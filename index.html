@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AHMET DUYAR - Kişisel Eğitim Sayfam</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { box-sizing: border-box; }
+        .activity-card { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid rgba(0,0,0,0.05); }
+        .activity-card:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-color: rgba(59, 130, 246, 0.2); }
+        .modal-backdrop { backdrop-filter: blur(8px); }
+        .fade-in { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Tab Styles */
+        .tab-btn { transition: all 0.3s ease; }
+        .tab-btn.active { background: linear-gradient(to right, #9333ea, #db2777); color: white; border-color: transparent; }
+        .tab-btn:not(.active) { background: white; color: #475569; border-color: #e2e8f0; }
+        .tab-btn:not(.active):hover { background: #f8fafc; color: #1e293b; }
+    </style>
+</head>
+<body class="min-h-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <main class="container mx-auto px-4 py-8">
+        <header class="text-center mb-8">
+            <h1 id="page-title" class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 bg-clip-text text-transparent mb-3 tracking-wide">👨‍🏫 AHMET DUYAR Kişisel Eğitim Sayfam</h1>
+            <div class="w-24 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 mx-auto mb-4 rounded-full"></div>
+            <p class="text-slate-600 text-lg font-light">Eğitim materyallerini ve bilim uygulamalarını yönetin</p>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <div class="flex justify-center gap-4 mb-10">
+            <button onclick="switchTab('interactive')" id="btn-tab-interactive" class="tab-btn active px-6 py-3 rounded-full font-medium border shadow-sm flex items-center gap-2">
+                💻 İnteraktif Etkinlikler
+            </button>
+            <button onclick="switchTab('science')" id="btn-tab-science" class="tab-btn px-6 py-3 rounded-full font-medium border shadow-sm flex items-center gap-2">
+                🔬 İlkokul Bilim Uygulamaları
+            </button>
+        </div>
+
+        <!-- TAB: INteraktif Etkinlikler -->
+        <section id="tab-interactive" class="fade-in block">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+                <div class="bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl p-6 text-center shadow-lg text-white"><div class="text-3xl font-bold mb-1" id="total-activities">0</div><div class="text-purple-100 text-sm font-medium">📚 Toplam Etkinlik</div></div>
+                <div class="bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl p-6 text-center shadow-lg text-white"><div class="text-3xl font-bold mb-1" id="total-categories">0</div><div class="text-blue-100 text-sm font-medium">🏷️ Kategori</div></div>
+                <div class="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-6 text-center shadow-lg text-white"><div class="text-3xl font-bold mb-1" id="recent-activities">0</div><div class="text-emerald-100 text-sm font-medium">⚡ Son 7 Gün</div></div>
+            </div>
+            
+            <div class="flex flex-col md:flex-row gap-4 mb-8">
+                <button id="add-activity-btn" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 shadow-lg transition-all transform hover:scale-105"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg><span id="add-button-text">✨ Yeni Etkinlik Ekle</span></button>
+                <div class="flex gap-3 flex-1"><input type="text" id="interactive-search" placeholder="Etkinlik ara..." class="flex-1 px-4 py-3 border-0 bg-white/70 backdrop-blur-sm rounded-xl focus:ring-2 focus:ring-blue-400 focus:bg-white shadow-sm"><select id="category-filter" class="px-4 py-3 border-0 bg-white/70 backdrop-blur-sm rounded-xl focus:ring-2 focus:ring-blue-400 focus:bg-white shadow-sm"><option value="">Tüm Kategoriler</option></select></div>
+            </div>
+            
+            <div id="activities-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            
+            <div id="empty-state-interactive" class="text-center py-16 hidden"><svg class="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg><h3 class="text-xl font-semibold text-gray-600 mb-2">Henüz etkinlik yok</h3><p class="text-gray-500 mb-4">İlk interaktif etkinliğinizi ekleyerek başlayın</p></div>
+        </section>
+
+        <!-- TAB: Bilim Uygulamaları -->
+        <section id="tab-science" class="fade-in hidden">
+            <div class="flex flex-col md:flex-row gap-4 mb-8">
+                <button id="add-science-btn" onclick="openScienceModal()" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 shadow-lg transition-all transform hover:scale-105"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg><span>✨ Yeni Uygulama Ekle</span></button>
+                <div class="flex gap-3 flex-1">
+                    <input type="text" id="science-search" placeholder="Deney/Uygulama ara..." class="flex-1 px-4 py-3 border border-slate-200 bg-white/70 backdrop-blur-sm rounded-xl focus:ring-2 focus:ring-emerald-400 shadow-sm">
+                    <select id="class-filter" class="px-4 py-3 border border-slate-200 bg-white/70 backdrop-blur-sm rounded-xl focus:ring-2 focus:ring-emerald-400 shadow-sm">
+                        <option value="">Tüm Sınıflar</option>
+                        <option value="1. Sınıf">1. Sınıf</option>
+                        <option value="2. Sınıf">2. Sınıf</option>
+                        <option value="3. Sınıf">3. Sınıf</option>
+                        <option value="4. Sınıf">4. Sınıf</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div id="science-grid" class="flex flex-col gap-6"></div>
+            
+            <div id="empty-state-science" class="text-center py-16 hidden"><svg class="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg><h3 class="text-xl font-semibold text-gray-600 mb-2">Henüz bilim uygulaması yok</h3><p class="text-gray-500 mb-4">İlk bilim uygulamanızı ekleyerek başlayın</p></div>
+        </section>
+
+    </main>
+
+    <!-- MODAL: İnteraktif Etkinlik Düzenleme -->
+    <div id="activity-modal" class="fixed inset-0 bg-black/30 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-white/20">
+            <div class="p-6 border-b border-slate-200/50"><h2 id="modal-title" class="text-2xl font-light text-slate-800">Yeni Etkinlik Ekle</h2></div>
+            <form id="activity-form" class="p-6 space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div><label class="block text-sm font-medium text-slate-700 mb-2">📝 Etkinlik Başlığı</label><input type="text" id="activity-title" required class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-purple-400"></div>
+                    <div><label class="block text-sm font-medium text-slate-700 mb-2">🏷️ Kategori</label><select id="activity-category" class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-purple-400"></select></div>
+                </div>
+                <div><label class="block text-sm font-medium text-slate-700 mb-2">📄 Açıklama</label><textarea id="activity-description" rows="3" class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-purple-400 resize-none"></textarea></div>
+                <div><label class="block text-sm font-medium text-slate-700 mb-2">💻 HTML Kodu</label><textarea id="activity-html" rows="12" required class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-purple-400 font-mono text-sm resize-none"></textarea></div>
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-200/50">
+                    <button type="button" onclick="closeModal('activity-modal')" class="px-6 py-3 border border-slate-300 bg-white text-slate-700 rounded-xl hover:bg-slate-50 transition-all font-medium">❌ İptal</button>
+                    <button type="submit" id="save-btn" class="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl transition-all font-medium shadow-lg hover:scale-105"><span class="save-text">💾 Kaydet</span><span class="loading-text hidden">⏳ Kaydediliyor...</span></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Bilim Uygulaması Düzenleme -->
+    <div id="science-modal" class="fixed inset-0 bg-black/30 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-white/20">
+            <div class="p-6 border-b border-slate-200/50"><h2 id="science-modal-title" class="text-2xl font-light text-slate-800">Yeni Bilim Uygulaması Ekle</h2></div>
+            <form id="science-form" class="p-6 space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">🎓 Sınıf Seviyesi</label>
+                        <select id="sci-class" required class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-emerald-400">
+                            <option value="">Seçiniz...</option>
+                            <option value="1. Sınıf">1. Sınıf</option>
+                            <option value="2. Sınıf">2. Sınıf</option>
+                            <option value="3. Sınıf">3. Sınıf</option>
+                            <option value="4. Sınıf">4. Sınıf</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">🔬 Deney/Uygulama Adı</label>
+                        <input type="text" id="sci-name" required class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-emerald-400">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">📚 Tema / Ünite</label>
+                        <input type="text" id="sci-theme" required class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-emerald-400">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">⏱️ Kaç Hafta Sürecek?</label>
+                        <input type="number" id="sci-duration" min="1" max="52" required class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-emerald-400">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">📋 İçerik (Nasıl Yapılacak?)</label>
+                    <textarea id="sci-content" rows="4" required class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-emerald-400 resize-none"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">🧰 Malzeme Listesi</label>
+                    <textarea id="sci-materials" rows="2" class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-emerald-400 resize-none"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">🔗 Kaynak (Görsel, Video veya PDF URL Adresi)</label>
+                    <input type="url" id="sci-source" placeholder="https://" class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-emerald-400">
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-200/50">
+                    <button type="button" onclick="closeModal('science-modal')" class="px-6 py-3 border border-slate-300 bg-white text-slate-700 rounded-xl hover:bg-slate-50 transition-all font-medium">❌ İptal</button>
+                    <button type="submit" id="sci-save-btn" class="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl transition-all font-medium shadow-lg hover:scale-105"><span class="save-text">💾 Kaydet</span><span class="loading-text hidden">⏳ Kaydediliyor...</span></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <div id="preview-modal" class="fixed inset-0 bg-black/30 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-white/20">
+            <div class="p-4 border-b border-slate-200/50 flex justify-between items-center"><h2 id="preview-title" class="text-xl font-light text-slate-800">Etkinlik Önizleme</h2><button onclick="closePreview()" class="text-slate-500 hover:text-slate-700 p-2 rounded-lg"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div>
+            <iframe id="preview-frame" class="w-full h-[70vh] border-0 rounded-b-2xl"></iframe>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyDn8WWA2et22ZqtSEf3oUsoxZZo7Mu8LtU",
+          authDomain: "interaktif-etkinliklerim.firebaseapp.com",
+          projectId: "interaktif-etkinliklerim",
+          storageBucket: "interaktif-etkinliklerim.firebasestorage.app",
+          messagingSenderId: "701319349005",
+          appId: "1:701319349005:web:5eef690a8ec9bb3ed92644"
+        };
+        try { firebase.initializeApp(firebaseConfig); } catch (e) { console.error("Firebase err: ", e); }
+        const db = firebase.firestore();
+
+        // Data Management Factory
+        function createDataSdk(collectionName) {
+            const collection = db.collection(collectionName);
+            return {
+                init: function(onData) {
+                    collection.onSnapshot(snapshot => {
+                        const data = snapshot.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }));
+                        onData(data);
+                    }, err => showMessage("Veritabanı hatası", "error"));
+                },
+                create: function(record) { delete record.__backendId; return collection.add(record).then(()=>({isOk:true})).catch(e=>({isOk:false, error:e.message})); },
+                update: function(record) { const id = record.__backendId; const data = {...record}; delete data.__backendId; return collection.doc(id).update(data).then(()=>({isOk:true})).catch(e=>({isOk:false, error:e.message})); },
+                delete: function(id) { return collection.doc(id).delete().then(()=>({isOk:true})).catch(e=>({isOk:false, error:e.message})); }
+            }
+        }
+
+        const interactiveSdk = createDataSdk("activities");
+        const scienceSdk = createDataSdk("science_activities");
+    </script>
+    
+    <script>
+        // State
+        let interactiveData = [];
+        let scienceData = [];
+        let editingInteractive = null;
+        let editingScience = null;
+
+        const INTERACTIVE_CATEGORIES = "Matematik, Fen Bilimleri, Türkçe, İngilizce, Tarih, Coğrafya, Oyun, Puzzle, Eğlence, Sanat, Müzik, Spor, Teknoloji, Kodlama, Yaratıcılık, Problem Çözme, Grup Çalışması, Bireysel, Sınav Hazırlık, Ödev".split(', ').sort();
+
+        // Init
+        async function initializeApp() {
+            // Setup Categories
+            const catSelect = document.getElementById('activity-category');
+            catSelect.innerHTML = '<option value="">Kategori Seçin</option>' + INTERACTIVE_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            // Listeners
+            document.getElementById('add-activity-btn').addEventListener('click', () => openInteractiveModal());
+            document.getElementById('activity-form').addEventListener('submit', handleInteractiveSubmit);
+            document.getElementById('interactive-search').addEventListener('input', renderInteractiveData);
+            document.getElementById('category-filter').addEventListener('change', renderInteractiveData);
+
+            document.getElementById('science-form').addEventListener('submit', handleScienceSubmit);
+            document.getElementById('science-search').addEventListener('input', renderScienceData);
+            document.getElementById('class-filter').addEventListener('change', renderScienceData);
+
+            // Modals Outside Click
+            ['activity-modal', 'science-modal', 'preview-modal'].forEach(id => {
+                document.getElementById(id).addEventListener('click', (e) => { if (e.target === e.currentTarget) closeModal(id); });
+            });
+
+            // Data Sync
+            interactiveSdk.init((data) => { interactiveData = data; updateInteractiveStats(); renderInteractiveData(); updateCategoryFilter(); });
+            scienceSdk.init((data) => { scienceData = data; renderScienceData(); });
+        }
+
+        // TABS
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-tab-' + tabId).classList.add('active');
+            
+            document.getElementById('tab-interactive').classList.add('hidden');
+            document.getElementById('tab-science').classList.add('hidden');
+            
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+        }
+
+        // =======================
+        // INTERACTIVE ACTIVITIES
+        // =======================
+        function updateInteractiveStats() {
+            document.getElementById('total-activities').textContent = interactiveData.length;
+            document.getElementById('total-categories').textContent = new Set(interactiveData.map(a => a.category).filter(Boolean)).size;
+            document.getElementById('recent-activities').textContent = interactiveData.filter(a => new Date(a.created_at) > new Date(Date.now() - 7*86400000)).length;
+        }
+
+        function updateCategoryFilter() {
+            const filter = document.getElementById('category-filter');
+            const current = filter.value;
+            const cats = [...new Set(interactiveData.map(a => a.category).filter(Boolean))].sort();
+            filter.innerHTML = '<option value="">Tüm Kategoriler</option>' + cats.map(c => `<option value="${c}" ${c===current?'selected':''}>${c}</option>`).join('');
+        }
+
+        function renderInteractiveData() {
+            const grid = document.getElementById('activities-grid');
+            const term = document.getElementById('interactive-search').value.toLowerCase();
+            const cat = document.getElementById('category-filter').value;
+            
+            const filtered = interactiveData.filter(a => {
+                const matchesSearch = a.title.toLowerCase().includes(term) || (a.description || '').toLowerCase().includes(term);
+                return (!cat || a.category === cat) && matchesSearch;
+            }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+            document.getElementById('empty-state-interactive').classList.toggle('hidden', filtered.length > 0);
+            
+            grid.innerHTML = filtered.map(a => `
+                <div class="activity-card bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm overflow-hidden fade-in">
+                    <div class="p-5">
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="text-lg font-medium text-slate-800 truncate pr-2">${esc(a.title)}</h3>
+                            <span class="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs px-3 py-1 rounded-full font-medium shadow-sm">${esc(a.category || 'Diğer')}</span>
+                        </div>
+                        ${a.description ? `<p class="text-slate-600 text-sm mb-4 leading-relaxed">${esc(a.description)}</p>` : ''}
+                        <div class="h-40 mb-4 rounded-lg overflow-hidden border border-slate-200 bg-white shadow-inner relative">
+                            <iframe srcdoc="${a.html_code.replace(/"/g, '&quot;')}" class="w-full h-full border-0" sandbox="allow-scripts" loading="lazy"></iframe>
+                            <div class="absolute inset-0 cursor-pointer" onclick="previewInteractive('${a.__backendId}')"></div>
+                        </div>
+                        <div class="text-xs text-slate-400 mb-4 flex justify-between">
+                            <span>📅 ${formatDate(a.created_at)}</span>
+                            ${a.last_used ? `<span>🕒 ${formatDate(a.last_used)}</span>` : ''}
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="previewInteractive('${a.__backendId}')" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 text-white px-2 py-2 rounded-lg text-sm transition text-center shadow">👁️ Önizle</button>
+                            <button onclick="useInteractive('${a.__backendId}')" class="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 text-white px-2 py-2 rounded-lg text-sm transition text-center shadow">📋 Kod</button>
+                            <button onclick="shareInteractive('${a.__backendId}')" class="bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 text-white px-2 py-2 rounded-lg text-sm transition text-center shadow">🔗</button>
+                            <button onclick="openInteractiveModal('${a.__backendId}')" class="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 text-white px-2 py-2 rounded-lg text-sm transition text-center shadow">✏️</button>
+                            <button onclick="deleteInteractive(event, '${a.__backendId}')" class="bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 text-white px-2 py-2 rounded-lg text-sm transition text-center shadow">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openInteractiveModal(id = null) {
+            editingInteractive = id ? interactiveData.find(a => a.__backendId === id) : null;
+            document.getElementById('modal-title').textContent = editingInteractive ? 'Etkinliği Düzenle' : 'Yeni Etkinlik Ekle';
+            document.getElementById('activity-title').value = editingInteractive?.title || '';
+            document.getElementById('activity-category').value = editingInteractive?.category || '';
+            document.getElementById('activity-description').value = editingInteractive?.description || '';
+            document.getElementById('activity-html').value = editingInteractive?.html_code || '';
+            document.getElementById('activity-modal').classList.remove('hidden');
+        }
+
+        async function handleInteractiveSubmit(e) {
+            e.preventDefault();
+            const btn = document.getElementById('save-btn'); toggleLoading(btn, true);
+            const data = {
+                title: v('activity-title'),
+                category: v('activity-category') || null,
+                description: v('activity-description') || null,
+                html_code: v('activity-html'),
+                created_at: editingInteractive ? editingInteractive.created_at : new Date().toISOString(),
+                ...editingInteractive ? {__backendId: editingInteractive.__backendId, last_used: editingInteractive.last_used} : {}
+            };
+            const res = editingInteractive ? await interactiveSdk.update(data) : await interactiveSdk.create(data);
+            toggleLoading(btn, false);
+            if(res.isOk) { closeModal('activity-modal'); showMessage('✅ Kaydedildi!', 'success'); }
+            else showMessage('Hata: ' + res.error, 'error');
+        }
+
+        async function deleteInteractive(e, id) {
+            const btn = e.target.closest('button');
+            if(btn.textContent !== '❓') { btn.textContent = '❓'; setTimeout(()=> btn.textContent = '🗑️', 2000); return; }
+            const res = await interactiveSdk.delete(id);
+            if(res.isOk) showMessage('Silindi', 'success');
+        }
+
+        function previewInteractive(id) {
+            const item = interactiveData.find(a => a.__backendId === id);
+            document.getElementById('preview-title').textContent = esc(item.title);
+            document.getElementById('preview-frame').srcdoc = item.html_code;
+            document.getElementById('preview-modal').classList.remove('hidden');
+        }
+        function closePreview() { closeModal('preview-modal'); document.getElementById('preview-frame').srcdoc = ''; }
+
+        async function useInteractive(id) {
+            const a = interactiveData.find(x => x.__backendId === id);
+            interactiveSdk.update({...a, last_used: new Date().toISOString()});
+            navigator.clipboard.writeText(a.html_code).then(()=>showMessage('HTML kopyalandı!','success'));
+        }
+        function shareInteractive(id) {
+            navigator.clipboard.writeText(`${window.location.origin}/view.html?id=${id}`).then(()=>showMessage('Link kopyalandı!', 'success'));
+        }
+
+        // =======================
+        // SCIENCE ACTIVITIES
+        // =======================
+        function openScienceModal(id = null) {
+            editingScience = id ? scienceData.find(a => a.__backendId === id) : null;
+            document.getElementById('science-modal-title').textContent = editingScience ? 'Uygulamayı Düzenle' : 'Yeni Bilim Uygulaması Ekle';
+            document.getElementById('sci-class').value = editingScience?.class_level || '';
+            document.getElementById('sci-name').value = editingScience?.name || '';
+            document.getElementById('sci-theme').value = editingScience?.theme || '';
+            document.getElementById('sci-content').value = editingScience?.content || '';
+            document.getElementById('sci-materials').value = editingScience?.materials || '';
+            document.getElementById('sci-source').value = editingScience?.source_url || '';
+            document.getElementById('sci-duration').value = editingScience?.duration_weeks || '';
+            document.getElementById('science-modal').classList.remove('hidden');
+        }
+
+        async function handleScienceSubmit(e) {
+            e.preventDefault();
+            const btn = document.getElementById('sci-save-btn'); toggleLoading(btn, true);
+            const data = {
+                class_level: v('sci-class'),
+                name: v('sci-name'),
+                theme: v('sci-theme'),
+                content: v('sci-content'),
+                materials: v('sci-materials') || null,
+                source_url: v('sci-source') || null,
+                duration_weeks: parseInt(v('sci-duration')),
+                created_at: editingScience ? editingScience.created_at : new Date().toISOString(),
+                ...editingScience ? {__backendId: editingScience.__backendId} : {}
+            };
+            const res = editingScience ? await scienceSdk.update(data) : await scienceSdk.create(data);
+            toggleLoading(btn, false);
+            if(res.isOk) { closeModal('science-modal'); showMessage('✅ Bilim Uygulaması kaydedildi!', 'success'); }
+            else showMessage('Hata: ' + res.error, 'error');
+        }
+
+        function renderScienceData() {
+            const grid = document.getElementById('science-grid');
+            const term = document.getElementById('science-search').value.toLowerCase();
+            const cls = document.getElementById('class-filter').value;
+            
+            const filtered = scienceData.filter(a => {
+                const matchesSearch = a.name.toLowerCase().includes(term) || a.theme.toLowerCase().includes(term);
+                return (!cls || a.class_level === cls) && matchesSearch;
+            }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+            document.getElementById('empty-state-science').classList.toggle('hidden', filtered.length > 0);
+            
+            grid.innerHTML = filtered.map(a => `
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition">
+                    <div class="p-6">
+                        <div class="flex flex-col md:flex-row justify-between md:items-start gap-4 mb-4">
+                            <div>
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="bg-emerald-100 text-emerald-800 text-xs px-3 py-1 rounded-full font-bold">${a.class_level}</span>
+                                    <span class="bg-slate-100 text-slate-600 text-xs px-3 py-1 rounded-full font-medium flex items-center gap-1">⏱️ ${a.duration_weeks} Hafta</span>
+                                </div>
+                                <h3 class="text-xl font-bold text-slate-800">${esc(a.name)}</h3>
+                                <p class="text-sm text-slate-500 font-medium">📚 Tema/Ünite: ${esc(a.theme)}</p>
+                            </div>
+                            <div class="flex gap-2">
+                                ${a.source_url ? `<a href="${a.source_url}" target="_blank" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm transition font-medium flex items-center gap-1">🔗 Kaynak</a>` : ''}
+                                <button onclick="openScienceModal('${a.__backendId}')" class="bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-2 rounded-lg text-sm transition font-medium">✏️ Düzenle</button>
+                                <button onclick="deleteScience(event, '${a.__backendId}')" class="bg-rose-100 hover:bg-rose-200 text-rose-700 px-3 py-2 rounded-lg text-sm transition font-medium">🗑️ Sil</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 rounded-xl p-4 border border-slate-100">
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">📋 Nasıl Yapılacak? (İçerik)</h4>
+                                <p class="text-slate-600 text-sm whitespace-pre-wrap leading-relaxed">${esc(a.content)}</p>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">🧰 Malzeme Listesi</h4>
+                                <p class="text-slate-600 text-sm whitespace-pre-wrap leading-relaxed">${esc(a.materials) || '<span class="italic opacity-50">Belirtilmedi</span>'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function deleteScience(e, id) {
+            const btn = e.target.closest('button');
+            if(btn.textContent !== '❓') { btn.textContent = '❓'; setTimeout(()=> btn.textContent = '🗑️ Sil', 2000); return; }
+            const res = await scienceSdk.delete(id);
+            if(res.isOk) showMessage('Silindi', 'success');
+        }
+
+        // =======================
+        // UTILS
+        // =======================
+        function v(id) { return document.getElementById(id).value.trim(); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function esc(t) { return t ? t.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;") : ''; }
+        function formatDate(d) { return d ? new Date(d).toLocaleDateString('tr-TR') : ''; }
+        function toggleLoading(btn, isLoading) {
+            btn.disabled = isLoading;
+            btn.querySelector('.save-text').classList.toggle('hidden', isLoading);
+            btn.querySelector('.loading-text').classList.toggle('hidden', !isLoading);
+        }
+        function showMessage(msg, type) {
+            const t = document.createElement('div');
+            t.className = `fixed top-5 right-5 px-6 py-3 rounded-lg text-white shadow-lg z-[100] transition-all transform animate-pulse ${type==='success'?'bg-green-600':'bg-red-600'}`;
+            t.textContent = msg; document.body.appendChild(t);
+            setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(-20px)'; setTimeout(()=>t.remove(),500); }, 3000);
+        }
+
+        // Start
+        initializeApp();
+    </script>
+</body>
+</html>
