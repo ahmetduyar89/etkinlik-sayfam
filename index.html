@@ -63,22 +63,15 @@
             color: #1e293b;
         }
 
-        /* Custom Week Slider/Selector Styles */
-        .week-card {
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 2px solid transparent;
-        }
-
-        .week-card.active {
-            border-color: #10b981;
-            background: #ecfdf5;
-            transform: scale(1.05);
-        }
-
         .science-column {
             min-height: 200px;
         }
+
+        iframe {
+            pointer-events: none;
+        }
+
+        /* Prevents interaction in grid preview */
     </style>
 </head>
 
@@ -105,7 +98,7 @@
             </button>
         </div>
 
-        <!-- TAB: İnteraktif Etkinlikler -->
+        <!-- TAB: İnteraktif Etkinlikler (RESTORED TO ORIGINAL) -->
         <section id="tab-interactive" class="fade-in block">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
                 <div
@@ -145,13 +138,18 @@
 
             <div id="activities-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
             <div id="empty-state-interactive" class="text-center py-16 hidden">
+                <svg class="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                    </path>
+                </svg>
                 <h3 class="text-xl font-semibold text-gray-600">Henüz etkinlik yok</h3>
+                <p class="text-gray-500">İlk interaktif etkinliğinizi ekleyerek başlayın</p>
             </div>
         </section>
 
-        <!-- TAB: Bilim Uygulamaları -->
+        <!-- TAB: Bilim Uygulamaları (STAYS NEW) -->
         <section id="tab-science" class="fade-in hidden">
-            <!-- Haftalık Plan Panosu -->
             <div class="bg-white/60 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-white/40 mb-10">
                 <div class="flex flex-col md:flex-row justify-between items-center gap-6 mb-8">
                     <div>
@@ -162,9 +160,7 @@
                     <div class="flex items-center gap-4">
                         <label class="text-sm font-bold text-slate-600 whitespace-nowrap">Hafta Seç:</label>
                         <select id="current-week-selector" onchange="setCurrentWeek(this.value)"
-                            class="px-6 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-emerald-600 shadow-sm focus:ring-2 focus:ring-emerald-400 outline-none">
-                            <!-- JS ile doldurulacak -->
-                        </select>
+                            class="px-6 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-emerald-600 shadow-sm focus:ring-2 focus:ring-emerald-400 outline-none"></select>
                     </div>
                     <button onclick="openScienceModal()"
                         class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-3 rounded-xl font-medium shadow-lg hover:scale-105 transition-all flex items-center gap-2">
@@ -172,9 +168,7 @@
                     </button>
                 </div>
 
-                <!-- 4 Sınıf Kolonu -->
                 <div id="weekly-dashboard" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <!-- 1. Sınıf -->
                     <div class="flex flex-col gap-3">
                         <div
                             class="bg-emerald-600 text-white p-3 rounded-t-2xl text-center font-bold text-sm shadow-sm">
@@ -183,7 +177,6 @@
                             class="science-column bg-white/40 rounded-b-2xl p-3 border-x border-b border-white/60 flex flex-col gap-4">
                         </div>
                     </div>
-                    <!-- 2. Sınıf -->
                     <div class="flex flex-col gap-3">
                         <div class="bg-blue-600 text-white p-3 rounded-t-2xl text-center font-bold text-sm shadow-sm">2.
                             SINIF</div>
@@ -191,7 +184,6 @@
                             class="science-column bg-white/40 rounded-b-2xl p-3 border-x border-b border-white/60 flex flex-col gap-4">
                         </div>
                     </div>
-                    <!-- 3. Sınıf -->
                     <div class="flex flex-col gap-3">
                         <div class="bg-purple-600 text-white p-3 rounded-t-2xl text-center font-bold text-sm shadow-sm">
                             3. SINIF</div>
@@ -199,7 +191,6 @@
                             class="science-column bg-white/40 rounded-b-2xl p-3 border-x border-b border-white/60 flex flex-col gap-4">
                         </div>
                     </div>
-                    <!-- 4. Sınıf -->
                     <div class="flex flex-col gap-3">
                         <div class="bg-orange-600 text-white p-3 rounded-t-2xl text-center font-bold text-sm shadow-sm">
                             4. SINIF</div>
@@ -210,7 +201,6 @@
                 </div>
             </div>
 
-            <!-- Liste ve Arama Görünümü (Yedek) -->
             <div class="mt-12">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-xl font-bold text-slate-700">🔍 Tüm Bilim Uygulamaları Arşivi</h3>
@@ -232,7 +222,7 @@
         </section>
     </main>
 
-    <!-- MODAL: İnteraktif Etkinlik Düzenleme -->
+    <!-- MODAL: İnteraktif Etkinlik Düzenleme (RESTORED) -->
     <div id="activity-modal"
         class="fixed inset-0 bg-black/30 modal-backdrop hidden z-50 flex items-center justify-center p-4">
         <div
@@ -240,34 +230,39 @@
             <div class="p-6 border-b border-slate-200/50">
                 <h2 id="modal-title" class="text-2xl font-light text-slate-800">Yeni Etkinlik Ekle</h2>
             </div>
-            <form id="activity-form" class="p-6 space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div><label class="block text-xs font-bold text-slate-500 mb-1">Başlık</label><input type="text"
-                            id="activity-title" required class="w-full px-4 py-2 border border-slate-200 rounded-lg">
+            <form id="activity-form" class="p-6 space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div><label class="block text-sm font-medium text-slate-700 mb-2">📝 Etkinlik Başlığı</label><input
+                            type="text" id="activity-title" required
+                            class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-purple-400">
                     </div>
-                    <div><label class="block text-xs font-bold text-slate-500 mb-1">Kategori</label><select
-                            id="activity-category" class="w-full px-4 py-2 border border-slate-200 rounded-lg"></select>
+                    <div><label class="block text-sm font-medium text-slate-700 mb-2">🏷️ Kategori</label><select
+                            id="activity-category"
+                            class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-purple-400"></select>
                     </div>
                 </div>
-                <div><label class="block text-xs font-bold text-slate-500 mb-1">Açıklama</label><textarea
-                        id="activity-description" rows="2"
-                        class="w-full px-4 py-2 border border-slate-200 rounded-lg resize-none"></textarea></div>
-                <div><label class="block text-xs font-bold text-slate-500 mb-1">HTML Kodu</label><textarea
-                        id="activity-html" rows="10" required
-                        class="w-full px-4 py-2 border border-slate-200 rounded-lg font-mono text-xs resize-none"></textarea>
+                <div><label class="block text-sm font-medium text-slate-700 mb-2">📄 Açıklama</label><textarea
+                        id="activity-description" rows="3"
+                        class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-purple-400 resize-none"></textarea>
                 </div>
-                <div class="flex justify-end gap-2">
+                <div><label class="block text-sm font-medium text-slate-700 mb-2">💻 HTML Kodu</label><textarea
+                        id="activity-html" rows="12" required
+                        class="w-full px-4 py-3 border border-slate-200 bg-white rounded-xl focus:ring-2 focus:ring-purple-400 font-mono text-sm resize-none"></textarea>
+                </div>
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-200/50">
                     <button type="button" onclick="closeModal('activity-modal')"
-                        class="px-4 py-2 border border-slate-300 rounded-lg">İptal</button>
+                        class="px-6 py-3 border border-slate-300 bg-white text-slate-700 rounded-xl">❌ İptal</button>
                     <button type="submit" id="save-btn"
-                        class="px-6 py-2 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700">💾
-                        Kaydet</button>
+                        class="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-medium shadow-lg hover:scale-105">
+                        <span class="save-text">💾 Kaydet</span><span class="loading-text hidden">⏳
+                            Kaydediliyor...</span>
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- MODAL: Bilim Uygulaması Düzenleme (HAFTA Eklendi!) -->
+    <!-- MODAL: Bilim Uygulaması -->
     <div id="science-modal"
         class="fixed inset-0 bg-black/30 modal-backdrop hidden z-50 flex items-center justify-center p-4">
         <div
@@ -277,73 +272,57 @@
             </div>
             <form id="science-form" class="p-6 space-y-6">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                        <label class="block text-sm font-bold text-slate-600 mb-2">🎓 Sınıf Seviyesi</label>
-                        <select id="sci-class" required
-                            class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-400">
+                    <div><label class="block text-sm font-bold text-slate-600 mb-2">🎓 Sınıf Seviyesi</label><select
+                            id="sci-class" required class="w-full px-4 py-3 border border-slate-200 rounded-xl">
                             <option value="1. Sınıf">1. Sınıf</option>
                             <option value="2. Sınıf">2. Sınıf</option>
                             <option value="3. Sınıf">3. Sınıf</option>
                             <option value="4. Sınıf">4. Sınıf</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-slate-600 mb-2">📅 Uygulama Haftası (1-36)</label>
-                        <input type="number" id="sci-week" min="1" max="36" required
-                            class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-400">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-slate-600 mb-2">⏱️ Kaç Hafta Sürecek?</label>
-                        <input type="number" id="sci-duration" min="1" max="4" required value="1"
-                            class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-400">
-                    </div>
+                        </select></div>
+                    <div><label class="block text-sm font-bold text-slate-600 mb-2">📅 Uygulama Haftası
+                            (1-36)</label><input type="number" id="sci-week" min="1" max="36" required
+                            class="w-full px-4 py-3 border border-slate-200 rounded-xl"></div>
+                    <div><label class="block text-sm font-bold text-slate-600 mb-2">⏱️ Kaç Hafta Sürecek?</label><input
+                            type="number" id="sci-duration" min="1" max="4" required value="1"
+                            class="w-full px-4 py-3 border border-slate-200 rounded-xl"></div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label class="block text-sm font-bold text-slate-600 mb-2">🔬 Deney/Uygulama Adı</label>
-                        <input type="text" id="sci-name" required
-                            class="w-full px-4 py-3 border border-slate-200 rounded-xl">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-slate-600 mb-2">📚 Tema / Ünite / Konu</label>
-                        <input type="text" id="sci-theme" required
-                            class="w-full px-4 py-3 border border-slate-200 rounded-xl">
-                    </div>
+                    <div><label class="block text-sm font-bold text-slate-600 mb-2">🔬 Deney Adı</label><input
+                            type="text" id="sci-name" required
+                            class="w-full px-4 py-3 border border-slate-200 rounded-xl"></div>
+                    <div><label class="block text-sm font-bold text-slate-600 mb-2">📚 Tema / Ünite</label><input
+                            type="text" id="sci-theme" required
+                            class="w-full px-4 py-3 border border-slate-200 rounded-xl"></div>
                 </div>
-                <div>
-                    <label class="block text-sm font-bold text-slate-600 mb-2">📋 İçerik (Uygulama Adımları)</label>
-                    <textarea id="sci-content" rows="4" required
-                        class="w-full px-4 py-3 border border-slate-200 rounded-xl resize-none"></textarea>
-                </div>
-                <div>
-                    <label class="block text-sm font-bold text-slate-600 mb-2">🧰 Malzeme Listesi</label>
-                    <textarea id="sci-materials" rows="2"
-                        class="w-full px-4 py-3 border border-slate-200 rounded-xl resize-none"></textarea>
-                </div>
-                <div>
-                    <label class="block text-sm font-bold text-slate-600 mb-2">🔗 Kaynak URL (Görsel/PDF)</label>
-                    <input type="url" id="sci-source" placeholder="https://"
-                        class="w-full px-4 py-3 border border-slate-200 rounded-xl">
-                </div>
-
+                <div><label class="block text-sm font-bold text-slate-600 mb-2">📋 İçerik</label><textarea
+                        id="sci-content" rows="4" required
+                        class="w-full px-4 py-3 border border-slate-200 rounded-xl resize-none"></textarea></div>
+                <div><label class="block text-sm font-bold text-slate-600 mb-2">🧰 Malzemeler</label><textarea
+                        id="sci-materials" rows="2"
+                        class="w-full px-4 py-3 border border-slate-200 rounded-xl resize-none"></textarea></div>
+                <div><label class="block text-sm font-bold text-slate-600 mb-2">🔗 Kaynak URL</label><input type="url"
+                        id="sci-source" placeholder="https://"
+                        class="w-full px-4 py-3 border border-slate-200 rounded-xl"></div>
                 <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
                     <button type="button" onclick="closeModal('science-modal')"
-                        class="px-6 py-3 border border-slate-300 rounded-xl font-medium">İptal</button>
+                        class="px-6 py-3 border border-slate-300 rounded-xl">İptal</button>
                     <button type="submit" id="sci-save-btn"
-                        class="px-8 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg hover:bg-emerald-700">💾
-                        Değişiklikleri Kaydet</button>
+                        class="px-8 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg">💾 Kaydet</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- MODAL: Preview -->
     <div id="preview-modal"
         class="fixed inset-0 bg-black/30 modal-backdrop hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+        <div
+            class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-white/20">
             <div class="p-4 border-b flex justify-between items-center">
-                <h2 id="preview-title" class="font-bold">Önizleme</h2><button onclick="closePreview()">❌</button>
+                <h2 id="preview-title" class="font-bold">Önizleme</h2><button onclick="closePreview()"
+                    class="p-2">❌</button>
             </div>
-            <iframe id="preview-frame" class="w-full h-[75vh] border-0"></iframe>
+            <iframe id="preview-frame" class="w-full h-[75vh] border-0" style="pointer-events: auto;"></iframe>
         </div>
     </div>
 
@@ -369,8 +348,8 @@
             return {
                 init: (onData) => collection.onSnapshot(snap => onData(snap.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }))), err => console.error(err)),
                 create: (rec) => collection.add(rec).then(() => ({ isOk: true })).catch(e => ({ isOk: false, error: e.message })),
-                update: (rec) => { const id = rec.__backendId; const data = { ...rec }; delete data.__backendId; return collection.doc(id).update(data).then(() => ({ isOk: true })); },
-                delete: (id) => collection.doc(id).delete().then(() => ({ isOk: true }))
+                update: (rec) => { const id = rec.__backendId; const data = { ...rec }; delete data.__backendId; return collection.doc(id).update(data).then(() => ({ isOk: true })).catch(e => ({ isOk: false, error: e.message })); },
+                delete: (id) => collection.doc(id).delete().then(() => ({ isOk: true })).catch(e => ({ isOk: false, error: e.message }))
             }
         }
         const interactiveSdk = createDataSdk("activities");
@@ -381,6 +360,8 @@
         let interactiveData = [], scienceData = [], currentWeek = 1;
         let editingInteractive = null, editingScience = null;
 
+        const INTER_CATS = "Matematik, Fen Bilimleri, Türkçe, İngilizce, Oyun, Puzzle, Eğlence, Sanat, Müzik, Spor, Teknoloji, Kodlama, Yaratıcılık, Problem Çözme, Grup Çalışması, Bireysel, Sınav Hazırlık, Ödev".split(', ').sort();
+
         async function initializeApp() {
             // Fill Week Selector
             const weekSelector = document.getElementById('current-week-selector');
@@ -390,60 +371,165 @@
             }
 
             const catSelect = document.getElementById('activity-category');
-            const INTER_CATS = "Matematik, Fen Bilimleri, Türkçe, İngilizce, Oyun, Sanat, Kodlama".split(', ').sort();
-            catSelect.innerHTML = INTER_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+            catSelect.innerHTML = '<option value="">Kategori Seçin</option>' + INTER_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
 
             // Listeners
             document.getElementById('add-activity-btn').onclick = () => openInteractiveModal();
             document.getElementById('activity-form').onsubmit = handleInteractiveSubmit;
+            document.getElementById('interactive-search').oninput = renderInteractiveData;
+            document.getElementById('category-filter').onchange = renderInteractiveData;
+
             document.getElementById('science-form').onsubmit = handleScienceSubmit;
+            document.getElementById('science-search').oninput = renderScienceData;
+            document.getElementById('class-filter').onchange = renderScienceData;
 
             // Sync
-            interactiveSdk.init(d => { interactiveData = d; renderInteractiveData(); updateInteractiveStats(); });
+            interactiveSdk.init(d => { interactiveData = d; updateInteractiveStats(); renderInteractiveData(); updateCategoryFilter(); });
             scienceSdk.init(d => { scienceData = d; renderDashboardPlots(); renderScienceData(); });
+
+            // Outside click
+            window.onclick = (e) => {
+                if (e.target.classList.contains('modal-backdrop')) closeModal(e.target.id);
+            };
         }
 
+        function switchTab(id) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-tab-' + id).classList.add('active');
+            document.getElementById('tab-interactive').classList.toggle('hidden', id !== 'interactive');
+            document.getElementById('tab-science').classList.toggle('hidden', id !== 'science');
+        }
+
+        // =======================
+        // INTERACTIVE (RESTORED)
+        // =======================
+        function updateInteractiveStats() {
+            document.getElementById('total-activities').textContent = interactiveData.length;
+            document.getElementById('total-categories').textContent = new Set(interactiveData.map(a => a.category).filter(Boolean)).size;
+            document.getElementById('recent-activities').textContent = interactiveData.filter(a => new Date(a.created_at) > new Date(Date.now() - 7 * 86400000)).length;
+        }
+
+        function updateCategoryFilter() {
+            const filter = document.getElementById('category-filter');
+            const current = filter.value;
+            const cats = [...new Set(interactiveData.map(a => a.category).filter(Boolean))].sort();
+            filter.innerHTML = '<option value="">Tüm Kategoriler</option>' + cats.map(c => `<option value="${c}" ${c === current ? 'selected' : ''}>${c}</option>`).join('');
+        }
+
+        function renderInteractiveData() {
+            const grid = document.getElementById('activities-grid');
+            const term = document.getElementById('interactive-search').value.toLowerCase();
+            const cat = document.getElementById('category-filter').value;
+
+            const filtered = interactiveData.filter(a => {
+                const matchesSearch = a.title.toLowerCase().includes(term) || (a.description || '').toLowerCase().includes(term);
+                return (!cat || a.category === cat) && matchesSearch;
+            }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            document.getElementById('empty-state-interactive').classList.toggle('hidden', filtered.length > 0);
+
+            grid.innerHTML = filtered.map(a => `
+                <div class="activity-card bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm overflow-hidden fade-in p-5 flex flex-col">
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-lg font-medium text-slate-800 truncate pr-2">${esc(a.title)}</h3>
+                        <span class="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] px-3 py-1 rounded-full font-bold">${esc(a.category || 'Diğer')}</span>
+                    </div>
+                    ${a.description ? `<p class="text-slate-600 text-xs mb-4 line-clamp-2">${esc(a.description)}</p>` : '<div class="flex-1"></div>'}
+                    <div class="h-40 mb-4 rounded-lg overflow-hidden border border-slate-200 bg-white relative">
+                        <iframe srcdoc="${a.html_code.replace(/"/g, '&quot;')}" class="w-full h-full border-0"></iframe>
+                        <div class="absolute inset-0 cursor-pointer" onclick="previewInteractive('${a.__backendId}')"></div>
+                    </div>
+                    <div class="text-[10px] text-slate-400 mb-4 flex justify-between">
+                        <span>📅 ${formatDate(a.created_at)}</span>
+                        ${a.last_used ? `<span>🕒 ${formatDate(a.last_used)}</span>` : ''}
+                    </div>
+                    <div class="grid grid-cols-5 gap-1">
+                        <button onclick="previewInteractive('${a.__backendId}')" class="bg-emerald-500 text-white p-2 rounded-lg text-sm shadow hover:bg-emerald-600 transition">👁️</button>
+                        <button onclick="useInteractive('${a.__backendId}')" class="bg-blue-500 text-white p-2 rounded-lg text-sm shadow hover:bg-blue-600 transition">📋</button>
+                        <button onclick="shareInteractive('${a.__backendId}')" class="bg-sky-500 text-white p-2 rounded-lg text-sm shadow hover:bg-sky-600 transition">🔗</button>
+                        <button onclick="openInteractiveModal('${a.__backendId}')" class="bg-amber-500 text-white p-2 rounded-lg text-sm shadow hover:bg-amber-600 transition">✏️</button>
+                        <button onclick="deleteInteractive(event, '${a.__backendId}')" class="bg-rose-500 text-white p-2 rounded-lg text-sm shadow hover:bg-rose-600 transition">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openInteractiveModal(id = null) {
+            editingInteractive = id ? interactiveData.find(a => a.__backendId === id) : null;
+            document.getElementById('modal-title').textContent = editingInteractive ? 'Etkinliği Düzenle' : 'Yeni Etkinlik Ekle';
+            document.getElementById('activity-title').value = editingInteractive?.title || '';
+            document.getElementById('activity-category').value = editingInteractive?.category || '';
+            document.getElementById('activity-description').value = editingInteractive?.description || '';
+            document.getElementById('activity-html').value = editingInteractive?.html_code || '';
+            document.getElementById('activity-modal').classList.remove('hidden');
+        }
+
+        async function handleInteractiveSubmit(e) {
+            e.preventDefault();
+            const btn = document.getElementById('save-btn'); toggleLoading(btn, true);
+            const data = {
+                title: v('activity-title'),
+                category: v('activity-category') || null,
+                description: v('activity-description') || null,
+                html_code: v('activity-html'),
+                created_at: editingInteractive ? editingInteractive.created_at : new Date().toISOString(),
+                ...editingInteractive ? { __backendId: editingInteractive.__backendId, last_used: editingInteractive.last_used } : {}
+            };
+            const res = editingInteractive ? await interactiveSdk.update(data) : await interactiveSdk.create(data);
+            toggleLoading(btn, false);
+            if (res.isOk) { closeModal('activity-modal'); showMessage('✅ Kaydedildi!', 'success'); }
+        }
+
+        async function deleteInteractive(e, id) {
+            const btn = e.target.closest('button');
+            if (btn.textContent !== '❓') { btn.textContent = '❓'; setTimeout(() => btn.textContent = '🗑️', 2000); return; }
+            const res = await interactiveSdk.delete(id);
+            if (res.isOk) showMessage('Silindi', 'success');
+        }
+
+        function previewInteractive(id) {
+            const item = interactiveData.find(a => a.__backendId === id);
+            document.getElementById('preview-title').textContent = esc(item.title);
+            document.getElementById('preview-frame').srcdoc = item.html_code;
+            document.getElementById('preview-modal').classList.remove('hidden');
+        }
+
+        async function useInteractive(id) {
+            const a = interactiveData.find(x => x.__backendId === id);
+            interactiveSdk.update({ ...a, last_used: new Date().toISOString() });
+            navigator.clipboard.writeText(a.html_code).then(() => showMessage('Kod kopyalandı!', 'success'));
+        }
+
+        function shareInteractive(id) {
+            const url = `${window.location.protocol}//${window.location.host}${window.location.pathname.replace('index.html', '')}view.html?id=${id}`;
+            navigator.clipboard.writeText(url).then(() => showMessage('Link kopyalandı!', 'success'));
+        }
+
+        // =======================
+        // SCIENCE (STAYS NEW)
+        // =======================
         function setCurrentWeek(w) { currentWeek = parseInt(w); renderDashboardPlots(); }
+        function openScienceModalWithGrade(grade) { openScienceModal(); document.getElementById('sci-class').value = grade; document.getElementById('sci-week').value = currentWeek; }
 
         function renderDashboardPlots() {
             const grades = ["1. Sınıf", "2. Sınıf", "3. Sınıf", "4. Sınıf"];
             grades.forEach((grade, idx) => {
                 const col = document.getElementById(`grade-${idx + 1}-col`);
-                const items = scienceData.filter(a => a.class_level === grade &&
-                    (parseInt(a.week_number) <= currentWeek && (parseInt(a.week_number) + (parseInt(a.duration_weeks) || 1) > currentWeek))
-                );
-
+                const items = scienceData.filter(a => a.class_level === grade && (parseInt(a.week_number) <= currentWeek && (parseInt(a.week_number) + (parseInt(a.duration_weeks) || 1) > currentWeek)));
                 if (items.length === 0) {
-                    col.innerHTML = `
-                        <div class="h-32 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-300 text-xs text-center p-4">
-                            <p>Bu hafta için planlanmış etkinlik bulunamadı.</p>
-                            <button onclick="openScienceModalWithGrade('${grade}')" class="mt-2 text-emerald-600 font-bold hover:underline">+ Plan Ekle</button>
-                        </div>`;
+                    col.innerHTML = `<div class="h-32 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-300 text-xs text-center p-4"><p>Plan yok.</p><button onclick="openScienceModalWithGrade('${grade}')" class="mt-2 text-emerald-600 font-bold hover:underline">+ Ekle</button></div>`;
                 } else {
-                    col.innerHTML = items.map(a => `
-                        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition group">
-                            <div class="flex justify-between items-start mb-2">
-                                <h4 class="font-bold text-slate-800 text-sm leading-tight">${esc(a.name)}</h4>
-                                <button onclick="openScienceModal('${a.__backendId}')" class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-amber-600 transition">✏️</button>
-                            </div>
-                            <p class="text-[10px] text-slate-400 font-medium mb-3">📚 ${esc(a.theme)}</p>
-                            <div class="bg-slate-50 p-2 rounded-lg text-[11px] text-slate-600 leading-snug line-clamp-3 mb-3">
-                                ${esc(a.content)}
-                            </div>
-                            <div class="flex gap-1">
-                                ${a.source_url ? `<a href="${a.source_url}" target="_blank" class="flex-1 text-center py-1.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-bold">🔗 Kaynak</a>` : ''}
-                                <button onclick="deleteScience('${a.__backendId}')" class="px-2 py-1.5 bg-rose-50 text-rose-600 rounded-md text-[10px]">🗑️</button>
-                            </div>
+                    col.innerHTML = items.map(a => `<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 group relative">
+                        <div class="flex justify-between items-start mb-2"><h4 class="font-bold text-slate-800 text-[13px] leading-tight">${esc(a.name)}</h4></div>
+                        <p class="text-[10px] text-slate-400 mb-3">📚 ${esc(a.theme)}</p>
+                        <div class="flex gap-1">
+                            <button onclick="openScienceModal('${a.__backendId}')" class="flex-1 bg-amber-50 text-amber-600 py-1 rounded text-[10px] font-bold">✏️</button>
+                            ${a.source_url ? `<a href="${a.source_url}" target="_blank" class="flex-1 text-center bg-slate-50 text-slate-700 py-1 rounded text-[10px] font-bold">🔗</a>` : ''}
+                            <button onclick="deleteScience('${a.__backendId}')" class="bg-rose-50 text-rose-600 px-2 py-1 rounded text-[10px]">🗑️</button>
                         </div>
-                    `).join('');
+                    </div>`).join('');
                 }
             });
-        }
-
-        function openScienceModalWithGrade(grade) {
-            openScienceModal();
-            document.getElementById('sci-class').value = grade;
-            document.getElementById('sci-week').value = currentWeek;
         }
 
         function openScienceModal(id = null) {
@@ -462,20 +548,9 @@
 
         async function handleScienceSubmit(e) {
             e.preventDefault();
-            const data = {
-                class_level: v('sci-class'),
-                week_number: parseInt(v('sci-week')),
-                duration_weeks: parseInt(v('sci-duration')),
-                name: v('sci-name'),
-                theme: v('sci-theme'),
-                content: v('sci-content'),
-                materials: v('sci-materials'),
-                source_url: v('sci-source'),
-                created_at: editingScience ? editingScience.created_at : new Date().toISOString(),
-                ...editingScience ? { __backendId: editingScience.__backendId } : {}
-            };
+            const data = { class_level: v('sci-class'), week_number: parseInt(v('sci-week')), duration_weeks: parseInt(v('sci-duration')), name: v('sci-name'), theme: v('sci-theme'), content: v('sci-content'), materials: v('sci-materials'), source_url: v('sci-source'), created_at: editingScience ? editingScience.created_at : new Date().toISOString(), ...editingScience ? { __backendId: editingScience.__backendId } : {} };
             const res = editingScience ? await scienceSdk.update(data) : await scienceSdk.create(data);
-            if (res) { closeModal('science-modal'); showMessage('Kaydedildi', 'success'); }
+            if (res) { closeModal('science-modal'); showMessage('✅ Kaydedildi!', 'success'); }
         }
 
         function renderScienceData() {
@@ -483,38 +558,35 @@
             const term = document.getElementById('science-search').value.toLowerCase();
             const cls = document.getElementById('class-filter').value;
             const filtered = scienceData.filter(a => (!cls || a.class_level === cls) && a.name.toLowerCase().includes(term)).sort((a, b) => a.week_number - b.week_number);
-            grid.innerHTML = filtered.map(a => `<div class="p-4 bg-white border rounded-xl flex justify-between items-center shadow-sm"><div><span class="text-[10px] font-bold text-emerald-600">${a.week_number}. Hafta | ${a.class_level}</span><h4 class="font-bold">${esc(a.name)}</h4></div><button onclick="openScienceModal('${a.__backendId}')" class="text-sm bg-slate-100 px-3 py-1 rounded-lg">Düzenle</button></div>`).join('');
+            grid.innerHTML = filtered.map(a => `<div class="p-4 bg-white border rounded-xl flex justify-between items-center shadow-sm"><div><span class="text-[10px] font-bold text-emerald-600">${a.week_number}. Hafta | ${a.class_level}</span><h4 class="font-bold text-sm">${esc(a.name)}</h4></div><button onclick="openScienceModal('${a.__backendId}')" class="text-xs bg-slate-100 px-3 py-1 rounded-lg font-bold">DÜZENLE</button></div>`).join('');
         }
 
-        // TABS
-        function switchTab(id) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById('btn-tab-' + id).classList.add('active');
-            document.getElementById('tab-interactive').classList.add('hidden');
-            document.getElementById('tab-science').classList.add('hidden');
-            document.getElementById('tab-' + id).classList.remove('hidden');
+        async function deleteScience(id) {
+            if (!confirm('Silmek istediğinize emin misiniz?')) return;
+            const res = await scienceSdk.delete(id);
+            if (res.isOk) showMessage('Silindi', 'success');
         }
 
-        // --- Interactive Activity Logic (Simplified) ---
-        function openInteractiveModal(id = null) {
-            editingInteractive = id ? interactiveData.find(a => a.__backendId === id) : null;
-            document.getElementById('activity-title').value = editingInteractive?.title || '';
-            document.getElementById('activity-modal').classList.remove('hidden');
-        }
-        async function handleInteractiveSubmit(e) { /* ... similar to before ... */ }
-        function renderInteractiveData() {
-            const grid = document.getElementById('activities-grid');
-            grid.innerHTML = interactiveData.map(a => `<div class="bg-white p-4 rounded-xl border shadow-sm"><h3 class="font-bold">${esc(a.title)}</h3></div>`).join('');
-        }
-        function updateInteractiveStats() {
-            document.getElementById('total-activities').textContent = interactiveData.length;
-        }
-
+        // =======================
         // UTILS
+        // =======================
         function v(id) { return document.getElementById(id).value.trim(); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function closePreview() { closeModal('preview-modal'); document.getElementById('preview-frame').srcdoc = ''; }
         function esc(t) { return t ? t.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;") : ''; }
-        function showMessage(msg, type) { /* ... existing ... */ }
+        function formatDate(d) { return d ? new Date(d).toLocaleDateString('tr-TR') : ''; }
+        function toggleLoading(btn, isLoading) {
+            btn.disabled = isLoading;
+            const st = btn.querySelector('.save-text'), lt = btn.querySelector('.loading-text');
+            if (st) st.classList.toggle('hidden', isLoading);
+            if (lt) lt.classList.toggle('hidden', !isLoading);
+        }
+        function showMessage(msg, type) {
+            const t = document.createElement('div');
+            t.className = `fixed top-5 right-5 px-6 py-3 rounded-lg text-white shadow-2xl z-[100] transition-all transform animate-bounce ${type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'}`;
+            t.textContent = msg; document.body.appendChild(t);
+            setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 500); }, 3000);
+        }
 
         initializeApp();
     </script>
