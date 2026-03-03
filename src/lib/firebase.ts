@@ -13,12 +13,12 @@ import {
 } from "firebase/firestore";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDn8WWA2et22ZqtSEf3oUsoxZZo7Mu8LtU",
-    authDomain: "interaktif-etkinliklerim.firebaseapp.com",
-    projectId: "interaktif-etkinliklerim",
-    storageBucket: "interaktif-etkinliklerim.firebasestorage.app",
-    messagingSenderId: "701319349005",
-    appId: "1:701319349005:web:5eef690a8ec9bb3ed92644"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
