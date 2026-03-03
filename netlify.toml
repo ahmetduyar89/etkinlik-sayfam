@@ -1,0 +1,9 @@
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+[build.environment]
+  # Netlify's secret scanning flags public Firebase API keys as secrets.
+  # Since these keys are intended to be public in the JS bundle for client-side use,
+  # we disable the smart detection to allow the build to proceed.
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
