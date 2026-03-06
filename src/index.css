@@ -4,14 +4,14 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 0 0% 100%;
+    --foreground: 224 71.4% 4.1%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 224 71.4% 4.1%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 224 71.4% 4.1%;
 
     --primary: 262 83% 58%;
     --primary-foreground: 210 40% 98%;
@@ -32,7 +32,7 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 262 83% 58%;
 
-    --radius: 1rem;
+    --radius: 1.5rem;
   }
 }
 
@@ -41,40 +41,28 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground antialiased;
-    background-image: radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
-                      radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
-                      radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
-    background-attachment: fixed;
+    @apply bg-slate-50 text-slate-900 antialiased;
     min-height: 100vh;
   }
 }
 
-/* Glassmorphism Classes */
-.glass {
-  @apply bg-white/10 backdrop-blur-xl border border-white/20 shadow-xl;
+/* Modern Minimalist Classes */
+.portal-card {
+  @apply bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300;
 }
 
-.glass-card {
-  @apply bg-white/5 backdrop-blur-lg border border-white/10 shadow-2xl transition-all duration-300;
-}
-
-.glass-card:hover {
-  @apply bg-white/10 border-white/20 -translate-y-1;
-}
-
-/* Gradient Text */
 .text-gradient {
-  @apply bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent;
+  @apply bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent underline decoration-indigo-200;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
 }
 ::-webkit-scrollbar-track {
   @apply bg-transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-white/20 rounded-full hover:bg-white/30 transition-colors;
+  @apply bg-slate-200 border-4 border-solid border-transparent bg-clip-padding rounded-full hover:bg-slate-300 transition-colors;
 }
+
