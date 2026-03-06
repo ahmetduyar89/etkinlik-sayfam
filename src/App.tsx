@@ -303,7 +303,15 @@ export default function App() {
                                                                 >
                                                                     <Edit3 className="w-3 h-3" /> DÜZENLE
                                                                 </button>
-                                                                <IconButton icon={Trash2} onClick={() => scienceHandler.remove(act.id)} className="hover:bg-rose-50 hover:border-rose-100 text-rose-500" />
+                                                                <IconButton
+                                                                    icon={Trash2}
+                                                                    onClick={() => {
+                                                                        if (window.confirm('Bu planı silmek istediğinizden emin misiniz?')) {
+                                                                            scienceHandler.remove(act.id);
+                                                                        }
+                                                                    }}
+                                                                    className="hover:bg-rose-50 hover:border-rose-100 text-rose-500"
+                                                                />
                                                             </div>
                                                         </div>
                                                         <div className={cn("h-1 w-full", idx === 0 ? "bg-emerald-500" : idx === 1 ? "bg-blue-500" : idx === 2 ? "bg-indigo-500" : "bg-orange-500")} />
@@ -385,11 +393,26 @@ export default function App() {
 
                                         <div className="absolute bottom-6 left-8 right-8 flex justify-between items-center">
                                             <div className="flex gap-2">
-                                                <IconButton icon={Copy} onClick={() => navigator.clipboard.writeText(act.html_code)} />
-                                                <IconButton icon={Share2} />
+                                                <IconButton icon={Copy} onClick={() => {
+                                                    navigator.clipboard.writeText(act.html_code);
+                                                    alert('HTML kodu panoya kopyalandı!');
+                                                }} />
+                                                <IconButton icon={Share2} onClick={() => {
+                                                    const shareUrl = `${window.location.origin}/legacy/view.html?id=${act.id}`;
+                                                    navigator.clipboard.writeText(shareUrl);
+                                                    alert('Paylaşım linki panoya kopyalandı!\n' + shareUrl);
+                                                }} />
                                                 <IconButton icon={Edit3} onClick={() => { setEditItem(act); setIsActivityOpen(true); }} />
                                             </div>
-                                            <IconButton icon={Trash2} onClick={() => activitiesHandler.remove(act.id)} className="text-rose-500 bg-rose-50 border-rose-100 hover:bg-rose-100" />
+                                            <IconButton
+                                                icon={Trash2}
+                                                onClick={() => {
+                                                    if (window.confirm('Bu interaktif etkinliği silmek istediğinizden emin misiniz?')) {
+                                                        activitiesHandler.remove(act.id);
+                                                    }
+                                                }}
+                                                className="text-rose-500 bg-rose-50 border-rose-100 hover:bg-rose-100"
+                                            />
                                         </div>
                                     </PortalCard>
                                 ))}
