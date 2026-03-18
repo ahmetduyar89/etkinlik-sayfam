@@ -42,6 +42,30 @@ function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
+export const getFormattedHtml = (code?: string) => {
+    if (!code) return '';
+    return `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+            background-color: transparent;
+        }
+        iframe, object, embed, video {
+            width: 100% !important; height: 100% !important; border: none !important; margin: 0 !important; padding: 0 !important;
+        }
+    </style>
+</head>
+<body>
+    ${code}
+</body>
+</html>`;
+};
+
 // =======================
 // COMPONENTS
 // =======================
@@ -152,6 +176,76 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
         )}
     </AnimatePresence>
 );
+
+
+// =======================
+// ACTIVITY CARD COMPONENT
+// =======================
+const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activitiesHandler }: any) => {
+    const [isHovered, setIsHovered] = useState(false);
+    
+    return (
+        <PortalCard className="p-0 border border-slate-200 bg-white h-full flex flex-col">
+            <div className="p-8 pb-24 space-y-6 flex-1">
+                <div className="flex justify-between items-start gap-4">
+                    <h3 className="text-xl font-bold tracking-tight uppercase leading-none text-slate-900">{act.title}</h3>
+                    <span className="shrink-0 px-2 py-1 bg-indigo-50 text-indigo-600 text-[8px] font-bold rounded-md uppercase tracking-wider">{act.category || 'GENEL'}</span>
+                </div>
+                <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed italic border-l-2 border-slate-100 pl-4">"{act.description || 'Açıklama girilmedi.'}"</p>
+
+                <div 
+                    className="aspect-video bg-indigo-50/30 rounded-2xl border border-indigo-50/50 relative group overflow-hidden flex items-center justify-center cursor-pointer shadow-inner"
+                    onMouseEnter={() => setIsHovered(true)}
+                    onMouseLeave={() => setIsHovered(false)}
+                    onClick={() => setPreviewId(act.id)}
+                >
+                    {act.html_code ? (
+                        <>
+                            <Zap className="w-12 h-12 text-indigo-200 group-hover:scale-110 transition-transform duration-500 absolute" />
+                            {isHovered && (
+                                <iframe 
+                                    srcDoc={getFormattedHtml(act.html_code)} 
+                                    className="absolute inset-0 w-full h-full border-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-white" 
+                                    title={act.title}
+                                />
+                            )}
+                        </>
+                    ) : <LayoutDashboard className="w-10 h-10 text-slate-200 absolute" />}
+                    
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all bg-indigo-900/10 backdrop-blur-[2px] z-10">
+                        <button onClick={(e) => { e.stopPropagation(); setPreviewId(act.id); }} className="w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all shadow-xl shadow-indigo-200">
+                            <Eye className="w-7 h-7" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="absolute bottom-6 left-8 right-8 flex justify-between items-center z-20">
+                <div className="flex gap-2">
+                    <IconButton icon={Copy} onClick={() => {
+                        navigator.clipboard.writeText(act.html_code);
+                        alert('HTML kodu panoya kopyalandı!');
+                    }} />
+                    <IconButton icon={Share2} onClick={() => {
+                        const shareUrl = `${window.location.origin}/legacy/view.html?id=${act.id}`;
+                        navigator.clipboard.writeText(shareUrl);
+                        alert('Paylaşım linki panoya kopyalandı!\\n' + shareUrl);
+                    }} />
+                    <IconButton icon={Edit3} onClick={() => { setEditItem(act); setIsActivityOpen(true); }} />
+                </div>
+                <IconButton
+                    icon={Trash2}
+                    onClick={() => {
+                        if (window.confirm('Bu interaktif etkinliği silmek istediğinizden emin misiniz?')) {
+                            activitiesHandler.remove(act.id);
+                        }
+                    }}
+                    className="text-rose-500 bg-rose-50 border-rose-100 hover:bg-rose-100 hover:text-rose-600"
+                />
+            </div>
+        </PortalCard>
+    );
+};
 
 
 // =======================
@@ -371,50 +465,14 @@ export default function App() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
                                 {activities.filter(a => a.title.toLowerCase().includes(search.toLowerCase())).map((act, i) => (
-                                    <PortalCard key={act.id} className="p-0 border border-slate-200 bg-white h-full flex flex-col">
-                                        <div className="p-8 pb-24 space-y-6 flex-1">
-                                            <div className="flex justify-between items-start gap-4">
-                                                <h3 className="text-xl font-bold tracking-tight uppercase leading-none text-slate-900">{act.title}</h3>
-                                                <span className="shrink-0 px-2 py-1 bg-indigo-50 text-indigo-600 text-[8px] font-bold rounded-md uppercase tracking-wider">{act.category || 'GENEL'}</span>
-                                            </div>
-                                            <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed italic border-l-2 border-slate-100 pl-4">"{act.description || 'Açıklama girilmedi.'}"</p>
-
-                                            <div className="aspect-video bg-slate-50 rounded-2xl border border-slate-100 relative group overflow-hidden">
-                                                {act.html_code ? (
-                                                    <iframe srcDoc={act.html_code} className="w-full h-full border-0 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity" />
-                                                ) : <div className="absolute inset-0 flex items-center justify-center"><LayoutDashboard className="w-10 h-10 text-slate-200" /></div>}
-                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all bg-white/40 backdrop-blur-[2px]">
-                                                    <button onClick={() => setPreviewId(act.id)} className="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all shadow-lg shadow-indigo-200">
-                                                        <Eye className="w-6 h-6" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="absolute bottom-6 left-8 right-8 flex justify-between items-center">
-                                            <div className="flex gap-2">
-                                                <IconButton icon={Copy} onClick={() => {
-                                                    navigator.clipboard.writeText(act.html_code);
-                                                    alert('HTML kodu panoya kopyalandı!');
-                                                }} />
-                                                <IconButton icon={Share2} onClick={() => {
-                                                    const shareUrl = `${window.location.origin}/legacy/view.html?id=${act.id}`;
-                                                    navigator.clipboard.writeText(shareUrl);
-                                                    alert('Paylaşım linki panoya kopyalandı!\n' + shareUrl);
-                                                }} />
-                                                <IconButton icon={Edit3} onClick={() => { setEditItem(act); setIsActivityOpen(true); }} />
-                                            </div>
-                                            <IconButton
-                                                icon={Trash2}
-                                                onClick={() => {
-                                                    if (window.confirm('Bu interaktif etkinliği silmek istediğinizden emin misiniz?')) {
-                                                        activitiesHandler.remove(act.id);
-                                                    }
-                                                }}
-                                                className="text-rose-500 bg-rose-50 border-rose-100 hover:bg-rose-100"
-                                            />
-                                        </div>
-                                    </PortalCard>
+                                    <ActivityCard 
+                                        key={act.id} 
+                                        act={act} 
+                                        setPreviewId={setPreviewId} 
+                                        setEditItem={setEditItem} 
+                                        setIsActivityOpen={setIsActivityOpen} 
+                                        activitiesHandler={activitiesHandler} 
+                                    />
                                 ))}
                             </div>
 
@@ -525,7 +583,12 @@ export default function App() {
                                     <X className="w-6 h-6" />
                                 </button>
                             </div>
-                            <iframe srcDoc={activities.find(a => a.id === previewId)?.html_code} className="w-full h-full border-0" />
+                            <iframe 
+                                srcDoc={getFormattedHtml(activities.find(a => a.id === previewId)?.html_code)} 
+                                className="w-full h-full border-0" 
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                allowFullScreen 
+                            />
                         </motion.div>
                     </div>
                 )}
