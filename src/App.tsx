@@ -139,6 +139,21 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
 );
 
 // =======================
+// PREVIEW COMPONENTS
+// =======================
+const LivePreview = ({ html, title }: { html: string, title?: string }) => (
+    <div className="absolute inset-0 w-full h-full pointer-events-none bg-white overflow-hidden rounded-2xl">
+        <iframe 
+            srcDoc={getFormattedHtml(html)} 
+            className="w-[1000px] h-[625px] border-0 origin-top-left scale-[0.28] sm:scale-[0.32] lg:scale-[0.35]"
+            title={title}
+            loading="lazy"
+        />
+        <div className="absolute inset-0 bg-transparent" />
+    </div>
+);
+
+// =======================
 // ACTIVITY CARD COMPONENT
 // =======================
 const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activitiesHandler }: any) => {
@@ -160,19 +175,21 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
                     onMouseLeave={() => setIsHovered(false)}
                     onClick={() => setPreviewId(act.id)}
                 >
-                    {act.html_code ? (
-                        <>
-                            <div className="absolute inset-0 bg-indigo-50 flex items-center justify-center group-hover:bg-white transition-colors duration-500">
-                                <Blocks className="w-10 h-10 text-indigo-300 group-hover:scale-125 transition-transform duration-500" />
-                            </div>
-                            {isHovered && (
-                                <iframe 
-                                    srcDoc={getFormattedHtml(act.html_code)} 
-                                    className="absolute inset-0 w-full h-full border-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-white" 
-                                    title={act.title}
-                                />
-                            )}
-                        </>
+                    {act.image_url ? (
+                        <div className="absolute inset-0 w-full h-full">
+                            <img src={act.image_url} alt={act.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                            <div className="absolute inset-0 bg-indigo-900/10 group-hover:bg-transparent transition-colors duration-500" />
+                        </div>
+                    ) : act.html_code ? (
+                        <div className="absolute inset-0 w-full h-full transition-all duration-500 overflow-hidden">
+                            <LivePreview html={act.html_code} title={act.title} />
+                            
+                            {/* Overlay for better text legibility and interaction feel */}
+                            <div className={cn(
+                                "absolute inset-0 transition-opacity duration-300",
+                                isHovered ? "bg-indigo-900/5" : "bg-transparent"
+                            )} />
+                        </div>
                     ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
                             <LayoutDashboard className="w-10 h-10 text-indigo-200" />
@@ -514,6 +531,11 @@ export default function App() {
                     <div>
                         <label className={labelClasses}>Kısa Açıklama</label>
                         <textarea name="description" defaultValue={editItem?.description} rows={2} className={cn(inputClasses, "resize-none")} placeholder="Etkinliğin amacını özetleyin" />
+                    </div>
+                    
+                     <div>
+                        <label className={labelClasses}>Önizleme Görseli (URL)</label>
+                        <input name="image_url" defaultValue={editItem?.image_url} className={inputClasses} placeholder="Görsel URL'si (Örn: https://.../resim.jpg)" />
                     </div>
                     
                     <div>
