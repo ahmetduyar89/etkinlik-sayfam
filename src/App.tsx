@@ -44,7 +44,7 @@ export const getFormattedHtml = (act?: any) => {
         try {
             ${js_code || ''}
         } catch (e) {
-            console.error('Simulation Error:', e);
+            console.error('Simülasyon Hatası:', e);
         }
     </script>
 </body>
@@ -773,14 +773,38 @@ export default function App() {
                         </div>
                     </div>
                     
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 px-6 py-4 bg-slate-50/50 rounded-2xl border-2 border-slate-100">
+                        <div className="flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer group">
+                                <div className="relative">
+                                    <input type="checkbox" name="is_test" defaultChecked={editItem?.is_test} className="sr-only peer" />
+                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                </div>
+                                <span className={labelClasses.replace('mb-2', '')}>Test Modu</span>
+                            </label>
+
+                            <label className="flex items-center gap-2 cursor-pointer group ml-4">
+                                <div className="relative">
+                                    <input type="checkbox" name="has_timer" defaultChecked={editItem?.has_timer} className="sr-only peer" />
+                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                </div>
+                                <span className={labelClasses.replace('mb-2', '')}>Süre Sınırı</span>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <input name="duration_minutes" type="number" defaultValue={editItem?.duration_minutes || 20} placeholder="Süre (Dakika)" className={inputClasses} />
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
                             <label className={labelClasses}>HTML Kodu</label>
-                            <textarea name="html_code" defaultValue={editItem?.html_code} rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="<div id='app'></div>" />
+                            <textarea name="html_code" defaultValue={editItem?.html_code} rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="<div id='uygulama'></div>" />
                         </div>
                         <div>
                             <label className={labelClasses}>JavaScript Kodu</label>
-                            <textarea name="js_code" defaultValue={editItem?.js_code} rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="// console.log('Hello World');" />
+                            <textarea name="js_code" defaultValue={editItem?.js_code} rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="// console.log('Merhaba Dünya');" />
                         </div>
                     </div>
 
