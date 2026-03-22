@@ -37,6 +37,12 @@ export const getFormattedHtml = (act?: any) => {
         }
         ${css_code || ''}
     </style>
+    <script>
+        // Helper to send answers to the portal
+        window.sendAnswer = (data) => {
+            window.parent.postMessage({ type: 'SIM_ANSWER', data }, '*');
+        };
+    </script>
 </head>
 <body>
     ${html_code || ''}
@@ -143,7 +149,7 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
                             <X className="w-4 h-4" />
                         </button>
                     </div>
-                    <div className="max-h-[70vh] overflow-y-auto custom-scroll -mr-2 pr-2">
+                    <div className="max-h-[75vh] overflow-y-auto custom-scroll -mr-6 pr-6">
                         {children}
                     </div>
                 </motion.div>
@@ -238,7 +244,6 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
                         <IconButton icon={BarChart3} onClick={() => setShowResultsId(act.id)} className="text-emerald-500 bg-emerald-50 hover:bg-emerald-100" title="Sonuçları Gör" />
                     )}
                 </div>
-                <ResultsModal isOpen={showResultsId === act.id} onClose={() => setShowResultsId(null)} activityId={act.id} />
                 <IconButton
                     icon={Trash2}
                     onClick={() => {
@@ -290,7 +295,19 @@ const ResultsModal = ({ isOpen, onClose, activityId }: { isOpen: boolean, onClos
                                         <td className="px-4 py-3 text-slate-500 text-[11px]">{new Date(sub.started_at).toLocaleString('tr-TR')}</td>
                                         <td className="px-4 py-3 text-slate-500 text-[11px]">{sub.submitted_at ? new Date(sub.submitted_at).toLocaleString('tr-TR') : 'Tamamlanmadı'}</td>
                                         <td className="px-4 py-3 font-bold text-indigo-600">
-                                            <button onClick={() => alert(JSON.stringify(sub.answers, null, 2))} className="text-[10px] bg-indigo-50 px-2 py-1 rounded">Cevapları Gör</button>
+                                            {sub.submitted_at ? (
+                                                <div className="space-y-1">
+                                                    {Object.keys(sub.answers || {}).length > 0 ? (
+                                                        <div className="text-[10px] bg-indigo-50 p-2 rounded-lg font-medium text-indigo-700">
+                                                            {JSON.stringify(sub.answers)}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400">Cevap yok</span>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <span className="text-[10px] text-amber-500">Devam ediyor...</span>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
@@ -337,6 +354,20 @@ const StudentPortal = ({ act }: { act: any }) => {
             return () => clearInterval(timer);
         }
     }, [timeLeft, isFinished]);
+
+    // Listen for answers from simulation
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            if (event.data.type === 'SIM_ANSWER' && submissionId) {
+                const newAnswer = event.data.data;
+                submissionsHandler.update(submissionId, {
+                    answers: newAnswer // Simulation should send current full state
+                });
+            }
+        };
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, [submissionId]);
 
     const handleStart = async () => {
         if (!name.trim()) return alert('Lütfen isminizi girin.');
@@ -686,6 +717,7 @@ export default function App() {
                         </motion.div>
                     )}
                 </AnimatePresence>
+                <ResultsModal isOpen={!!showResultsId} onClose={() => setShowResultsId(null)} activityId={showResultsId || ''} />
             </main>
 
             {/* NEW MINIMALIST FOOTER */}
