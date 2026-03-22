@@ -14,26 +14,39 @@ function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
-export const getFormattedHtml = (code?: string) => {
-    if (!code) return '';
+export const getFormattedHtml = (act?: any) => {
+    if (!act) return '';
+    const { html_code, css_code, js_code, external_libs } = act;
+    
+    // Build external library scripts and link tags
+    const libs = external_libs ? external_libs.split('\n').filter((l: string) => l.trim()).map((lib: string) => {
+        if (lib.trim().endsWith('.css')) return `<link rel="stylesheet" href="${lib.trim()}">`;
+        return `<script src="${lib.trim()}"></script>`;
+    }).join('\n') : '';
+
     return `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    ${libs}
     <style>
         body, html {
-            margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden;
-            display: flex; align-items: center; justify-content: center;
+            margin: 0; padding: 0; width: 100vw; min-height: 100vh;
             background-color: transparent;
         }
-        iframe, object, embed, video {
-            width: 100% !important; height: 100% !important; border: none !important; margin: 0 !important; padding: 0 !important;
-        }
+        ${css_code || ''}
     </style>
 </head>
 <body>
-    ${code}
+    ${html_code || ''}
+    <script>
+        try {
+            ${js_code || ''}
+        } catch (e) {
+            console.error('Simulation Error:', e);
+        }
+    </script>
 </body>
 </html>`;
 };
@@ -141,12 +154,12 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
 // =======================
 // PREVIEW COMPONENTS
 // =======================
-const LivePreview = ({ html, title }: { html: string, title?: string }) => (
+const LivePreview = ({ act }: { act: any }) => (
     <div className="absolute inset-0 w-full h-full pointer-events-none bg-white overflow-hidden rounded-2xl">
         <iframe 
-            srcDoc={getFormattedHtml(html)} 
+            srcDoc={getFormattedHtml(act)} 
             className="w-[1000px] h-[625px] border-0 origin-top-left scale-[0.28] sm:scale-[0.32] lg:scale-[0.35]"
-            title={title}
+            title={act?.title}
             loading="lazy"
         />
         <div className="absolute inset-0 bg-transparent" />
@@ -180,9 +193,9 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
                             <img src={act.image_url} alt={act.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                             <div className="absolute inset-0 bg-indigo-900/10 group-hover:bg-transparent transition-colors duration-500" />
                         </div>
-                    ) : act.html_code ? (
+                    ) : (act.html_code || act.js_code) ? (
                         <div className="absolute inset-0 w-full h-full transition-all duration-500 overflow-hidden">
-                            <LivePreview html={act.html_code} title={act.title} />
+                            <LivePreview act={act} />
                             
                             {/* Overlay for better text legibility and interaction feel */}
                             <div className={cn(
@@ -518,29 +531,48 @@ export default function App() {
 
             <Modal isOpen={isActivityOpen} onClose={() => setIsActivityOpen(false)} title={editItem ? "Etkinliği Güncelle" : "Yeni İnteraktif İçerik"}>
                 <form onSubmit={handleActivitySubmit} className="space-y-6">
-                    <div>
-                        <label className={labelClasses}>Etkinlik Başlığı</label>
-                        <input name="title" defaultValue={editItem?.title} required className={inputClasses} placeholder="İlgi çekici bir başlık girin" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                            <label className={labelClasses}>Etkinlik Başlığı</label>
+                            <input name="title" defaultValue={editItem?.title} required className={inputClasses} placeholder="İlgi çekici bir başlık girin" />
+                        </div>
+                        <div>
+                            <label className={labelClasses}>Önizleme Görseli (URL)</label>
+                            <input name="image_url" defaultValue={editItem?.image_url} className={inputClasses} placeholder="Görsel URL'si (Örn: https://.../resim.jpg)" />
+                        </div>
                     </div>
                     
-                    <div>
-                        <label className={labelClasses}>Kategori</label>
-                        <input name="category" defaultValue={editItem?.category} className={inputClasses} placeholder="Matematik, Fen, vb." />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                            <label className={labelClasses}>Kategori</label>
+                            <input name="category" defaultValue={editItem?.category} className={inputClasses} placeholder="Matematik, Fen, vb." />
+                        </div>
+                        <div>
+                            <label className={labelClasses}>Kısa Açıklama</label>
+                            <textarea name="description" defaultValue={editItem?.description} rows={2} className={cn(inputClasses, "resize-none")} placeholder="Etkinliğin amacını özetleyin" />
+                        </div>
                     </div>
                     
-                    <div>
-                        <label className={labelClasses}>Kısa Açıklama</label>
-                        <textarea name="description" defaultValue={editItem?.description} rows={2} className={cn(inputClasses, "resize-none")} placeholder="Etkinliğin amacını özetleyin" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                            <label className={labelClasses}>HTML Kodu</label>
+                            <textarea name="html_code" defaultValue={editItem?.html_code} rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="<div id='app'></div>" />
+                        </div>
+                        <div>
+                            <label className={labelClasses}>JavaScript Kodu</label>
+                            <textarea name="js_code" defaultValue={editItem?.js_code} rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="// console.log('Hello World');" />
+                        </div>
                     </div>
-                    
-                     <div>
-                        <label className={labelClasses}>Önizleme Görseli (URL)</label>
-                        <input name="image_url" defaultValue={editItem?.image_url} className={inputClasses} placeholder="Görsel URL'si (Örn: https://.../resim.jpg)" />
-                    </div>
-                    
-                    <div>
-                        <label className={labelClasses}>HTML Embed Kodu</label>
-                        <textarea name="html_code" defaultValue={editItem?.html_code} required rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="<iframe src='...'></iframe>" />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                            <label className={labelClasses}>CSS Kodu (Opsiyonel)</label>
+                            <textarea name="css_code" defaultValue={editItem?.css_code} rows={3} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="body { background: #f0f; }" />
+                        </div>
+                        <div>
+                            <label className={labelClasses}>Dış Kütüphaneler (Her satıra bir link)</label>
+                            <textarea name="external_libs" defaultValue={editItem?.external_libs} rows={3} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js" />
+                        </div>
                     </div>
                     
                     <div className="flex justify-end gap-3 pt-2">
@@ -566,7 +598,7 @@ export default function App() {
                                 </button>
                             </div>
                             <iframe 
-                                srcDoc={getFormattedHtml(activities.find(a => a.id === previewId)?.html_code)} 
+                                srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} 
                                 className="w-full h-full border-0" 
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                                 allowFullScreen 
