@@ -295,19 +295,21 @@ const ResultsModal = ({ isOpen, onClose, activityId }: { isOpen: boolean, onClos
                                         <td className="px-4 py-3 text-slate-500 text-[11px]">{new Date(sub.started_at).toLocaleString('tr-TR')}</td>
                                         <td className="px-4 py-3 text-slate-500 text-[11px]">{sub.submitted_at ? new Date(sub.submitted_at).toLocaleString('tr-TR') : 'Tamamlanmadı'}</td>
                                         <td className="px-4 py-3 font-bold text-indigo-600">
-                                            {sub.submitted_at ? (
-                                                <div className="space-y-1">
-                                                    {Object.keys(sub.answers || {}).length > 0 ? (
-                                                        <div className="text-[10px] bg-indigo-50 p-2 rounded-lg font-medium text-indigo-700">
-                                                            {JSON.stringify(sub.answers)}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-[10px] text-slate-400">Cevap yok</span>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <span className="text-[10px] text-amber-500">Devam ediyor...</span>
-                                            )}
+                                            <div className="space-y-1">
+                                                {Object.keys(sub.answers || {}).length > 0 ? (
+                                                    <div className="text-[10px] bg-indigo-50 p-2 rounded-lg font-medium text-indigo-700 max-w-[200px] break-words">
+                                                        {JSON.stringify(sub.answers)}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[10px] text-neutral-300 font-normal italic">Cevaplanmadı</span>
+                                                )}
+                                                {!sub.submitted_at && (
+                                                   <div className="flex items-center gap-1.5 mt-1">
+                                                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                       <span className="text-[9px] text-emerald-600 uppercase font-black tracking-widest">CANLI</span>
+                                                   </div>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -332,7 +334,7 @@ const ResultsModal = ({ isOpen, onClose, activityId }: { isOpen: boolean, onClos
 // =======================
 const StudentPortal = ({ act }: { act: any }) => {
     const [name, setName] = useState('');
-    const [isStarted, setIsStarted] = useState(false);
+    const [isStarted, setIsStarted] = useState(!act.is_test);
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
     const [isFinished, setIsFinished] = useState(false);
     const [submissionId, setSubmissionId] = useState<string | null>(null);
@@ -340,20 +342,20 @@ const StudentPortal = ({ act }: { act: any }) => {
 
     // Timer logic
     useEffect(() => {
-        if (isStarted && act.has_timer && act.duration_minutes) {
+        if (isStarted && act.is_test && act.has_timer && act.duration_minutes) {
             setTimeLeft(parseInt(act.duration_minutes) * 60);
         }
     }, [isStarted, act]);
 
     useEffect(() => {
-        if (timeLeft === 0 && !isFinished) {
+        if (act.is_test && timeLeft === 0 && !isFinished) {
             handleSubmit();
         }
-        if (timeLeft !== null && timeLeft > 0 && !isFinished) {
+        if (act.is_test && timeLeft !== null && timeLeft > 0 && !isFinished) {
             const timer = setInterval(() => setTimeLeft(prev => (prev !== null ? prev - 1 : null)), 1000);
             return () => clearInterval(timer);
         }
-    }, [timeLeft, isFinished]);
+    }, [timeLeft, isFinished, act.is_test]);
 
     // Listen for answers from simulation
     useEffect(() => {
@@ -439,31 +441,33 @@ const StudentPortal = ({ act }: { act: any }) => {
 
     return (
         <div className="min-h-screen bg-white flex flex-col h-screen overflow-hidden">
-            <header className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white/80 backdrop-blur-md z-10 shrink-0">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center">
-                        <User className="w-4 h-4" />
+            {act.is_test && (
+                <header className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white/80 backdrop-blur-md z-10 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center">
+                            <User className="w-4 h-4" />
+                        </div>
+                        <span className="font-bold text-slate-700">{name}</span>
                     </div>
-                    <span className="font-bold text-slate-700">{name}</span>
-                </div>
-                
-                {act.has_timer && timeLeft !== null && (
-                    <div className={cn(
-                        "font-black tabular-nums transition-colors px-4 py-2 rounded-xl flex items-center gap-2",
-                        timeLeft < 60 ? "bg-red-50 text-red-500 animate-pulse" : "bg-slate-50 text-slate-600"
-                    )}>
-                        <Clock className="w-4 h-4" />
-                        {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
-                    </div>
-                )}
-                
-                <button onClick={handleSubmit} className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">
-                    Sınavı Bitir
-                </button>
-            </header>
+                    
+                    {act.has_timer && timeLeft !== null && (
+                        <div className={cn(
+                            "font-black tabular-nums transition-colors px-4 py-2 rounded-xl flex items-center gap-2",
+                            timeLeft < 60 ? "bg-red-50 text-red-500 animate-pulse" : "bg-slate-50 text-slate-600"
+                        )}>
+                            <Clock className="w-4 h-4" />
+                            {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                        </div>
+                    )}
+                    
+                    <button onClick={handleSubmit} className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">
+                        Sınavı Bitir
+                    </button>
+                </header>
+            )}
             
-            <main className="flex-1 min-h-0 bg-slate-50 p-4">
-                <div className="w-full h-full bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 relative">
+            <main className={cn("flex-1 min-h-0 bg-slate-50", act.is_test ? "p-4" : "p-0")}>
+                <div className={cn("w-full h-full bg-white overflow-hidden relative", act.is_test ? "rounded-3xl shadow-sm border border-slate-100" : "")}>
                     <iframe 
                         srcDoc={getFormattedHtml(act)} 
                         className="w-full h-full border-0" 
