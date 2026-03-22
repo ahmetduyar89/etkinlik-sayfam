@@ -60,9 +60,10 @@ const PortalCard = ({ children, className, onClick }: { children: React.ReactNod
     </div>
 );
 
-const IconButton = ({ icon: Icon, onClick, className }: { icon: any, onClick?: (e: any) => void, className?: string }) => (
+const IconButton = ({ icon: Icon, onClick, className, title }: { icon: any, onClick?: (e: any) => void, className?: string, title?: string }) => (
     <button
         onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
+        title={title}
         className={cn("p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors group", className)}
     >
         <Icon className="w-4 h-4" />
@@ -169,7 +170,7 @@ const LivePreview = ({ act }: { act: any }) => (
 // =======================
 // ACTIVITY CARD COMPONENT
 // =======================
-const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activitiesHandler }: any) => {
+const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activitiesHandler, showResultsId, setShowResultsId }: any) => {
     const [isHovered, setIsHovered] = useState(false);
     
     return (
@@ -177,7 +178,12 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
             <div className="p-6 space-y-5">
                 <div className="flex justify-between items-start gap-3">
                     <h3 className="text-[17px] font-bold tracking-tight leading-snug text-slate-800 line-clamp-2">{act.title}</h3>
-                    <span className="shrink-0 px-3 py-1.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded-lg uppercase tracking-wider">{act.category || 'Genel'}</span>
+                    <div className="flex gap-2 shrink-0">
+                        {act.is_test && (
+                            <span className="px-2 py-1 bg-amber-100 text-amber-700 text-[9px] font-black rounded-md uppercase tracking-widest border border-amber-200">TEST</span>
+                        )}
+                        <span className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded-lg uppercase tracking-wider">{act.category || 'Genel'}</span>
+                    </div>
                 </div>
                 
                 <p className="text-[13px] text-slate-500 line-clamp-2 leading-relaxed h-[40px] font-medium">{act.description || 'Açıklama girilmedi.'}</p>
@@ -221,13 +227,18 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
                 <div className="flex gap-1">
                     <IconButton icon={Copy} onClick={() => {
                         navigator.clipboard.writeText(act.html_code);
-                    }} />
+                    }} title="HTML Kodunu Kopyala" />
                     <IconButton icon={Share2} onClick={() => {
-                        const shareUrl = `${window.location.origin}/legacy/view.html?id=${act.id}`;
-                        navigator.clipboard.writeText(shareUrl);
-                    }} />
-                    <IconButton icon={Edit3} onClick={() => { setEditItem(act); setIsActivityOpen(true); }} />
+                         const studentLink = `${window.location.origin}${window.location.pathname}?view=student&id=${act.id}`;
+                         navigator.clipboard.writeText(studentLink);
+                         alert('Öğrenci giriş linki kopyalandı!');
+                    }} title="Öğrenci Linki Kopyala" />
+                    <IconButton icon={Edit3} onClick={() => { setEditItem(act); setIsActivityOpen(true); }} title="Düzenle" />
+                    {act.is_test && (
+                        <IconButton icon={BarChart3} onClick={() => setShowResultsId(act.id)} className="text-emerald-500 bg-emerald-50 hover:bg-emerald-100" title="Sonuçları Gör" />
+                    )}
                 </div>
+                <ResultsModal isOpen={showResultsId === act.id} onClose={() => setShowResultsId(null)} activityId={act.id} />
                 <IconButton
                     icon={Trash2}
                     onClick={() => {
@@ -243,15 +254,209 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
 };
 
 // =======================
+// RESULTS MODAL COMPONENT
+// =======================
+const ResultsModal = ({ isOpen, onClose, activityId }: { isOpen: boolean, onClose: () => void, activityId: string }) => {
+    const [submissions, setSubmissions] = useState<any[]>([]);
+    const submissionsHandler = useFirestore('submissions');
+
+    useEffect(() => {
+        if (isOpen) {
+            const unsub = submissionsHandler.sync((data) => {
+                setSubmissions(data.filter(s => s.activity_id === activityId));
+            });
+            return unsub;
+        }
+    }, [isOpen, activityId]);
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Öğrenci Sonuçları">
+            <div className="space-y-4">
+                {submissions.length > 0 ? (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead>
+                                <tr className="border-b border-slate-100 bg-slate-50">
+                                    <th className="px-4 py-3 font-bold text-slate-600">Öğrenci Adı</th>
+                                    <th className="px-4 py-3 font-bold text-slate-600">Başlangıç</th>
+                                    <th className="px-4 py-3 font-bold text-slate-600">Teslim Tarihi</th>
+                                    <th className="px-4 py-3 font-bold text-slate-600">Puan/Cevaplar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {submissions.map((sub) => (
+                                    <tr key={sub.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                                        <td className="px-4 py-3 font-medium text-slate-800">{sub.student_name}</td>
+                                        <td className="px-4 py-3 text-slate-500 text-[11px]">{new Date(sub.started_at).toLocaleString('tr-TR')}</td>
+                                        <td className="px-4 py-3 text-slate-500 text-[11px]">{sub.submitted_at ? new Date(sub.submitted_at).toLocaleString('tr-TR') : 'Tamamlanmadı'}</td>
+                                        <td className="px-4 py-3 font-bold text-indigo-600">
+                                            <button onClick={() => alert(JSON.stringify(sub.answers, null, 2))} className="text-[10px] bg-indigo-50 px-2 py-1 rounded">Cevapları Gör</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="py-12 text-center space-y-3">
+                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
+                            <Database className="w-8 h-8 text-slate-300" />
+                        </div>
+                        <p className="text-slate-400 font-medium">Henüz bir katılım bulunmuyor.</p>
+                    </div>
+                )}
+            </div>
+        </Modal>
+    );
+};
+
+// =======================
+// STUDENT VIEW COMPONENT
+// =======================
+const StudentPortal = ({ act }: { act: any }) => {
+    const [name, setName] = useState('');
+    const [isStarted, setIsStarted] = useState(false);
+    const [timeLeft, setTimeLeft] = useState<number | null>(null);
+    const [isFinished, setIsFinished] = useState(false);
+    const [submissionId, setSubmissionId] = useState<string | null>(null);
+    const submissionsHandler = useFirestore('submissions');
+
+    // Timer logic
+    useEffect(() => {
+        if (isStarted && act.has_timer && act.duration_minutes) {
+            setTimeLeft(parseInt(act.duration_minutes) * 60);
+        }
+    }, [isStarted, act]);
+
+    useEffect(() => {
+        if (timeLeft === 0 && !isFinished) {
+            handleSubmit();
+        }
+        if (timeLeft !== null && timeLeft > 0 && !isFinished) {
+            const timer = setInterval(() => setTimeLeft(prev => (prev !== null ? prev - 1 : null)), 1000);
+            return () => clearInterval(timer);
+        }
+    }, [timeLeft, isFinished]);
+
+    const handleStart = async () => {
+        if (!name.trim()) return alert('Lütfen isminizi girin.');
+        const res = await submissionsHandler.add({
+            activity_id: act.id,
+            student_name: name,
+            started_at: new Date().toISOString(),
+            answers: {},
+            submitted_at: null
+        });
+        setSubmissionId(res.id);
+        setIsStarted(true);
+    };
+
+    const handleSubmit = async () => {
+        if (isFinished) return;
+        setIsFinished(true);
+        if (submissionId) {
+            await submissionsHandler.update(submissionId, {
+                submitted_at: new Date().toISOString()
+            });
+        }
+    };
+
+    if (isFinished) {
+        return (
+            <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8 text-center space-y-6">
+                <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center shadow-xl shadow-emerald-100">
+                    <Zap className="w-10 h-10" />
+                </div>
+                <div className="space-y-2">
+                    <h1 className="text-3xl font-black text-slate-800 tracking-tight">Test Tamamlandı!</h1>
+                    <p className="text-slate-500 font-medium uppercase tracking-widest text-xs">Cevapların başarıyla kaydedildi.</p>
+                </div>
+                <p className="text-slate-500 max-w-sm">Dersi takip ettiğin için teşekkürler. Şimdi bu sekmeyi kapatabilirsin.</p>
+            </div>
+        );
+    }
+
+    if (!isStarted) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md bg-white rounded-3xl p-10 shadow-2xl border border-slate-100 text-center space-y-8">
+                    <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-indigo-200">
+                        <User className="w-8 h-8 text-white" />
+                    </div>
+                    <div className="space-y-2">
+                        <h1 className="text-2xl font-black text-slate-800 tracking-tight">{act.title}</h1>
+                        <p className="text-slate-500 text-sm font-medium">Başlamadan önce lütfen adınızı girin</p>
+                    </div>
+                    <div className="space-y-4">
+                        <input 
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="Adınız Soyadınız"
+                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 text-center text-lg font-bold text-slate-800 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-slate-300"
+                        />
+                        <button 
+                            onClick={handleStart}
+                            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-indigo-200"
+                        >
+                            Teste Başla
+                        </button>
+                    </div>
+                </motion.div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-white flex flex-col h-screen overflow-hidden">
+            <header className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white/80 backdrop-blur-md z-10 shrink-0">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center">
+                        <User className="w-4 h-4" />
+                    </div>
+                    <span className="font-bold text-slate-700">{name}</span>
+                </div>
+                
+                {act.has_timer && timeLeft !== null && (
+                    <div className={cn(
+                        "font-black tabular-nums transition-colors px-4 py-2 rounded-xl flex items-center gap-2",
+                        timeLeft < 60 ? "bg-red-50 text-red-500 animate-pulse" : "bg-slate-50 text-slate-600"
+                    )}>
+                        <Clock className="w-4 h-4" />
+                        {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                    </div>
+                )}
+                
+                <button onClick={handleSubmit} className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">
+                    Sınavı Bitir
+                </button>
+            </header>
+            
+            <main className="flex-1 min-h-0 bg-slate-50 p-4">
+                <div className="w-full h-full bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 relative">
+                    <iframe 
+                        srcDoc={getFormattedHtml(act)} 
+                        className="w-full h-full border-0" 
+                        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" 
+                        allowFullScreen 
+                    />
+                </div>
+            </main>
+        </div>
+    );
+};
+
+// =======================
 // MAIN APP COMPONENT
 // =======================
 export default function App() {
+    const params = new URLSearchParams(window.location.search);
     const [tab, setTab] = useState('dashboard');
     const [selectedWeek, setSelectedWeek] = useState(1);
     const [activities, setActivities] = useState<any[]>([]);
     const [science, setScience] = useState<any[]>([]);
     const [search, setSearch] = useState('');
     const [previewId, setPreviewId] = useState<string | null>(null);
+    const [showResultsId, setShowResultsId] = useState<string | null>(null);
 
     // Form States
     const [isScienceOpen, setIsScienceOpen] = useState(false);
@@ -297,11 +502,18 @@ export default function App() {
         e.preventDefault();
         const formData = new FormData(e.target as HTMLFormElement);
         const payload = Object.fromEntries(formData.entries());
+        
+        // Handle checkbox values explicitly
+        const finalPayload = {
+            ...payload,
+            is_test: formData.get('is_test') === 'on',
+            has_timer: formData.get('has_timer') === 'on',
+        };
 
         if (editItem) {
-            await activitiesHandler.update(editItem.id, payload);
+            await activitiesHandler.update(editItem.id, finalPayload);
         } else {
-            await activitiesHandler.add(payload);
+            await activitiesHandler.add(finalPayload);
         }
         setIsActivityOpen(false);
         setEditItem(null);
@@ -319,6 +531,12 @@ export default function App() {
             default: return { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-700', hover: 'hover:border-slate-300', icon: 'text-slate-500', button: 'bg-slate-100 text-slate-700 hover:bg-slate-200' };
         }
     };
+
+    if (params.get('view') === 'student' && params.get('id')) {
+        const activity = activities.find(a => a.id === params.get('id'));
+        if (activity) return <StudentPortal act={activity} />;
+        return <div className="p-20 text-center font-bold text-slate-400">Etkinlik bulunamadı veya silinmiş olabilir.</div>;
+    }
 
     return (
         <div className="min-h-screen pt-28 pb-16 px-4 bg-slate-50 relative">
@@ -460,6 +678,8 @@ export default function App() {
                                         setEditItem={setEditItem} 
                                         setIsActivityOpen={setIsActivityOpen} 
                                         activitiesHandler={activitiesHandler} 
+                                        showResultsId={showResultsId}
+                                        setShowResultsId={setShowResultsId}
                                     />
                                 ))}
                             </div>
