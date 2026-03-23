@@ -3,7 +3,8 @@ import {
     Sparkles, Search, ExternalLink, Copy, Share2, Trash2, Edit3, Grid, Filter, Plus,
     LayoutDashboard, ChevronLeft, ChevronRight, Database, BarChart3, CalendarDays,
     Target, Zap, Globe, Settings, Bell, User, ArrowRight, HelpCircle, Eye,
-    MoreVertical, X, Save, Clock, BookOpen, Anchor, Book, FlaskConical, Command, Blocks, Pencil, Eraser
+    MoreVertical, X, Save, Clock, BookOpen, Anchor, Book, FlaskConical, Command, Blocks, Pencil, Eraser,
+    Hand, Highlighter, Type, Shapes, Undo, History, Sun, Square, Circle, Triangle, MousePointer2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, useFirestore } from './lib/firebase';
@@ -60,8 +61,10 @@ export const getFormattedHtml = (act?: any) => {
                     toggleDrawingMode(e.data.enabled);
                 } else if (e.data.type === 'CLEAR_DRAWING') {
                     clearDrawing();
-                } else if (e.data.type === 'SET_DRAW_COLOR') {
-                    window.__drawColor = e.data.color;
+                } else if (e.data.type === 'UNDO_DRAWING') {
+                    undoDrawing();
+                } else if (e.data.type === 'SET_DRAW_CONFIG') {
+                    window.__drawConfig = { ...window.__drawConfig, ...e.data.config };
                 }
             });
 
@@ -73,6 +76,19 @@ export const getFormattedHtml = (act?: any) => {
                 if (canvas) {
                     canvas.style.display = enabled ? 'block' : 'none';
                     canvas.style.pointerEvents = enabled ? 'all' : 'none';
+                }
+            }
+
+            let history = [];
+            function saveHistory() {
+                if (!ctx) return;
+                history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+                if (history.length > 20) history.shift();
+            }
+
+            function undoDrawing() {
+                if (history.length > 0) {
+                    ctx.putImageData(history.pop(), 0, 0);
                 }
             }
 
@@ -94,33 +110,75 @@ export const getFormattedHtml = (act?: any) => {
                 canvas.addEventListener('pointerdown', startDrawing);
                 canvas.addEventListener('pointermove', draw);
                 canvas.addEventListener('pointerup', stopDrawing);
-                canvas.addEventListener('pointerout', stopDrawing);
             }
 
             function resize() {
+                const oldData = ctx ? ctx.getImageData(0, 0, canvas.width, canvas.height) : null;
                 canvas.width = window.innerWidth * window.devicePixelRatio;
                 canvas.height = window.innerHeight * window.devicePixelRatio;
                 ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
+                if (oldData) ctx.putImageData(oldData, 0, 0);
             }
+
+            let startX, startY;
+            window.__drawConfig = { tool: 'pencil', color: '#4f46e5', width: 3 };
 
             function startDrawing(e) {
                 if (!enabled) return;
+                saveHistory();
                 isDrawing = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                
+                if (window.__drawConfig.tool === 'text') {
+                    const text = prompt('Notunuzu girin:');
+                    if (text) {
+                        ctx.font = '20px Arial';
+                        ctx.fillStyle = window.__drawConfig.color;
+                        ctx.fillText(text, startX, startY);
+                    }
+                    isDrawing = false;
+                    return;
+                }
+
                 ctx.beginPath();
-                ctx.moveTo(e.clientX, e.clientY);
-                ctx.strokeStyle = window.__drawColor || '#4f46e5';
-                ctx.lineWidth = window.__drawWidth || 3;
+                ctx.moveTo(startX, startY);
+                ctx.strokeStyle = window.__drawConfig.color;
+                ctx.lineWidth = window.__drawConfig.width;
+                
+                if (window.__drawConfig.tool === 'highlighter') {
+                    ctx.globalAlpha = 0.5;
+                    ctx.lineWidth = 15;
+                } else {
+                    ctx.globalAlpha = 1.0;
+                }
             }
 
             function draw(e) {
                 if (!isDrawing || !enabled) return;
-                ctx.lineTo(e.clientX, e.clientY);
-                ctx.stroke();
+                const tool = window.__drawConfig.tool;
+                
+                if (tool === 'pencil' || tool === 'highlighter') {
+                    ctx.lineTo(e.clientX, e.clientY);
+                    ctx.stroke();
+                } else if (tool === 'rect') {
+                    // Implementation for live preview of shapes could be added here
+                }
             }
 
-            function stopDrawing() {
+            function stopDrawing(e) {
+                if (!isDrawing) return;
+                const tool = window.__drawConfig.tool;
+                if (tool === 'rect') {
+                    ctx.strokeRect(startX, startY, e.clientX - startX, e.clientY - startY);
+                } else if (tool === 'circle') {
+                    const radius = Math.sqrt(Math.pow(e.clientX - startX, 2) + Math.pow(e.clientY - startY, 2));
+                    ctx.beginPath();
+                    ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+                    ctx.stroke();
+                }
                 isDrawing = false;
             }
 
@@ -146,6 +204,96 @@ export const getFormattedHtml = (act?: any) => {
 // =======================
 // COMPONENTS
 // =======================
+// =======================
+// DRAWING TOOLBAR
+// =======================
+const DrawingToolbar = ({ onCommand, config, setConfig }: { 
+    onCommand: (type: string, data?: any) => void, 
+    config: any, 
+    setConfig: (c: any) => void 
+}) => {
+    const colors = ['#ffffff', '#ff4d4d', '#ffa500', '#2ecc71', '#3498db', '#9b59b6', '#000000'];
+    const tools = [
+        { id: 'pencil', icon: Pencil, label: 'Kurşun Kalem' },
+        { id: 'pan', icon: Hand, label: 'El / Seçim' },
+        { id: 'highlighter', icon: Highlighter, label: 'Fosforlu Kalem' },
+        { id: 'sun', icon: Sun, label: 'Lazer' },
+        { id: 'eraser', icon: Eraser, label: 'Silgi' },
+        { id: 'text', icon: Type, label: 'Metin' },
+        { id: 'rect', icon: Square, label: 'Şekiller' },
+    ];
+
+    return (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-1 bg-[#1a1b26] p-1.5 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5 transition-all duration-300 scale-90 sm:scale-100">
+            <div className="flex items-center gap-0.5 px-2 border-r border-white/10">
+                {tools.map(tool => (
+                    <button
+                        key={tool.id}
+                        onClick={() => setConfig({ ...config, tool: tool.id })}
+                        className={cn(
+                            "p-2.5 rounded-xl transition-all duration-200 group relative",
+                            config.tool === tool.id ? "bg-[#2d3045] text-white" : "text-slate-400 hover:text-white hover:bg-white/5"
+                        )}
+                        title={tool.label}
+                    >
+                        <tool.icon className="w-5 h-5" />
+                        {config.tool === tool.id && (
+                            <motion.div layoutId="activeTool" className="absolute inset-0 border-2 border-emerald-500/50 rounded-xl pointer-events-none" />
+                        )}
+                    </button>
+                ))}
+            </div>
+
+            <div className="flex items-center gap-2 px-4 border-r border-white/10">
+                {colors.map(color => (
+                    <button
+                        key={color}
+                        onClick={() => setConfig({ ...config, color })}
+                        className={cn(
+                            "w-7 h-7 rounded-full border-2 transition-all hover:scale-110 flex items-center justify-center",
+                            config.color === color ? "border-white" : "border-transparent"
+                        )}
+                        style={{ backgroundColor: color }}
+                    />
+                ))}
+                <div className="w-4 h-4 rounded-full bg-slate-400 cursor-pointer ml-1" /> {/* Brush size indicator */}
+            </div>
+
+            <div className="flex items-center gap-1.5 px-2">
+                <button 
+                    onClick={() => onCommand('UNDO_DRAWING')} 
+                    className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                    title="Geri Al"
+                >
+                    <Undo className="w-5 h-5" />
+                </button>
+                <button 
+                    onClick={() => onCommand('CLEAR_DRAWING')}
+                    className="p-2.5 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                    title="Temizle"
+                >
+                    <Trash2 className="w-5 h-5" />
+                </button>
+                <button 
+                    onClick={() => {
+                        alert('Çizim kaydedildi! (Bu özellik yakında aktif olacak)');
+                    }}
+                    className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                    title="Kaydet"
+                >
+                    <Save className="w-5 h-5" />
+                </button>
+                <button 
+                    className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                    title="Ayarlar"
+                >
+                    <Settings className="w-5 h-5" />
+                </button>
+            </div>
+        </div>
+    );
+};
+
 const PortalCard = ({ children, className, onClick }: { children: React.ReactNode, className?: string, onClick?: () => void }) => (
     <div onClick={onClick} className={cn("portal-card overflow-hidden relative group", className)}>
         {children}
@@ -425,6 +573,7 @@ const StudentPortal = ({ act }: { act: any }) => {
     const [isFinished, setIsFinished] = useState(false);
     const [submissionId, setSubmissionId] = useState<string | null>(null);
     const [isDrawingMode, setIsDrawingMode] = useState(false);
+    const [drawConfig, setDrawConfig] = useState({ tool: 'pencil', color: '#ffffff', width: 3 });
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const submissionsHandler = useFirestore('submissions');
 
@@ -469,9 +618,18 @@ const StudentPortal = ({ act }: { act: any }) => {
         }
     }, [isDrawingMode]);
 
-    const handleClearDrawing = () => {
+    useEffect(() => {
         if (iframeRef.current?.contentWindow) {
-            iframeRef.current.contentWindow.postMessage({ type: 'CLEAR_DRAWING' }, '*');
+            iframeRef.current.contentWindow.postMessage({ 
+                type: 'SET_DRAW_CONFIG', 
+                config: drawConfig 
+            }, '*');
+        }
+    }, [drawConfig]);
+
+    const handleDrawingCommand = (type: string, data?: any) => {
+        if (iframeRef.current?.contentWindow) {
+            iframeRef.current.contentWindow.postMessage({ type, ...data }, '*');
         }
     };
 
@@ -575,16 +733,6 @@ const StudentPortal = ({ act }: { act: any }) => {
                             {isDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}
                         </button>
                         
-                        {isDrawingMode && (
-                            <button 
-                                onClick={handleClearDrawing}
-                                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-bold uppercase tracking-widest transition-all"
-                            >
-                                <Eraser className="w-4 h-4" />
-                                Temizle
-                            </button>
-                        )}
-                        
                         <button onClick={handleSubmit} className="ml-2 px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">
                             Sınavı Bitir
                         </button>
@@ -604,15 +752,15 @@ const StudentPortal = ({ act }: { act: any }) => {
                         <Pencil className="w-4 h-4" />
                         {isDrawingMode ? 'Modu Kapat' : 'Kalem Modu'}
                     </button>
-                    {isDrawingMode && (
-                        <button 
-                            onClick={handleClearDrawing}
-                            className="p-3 bg-white/90 backdrop-blur-md border border-slate-200 text-slate-600 hover:bg-white rounded-2xl shadow-xl transition-all"
-                        >
-                            <Eraser className="w-5 h-5" />
-                        </button>
-                    )}
                 </div>
+            )}
+
+            {isDrawingMode && (
+                <DrawingToolbar 
+                    config={drawConfig} 
+                    setConfig={setDrawConfig} 
+                    onCommand={handleDrawingCommand} 
+                />
             )}
             
             <main className={cn("flex-1 min-h-0 bg-slate-50", act.is_test ? "p-4" : "p-0")}>
@@ -643,6 +791,7 @@ export default function App() {
     const [previewId, setPreviewId] = useState<string | null>(null);
     const [showResultsId, setShowResultsId] = useState<string | null>(null);
     const [isPreviewDrawingMode, setIsPreviewDrawingMode] = useState(false);
+    const [previewDrawConfig, setPreviewDrawConfig] = useState({ tool: 'pencil', color: '#ffffff', width: 3 });
     const previewIframeRef = React.useRef<HTMLIFrameElement>(null);
 
     // Form States
@@ -668,6 +817,21 @@ export default function App() {
             }, '*');
         }
     }, [isPreviewDrawingMode, previewId]);
+
+    useEffect(() => {
+        if (previewIframeRef.current?.contentWindow) {
+            previewIframeRef.current.contentWindow.postMessage({ 
+                type: 'SET_DRAW_CONFIG', 
+                config: previewDrawConfig 
+            }, '*');
+        }
+    }, [previewDrawConfig]);
+
+    const handlePreviewDrawingCommand = (type: string, data?: any) => {
+        if (previewIframeRef.current?.contentWindow) {
+            previewIframeRef.current.contentWindow.postMessage({ type, ...data }, '*');
+        }
+    };
 
     const filteredScience = useMemo(() => {
         const grades = ["1. Sınıf", "2. Sınıf", "3. Sınıf", "4. Sınıf"];
@@ -1045,22 +1209,18 @@ export default function App() {
                                     <Pencil className="w-4 h-4" />
                                     {isPreviewDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}
                                 </button>
-                                {isPreviewDrawingMode && (
-                                    <button 
-                                        onClick={() => {
-                                            if (previewIframeRef.current?.contentWindow) {
-                                                previewIframeRef.current.contentWindow.postMessage({ type: 'CLEAR_DRAWING' }, '*');
-                                            }
-                                        }}
-                                        className="w-10 h-10 bg-white/90 backdrop-blur-md border border-neutral-200/50 text-neutral-900 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors shadow-sm"
-                                    >
-                                        <Eraser className="w-4 h-4" />
-                                    </button>
-                                )}
                                 <button onClick={() => setPreviewId(null)} className="w-10 h-10 bg-white/90 backdrop-blur-md border border-neutral-200/50 text-neutral-900 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors shadow-sm">
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
+
+                            {isPreviewDrawingMode && (
+                                <DrawingToolbar 
+                                    config={previewDrawConfig} 
+                                    setConfig={setPreviewDrawConfig} 
+                                    onCommand={handlePreviewDrawingCommand} 
+                                />
+                            )}
                             <iframe 
                                 ref={previewIframeRef}
                                 srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} 
