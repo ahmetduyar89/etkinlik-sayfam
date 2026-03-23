@@ -35,8 +35,6 @@ export const getFormattedHtml = (act?: any) => {
         body, html {
             margin: 0; padding: 0; width: 100vw; min-height: 100vh;
             background-color: transparent;
-            overflow: hidden;
-            touch-action: none;
         }
         ${css_code || ''}
         #drawing-canvas {
@@ -65,6 +63,7 @@ export const getFormattedHtml = (act?: any) => {
                     undoDrawing();
                 } else if (e.data.type === 'SET_DRAW_CONFIG') {
                     window.__drawConfig = { ...window.__drawConfig, ...e.data.config };
+                    updateCanvasInteractivity();
                 }
             });
 
@@ -73,9 +72,37 @@ export const getFormattedHtml = (act?: any) => {
                 if (enabled && !canvas) {
                     initCanvas();
                 }
+                
+                // Allow scrolling when not in drawing mode or when 'pan' tool is selected
+                document.documentElement.style.overflow = enabled ? 'hidden' : 'auto';
+                document.body.style.overflow = enabled ? 'hidden' : 'auto';
+                document.documentElement.style.touchAction = enabled ? 'none' : 'auto';
+                document.body.style.touchAction = enabled ? 'none' : 'auto';
+
                 if (canvas) {
                     canvas.style.display = enabled ? 'block' : 'none';
+                    updateCanvasInteractivity();
+                }
+            }
+
+            function updateCanvasInteractivity() {
+                if (!canvas) return;
+                const tool = window.__drawConfig.tool;
+                // If 'pan' (hand) tool is selected, we want to be able to click through the canvas
+                if (tool === 'pan') {
+                    canvas.style.pointerEvents = 'none';
+                    document.documentElement.style.overflow = 'auto';
+                    document.body.style.overflow = 'auto';
+                    document.documentElement.style.touchAction = 'auto';
+                    document.body.style.touchAction = 'auto';
+                } else {
                     canvas.style.pointerEvents = enabled ? 'all' : 'none';
+                    if (enabled) {
+                        document.documentElement.style.overflow = 'hidden';
+                        document.body.style.overflow = 'hidden';
+                        document.documentElement.style.touchAction = 'none';
+                        document.body.style.touchAction = 'none';
+                    }
                 }
             }
 
@@ -148,9 +175,15 @@ export const getFormattedHtml = (act?: any) => {
                 ctx.strokeStyle = window.__drawConfig.color;
                 ctx.lineWidth = window.__drawConfig.width;
                 
+                // Tool specific settings
+                ctx.globalCompositeOperation = 'source-over';
+                
                 if (window.__drawConfig.tool === 'highlighter') {
                     ctx.globalAlpha = 0.5;
-                    ctx.lineWidth = 15;
+                    ctx.lineWidth = 20;
+                } else if (window.__drawConfig.tool === 'eraser') {
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.lineWidth = 30;
                 } else {
                     ctx.globalAlpha = 1.0;
                 }
@@ -160,11 +193,9 @@ export const getFormattedHtml = (act?: any) => {
                 if (!isDrawing || !enabled) return;
                 const tool = window.__drawConfig.tool;
                 
-                if (tool === 'pencil' || tool === 'highlighter') {
+                if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser') {
                     ctx.lineTo(e.clientX, e.clientY);
                     ctx.stroke();
-                } else if (tool === 'rect') {
-                    // Implementation for live preview of shapes could be added here
                 }
             }
 
