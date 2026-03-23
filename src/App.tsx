@@ -193,14 +193,36 @@ export const getFormattedHtml = (act?: any) => {
                     ctx.putImageData(currentImageData, 0, 0);
                 }
 
-                if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser' || tool === 'dashed') {
+                if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser' || tool === 'dashed' || tool === 'chisel') {
                     window.__currentPath.push({ x, y });
+                    const pts = window.__currentPath;
                     
-                    ctx.beginPath();
-                    ctx.strokeStyle = window.__drawConfig.color;
-                    ctx.lineWidth = window.__drawConfig.width;
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
+                    ctx.save();
+                    
+                    if (tool === 'chisel') {
+                        // Better calligraphic effect using transforms
+                        ctx.beginPath();
+                        ctx.strokeStyle = window.__drawConfig.color;
+                        ctx.lineWidth = window.__drawConfig.width * 2;
+                        ctx.lineCap = 'square';
+                        ctx.lineJoin = 'miter';
+                        
+                        // Apply a 45-degree tilt to the brush
+                        // We achieve this by tilting the coordinate system, drawing, and restoring
+                        const angle = Math.PI / 4;
+                        ctx.translate(pts[0].x, pts[0].y);
+                        ctx.rotate(angle);
+                        ctx.scale(1, 0.25); // Squash one axis to make it a flat tip
+                        ctx.rotate(-angle);
+                        ctx.translate(-pts[0].x, -pts[0].y);
+                    } else {
+                        ctx.beginPath();
+                        ctx.strokeStyle = window.__drawConfig.color;
+                        ctx.lineWidth = window.__drawConfig.width;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                    }
+
                     ctx.setLineDash(tool === 'dashed' ? [10, 5] : []);
                     ctx.globalAlpha = 1.0;
                     ctx.globalCompositeOperation = 'source-over';
@@ -214,28 +236,27 @@ export const getFormattedHtml = (act?: any) => {
                         ctx.lineWidth = window.__drawConfig.width * 10;
                     }
 
-                    ctx.moveTo(window.__currentPath[0].x, window.__currentPath[0].y);
-                    for (let i = 1; i < window.__currentPath.length; i++) {
-                        ctx.lineTo(window.__currentPath[i].x, window.__currentPath[i].y);
+                    // Smooth path with quadratic curves
+                    if (pts.length < 3) {
+                        ctx.moveTo(pts[0].x, pts[0].y);
+                        if (pts.length === 2) ctx.lineTo(pts[1].x, pts[1].y);
+                    } else {
+                        ctx.moveTo(pts[0].x, pts[0].y);
+                        for (let i = 1; i < pts.length - 2; i++) {
+                            const xc = (pts[i].x + pts[i + 1].x) / 2;
+                            const yc = (pts[i].y + pts[i + 1].y) / 2;
+                            ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+                        }
+                        // last 2 points
+                        ctx.quadraticCurveTo(
+                            pts[pts.length - 2].x,
+                            pts[pts.length - 2].y,
+                            pts[pts.length - 1].x,
+                            pts[pts.length - 1].y
+                        );
                     }
                     ctx.stroke();
-                } else if (tool === 'chisel') {
-                    window.__currentPath.push({ x, y });
-                    ctx.fillStyle = window.__drawConfig.color;
-                    ctx.globalAlpha = 1.0;
-                    ctx.globalCompositeOperation = 'source-over';
-                    
-                    for (let i = 0; i < window.__currentPath.length; i++) {
-                        const pt = window.__currentPath[i];
-                        const w = window.__drawConfig.width * 4;
-                        const h = window.__drawConfig.width;
-                        const angle = Math.PI / 4;
-                        ctx.save();
-                        ctx.translate(pt.x, pt.y);
-                        ctx.rotate(angle);
-                        ctx.fillRect(-w/2, -h/2, w, h);
-                        ctx.restore();
-                    }
+                    ctx.restore();
                 } else {
                     drawShape(tool, startX, startY, x, y);
                 }
