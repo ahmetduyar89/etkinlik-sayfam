@@ -160,16 +160,32 @@ export const getFormattedHtml = (act?: any) => {
             let startX, startY;
             window.__drawConfig = { tool: 'pencil', color: '#4f46e5', width: 3 };
 
+            // High-speed smooth drawing engine
+            let tempCanvas, tempCtx;
+            let lastPoint, midPoint;
+
+            function initLayer() {
+                if (!tempCanvas) {
+                    tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = canvas.width;
+                    tempCanvas.height = canvas.height;
+                    tempCtx = tempCanvas.getContext('2d');
+                }
+                tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+            }
+
             function startDrawing(e) {
                 if (!enabled) return;
                 saveHistory();
                 isDrawing = true;
                 startX = e.pageX;
                 startY = e.pageY;
-                
-                // For smoother lines and no highlighter overlap beading:
-                window.__currentPath = [{ x: startX, y: startY }];
+                lastPoint = { x: startX, y: startY };
+                midPoint = { x: startX, y: startY };
+                window.__currentPath = [lastPoint];
                 currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                initLayer();
 
                 if (window.__drawConfig.tool === 'text') {
                     const text = prompt('Notunuzu girin:');
@@ -188,76 +204,79 @@ export const getFormattedHtml = (act?: any) => {
                 const tool = window.__drawConfig.tool;
                 const x = e.pageX;
                 const y = e.pageY;
-                
-                if (currentImageData) {
-                    ctx.putImageData(currentImageData, 0, 0);
-                }
+                const newPoint = { x, y };
 
                 if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser' || tool === 'dashed' || tool === 'chisel') {
-                    window.__currentPath.push({ x, y });
-                    const pts = window.__currentPath;
+                    window.__currentPath.push(newPoint);
+                    const currentMid = { x: (lastPoint.x + x) / 2, y: (lastPoint.y + y) / 2 };
                     
-                    ctx.save();
+                    // Standard segment settings
+                    const tCtx = (tool === 'highlighter' || tool === 'chisel') ? tempCtx : ctx;
+                    
+                    tCtx.beginPath();
+                    tCtx.setLineDash(tool === 'dashed' ? [10, 5] : []);
+                    tCtx.strokeStyle = window.__drawConfig.color;
+                    tCtx.lineWidth = window.__drawConfig.width;
+                    tCtx.lineCap = 'round';
+                    tCtx.lineJoin = 'round';
+                    tCtx.globalAlpha = 1.0;
+                    tCtx.globalCompositeOperation = 'source-over';
+
+                    if (tool === 'eraser') {
+                        tCtx.globalCompositeOperation = 'destination-out';
+                        tCtx.lineWidth = window.__drawConfig.width * 10;
+                    } else if (tool === 'chisel') {
+                        tCtx.lineCap = 'square';
+                        tCtx.lineWidth = window.__drawConfig.width * 2;
+                    }
+
+                    // Draw smooth segment
+                    tCtx.moveTo(midPoint.x, midPoint.y);
+                    tCtx.quadraticCurveTo(lastPoint.x, lastPoint.y, currentMid.x, currentMid.y);
                     
                     if (tool === 'chisel') {
-                        // Better calligraphic effect using transforms
-                        ctx.beginPath();
-                        ctx.strokeStyle = window.__drawConfig.color;
-                        ctx.lineWidth = window.__drawConfig.width * 2;
-                        ctx.lineCap = 'square';
-                        ctx.lineJoin = 'miter';
-                        
-                        // Apply a 45-degree tilt to the brush
-                        // We achieve this by tilting the coordinate system, drawing, and restoring
+                        // For chisel, we apply the tilt transform only to the stroke
+                        tCtx.save();
                         const angle = Math.PI / 4;
-                        ctx.translate(pts[0].x, pts[0].y);
-                        ctx.rotate(angle);
-                        ctx.scale(1, 0.25); // Squash one axis to make it a flat tip
-                        ctx.rotate(-angle);
-                        ctx.translate(-pts[0].x, -pts[0].y);
+                        // Transform the stroke to be calligraphic
+                        // Note: To do this O(1) we apply it globally, but because we draw segment-by-segment,
+                        // we need to be careful with coordinate space.
+                        // Simpler: Just draw the segment.
+                        tCtx.stroke();
+                        tCtx.restore();
                     } else {
-                        ctx.beginPath();
-                        ctx.strokeStyle = window.__drawConfig.color;
-                        ctx.lineWidth = window.__drawConfig.width;
-                        ctx.lineCap = 'round';
-                        ctx.lineJoin = 'round';
+                        tCtx.stroke();
                     }
 
-                    ctx.setLineDash(tool === 'dashed' ? [10, 5] : []);
-                    ctx.globalAlpha = 1.0;
-                    ctx.globalCompositeOperation = 'source-over';
-
-                    if (tool === 'highlighter') {
-                        ctx.globalAlpha = 0.3;
-                        ctx.lineWidth = window.__drawConfig.width * 8;
-                        ctx.globalCompositeOperation = 'multiply';
-                    } else if (tool === 'eraser') {
-                        ctx.globalCompositeOperation = 'destination-out';
-                        ctx.lineWidth = window.__drawConfig.width * 10;
-                    }
-
-                    // Smooth path with quadratic curves
-                    if (pts.length < 3) {
-                        ctx.moveTo(pts[0].x, pts[0].y);
-                        if (pts.length === 2) ctx.lineTo(pts[1].x, pts[1].y);
-                    } else {
-                        ctx.moveTo(pts[0].x, pts[0].y);
-                        for (let i = 1; i < pts.length - 2; i++) {
-                            const xc = (pts[i].x + pts[i + 1].x) / 2;
-                            const yc = (pts[i].y + pts[i + 1].y) / 2;
-                            ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+                    // If using temp layer (highlighter/chisel), composite back
+                    if (tool === 'highlighter' || tool === 'chisel') {
+                        ctx.putImageData(currentImageData, 0, 0);
+                        ctx.save();
+                        if (tool === 'highlighter') {
+                            ctx.globalAlpha = 0.3;
+                            ctx.globalCompositeOperation = 'multiply';
                         }
-                        // last 2 points
-                        ctx.quadraticCurveTo(
-                            pts[pts.length - 2].x,
-                            pts[pts.length - 2].y,
-                            pts[pts.length - 1].x,
-                            pts[pts.length - 1].y
-                        );
+                        
+                        if (tool === 'chisel') {
+                            // Apply calligraphic transform for the whole stroke render
+                            const tiltAngle = Math.PI / 4;
+                            ctx.translate(startX, startY);
+                            ctx.rotate(tiltAngle);
+                            ctx.scale(1, 0.25);
+                            ctx.rotate(-tiltAngle);
+                            ctx.translate(-startX, -startY);
+                        }
+                        
+                        ctx.drawImage(tempCanvas, 0, 0);
+                        ctx.restore();
                     }
-                    ctx.stroke();
-                    ctx.restore();
+
+                    lastPoint = newPoint;
+                    midPoint = currentMid;
                 } else {
+                    if (currentImageData) {
+                        ctx.putImageData(currentImageData, 0, 0);
+                    }
                     drawShape(tool, startX, startY, x, y);
                 }
             }
