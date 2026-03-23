@@ -42,6 +42,15 @@ export const getFormattedHtml = (act?: any) => {
             touch-action: none;
             cursor: crosshair;
         }
+        body.whiteboard-active {
+            background-color: white !important;
+            background-image: linear-gradient(#f0f0f0 1px, transparent 1px), linear-gradient(90deg, #f0f0f0 1px, transparent 1px) !important;
+            background-size: 30px 30px !important;
+        }
+        body.whiteboard-active > *:not(#drawing-canvas):not(script):not(style) {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
     </style>
     <script>
         // Helper to send answers to the portal
@@ -66,6 +75,12 @@ export const getFormattedHtml = (act?: any) => {
                 } else if (e.data.type === 'SET_DRAW_CONFIG') {
                     window.__drawConfig = { ...window.__drawConfig, ...e.data.config };
                     updateCanvasInteractivity();
+                } else if (e.data.type === 'SET_WHITEBOARD') {
+                    if (e.data.enabled) {
+                        document.body.classList.add('whiteboard-active');
+                    } else {
+                        document.body.classList.remove('whiteboard-active');
+                    }
                 }
             });
 
@@ -548,7 +563,7 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
                     </button>
                     {setShowWhiteboard && (
                         <button 
-                            onClick={() => setShowWhiteboard(!showWhiteboard)}
+                            onClick={() => onCommand('TOGGLE_WHITEBOARD')}
                             className={cn(
                                 "p-2.5 rounded-xl transition-all",
                                 showWhiteboard ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-white hover:bg-white/5"
@@ -1477,9 +1492,8 @@ export default function App() {
                         <motion.div initial={{ opacity: 0, scale: 1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1 }} transition={{ duration: 0.2 }} className="relative w-full h-full bg-white overflow-hidden">
                             <motion.div 
                                 drag 
-                                dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                                dragElastic={0.1}
-                                whileDrag={{ scale: 1.1, cursor: 'grabbing' }}
+                                dragMomentum={false}
+                                whileDrag={{ scale: 1.1 }}
                                 className="absolute top-4 right-4 z-[400] flex gap-2 cursor-grab active:cursor-grabbing"
                             >
                                 <button 
@@ -1496,6 +1510,7 @@ export default function App() {
                                     onClick={() => {
                                         setPreviewId(null);
                                         setIsPreviewDrawingMode(false);
+                                        setShowWhiteboard(false);
                                     }} 
                                     className="w-10 h-10 bg-white border border-neutral-200 text-neutral-900 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors shadow-lg"
                                 >
@@ -1507,27 +1522,36 @@ export default function App() {
                                 <DrawingToolbar 
                                     config={previewDrawConfig} 
                                     setConfig={setPreviewDrawConfig} 
-                                    onCommand={handlePreviewDrawingCommand} 
+                                    onCommand={(type, data) => {
+                                        if (type === 'TOGGLE_WHITEBOARD') {
+                                            const newVal = !showWhiteboard;
+                                            setShowWhiteboard(newVal);
+                                            handlePreviewDrawingCommand('SET_WHITEBOARD', { enabled: newVal });
+                                        } else {
+                                            handlePreviewDrawingCommand(type, data);
+                                        }
+                                    }} 
                                     showWhiteboard={showWhiteboard}
-                                    setShowWhiteboard={setShowWhiteboard}
+                                    setShowWhiteboard={(val) => {
+                                        setShowWhiteboard(val);
+                                        handlePreviewDrawingCommand('SET_WHITEBOARD', { enabled: val });
+                                    }}
                                 />
                             )}
                             <div className="relative w-full h-full bg-white overflow-hidden">
-                                {showWhiteboard && (
-                                    <div className="absolute inset-0 z-[5] bg-white whiteboard-grid transition-all pointer-events-none" style={{
-                                        backgroundImage: 'linear-gradient(#e5e7eb 1px, transparent 1px), linear-gradient(90deg, #e5e7eb 1px, transparent 1px)',
-                                        backgroundSize: '30px 30px'
-                                    }} />
-                                )}
                                 <iframe 
                                     ref={previewIframeRef}
                                     srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} 
-                                    className={cn("w-full h-full border-0 transition-opacity duration-300", showWhiteboard ? "opacity-0" : "opacity-100")} 
+                                    className="w-full h-full border-0" 
                                     onLoad={() => {
                                         if (previewIframeRef.current?.contentWindow) {
                                             previewIframeRef.current.contentWindow.postMessage({ 
                                                 type: 'TOGGLE_DRAWING', 
                                                 enabled: isPreviewDrawingMode 
+                                            }, '*');
+                                            previewIframeRef.current.contentWindow.postMessage({ 
+                                                type: 'SET_WHITEBOARD', 
+                                                enabled: showWhiteboard 
                                             }, '*');
                                         }
                                     }}
