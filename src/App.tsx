@@ -160,10 +160,11 @@ export const getFormattedHtml = (act?: any) => {
             let startX, startY;
             window.__drawConfig = { tool: 'pencil', color: '#4f46e5', width: 3 };
 
-            // High-speed smooth drawing engine with page awareness
+            // High-speed smooth drawing engine with page-specific persistence
             let tempCanvas, tempCtx;
             let lastPoint, midPoint;
             let currentPage = '';
+            let drawingCache = {}; // Storage for page drawings: { pageId: ImageData }
 
             function initLayer() {
                 if (!tempCanvas) {
@@ -175,6 +176,29 @@ export const getFormattedHtml = (act?: any) => {
                 tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
             }
 
+            function saveCurrentPage() {
+                if (currentPage && ctx) {
+                    try {
+                        // Snapshot current canvas state
+                        drawingCache[currentPage] = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    } catch (e) {
+                        console.error('Save error:', e);
+                    }
+                }
+            }
+
+            function loadPage(id) {
+                if (!ctx) return;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                if (drawingCache[id]) {
+                    try {
+                        ctx.putImageData(drawingCache[id], 0, 0);
+                    } catch (e) {
+                        console.error('Load error:', e);
+                    }
+                }
+            }
+
             // Sync drawings with iframe navigation
             function checkPage() {
                 try {
@@ -184,10 +208,9 @@ export const getFormattedHtml = (act?: any) => {
                     const newId = (window.location.hash || window.location.pathname) + h1;
                     
                     if (newId !== currentPage) {
-                        if (currentPage !== '') {
-                            clearDrawing();
-                        }
+                        saveCurrentPage(); // Save existing work
                         currentPage = newId;
+                        loadPage(newId);   // Restore or start fresh
                     }
                 } catch(e) {}
             }
@@ -196,20 +219,17 @@ export const getFormattedHtml = (act?: any) => {
             function startDrawing(e) {
                 if (!enabled) return;
 
-                // ALLOW Finger scroll while drawing with Pen:
-                // If the pointer is a finger (touch) and we are not in 'pan' mode, 
-                // we allow it to scroll unless we are explicitly drawing with it.
-                // However, to keep it simple: Pen draws, Finger scrolls.
-                if (e.pointerType === 'touch' && window.__drawConfig.tool !== 'pan') {
-                    // If we want to allow finger scroll, we must NOT start drawing
-                    return; 
-                }
-
+                // INPUT LOGIC: Pen Draws, Finger Scrolls
+                // If the pointer is a finger (touch), we don't draw. 
+                // This allows the browser to handle the touch for scrolling.
+                if (e.pointerType === 'touch') return;
+                
+                // Block 'pan' tool click
                 if (window.__drawConfig.tool === 'pan') return;
 
                 saveHistory();
                 isDrawing = true;
-                e.preventDefault(); // Block scroll only for pen/mouse
+                e.preventDefault(); // Block scroll for pen input
                 
                 startX = e.pageX;
                 startY = e.pageY;
@@ -235,9 +255,6 @@ export const getFormattedHtml = (act?: any) => {
             function draw(e) {
                 if (!isDrawing || !enabled) return;
                 
-                // Allow scrolling if using finger and tool is 'pan'
-                if (e.pointerType === 'touch' && window.__drawConfig.tool === 'pan') return;
-                
                 const tool = window.__drawConfig.tool;
                 const x = e.pageX;
                 const y = e.pageY;
@@ -254,8 +271,8 @@ export const getFormattedHtml = (act?: any) => {
                     tCtx.setLineDash(tool === 'dashed' ? [10, 5] : []);
                     tCtx.strokeStyle = window.__drawConfig.color;
                     tCtx.lineWidth = window.__drawConfig.width;
-                    tCtx.lineCap = 'round';
-                    tCtx.lineJoin = 'round';
+                    tCtx.lineCap = tool === 'chisel' ? 'square' : 'round';
+                    tCtx.lineJoin = tool === 'chisel' ? 'miter' : 'round';
                     tCtx.globalAlpha = 1.0;
                     tCtx.globalCompositeOperation = 'source-over';
 
@@ -263,15 +280,13 @@ export const getFormattedHtml = (act?: any) => {
                         tCtx.globalCompositeOperation = 'destination-out';
                         tCtx.lineWidth = window.__drawConfig.width * 10;
                     } else if (tool === 'chisel') {
-                        // Real Chisel Effect: Slanted transformation
+                        // Calligraphic transform at 45 degrees
                         tCtx.translate(lastPoint.x, lastPoint.y);
                         tCtx.rotate(Math.PI / 4);
                         tCtx.scale(1, 0.2); 
                         tCtx.rotate(-Math.PI / 4);
                         tCtx.translate(-lastPoint.x, -lastPoint.y);
                         tCtx.lineWidth = window.__drawConfig.width * 4;
-                        tCtx.lineCap = 'square';
-                        tCtx.lineJoin = 'miter';
                     }
 
                     tCtx.moveTo(midPoint.x, midPoint.y);
@@ -352,6 +367,8 @@ export const getFormattedHtml = (act?: any) => {
 
             function clearDrawing() {
                 if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+                // Also clear from cache for current page
+                if (currentPage) delete drawingCache[currentPage];
             }
 
             // Set touch action based on tool
@@ -359,7 +376,7 @@ export const getFormattedHtml = (act?: any) => {
                 if (window.__drawConfig.tool === 'pan') {
                     canvas.style.touchAction = 'auto'; // allow everything
                 } else {
-                    // pan-y allows vertical scroll with finger but blocks lateral movement
+                    // pan-y allows vertical scroll with finger but blocks lateral drawing-like movement
                     canvas.style.touchAction = 'pan-y pinch-zoom';
                 }
             }
