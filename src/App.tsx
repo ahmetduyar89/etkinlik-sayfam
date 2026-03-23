@@ -82,13 +82,13 @@ export const getFormattedHtml = (act?: any) => {
                 if (canvas) {
                     canvas.style.display = enabled ? 'block' : 'none';
                     updateCanvasInteractivity();
+                    if (enabled) resize(); // Re-sync size when opening
                 }
             }
 
             function updateCanvasInteractivity() {
                 if (!canvas) return;
                 const tool = window.__drawConfig.tool;
-                // If 'pan' (hand) tool is selected, we want to be able to click through the canvas
                 if (tool === 'pan') {
                     canvas.style.pointerEvents = 'none';
                     document.documentElement.style.overflow = 'auto';
@@ -122,17 +122,18 @@ export const getFormattedHtml = (act?: any) => {
             function initCanvas() {
                 canvas = document.createElement('canvas');
                 canvas.id = 'drawing-canvas';
-                canvas.style.position = 'fixed';
+                canvas.style.position = 'absolute'; // Changed from fixed to absolute
                 canvas.style.top = '0';
                 canvas.style.left = '0';
-                canvas.style.width = '100vw';
-                canvas.style.height = '100vh';
                 canvas.style.zIndex = '999999';
                 document.body.appendChild(canvas);
 
                 ctx = canvas.getContext('2d');
                 resize();
                 window.addEventListener('resize', resize);
+                // Watch for content changes to adjust canvas height
+                const observer = new MutationObserver(resize);
+                observer.observe(document.body, { childList: true, subtree: true });
 
                 canvas.addEventListener('pointerdown', startDrawing);
                 canvas.addEventListener('pointermove', draw);
@@ -140,9 +141,18 @@ export const getFormattedHtml = (act?: any) => {
             }
 
             function resize() {
+                if (!canvas) return;
                 const oldData = ctx ? ctx.getImageData(0, 0, canvas.width, canvas.height) : null;
-                canvas.width = window.innerWidth * window.devicePixelRatio;
-                canvas.height = window.innerHeight * window.devicePixelRatio;
+                
+                // Set canvas to cover the whole scrollable area
+                const w = Math.max(document.documentElement.scrollWidth, window.innerWidth);
+                const h = Math.max(document.documentElement.scrollHeight, window.innerHeight);
+                
+                canvas.width = w * window.devicePixelRatio;
+                canvas.height = h * window.devicePixelRatio;
+                canvas.style.width = w + 'px';
+                canvas.style.height = h + 'px';
+                
                 ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
@@ -156,8 +166,10 @@ export const getFormattedHtml = (act?: any) => {
                 if (!enabled) return;
                 saveHistory();
                 isDrawing = true;
-                startX = e.clientX;
-                startY = e.clientY;
+                
+                // Use pageX/pageY for absolute positioning reference
+                startX = e.pageX;
+                startY = e.pageY;
                 
                 if (window.__drawConfig.tool === 'text') {
                     const text = prompt('Notunuzu girin:');
@@ -175,15 +187,14 @@ export const getFormattedHtml = (act?: any) => {
                 ctx.strokeStyle = window.__drawConfig.color;
                 ctx.lineWidth = window.__drawConfig.width;
                 
-                // Tool specific settings
                 ctx.globalCompositeOperation = 'source-over';
                 
                 if (window.__drawConfig.tool === 'highlighter') {
                     ctx.globalAlpha = 0.5;
-                    ctx.lineWidth = 20;
+                    ctx.lineWidth = window.__drawConfig.width * 5; // Scale relative to brush size
                 } else if (window.__drawConfig.tool === 'eraser') {
                     ctx.globalCompositeOperation = 'destination-out';
-                    ctx.lineWidth = 30;
+                    ctx.lineWidth = window.__drawConfig.width * 10;
                 } else {
                     ctx.globalAlpha = 1.0;
                 }
@@ -194,7 +205,7 @@ export const getFormattedHtml = (act?: any) => {
                 const tool = window.__drawConfig.tool;
                 
                 if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser') {
-                    ctx.lineTo(e.clientX, e.clientY);
+                    ctx.lineTo(e.pageX, e.pageY);
                     ctx.stroke();
                 }
             }
@@ -203,9 +214,9 @@ export const getFormattedHtml = (act?: any) => {
                 if (!isDrawing) return;
                 const tool = window.__drawConfig.tool;
                 if (tool === 'rect') {
-                    ctx.strokeRect(startX, startY, e.clientX - startX, e.clientY - startY);
+                    ctx.strokeRect(startX, startY, e.pageX - startX, e.pageY - startY);
                 } else if (tool === 'circle') {
-                    const radius = Math.sqrt(Math.pow(e.clientX - startX, 2) + Math.pow(e.clientY - startY, 2));
+                    const radius = Math.sqrt(Math.pow(e.pageX - startX, 2) + Math.pow(e.pageY - startY, 2));
                     ctx.beginPath();
                     ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
                     ctx.stroke();
@@ -287,7 +298,24 @@ const DrawingToolbar = ({ onCommand, config, setConfig }: {
                         style={{ backgroundColor: color }}
                     />
                 ))}
-                <div className="w-4 h-4 rounded-full bg-slate-400 cursor-pointer ml-1" /> {/* Brush size indicator */}
+            </div>
+
+            <div className="flex items-center gap-3 px-4 border-r border-white/10">
+                {[2, 5, 10].map(size => (
+                    <button
+                        key={size}
+                        onClick={() => setConfig({ ...config, width: size })}
+                        className={cn(
+                            "rounded-full bg-slate-400 transition-all hover:bg-white",
+                            config.width === size ? "bg-white scale-125 ring-2 ring-indigo-500 ring-offset-2 ring-offset-[#1a1b26]" : "hover:scale-110"
+                        )}
+                        style={{ 
+                            width: size + 4 + 'px', 
+                            height: size + 4 + 'px' 
+                        }}
+                        title={`${size}px Boyut`}
+                    />
+                ))}
             </div>
 
             <div className="flex items-center gap-1.5 px-2">
