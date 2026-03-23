@@ -141,7 +141,15 @@ export const getFormattedHtml = (act?: any) => {
 
             function resize() {
                 if (!canvas) return;
-                const oldData = ctx ? ctx.getImageData(0, 0, canvas.width, canvas.height) : null;
+                
+                // PERFORMANCE FIX: Use GPU-backed drawImage instead of CPU-heavy getImageData
+                // This prevents the "22MB memory stall" on iPad during resize/close.
+                const tempCanvasForResize = document.createElement('canvas');
+                tempCanvasForResize.width = canvas.width;
+                tempCanvasForResize.height = canvas.height;
+                const tempCtxForResize = tempCanvasForResize.getContext('2d');
+                tempCtxForResize.drawImage(canvas, 0, 0);
+
                 const w = Math.max(document.documentElement.scrollWidth, window.innerWidth);
                 const h = Math.max(document.documentElement.scrollHeight, window.innerHeight);
                 
@@ -150,10 +158,12 @@ export const getFormattedHtml = (act?: any) => {
                 canvas.style.width = w + 'px';
                 canvas.style.height = h + 'px';
                 
+                ctx = canvas.getContext('2d');
                 ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
-                if (oldData) ctx.putImageData(oldData, 0, 0);
+                
+                ctx.drawImage(tempCanvasForResize, 0, 0, w, h);
             }
 
             let startX, startY;
@@ -163,7 +173,7 @@ export const getFormattedHtml = (act?: any) => {
             let tempCanvas, tempCtx;
             let lastPoint, midPoint;
             let currentPage = '';
-            let drawingCache = {}; // Storage for page drawings: { pageId: ImageData }
+            let drawingCache = {}; // Storage for page drawings: { pageId: DataURL }
 
             function initLayer() {
                 if (!tempCanvas) {
@@ -176,13 +186,11 @@ export const getFormattedHtml = (act?: any) => {
             }
 
             function saveCurrentPage() {
-                if (currentPage && ctx) {
+                if (currentPage && canvas) {
                     try {
-                        // Snapshot current canvas state
-                        drawingCache[currentPage] = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    } catch (e) {
-                        console.error('Save error:', e);
-                    }
+                        // Use toDataURL for persistence - more memory stable for storage than ImageData
+                        drawingCache[currentPage] = canvas.toDataURL();
+                    } catch (e) {}
                 }
             }
 
@@ -190,51 +198,44 @@ export const getFormattedHtml = (act?: any) => {
                 if (!ctx) return;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 if (drawingCache[id]) {
-                    try {
-                        ctx.putImageData(drawingCache[id], 0, 0);
-                    } catch (e) {
-                        console.error('Load error:', e);
-                    }
+                    const img = new Image();
+                    img.onload = () => ctx.drawImage(img, 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
+                    img.src = drawingCache[id];
                 }
             }
 
             // Sync drawings with iframe navigation
             function checkPage() {
                 try {
-                    // Check pathname, hash, and content title to see if the internal page changed
                     const body = document.body;
                     const h1 = body.querySelector('h1')?.innerText || '';
                     const newId = (window.location.hash || window.location.pathname) + h1;
                     
                     if (newId !== currentPage) {
-                        saveCurrentPage(); // Save existing work
+                        saveCurrentPage();
                         currentPage = newId;
-                        loadPage(newId);   // Restore or start fresh
+                        loadPage(newId);
                     }
                 } catch(e) {}
             }
-            setInterval(checkPage, 500);
+            setInterval(checkPage, 800);
 
             function startDrawing(e) {
                 if (!enabled) return;
-
-                // INPUT LOGIC: Pen Draws, Finger Scrolls
-                // If the pointer is a finger (touch), we don't draw. 
-                // This allows the browser to handle the touch for scrolling.
                 if (e.pointerType === 'touch') return;
-                
-                // Block 'pan' tool click
                 if (window.__drawConfig.tool === 'pan') return;
 
                 saveHistory();
                 isDrawing = true;
-                e.preventDefault(); // Block scroll for pen input
+                e.preventDefault();
                 
                 startX = e.pageX;
                 startY = e.pageY;
                 lastPoint = { x: startX, y: startY };
                 midPoint = { x: startX, y: startY };
                 window.__currentPath = [lastPoint];
+                
+                // Performance: avoid getImageData here if possible, but shapes need it for preview
                 currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 
                 initLayer();
