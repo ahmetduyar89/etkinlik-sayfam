@@ -127,13 +127,12 @@ export const getFormattedHtml = (act?: any) => {
                 canvas.style.top = '0';
                 canvas.style.left = '0';
                 canvas.style.zIndex = '999999';
+                canvas.style.pointerEvents = 'none'; // Default to through
                 document.body.appendChild(canvas);
 
                 ctx = canvas.getContext('2d');
                 resize();
                 window.addEventListener('resize', resize);
-                const observer = new MutationObserver(resize);
-                observer.observe(document.body, { childList: true, subtree: true });
 
                 canvas.addEventListener('pointerdown', startDrawing);
                 canvas.addEventListener('pointermove', draw);
@@ -1457,7 +1456,13 @@ export default function App() {
             <AnimatePresence>
                 {previewId && (
                     <div className="fixed inset-0 z-[300] flex items-center justify-center p-0">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPreviewId(null)} className="absolute inset-0 bg-neutral-900/60 backdrop-blur-md" />
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
+                            onClick={() => {
+                                setPreviewId(null);
+                                setIsPreviewDrawingMode(false);
+                            }} 
+                            className="absolute inset-0 bg-neutral-900/60 backdrop-blur-md" 
+                        />
                         <motion.div initial={{ opacity: 0, scale: 1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1 }} transition={{ duration: 0.2 }} className="relative w-full h-full bg-white overflow-hidden">
                             <div className="absolute top-4 right-4 z-10 flex gap-2">
                                 <button 
@@ -1470,7 +1475,13 @@ export default function App() {
                                     <Pencil className="w-4 h-4" />
                                     {isPreviewDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}
                                 </button>
-                                <button onClick={() => setPreviewId(null)} className="w-10 h-10 bg-white/90 backdrop-blur-md border border-neutral-200/50 text-neutral-900 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors shadow-sm">
+                                <button 
+                                    onClick={() => {
+                                        setPreviewId(null);
+                                        setIsPreviewDrawingMode(false);
+                                    }} 
+                                    className="w-10 h-10 bg-white/90 backdrop-blur-md border border-neutral-200/50 text-neutral-900 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors shadow-sm"
+                                >
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
