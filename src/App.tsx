@@ -1456,9 +1456,9 @@ export default function App() {
             {/* FULL PREVIEW MODAL */}
             <AnimatePresence>
                 {previewId && (
-                    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 sm:p-8">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPreviewId(null)} className="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" />
-                        <motion.div initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: 10 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }} className="relative w-full h-full bg-white rounded-2xl border border-neutral-200/50 overflow-hidden shadow-2xl">
+                    <div className="fixed inset-0 z-[300] flex items-center justify-center p-0">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPreviewId(null)} className="absolute inset-0 bg-neutral-900/60 backdrop-blur-md" />
+                        <motion.div initial={{ opacity: 0, scale: 1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1 }} transition={{ duration: 0.2 }} className="relative w-full h-full bg-white overflow-hidden">
                             <div className="absolute top-4 right-4 z-10 flex gap-2">
                                 <button 
                                     onClick={() => setIsPreviewDrawingMode(!isPreviewDrawingMode)}
