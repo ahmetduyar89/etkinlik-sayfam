@@ -160,9 +160,10 @@ export const getFormattedHtml = (act?: any) => {
             let startX, startY;
             window.__drawConfig = { tool: 'pencil', color: '#4f46e5', width: 3 };
 
-            // High-speed smooth drawing engine
+            // High-speed smooth drawing engine with page awareness
             let tempCanvas, tempCtx;
             let lastPoint, midPoint;
+            let currentPage = '';
 
             function initLayer() {
                 if (!tempCanvas) {
@@ -174,10 +175,42 @@ export const getFormattedHtml = (act?: any) => {
                 tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
             }
 
+            // Sync drawings with iframe navigation
+            function checkPage() {
+                try {
+                    // Check pathname, hash, and content title to see if the internal page changed
+                    const body = document.body;
+                    const h1 = body.querySelector('h1')?.innerText || '';
+                    const newId = (window.location.hash || window.location.pathname) + h1;
+                    
+                    if (newId !== currentPage) {
+                        if (currentPage !== '') {
+                            clearDrawing();
+                        }
+                        currentPage = newId;
+                    }
+                } catch(e) {}
+            }
+            setInterval(checkPage, 500);
+
             function startDrawing(e) {
                 if (!enabled) return;
+
+                // ALLOW Finger scroll while drawing with Pen:
+                // If the pointer is a finger (touch) and we are not in 'pan' mode, 
+                // we allow it to scroll unless we are explicitly drawing with it.
+                // However, to keep it simple: Pen draws, Finger scrolls.
+                if (e.pointerType === 'touch' && window.__drawConfig.tool !== 'pan') {
+                    // If we want to allow finger scroll, we must NOT start drawing
+                    return; 
+                }
+
+                if (window.__drawConfig.tool === 'pan') return;
+
                 saveHistory();
                 isDrawing = true;
+                e.preventDefault(); // Block scroll only for pen/mouse
+                
                 startX = e.pageX;
                 startY = e.pageY;
                 lastPoint = { x: startX, y: startY };
@@ -201,6 +234,10 @@ export const getFormattedHtml = (act?: any) => {
 
             function draw(e) {
                 if (!isDrawing || !enabled) return;
+                
+                // Allow scrolling if using finger and tool is 'pan'
+                if (e.pointerType === 'touch' && window.__drawConfig.tool === 'pan') return;
+                
                 const tool = window.__drawConfig.tool;
                 const x = e.pageX;
                 const y = e.pageY;
@@ -210,9 +247,9 @@ export const getFormattedHtml = (act?: any) => {
                     window.__currentPath.push(newPoint);
                     const currentMid = { x: (lastPoint.x + x) / 2, y: (lastPoint.y + y) / 2 };
                     
-                    // Standard segment settings
                     const tCtx = (tool === 'highlighter' || tool === 'chisel') ? tempCtx : ctx;
                     
+                    tCtx.save();
                     tCtx.beginPath();
                     tCtx.setLineDash(tool === 'dashed' ? [10, 5] : []);
                     tCtx.strokeStyle = window.__drawConfig.color;
@@ -226,29 +263,22 @@ export const getFormattedHtml = (act?: any) => {
                         tCtx.globalCompositeOperation = 'destination-out';
                         tCtx.lineWidth = window.__drawConfig.width * 10;
                     } else if (tool === 'chisel') {
+                        // Real Chisel Effect: Slanted transformation
+                        tCtx.translate(lastPoint.x, lastPoint.y);
+                        tCtx.rotate(Math.PI / 4);
+                        tCtx.scale(1, 0.2); 
+                        tCtx.rotate(-Math.PI / 4);
+                        tCtx.translate(-lastPoint.x, -lastPoint.y);
+                        tCtx.lineWidth = window.__drawConfig.width * 4;
                         tCtx.lineCap = 'square';
-                        tCtx.lineWidth = window.__drawConfig.width * 2;
+                        tCtx.lineJoin = 'miter';
                     }
 
-                    // Draw smooth segment
                     tCtx.moveTo(midPoint.x, midPoint.y);
                     tCtx.quadraticCurveTo(lastPoint.x, lastPoint.y, currentMid.x, currentMid.y);
-                    
-                    if (tool === 'chisel') {
-                        // For chisel, we apply the tilt transform only to the stroke
-                        tCtx.save();
-                        const angle = Math.PI / 4;
-                        // Transform the stroke to be calligraphic
-                        // Note: To do this O(1) we apply it globally, but because we draw segment-by-segment,
-                        // we need to be careful with coordinate space.
-                        // Simpler: Just draw the segment.
-                        tCtx.stroke();
-                        tCtx.restore();
-                    } else {
-                        tCtx.stroke();
-                    }
+                    tCtx.stroke();
+                    tCtx.restore();
 
-                    // If using temp layer (highlighter/chisel), composite back
                     if (tool === 'highlighter' || tool === 'chisel') {
                         ctx.putImageData(currentImageData, 0, 0);
                         ctx.save();
@@ -256,24 +286,13 @@ export const getFormattedHtml = (act?: any) => {
                             ctx.globalAlpha = 0.3;
                             ctx.globalCompositeOperation = 'multiply';
                         }
-                        
-                        if (tool === 'chisel') {
-                            // Apply calligraphic transform for the whole stroke render
-                            const tiltAngle = Math.PI / 4;
-                            ctx.translate(startX, startY);
-                            ctx.rotate(tiltAngle);
-                            ctx.scale(1, 0.25);
-                            ctx.rotate(-tiltAngle);
-                            ctx.translate(-startX, -startY);
-                        }
-                        
                         ctx.drawImage(tempCanvas, 0, 0);
                         ctx.restore();
                     }
 
                     lastPoint = newPoint;
                     midPoint = currentMid;
-                } else {
+                } else if (tool !== 'pan') {
                     if (currentImageData) {
                         ctx.putImageData(currentImageData, 0, 0);
                     }
@@ -307,7 +326,6 @@ export const getFormattedHtml = (act?: any) => {
                 ctx.lineTo(x2, y2);
                 ctx.stroke();
 
-                // Arrow head at end
                 ctx.beginPath();
                 ctx.moveTo(x2, y2);
                 ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
@@ -335,6 +353,17 @@ export const getFormattedHtml = (act?: any) => {
             function clearDrawing() {
                 if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
+
+            // Set touch action based on tool
+            function updateTouchAction() {
+                if (window.__drawConfig.tool === 'pan') {
+                    canvas.style.touchAction = 'auto'; // allow everything
+                } else {
+                    // pan-y allows vertical scroll with finger but blocks lateral movement
+                    canvas.style.touchAction = 'pan-y pinch-zoom';
+                }
+            }
+            setInterval(updateTouchAction, 500);
         })();
     </script>
 </head>
