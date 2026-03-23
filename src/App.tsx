@@ -167,6 +167,8 @@ export const getFormattedHtml = (act?: any) => {
                 startX = e.pageX;
                 startY = e.pageY;
                 
+                // For smoother lines and no highlighter overlap beading:
+                window.__currentPath = [{ x: startX, y: startY }];
                 currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
                 if (window.__drawConfig.tool === 'text') {
@@ -179,56 +181,76 @@ export const getFormattedHtml = (act?: any) => {
                     isDrawing = false;
                     return;
                 }
-
-                ctx.beginPath();
-                ctx.moveTo(startX, startY);
-                ctx.strokeStyle = window.__drawConfig.color;
-                ctx.lineWidth = window.__drawConfig.width;
-                ctx.setLineDash([]);
-                
-                ctx.globalCompositeOperation = 'source-over';
-                
-                if (window.__drawConfig.tool === 'highlighter') {
-                    ctx.globalAlpha = 0.3; // Much lighter for highlighter
-                    ctx.lineWidth = window.__drawConfig.width * 8;
-                    ctx.strokeStyle = window.__drawConfig.color;
-                    ctx.globalCompositeOperation = 'multiply'; // Better blending for highlighters
-                } else if (window.__drawConfig.tool === 'eraser') {
-                    ctx.globalCompositeOperation = 'destination-out';
-                    ctx.lineWidth = window.__drawConfig.width * 10;
-                } else if (window.__drawConfig.tool === 'dashed') {
-                    ctx.setLineDash([10, 5]);
-                }
             }
 
             function draw(e) {
                 if (!isDrawing || !enabled) return;
                 const tool = window.__drawConfig.tool;
+                const x = e.pageX;
+                const y = e.pageY;
                 
-                if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser') {
-                    ctx.lineTo(e.pageX, e.pageY);
-                    ctx.stroke();
-                } else {
-                    // Shape Preview
-                    if (currentImageData) {
-                        ctx.putImageData(currentImageData, 0, 0);
+                if (currentImageData) {
+                    ctx.putImageData(currentImageData, 0, 0);
+                }
+
+                if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser' || tool === 'dashed') {
+                    window.__currentPath.push({ x, y });
+                    
+                    ctx.beginPath();
+                    ctx.strokeStyle = window.__drawConfig.color;
+                    ctx.lineWidth = window.__drawConfig.width;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.setLineDash(tool === 'dashed' ? [10, 5] : []);
+                    ctx.globalAlpha = 1.0;
+                    ctx.globalCompositeOperation = 'source-over';
+
+                    if (tool === 'highlighter') {
+                        ctx.globalAlpha = 0.3;
+                        ctx.lineWidth = window.__drawConfig.width * 8;
+                        ctx.globalCompositeOperation = 'multiply';
+                    } else if (tool === 'eraser') {
+                        ctx.globalCompositeOperation = 'destination-out';
+                        ctx.lineWidth = window.__drawConfig.width * 10;
                     }
-                    drawShape(tool, startX, startY, e.pageX, e.pageY);
+
+                    ctx.moveTo(window.__currentPath[0].x, window.__currentPath[0].y);
+                    for (let i = 1; i < window.__currentPath.length; i++) {
+                        ctx.lineTo(window.__currentPath[i].x, window.__currentPath[i].y);
+                    }
+                    ctx.stroke();
+                } else if (tool === 'chisel') {
+                    window.__currentPath.push({ x, y });
+                    ctx.fillStyle = window.__drawConfig.color;
+                    ctx.globalAlpha = 1.0;
+                    ctx.globalCompositeOperation = 'source-over';
+                    
+                    for (let i = 0; i < window.__currentPath.length; i++) {
+                        const pt = window.__currentPath[i];
+                        const w = window.__drawConfig.width * 4;
+                        const h = window.__drawConfig.width;
+                        const angle = Math.PI / 4;
+                        ctx.save();
+                        ctx.translate(pt.x, pt.y);
+                        ctx.rotate(angle);
+                        ctx.fillRect(-w/2, -h/2, w, h);
+                        ctx.restore();
+                    }
+                } else {
+                    drawShape(tool, startX, startY, x, y);
                 }
             }
 
             function drawShape(tool, x1, y1, x2, y2) {
                 ctx.beginPath();
                 ctx.setLineDash(tool === 'dashed' ? [10, 5] : []);
+                ctx.globalAlpha = 1.0;
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.strokeStyle = window.__drawConfig.color;
+                ctx.lineWidth = window.__drawConfig.width;
                 
-                if (tool === 'rect' || tool === 'dashed') {
-                    if (tool === 'rect') {
-                        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-                    } else {
-                        ctx.moveTo(x1, y1);
-                        ctx.lineTo(x2, y2);
-                        ctx.stroke();
-                    }
+                if (tool === 'rect') {
+                    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
                 } else if (tool === 'circle') {
                     const r = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
                     ctx.arc(x1, y1, r, 0, 2 * Math.PI);
@@ -267,6 +289,7 @@ export const getFormattedHtml = (act?: any) => {
                 if (!isDrawing) return;
                 isDrawing = false;
                 currentImageData = null;
+                window.__currentPath = null;
             }
 
             function clearDrawing() {
@@ -299,14 +322,21 @@ const DrawingToolbar = ({ onCommand, config, setConfig }: {
     config: any, 
     setConfig: (c: any) => void 
 }) => {
+    const [showShapes, setShowShapes] = React.useState(false);
+    
     const colors = ['#ffffff', '#ff4d4d', '#ffa500', '#2ecc71', '#3498db', '#9b59b6', '#000000'];
-    const tools = [
+    
+    const mainTools = [
         { id: 'pencil', icon: Pencil, label: 'Kurşun Kalem' },
+        { id: 'chisel', icon: Edit3, label: 'Kesik Uçlu Kalem' },
         { id: 'pan', icon: Hand, label: 'El / Seçim' },
         { id: 'highlighter', icon: Highlighter, label: 'Fosforlu Kalem' },
         { id: 'sun', icon: Sun, label: 'Lazer' },
         { id: 'eraser', icon: Eraser, label: 'Silgi' },
         { id: 'text', icon: Type, label: 'Metin' },
+    ];
+
+    const shapeTools = [
         { id: 'rect', icon: Square, label: 'Dikdörtgen' },
         { id: 'circle', icon: Circle, label: 'Daire' },
         { id: 'arrow', icon: MoveRight, label: 'Ok' },
@@ -314,89 +344,126 @@ const DrawingToolbar = ({ onCommand, config, setConfig }: {
         { id: 'dashed', icon: Minus, label: 'Kesikli Çizgi' },
     ];
 
+    const isShapeTool = shapeTools.some(t => t.id === config.tool);
+
     return (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-1 bg-[#1a1b26] p-1.5 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5 transition-all duration-300 scale-90 sm:scale-100">
-            <div className="flex items-center gap-0.5 px-2 border-r border-white/10">
-                {tools.map(tool => (
-                    <button
-                        key={tool.id}
-                        onClick={() => setConfig({ ...config, tool: tool.id })}
-                        className={cn(
-                            "p-2.5 rounded-xl transition-all duration-200 group relative",
-                            config.tool === tool.id ? "bg-[#2d3045] text-white" : "text-slate-400 hover:text-white hover:bg-white/5"
-                        )}
-                        title={tool.label}
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center gap-3 scale-90 sm:scale-100">
+            {/* Shapes Sub-menu */}
+            <AnimatePresence>
+                {showShapes && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="flex items-center gap-1 bg-[#1a1b26]/90 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 shadow-2xl"
                     >
-                        <tool.icon className="w-5 h-5" />
-                        {config.tool === tool.id && (
-                            <motion.div layoutId="activeTool" className="absolute inset-0 border-2 border-emerald-500/50 rounded-xl pointer-events-none" />
+                        {shapeTools.map(tool => (
+                            <button
+                                key={tool.id}
+                                onClick={() => {
+                                    setConfig({ ...config, tool: tool.id });
+                                    setShowShapes(false);
+                                }}
+                                className={cn(
+                                    "p-2.5 rounded-xl transition-all duration-200 relative",
+                                    config.tool === tool.id ? "bg-[#2d3045] text-white" : "text-slate-400 hover:text-white hover:bg-white/5"
+                                )}
+                                title={tool.label}
+                            >
+                                <tool.icon className="w-5 h-5" />
+                            </button>
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Main Toolbar */}
+            <div className="flex items-center gap-1 bg-[#1a1b26] p-1.5 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5 transition-all duration-300">
+                <div className="flex items-center gap-0.5 px-2 border-r border-white/10">
+                    {mainTools.map(tool => (
+                        <button
+                            key={tool.id}
+                            onClick={() => {
+                                setConfig({ ...config, tool: tool.id });
+                                setShowShapes(false);
+                            }}
+                            className={cn(
+                                "p-2.5 rounded-xl transition-all duration-200 group relative",
+                                config.tool === tool.id ? "bg-[#2d3045] text-white" : "text-slate-400 hover:text-white hover:bg-white/5"
+                            )}
+                            title={tool.label}
+                        >
+                            <tool.icon className="w-5 h-5" />
+                            {config.tool === tool.id && (
+                                <motion.div layoutId="activeTool" className="absolute inset-0 border-2 border-emerald-500/50 rounded-xl pointer-events-none" />
+                            )}
+                        </button>
+                    ))}
+                    
+                    <button
+                        onClick={() => setShowShapes(!showShapes)}
+                        className={cn(
+                            "p-2.5 rounded-xl transition-all duration-200 relative",
+                            isShapeTool ? "bg-[#2d3045] text-indigo-400" : "text-slate-400 hover:text-white hover:bg-white/5",
+                            showShapes ? "bg-white/10 text-white" : ""
+                        )}
+                        title="Şekiller"
+                    >
+                        <Shapes className="w-5 h-5" />
+                        {isShapeTool && (
+                            <div className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full border border-[#1a1b26]" />
                         )}
                     </button>
-                ))}
-            </div>
+                </div>
 
-            <div className="flex items-center gap-2 px-4 border-r border-white/10">
-                {colors.map(color => (
-                    <button
-                        key={color}
-                        onClick={() => setConfig({ ...config, color })}
-                        className={cn(
-                            "w-7 h-7 rounded-full border-2 transition-all hover:scale-110 flex items-center justify-center",
-                            config.color === color ? "border-white" : "border-transparent"
-                        )}
-                        style={{ backgroundColor: color }}
-                    />
-                ))}
-            </div>
+                <div className="flex items-center gap-2 px-4 border-r border-white/10">
+                    {colors.map(color => (
+                        <button
+                            key={color}
+                            onClick={() => setConfig({ ...config, color })}
+                            className={cn(
+                                "w-7 h-7 rounded-full border-2 transition-all hover:scale-110 flex items-center justify-center",
+                                config.color === color ? "border-white" : "border-transparent"
+                            )}
+                            style={{ backgroundColor: color }}
+                        />
+                    ))}
+                </div>
 
-            <div className="flex items-center gap-3 px-4 border-r border-white/10">
-                {[2, 5, 10].map(size => (
-                    <button
-                        key={size}
-                        onClick={() => setConfig({ ...config, width: size })}
-                        className={cn(
-                            "rounded-full bg-slate-400 transition-all hover:bg-white",
-                            config.width === size ? "bg-white scale-125 ring-2 ring-indigo-500 ring-offset-2 ring-offset-[#1a1b26]" : "hover:scale-110"
-                        )}
-                        style={{ 
-                            width: size + 4 + 'px', 
-                            height: size + 4 + 'px' 
-                        }}
-                        title={`${size}px Boyut`}
-                    />
-                ))}
-            </div>
+                <div className="flex items-center gap-3 px-4 border-r border-white/10">
+                    {[2, 5, 10].map(size => (
+                        <button
+                            key={size}
+                            onClick={() => setConfig({ ...config, width: size })}
+                            className={cn(
+                                "rounded-full bg-slate-400 transition-all hover:bg-white",
+                                config.width === size ? "bg-white scale-125 ring-2 ring-indigo-500 ring-offset-2 ring-offset-[#1a1b26]" : "hover:scale-110"
+                            )}
+                            style={{ 
+                                width: size + 4 + 'px', 
+                                height: size + 4 + 'px' 
+                            }}
+                            title={`${size}px Boyut`}
+                        />
+                    ))}
+                </div>
 
-            <div className="flex items-center gap-1.5 px-2">
-                <button 
-                    onClick={() => onCommand('UNDO_DRAWING')} 
-                    className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
-                    title="Geri Al"
-                >
-                    <Undo className="w-5 h-5" />
-                </button>
-                <button 
-                    onClick={() => onCommand('CLEAR_DRAWING')}
-                    className="p-2.5 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all"
-                    title="Temizle"
-                >
-                    <Trash2 className="w-5 h-5" />
-                </button>
-                <button 
-                    onClick={() => {
-                        alert('Çizim kaydedildi! (Bu özellik yakında aktif olacak)');
-                    }}
-                    className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
-                    title="Kaydet"
-                >
-                    <Save className="w-5 h-5" />
-                </button>
-                <button 
-                    className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
-                    title="Ayarlar"
-                >
-                    <Settings className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-1.5 px-2">
+                    <button 
+                        onClick={() => onCommand('UNDO_DRAWING')} 
+                        className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                        title="Geri Al"
+                    >
+                        <Undo className="w-5 h-5" />
+                    </button>
+                    <button 
+                        onClick={() => onCommand('CLEAR_DRAWING')}
+                        className="p-2.5 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                        title="Temizle"
+                    >
+                        <Trash2 className="w-5 h-5" />
+                    </button>
+                </div>
             </div>
         </div>
     );
