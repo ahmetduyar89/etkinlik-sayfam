@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ders Araçları">
+<title>Çizim Aracı Demo — Etkinlik Sayfam</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Baloo+2:wght@700;800&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET & BASE ─── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --c-bg: #f0f4f8;
+  --c-white: #ffffff;
+  --c-dark: #1a1a2e;
+  --c-green: #2ecc71;
+  --c-red: #e74c3c;
+  --c-blue: #3498db;
+  --c-orange: #f39c12;
+  --c-yellow: #f1c40f;
+  --c-purple: #9b59b6;
+  --c-pink: #e91e8c;
+  --toolbar-h: 68px;
+  --radius: 16px;
+  --shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--c-bg); touch-action: none; }
+
+/* ─── DEMO CONTENT (sayfa içeriği simülasyonu) ─── */
+#page-content {
+  position: fixed; inset: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  z-index: 1;
+  background: var(--c-bg);
+  padding-bottom: calc(var(--toolbar-h) + 20px);
+}
+#page-content.drawing-mode { pointer-events: none; overflow: hidden; }
+
+/* ─── TRANSPARENT CANVAS OVERLAY ─── */
+#draw-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 10;
+  pointer-events: none;
+  cursor: crosshair;
+  touch-action: none;
+}
+#draw-canvas.active { pointer-events: all; }
+
+/* ─── FLOATING TOOLBAR ─── */
+#toolbar {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(22, 22, 42, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 24px;
+  padding: 10px 14px;
+  box-shadow: var(--shadow), 0 0 0 1px rgba(255,255,255,0.08);
+  transition: all 0.3s cubic-bezier(.4,0,.2,1);
+  max-width: calc(100vw - 24px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#toolbar::-webkit-scrollbar { display: none; }
+
+/* Toolbar collapsed state */
+#toolbar.collapsed {
+  padding: 10px 14px;
+  gap: 0;
+}
+#toolbar.collapsed .tb-group,
+#toolbar.collapsed .tb-sep { display: none; }
+
+/* ─── TOOLBAR BUTTON BASE ─── */
+.tb-btn {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.6);
+  font-size: 1.3rem;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.tb-btn:hover, .tb-btn.active {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  transform: scale(1.05);
+}
+.tb-btn.active {
+  background: rgba(46,204,113,0.25);
+  color: var(--c-green);
+  box-shadow: 0 0 0 2px rgba(46,204,113,0.4);
+}
+.tb-btn.danger.active {
+  background: rgba(231,76,60,0.25);
+  color: var(--c-red);
+  box-shadow: 0 0 0 2px rgba(231,76,60,0.4);
+}
+.tb-btn:active { transform: scale(0.93); }
+
+/* Separator */
+.tb-sep {
+  width: 1px; height: 28px;
+  background: rgba(255,255,255,0.1);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* ─── COLOR PICKER STRIP ─── */
+.color-dot {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.color-dot:active { transform: scale(0.88); }
+.color-dot.selected {
+  border-color: #fff;
+  transform: scale(1.18);
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.3);
+}
+
+/* ─── SIZE SLIDER POPUP ─── */
+#size-popup {
+  position: fixed;
+  bottom: calc(var(--toolbar-h) + 32px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.9);
+  background: rgba(22,22,42,0.97);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 16px 20px;
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s;
+  box-shadow: var(--shadow);
+  min-width: 220px;
+}
+#size-popup.show {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateX(-50%) scale(1);
+}
+#size-popup label {
+  color: rgba(255,255,255,0.7);
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 10px;
+  font-family: 'Nunito', sans-serif;
+}
+#size-slider {
+  width: 100%;
+  accent-color: var(--c-green);
+  height: 6px;
+  cursor: pointer;
+}
+#size-preview {
+  display: flex; align-items: center; justify-content: center;
+  height: 40px; margin-top: 10px;
+}
+#size-dot {
+  background: #fff;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+/* ─── SHAPE PICKER POPUP ─── */
+#shape-popup {
+  position: fixed;
+  bottom: calc(var(--toolbar-h) + 32px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.9);
+  background: rgba(22,22,42,0.97);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 12px;
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s;
+  box-shadow: var(--shadow);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+#shape-popup.show { opacity: 1; pointer-events: all; transform: translateX(-50%) scale(1); }
+.shape-btn {
+  width: 52px; height: 52px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+  border: none;
+  color: #fff;
+  font-size: 1.4rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.shape-btn:hover, .shape-btn.active { background: rgba(46,204,113,0.25); color: var(--c-green); }
+
+/* ─── TEXT INPUT ─── */
+#text-input-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.5);
+}
+#text-input-overlay.show { display: flex; }
+#text-box {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  width: min(380px, 90vw);
+  box-shadow: var(--shadow);
+}
+#text-box h3 {
+  font-family: 'Baloo 2', cursive;
+  margin-bottom: 12px;
+  color: var(--c-dark);
+}
+#text-input {
+  width: 100%;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 1rem;
+  font-family: 'Nunito', sans-serif;
+  outline: none;
+  transition: border-color 0.2s;
+}
+#text-input:focus { border-color: var(--c-green); }
+.text-box-actions {
+  display: flex; gap: 8px; margin-top: 12px;
+}
+.text-box-actions button {
+  flex: 1; padding: 10px;
+  border-radius: 10px; border: none;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700; font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+#text-cancel { background: #f0f0f0; color: #666; }
+#text-confirm { background: var(--c-green); color: #fff; }
+
+/* ─── SAVE/SCREENSHOT OVERLAY ─── */
+#save-overlay {
+  position: fixed; inset: 0; z-index: 400;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.7);
+}
+#save-overlay.show { display: flex; }
+#save-box {
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  width: min(340px, 90vw);
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+#save-box h3 { font-family: 'Baloo 2'; color: var(--c-dark); margin-bottom: 6px; }
+#save-box p { font-size: 0.85rem; color: #888; margin-bottom: 20px; }
+#save-preview {
+  width: 100%; border-radius: 12px; border: 1px solid #eee;
+  margin-bottom: 16px; max-height: 200px; object-fit: contain;
+}
+.save-actions { display: flex; gap: 8px; }
+.save-actions button {
+  flex: 1; padding: 12px;
+  border-radius: 12px; border: none;
+  font-family: 'Nunito'; font-weight: 700;
+  cursor: pointer; transition: all 0.15s;
+}
+#save-download { background: var(--c-green); color: #fff; }
+#save-close { background: #f0f0f0; color: #666; }
+
+/* ─── MODE INDICATOR ─── */
+#mode-indicator {
+  position: fixed;
+  top: 16px; left: 50%;
+  transform: translateX(-50%) translateY(-60px);
+  background: rgba(22,22,42,0.9);
+  color: #fff;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-family: 'Nunito'; font-weight: 700; font-size: 0.85rem;
+  z-index: 50;
+  transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+  white-space: nowrap;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+#mode-indicator.show { transform: translateX(-50%) translateY(0); }
+
+/* ─── UNDO TOAST ─── */
+#undo-toast {
+  position: fixed;
+  top: 70px; left: 50%;
+  transform: translateX(-50%) scale(0.8);
+  background: rgba(22,22,42,0.9);
+  color: #aaa;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-family: 'Nunito'; font-size: 0.8rem;
+  z-index: 50;
+  opacity: 0;
+  transition: all 0.2s;
+  pointer-events: none;
+}
+#undo-toast.show { opacity: 1; transform: translateX(-50%) scale(1); }
+
+/* ─── DEMO PAGE CONTENT ─── */
+.demo-header {
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  padding: 40px 24px 32px;
+  text-align: center;
+  color: #fff;
+}
+.demo-header h1 {
+  font-family: 'Baloo 2'; font-size: clamp(1.4rem, 5vw, 2.4rem);
+  font-weight: 800; margin-bottom: 8px;
+}
+.demo-header h1 span { color: var(--c-green); }
+.demo-header p { color: rgba(255,255,255,0.6); font-size: 0.9rem; }
+
+.demo-section {
+  max-width: 860px; margin: 0 auto; padding: 28px 20px;
+}
+.demo-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+  border: 1px solid #e8ecf0;
+}
+.demo-card h2 {
+  font-family: 'Baloo 2'; font-size: 1.2rem; font-weight: 700;
+  color: var(--c-dark); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.demo-card p { color: #555; line-height: 1.7; font-size: 0.95rem; }
+.demo-card ul { list-style: none; padding: 0; }
+.demo-card ul li {
+  padding: 8px 0 8px 28px; position: relative;
+  color: #444; font-size: 0.9rem; border-bottom: 1px solid #f5f5f5;
+}
+.demo-card ul li:last-child { border: none; }
+.demo-card ul li::before { content: '✦'; position: absolute; left: 0; color: var(--c-green); font-size: 0.8rem; }
+.diagram-box {
+  background: linear-gradient(135deg, #f0fff4, #e8f5e9);
+  border: 2px dashed #2ecc71;
+  border-radius: 14px;
+  padding: 20px;
+  margin-top: 14px;
+  text-align: center;
+  font-size: 0.9rem; color: #2d6a4f;
+}
+.diagram-box .chain {
+  display: flex; align-items: center; justify-content: center;
+  flex-wrap: wrap; gap: 8px; margin: 10px 0;
+  font-size: 1.5rem;
+}
+.formula-box {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border-radius: 14px; padding: 18px;
+  text-align: center; color: #fff; margin-top: 14px;
+  font-family: 'Baloo 2'; font-size: 1rem;
+}
+.formula-box strong { color: var(--c-green); }
+
+/* ─── HOW TO USE GUIDE ─── */
+#guide-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.85);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(8px);
+}
+#guide-box {
+  background: #fff; border-radius: 24px;
+  padding: 28px 28px 24px;
+  width: min(460px, 92vw);
+  max-height: 88vh; overflow-y: auto;
+}
+#guide-box h2 { font-family: 'Baloo 2'; color: var(--c-dark); margin-bottom: 4px; }
+#guide-box .sub { color: #888; font-size: 0.85rem; margin-bottom: 20px; }
+.guide-item {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 12px 0; border-bottom: 1px solid #f0f0f0;
+}
+.guide-item:last-of-type { border: none; }
+.guide-icon {
+  width: 40px; height: 40px; border-radius: 12px;
+  background: #f0fff4; display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; flex-shrink: 0;
+}
+.guide-text strong { display: block; font-weight: 700; font-size: 0.9rem; color: var(--c-dark); margin-bottom: 2px; }
+.guide-text span { font-size: 0.82rem; color: #888; line-height: 1.5; }
+#guide-start {
+  width: 100%; padding: 14px;
+  background: var(--c-green); color: #fff;
+  border: none; border-radius: 14px;
+  font-family: 'Nunito'; font-weight: 800; font-size: 1rem;
+  cursor: pointer; margin-top: 16px; transition: all 0.2s;
+}
+#guide-start:hover { background: #27ae60; transform: translateY(-1px); }
+
+/* ─── POINTER CURSOR in draw mode ─── */
+body.pen-mode { cursor: none !important; }
+body.pen-mode * { cursor: none !important; }
+#custom-cursor {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  display: none;
+  transition: width 0.1s, height 0.1s;
+}
+body.pen-mode #custom-cursor { display: block; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     GUIDE OVERLAY (ilk açılışta göster)
+════════════════════════════════════════ -->
+<div id="guide-overlay">
+  <div id="guide-box">
+    <h2>✏️ Çizim Araç Rehberi</h2>
+    <p class="sub">Tablet + kalemle ders anlatımı için profesyonel araç seti</p>
+
+    <div class="guide-item">
+      <div class="guide-icon">✏️</div>
+      <div class="guide-text">
+        <strong>Çizim Modu</strong>
+        <span>Kalemi etkinleştir, içerik üzerine serbest çiz. Apple Pencil / S Pen basınca duyarlıdır.</span>
+      </div>
+    </div>
+    <div class="guide-item">
+      <div class="guide-icon">🖐️</div>
+      <div class="guide-text">
+        <strong>Gezinme Modu</strong>
+        <span>Çizim modundan çık, sayfayı kaydır ve tıklayarak içerikle etkileşime geç.</span>
+      </div>
+    </div>
+    <div class="guide-item">
+      <div class="guide-icon">🟡</div>
+      <div class="guide-text">
+        <strong>Fosforlu Kalem (Highlighter)</strong>
+        <span>Yarı saydam sarı/turuncu ile önemli yerlerin altını çiz.</span>
+      </div>
+    </div>
+    <div class="guide-item">
+      <div class="guide-icon">⬛</div>
+      <div class="guide-text">
+        <strong>Şekil Çizme</strong>
+        <span>Ok, daire, dikdörtgen, çizgi gibi hazır şekilleri tek parmakla çiz.</span>
+      </div>
+    </div>
+    <div class="guide-item">
+      <div class="guide-icon">T</div>
+      <div class="guide-text">
+        <strong>Metin Ekleme</strong>
+        <span>İstediğin yere klavyeyle yazı ekle. Ekrana tıkla, yaz, konumlandır.</span>
+      </div>
+    </div>
+    <div class="guide-item">
+      <div class="guide-icon">↩️</div>
+      <div class="guide-text">
+        <strong>Geri Al (Undo)</strong>
+        <span>Son çizimi/yazıyı geri al. İki parmakla çift tıklamak da çalışır.</span>
+      </div>
+    </div>
+    <div class="guide-item">
+      <div class="guide-icon">🗑️</div>
+      <div class="guide-text">
+        <strong>Tümünü Temizle</strong>
+        <span>Tüm çizimleri ve metinleri sil. İçerik etkilenmez.</span>
+      </div>
+    </div>
+    <div class="guide-item">
+      <div class="guide-icon">💾</div>
+      <div class="guide-text">
+        <strong>Kaydet / İndir</strong>
+        <span>Ekranın anlık görüntüsünü PNG olarak kaydet. Galeriye ekle.</span>
+      </div>
+    </div>
+
+    <button id="guide-start" onclick="closeGuide()">🚀 Başla!</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     DEMO SAYFA İÇERİĞİ
+     (Gerçek kullanımda bu kısım
+     etkinliksayfam.netlify.app içeriği olacak)
+════════════════════════════════════════ -->
+<div id="page-content">
+  <div class="demo-header">
+    <h1>Enerji Dönüşümleri ve <span>Çevre Bilimi</span></h1>
+    <p>8. Sınıf Fen Bilimleri · Ünite 6 · Üzerine çizim yaparak ders anlat!</p>
+  </div>
+
+  <div class="demo-section">
+    <div class="demo-card">
+      <h2>🌱 Besin Zinciri</h2>
+      <p>Ekosistemlerdeki canlıların beslenme sırasıyla birbirine bağlandığı sisteme besin zinciri denir. Zincirin ilk halkasını her zaman üreticiler oluşturur.</p>
+      <div class="diagram-box">
+        <div style="font-weight:700;margin-bottom:8px;">Örnek Besin Zinciri</div>
+        <div class="chain">🌿 <span style="color:#2d6a4f;font-size:1rem;">→</span> 🐇 <span style="color:#2d6a4f;font-size:1rem;">→</span> 🐺 <span style="color:#2d6a4f;font-size:1rem;">→</span> 🦁</div>
+        <div style="font-size:0.82rem;color:#555;">Üretici → 1. Tüketici → 2. Tüketici → 3. Tüketici</div>
+      </div>
+    </div>
+
+    <div class="demo-card">
+      <h2>☀️ Fotosentez</h2>
+      <p>Yeşil bitkiler, ışık enerjisini ve karbondioksiti kullanarak glikoz ve oksijen üretir. Bu süreç kloroplastlarda gerçekleşir.</p>
+      <div class="formula-box">
+        <strong>CO₂</strong> + <strong>H₂O</strong> + <strong>Işık Enerjisi</strong>
+        <div style="font-size:1.4rem;color:var(--c-green);margin:6px 0;">⬇ klorofil</div>
+        <strong>Glikoz</strong> + <strong>O₂</strong>
+      </div>
+    </div>
+
+    <div class="demo-card">
+      <h2>🔄 Madde Döngüleri</h2>
+      <p>Doğadaki su, karbon, oksijen ve azot elementleri canlı ve cansız çevre arasında sürekli döngüsel şekilde kullanılır.</p>
+      <ul>
+        <li>Su Döngüsü: Buharlaşma → Yoğunlaşma → Yağış</li>
+        <li>Karbon Döngüsü: Fotosentez + Solunum + Yanma</li>
+        <li>Azot Döngüsü: Bakteri + Şimşek + Ayrıştırıcılar</li>
+        <li>Oksijen Döngüsü: Fotosentez → Solunum → Yanma</li>
+      </ul>
+    </div>
+
+    <div class="demo-card">
+      <h2>♻️ Sera Etkisi & Küresel Isınma</h2>
+      <p>Atmosferdeki sera gazlarının artması (CO₂, CH₄, N₂O) yüzünden yeryüzünden yansıyan ısının uzaya kaçamaması olayına küresel ısınma denir.</p>
+      <ul>
+        <li>Buzullar erir → Deniz seviyesi yükselir</li>
+        <li>Tarımsal üretim azalır → Kıtlık riski</li>
+        <li>Ekstrem hava olayları artar</li>
+        <li>Çözüm: Yenilenebilir enerji, Kyoto Protokolü</li>
+      </ul>
+    </div>
+
+    <div class="demo-card" style="background:linear-gradient(135deg,#fff9f0,#fff3e0);">
+      <h2>📝 Boş Alan — Buraya Çiz!</h2>
+      <p style="color:#999;font-style:italic;">Bu alan ders anlatımı sırasında serbest not ve çizim yapmak için ayrılmıştır. Araç çubuğunu açarak çizim moduna geç.</p>
+      <div style="height:160px;border:2px dashed #f0c080;border-radius:12px;margin-top:12px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:2rem;">✎</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     CANVAS OVERLAY
+════════════════════════════════════════ -->
+<canvas id="draw-canvas"></canvas>
+
+<!-- Custom cursor dot -->
+<div id="custom-cursor"></div>
+
+<!-- ═══════════════════════════════════════
+     FLOATING TOOLBAR
+════════════════════════════════════════ -->
+<div id="toolbar">
+
+  <!-- Toggle draw mode -->
+  <button class="tb-btn" id="btn-draw" title="Çizim Modu" onclick="toggleDrawMode()">✏️</button>
+
+  <!-- Toggle scroll mode -->
+  <button class="tb-btn" id="btn-scroll" title="Gezinme Modu" onclick="setScrollMode()">🖐️</button>
+
+  <div class="tb-sep tb-group"></div>
+
+  <!-- TOOLS -->
+  <div class="tb-group" style="display:flex;align-items:center;gap:4px;">
+    <button class="tb-btn active" id="btn-pen" title="Kalem" onclick="setTool('pen')">🖊️</button>
+    <button class="tb-btn" id="btn-highlight" title="Fosforlu Kalem" onclick="setTool('highlight')">🔆</button>
+    <button class="tb-btn" id="btn-eraser" title="Silgi" onclick="setTool('eraser')">🧹</button>
+    <button class="tb-btn" id="btn-text" title="Metin Ekle" onclick="setTool('text')">T</button>
+    <button class="tb-btn" id="btn-shape" title="Şekil" onclick="toggleShapePopup()">△</button>
+  </div>
+
+  <div class="tb-sep tb-group"></div>
+
+  <!-- COLORS -->
+  <div class="tb-group" style="display:flex;align-items:center;gap:6px;padding:0 4px;">
+    <div class="color-dot selected" style="background:#ffffff;" onclick="setColor('#ffffff')" data-color="#ffffff"></div>
+    <div class="color-dot" style="background:#e74c3c;" onclick="setColor('#e74c3c')" data-color="#e74c3c"></div>
+    <div class="color-dot" style="background:#f39c12;" onclick="setColor('#f39c12')" data-color="#f39c12"></div>
+    <div class="color-dot" style="background:#2ecc71;" onclick="setColor('#2ecc71')" data-color="#2ecc71"></div>
+    <div class="color-dot" style="background:#3498db;" onclick="setColor('#3498db')" data-color="#3498db"></div>
+    <div class="color-dot" style="background:#9b59b6;" onclick="setColor('#9b59b6')" data-color="#9b59b6"></div>
+    <div class="color-dot" style="background:#1a1a2e;border:1px solid #444;" onclick="setColor('#1a1a2e')" data-color="#1a1a2e"></div>
+  </div>
+
+  <div class="tb-sep tb-group"></div>
+
+  <!-- SIZE -->
+  <button class="tb-btn tb-group" id="btn-size" title="Kalem Kalınlığı" onclick="toggleSizePopup()">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <circle cx="10" cy="10" r="4" fill="currentColor"/>
+    </svg>
+  </button>
+
+  <div class="tb-sep tb-group"></div>
+
+  <!-- UNDO / CLEAR -->
+  <button class="tb-btn tb-group" id="btn-undo" title="Geri Al" onclick="undo()">↩️</button>
+  <button class="tb-btn tb-group danger" id="btn-clear" title="Tümünü Temizle" onclick="clearAll()">🗑️</button>
+
+  <div class="tb-sep tb-group"></div>
+
+  <!-- SAVE -->
+  <button class="tb-btn tb-group" id="btn-save" title="Kaydet" onclick="saveSnapshot()">💾</button>
+
+  <!-- COLLAPSE (always visible) -->
+  <button class="tb-btn" id="btn-collapse" title="Araç Çubuğunu Gizle/Göster" onclick="toggleToolbar()">⚙️</button>
+</div>
+
+<!-- Shape Popup -->
+<div id="shape-popup">
+  <button class="shape-btn active" onclick="setShape('line')" title="Çizgi">╱</button>
+  <button class="shape-btn" onclick="setShape('arrow')" title="Ok">➡</button>
+  <button class="shape-btn" onclick="setShape('rect')" title="Dikdörtgen">▭</button>
+  <button class="shape-btn" onclick="setShape('circle')" title="Daire">○</button>
+  <button class="shape-btn" onclick="setShape('triangle')" title="Üçgen">△</button>
+  <button class="shape-btn" onclick="setShape('star')" title="Yıldız">★</button>
+  <button class="shape-btn" onclick="setShape('check')" title="Tik">✓</button>
+  <button class="shape-btn" onclick="setShape('cross')" title="Çarpı">✕</button>
+</div>
+
+<!-- Size Popup -->
+<div id="size-popup">
+  <label>Kalem Kalınlığı: <span id="size-label">4</span>px</label>
+  <input type="range" id="size-slider" min="1" max="40" value="4" oninput="onSizeChange(this.value)">
+  <div id="size-preview"><div id="size-dot"></div></div>
+</div>
+
+<!-- Text Input Overlay -->
+<div id="text-input-overlay">
+  <div id="text-box">
+    <h3>📝 Metin Ekle</h3>
+    <input id="text-input" type="text" placeholder="Yazınızı girin..." maxlength="120">
+    <div class="text-box-actions">
+      <button id="text-cancel" onclick="cancelText()">İptal</button>
+      <button id="text-confirm" onclick="confirmText()">Ekle ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- Save Overlay -->
+<div id="save-overlay">
+  <div id="save-box">
+    <h3>💾 Görüntüyü Kaydet</h3>
+    <p>Ekranın anlık görüntüsü hazırlandı</p>
+    <img id="save-preview" src="" alt="önizleme">
+    <div class="save-actions">
+      <button id="save-download" onclick="downloadImage()">⬇️ İndir</button>
+      <button id="save-close" onclick="closeSave()">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mode Indicator -->
+<div id="mode-indicator">✏️ Çizim Modu Aktif</div>
+
+<!-- Undo Toast -->
+<div id="undo-toast">Geri alındı</div>
+
+<!-- ═══════════════════════════════════════
+     JAVASCRIPT ENGINE
+════════════════════════════════════════ -->
+<script>
+/* ════════════════════════════════
+   STATE
+════════════════════════════════ */
+const state = {
+  drawMode: false,
+  tool: 'pen',          // pen | highlight | eraser | text | shape
+  color: '#ffffff',
+  size: 4,
+  shape: 'line',
+  toolbarOpen: true,
+  isDrawing: false,
+  startX: 0, startY: 0,
+  lastX: 0, lastY: 0,
+  textPendingX: 0, textPendingY: 0,
+  capturedSnapshot: null
+};
+
+/* Undo stack: each item = { type:'stroke'|'text', imageData|... } */
+const undoStack = [];
+const MAX_UNDO = 30;
+
+/* Text objects for re-render */
+const textObjects = [];
+
+/* ════════════════════════════════
+   CANVAS SETUP
+════════════════════════════════ */
+const canvas = document.getElementById('draw-canvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  redrawAll();
+}
+
+function redrawAll() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  textObjects.forEach(renderTextObject);
+}
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+/* ════════════════════════════════
+   GUIDE
+════════════════════════════════ */
+function closeGuide() {
+  document.getElementById('guide-overlay').style.display = 'none';
+}
+
+/* ════════════════════════════════
+   DRAW / SCROLL MODE TOGGLE
+════════════════════════════════ */
+function toggleDrawMode() {
+  state.drawMode ? setScrollMode() : activateDrawMode();
+}
+
+function activateDrawMode() {
+  state.drawMode = true;
+  canvas.classList.add('active');
+  document.getElementById('page-content').classList.add('drawing-mode');
+  document.getElementById('btn-draw').classList.add('active');
+  document.getElementById('btn-scroll').classList.remove('active');
+  document.body.classList.add('pen-mode');
+  showModeIndicator('✏️ Çizim Modu — Kalemle çizebilirsin');
+}
+
+function setScrollMode() {
+  state.drawMode = false;
+  canvas.classList.remove('active');
+  document.getElementById('page-content').classList.remove('drawing-mode');
+  document.getElementById('btn-draw').classList.remove('active');
+  document.getElementById('btn-scroll').classList.add('active');
+  document.body.classList.remove('pen-mode');
+  showModeIndicator('🖐️ Gezinme Modu — Sayfayı kaydırabilirsin');
+  closeAllPopups();
+}
+
+/* ════════════════════════════════
+   TOOL SELECTION
+════════════════════════════════ */
+function setTool(tool) {
+  state.tool = tool;
+  ['pen','highlight','eraser','text','shape'].forEach(t => {
+    const btn = document.getElementById('btn-' + t);
+    if(btn) btn.classList.remove('active');
+  });
+  const target = document.getElementById('btn-' + tool);
+  if(target) target.classList.add('active');
+  closeAllPopups();
+  if(tool !== 'shape') {
+    document.getElementById('shape-popup').classList.remove('show');
+  }
+  if(!state.drawMode) activateDrawMode();
+}
+
+/* ════════════════════════════════
+   COLOR
+════════════════════════════════ */
+function setColor(color) {
+  state.color = color;
+  document.querySelectorAll('.color-dot').forEach(d => {
+    d.classList.toggle('selected', d.dataset.color === color);
+  });
+  updateSizeDot();
+}
+
+/* ════════════════════════════════
+   SIZE
+════════════════════════════════ */
+function toggleSizePopup() {
+  const popup = document.getElementById('size-popup');
+  popup.classList.toggle('show');
+  document.getElementById('shape-popup').classList.remove('show');
+}
+function onSizeChange(val) {
+  state.size = parseInt(val);
+  document.getElementById('size-label').textContent = val;
+  updateSizeDot();
+}
+function updateSizeDot() {
+  const dot = document.getElementById('size-dot');
+  const s = Math.max(6, Math.min(40, state.size * 2));
+  dot.style.width = s + 'px';
+  dot.style.height = s + 'px';
+  dot.style.background = state.color === '#1a1a2e' ? '#fff' : state.color;
+}
+updateSizeDot();
+
+/* ════════════════════════════════
+   SHAPE
+════════════════════════════════ */
+function toggleShapePopup() {
+  const popup = document.getElementById('shape-popup');
+  popup.classList.toggle('show');
+  document.getElementById('size-popup').classList.remove('show');
+  if(!state.drawMode) activateDrawMode();
+  state.tool = 'shape';
+  document.querySelectorAll('.tb-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-shape').classList.add('active');
+}
+function setShape(shape) {
+  state.shape = shape;
+  document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('shape-popup').classList.remove('show');
+  state.tool = 'shape';
+  if(!state.drawMode) activateDrawMode();
+}
+
+/* ════════════════════════════════
+   CLOSE POPUPS
+════════════════════════════════ */
+function closeAllPopups() {
+  document.getElementById('size-popup').classList.remove('show');
+  document.getElementById('shape-popup').classList.remove('show');
+}
+
+/* ════════════════════════════════
+   DRAW CONTEXT HELPER
+════════════════════════════════ */
+function setupCtx(isHighlight) {
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if(isHighlight) {
+    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = Math.max(state.size * 5, 20);
+  } else {
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = state.size;
+  }
+  ctx.strokeStyle = state.color;
+  ctx.fillStyle = state.color;
+}
+
+/* ════════════════════════════════
+   POINTER EVENTS — DRAWING
+════════════════════════════════ */
+function getPos(e) {
+  const r = canvas.getBoundingClientRect();
+  const src = e.touches ? e.touches[0] : e;
+  return {
+    x: (src.clientX - r.left),
+    y: (src.clientY - r.top)
+  };
+}
+
+let shapeSnapshot = null; // for live shape preview
+
+canvas.addEventListener('pointerdown', onPointerDown, { passive: false });
+canvas.addEventListener('pointermove', onPointerMove, { passive: false });
+canvas.addEventListener('pointerup', onPointerUp, { passive: false });
+canvas.addEventListener('pointerleave', onPointerUp, { passive: false });
+
+function onPointerDown(e) {
+  if(!state.drawMode) return;
+  e.preventDefault();
+  const pos = getPos(e);
+  state.isDrawing = true;
+  state.startX = pos.x; state.startY = pos.y;
+  state.lastX = pos.x; state.lastY = pos.y;
+
+  if(state.tool === 'text') {
+    state.textPendingX = pos.x;
+    state.textPendingY = pos.y;
+    openTextInput();
+    state.isDrawing = false;
+    return;
+  }
+
+  if(state.tool === 'shape') {
+    // snapshot current canvas for live preview
+    shapeSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    return;
+  }
+
+  // Push undo snapshot before starting stroke
+  pushUndo();
+
+  if(state.tool === 'pen' || state.tool === 'highlight') {
+    setupCtx(state.tool === 'highlight');
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  }
+}
+
+function onPointerMove(e) {
+  if(!state.drawMode) return;
+  e.preventDefault();
+
+  const pos = getPos(e);
+
+  // custom cursor
+  const cur = document.getElementById('custom-cursor');
+  cur.style.left = pos.x + 'px'; cur.style.top = pos.y + 'px';
+  const curSize = state.tool === 'eraser' ? Math.max(state.size * 3, 20) : Math.max(state.size * 2, 8);
+  cur.style.width = curSize + 'px'; cur.style.height = curSize + 'px';
+  cur.style.background = state.tool === 'eraser' ? 'rgba(255,255,255,0.3)' : state.color;
+  cur.style.border = state.tool === 'eraser' ? '2px solid rgba(255,255,255,0.8)' : 'none';
+  cur.style.opacity = '0.85';
+
+  if(!state.isDrawing) return;
+
+  if(state.tool === 'pen' || state.tool === 'highlight') {
+    setupCtx(state.tool === 'highlight');
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    state.lastX = pos.x; state.lastY = pos.y;
+  } else if(state.tool === 'eraser') {
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, Math.max(state.size * 2, 10), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+  } else if(state.tool === 'shape') {
+    // live preview: restore snapshot and draw shape
+    ctx.putImageData(shapeSnapshot, 0, 0);
+    drawShape(state.startX, state.startY, pos.x, pos.y, false);
+  }
+}
+
+function onPointerUp(e) {
+  if(!state.isDrawing) return;
+  state.isDrawing = false;
+
+  if(state.tool === 'shape') {
+    const pos = getPos(e);
+    if(shapeSnapshot) ctx.putImageData(shapeSnapshot, 0, 0);
+    pushUndo();
+    drawShape(state.startX, state.startY,
+      e.type === 'pointerleave' ? state.lastX : pos.x,
+      e.type === 'pointerleave' ? state.lastY : pos.y, true);
+    shapeSnapshot = null;
+    return;
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/* ════════════════════════════════
+   SHAPE DRAWING
+════════════════════════════════ */
+function drawShape(x1, y1, x2, y2, final) {
+  setupCtx(false);
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+
+  switch(state.shape) {
+    case 'line':
+      ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      ctx.stroke(); break;
+
+    case 'arrow':
+      drawArrow(x1, y1, x2, y2); break;
+
+    case 'rect':
+      ctx.strokeRect(x1, y1, x2-x1, y2-y1); break;
+
+    case 'circle':
+      const rx = Math.abs(x2-x1)/2, ry = Math.abs(y2-y1)/2;
+      ctx.ellipse(x1+(x2-x1)/2, y1+(y2-y1)/2, rx, ry, 0, 0, Math.PI*2);
+      ctx.stroke(); break;
+
+    case 'triangle':
+      ctx.moveTo((x1+x2)/2, y1);
+      ctx.lineTo(x2, y2); ctx.lineTo(x1, y2);
+      ctx.closePath(); ctx.stroke(); break;
+
+    case 'star':
+      drawStar((x1+x2)/2, (y1+y2)/2, Math.min(Math.abs(x2-x1), Math.abs(y2-y1))/2); break;
+
+    case 'check':
+      ctx.moveTo(x1, (y1+y2)/2);
+      ctx.lineTo((x1+x2)/2.2, y2);
+      ctx.lineTo(x2, y1);
+      ctx.stroke(); break;
+
+    case 'cross':
+      ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x2,y1); ctx.lineTo(x1,y2);
+      ctx.stroke(); break;
+  }
+}
+
+function drawArrow(x1, y1, x2, y2) {
+  const headLen = Math.max(15, state.size * 3);
+  const angle = Math.atan2(y2-y1, x2-x1);
+  ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - headLen*Math.cos(angle-Math.PI/7), y2 - headLen*Math.sin(angle-Math.PI/7));
+  ctx.lineTo(x2 - headLen*Math.cos(angle+Math.PI/7), y2 - headLen*Math.sin(angle+Math.PI/7));
+  ctx.closePath(); ctx.fill();
+}
+
+function drawStar(cx, cy, r) {
+  const spikes = 5, step = Math.PI / spikes;
+  ctx.moveTo(cx, cy - r);
+  for(let i = 0; i < spikes*2; i++) {
+    const radius = i%2 === 0 ? r : r*0.4;
+    const x = cx + Math.cos(i*step - Math.PI/2) * radius;
+    const y = cy + Math.sin(i*step - Math.PI/2) * radius;
+    i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.closePath(); ctx.fill();
+}
+
+/* ════════════════════════════════
+   TEXT TOOL
+════════════════════════════════ */
+function openTextInput() {
+  document.getElementById('text-input-overlay').classList.add('show');
+  setTimeout(() => document.getElementById('text-input').focus(), 100);
+}
+function cancelText() {
+  document.getElementById('text-input-overlay').classList.remove('show');
+  document.getElementById('text-input').value = '';
+}
+function confirmText() {
+  const val = document.getElementById('text-input').value.trim();
+  if(!val) { cancelText(); return; }
+  pushUndo();
+  const obj = {
+    text: val, x: state.textPendingX, y: state.textPendingY,
+    color: state.color, size: Math.max(state.size * 4 + 10, 14),
+    id: Date.now()
+  };
+  textObjects.push(obj);
+  renderTextObject(obj);
+  cancelText();
+}
+function renderTextObject(obj) {
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.font = `bold ${obj.size}px Nunito, sans-serif`;
+  ctx.fillStyle = obj.color;
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur = 4;
+  ctx.fillText(obj.text, obj.x, obj.y);
+  ctx.shadowBlur = 0;
+}
+
+/* ════════════════════════════════
+   UNDO
+════════════════════════════════ */
+function pushUndo() {
+  if(undoStack.length >= MAX_UNDO) undoStack.shift();
+  undoStack.push({
+    imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
+    textCount: textObjects.length
+  });
+}
+
+function undo() {
+  if(!undoStack.length) return;
+  const prev = undoStack.pop();
+  ctx.putImageData(prev.imageData, 0, 0);
+  textObjects.splice(prev.textCount);
+  showUndoToast();
+}
+
+function showUndoToast() {
+  const t = document.getElementById('undo-toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1200);
+}
+
+/* ════════════════════════════════
+   CLEAR ALL
+════════════════════════════════ */
+function clearAll() {
+  if(!confirm('Tüm çizimler ve metinler silinsin mi?')) return;
+  pushUndo();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  textObjects.length = 0;
+}
+
+/* ════════════════════════════════
+   SAVE / SCREENSHOT
+════════════════════════════════ */
+function saveSnapshot() {
+  // Merge page screenshot + canvas (canvas only, since cross-origin blocks page capture)
+  const dataUrl = canvas.toDataURL('image/png');
+  state.capturedSnapshot = dataUrl;
+  document.getElementById('save-preview').src = dataUrl;
+  document.getElementById('save-overlay').classList.add('show');
+}
+function downloadImage() {
+  const a = document.createElement('a');
+  a.href = state.capturedSnapshot;
+  const now = new Date();
+  a.download = `ders-notu-${now.toLocaleDateString('tr')}-${now.getHours()}-${now.getMinutes()}.png`;
+  a.click();
+}
+function closeSave() {
+  document.getElementById('save-overlay').classList.remove('show');
+}
+
+/* ════════════════════════════════
+   TOOLBAR COLLAPSE
+════════════════════════════════ */
+function toggleToolbar() {
+  state.toolbarOpen = !state.toolbarOpen;
+  document.getElementById('toolbar').classList.toggle('collapsed', !state.toolbarOpen);
+}
+
+/* ════════════════════════════════
+   MODE INDICATOR
+════════════════════════════════ */
+let modeTimer;
+function showModeIndicator(msg) {
+  const el = document.getElementById('mode-indicator');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(modeTimer);
+  modeTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+/* ════════════════════════════════
+   DOUBLE-TAP UNDO (two-finger)
+════════════════════════════════ */
+let lastTap = 0;
+canvas.addEventListener('touchstart', e => {
+  if(e.touches.length === 2) {
+    const now = Date.now();
+    if(now - lastTap < 400) undo();
+    lastTap = now;
+  }
+}, { passive: true });
+
+/* ════════════════════════════════
+   KEYBOARD SHORTCUTS
+════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if(e.target.tagName === 'INPUT') return;
+  if((e.metaKey || e.ctrlKey) && e.key === 'z') { undo(); return; }
+  switch(e.key) {
+    case 'p': case 'P': setTool('pen'); break;
+    case 'h': case 'H': setTool('highlight'); break;
+    case 'e': case 'E': setTool('eraser'); break;
+    case 't': case 'T': setTool('text'); break;
+    case 'Escape': setScrollMode(); closeAllPopups(); break;
+    case 'd': case 'D': toggleDrawMode(); break;
+  }
+});
+
+/* close popups on outside click */
+document.addEventListener('pointerdown', e => {
+  const sizePopup = document.getElementById('size-popup');
+  const shapePopup = document.getElementById('shape-popup');
+  if(!e.target.closest('#size-popup') && !e.target.closest('#btn-size')) sizePopup.classList.remove('show');
+  if(!e.target.closest('#shape-popup') && !e.target.closest('#btn-shape')) shapePopup.classList.remove('show');
+});
+</script>
+</body>
+</html>
