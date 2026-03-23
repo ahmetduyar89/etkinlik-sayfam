@@ -3,7 +3,7 @@ import {
     Sparkles, Search, ExternalLink, Copy, Share2, Trash2, Edit3, Grid, Filter, Plus,
     LayoutDashboard, ChevronLeft, ChevronRight, Database, BarChart3, CalendarDays,
     Target, Zap, Globe, Settings, Bell, User, ArrowRight, HelpCircle, Eye,
-    MoreVertical, X, Save, Clock, BookOpen, Anchor, Book, FlaskConical, Command, Blocks
+    MoreVertical, X, Save, Clock, BookOpen, Anchor, Book, FlaskConical, Command, Blocks, Pencil, Eraser
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, useFirestore } from './lib/firebase';
@@ -28,20 +28,106 @@ export const getFormattedHtml = (act?: any) => {
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     ${libs}
     <style>
         body, html {
             margin: 0; padding: 0; width: 100vw; min-height: 100vh;
             background-color: transparent;
+            overflow: hidden;
+            touch-action: none;
         }
         ${css_code || ''}
+        #drawing-canvas {
+            touch-action: none;
+            cursor: crosshair;
+        }
     </style>
     <script>
         // Helper to send answers to the portal
         window.sendAnswer = (data) => {
             window.parent.postMessage({ type: 'SIM_ANSWER', data }, '*');
         };
+
+        // Drawing Script
+        (function() {
+            let isDrawing = false;
+            let canvas, ctx;
+            let enabled = false;
+
+            window.addEventListener('message', (e) => {
+                if (e.data.type === 'TOGGLE_DRAWING') {
+                    toggleDrawingMode(e.data.enabled);
+                } else if (e.data.type === 'CLEAR_DRAWING') {
+                    clearDrawing();
+                } else if (e.data.type === 'SET_DRAW_COLOR') {
+                    window.__drawColor = e.data.color;
+                }
+            });
+
+            function toggleDrawingMode(state) {
+                enabled = state;
+                if (enabled && !canvas) {
+                    initCanvas();
+                }
+                if (canvas) {
+                    canvas.style.display = enabled ? 'block' : 'none';
+                    canvas.style.pointerEvents = enabled ? 'all' : 'none';
+                }
+            }
+
+            function initCanvas() {
+                canvas = document.createElement('canvas');
+                canvas.id = 'drawing-canvas';
+                canvas.style.position = 'fixed';
+                canvas.style.top = '0';
+                canvas.style.left = '0';
+                canvas.style.width = '100vw';
+                canvas.style.height = '100vh';
+                canvas.style.zIndex = '999999';
+                document.body.appendChild(canvas);
+
+                ctx = canvas.getContext('2d');
+                resize();
+                window.addEventListener('resize', resize);
+
+                canvas.addEventListener('pointerdown', startDrawing);
+                canvas.addEventListener('pointermove', draw);
+                canvas.addEventListener('pointerup', stopDrawing);
+                canvas.addEventListener('pointerout', stopDrawing);
+            }
+
+            function resize() {
+                canvas.width = window.innerWidth * window.devicePixelRatio;
+                canvas.height = window.innerHeight * window.devicePixelRatio;
+                ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+            }
+
+            function startDrawing(e) {
+                if (!enabled) return;
+                isDrawing = true;
+                ctx.beginPath();
+                ctx.moveTo(e.clientX, e.clientY);
+                ctx.strokeStyle = window.__drawColor || '#4f46e5';
+                ctx.lineWidth = window.__drawWidth || 3;
+            }
+
+            function draw(e) {
+                if (!isDrawing || !enabled) return;
+                ctx.lineTo(e.clientX, e.clientY);
+                ctx.stroke();
+            }
+
+            function stopDrawing() {
+                isDrawing = false;
+            }
+
+            function clearDrawing() {
+                if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        })();
     </script>
 </head>
 <body>
@@ -338,6 +424,8 @@ const StudentPortal = ({ act }: { act: any }) => {
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
     const [isFinished, setIsFinished] = useState(false);
     const [submissionId, setSubmissionId] = useState<string | null>(null);
+    const [isDrawingMode, setIsDrawingMode] = useState(false);
+    const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const submissionsHandler = useFirestore('submissions');
 
     // Timer logic
@@ -370,6 +458,22 @@ const StudentPortal = ({ act }: { act: any }) => {
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
     }, [submissionId]);
+
+    // Handle Drawing Mode toggle
+    useEffect(() => {
+        if (iframeRef.current?.contentWindow) {
+            iframeRef.current.contentWindow.postMessage({ 
+                type: 'TOGGLE_DRAWING', 
+                enabled: isDrawingMode 
+            }, '*');
+        }
+    }, [isDrawingMode]);
+
+    const handleClearDrawing = () => {
+        if (iframeRef.current?.contentWindow) {
+            iframeRef.current.contentWindow.postMessage({ type: 'CLEAR_DRAWING' }, '*');
+        }
+    };
 
     const handleStart = async () => {
         if (!name.trim()) return alert('Lütfen isminizi girin.');
@@ -459,16 +563,62 @@ const StudentPortal = ({ act }: { act: any }) => {
                             {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
                         </div>
                     )}
-                    
-                    <button onClick={handleSubmit} className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">
-                        Sınavı Bitir
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button 
+                            onClick={() => setIsDrawingMode(!isDrawingMode)}
+                            className={cn(
+                                "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
+                                isDrawingMode ? "bg-indigo-600 text-white shadow-lg" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                            )}
+                        >
+                            <Pencil className="w-4 h-4" />
+                            {isDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}
+                        </button>
+                        
+                        {isDrawingMode && (
+                            <button 
+                                onClick={handleClearDrawing}
+                                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-bold uppercase tracking-widest transition-all"
+                            >
+                                <Eraser className="w-4 h-4" />
+                                Temizle
+                            </button>
+                        )}
+                        
+                        <button onClick={handleSubmit} className="ml-2 px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">
+                            Sınavı Bitir
+                        </button>
+                    </div>
                 </header>
+            )}
+            
+            {!act.is_test && (
+                <div className="fixed top-4 right-4 z-[100] flex gap-2">
+                    <button 
+                        onClick={() => setIsDrawingMode(!isDrawingMode)}
+                        className={cn(
+                            "flex items-center gap-2 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all shadow-xl",
+                            isDrawingMode ? "bg-indigo-600 text-white" : "bg-white/90 backdrop-blur-md text-slate-600 border border-slate-200 hover:bg-white"
+                        )}
+                    >
+                        <Pencil className="w-4 h-4" />
+                        {isDrawingMode ? 'Modu Kapat' : 'Kalem Modu'}
+                    </button>
+                    {isDrawingMode && (
+                        <button 
+                            onClick={handleClearDrawing}
+                            className="p-3 bg-white/90 backdrop-blur-md border border-slate-200 text-slate-600 hover:bg-white rounded-2xl shadow-xl transition-all"
+                        >
+                            <Eraser className="w-5 h-5" />
+                        </button>
+                    )}
+                </div>
             )}
             
             <main className={cn("flex-1 min-h-0 bg-slate-50", act.is_test ? "p-4" : "p-0")}>
                 <div className={cn("w-full h-full bg-white overflow-hidden relative", act.is_test ? "rounded-3xl shadow-sm border border-slate-100" : "")}>
                     <iframe 
+                        ref={iframeRef}
                         srcDoc={getFormattedHtml(act)} 
                         className="w-full h-full border-0" 
                         allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" 
@@ -492,6 +642,8 @@ export default function App() {
     const [search, setSearch] = useState('');
     const [previewId, setPreviewId] = useState<string | null>(null);
     const [showResultsId, setShowResultsId] = useState<string | null>(null);
+    const [isPreviewDrawingMode, setIsPreviewDrawingMode] = useState(false);
+    const previewIframeRef = React.useRef<HTMLIFrameElement>(null);
 
     // Form States
     const [isScienceOpen, setIsScienceOpen] = useState(false);
@@ -506,6 +658,16 @@ export default function App() {
         const unsubS = scienceHandler.sync(setScience);
         return () => { unsubA(); unsubS(); };
     }, []);
+
+    // Sync isPreviewDrawingMode state to iframe when it changes
+    useEffect(() => {
+        if (previewIframeRef.current?.contentWindow) {
+            previewIframeRef.current.contentWindow.postMessage({ 
+                type: 'TOGGLE_DRAWING', 
+                enabled: isPreviewDrawingMode 
+            }, '*');
+        }
+    }, [isPreviewDrawingMode, previewId]);
 
     const filteredScience = useMemo(() => {
         const grades = ["1. Sınıf", "2. Sınıf", "3. Sınıf", "4. Sınıf"];
@@ -872,14 +1034,45 @@ export default function App() {
                     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 sm:p-8">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPreviewId(null)} className="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" />
                         <motion.div initial={{ opacity: 0, scale: 0.98, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: 10 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }} className="relative w-full h-full bg-white rounded-2xl border border-neutral-200/50 overflow-hidden shadow-2xl">
-                            <div className="absolute top-4 right-4 z-10">
+                            <div className="absolute top-4 right-4 z-10 flex gap-2">
+                                <button 
+                                    onClick={() => setIsPreviewDrawingMode(!isPreviewDrawingMode)}
+                                    className={cn(
+                                        "h-10 px-4 bg-white/90 backdrop-blur-md border border-neutral-200/50 text-neutral-900 flex items-center gap-2 rounded-full hover:bg-neutral-100 transition-colors shadow-sm text-xs font-bold uppercase tracking-widest",
+                                        isPreviewDrawingMode ? "bg-indigo-600 !text-white !border-indigo-600" : ""
+                                    )}
+                                >
+                                    <Pencil className="w-4 h-4" />
+                                    {isPreviewDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}
+                                </button>
+                                {isPreviewDrawingMode && (
+                                    <button 
+                                        onClick={() => {
+                                            if (previewIframeRef.current?.contentWindow) {
+                                                previewIframeRef.current.contentWindow.postMessage({ type: 'CLEAR_DRAWING' }, '*');
+                                            }
+                                        }}
+                                        className="w-10 h-10 bg-white/90 backdrop-blur-md border border-neutral-200/50 text-neutral-900 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors shadow-sm"
+                                    >
+                                        <Eraser className="w-4 h-4" />
+                                    </button>
+                                )}
                                 <button onClick={() => setPreviewId(null)} className="w-10 h-10 bg-white/90 backdrop-blur-md border border-neutral-200/50 text-neutral-900 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors shadow-sm">
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
                             <iframe 
+                                ref={previewIframeRef}
                                 srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} 
                                 className="w-full h-full border-0" 
+                                onLoad={() => {
+                                    if (previewIframeRef.current?.contentWindow) {
+                                        previewIframeRef.current.contentWindow.postMessage({ 
+                                            type: 'TOGGLE_DRAWING', 
+                                            enabled: isPreviewDrawingMode 
+                                        }, '*');
+                                    }
+                                }}
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                                 allowFullScreen 
                             />
