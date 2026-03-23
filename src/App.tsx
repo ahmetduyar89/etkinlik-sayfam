@@ -398,10 +398,12 @@ export const getFormattedHtml = (act?: any) => {
 // =======================
 // DRAWING TOOLBAR
 // =======================
-const DrawingToolbar = ({ onCommand, config, setConfig }: { 
+const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowWhiteboard }: { 
     onCommand: (type: string, data?: any) => void, 
     config: any, 
-    setConfig: (c: any) => void 
+    setConfig: (c: any) => void,
+    showWhiteboard?: boolean,
+    setShowWhiteboard?: (val: boolean) => void
 }) => {
     const [showShapes, setShowShapes] = React.useState(false);
     
@@ -544,6 +546,18 @@ const DrawingToolbar = ({ onCommand, config, setConfig }: {
                     >
                         <Trash2 className="w-5 h-5" />
                     </button>
+                    {setShowWhiteboard && (
+                        <button 
+                            onClick={() => setShowWhiteboard(!showWhiteboard)}
+                            className={cn(
+                                "p-2.5 rounded-xl transition-all",
+                                showWhiteboard ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-white hover:bg-white/5"
+                            )}
+                            title="Yazı Tahtası"
+                        >
+                            <Grid className="w-5 h-5" />
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
@@ -1048,6 +1062,7 @@ export default function App() {
     const [showResultsId, setShowResultsId] = useState<string | null>(null);
     const [isPreviewDrawingMode, setIsPreviewDrawingMode] = useState(false);
     const [previewDrawConfig, setPreviewDrawConfig] = useState({ tool: 'pencil', color: '#ffffff', width: 3 });
+    const [showWhiteboard, setShowWhiteboard] = useState(false);
     const previewIframeRef = React.useRef<HTMLIFrameElement>(null);
 
     // Form States
@@ -1460,11 +1475,17 @@ export default function App() {
                             className="absolute inset-0 bg-neutral-900/80" 
                         />
                         <motion.div initial={{ opacity: 0, scale: 1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1 }} transition={{ duration: 0.2 }} className="relative w-full h-full bg-white overflow-hidden">
-                            <div className="absolute top-4 right-4 z-10 flex gap-2">
+                            <motion.div 
+                                drag 
+                                dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                                dragElastic={0.1}
+                                whileDrag={{ scale: 1.1, cursor: 'grabbing' }}
+                                className="absolute top-4 right-4 z-[400] flex gap-2 cursor-grab active:cursor-grabbing"
+                            >
                                 <button 
                                     onClick={() => setIsPreviewDrawingMode(!isPreviewDrawingMode)}
                                     className={cn(
-                                        "h-10 px-4 bg-white border border-neutral-200 text-neutral-900 flex items-center gap-2 rounded-full hover:bg-neutral-100 transition-colors shadow-sm text-xs font-bold uppercase tracking-widest",
+                                        "h-10 px-4 bg-white border border-neutral-200 text-neutral-900 flex items-center gap-2 rounded-full hover:bg-neutral-100 transition-colors shadow-lg text-xs font-bold uppercase tracking-widest",
                                         isPreviewDrawingMode ? "bg-indigo-600 !text-white !border-indigo-600" : ""
                                     )}
                                 >
@@ -1476,34 +1497,44 @@ export default function App() {
                                         setPreviewId(null);
                                         setIsPreviewDrawingMode(false);
                                     }} 
-                                    className="w-10 h-10 bg-white/90 backdrop-blur-md border border-neutral-200/50 text-neutral-900 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors shadow-sm"
+                                    className="w-10 h-10 bg-white border border-neutral-200 text-neutral-900 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors shadow-lg"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
-                            </div>
+                            </motion.div>
 
                             {isPreviewDrawingMode && (
                                 <DrawingToolbar 
                                     config={previewDrawConfig} 
                                     setConfig={setPreviewDrawConfig} 
                                     onCommand={handlePreviewDrawingCommand} 
+                                    showWhiteboard={showWhiteboard}
+                                    setShowWhiteboard={setShowWhiteboard}
                                 />
                             )}
-                            <iframe 
-                                ref={previewIframeRef}
-                                srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} 
-                                className="w-full h-full border-0" 
-                                onLoad={() => {
-                                    if (previewIframeRef.current?.contentWindow) {
-                                        previewIframeRef.current.contentWindow.postMessage({ 
-                                            type: 'TOGGLE_DRAWING', 
-                                            enabled: isPreviewDrawingMode 
-                                        }, '*');
-                                    }
-                                }}
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                allowFullScreen 
-                            />
+                            <div className="relative w-full h-full bg-white overflow-hidden">
+                                {showWhiteboard && (
+                                    <div className="absolute inset-0 z-[5] bg-white whiteboard-grid transition-all pointer-events-none" style={{
+                                        backgroundImage: 'linear-gradient(#e5e7eb 1px, transparent 1px), linear-gradient(90deg, #e5e7eb 1px, transparent 1px)',
+                                        backgroundSize: '30px 30px'
+                                    }} />
+                                )}
+                                <iframe 
+                                    ref={previewIframeRef}
+                                    srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} 
+                                    className={cn("w-full h-full border-0 transition-opacity duration-300", showWhiteboard ? "opacity-0" : "opacity-100")} 
+                                    onLoad={() => {
+                                        if (previewIframeRef.current?.contentWindow) {
+                                            previewIframeRef.current.contentWindow.postMessage({ 
+                                                type: 'TOGGLE_DRAWING', 
+                                                enabled: isPreviewDrawingMode 
+                                            }, '*');
+                                        }
+                                    }}
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                    allowFullScreen 
+                                />
+                            </div>
                         </motion.div>
                     </div>
                 )}
