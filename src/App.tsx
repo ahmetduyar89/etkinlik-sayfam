@@ -4,7 +4,8 @@ import {
     LayoutDashboard, ChevronLeft, ChevronRight, Database, BarChart3, CalendarDays,
     Target, Zap, Globe, Settings, Bell, User, ArrowRight, HelpCircle, Eye,
     MoreVertical, X, Save, Clock, BookOpen, Anchor, Book, FlaskConical, Command, Blocks, Pencil, Eraser,
-    Hand, Highlighter, Type, Shapes, Undo, History, Sun, Square, Circle, Triangle, MousePointer2
+    Hand, Highlighter, Type, Shapes, Undo, History, Sun, Square, Circle, Triangle, MousePointer2,
+    MoveRight, ArrowRightLeft, Minus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, useFirestore } from './lib/firebase';
@@ -53,6 +54,7 @@ export const getFormattedHtml = (act?: any) => {
             let isDrawing = false;
             let canvas, ctx;
             let enabled = false;
+            let currentImageData = null;
 
             window.addEventListener('message', (e) => {
                 if (e.data.type === 'TOGGLE_DRAWING') {
@@ -73,7 +75,6 @@ export const getFormattedHtml = (act?: any) => {
                     initCanvas();
                 }
                 
-                // Allow scrolling when not in drawing mode or when 'pan' tool is selected
                 document.documentElement.style.overflow = enabled ? 'hidden' : 'auto';
                 document.body.style.overflow = enabled ? 'hidden' : 'auto';
                 document.documentElement.style.touchAction = enabled ? 'none' : 'auto';
@@ -82,7 +83,7 @@ export const getFormattedHtml = (act?: any) => {
                 if (canvas) {
                     canvas.style.display = enabled ? 'block' : 'none';
                     updateCanvasInteractivity();
-                    if (enabled) resize(); // Re-sync size when opening
+                    if (enabled) resize();
                 }
             }
 
@@ -122,7 +123,7 @@ export const getFormattedHtml = (act?: any) => {
             function initCanvas() {
                 canvas = document.createElement('canvas');
                 canvas.id = 'drawing-canvas';
-                canvas.style.position = 'absolute'; // Changed from fixed to absolute
+                canvas.style.position = 'absolute';
                 canvas.style.top = '0';
                 canvas.style.left = '0';
                 canvas.style.zIndex = '999999';
@@ -131,7 +132,6 @@ export const getFormattedHtml = (act?: any) => {
                 ctx = canvas.getContext('2d');
                 resize();
                 window.addEventListener('resize', resize);
-                // Watch for content changes to adjust canvas height
                 const observer = new MutationObserver(resize);
                 observer.observe(document.body, { childList: true, subtree: true });
 
@@ -143,8 +143,6 @@ export const getFormattedHtml = (act?: any) => {
             function resize() {
                 if (!canvas) return;
                 const oldData = ctx ? ctx.getImageData(0, 0, canvas.width, canvas.height) : null;
-                
-                // Set canvas to cover the whole scrollable area
                 const w = Math.max(document.documentElement.scrollWidth, window.innerWidth);
                 const h = Math.max(document.documentElement.scrollHeight, window.innerHeight);
                 
@@ -166,11 +164,11 @@ export const getFormattedHtml = (act?: any) => {
                 if (!enabled) return;
                 saveHistory();
                 isDrawing = true;
-                
-                // Use pageX/pageY for absolute positioning reference
                 startX = e.pageX;
                 startY = e.pageY;
                 
+                currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
                 if (window.__drawConfig.tool === 'text') {
                     const text = prompt('Notunuzu girin:');
                     if (text) {
@@ -186,17 +184,20 @@ export const getFormattedHtml = (act?: any) => {
                 ctx.moveTo(startX, startY);
                 ctx.strokeStyle = window.__drawConfig.color;
                 ctx.lineWidth = window.__drawConfig.width;
+                ctx.setLineDash([]);
                 
                 ctx.globalCompositeOperation = 'source-over';
                 
                 if (window.__drawConfig.tool === 'highlighter') {
-                    ctx.globalAlpha = 0.5;
-                    ctx.lineWidth = window.__drawConfig.width * 5; // Scale relative to brush size
+                    ctx.globalAlpha = 0.3; // Much lighter for highlighter
+                    ctx.lineWidth = window.__drawConfig.width * 8;
+                    ctx.strokeStyle = window.__drawConfig.color;
+                    ctx.globalCompositeOperation = 'multiply'; // Better blending for highlighters
                 } else if (window.__drawConfig.tool === 'eraser') {
                     ctx.globalCompositeOperation = 'destination-out';
                     ctx.lineWidth = window.__drawConfig.width * 10;
-                } else {
-                    ctx.globalAlpha = 1.0;
+                } else if (window.__drawConfig.tool === 'dashed') {
+                    ctx.setLineDash([10, 5]);
                 }
             }
 
@@ -207,21 +208,65 @@ export const getFormattedHtml = (act?: any) => {
                 if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser') {
                     ctx.lineTo(e.pageX, e.pageY);
                     ctx.stroke();
+                } else {
+                    // Shape Preview
+                    if (currentImageData) {
+                        ctx.putImageData(currentImageData, 0, 0);
+                    }
+                    drawShape(tool, startX, startY, e.pageX, e.pageY);
+                }
+            }
+
+            function drawShape(tool, x1, y1, x2, y2) {
+                ctx.beginPath();
+                ctx.setLineDash(tool === 'dashed' ? [10, 5] : []);
+                
+                if (tool === 'rect' || tool === 'dashed') {
+                    if (tool === 'rect') {
+                        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+                    } else {
+                        ctx.moveTo(x1, y1);
+                        ctx.lineTo(x2, y2);
+                        ctx.stroke();
+                    }
+                } else if (tool === 'circle') {
+                    const r = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+                    ctx.arc(x1, y1, r, 0, 2 * Math.PI);
+                    ctx.stroke();
+                } else if (tool === 'arrow' || tool === 'double_arrow') {
+                    drawArrow(x1, y1, x2, y2, tool === 'double_arrow');
+                }
+            }
+
+            function drawArrow(x1, y1, x2, y2, double) {
+                const headlen = 15;
+                const angle = Math.atan2(y2 - y1, x2 - x1);
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+
+                // Arrow head at end
+                ctx.beginPath();
+                ctx.moveTo(x2, y2);
+                ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
+                ctx.moveTo(x2, y2);
+                ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
+                ctx.stroke();
+
+                if (double) {
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x1 + headlen * Math.cos(angle - Math.PI / 6), y1 + headlen * Math.sin(angle - Math.PI / 6));
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x1 + headlen * Math.cos(angle + Math.PI / 6), y1 + headlen * Math.sin(angle + Math.PI / 6));
+                    ctx.stroke();
                 }
             }
 
             function stopDrawing(e) {
                 if (!isDrawing) return;
-                const tool = window.__drawConfig.tool;
-                if (tool === 'rect') {
-                    ctx.strokeRect(startX, startY, e.pageX - startX, e.pageY - startY);
-                } else if (tool === 'circle') {
-                    const radius = Math.sqrt(Math.pow(e.pageX - startX, 2) + Math.pow(e.pageY - startY, 2));
-                    ctx.beginPath();
-                    ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
-                    ctx.stroke();
-                }
                 isDrawing = false;
+                currentImageData = null;
             }
 
             function clearDrawing() {
@@ -262,7 +307,11 @@ const DrawingToolbar = ({ onCommand, config, setConfig }: {
         { id: 'sun', icon: Sun, label: 'Lazer' },
         { id: 'eraser', icon: Eraser, label: 'Silgi' },
         { id: 'text', icon: Type, label: 'Metin' },
-        { id: 'rect', icon: Square, label: 'Şekiller' },
+        { id: 'rect', icon: Square, label: 'Dikdörtgen' },
+        { id: 'circle', icon: Circle, label: 'Daire' },
+        { id: 'arrow', icon: MoveRight, label: 'Ok' },
+        { id: 'double_arrow', icon: ArrowRightLeft, label: 'Çift Taraflı Ok' },
+        { id: 'dashed', icon: Minus, label: 'Kesikli Çizgi' },
     ];
 
     return (
