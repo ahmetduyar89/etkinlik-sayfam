@@ -107,16 +107,24 @@ export const getFormattedHtml = (act?: any) => {
                 }
             }
 
+            // GPU-Accelerated History & Logic
             let history = [];
             function saveHistory() {
-                if (!ctx) return;
-                history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
-                if (history.length > 20) history.shift();
+                if (!canvas) return;
+                // Capture GPU texture instead of CPU pixel copy
+                const hCanvas = document.createElement('canvas');
+                hCanvas.width = canvas.width;
+                hCanvas.height = canvas.height;
+                hCanvas.getContext('2d').drawImage(canvas, 0, 0);
+                history.push(hCanvas);
+                if (history.length > 10) history.shift();
             }
 
             function undoDrawing() {
                 if (history.length > 0) {
-                    ctx.putImageData(history.pop(), 0, 0);
+                    const hCanvas = history.pop();
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(hCanvas, 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
                 }
             }
 
@@ -127,7 +135,7 @@ export const getFormattedHtml = (act?: any) => {
                 canvas.style.top = '0';
                 canvas.style.left = '0';
                 canvas.style.zIndex = '999999';
-                canvas.style.pointerEvents = 'none'; // Default to through
+                canvas.style.pointerEvents = 'none';
                 document.body.appendChild(canvas);
 
                 ctx = canvas.getContext('2d');
@@ -141,18 +149,13 @@ export const getFormattedHtml = (act?: any) => {
 
             function resize() {
                 if (!canvas) return;
-                
-                // PERFORMANCE FIX: Use GPU-backed drawImage instead of CPU-heavy getImageData
-                // This prevents the "22MB memory stall" on iPad during resize/close.
-                const tempCanvasForResize = document.createElement('canvas');
-                tempCanvasForResize.width = canvas.width;
-                tempCanvasForResize.height = canvas.height;
-                const tempCtxForResize = tempCanvasForResize.getContext('2d');
-                tempCtxForResize.drawImage(canvas, 0, 0);
+                const temp = document.createElement('canvas');
+                temp.width = canvas.width;
+                temp.height = canvas.height;
+                temp.getContext('2d').drawImage(canvas, 0, 0);
 
-                const w = Math.max(document.documentElement.scrollWidth, window.innerWidth);
-                const h = Math.max(document.documentElement.scrollHeight, window.innerHeight);
-                
+                const w = window.innerWidth;
+                const h = window.innerHeight;
                 canvas.width = w * window.devicePixelRatio;
                 canvas.height = h * window.devicePixelRatio;
                 canvas.style.width = w + 'px';
@@ -160,20 +163,17 @@ export const getFormattedHtml = (act?: any) => {
                 
                 ctx = canvas.getContext('2d');
                 ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                
-                ctx.drawImage(tempCanvasForResize, 0, 0, w, h);
+                ctx.drawImage(temp, 0, 0, w, h);
             }
 
             let startX, startY;
             window.__drawConfig = { tool: 'pencil', color: '#4f46e5', width: 3 };
 
-            // High-speed smooth drawing engine with page-specific persistence
             let tempCanvas, tempCtx;
             let lastPoint, midPoint;
             let currentPage = '';
-            let drawingCache = {}; // Storage for page drawings: { pageId: DataURL }
+            let drawingCache = {}; 
+            let previewLayer = null; // GPU layer for shapes
 
             function initLayer() {
                 if (!tempCanvas) {
@@ -187,10 +187,11 @@ export const getFormattedHtml = (act?: any) => {
 
             function saveCurrentPage() {
                 if (currentPage && canvas) {
-                    try {
-                        // Use toDataURL for persistence - more memory stable for storage than ImageData
-                        drawingCache[currentPage] = canvas.toDataURL();
-                    } catch (e) {}
+                    const snap = document.createElement('canvas');
+                    snap.width = canvas.width;
+                    snap.height = canvas.height;
+                    snap.getContext('2d').drawImage(canvas, 0, 0);
+                    drawingCache[currentPage] = snap; // Store GPU Canvas reference
                 }
             }
 
@@ -198,19 +199,14 @@ export const getFormattedHtml = (act?: any) => {
                 if (!ctx) return;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 if (drawingCache[id]) {
-                    const img = new Image();
-                    img.onload = () => ctx.drawImage(img, 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
-                    img.src = drawingCache[id];
+                    ctx.drawImage(drawingCache[id], 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
                 }
             }
 
-            // Sync drawings with iframe navigation
             function checkPage() {
                 try {
-                    const body = document.body;
-                    const h1 = body.querySelector('h1')?.innerText || '';
+                    const h1 = document.body.querySelector('h1')?.innerText || '';
                     const newId = (window.location.hash || window.location.pathname) + h1;
-                    
                     if (newId !== currentPage) {
                         saveCurrentPage();
                         currentPage = newId;
@@ -218,27 +214,27 @@ export const getFormattedHtml = (act?: any) => {
                     }
                 } catch(e) {}
             }
-            setInterval(checkPage, 800);
+            setInterval(checkPage, 1000);
 
             function startDrawing(e) {
-                if (!enabled) return;
-                if (e.pointerType === 'touch') return;
-                if (window.__drawConfig.tool === 'pan') return;
+                if (!enabled || e.pointerType === 'touch' || window.__drawConfig.tool === 'pan') return;
 
                 saveHistory();
                 isDrawing = true;
                 e.preventDefault();
-                
                 startX = e.pageX;
-                startY = e.pageY;
-                lastPoint = { x: startX, y: startY };
-                midPoint = { x: startX, y: startY };
-                window.__currentPath = [lastPoint];
-                
-                // Performance: avoid getImageData here if possible, but shapes need it for preview
-                currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                
-                initLayer();
+            startY = e.pageY;
+            lastPoint = { x: startX, y: startY };
+            midPoint = { x: startX, y: startY };
+            window.__currentPath = [lastPoint];
+            
+            // PERFORMANCE: Shape preview GPU layer
+            previewLayer = document.createElement('canvas');
+            previewLayer.width = canvas.width;
+            previewLayer.height = canvas.height;
+            previewLayer.getContext('2d').drawImage(canvas, 0, 0);
+            
+            initLayer();
 
                 if (window.__drawConfig.tool === 'text') {
                     const text = prompt('Notunuzu girin:');
@@ -280,7 +276,6 @@ export const getFormattedHtml = (act?: any) => {
                         tCtx.globalCompositeOperation = 'destination-out';
                         tCtx.lineWidth = window.__drawConfig.width * 10;
                     } else if (tool === 'chisel') {
-                        // Calligraphic transform at 45 degrees
                         tCtx.translate(lastPoint.x, lastPoint.y);
                         tCtx.rotate(Math.PI / 4);
                         tCtx.scale(1, 0.2); 
@@ -295,22 +290,22 @@ export const getFormattedHtml = (act?: any) => {
                     tCtx.restore();
 
                     if (tool === 'highlighter' || tool === 'chisel') {
-                        ctx.putImageData(currentImageData, 0, 0);
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(previewLayer, 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
                         ctx.save();
                         if (tool === 'highlighter') {
                             ctx.globalAlpha = 0.3;
                             ctx.globalCompositeOperation = 'multiply';
                         }
-                        ctx.drawImage(tempCanvas, 0, 0);
+                        ctx.drawImage(tempCanvas, 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
                         ctx.restore();
                     }
 
                     lastPoint = newPoint;
                     midPoint = currentMid;
                 } else if (tool !== 'pan') {
-                    if (currentImageData) {
-                        ctx.putImageData(currentImageData, 0, 0);
-                    }
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(previewLayer, 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
                     drawShape(tool, startX, startY, x, y);
                 }
             }
@@ -1462,14 +1457,14 @@ export default function App() {
                                 setPreviewId(null);
                                 setIsPreviewDrawingMode(false);
                             }} 
-                            className="absolute inset-0 bg-neutral-900/60 backdrop-blur-md" 
+                            className="absolute inset-0 bg-neutral-900/80" 
                         />
                         <motion.div initial={{ opacity: 0, scale: 1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1 }} transition={{ duration: 0.2 }} className="relative w-full h-full bg-white overflow-hidden">
                             <div className="absolute top-4 right-4 z-10 flex gap-2">
                                 <button 
                                     onClick={() => setIsPreviewDrawingMode(!isPreviewDrawingMode)}
                                     className={cn(
-                                        "h-10 px-4 bg-white/90 backdrop-blur-md border border-neutral-200/50 text-neutral-900 flex items-center gap-2 rounded-full hover:bg-neutral-100 transition-colors shadow-sm text-xs font-bold uppercase tracking-widest",
+                                        "h-10 px-4 bg-white border border-neutral-200 text-neutral-900 flex items-center gap-2 rounded-full hover:bg-neutral-100 transition-colors shadow-sm text-xs font-bold uppercase tracking-widest",
                                         isPreviewDrawingMode ? "bg-indigo-600 !text-white !border-indigo-600" : ""
                                     )}
                                 >
