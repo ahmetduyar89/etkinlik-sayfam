@@ -106,7 +106,6 @@ export const getFormattedHtml = (act?: any) => {
                 if (canvas) {
                     canvas.style.display = enabled ? 'block' : 'none';
                     updateCanvasInteractivity();
-                    if (enabled) resize();
                 }
                 if (laserCanvas) {
                     laserCanvas.style.display = enabled ? 'block' : 'none';
@@ -119,13 +118,17 @@ export const getFormattedHtml = (act?: any) => {
                 const tool = window.__drawConfig.tool;
                 if (tool === 'pan') {
                     canvas.style.pointerEvents = 'none';
+                    canvas.style.touchAction = 'auto';
                     document.documentElement.style.overflow = 'auto';
                     document.body.style.overflow = 'auto';
                     document.documentElement.style.touchAction = 'auto';
                     document.body.style.touchAction = 'auto';
                 } else {
                     canvas.style.pointerEvents = enabled ? 'all' : 'none';
+                    canvas.style.touchAction = 'none';
                     if (enabled) {
+                        // resize() ÖNCE çağrılmalı: overflow:hidden olmadan scrollHeight doğru gelir
+                        resize();
                         document.documentElement.style.overflow = 'hidden';
                         document.body.style.overflow = 'hidden';
                         document.documentElement.style.touchAction = 'none';
@@ -149,16 +152,17 @@ export const getFormattedHtml = (act?: any) => {
             function undoDrawing() {
                 if (history.length > 0) {
                     const hCanvas = history.pop();
+                    const dpr = window.devicePixelRatio;
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(hCanvas, 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
+                    ctx.drawImage(hCanvas, 0, 0, hCanvas.width / dpr, hCanvas.height / dpr);
                 }
             }
 
             function initCanvas() {
                 canvas = document.createElement('canvas');
                 canvas.id = 'drawing-canvas';
-                // fixed → kaydırma sonrası da her zaman görünür alanı kapsar
-                canvas.style.position = 'fixed';
+                // absolute → çizimler belgede kalır, içerikle birlikte kayar
+                canvas.style.position = 'absolute';
                 canvas.style.top = '0';
                 canvas.style.left = '0';
                 canvas.style.zIndex = '999999';
@@ -227,15 +231,18 @@ export const getFormattedHtml = (act?: any) => {
                 temp.getContext('2d').drawImage(canvas, 0, 0);
 
                 const w = window.innerWidth;
-                const h = window.innerHeight;
-                canvas.width = w * window.devicePixelRatio;
-                canvas.height = h * window.devicePixelRatio;
+                // Tüm belge yüksekliğini kapla — çizimler sayfayla birlikte kayar
+                const h = Math.max(document.body.scrollHeight, window.innerHeight);
+                const dpr = window.devicePixelRatio;
+                canvas.width = w * dpr;
+                canvas.height = h * dpr;
                 canvas.style.width = w + 'px';
                 canvas.style.height = h + 'px';
 
                 ctx = canvas.getContext('2d');
-                ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-                ctx.drawImage(temp, 0, 0, w, h);
+                ctx.scale(dpr, dpr);
+                // Eski içeriği orijinal boyutunda geri yaz (ölçekleme yok)
+                ctx.drawImage(temp, 0, 0, temp.width / dpr, temp.height / dpr);
 
                 if (previewLayer) {
                     previewLayer.width = canvas.width;
@@ -286,7 +293,9 @@ export const getFormattedHtml = (act?: any) => {
                 if (!ctx) return;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 if (drawingCache[id]) {
-                    ctx.drawImage(drawingCache[id], 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
+                    const snap = drawingCache[id];
+                    const dpr = window.devicePixelRatio;
+                    ctx.drawImage(snap, 0, 0, snap.width / dpr, snap.height / dpr);
                 }
             }
 
@@ -306,7 +315,8 @@ export const getFormattedHtml = (act?: any) => {
             const _intCheck = setInterval(checkPage, 1000);
 
             // FIX 5: prompt() yerine inline metin girişi
-            function showTextInput(x, y) {
+            // vx/vy = viewport (input kutusu yeri), dx/dy = belge koordinatı (çizim yeri)
+            function showTextInput(vx, vy, dx, dy) {
                 const existing = document.getElementById('canvas-text-input');
                 if (existing) existing.remove();
                 const input = document.createElement('input');
@@ -315,8 +325,8 @@ export const getFormattedHtml = (act?: any) => {
                 input.placeholder = 'Yazın, Enter ile onayla';
                 input.style.cssText = [
                     'position:fixed',
-                    'left:' + Math.min(x, window.innerWidth - 260) + 'px',
-                    'top:' + Math.max(y - 44, 8) + 'px',
+                    'left:' + Math.min(vx, window.innerWidth - 260) + 'px',
+                    'top:' + Math.max(vy - 44, 8) + 'px',
                     'font:bold 18px Arial',
                     'color:' + window.__drawConfig.color,
                     'background:rgba(15,15,25,0.88)',
@@ -337,7 +347,8 @@ export const getFormattedHtml = (act?: any) => {
                         ctx.save();
                         ctx.font = 'bold 20px Arial';
                         ctx.fillStyle = window.__drawConfig.color;
-                        ctx.fillText(text, x, y);
+                        // Belge koordinatında çiz — sayfayla birlikte kayar
+                        ctx.fillText(text, dx, dy);
                         ctx.restore();
                     }
                     input.remove();
@@ -361,7 +372,8 @@ export const getFormattedHtml = (act?: any) => {
                 // FIX 5: Metin aracı inline input kullanır
                 if (window.__drawConfig.tool === 'text') {
                     saveHistory();
-                    showTextInput(e.clientX, e.clientY);
+                    // Input kutusu: viewport (fixed); çizim: belge koordinatı (page)
+                    showTextInput(e.clientX, e.clientY, e.pageX, e.pageY);
                     return;
                 }
 
@@ -371,8 +383,9 @@ export const getFormattedHtml = (act?: any) => {
                 // FIX 3: Pointer capture — hızlı çizimde event kaybolmaz
                 canvas.setPointerCapture(e.pointerId);
 
-                startX = e.clientX;
-                startY = e.clientY;
+                // Belge koordinatı: çizim sayfayla birlikte kayar
+                startX = e.pageX;
+                startY = e.pageY;
                 lastPoint = { x: startX, y: startY };
                 midPoint = { x: startX, y: startY };
                 window.__currentPath = [lastPoint];
@@ -396,8 +409,9 @@ export const getFormattedHtml = (act?: any) => {
                 if (!isDrawing) return;
 
                 const tool = window.__drawConfig.tool;
-                const x = e.clientX;
-                const y = e.clientY;
+                // Belge koordinatı: scrollY dahil
+                const x = e.pageX;
+                const y = e.pageY;
                 const newPoint = { x, y };
                 // FIX 6: Kalem baskısı (Apple Pencil / S Pen)
                 const pressure = (e.pointerType === 'pen' && e.pressure > 0) ? e.pressure : 0.5;
@@ -515,11 +529,8 @@ export const getFormattedHtml = (act?: any) => {
             // Set touch action based on tool
             function updateTouchAction() {
                 if (!canvas) return;
-                if (window.__drawConfig.tool === 'pan') {
-                    canvas.style.touchAction = 'auto';
-                } else {
-                    canvas.style.touchAction = 'pan-y pinch-zoom';
-                }
+                // Pan modunda scroll açık; diğer modlarda 'none' → çizim sırasında sayfa kaymaz
+                canvas.style.touchAction = (window.__drawConfig.tool === 'pan') ? 'auto' : 'none';
             }
             const _intTouch = setInterval(updateTouchAction, 500);
 
