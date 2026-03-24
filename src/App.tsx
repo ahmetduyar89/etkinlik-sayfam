@@ -99,21 +99,15 @@ export const getFormattedHtml = (act?: any) => {
                     initCanvas();
                 }
 
-                // Scroll kilitlemeyi kaldırıyoruz — kullanıcı uzun etkinliklerde aşağı inebilmeli.
-                // touch-action: none ve preventDefault() zaten çizim sırasında kaymayı engeller.
-                document.documentElement.style.touchAction = enabled ? 'none' : 'auto';
-                // Bu satırlar updateCanvasInteractivity içinde yönetiliyor.
-                // document.documentElement.style.touchAction = enabled ? 'none' : 'auto';
-                // document.body.style.touchAction = enabled ? 'none' : 'auto';
+                // Scroll handling managed via updateTouchAction
 
                 if (canvas) {
                     canvas.style.display = enabled ? 'block' : 'none';
                     updateCanvasInteractivity();
                 }
-                if (laserCanvas) {
-                    laserCanvas.style.display = enabled ? 'block' : 'none';
                     if (!enabled) laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
                 }
+                updateTouchAction();
             }
 
             function updateCanvasInteractivity() {
@@ -301,6 +295,9 @@ export const getFormattedHtml = (act?: any) => {
                     const snap = drawingCache[id];
                     const dpr = window.devicePixelRatio;
                     ctx.drawImage(snap, 0, 0, snap.width / dpr, snap.height / dpr);
+                }
+            }
+
             function checkPage() {
                 try {
                     // Kalem modu açıksa ama canvas DOM'dan uçtuysa (etkinlik script'i body'yi sildiyse)
