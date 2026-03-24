@@ -77,6 +77,7 @@ export const getFormattedHtml = (act?: any) => {
                 } else if (e.data.type === 'SET_DRAW_CONFIG') {
                     window.__drawConfig = { ...window.__drawConfig, ...e.data.config };
                     updateCanvasInteractivity();
+                    updateTouchAction();
                     // Lazer dışı araca geçilince lazer izini temizle
                     if (laserCanvas && e.data.config.tool && e.data.config.tool !== 'sun') {
                         laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
@@ -101,7 +102,9 @@ export const getFormattedHtml = (act?: any) => {
                 // Scroll kilitlemeyi kaldırıyoruz — kullanıcı uzun etkinliklerde aşağı inebilmeli.
                 // touch-action: none ve preventDefault() zaten çizim sırasında kaymayı engeller.
                 document.documentElement.style.touchAction = enabled ? 'none' : 'auto';
-                document.body.style.touchAction = enabled ? 'none' : 'auto';
+                // Bu satırlar updateCanvasInteractivity içinde yönetiliyor.
+                // document.documentElement.style.touchAction = enabled ? 'none' : 'auto';
+                // document.body.style.touchAction = enabled ? 'none' : 'auto';
 
                 if (canvas) {
                     canvas.style.display = enabled ? 'block' : 'none';
@@ -298,12 +301,6 @@ export const getFormattedHtml = (act?: any) => {
                     const snap = drawingCache[id];
                     const dpr = window.devicePixelRatio;
                     ctx.drawImage(snap, 0, 0, snap.width / dpr, snap.height / dpr);
-                }
-            }
-
-            // Sayfa tespiti yalnızca URL hash'ine bakıyor.
-            // h1 içeriği KULLANILMIYOR — etkinlik JS'i h1 değiştirince
-            // "yeni sayfa" algılanıp canvas temizlenmesin diye.
             function checkPage() {
                 try {
                     // Kalem modu açıksa ama canvas DOM'dan uçtuysa (etkinlik script'i body'yi sildiyse)
@@ -311,12 +308,6 @@ export const getFormattedHtml = (act?: any) => {
                         initCanvas();
                         if (enabled) canvas.style.display = 'block';
                         updateCanvasInteractivity();
-                    }
-
-                    // Sayfa boyutu değiştiyse canvas'ı güncelle
-                    const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight);
-                    if (canvas && Math.abs(canvas.height / window.devicePixelRatio - h) > 10) {
-                        resize();
                     }
 
                     const newId = window.location.hash || window.location.href;
@@ -327,7 +318,16 @@ export const getFormattedHtml = (act?: any) => {
                     }
                 } catch(e) {}
             }
-            const _intCheck = setInterval(checkPage, 1000);
+
+            // OPTİMAZASYON: Polling yerine ResizeObserver kullanarak sayfa boyutu değişimlerini izleyelim.
+            const resizeObserver = new ResizeObserver(() => {
+                if (canvas) resize();
+            });
+            resizeObserver.observe(document.body);
+
+            // Hash değişimlerini de izleyelim (Sayfa değişimi için)
+            window.addEventListener('hashchange', checkPage);
+            const _intCheck = setInterval(checkPage, 5000); // Çok daha seyrek check (sadece güvenlik için)
 
             // FIX 5: prompt() yerine inline metin girişi
             // vx/vy = viewport (input kutusu yeri), dx/dy = belge koordinatı (çizim yeri)
@@ -478,15 +478,20 @@ export const getFormattedHtml = (act?: any) => {
                     tCtx.stroke();
                     tCtx.restore();
 
+                    // OPTİMAZASYON: Highlighter her adımda tüm canvas'ı yeniden çizmek yerine 
+                    // ana canvas'a sadece son parçayı basalım (globalAlpha ile).
                     if (tool === 'highlighter') {
-                        const dpr = window.devicePixelRatio;
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(previewLayer, 0, 0, canvas.width / dpr, canvas.height / dpr);
                         ctx.save();
-                        // source-over: açık ya da koyu arka plan fark etmez
                         ctx.globalAlpha = 0.45;
                         ctx.globalCompositeOperation = 'source-over';
-                        ctx.drawImage(tempCanvas, 0, 0, canvas.width / dpr, canvas.height / dpr);
+                        ctx.beginPath();
+                        ctx.lineWidth = baseWidth;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        ctx.strokeStyle = window.__drawConfig.color;
+                        ctx.moveTo(midPoint.x, midPoint.y);
+                        ctx.quadraticCurveTo(lastPoint.x, lastPoint.y, currentMid.x, currentMid.y);
+                        ctx.stroke();
                         ctx.restore();
                     }
 
@@ -584,12 +589,15 @@ export const getFormattedHtml = (act?: any) => {
                 if (!canvas) return;
                 // Pan modunda scroll açık; diğer modlarda 'none' → çizim sırasında sayfa kaymaz
                 canvas.style.touchAction = (window.__drawConfig.tool === 'pan') ? 'auto' : 'none';
+                document.body.style.touchAction = (window.__drawConfig.tool === 'pan') ? 'auto' : 'none';
+                document.documentElement.style.touchAction = (window.__drawConfig.tool === 'pan') ? 'auto' : 'none';
             }
-            const _intTouch = setInterval(updateTouchAction, 500);
+            // Interval kaldırıldı, toggleDrawingMode ve SET_DRAW_CONFIG içinde çağrılacak.
 
             _cleanup = function() {
                 clearInterval(_intCheck);
-                clearInterval(_intTouch);
+                resizeObserver.disconnect();
+                window.removeEventListener('hashchange', checkPage);
                 history.length = 0;
                 for (const key in drawingCache) delete drawingCache[key];
                 if (previewLayer) { previewLayer.width = 1; previewLayer.height = 1; }
@@ -994,7 +1002,14 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
                         </div>
                     ) : (act.html_code || act.js_code) ? (
                         <div className="absolute inset-0 w-full h-full transition-all duration-500 overflow-hidden">
-                            <LivePreview act={act} />
+                            {isHovered ? (
+                                <LivePreview act={act} />
+                            ) : (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-indigo-50/30">
+                                    <LayoutDashboard className="w-8 h-8 text-indigo-200" />
+                                    <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Önizleme için üzerine gel</span>
+                                </div>
+                            )}
                             
                             {/* Overlay for better text legibility and interaction feel */}
                             <div className={cn(
