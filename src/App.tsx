@@ -232,7 +232,7 @@ export const getFormattedHtml = (act?: any) => {
             setInterval(checkPage, 1000);
 
             function startDrawing(e) {
-                if (!enabled || e.pointerType === 'touch' || window.__drawConfig.tool === 'pan') return;
+                if (!enabled || window.__drawConfig.tool === 'pan') return;
 
                 saveHistory();
                 isDrawing = true;
@@ -384,10 +384,9 @@ export const getFormattedHtml = (act?: any) => {
             // Set touch action based on tool
             function updateTouchAction() {
                 if (window.__drawConfig.tool === 'pan') {
-                    canvas.style.touchAction = 'auto'; // allow everything
+                    canvas.style.touchAction = 'auto';
                 } else {
-                    // pan-y allows vertical scroll with finger but blocks lateral drawing-like movement
-                    canvas.style.touchAction = 'pan-y pinch-zoom';
+                    canvas.style.touchAction = 'none';
                 }
             }
             setInterval(updateTouchAction, 500);
@@ -422,7 +421,7 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
 }) => {
     const [showShapes, setShowShapes] = React.useState(false);
     
-    const colors = ['#ffffff', '#ff4d4d', '#ffa500', '#2ecc71', '#3498db', '#9b59b6', '#000000'];
+    const colors = ['#ffffff', '#ff4d4d', '#ffa500', '#2ecc71', '#3498db', '#9b59b6', '#4f46e5', '#000000'];
     
     const mainTools = [
         { id: 'pencil', icon: Pencil, label: 'Kurşun Kalem' },
@@ -858,7 +857,7 @@ const StudentPortal = ({ act }: { act: any }) => {
     const [isFinished, setIsFinished] = useState(false);
     const [submissionId, setSubmissionId] = useState<string | null>(null);
     const [isDrawingMode, setIsDrawingMode] = useState(false);
-    const [drawConfig, setDrawConfig] = useState({ tool: 'pencil', color: '#ffffff', width: 3 });
+    const [drawConfig, setDrawConfig] = useState({ tool: 'pencil', color: '#4f46e5', width: 3 });
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const submissionsHandler = useFirestore('submissions');
 
@@ -1076,7 +1075,7 @@ export default function App() {
     const [previewId, setPreviewId] = useState<string | null>(null);
     const [showResultsId, setShowResultsId] = useState<string | null>(null);
     const [isPreviewDrawingMode, setIsPreviewDrawingMode] = useState(false);
-    const [previewDrawConfig, setPreviewDrawConfig] = useState({ tool: 'pencil', color: '#ffffff', width: 3 });
+    const [previewDrawConfig, setPreviewDrawConfig] = useState({ tool: 'pencil', color: '#4f46e5', width: 3 });
     const [showWhiteboard, setShowWhiteboard] = useState(false);
     const previewIframeRef = React.useRef<HTMLIFrameElement>(null);
 
