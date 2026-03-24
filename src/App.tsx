@@ -99,12 +99,12 @@ export const getFormattedHtml = (act?: any) => {
                     initCanvas();
                 }
 
-                // Scroll handling managed via updateTouchAction
-
                 if (canvas) {
                     canvas.style.display = enabled ? 'block' : 'none';
                     updateCanvasInteractivity();
                 }
+                if (laserCanvas) {
+                    laserCanvas.style.display = enabled ? 'block' : 'none';
                     if (!enabled) laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
                 }
                 updateTouchAction();
@@ -300,11 +300,16 @@ export const getFormattedHtml = (act?: any) => {
 
             function checkPage() {
                 try {
-                    // Kalem modu açıksa ama canvas DOM'dan uçtuysa (etkinlik script'i body'yi sildiyse)
                     if (enabled && (!canvas || !canvas.parentElement)) {
                         initCanvas();
                         if (enabled) canvas.style.display = 'block';
                         updateCanvasInteractivity();
+                    }
+
+                    // Sayfa boyutu 15px'den fazla değişirse yeniden boyutlandır (Daha güvenli)
+                    const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight);
+                    if (canvas && Math.abs(canvas.height / window.devicePixelRatio - h) > 15) {
+                        resize();
                     }
 
                     const newId = window.location.hash || window.location.href;
@@ -315,16 +320,8 @@ export const getFormattedHtml = (act?: any) => {
                     }
                 } catch(e) {}
             }
-
-            // OPTİMAZASYON: Polling yerine ResizeObserver kullanarak sayfa boyutu değişimlerini izleyelim.
-            const resizeObserver = new ResizeObserver(() => {
-                if (canvas) resize();
-            });
-            resizeObserver.observe(document.body);
-
-            // Hash değişimlerini de izleyelim (Sayfa değişimi için)
+            const _intCheck = setInterval(checkPage, 1500);
             window.addEventListener('hashchange', checkPage);
-            const _intCheck = setInterval(checkPage, 5000); // Çok daha seyrek check (sadece güvenlik için)
 
             // FIX 5: prompt() yerine inline metin girişi
             // vx/vy = viewport (input kutusu yeri), dx/dy = belge koordinatı (çizim yeri)
@@ -593,7 +590,6 @@ export const getFormattedHtml = (act?: any) => {
 
             _cleanup = function() {
                 clearInterval(_intCheck);
-                resizeObserver.disconnect();
                 window.removeEventListener('hashchange', checkPage);
                 history.length = 0;
                 for (const key in drawingCache) delete drawingCache[key];
