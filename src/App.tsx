@@ -400,12 +400,11 @@ export const getFormattedHtml = (act?: any) => {
                 // FIX 6: Kalem baskısı (Apple Pencil / S Pen)
                 const pressure = (e.pointerType === 'pen' && e.pressure > 0) ? e.pressure : 0.5;
 
-                // FIX 2: 'dashed' freehand gruptan çıkarıldı → drawShape'e gider
-                if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser' || tool === 'chisel') {
+                if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser') {
                     window.__currentPath.push(newPoint);
                     const currentMid = { x: (lastPoint.x + x) / 2, y: (lastPoint.y + y) / 2 };
 
-                    const tCtx = (tool === 'highlighter' || tool === 'chisel') ? tempCtx : ctx;
+                    const tCtx = tool === 'highlighter' ? tempCtx : ctx;
                     const baseWidth = window.__drawConfig.width * (0.4 + pressure * 1.2);
 
                     tCtx.save();
@@ -413,21 +412,14 @@ export const getFormattedHtml = (act?: any) => {
                     tCtx.setLineDash([]);
                     tCtx.strokeStyle = window.__drawConfig.color;
                     tCtx.lineWidth = baseWidth;
-                    tCtx.lineCap = tool === 'chisel' ? 'square' : 'round';
-                    tCtx.lineJoin = tool === 'chisel' ? 'miter' : 'round';
+                    tCtx.lineCap = 'round';
+                    tCtx.lineJoin = 'round';
                     tCtx.globalAlpha = 1.0;
                     tCtx.globalCompositeOperation = 'source-over';
 
                     if (tool === 'eraser') {
                         tCtx.globalCompositeOperation = 'destination-out';
                         tCtx.lineWidth = baseWidth * 10;
-                    } else if (tool === 'chisel') {
-                        tCtx.translate(lastPoint.x, lastPoint.y);
-                        tCtx.rotate(Math.PI / 4);
-                        tCtx.scale(1, 0.2);
-                        tCtx.rotate(-Math.PI / 4);
-                        tCtx.translate(-lastPoint.x, -lastPoint.y);
-                        tCtx.lineWidth = baseWidth * 4;
                     }
 
                     tCtx.moveTo(midPoint.x, midPoint.y);
@@ -435,14 +427,12 @@ export const getFormattedHtml = (act?: any) => {
                     tCtx.stroke();
                     tCtx.restore();
 
-                    if (tool === 'highlighter' || tool === 'chisel') {
+                    if (tool === 'highlighter') {
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
                         ctx.drawImage(previewLayer, 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
                         ctx.save();
-                        if (tool === 'highlighter') {
-                            ctx.globalAlpha = 0.3;
-                            ctx.globalCompositeOperation = 'multiply';
-                        }
+                        ctx.globalAlpha = 0.3;
+                        ctx.globalCompositeOperation = 'multiply';
                         ctx.drawImage(tempCanvas, 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
                         ctx.restore();
                     }
@@ -575,7 +565,6 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
     
     const mainTools = [
         { id: 'pencil', icon: Pencil, label: 'Kurşun Kalem' },
-        { id: 'chisel', icon: Edit3, label: 'Kesik Uçlu Kalem' },
         { id: 'pan', icon: Hand, label: 'El / Seçim' },
         { id: 'highlighter', icon: Highlighter, label: 'Fosforlu Kalem' },
         { id: 'sun', icon: Sun, label: 'Lazer' },
