@@ -1627,101 +1627,93 @@ export default function App() {
             </Modal>
 
             {/* FULL PREVIEW MODAL */}
-            <AnimatePresence>
-                {previewId && (
-                    // pointer-events-none → sadece içteki elemanlar tıklanabilir, exit animasyonu sırasında ana sayfa bloklanmaz
-                    <div className="fixed inset-0 z-[300] flex items-center justify-center p-0 pointer-events-none">
-                        <motion.div
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            transition={{ duration: 0.12 }}
-                            onClick={() => {
-                                const cw = previewIframeRef.current?.contentWindow;
-                                if (cw) {
-                                    cw.postMessage({ type: 'TOGGLE_DRAWING', enabled: false }, '*');
-                                    cw.postMessage({ type: 'CLEANUP' }, '*');
-                                }
-                                setPreviewId(null);
-                                setIsPreviewDrawingMode(false);
-                                setShowWhiteboard(false);
-                            }}
-                            className="absolute inset-0 bg-neutral-900/80 pointer-events-auto"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            transition={{ duration: 0.12 }}
-                            className="relative w-full h-full bg-white overflow-hidden pointer-events-auto"
-                        >
-                            {/* drag kaldırıldı — Framer Motion drag global pointermove/pointerup dinleyicisi bırakıp ana sayfayı donduruyordu */}
-                            <div className="absolute top-4 right-4 z-[400] flex gap-2">
-                                <button 
-                                    onClick={() => setIsPreviewDrawingMode(!isPreviewDrawingMode)}
-                                    className={cn(
-                                        "h-10 px-4 bg-white border border-neutral-200 text-neutral-900 flex items-center gap-2 rounded-full hover:bg-neutral-100 transition-colors shadow-lg text-xs font-bold uppercase tracking-widest",
-                                        isPreviewDrawingMode ? "bg-indigo-600 !text-white !border-indigo-600" : ""
-                                    )}
-                                >
-                                    <Pencil className="w-4 h-4" />
-                                    {isPreviewDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        const cw = previewIframeRef.current?.contentWindow;
-                                        if (cw) {
-                                            cw.postMessage({ type: 'TOGGLE_DRAWING', enabled: false }, '*');
-                                            cw.postMessage({ type: 'CLEANUP' }, '*');
-                                        }
-                                        setPreviewId(null);
-                                        setIsPreviewDrawingMode(false);
-                                        setShowWhiteboard(false);
-                                    }}
-                                    className="w-10 h-10 bg-white border border-neutral-200 text-neutral-900 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors shadow-lg"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
+            {previewId && (
+                <div className="fixed inset-0 z-[300] flex items-center justify-center p-0 pointer-events-none">
+                    {/* Backdrop — enter animasyonu var, exit yok: kapanınca React anında siler, AnimatePresence asılı kalmaz */}
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                        transition={{ duration: 0.15 }}
+                        onClick={() => {
+                            const cw = previewIframeRef.current?.contentWindow;
+                            if (cw) {
+                                cw.postMessage({ type: 'TOGGLE_DRAWING', enabled: false }, '*');
+                                cw.postMessage({ type: 'CLEANUP' }, '*');
+                            }
+                            setPreviewId(null);
+                            setIsPreviewDrawingMode(false);
+                            setShowWhiteboard(false);
+                        }}
+                        className="absolute inset-0 bg-neutral-900/80 pointer-events-auto"
+                    />
+                    <div className="relative w-full h-full bg-white overflow-hidden pointer-events-auto">
+                        <div className="absolute top-4 right-4 z-[400] flex gap-2">
+                            <button
+                                onClick={() => setIsPreviewDrawingMode(!isPreviewDrawingMode)}
+                                className={cn(
+                                    "h-10 px-4 bg-white border border-neutral-200 text-neutral-900 flex items-center gap-2 rounded-full hover:bg-neutral-100 transition-colors shadow-lg text-xs font-bold uppercase tracking-widest",
+                                    isPreviewDrawingMode ? "bg-indigo-600 !text-white !border-indigo-600" : ""
+                                )}
+                            >
+                                <Pencil className="w-4 h-4" />
+                                {isPreviewDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const cw = previewIframeRef.current?.contentWindow;
+                                    if (cw) {
+                                        cw.postMessage({ type: 'TOGGLE_DRAWING', enabled: false }, '*');
+                                        cw.postMessage({ type: 'CLEANUP' }, '*');
+                                    }
+                                    setPreviewId(null);
+                                    setIsPreviewDrawingMode(false);
+                                    setShowWhiteboard(false);
+                                }}
+                                className="w-10 h-10 bg-white border border-neutral-200 text-neutral-900 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors shadow-lg"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
 
-                            {isPreviewDrawingMode && (
-                                <DrawingToolbar 
-                                    config={previewDrawConfig} 
-                                    setConfig={setPreviewDrawConfig} 
-                                    onCommand={(type, data) => {
-                                        if (type === 'TOGGLE_WHITEBOARD') {
-                                            const newVal = !showWhiteboard;
-                                            setShowWhiteboard(newVal);
-                                            handlePreviewDrawingCommand('SET_WHITEBOARD', { enabled: newVal });
-                                        } else {
-                                            handlePreviewDrawingCommand(type, data);
-                                        }
-                                    }} 
-                                    showWhiteboard={showWhiteboard}
-                                    setShowWhiteboard={(val) => {
-                                        setShowWhiteboard(val);
-                                        handlePreviewDrawingCommand('SET_WHITEBOARD', { enabled: val });
-                                    }}
-                                />
-                            )}
-                            <div className="relative w-full h-full bg-white overflow-hidden">
-                                <iframe 
-                                    ref={previewIframeRef}
-                                    srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} 
-                                    className="w-full h-full border-0" 
-                                    onLoad={() => {
-                                        const cw = previewIframeRef.current?.contentWindow;
-                                        if (cw) {
-                                            cw.postMessage({ type: 'TOGGLE_DRAWING', enabled: isPreviewDrawingMode }, '*');
-                                            cw.postMessage({ type: 'SET_WHITEBOARD', enabled: showWhiteboard }, '*');
-                                            // FIX 4: İlk yüklemede config senkronizasyonu
-                                            cw.postMessage({ type: 'SET_DRAW_CONFIG', config: previewDrawConfig }, '*');
-                                        }
-                                    }}
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                    allowFullScreen 
-                                />
-                            </div>
-                        </motion.div>
+                        {isPreviewDrawingMode && (
+                            <DrawingToolbar
+                                config={previewDrawConfig}
+                                setConfig={setPreviewDrawConfig}
+                                onCommand={(type, data) => {
+                                    if (type === 'TOGGLE_WHITEBOARD') {
+                                        const newVal = !showWhiteboard;
+                                        setShowWhiteboard(newVal);
+                                        handlePreviewDrawingCommand('SET_WHITEBOARD', { enabled: newVal });
+                                    } else {
+                                        handlePreviewDrawingCommand(type, data);
+                                    }
+                                }}
+                                showWhiteboard={showWhiteboard}
+                                setShowWhiteboard={(val) => {
+                                    setShowWhiteboard(val);
+                                    handlePreviewDrawingCommand('SET_WHITEBOARD', { enabled: val });
+                                }}
+                            />
+                        )}
+                        <div className="relative w-full h-full bg-white overflow-hidden">
+                            <iframe
+                                ref={previewIframeRef}
+                                srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))}
+                                className="w-full h-full border-0"
+                                onLoad={() => {
+                                    const cw = previewIframeRef.current?.contentWindow;
+                                    if (cw) {
+                                        cw.postMessage({ type: 'TOGGLE_DRAWING', enabled: isPreviewDrawingMode }, '*');
+                                        cw.postMessage({ type: 'SET_WHITEBOARD', enabled: showWhiteboard }, '*');
+                                        cw.postMessage({ type: 'SET_DRAW_CONFIG', config: previewDrawConfig }, '*');
+                                    }
+                                }}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                            />
+                        </div>
                     </div>
-                )}
-            </AnimatePresence>
+                </div>
+            )}
 
         </div>
     );
