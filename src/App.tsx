@@ -98,8 +98,8 @@ export const getFormattedHtml = (act?: any) => {
                     initCanvas();
                 }
 
-                document.documentElement.style.overflow = enabled ? 'hidden' : 'auto';
-                document.body.style.overflow = enabled ? 'hidden' : 'auto';
+                // Scroll kilitlemeyi kaldırıyoruz — kullanıcı uzun etkinliklerde aşağı inebilmeli.
+                // touch-action: none ve preventDefault() zaten çizim sırasında kaymayı engeller.
                 document.documentElement.style.touchAction = enabled ? 'none' : 'auto';
                 document.body.style.touchAction = enabled ? 'none' : 'auto';
 
@@ -127,10 +127,7 @@ export const getFormattedHtml = (act?: any) => {
                     canvas.style.pointerEvents = enabled ? 'all' : 'none';
                     canvas.style.touchAction = 'none';
                     if (enabled) {
-                        // resize() ÖNCE çağrılmalı: overflow:hidden olmadan scrollHeight doğru gelir
                         resize();
-                        document.documentElement.style.overflow = 'hidden';
-                        document.body.style.overflow = 'hidden';
                         document.documentElement.style.touchAction = 'none';
                         document.body.style.touchAction = 'none';
                     }
@@ -161,11 +158,10 @@ export const getFormattedHtml = (act?: any) => {
             function initCanvas() {
                 canvas = document.createElement('canvas');
                 canvas.id = 'drawing-canvas';
-                // absolute → çizimler belgede kalır, içerikle birlikte kayar
                 canvas.style.position = 'absolute';
                 canvas.style.top = '0';
                 canvas.style.left = '0';
-                canvas.style.zIndex = '999999';
+                canvas.style.zIndex = '2147483647';
                 canvas.style.pointerEvents = 'none';
                 document.body.appendChild(canvas);
 
@@ -190,7 +186,7 @@ export const getFormattedHtml = (act?: any) => {
                 laserCanvas.style.position = 'fixed';
                 laserCanvas.style.top = '0';
                 laserCanvas.style.left = '0';
-                laserCanvas.style.zIndex = '1000000';
+                laserCanvas.style.zIndex = '2147483647';
                 laserCanvas.style.pointerEvents = 'none';
                 document.body.appendChild(laserCanvas);
                 laserCtx = laserCanvas.getContext('2d');
@@ -230,9 +226,8 @@ export const getFormattedHtml = (act?: any) => {
                 temp.height = canvas.height;
                 temp.getContext('2d').drawImage(canvas, 0, 0);
 
-                const w = window.innerWidth;
-                // Tüm belge yüksekliğini kapla — çizimler sayfayla birlikte kayar
-                const h = Math.max(document.body.scrollHeight, window.innerHeight);
+                const w = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth, window.innerWidth);
+                const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight);
                 const dpr = window.devicePixelRatio;
                 canvas.width = w * dpr;
                 canvas.height = h * dpr;
@@ -311,6 +306,19 @@ export const getFormattedHtml = (act?: any) => {
             // "yeni sayfa" algılanıp canvas temizlenmesin diye.
             function checkPage() {
                 try {
+                    // Kalem modu açıksa ama canvas DOM'dan uçtuysa (etkinlik script'i body'yi sildiyse)
+                    if (enabled && (!canvas || !canvas.parentElement)) {
+                        initCanvas();
+                        if (enabled) canvas.style.display = 'block';
+                        updateCanvasInteractivity();
+                    }
+
+                    // Sayfa boyutu değiştiyse canvas'ı güncelle
+                    const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight);
+                    if (canvas && Math.abs(canvas.height / window.devicePixelRatio - h) > 10) {
+                        resize();
+                    }
+
                     const newId = window.location.hash || window.location.href;
                     if (newId !== currentPage) {
                         saveCurrentPage();
