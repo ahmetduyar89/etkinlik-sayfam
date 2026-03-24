@@ -65,6 +65,7 @@ export const getFormattedHtml = (act?: any) => {
             let enabled = false;
             let currentImageData = null;
             let _cleanup = null;
+            let laserCanvas = null, laserCtx = null;
 
             window.addEventListener('message', (e) => {
                 if (e.data.type === 'TOGGLE_DRAWING') {
@@ -76,6 +77,10 @@ export const getFormattedHtml = (act?: any) => {
                 } else if (e.data.type === 'SET_DRAW_CONFIG') {
                     window.__drawConfig = { ...window.__drawConfig, ...e.data.config };
                     updateCanvasInteractivity();
+                    // Lazer dışı araca geçilince lazer izini temizle
+                    if (laserCanvas && e.data.config.tool && e.data.config.tool !== 'sun') {
+                        laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
+                    }
                 } else if (e.data.type === 'SET_WHITEBOARD') {
                     if (e.data.enabled) {
                         document.body.classList.add('whiteboard-active');
@@ -92,7 +97,7 @@ export const getFormattedHtml = (act?: any) => {
                 if (enabled && !canvas) {
                     initCanvas();
                 }
-                
+
                 document.documentElement.style.overflow = enabled ? 'hidden' : 'auto';
                 document.body.style.overflow = enabled ? 'hidden' : 'auto';
                 document.documentElement.style.touchAction = enabled ? 'none' : 'auto';
@@ -102,6 +107,10 @@ export const getFormattedHtml = (act?: any) => {
                     canvas.style.display = enabled ? 'block' : 'none';
                     updateCanvasInteractivity();
                     if (enabled) resize();
+                }
+                if (laserCanvas) {
+                    laserCanvas.style.display = enabled ? 'block' : 'none';
+                    if (!enabled) laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
                 }
             }
 
@@ -125,11 +134,10 @@ export const getFormattedHtml = (act?: any) => {
                 }
             }
 
-            // GPU-Accelerated History & Logic
+            // History
             let history = [];
             function saveHistory() {
                 if (!canvas) return;
-                // Capture GPU texture instead of CPU pixel copy
                 const hCanvas = document.createElement('canvas');
                 hCanvas.width = canvas.width;
                 hCanvas.height = canvas.height;
@@ -166,6 +174,48 @@ export const getFormattedHtml = (act?: any) => {
                 canvas.addEventListener('pointerdown', startDrawing);
                 canvas.addEventListener('pointermove', draw);
                 canvas.addEventListener('pointerup', stopDrawing);
+                canvas.addEventListener('pointercancel', stopDrawing);
+                window.addEventListener('pointerup', stopDrawing);
+            }
+
+            // FIX 1: Ayrı lazer canvas — çizim katmanına iz bırakmaz
+            function initLaserCanvas() {
+                if (laserCanvas) return;
+                laserCanvas = document.createElement('canvas');
+                laserCanvas.style.position = 'absolute';
+                laserCanvas.style.top = '0';
+                laserCanvas.style.left = '0';
+                laserCanvas.style.zIndex = '1000000';
+                laserCanvas.style.pointerEvents = 'none';
+                document.body.appendChild(laserCanvas);
+                laserCtx = laserCanvas.getContext('2d');
+                laserCanvas.width = canvas.width;
+                laserCanvas.height = canvas.height;
+                laserCanvas.style.width = canvas.style.width;
+                laserCanvas.style.height = canvas.style.height;
+            }
+
+            function drawLaser(x, y) {
+                initLaserCanvas();
+                laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
+                const dpr = window.devicePixelRatio;
+                const cx = x * dpr, cy = y * dpr, r = 14 * dpr;
+                const glow = laserCtx.createRadialGradient(cx, cy, 0, cx, cy, r * 3);
+                glow.addColorStop(0,    'rgba(255,50,50,0.95)');
+                glow.addColorStop(0.25, 'rgba(255,80,80,0.55)');
+                glow.addColorStop(0.6,  'rgba(255,20,20,0.15)');
+                glow.addColorStop(1,    'rgba(255,0,0,0)');
+                laserCtx.save();
+                laserCtx.fillStyle = glow;
+                laserCtx.beginPath();
+                laserCtx.arc(cx, cy, r * 3, 0, Math.PI * 2);
+                laserCtx.fill();
+                // Parlak merkez nokta
+                laserCtx.fillStyle = 'rgba(255,240,240,0.95)';
+                laserCtx.beginPath();
+                laserCtx.arc(cx, cy, r * 0.35, 0, Math.PI * 2);
+                laserCtx.fill();
+                laserCtx.restore();
             }
 
             function resize() {
@@ -181,7 +231,7 @@ export const getFormattedHtml = (act?: any) => {
                 canvas.height = h * window.devicePixelRatio;
                 canvas.style.width = w + 'px';
                 canvas.style.height = h + 'px';
-                
+
                 ctx = canvas.getContext('2d');
                 ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
                 ctx.drawImage(temp, 0, 0, w, h);
@@ -194,16 +244,22 @@ export const getFormattedHtml = (act?: any) => {
                     tempCanvas.width = canvas.width;
                     tempCanvas.height = canvas.height;
                 }
+                if (laserCanvas) {
+                    laserCanvas.width = canvas.width;
+                    laserCanvas.height = canvas.height;
+                    laserCanvas.style.width = w + 'px';
+                    laserCanvas.style.height = h + 'px';
+                }
             }
 
             let startX, startY;
-            window.__drawConfig = { tool: 'pencil', color: '#4f46e5', width: 3 };
+            window.__drawConfig = { tool: 'pencil', color: '#ffffff', width: 3 };
 
             let tempCanvas, tempCtx;
             let lastPoint, midPoint;
             let currentPage = '';
-            let drawingCache = {}; 
-            let previewLayer = null; // GPU layer for shapes
+            let drawingCache = {};
+            let previewLayer = null;
 
             function initLayer() {
                 if (!tempCanvas) {
@@ -221,7 +277,7 @@ export const getFormattedHtml = (act?: any) => {
                     snap.width = canvas.width;
                     snap.height = canvas.height;
                     snap.getContext('2d').drawImage(canvas, 0, 0);
-                    drawingCache[currentPage] = snap; // Store GPU Canvas reference
+                    drawingCache[currentPage] = snap;
                 }
             }
 
@@ -246,56 +302,116 @@ export const getFormattedHtml = (act?: any) => {
             }
             const _intCheck = setInterval(checkPage, 1000);
 
+            // FIX 5: prompt() yerine inline metin girişi
+            function showTextInput(x, y) {
+                const existing = document.getElementById('canvas-text-input');
+                if (existing) existing.remove();
+                const input = document.createElement('input');
+                input.id = 'canvas-text-input';
+                input.type = 'text';
+                input.placeholder = 'Yazın, Enter ile onayla';
+                input.style.cssText = [
+                    'position:fixed',
+                    'left:' + Math.min(x, window.innerWidth - 260) + 'px',
+                    'top:' + Math.max(y - 44, 8) + 'px',
+                    'font:bold 18px Arial',
+                    'color:' + window.__drawConfig.color,
+                    'background:rgba(15,15,25,0.88)',
+                    'border:2px solid ' + window.__drawConfig.color,
+                    'border-radius:10px',
+                    'padding:8px 14px',
+                    'outline:none',
+                    'min-width:240px',
+                    'z-index:9999999',
+                    'backdrop-filter:blur(8px)',
+                ].join(';');
+                document.body.appendChild(input);
+                input.focus();
+
+                function commit() {
+                    const text = input.value.trim();
+                    if (text) {
+                        ctx.save();
+                        ctx.font = 'bold 20px Arial';
+                        ctx.fillStyle = window.__drawConfig.color;
+                        ctx.fillText(text, x, y);
+                        ctx.restore();
+                    }
+                    input.remove();
+                    document.removeEventListener('pointerdown', outsideHandler);
+                }
+                function outsideHandler(ev) {
+                    if (ev.target !== input) commit();
+                }
+                input.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Enter') commit();
+                    if (ev.key === 'Escape') { input.remove(); document.removeEventListener('pointerdown', outsideHandler); }
+                    ev.stopPropagation();
+                });
+                setTimeout(() => document.addEventListener('pointerdown', outsideHandler), 150);
+            }
+
             function startDrawing(e) {
                 if (!enabled || e.pointerType === 'touch' || window.__drawConfig.tool === 'pan') return;
+                // FIX 1: Lazer basım gerektirmez, sadece hover ile takip eder
+                if (window.__drawConfig.tool === 'sun') return;
+                // FIX 5: Metin aracı inline input kullanır
+                if (window.__drawConfig.tool === 'text') {
+                    saveHistory();
+                    showTextInput(e.pageX, e.pageY);
+                    return;
+                }
 
                 saveHistory();
                 isDrawing = true;
                 e.preventDefault();
-                startX = e.pageX;
-            startY = e.pageY;
-            lastPoint = { x: startX, y: startY };
-            midPoint = { x: startX, y: startY };
-            window.__currentPath = [lastPoint];
-            
-            // Snapshot current canvas state for stroke preview
-            const previewCtx = previewLayer.getContext('2d');
-            previewCtx.clearRect(0, 0, previewLayer.width, previewLayer.height);
-            previewCtx.drawImage(canvas, 0, 0);
-            
-            initLayer();
+                // FIX 3: Pointer capture — hızlı çizimde event kaybolmaz
+                canvas.setPointerCapture(e.pointerId);
 
-                if (window.__drawConfig.tool === 'text') {
-                    const text = prompt('Notunuzu girin:');
-                    if (text) {
-                        ctx.font = '20px Arial';
-                        ctx.fillStyle = window.__drawConfig.color;
-                        ctx.fillText(text, startX, startY);
-                    }
-                    isDrawing = false;
-                    return;
-                }
+                startX = e.pageX;
+                startY = e.pageY;
+                lastPoint = { x: startX, y: startY };
+                midPoint = { x: startX, y: startY };
+                window.__currentPath = [lastPoint];
+
+                const previewCtx = previewLayer.getContext('2d');
+                previewCtx.clearRect(0, 0, previewLayer.width, previewLayer.height);
+                previewCtx.drawImage(canvas, 0, 0);
+
+                initLayer();
             }
 
             function draw(e) {
-                if (!isDrawing || !enabled) return;
-                
+                if (!enabled) return;
+
+                // FIX 1: Lazer — isDrawing gerektirmez, hover'da da çalışır
+                if (window.__drawConfig.tool === 'sun') {
+                    drawLaser(e.pageX, e.pageY);
+                    return;
+                }
+
+                if (!isDrawing) return;
+
                 const tool = window.__drawConfig.tool;
                 const x = e.pageX;
                 const y = e.pageY;
                 const newPoint = { x, y };
+                // FIX 6: Kalem baskısı (Apple Pencil / S Pen)
+                const pressure = (e.pointerType === 'pen' && e.pressure > 0) ? e.pressure : 0.5;
 
-                if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser' || tool === 'dashed' || tool === 'chisel') {
+                // FIX 2: 'dashed' freehand gruptan çıkarıldı → drawShape'e gider
+                if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser' || tool === 'chisel') {
                     window.__currentPath.push(newPoint);
                     const currentMid = { x: (lastPoint.x + x) / 2, y: (lastPoint.y + y) / 2 };
-                    
+
                     const tCtx = (tool === 'highlighter' || tool === 'chisel') ? tempCtx : ctx;
-                    
+                    const baseWidth = window.__drawConfig.width * (0.4 + pressure * 1.2);
+
                     tCtx.save();
                     tCtx.beginPath();
-                    tCtx.setLineDash(tool === 'dashed' ? [10, 5] : []);
+                    tCtx.setLineDash([]);
                     tCtx.strokeStyle = window.__drawConfig.color;
-                    tCtx.lineWidth = window.__drawConfig.width;
+                    tCtx.lineWidth = baseWidth;
                     tCtx.lineCap = tool === 'chisel' ? 'square' : 'round';
                     tCtx.lineJoin = tool === 'chisel' ? 'miter' : 'round';
                     tCtx.globalAlpha = 1.0;
@@ -303,14 +419,14 @@ export const getFormattedHtml = (act?: any) => {
 
                     if (tool === 'eraser') {
                         tCtx.globalCompositeOperation = 'destination-out';
-                        tCtx.lineWidth = window.__drawConfig.width * 10;
+                        tCtx.lineWidth = baseWidth * 10;
                     } else if (tool === 'chisel') {
                         tCtx.translate(lastPoint.x, lastPoint.y);
                         tCtx.rotate(Math.PI / 4);
-                        tCtx.scale(1, 0.2); 
+                        tCtx.scale(1, 0.2);
                         tCtx.rotate(-Math.PI / 4);
                         tCtx.translate(-lastPoint.x, -lastPoint.y);
-                        tCtx.lineWidth = window.__drawConfig.width * 4;
+                        tCtx.lineWidth = baseWidth * 4;
                     }
 
                     tCtx.moveTo(midPoint.x, midPoint.y);
@@ -341,17 +457,24 @@ export const getFormattedHtml = (act?: any) => {
 
             function drawShape(tool, x1, y1, x2, y2) {
                 ctx.beginPath();
-                ctx.setLineDash(tool === 'dashed' ? [10, 5] : []);
+                // FIX 2: dashed artık şekil grubunda — düz kesikli çizgi
+                ctx.setLineDash(tool === 'dashed' ? [12, 6] : []);
                 ctx.globalAlpha = 1.0;
                 ctx.globalCompositeOperation = 'source-over';
                 ctx.strokeStyle = window.__drawConfig.color;
                 ctx.lineWidth = window.__drawConfig.width;
-                
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
                 if (tool === 'rect') {
                     ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
                 } else if (tool === 'circle') {
                     const r = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
                     ctx.arc(x1, y1, r, 0, 2 * Math.PI);
+                    ctx.stroke();
+                } else if (tool === 'dashed') {
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
                     ctx.stroke();
                 } else if (tool === 'arrow' || tool === 'double_arrow') {
                     drawArrow(x1, y1, x2, y2, tool === 'double_arrow');
@@ -382,7 +505,9 @@ export const getFormattedHtml = (act?: any) => {
                 }
             }
 
-            function stopDrawing(e) {
+            function stopDrawing() {
+                // FIX 1: Lazer noktasını kaldır
+                if (laserCanvas) laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
                 if (!isDrawing) return;
                 isDrawing = false;
                 currentImageData = null;
@@ -391,7 +516,6 @@ export const getFormattedHtml = (act?: any) => {
 
             function clearDrawing() {
                 if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-                // Also clear from cache for current page
                 if (currentPage) delete drawingCache[currentPage];
             }
 
@@ -399,9 +523,8 @@ export const getFormattedHtml = (act?: any) => {
             function updateTouchAction() {
                 if (!canvas) return;
                 if (window.__drawConfig.tool === 'pan') {
-                    canvas.style.touchAction = 'auto'; // allow everything
+                    canvas.style.touchAction = 'auto';
                 } else {
-                    // pan-y allows vertical scroll with finger but blocks lateral drawing-like movement
                     canvas.style.touchAction = 'pan-y pinch-zoom';
                 }
             }
@@ -414,6 +537,7 @@ export const getFormattedHtml = (act?: any) => {
                 for (const key in drawingCache) delete drawingCache[key];
                 if (previewLayer) { previewLayer.width = 1; previewLayer.height = 1; }
                 if (tempCanvas) { tempCanvas.width = 1; tempCanvas.height = 1; }
+                if (laserCanvas) { laserCanvas.remove(); laserCanvas = null; }
             };
         })();
     </script>
@@ -1571,15 +1695,12 @@ export default function App() {
                                     srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} 
                                     className="w-full h-full border-0" 
                                     onLoad={() => {
-                                        if (previewIframeRef.current?.contentWindow) {
-                                            previewIframeRef.current.contentWindow.postMessage({ 
-                                                type: 'TOGGLE_DRAWING', 
-                                                enabled: isPreviewDrawingMode 
-                                            }, '*');
-                                            previewIframeRef.current.contentWindow.postMessage({ 
-                                                type: 'SET_WHITEBOARD', 
-                                                enabled: showWhiteboard 
-                                            }, '*');
+                                        const cw = previewIframeRef.current?.contentWindow;
+                                        if (cw) {
+                                            cw.postMessage({ type: 'TOGGLE_DRAWING', enabled: isPreviewDrawingMode }, '*');
+                                            cw.postMessage({ type: 'SET_WHITEBOARD', enabled: showWhiteboard }, '*');
+                                            // FIX 4: İlk yüklemede config senkronizasyonu
+                                            cw.postMessage({ type: 'SET_DRAW_CONFIG', config: previewDrawConfig }, '*');
                                         }
                                     }}
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
