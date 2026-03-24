@@ -290,10 +290,12 @@ export const getFormattedHtml = (act?: any) => {
                 }
             }
 
+            // Sayfa tespiti yalnızca URL hash'ine bakıyor.
+            // h1 içeriği KULLANILMIYOR — etkinlik JS'i h1 değiştirince
+            // "yeni sayfa" algılanıp canvas temizlenmesin diye.
             function checkPage() {
                 try {
-                    const h1 = document.body.querySelector('h1')?.innerText || '';
-                    const newId = (window.location.hash || window.location.pathname) + h1;
+                    const newId = window.location.hash || window.location.href;
                     if (newId !== currentPage) {
                         saveCurrentPage();
                         currentPage = newId;
