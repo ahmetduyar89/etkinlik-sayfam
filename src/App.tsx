@@ -64,6 +64,7 @@ export const getFormattedHtml = (act?: any) => {
             let canvas, ctx;
             let enabled = false;
             let currentImageData = null;
+            let _cleanup = null;
 
             window.addEventListener('message', (e) => {
                 if (e.data.type === 'TOGGLE_DRAWING') {
@@ -81,6 +82,8 @@ export const getFormattedHtml = (act?: any) => {
                     } else {
                         document.body.classList.remove('whiteboard-active');
                     }
+                } else if (e.data.type === 'CLEANUP') {
+                    if (_cleanup) _cleanup();
                 }
             });
 
@@ -155,6 +158,9 @@ export const getFormattedHtml = (act?: any) => {
 
                 ctx = canvas.getContext('2d');
                 resize();
+                previewLayer = document.createElement('canvas');
+                previewLayer.width = canvas.width;
+                previewLayer.height = canvas.height;
                 window.addEventListener('resize', resize);
 
                 canvas.addEventListener('pointerdown', startDrawing);
@@ -179,6 +185,15 @@ export const getFormattedHtml = (act?: any) => {
                 ctx = canvas.getContext('2d');
                 ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
                 ctx.drawImage(temp, 0, 0, w, h);
+
+                if (previewLayer) {
+                    previewLayer.width = canvas.width;
+                    previewLayer.height = canvas.height;
+                }
+                if (tempCanvas) {
+                    tempCanvas.width = canvas.width;
+                    tempCanvas.height = canvas.height;
+                }
             }
 
             let startX, startY;
@@ -229,7 +244,7 @@ export const getFormattedHtml = (act?: any) => {
                     }
                 } catch(e) {}
             }
-            setInterval(checkPage, 1000);
+            const _intCheck = setInterval(checkPage, 1000);
 
             function startDrawing(e) {
                 if (!enabled || e.pointerType === 'touch' || window.__drawConfig.tool === 'pan') return;
@@ -243,11 +258,10 @@ export const getFormattedHtml = (act?: any) => {
             midPoint = { x: startX, y: startY };
             window.__currentPath = [lastPoint];
             
-            // PERFORMANCE: Shape preview GPU layer
-            previewLayer = document.createElement('canvas');
-            previewLayer.width = canvas.width;
-            previewLayer.height = canvas.height;
-            previewLayer.getContext('2d').drawImage(canvas, 0, 0);
+            // Snapshot current canvas state for stroke preview
+            const previewCtx = previewLayer.getContext('2d');
+            previewCtx.clearRect(0, 0, previewLayer.width, previewLayer.height);
+            previewCtx.drawImage(canvas, 0, 0);
             
             initLayer();
 
@@ -383,6 +397,7 @@ export const getFormattedHtml = (act?: any) => {
 
             // Set touch action based on tool
             function updateTouchAction() {
+                if (!canvas) return;
                 if (window.__drawConfig.tool === 'pan') {
                     canvas.style.touchAction = 'auto'; // allow everything
                 } else {
@@ -390,7 +405,16 @@ export const getFormattedHtml = (act?: any) => {
                     canvas.style.touchAction = 'pan-y pinch-zoom';
                 }
             }
-            setInterval(updateTouchAction, 500);
+            const _intTouch = setInterval(updateTouchAction, 500);
+
+            _cleanup = function() {
+                clearInterval(_intCheck);
+                clearInterval(_intTouch);
+                history.length = 0;
+                for (const key in drawingCache) delete drawingCache[key];
+                if (previewLayer) { previewLayer.width = 1; previewLayer.height = 1; }
+                if (tempCanvas) { tempCanvas.width = 1; tempCanvas.height = 1; }
+            };
         })();
     </script>
 </head>
@@ -1482,12 +1506,14 @@ export default function App() {
             <AnimatePresence>
                 {previewId && (
                     <div className="fixed inset-0 z-[300] flex items-center justify-center p-0">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             onClick={() => {
+                                previewIframeRef.current?.contentWindow?.postMessage({ type: 'CLEANUP' }, '*');
                                 setPreviewId(null);
                                 setIsPreviewDrawingMode(false);
-                            }} 
-                            className="absolute inset-0 bg-neutral-900/80" 
+                                setShowWhiteboard(false);
+                            }}
+                            className="absolute inset-0 bg-neutral-900/80"
                         />
                         <motion.div initial={{ opacity: 0, scale: 1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1 }} transition={{ duration: 0.2 }} className="relative w-full h-full bg-white overflow-hidden">
                             <motion.div 
@@ -1506,12 +1532,13 @@ export default function App() {
                                     <Pencil className="w-4 h-4" />
                                     {isPreviewDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => {
+                                        previewIframeRef.current?.contentWindow?.postMessage({ type: 'CLEANUP' }, '*');
                                         setPreviewId(null);
                                         setIsPreviewDrawingMode(false);
                                         setShowWhiteboard(false);
-                                    }} 
+                                    }}
                                     className="w-10 h-10 bg-white border border-neutral-200 text-neutral-900 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors shadow-lg"
                                 >
                                     <X className="w-5 h-5" />
