@@ -157,7 +157,8 @@ export const getFormattedHtml = (act?: any) => {
             function initCanvas() {
                 canvas = document.createElement('canvas');
                 canvas.id = 'drawing-canvas';
-                canvas.style.position = 'absolute';
+                // fixed → kaydırma sonrası da her zaman görünür alanı kapsar
+                canvas.style.position = 'fixed';
                 canvas.style.top = '0';
                 canvas.style.left = '0';
                 canvas.style.zIndex = '999999';
@@ -182,7 +183,7 @@ export const getFormattedHtml = (act?: any) => {
             function initLaserCanvas() {
                 if (laserCanvas) return;
                 laserCanvas = document.createElement('canvas');
-                laserCanvas.style.position = 'absolute';
+                laserCanvas.style.position = 'fixed';
                 laserCanvas.style.top = '0';
                 laserCanvas.style.left = '0';
                 laserCanvas.style.zIndex = '1000000';
@@ -358,7 +359,7 @@ export const getFormattedHtml = (act?: any) => {
                 // FIX 5: Metin aracı inline input kullanır
                 if (window.__drawConfig.tool === 'text') {
                     saveHistory();
-                    showTextInput(e.pageX, e.pageY);
+                    showTextInput(e.clientX, e.clientY);
                     return;
                 }
 
@@ -368,8 +369,8 @@ export const getFormattedHtml = (act?: any) => {
                 // FIX 3: Pointer capture — hızlı çizimde event kaybolmaz
                 canvas.setPointerCapture(e.pointerId);
 
-                startX = e.pageX;
-                startY = e.pageY;
+                startX = e.clientX;
+                startY = e.clientY;
                 lastPoint = { x: startX, y: startY };
                 midPoint = { x: startX, y: startY };
                 window.__currentPath = [lastPoint];
@@ -386,15 +387,15 @@ export const getFormattedHtml = (act?: any) => {
 
                 // FIX 1: Lazer — isDrawing gerektirmez, hover'da da çalışır
                 if (window.__drawConfig.tool === 'sun') {
-                    drawLaser(e.pageX, e.pageY);
+                    drawLaser(e.clientX, e.clientY);
                     return;
                 }
 
                 if (!isDrawing) return;
 
                 const tool = window.__drawConfig.tool;
-                const x = e.pageX;
-                const y = e.pageY;
+                const x = e.clientX;
+                const y = e.clientY;
                 const newPoint = { x, y };
                 // FIX 6: Kalem baskısı (Apple Pencil / S Pen)
                 const pressure = (e.pointerType === 'pen' && e.pressure > 0) ? e.pressure : 0.5;
