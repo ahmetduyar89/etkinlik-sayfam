@@ -1629,23 +1629,30 @@ export default function App() {
             {/* FULL PREVIEW MODAL */}
             <AnimatePresence>
                 {previewId && (
-                    <div className="fixed inset-0 z-[300] flex items-center justify-center p-0">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    // pointer-events-none → sadece içteki elemanlar tıklanabilir, exit animasyonu sırasında ana sayfa bloklanmaz
+                    <div className="fixed inset-0 z-[300] flex items-center justify-center p-0 pointer-events-none">
+                        <motion.div
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            transition={{ duration: 0.12 }}
                             onClick={() => {
-                                previewIframeRef.current?.contentWindow?.postMessage({ type: 'CLEANUP' }, '*');
+                                const cw = previewIframeRef.current?.contentWindow;
+                                if (cw) {
+                                    cw.postMessage({ type: 'TOGGLE_DRAWING', enabled: false }, '*');
+                                    cw.postMessage({ type: 'CLEANUP' }, '*');
+                                }
                                 setPreviewId(null);
                                 setIsPreviewDrawingMode(false);
                                 setShowWhiteboard(false);
                             }}
-                            className="absolute inset-0 bg-neutral-900/80"
+                            className="absolute inset-0 bg-neutral-900/80 pointer-events-auto"
                         />
-                        <motion.div initial={{ opacity: 0, scale: 1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1 }} transition={{ duration: 0.2 }} className="relative w-full h-full bg-white overflow-hidden">
-                            <motion.div 
-                                drag 
-                                dragMomentum={false}
-                                whileDrag={{ scale: 1.1 }}
-                                className="absolute top-4 right-4 z-[400] flex gap-2 cursor-grab active:cursor-grabbing"
-                            >
+                        <motion.div
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            transition={{ duration: 0.12 }}
+                            className="relative w-full h-full bg-white overflow-hidden pointer-events-auto"
+                        >
+                            {/* drag kaldırıldı — Framer Motion drag global pointermove/pointerup dinleyicisi bırakıp ana sayfayı donduruyordu */}
+                            <div className="absolute top-4 right-4 z-[400] flex gap-2">
                                 <button 
                                     onClick={() => setIsPreviewDrawingMode(!isPreviewDrawingMode)}
                                     className={cn(
@@ -1658,7 +1665,11 @@ export default function App() {
                                 </button>
                                 <button
                                     onClick={() => {
-                                        previewIframeRef.current?.contentWindow?.postMessage({ type: 'CLEANUP' }, '*');
+                                        const cw = previewIframeRef.current?.contentWindow;
+                                        if (cw) {
+                                            cw.postMessage({ type: 'TOGGLE_DRAWING', enabled: false }, '*');
+                                            cw.postMessage({ type: 'CLEANUP' }, '*');
+                                        }
                                         setPreviewId(null);
                                         setIsPreviewDrawingMode(false);
                                         setShowWhiteboard(false);
@@ -1667,7 +1678,7 @@ export default function App() {
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
-                            </motion.div>
+                            </div>
 
                             {isPreviewDrawingMode && (
                                 <DrawingToolbar 
