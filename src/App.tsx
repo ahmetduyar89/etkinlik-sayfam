@@ -5,7 +5,7 @@ import {
     Target, Zap, Globe, Settings, Bell, User, ArrowRight, HelpCircle, Eye,
     MoreVertical, X, Save, Clock, BookOpen, Anchor, Book, FlaskConical, Command, Blocks, Pencil, Eraser,
     Hand, Highlighter, Type, Shapes, Undo, History, Sun, Square, Circle, Triangle, MousePointer2,
-    MoveRight, ArrowRightLeft, Minus
+    MoveRight, ArrowRightLeft, Minus, PaintBucket
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, useFirestore } from './lib/firebase';
@@ -261,7 +261,7 @@ export const getFormattedHtml = (act?: any) => {
             }
 
             let startX, startY;
-            window.__drawConfig = { tool: 'pencil', color: '#ffffff', width: 3 };
+            window.__drawConfig = { tool: 'pencil', color: '#ffffff', width: 3, fillEnabled: false, stampIcon: '✅' };
 
             let tempCanvas, tempCtx;
             let lastPoint, midPoint;
@@ -377,6 +377,18 @@ export const getFormattedHtml = (act?: any) => {
                     return;
                 }
 
+                if (window.__drawConfig.tool === 'stamp') {
+                    saveHistory();
+                    const icon = window.__drawConfig.stampIcon || '✅';
+                    ctx.save();
+                    ctx.font = '44px serif';
+                    ctx.textBaseline = 'middle';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(icon, e.pageX, e.pageY);
+                    ctx.restore();
+                    return;
+                }
+
                 saveHistory();
                 isDrawing = true;
                 e.preventDefault();
@@ -421,7 +433,14 @@ export const getFormattedHtml = (act?: any) => {
                     const currentMid = { x: (lastPoint.x + x) / 2, y: (lastPoint.y + y) / 2 };
 
                     const tCtx = tool === 'highlighter' ? tempCtx : ctx;
-                    const baseWidth = window.__drawConfig.width * (0.4 + pressure * 1.2);
+
+                    // Kalem: basınç aralığı daraltıldı → daha yumuşak, daha tutarlı çizgi
+                    // Fosforlu: sabit geniş çizgi, basınç etkisiz
+                    const baseWidth = tool === 'highlighter'
+                        ? window.__drawConfig.width * 5
+                        : tool === 'eraser'
+                            ? window.__drawConfig.width
+                            : window.__drawConfig.width * (0.85 + pressure * 0.3);
 
                     tCtx.save();
                     tCtx.beginPath();
@@ -444,12 +463,14 @@ export const getFormattedHtml = (act?: any) => {
                     tCtx.restore();
 
                     if (tool === 'highlighter') {
+                        const dpr = window.devicePixelRatio;
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(previewLayer, 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
+                        ctx.drawImage(previewLayer, 0, 0, canvas.width / dpr, canvas.height / dpr);
                         ctx.save();
-                        ctx.globalAlpha = 0.3;
-                        ctx.globalCompositeOperation = 'multiply';
-                        ctx.drawImage(tempCanvas, 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
+                        // source-over: açık ya da koyu arka plan fark etmez
+                        ctx.globalAlpha = 0.45;
+                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.drawImage(tempCanvas, 0, 0, canvas.width / dpr, canvas.height / dpr);
                         ctx.restore();
                     }
 
@@ -463,29 +484,45 @@ export const getFormattedHtml = (act?: any) => {
             }
 
             function drawShape(tool, x1, y1, x2, y2) {
-                ctx.beginPath();
-                // FIX 2: dashed artık şekil grubunda — düz kesikli çizgi
+                const fillEnabled = window.__drawConfig.fillEnabled;
+                ctx.save();
                 ctx.setLineDash(tool === 'dashed' ? [12, 6] : []);
                 ctx.globalAlpha = 1.0;
                 ctx.globalCompositeOperation = 'source-over';
                 ctx.strokeStyle = window.__drawConfig.color;
-                ctx.lineWidth = window.__drawConfig.width;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
+                ctx.fillStyle  = window.__drawConfig.color;
+                ctx.lineWidth  = window.__drawConfig.width;
+                ctx.lineCap    = 'round';
+                ctx.lineJoin   = 'round';
 
-                if (tool === 'rect') {
-                    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-                } else if (tool === 'circle') {
-                    const r = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-                    ctx.arc(x1, y1, r, 0, 2 * Math.PI);
-                    ctx.stroke();
-                } else if (tool === 'dashed') {
-                    ctx.moveTo(x1, y1);
-                    ctx.lineTo(x2, y2);
-                    ctx.stroke();
-                } else if (tool === 'arrow' || tool === 'double_arrow') {
+                if (tool === 'arrow' || tool === 'double_arrow') {
+                    ctx.beginPath();
                     drawArrow(x1, y1, x2, y2, tool === 'double_arrow');
+                } else {
+                    ctx.beginPath();
+                    if (tool === 'rect') {
+                        ctx.rect(x1, y1, x2 - x1, y2 - y1);
+                    } else if (tool === 'circle') {
+                        const r = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+                        ctx.arc(x1, y1, r, 0, 2 * Math.PI);
+                    } else if (tool === 'triangle') {
+                        ctx.moveTo((x1 + x2) / 2, y1);
+                        ctx.lineTo(x2, y2);
+                        ctx.lineTo(x1, y2);
+                        ctx.closePath();
+                    } else if (tool === 'line' || tool === 'dashed') {
+                        ctx.moveTo(x1, y1);
+                        ctx.lineTo(x2, y2);
+                    }
+                    // Şekil doldurma (çizgiler hariç)
+                    if (fillEnabled && tool !== 'line' && tool !== 'dashed') {
+                        ctx.globalAlpha = 0.22;
+                        ctx.fill();
+                        ctx.globalAlpha = 1.0;
+                    }
+                    ctx.stroke();
                 }
+                ctx.restore();
             }
 
             function drawArrow(x1, y1, x2, y2, double) {
@@ -565,77 +602,146 @@ export const getFormattedHtml = (act?: any) => {
 // =======================
 // DRAWING TOOLBAR
 // =======================
-const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowWhiteboard }: { 
-    onCommand: (type: string, data?: any) => void, 
-    config: any, 
+
+// Inline SVG ikonlar — yeni araçlar için ek import gerekmez
+const SolidLineIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <line x1="4" y1="12" x2="20" y2="12"/>
+    </svg>
+);
+const DashedLineIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <line x1="3" y1="12" x2="7" y2="12"/>
+        <line x1="11" y1="12" x2="15" y2="12"/>
+        <line x1="19" y1="12" x2="21" y2="12"/>
+    </svg>
+);
+
+const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowWhiteboard }: {
+    onCommand: (type: string, data?: any) => void,
+    config: any,
     setConfig: (c: any) => void,
     showWhiteboard?: boolean,
     setShowWhiteboard?: (val: boolean) => void
 }) => {
     const [showShapes, setShowShapes] = React.useState(false);
-    
-    const colors = ['#ffffff', '#ff4d4d', '#ffa500', '#2ecc71', '#3498db', '#9b59b6', '#000000'];
-    
+
+    // Sarı eklendi — fosforlu kalem için
+    const colors = ['#ffffff', '#ff4d4d', '#ffff00', '#ffa500', '#2ecc71', '#3498db', '#9b59b6', '#000000'];
+
     const mainTools = [
-        { id: 'pencil', icon: Pencil, label: 'Kurşun Kalem' },
-        { id: 'pan', icon: Hand, label: 'El / Seçim' },
-        { id: 'highlighter', icon: Highlighter, label: 'Fosforlu Kalem' },
-        { id: 'sun', icon: Sun, label: 'Lazer' },
-        { id: 'eraser', icon: Eraser, label: 'Silgi' },
-        { id: 'text', icon: Type, label: 'Metin' },
+        { id: 'pencil',      icon: Pencil,      label: 'Kalem' },
+        { id: 'pan',         icon: Hand,        label: 'El' },
+        { id: 'highlighter', icon: Highlighter, label: 'Fosforlu' },
+        { id: 'sun',         icon: Sun,         label: 'Lazer' },
+        { id: 'eraser',      icon: Eraser,      label: 'Silgi' },
+        { id: 'text',        icon: Type,        label: 'Metin' },
     ];
 
-    const shapeTools = [
-        { id: 'rect', icon: Square, label: 'Dikdörtgen' },
-        { id: 'circle', icon: Circle, label: 'Daire' },
-        { id: 'arrow', icon: MoveRight, label: 'Ok' },
-        { id: 'double_arrow', icon: ArrowRightLeft, label: 'Çift Taraflı Ok' },
-        { id: 'dashed', icon: Minus, label: 'Kesikli Çizgi' },
+    const shapeTools: { id: string; label: string; Icon?: React.ComponentType<{ className?: string }>; Svg?: React.ComponentType }[] = [
+        { id: 'rect',        Icon: Square,        label: 'Dikdörtgen' },
+        { id: 'circle',      Icon: Circle,        label: 'Daire' },
+        { id: 'triangle',    Icon: Triangle,      label: 'Üçgen' },
+        { id: 'line',        Svg: SolidLineIcon,  label: 'Çizgi' },
+        { id: 'arrow',       Icon: MoveRight,     label: 'Ok' },
+        { id: 'double_arrow',Icon: ArrowRightLeft,label: 'Çift Ok' },
+        { id: 'dashed',      Svg: DashedLineIcon, label: 'Kesikli' },
     ];
 
-    const isShapeTool = shapeTools.some(t => t.id === config.tool);
+    const stamps = [
+        { emoji: '✅', label: 'Doğru' },
+        { emoji: '❌', label: 'Yanlış' },
+        { emoji: '⭐', label: 'Harika' },
+        { emoji: '❤️', label: 'Sevdim' },
+        { emoji: '❓', label: 'Soru' },
+        { emoji: '❗', label: 'Dikkat' },
+        { emoji: '💡', label: 'Fikir' },
+        { emoji: '📌', label: 'Önemli' },
+        { emoji: '🔥', label: 'Muhteşem' },
+        { emoji: '👍', label: 'Tebrikler' },
+    ];
+
+    const isShapeTool = shapeTools.some(t => t.id === config.tool) || config.tool === 'stamp';
 
     return (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center gap-3 scale-90 sm:scale-100">
-            {/* Shapes Sub-menu */}
+
+            {/* Şekiller + Damgalar alt menüsü */}
             <AnimatePresence>
                 {showShapes && (
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="flex items-center gap-1 bg-[#1a1b26]/90 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 shadow-2xl"
+                        className="flex flex-col gap-2 bg-[#1a1b26]/95 backdrop-blur-md p-3 rounded-2xl border border-white/10 shadow-2xl"
                     >
-                        {shapeTools.map(tool => (
-                            <button
-                                key={tool.id}
-                                onClick={() => {
-                                    setConfig({ ...config, tool: tool.id });
-                                    setShowShapes(false);
-                                }}
-                                className={cn(
-                                    "p-2.5 rounded-xl transition-all duration-200 relative",
-                                    config.tool === tool.id ? "bg-[#2d3045] text-white" : "text-slate-400 hover:text-white hover:bg-white/5"
-                                )}
-                                title={tool.label}
-                            >
-                                <tool.icon className="w-5 h-5" />
-                            </button>
-                        ))}
+                        {/* Şekil araçları satırı */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-slate-500 font-medium w-12 shrink-0">Şekil</span>
+                            <div className="flex items-center gap-0.5">
+                                {shapeTools.map(tool => (
+                                    <button
+                                        key={tool.id}
+                                        onClick={() => { setConfig({ ...config, tool: tool.id }); setShowShapes(false); }}
+                                        className={cn(
+                                            "p-2 rounded-xl transition-all",
+                                            config.tool === tool.id
+                                                ? "bg-[#2d3045] text-white"
+                                                : "text-slate-400 hover:text-white hover:bg-white/5"
+                                        )}
+                                        title={tool.label}
+                                    >
+                                        {tool.Icon ? <tool.Icon className="w-5 h-5" /> : tool.Svg ? <tool.Svg /> : null}
+                                    </button>
+                                ))}
+                                {/* Dolgu toggle */}
+                                <button
+                                    onClick={() => setConfig({ ...config, fillEnabled: !config.fillEnabled })}
+                                    className={cn(
+                                        "p-2 rounded-xl transition-all ml-1 border",
+                                        config.fillEnabled
+                                            ? "bg-indigo-600/40 text-indigo-300 border-indigo-500/50"
+                                            : "text-slate-500 hover:text-white hover:bg-white/5 border-white/10"
+                                    )}
+                                    title="Şekli Doldur"
+                                >
+                                    <PaintBucket className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Damgalar satırı */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-slate-500 font-medium w-12 shrink-0">Damga</span>
+                            <div className="flex items-center gap-0.5 flex-wrap">
+                                {stamps.map(stamp => (
+                                    <button
+                                        key={stamp.emoji}
+                                        onClick={() => { setConfig({ ...config, tool: 'stamp', stampIcon: stamp.emoji }); setShowShapes(false); }}
+                                        className={cn(
+                                            "w-9 h-9 rounded-xl text-xl transition-all hover:bg-white/10 flex items-center justify-center",
+                                            config.tool === 'stamp' && config.stampIcon === stamp.emoji
+                                                ? "bg-[#2d3045] ring-2 ring-indigo-500"
+                                                : ""
+                                        )}
+                                        title={stamp.label}
+                                    >
+                                        {stamp.emoji}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* Main Toolbar */}
+            {/* Ana toolbar */}
             <div className="flex items-center gap-1 bg-[#1a1b26] p-1.5 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5 transition-all duration-300">
                 <div className="flex items-center gap-0.5 px-2 border-r border-white/10">
                     {mainTools.map(tool => (
                         <button
                             key={tool.id}
-                            onClick={() => {
-                                setConfig({ ...config, tool: tool.id });
-                                setShowShapes(false);
-                            }}
+                            onClick={() => { setConfig({ ...config, tool: tool.id }); setShowShapes(false); }}
                             className={cn(
                                 "p-2.5 rounded-xl transition-all duration-200 group relative",
                                 config.tool === tool.id ? "bg-[#2d3045] text-white" : "text-slate-400 hover:text-white hover:bg-white/5"
@@ -648,7 +754,8 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
                             )}
                         </button>
                     ))}
-                    
+
+                    {/* Şekil / Damga butonu */}
                     <button
                         onClick={() => setShowShapes(!showShapes)}
                         className={cn(
@@ -656,29 +763,35 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
                             isShapeTool ? "bg-[#2d3045] text-indigo-400" : "text-slate-400 hover:text-white hover:bg-white/5",
                             showShapes ? "bg-white/10 text-white" : ""
                         )}
-                        title="Şekiller"
+                        title="Şekiller & Damgalar"
                     >
-                        <Shapes className="w-5 h-5" />
-                        {isShapeTool && (
+                        {config.tool === 'stamp' ? (
+                            <span className="text-xl leading-none">{config.stampIcon || '✅'}</span>
+                        ) : (
+                            <Shapes className="w-5 h-5" />
+                        )}
+                        {isShapeTool && config.tool !== 'stamp' && (
                             <div className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full border border-[#1a1b26]" />
                         )}
                     </button>
                 </div>
 
+                {/* Renkler */}
                 <div className="flex items-center gap-2 px-4 border-r border-white/10">
                     {colors.map(color => (
                         <button
                             key={color}
                             onClick={() => setConfig({ ...config, color })}
                             className={cn(
-                                "w-7 h-7 rounded-full border-2 transition-all hover:scale-110 flex items-center justify-center",
-                                config.color === color ? "border-white" : "border-transparent"
+                                "w-7 h-7 rounded-full border-2 transition-all hover:scale-110",
+                                config.color === color ? "border-white scale-110" : "border-transparent"
                             )}
                             style={{ backgroundColor: color }}
                         />
                     ))}
                 </div>
 
+                {/* Kalınlık */}
                 <div className="flex items-center gap-3 px-4 border-r border-white/10">
                     {[2, 5, 10].map(size => (
                         <button
@@ -688,32 +801,22 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
                                 "rounded-full bg-slate-400 transition-all hover:bg-white",
                                 config.width === size ? "bg-white scale-125 ring-2 ring-indigo-500 ring-offset-2 ring-offset-[#1a1b26]" : "hover:scale-110"
                             )}
-                            style={{ 
-                                width: size + 4 + 'px', 
-                                height: size + 4 + 'px' 
-                            }}
-                            title={`${size}px Boyut`}
+                            style={{ width: size + 4 + 'px', height: size + 4 + 'px' }}
+                            title={`${size}px`}
                         />
                     ))}
                 </div>
 
+                {/* İşlemler */}
                 <div className="flex items-center gap-1.5 px-2">
-                    <button 
-                        onClick={() => onCommand('UNDO_DRAWING')} 
-                        className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
-                        title="Geri Al"
-                    >
+                    <button onClick={() => onCommand('UNDO_DRAWING')} className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all" title="Geri Al">
                         <Undo className="w-5 h-5" />
                     </button>
-                    <button 
-                        onClick={() => onCommand('CLEAR_DRAWING')}
-                        className="p-2.5 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all"
-                        title="Temizle"
-                    >
+                    <button onClick={() => onCommand('CLEAR_DRAWING')} className="p-2.5 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all" title="Temizle">
                         <Trash2 className="w-5 h-5" />
                     </button>
                     {setShowWhiteboard && (
-                        <button 
+                        <button
                             onClick={() => onCommand('TOGGLE_WHITEBOARD')}
                             className={cn(
                                 "p-2.5 rounded-xl transition-all",
