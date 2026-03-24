@@ -251,6 +251,9 @@ export const getFormattedHtml = (act?: any) => {
                 if (tempCanvas) {
                     tempCanvas.width = canvas.width;
                     tempCanvas.height = canvas.height;
+                    // canvas.width/height değişince transform sıfırlanır — yeniden uygula
+                    tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
                 }
                 if (laserCanvas) {
                     laserCanvas.width = canvas.width;
@@ -270,13 +273,17 @@ export const getFormattedHtml = (act?: any) => {
             let previewLayer = null;
 
             function initLayer() {
+                const dpr = window.devicePixelRatio;
                 if (!tempCanvas) {
                     tempCanvas = document.createElement('canvas');
                     tempCanvas.width = canvas.width;
                     tempCanvas.height = canvas.height;
                     tempCtx = tempCanvas.getContext('2d');
+                    // Ana canvas ile aynı DPR ölçeği — CSS koordinatları doğru konuma çizer
+                    tempCtx.scale(dpr, dpr);
                 }
-                tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+                // clearRect CSS boyutlarıyla (scale uygulandığı için)
+                tempCtx.clearRect(0, 0, tempCanvas.width / dpr, tempCanvas.height / dpr);
             }
 
             function saveCurrentPage() {
