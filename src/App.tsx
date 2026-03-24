@@ -264,7 +264,7 @@ export const getFormattedHtml = (act?: any) => {
             }
 
             let startX, startY;
-            window.__drawConfig = { tool: 'pencil', color: '#ffffff', width: 3, fillEnabled: false, stampIcon: '✅' };
+            window.__drawConfig = { tool: 'pencil', color: '#000000', width: 3, fillEnabled: false, stampIcon: '✅' };
 
             let tempCanvas, tempCtx;
             let lastPoint, midPoint;
@@ -1119,7 +1119,7 @@ const StudentPortal = ({ act }: { act: any }) => {
     const [isFinished, setIsFinished] = useState(false);
     const [submissionId, setSubmissionId] = useState<string | null>(null);
     const [isDrawingMode, setIsDrawingMode] = useState(false);
-    const [drawConfig, setDrawConfig] = useState({ tool: 'pencil', color: '#ffffff', width: 3 });
+    const [drawConfig, setDrawConfig] = useState({ tool: 'pencil', color: '#000000', width: 3 });
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const submissionsHandler = useFirestore('submissions');
 
@@ -1337,7 +1337,7 @@ export default function App() {
     const [previewId, setPreviewId] = useState<string | null>(null);
     const [showResultsId, setShowResultsId] = useState<string | null>(null);
     const [isPreviewDrawingMode, setIsPreviewDrawingMode] = useState(false);
-    const [previewDrawConfig, setPreviewDrawConfig] = useState({ tool: 'pencil', color: '#ffffff', width: 3 });
+    const [previewDrawConfig, setPreviewDrawConfig] = useState({ tool: 'pencil', color: '#000000', width: 3 });
     const [showWhiteboard, setShowWhiteboard] = useState(false);
     const previewIframeRef = React.useRef<HTMLIFrameElement>(null);
 
