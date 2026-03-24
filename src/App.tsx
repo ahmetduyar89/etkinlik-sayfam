@@ -373,7 +373,7 @@ export const getFormattedHtml = (act?: any) => {
             }
 
             function startDrawing(e) {
-                if (!enabled || e.pointerType === 'touch' || window.__drawConfig.tool === 'pan') return;
+                if (!enabled || window.__drawConfig.tool === 'pan') return;
                 // FIX 1: Lazer basım gerektirmez, sadece hover ile takip eder
                 if (window.__drawConfig.tool === 'sun') return;
                 // FIX 5: Metin aracı inline input kullanır
