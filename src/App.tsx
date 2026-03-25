@@ -149,12 +149,15 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
             drag
             dragMomentum={false}
             dragElastic={0}
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerMove={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
             initial={{ x: -100, y: -20, opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="fixed bottom-10 left-1/2 z-[1000] flex flex-col items-center gap-3 cursor-move active:cursor-grabbing"
+            className="fixed bottom-10 left-1/2 z-[5000] flex flex-col items-center gap-3 cursor-move active:cursor-grabbing pointer-events-auto"
             style={{ 
                 translateX: '-50%',
-                touchAction: 'none' // Important for mobile dragging
+                touchAction: 'none'
             }}
         >
 
@@ -879,9 +882,9 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         <>
             <canvas ref={bufferCanvasRef} style={{ display: 'none' }} />
             <canvas ref={canvasRef} onPointerDown={startDrawing} onPointerMove={draw} onPointerUp={stopDrawing} onPointerLeave={stopDrawing}
-                className={cn("fixed top-0 left-0 z-[2000] touch-none transition-opacity", enabled ? (config.tool === 'pan' ? "pointer-events-none opacity-100" : "pointer-events-auto opacity-100") : "pointer-events-none opacity-0")}
+                className={cn("fixed top-0 left-0 z-[4000] touch-none transition-opacity", enabled ? (config.tool === 'pan' ? "pointer-events-none opacity-100" : "pointer-events-auto opacity-100") : "pointer-events-none opacity-0")}
                 style={{ backgroundColor: whiteboardMode ? 'white' : 'transparent' }} />
-            <canvas ref={laserCanvasRef} className="fixed top-0 left-0 z-[2001] pointer-events-none touch-none" />
+            <canvas ref={laserCanvasRef} className="fixed top-0 left-0 z-[4001] pointer-events-none touch-none" />
         </>
     );
 });
@@ -970,8 +973,8 @@ const StudentPortal = ({ act }: { act: any }) => {
     }
 
     return (
-        <div className="fixed inset-0 bg-[#0f172a] z-[3000] flex flex-col h-screen overflow-hidden">
-            <header className="h-16 px-6 border-b border-white/5 flex justify-between items-center bg-slate-900 z-[3001] shrink-0">
+        <div className="fixed inset-0 bg-[#0f172a] z-[3000] flex flex-col h-screen overflow-hidden" onPointerDown={(e) => e.stopPropagation()}>
+            <header className="h-16 px-6 border-b border-white/5 flex justify-between items-center bg-slate-900 z-[6000] shrink-0" onPointerDown={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-indigo-500/10 text-indigo-400 rounded-lg flex items-center justify-center"><User className="w-4 h-4" /></div>
                     <span className="font-bold text-slate-200">{name || act.title}</span>
@@ -1438,7 +1441,7 @@ export default function App() {
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center p-0 overflow-hidden">
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => { setPreviewId(null); setIsPreviewDrawingMode(false); setShowWhiteboard(false); }} className="absolute inset-0 bg-neutral-900/90" />
                     <div className="relative w-full h-full bg-white overflow-hidden flex flex-col">
-                        <header className="h-14 px-6 bg-slate-900 border-b border-white/5 flex justify-between items-center shrink-0 z-[10001]">
+                        <header className="h-14 px-6 bg-slate-900 border-b border-white/5 flex justify-between items-center shrink-0 z-[11000]">
                             <h3 className="text-white font-bold">{activities.find(a => a.id === previewId)?.title}</h3>
                             <div className="flex items-center gap-3">
                                 <button onClick={() => setIsPreviewDrawingMode(!isPreviewDrawingMode)} className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all", isPreviewDrawingMode ? "bg-indigo-600 text-white shadow-lg" : "bg-white/5 text-slate-300 hover:bg-white/10")}><Pencil className="w-4 h-4" />{isPreviewDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}</button>
