@@ -54,56 +54,40 @@ export const getFormattedHtml = (act?: any) => {
         }
     </style>
     <script>
-        // Helper to send answers to the portal
-        window.sendAnswer = (data) => {
-            window.parent.postMessage({ type: 'SIM_ANSWER', data }, '*');
-        };
+        window.sendAnswer = (data) => window.parent.postMessage({ type: 'SIM_ANSWER', data }, '*');
 
-        // Drawing Script
         (function() {
-            let isDrawing = false;
+            let isDrawing = false, enabled = false;
             let canvas = null, ctx = null, previewLayer = null;
-            let enabled = false;
-            let _cleanup = null;
-            let laserCanvas = null, laserCtx = null;
-            let _resizeObserver = null;
+            let laserCanvas = null, laserCtx = null, _resizeObserver = null, _cleanup = null;
+            
+            let strokes = []; // Vector storage
+            let currentStroke = null;
+            let lastPoint = null;
 
             window.addEventListener('message', (e) => {
                 const d = e.data;
-                if (d.type === 'TOGGLE_DRAWING') {
-                    toggleDrawingMode(d.enabled);
-                } else if (d.type === 'CLEAR_DRAWING') {
-                    clearDrawing();
-                } else if (d.type === 'UNDO_DRAWING') {
-                    undoDrawing();
-                } else if (d.type === 'SET_DRAW_CONFIG') {
+                if (d.type === 'TOGGLE_DRAWING') toggleDrawingMode(d.enabled);
+                else if (d.type === 'CLEAR_DRAWING') clearDrawing();
+                else if (d.type === 'UNDO_DRAWING') undoDrawing();
+                else if (d.type === 'SET_DRAW_CONFIG') {
                     window.__drawConfig = Object.assign({}, window.__drawConfig, d.config);
                     updateCanvasInteractivity();
                 } else if (d.type === 'SET_WHITEBOARD') {
                     if (d.enabled) document.body.classList.add('whiteboard-active');
                     else document.body.classList.remove('whiteboard-active');
                     resize();
-                } else if (d.type === 'CLEANUP') {
-                    if (_cleanup) _cleanup();
-                }
+                } else if (d.type === 'CLEANUP' && _cleanup) _cleanup();
             });
 
             function toggleDrawingMode(state) {
                 enabled = state;
                 if (enabled) {
-                    if (!canvas || !canvas.parentElement) {
-                        initCanvas();
-                    } else {
-                        canvas.style.display = 'block';
-                        updateCanvasInteractivity();
-                        resize();
-                    }
+                    if (!canvas || !canvas.parentElement) initCanvas();
+                    else { canvas.style.display = 'block'; updateCanvasInteractivity(); resize(); }
                 } else {
                     if (canvas) canvas.style.display = 'none';
-                    if (laserCanvas) {
-                        laserCanvas.style.display = 'none';
-                        if (laserCtx) laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
-                    }
+                    if (laserCanvas) { laserCanvas.style.display = 'none'; if (laserCtx) laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height); }
                     updateCanvasInteractivity();
                 }
             }
@@ -112,124 +96,120 @@ export const getFormattedHtml = (act?: any) => {
                 if (!canvas) return;
                 const tool = (window.__drawConfig && window.__drawConfig.tool) || 'pencil';
                 const isPan = tool === 'pan';
-                
                 canvas.style.pointerEvents = (enabled && !isPan) ? 'all' : 'none';
-                
-                const behavior = (enabled && !isPan) ? 'none' : 'auto';
                 canvas.style.touchAction = (enabled && !isPan) ? 'none' : 'auto';
-                
                 if (document.body) {
-                    document.body.style.touchAction = behavior;
-                    document.documentElement.style.touchAction = behavior;
-                    if (enabled && !isPan) {
-                        document.body.style.overflow = 'hidden';
-                        document.documentElement.style.overflow = 'hidden';
-                    } else {
-                        document.body.style.overflow = '';
-                        document.documentElement.style.overflow = '';
-                    }
-                }
-            }
-
-            let history = [];
-            function saveHistory() {
-                if (!canvas) return;
-                const hCanvas = document.createElement('canvas');
-                hCanvas.width = canvas.width;
-                hCanvas.height = canvas.height;
-                hCanvas.getContext('2d').drawImage(canvas, 0, 0);
-                history.push(hCanvas);
-                if (history.length > 20) history.shift();
-            }
-
-            function undoDrawing() {
-                if (history.length > 0 && ctx) {
-                    const hCanvas = history.pop();
-                    const dpr = window.devicePixelRatio || 1;
-                    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-                    ctx.drawImage(hCanvas, 0, 0, hCanvas.width / dpr, hCanvas.height / dpr);
+                    const b = (enabled && !isPan) ? 'none' : 'auto';
+                    document.body.style.touchAction = b; document.documentElement.style.touchAction = b;
+                    if (enabled && !isPan) { document.body.style.overflow = 'hidden'; document.documentElement.style.overflow = 'hidden'; }
+                    else { document.body.style.overflow = ''; document.documentElement.style.overflow = ''; }
                 }
             }
 
             function initCanvas() {
-                if (!document.body) {
-                    setTimeout(initCanvas, 50);
-                    return;
-                }
-                
-                // Remove existing to avoid duplicates
-                const old = document.getElementById('drawing-canvas');
-                if (old) old.remove();
-
+                if (!document.body) { setTimeout(initCanvas, 50); return; }
+                const old = document.getElementById('drawing-canvas'); if (old) old.remove();
                 canvas = document.createElement('canvas');
                 canvas.id = 'drawing-canvas';
-                canvas.className = 'ignore-html2canvas'; // For future usage
                 canvas.style.cssText = 'position:absolute;top:0;left:0;z-index:2147483647;pointer-events:none;background:transparent;';
                 document.body.appendChild(canvas);
-
                 ctx = canvas.getContext('2d');
-                previewLayer = document.createElement('canvas');
-                
                 resize();
-
                 if (window.ResizeObserver) {
-                    _resizeObserver = new ResizeObserver(function() { requestAnimationFrame(resize); });
+                    _resizeObserver = new ResizeObserver(() => requestAnimationFrame(resize));
                     _resizeObserver.observe(document.body);
-                } else {
-                    window.addEventListener('resize', resize);
-                }
-
-                canvas.addEventListener('pointerdown', startDrawing, { passive: false });
-                canvas.addEventListener('pointermove', draw, { passive: false });
+                } else window.addEventListener('resize', resize);
+                canvas.addEventListener('pointerdown', startDrawing);
+                canvas.addEventListener('pointermove', draw);
                 canvas.addEventListener('pointerup', stopDrawing);
                 canvas.addEventListener('pointercancel', stopDrawing);
                 window.addEventListener('pointerup', stopDrawing);
-                
                 updateCanvasInteractivity();
-
-                // Notify parent immediately
                 window.parent.postMessage({ type: 'DRAWING_READY' }, '*');
             }
 
-            function initLaserCanvas() {
-                if (laserCanvas) return;
-                laserCanvas = document.createElement('canvas');
-                laserCanvas.style.position = 'fixed';
-                laserCanvas.style.top = '0';
-                laserCanvas.style.left = '0';
-                laserCanvas.style.zIndex = '2147483647';
-                laserCanvas.style.pointerEvents = 'none';
-                document.body.appendChild(laserCanvas);
-                laserCtx = laserCanvas.getContext('2d');
-            }
-
             function drawLaser(x, y) {
-                initLaserCanvas();
+                if (!laserCanvas) {
+                    laserCanvas = document.createElement('canvas');
+                    laserCanvas.style.cssText = 'position:fixed;top:0;left:0;z-index:2147483647;pointer-events:none;';
+                    document.body.appendChild(laserCanvas);
+                    laserCtx = laserCanvas.getContext('2d');
+                }
                 laserCanvas.style.display = 'block';
                 const dpr = window.devicePixelRatio || 1;
                 if (laserCanvas.width !== window.innerWidth * dpr) {
-                    laserCanvas.width = window.innerWidth * dpr;
-                    laserCanvas.height = window.innerHeight * dpr;
-                    laserCanvas.style.width = window.innerWidth + 'px';
-                    laserCanvas.style.height = window.innerHeight + 'px';
+                    laserCanvas.width = window.innerWidth * dpr; laserCanvas.height = window.innerHeight * dpr;
+                    laserCanvas.style.width = window.innerWidth + 'px'; laserCanvas.style.height = window.innerHeight + 'px';
                     laserCtx.scale(dpr, dpr);
                 }
                 laserCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-                const cx = x, cy = y, r = 14;
-                const glow = laserCtx.createRadialGradient(cx, cy, 0, cx, cy, r * 3);
-                glow.addColorStop(0, 'rgba(255,50,50,0.95)');
-                glow.addColorStop(0.25, 'rgba(255,80,80,0.55)');
-                glow.addColorStop(1, 'rgba(255,0,0,0)');
-                laserCtx.save();
-                laserCtx.fillStyle = glow;
-                laserCtx.beginPath();
-                laserCtx.arc(cx, cy, r * 3, 0, Math.PI * 2);
-                laserCtx.fill();
-                laserCtx.fillStyle = 'rgba(255,240,240,0.95)';
-                laserCtx.beginPath();
-                laserCtx.arc(cx, cy, r * 0.3, 0, Math.PI * 2);
-                laserCtx.fill();
-                laserCtx.restore();
+                const cx = x, cy = y, r = 12;
+                const g = laserCtx.createRadialGradient(cx, cy, 0, cx, cy, r * 3);
+                g.addColorStop(0, 'rgba(255,50,50,1)'); g.addColorStop(0.3, 'rgba(255,80,80,0.4)'); g.addColorStop(1, 'rgba(255,0,0,0)');
+                laserCtx.fillStyle = g; laserCtx.beginPath(); laserCtx.arc(cx, cy, r * 3, 0, Math.PI * 2); laserCtx.fill();
+                laserCtx.fillStyle = '#fff'; laserCtx.beginPath(); laserCtx.arc(cx, cy, 2, 0, Math.PI * 2); laserCtx.fill();
+            }
+
+            function redraw() {
+                if (!ctx) return;
+                const dpr = window.devicePixelRatio || 1;
+                ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+                strokes.forEach(s => drawStroke(ctx, s));
+            }
+
+            function drawStroke(tCtx, s) {
+                if (!s || s.points.length < 1) return;
+                tCtx.save();
+                tCtx.strokeStyle = s.color; tCtx.fillStyle = s.color; tCtx.lineWidth = s.width;
+                tCtx.lineCap = 'round'; tCtx.lineJoin = 'round';
+                if (s.tool === 'eraser') tCtx.globalCompositeOperation = 'destination-out';
+                if (s.tool === 'highlighter') tCtx.globalAlpha = 0.4;
+                if (s.tool === 'dashed') tCtx.setLineDash([12, 6]);
+
+                if (s.tool === 'pencil' || s.tool === 'highlighter' || s.tool === 'eraser') {
+                    if (s.points.length < 2) {
+                        tCtx.beginPath(); tCtx.arc(s.points[0].x, s.points[0].y, s.width/2, 0, Math.PI*2); tCtx.fill();
+                    } else {
+                        tCtx.beginPath(); tCtx.moveTo(s.points[0].x, s.points[0].y);
+                        for (let i = 1; i < s.points.length - 1; i++) {
+                            const mid = { x: (s.points[i].x + s.points[i+1].x)/2, y: (s.points[i].y + s.points[i+1].y)/2 };
+                            tCtx.quadraticCurveTo(s.points[i].x, s.points[i].y, mid.x, mid.y);
+                        }
+                        const last = s.points[s.points.length - 1];
+                        tCtx.lineTo(last.x, last.y);
+                        tCtx.stroke();
+                    }
+                } else if (s.tool === 'text') {
+                    tCtx.font = 'bold 20px Arial'; tCtx.fillText(s.text, s.points[0].x, s.points[0].y);
+                } else if (s.tool === 'stamp') {
+                    tCtx.font = '44px serif'; tCtx.textAlign = 'center'; tCtx.textBaseline = 'middle';
+                    tCtx.fillText(s.stampIcon, s.points[0].x, s.points[0].y);
+                } else {
+                    const p1 = s.points[0], p2 = s.points[s.points.length - 1];
+                    drawShape(tCtx, s.tool, p1.x, p1.y, p2.x, p2.y, s.fillEnabled);
+                }
+                tCtx.restore();
+            }
+
+            function drawShape(tCtx, tool, x1, y1, x2, y2, fill) {
+                tCtx.beginPath();
+                if (tool === 'rect') tCtx.rect(x1, y1, x2 - x1, y2 - y1);
+                else if (tool === 'circle') tCtx.arc(x1, y1, Math.sqrt(Math.pow(x2-x1,2)+Math.pow(y2-y1,2)), 0, Math.PI*2);
+                else if (tool === 'triangle') { tCtx.moveTo((x1+x2)/2,y1); tCtx.lineTo(x2,y2); tCtx.lineTo(x1,y2); tCtx.closePath(); }
+                else if (tool === 'line' || tool === 'dashed') { tCtx.moveTo(x1, y1); tCtx.lineTo(x2, y2); }
+                else if (tool === 'arrow' || tool === 'double_arrow') {
+                    const h = 15, a = Math.atan2(y2-y1, x2-x1);
+                    tCtx.moveTo(x1, y1); tCtx.lineTo(x2, y2); tCtx.stroke();
+                    tCtx.beginPath(); tCtx.moveTo(x2, y2); 
+                    tCtx.lineTo(x2-h*Math.cos(a-Math.PI/6), y2-h*Math.sin(a-Math.PI/6));
+                    tCtx.moveTo(x2, y2); tCtx.lineTo(x2-h*Math.cos(a+Math.PI/6), y2-h*Math.sin(a+Math.PI/6));
+                    if (tool === 'double_arrow') {
+                        tCtx.moveTo(x1, y1); tCtx.lineTo(x1+h*Math.cos(a-Math.PI/6), y1+h*Math.sin(a-Math.PI/6));
+                        tCtx.moveTo(x1, y1); tCtx.lineTo(x1+h*Math.cos(a+Math.PI/6), y1+h*Math.sin(a+Math.PI/6));
+                    }
+                }
+                if (fill && !['line', 'dashed', 'arrow', 'double_arrow'].includes(tool)) { tCtx.globalAlpha = 0.2; tCtx.fill(); tCtx.globalAlpha = 1; }
+                tCtx.stroke();
             }
 
             function resize() {
@@ -237,86 +217,28 @@ export const getFormattedHtml = (act?: any) => {
                 const dpr = window.devicePixelRatio || 1;
                 const w = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth, window.innerWidth);
                 const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight);
-
-                if (canvas.width === w * dpr && canvas.height === h * dpr) return;
-
-                const temp = document.createElement('canvas');
-                temp.width = canvas.width;
-                temp.height = canvas.height;
-                if (canvas.width > 0 && canvas.height > 0) {
-                    temp.getContext('2d').drawImage(canvas, 0, 0);
-                }
-
-                canvas.width = w * dpr;
-                canvas.height = h * dpr;
-                canvas.style.width = w + 'px';
-                canvas.style.height = h + 'px';
-
-                ctx = canvas.getContext('2d');
-                ctx.setTransform(1, 0, 0, 1, 0, 0);
-                ctx.scale(dpr, dpr);
-                if (temp.width > 0) {
-                    ctx.drawImage(temp, 0, 0, temp.width / dpr, temp.height / dpr);
-                }
-
-                if (previewLayer) {
-                    previewLayer.width = canvas.width;
-                    previewLayer.height = canvas.height;
-                }
-                if (tempCanvas) {
-                    tempCanvas.width = canvas.width;
-                    tempCanvas.height = canvas.height;
-                    tempCtx = tempCanvas.getContext('2d');
-                    tempCtx.setTransform(1, 0, 0, 1, 0, 0);
-                    tempCtx.scale(dpr, dpr);
-                }
+                canvas.width = w * dpr; canvas.height = h * dpr;
+                canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+                ctx = canvas.getContext('2d'); ctx.setTransform(1,0,0,1,0,0); ctx.scale(dpr, dpr);
+                redraw();
             }
 
-            let startX, startY;
-            window.__drawConfig = { tool: 'pencil', color: '#4f46e5', width: 3, fillEnabled: false, stampIcon: '✅' };
-
-            let tempCanvas, tempCtx, lastPoint, midPoint, currentPage = '';
-            let drawingCache = {};
-
-            function initLayer() {
-                const dpr = window.devicePixelRatio || 1;
-                if (!tempCanvas) {
-                    tempCanvas = document.createElement('canvas');
-                    tempCanvas.width = canvas.width;
-                    tempCanvas.height = canvas.height;
-                    tempCtx = tempCanvas.getContext('2d');
-                    tempCtx.scale(dpr, dpr);
-                }
-                tempCtx.clearRect(0, 0, tempCanvas.width / dpr, tempCanvas.height / dpr);
-            }
+            let drawingCache = {}; // Page-based vector storage
+            let currentPage = '';
 
             function saveCurrentPage() {
-                if (currentPage && canvas) {
-                    const snap = document.createElement('canvas');
-                    snap.width = canvas.width;
-                    snap.height = canvas.height;
-                    snap.getContext('2d').drawImage(canvas, 0, 0);
-                    drawingCache[currentPage] = snap;
-                }
+                if (currentPage) drawingCache[currentPage] = [...strokes];
             }
 
             function loadPage(id) {
-                if (!ctx) return;
-                const dpr = window.devicePixelRatio || 1;
-                ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-                if (drawingCache[id]) {
-                    ctx.drawImage(drawingCache[id], 0, 0, drawingCache[id].width / dpr, drawingCache[id].height / dpr);
-                } else {
-                    saveCurrentPage();
-                }
+                if (drawingCache[id]) strokes = [...drawingCache[id]];
+                else { strokes = []; saveCurrentPage(); }
+                redraw();
             }
 
             function checkPage() {
                 try {
-                    if (enabled && (!canvas || !canvas.parentElement)) {
-                        initCanvas();
-                        return;
-                    }
+                    if (enabled && (!canvas || !canvas.parentElement)) { initCanvas(); return; }
                     const newId = window.location.hash || window.location.href;
                     if (newId !== currentPage) {
                         saveCurrentPage();
@@ -328,167 +250,68 @@ export const getFormattedHtml = (act?: any) => {
             const _intCheck = setInterval(checkPage, 1500);
             window.addEventListener('hashchange', checkPage);
 
-            function showTextInput(vx, vy, dx, dy) {
-                const existing = document.getElementById('canvas-text-input');
-                if (existing) existing.remove();
-                const input = document.createElement('input');
-                input.id = 'canvas-text-input';
-                input.style.cssText = 'position:fixed; left:' + Math.min(vx, window.innerWidth-260) + 'px; top:' + Math.max(vy-44,8) + 'px; font:bold 18px Arial; color:' + window.__drawConfig.color + '; background:rgba(255,255,255,0.95); border:2px solid ' + window.__drawConfig.color + '; border-radius:10px; padding:10px 15px; outline:none; min-width:240px; z-index:2147483647; box-shadow:0 10px 25px rgba(0,0,0,0.1);';
-                document.body.appendChild(input);
-                input.focus();
-                const commit = function() {
-                    const text = input.value.trim();
-                    if (text) {
-                        saveHistory();
-                        ctx.save();
-                        ctx.font = 'bold 20px Arial';
-                        ctx.fillStyle = window.__drawConfig.color;
-                        ctx.fillText(text, dx, dy);
-                        ctx.restore();
-                    }
-                    input.remove();
-                };
-                input.addEventListener('keydown', function(ev) { if (ev.key === 'Enter') commit(); if (ev.key === 'Escape') input.remove(); });
-                setTimeout(function() {
-                    const h = function(ev) { if (ev.target !== input) { commit(); document.removeEventListener('pointerdown', h); } };
-                    document.addEventListener('pointerdown', h);
-                }, 100);
-            }
-
             function startDrawing(e) {
-                if (!enabled || !canvas || window.__drawConfig.tool === 'pan' || window.__drawConfig.tool === 'sun') return;
-                if (window.__drawConfig.tool === 'text') {
-                    showTextInput(e.clientX, e.clientY, e.pageX, e.pageY);
-                    return;
-                }
-                if (window.__drawConfig.tool === 'stamp') {
-                    saveHistory();
-                    ctx.save();
-                    ctx.font = '44px serif';
-                    ctx.textBaseline = 'middle';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(window.__drawConfig.stampIcon || '✅', e.pageX, e.pageY);
-                    ctx.restore();
-                    return;
-                }
+                if (!enabled || !canvas || ['pan', 'sun'].includes(window.__drawConfig.tool)) return;
+                const tool = window.__drawConfig.tool;
+                const x = e.pageX, y = e.pageY;
+                if (tool === 'text') { showTextInput(e.clientX, e.clientY, x, y); return; }
+                if (tool === 'stamp') { strokes.push({ tool, points: [{x, y}], stampIcon: window.__drawConfig.stampIcon, color: '#000', width: 1 }); redraw(); return; }
 
-                saveHistory();
                 isDrawing = true;
-                if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch(err) {} }
-                startX = e.pageX; startY = e.pageY;
-                lastPoint = { x: startX, y: startY };
-                midPoint = { x: startX, y: startY };
-
-                const pCtx = previewLayer.getContext('2d');
-                pCtx.clearRect(0, 0, previewLayer.width, previewLayer.height);
-                pCtx.drawImage(canvas, 0, 0);
-                initLayer();
+                if (canvas.setPointerCapture) try { canvas.setPointerCapture(e.pointerId); } catch(err) {}
+                currentStroke = {
+                    tool, color: window.__drawConfig.color, 
+                    width: tool === 'highlighter' ? window.__drawConfig.width * 5 : tool === 'eraser' ? window.__drawConfig.width * 10 : window.__drawConfig.width,
+                    fillEnabled: window.__drawConfig.fillEnabled,
+                    points: [{x, y}]
+                };
+                strokes.push(currentStroke);
             }
 
             function draw(e) {
                 if (!enabled || !canvas) return;
                 if (window.__drawConfig.tool === 'sun') { drawLaser(e.clientX, e.clientY); return; }
-                if (!isDrawing) return;
-
-                const x = e.pageX, y = e.pageY, tool = window.__drawConfig.tool;
-                const pressure = (e.pointerType === 'pen' && e.pressure > 0) ? e.pressure : 1.0;
-
-                if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser') {
-                    const currentMid = { x: (lastPoint.x + x) / 2, y: (lastPoint.y + y) / 2 };
-                    const tCtx = tool === 'highlighter' ? tempCtx : ctx;
-                    const baseWidth = tool === 'highlighter' ? window.__drawConfig.width * 5 : tool === 'eraser' ? window.__drawConfig.width * 10 : window.__drawConfig.width * (0.8 + pressure * 0.4);
-
-                    tCtx.save();
-                    tCtx.beginPath();
-                    tCtx.strokeStyle = window.__drawConfig.color;
-                    tCtx.lineWidth = baseWidth;
-                    tCtx.lineCap = 'round';
-                    tCtx.lineJoin = 'round';
-                    if (tool === 'eraser') tCtx.globalCompositeOperation = 'destination-out';
-                    tCtx.moveTo(midPoint.x, midPoint.y);
-                    tCtx.quadraticCurveTo(lastPoint.x, lastPoint.y, currentMid.x, currentMid.y);
-                    tCtx.stroke();
-                    tCtx.restore();
-
-                    if (tool === 'highlighter') {
-                        ctx.save();
-                        ctx.globalAlpha = 0.4;
-                        ctx.beginPath();
-                        ctx.lineWidth = baseWidth;
-                        ctx.lineCap = 'round';
-                        ctx.strokeStyle = window.__drawConfig.color;
-                        ctx.moveTo(midPoint.x, midPoint.y);
-                        ctx.quadraticCurveTo(lastPoint.x, lastPoint.y, currentMid.x, currentMid.y);
-                        ctx.stroke();
-                        ctx.restore();
-                    }
-                    lastPoint = { x: x, y: y }; midPoint = currentMid;
-                } else if (tool !== 'pan') {
-                    const dpr = window.devicePixelRatio || 1;
-                    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-                    ctx.drawImage(previewLayer, 0, 0, canvas.width / dpr, canvas.height / dpr);
-                    drawShape(tool, startX, startY, x, y);
-                }
-            }
-
-            function drawShape(tool, x1, y1, x2, y2) {
-                ctx.save();
-                ctx.strokeStyle = window.__drawConfig.color;
-                ctx.fillStyle = window.__drawConfig.color;
-                ctx.lineWidth = window.__drawConfig.width;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                if (tool === 'dashed') ctx.setLineDash([12, 6]);
-                
-                if (tool === 'arrow' || tool === 'double_arrow') {
-                    ctx.beginPath();
-                    const headlen = 15, angle = Math.atan2(y2 - y1, x2 - x1);
-                    ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-                    ctx.beginPath(); ctx.moveTo(x2, y2);
-                    ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
-                    ctx.moveTo(x2, y2);
-                    ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
-                    ctx.stroke();
-                    if (tool === 'double_arrow') {
-                        ctx.beginPath(); ctx.moveTo(x1, y1);
-                        ctx.lineTo(x1 + headlen * Math.cos(angle - Math.PI / 6), y1 + headlen * Math.sin(angle - Math.PI / 6));
-                        ctx.moveTo(x1, y1);
-                        ctx.lineTo(x1 + headlen * Math.cos(angle + Math.PI / 6), y1 + headlen * Math.sin(angle + Math.PI / 6));
-                        ctx.stroke();
-                    }
-                } else {
-                    ctx.beginPath();
-                    if (tool === 'rect') ctx.rect(x1, y1, x2 - x1, y2 - y1);
-                    else if (tool === 'circle') ctx.arc(x1, y1, Math.sqrt(Math.pow(x2-x1,2) + Math.pow(y2-y1,2)), 0, 2*Math.PI);
-                    else if (tool === 'triangle') { ctx.moveTo((x1+x2)/2,y1); ctx.lineTo(x2,y2); ctx.lineTo(x1,y2); ctx.closePath(); }
-                    else if (tool === 'line' || tool === 'dashed') { ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }
-                    if (window.__drawConfig.fillEnabled && !['line', 'dashed'].includes(tool)) { ctx.globalAlpha = 0.2; ctx.fill(); ctx.globalAlpha = 1; }
-                    ctx.stroke();
-                }
-                ctx.restore();
+                if (!isDrawing || !currentStroke) return;
+                const x = e.pageX, y = e.pageY;
+                const lastIdx = currentStroke.points.length - 1;
+                const last = currentStroke.points[lastIdx];
+                if (Math.hypot(x - last.x, y - last.y) < 2) return; // Optimization
+                currentStroke.points.push({x, y});
+                redraw();
             }
 
             function stopDrawing(e) {
-                if (laserCanvas) laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
-                if (!isDrawing) return;
-                isDrawing = false;
-                if (e && e.pointerId && canvas.releasePointerCapture) { try { canvas.releasePointerCapture(e.pointerId); } catch(err) {} }
+                if (laserCanvas) laserCtx.clearRect(0,0,laserCanvas.width, laserCanvas.height);
+                isDrawing = false; currentStroke = null;
+                if (e && e.pointerId && canvas.releasePointerCapture) try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
             }
 
-            function clearDrawing() {
-                if (ctx) {
-                    const dpr = window.devicePixelRatio || 1;
-                    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-                }
-                drawingCache = {};
+            function undoDrawing() { strokes.pop(); redraw(); }
+            function clearDrawing() { strokes = []; redraw(); }
+
+            function showTextInput(vx, vy, dx, dy) {
+                const ex = document.getElementById('canvas-text-input'); if (ex) ex.remove();
+                const i = document.createElement('input');
+                i.id = 'canvas-text-input';
+                i.style.cssText = 'position:fixed;left:'+Math.min(vx, window.innerWidth-260)+'px;top:'+Math.max(vy-44,8)+'px;font:bold 18px Arial;color:'+window.__drawConfig.color+';background:#fff;border:2px solid '+window.__drawConfig.color+';border-radius:10px;padding:10px;z-index:2147483647;outline:none;';
+                document.body.appendChild(i); i.focus();
+                const commit = () => {
+                    if (i.value.trim()) { strokes.push({ tool: 'text', text: i.value.trim(), color: window.__drawConfig.color, points: [{x:dx, y:dy}] }); redraw(); }
+                    i.remove();
+                };
+                i.onkeydown = (ev) => { if (ev.key === 'Enter') commit(); if (ev.key === 'Escape') i.remove(); };
+                setTimeout(() => {
+                    const h = (ev) => { if (ev.target !== i) { commit(); document.removeEventListener('pointerdown', h); } };
+                    document.addEventListener('pointerdown', h);
+                }, 100);
             }
 
-            _cleanup = function() {
+            _cleanup = () => {
                 clearInterval(_intCheck);
                 if (_resizeObserver) _resizeObserver.disconnect();
                 window.removeEventListener('resize', resize);
                 window.removeEventListener('hashchange', checkPage);
-                if (laserCanvas) { laserCanvas.remove(); laserCanvas = null; }
+                if (laserCanvas) laserCanvas.remove();
             };
         })();
     </script>
@@ -572,7 +395,18 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
     const isShapeTool = shapeTools.some(t => t.id === config.tool) || config.tool === 'stamp';
 
     return (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center gap-3 scale-90 sm:scale-100">
+        <motion.div 
+            drag
+            dragMomentum={false}
+            dragElastic={0}
+            initial={{ x: -100, y: -20, opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed bottom-10 left-1/2 z-[1000] flex flex-col items-center gap-3 cursor-move active:cursor-grabbing"
+            style={{ 
+                translateX: '-50%',
+                touchAction: 'none' // Important for mobile dragging
+            }}
+        >
 
             {/* Şekiller + Damgalar alt menüsü */}
             <AnimatePresence>
@@ -737,7 +571,7 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
                     )}
                 </div>
             </div>
-        </div>
+        </motion.div>
     );
 };
 
