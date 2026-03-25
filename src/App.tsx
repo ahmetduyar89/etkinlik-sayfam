@@ -57,278 +57,13 @@ export const getFormattedHtml = (act?: any) => {
         window.sendAnswer = (data) => window.parent.postMessage({ type: 'SIM_ANSWER', data }, '*');
 
         (function() {
-            let isDrawing = false, enabled = false;
-            let canvas = null, ctx = null, bufferCanvas = null, bufferCtx = null;
-            let laserCanvas = null, laserCtx = null, _resizeObserver = null, _cleanup = null;
-            
-            let strokes = []; // Vector storage
-            let currentStroke = null;
-
+            // Student Portal Answer Sync & Readiness
             window.addEventListener('message', (e) => {
-                const d = e.data;
-                if (d.type === 'TOGGLE_DRAWING') toggleDrawingMode(d.enabled);
-                else if (d.type === 'CLEAR_DRAWING') clearDrawing();
-                else if (d.type === 'UNDO_DRAWING') undoDrawing();
-                else if (d.type === 'SET_DRAW_CONFIG') {
-                    window.__drawConfig = Object.assign({}, window.__drawConfig, d.config);
-                    updateCanvasInteractivity();
-                } else if (d.type === 'SET_WHITEBOARD') {
-                    if (d.enabled) document.body.classList.add('whiteboard-active');
-                    else document.body.classList.remove('whiteboard-active');
-                    resize();
-                } else if (d.type === 'CLEANUP' && _cleanup) _cleanup();
+                if (e.data.type === 'CLEANUP' && window._cleanup) window._cleanup();
             });
-
-            function toggleDrawingMode(state) {
-                enabled = state;
-                if (enabled) {
-                    if (!canvas || !canvas.parentElement) initCanvas();
-                    else { canvas.style.display = 'block'; updateCanvasInteractivity(); resize(); }
-                } else {
-                    if (canvas) canvas.style.display = 'none';
-                    if (laserCanvas) { laserCanvas.style.display = 'none'; if (laserCtx) laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height); }
-                    updateCanvasInteractivity();
-                }
-            }
-
-            function updateCanvasInteractivity() {
-                if (!canvas) return;
-                const tool = (window.__drawConfig && window.__drawConfig.tool) || 'pencil';
-                const isPan = tool === 'pan';
-                canvas.style.pointerEvents = (enabled && !isPan) ? 'all' : 'none';
-                canvas.style.touchAction = (enabled && !isPan) ? 'none' : 'auto';
-                if (document.body) {
-                    const b = (enabled && !isPan) ? 'none' : 'auto';
-                    document.body.style.touchAction = b; document.documentElement.style.touchAction = b;
-                    if (enabled && !isPan) { document.body.style.overflow = 'hidden'; document.documentElement.style.overflow = 'hidden'; }
-                    else { document.body.style.overflow = ''; document.documentElement.style.overflow = ''; }
-                }
-            }
-
-            function initCanvas() {
-                if (!document.body) { setTimeout(initCanvas, 50); return; }
-                const old = document.getElementById('drawing-canvas'); if (old) old.remove();
-                canvas = document.createElement('canvas');
-                canvas.id = 'drawing-canvas';
-                canvas.style.cssText = 'position:absolute;top:0;left:0;z-index:2147483647;pointer-events:none;background:transparent;';
-                document.body.appendChild(canvas);
-                ctx = canvas.getContext('2d');
-                
-                bufferCanvas = document.createElement('canvas');
-                bufferCtx = bufferCanvas.getContext('2d');
-                
-                resize();
-                if (window.ResizeObserver) {
-                    _resizeObserver = new ResizeObserver(() => requestAnimationFrame(resize));
-                    _resizeObserver.observe(document.body);
-                } else window.addEventListener('resize', resize);
-                
-                canvas.addEventListener('pointerdown', startDrawing);
-                canvas.addEventListener('pointermove', draw);
-                canvas.addEventListener('pointerup', stopDrawing);
-                canvas.addEventListener('pointercancel', stopDrawing);
-                window.addEventListener('pointerup', stopDrawing);
-                updateCanvasInteractivity();
-                window.parent.postMessage({ type: 'DRAWING_READY' }, '*');
-            }
-
-            function drawLaser(x, y) {
-                if (!laserCanvas) {
-                    laserCanvas = document.createElement('canvas');
-                    laserCanvas.style.cssText = 'position:fixed;top:0;left:0;z-index:2147483647;pointer-events:none;';
-                    document.body.appendChild(laserCanvas);
-                    laserCtx = laserCanvas.getContext('2d');
-                }
-                laserCanvas.style.display = 'block';
-                const dpr = window.devicePixelRatio || 1;
-                if (laserCanvas.width !== window.innerWidth * dpr) {
-                    laserCanvas.width = window.innerWidth * dpr; laserCanvas.height = window.innerHeight * dpr;
-                    laserCanvas.style.width = window.innerWidth + 'px'; laserCanvas.style.height = window.innerHeight + 'px';
-                    laserCtx.scale(dpr, dpr);
-                }
-                laserCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-                const cx = x, cy = y, r = 12;
-                const g = laserCtx.createRadialGradient(cx, cy, 0, cx, cy, r * 3);
-                g.addColorStop(0, 'rgba(255,50,50,1)'); g.addColorStop(0.3, 'rgba(255,80,80,0.4)'); g.addColorStop(1, 'rgba(255,0,0,0)');
-                laserCtx.fillStyle = g; laserCtx.beginPath(); laserCtx.arc(cx, cy, r * 3, 0, Math.PI * 2); laserCtx.fill();
-                laserCtx.fillStyle = '#fff'; laserCtx.beginPath(); laserCtx.arc(cx, cy, 2, 0, Math.PI * 2); laserCtx.fill();
-            }
-
-            function updateBuffer() {
-                if (!bufferCtx) return;
-                const dpr = window.devicePixelRatio || 1;
-                bufferCtx.clearRect(0, 0, bufferCanvas.width / dpr, bufferCanvas.height / dpr);
-                strokes.forEach(s => drawStroke(bufferCtx, s));
-            }
-
-            function redraw() {
-                if (!ctx) return;
-                updateBuffer();
-                const dpr = window.devicePixelRatio || 1;
-                ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-                ctx.drawImage(bufferCanvas, 0, 0, canvas.width / dpr, canvas.height / dpr);
-                if (currentStroke) drawStroke(ctx, currentStroke);
-            }
-
-            function drawStroke(tCtx, s) {
-                if (!s || s.points.length < 1) return;
-                tCtx.save();
-                tCtx.strokeStyle = s.color; tCtx.fillStyle = s.color; tCtx.lineWidth = s.width;
-                tCtx.lineCap = 'round'; tCtx.lineJoin = 'round';
-                if (s.tool === 'eraser') tCtx.globalCompositeOperation = 'destination-out';
-                if (s.tool === 'highlighter') tCtx.globalAlpha = 0.4;
-                if (s.tool === 'dashed') tCtx.setLineDash([12, 6]);
-
-                if (['pencil', 'highlighter', 'eraser'].includes(s.tool)) {
-                    if (s.points.length < 2) {
-                        tCtx.beginPath(); tCtx.arc(s.points[0].x, s.points[0].y, s.width/2, 0, Math.PI*2); tCtx.fill();
-                    } else {
-                        tCtx.beginPath(); tCtx.moveTo(s.points[0].x, s.points[0].y);
-                        for (let i = 1; i < s.points.length - 1; i++) {
-                            const mid = { x: (s.points[i].x + s.points[i+1].x)/2, y: (s.points[i].y + s.points[i+1].y)/2 };
-                            tCtx.quadraticCurveTo(s.points[i].x, s.points[i].y, mid.x, mid.y);
-                        }
-                        const last = s.points[s.points.length - 1];
-                        tCtx.lineTo(last.x, last.y);
-                        tCtx.stroke();
-                    }
-                } else if (s.tool === 'text') {
-                    tCtx.font = 'bold 20px Arial'; tCtx.fillText(s.text, s.points[0].x, s.points[0].y);
-                } else if (s.tool === 'stamp') {
-                    tCtx.font = '44px serif'; tCtx.textAlign = 'center'; tCtx.textBaseline = 'middle';
-                    tCtx.fillText(s.stampIcon, s.points[0].x, s.points[0].y);
-                } else {
-                    const p1 = s.points[0], p2 = s.points[s.points.length - 1];
-                    drawShape(tCtx, s.tool, p1.x, p1.y, p2.x, p2.y, s.fillEnabled);
-                }
-                tCtx.restore();
-            }
-
-            function drawShape(tCtx, tool, x1, y1, x2, y2, fill) {
-                tCtx.beginPath();
-                if (tool === 'rect') tCtx.rect(x1, y1, x2 - x1, y2 - y1);
-                else if (tool === 'circle') tCtx.arc(x1, y1, Math.sqrt(Math.pow(x2-x1,2)+Math.pow(y2-y1,2)), 0, Math.PI*2);
-                else if (tool === 'triangle') { tCtx.moveTo((x1+x2)/2,y1); tCtx.lineTo(x2,y2); tCtx.lineTo(x1,y2); tCtx.closePath(); }
-                else if (tool === 'line' || tool === 'dashed') { tCtx.moveTo(x1, y1); tCtx.lineTo(x2, y2); }
-                else if (tool === 'arrow' || tool === 'double_arrow') {
-                    const h = 15, a = Math.atan2(y2-y1, x2-x1);
-                    tCtx.moveTo(x1, y1); tCtx.lineTo(x2, y2); tCtx.stroke();
-                    tCtx.beginPath(); tCtx.moveTo(x2, y2); 
-                    tCtx.lineTo(x2-h*Math.cos(a-Math.PI/6), y2-h*Math.sin(a-Math.PI/6));
-                    tCtx.moveTo(x2, y2); tCtx.lineTo(x2-h*Math.cos(a+Math.PI/6), y2-h*Math.sin(a+Math.PI/6));
-                    if (tool === 'double_arrow') {
-                        tCtx.moveTo(x1, y1); tCtx.lineTo(x1+h*Math.cos(a-Math.PI/6), y1+h*Math.sin(a-Math.PI/6));
-                        tCtx.moveTo(x1, y1); tCtx.lineTo(x1+h*Math.cos(a+Math.PI/6), y1+h*Math.sin(a+Math.PI/6));
-                    }
-                }
-                if (fill && !['line', 'dashed', 'arrow', 'double_arrow'].includes(tool)) { tCtx.globalAlpha = 0.2; tCtx.fill(); tCtx.globalAlpha = 1; }
-                tCtx.stroke();
-            }
-
-            function resize() {
-                if (!canvas) return;
-                const dpr = window.devicePixelRatio || 1;
-                const w = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth, window.innerWidth);
-                const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight);
-                canvas.width = w * dpr; canvas.height = h * dpr;
-                canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
-                bufferCanvas.width = canvas.width; bufferCanvas.height = canvas.height;
-                bufferCtx = bufferCanvas.getContext('2d'); bufferCtx.setTransform(1,0,0,1,0,0); bufferCtx.scale(dpr, dpr);
-                ctx = canvas.getContext('2d'); ctx.setTransform(1,0,0,1,0,0); ctx.scale(dpr, dpr);
-                redraw();
-            }
-
-            let drawingCache = {}; // Page-based vector storage
-            let currentPage = '';
-
-            function saveCurrentPage() { if (currentPage) drawingCache[currentPage] = [...strokes]; }
-            function loadPage(id) {
-                if (drawingCache[id]) strokes = [...drawingCache[id]];
-                else { strokes = []; saveCurrentPage(); }
-                redraw();
-            }
-
-            function checkPage() {
-                try {
-                    if (enabled && (!canvas || !canvas.parentElement)) { initCanvas(); return; }
-                    const newId = window.location.hash || window.location.href;
-                    if (newId !== currentPage) { saveCurrentPage(); currentPage = newId; loadPage(newId); }
-                } catch(e) {}
-            }
-            const _intCheck = setInterval(checkPage, 1500);
-            window.addEventListener('hashchange', checkPage);
-
-            function showTextInput(vx, vy, dx, dy) {
-                const ex = document.getElementById('canvas-text-input'); if (ex) ex.remove();
-                const i = document.createElement('input');
-                i.id = 'canvas-text-input';
-                i.style.cssText = 'position:fixed;left:'+Math.min(vx, window.innerWidth-260)+'px;top:'+Math.max(vy-44,8)+'px;font:bold 18px Arial;color:'+window.__drawConfig.color+';background:#fff;border:2px solid '+window.__drawConfig.color+';border-radius:10px;padding:10px;z-index:2147483647;outline:none;';
-                document.body.appendChild(i); i.focus();
-                const commit = () => {
-                    if (i.value.trim()) { strokes.push({ tool: 'text', text: i.value.trim(), color: window.__drawConfig.color, points: [{x:dx, y:dy}] }); redraw(); }
-                    i.remove();
-                };
-                i.onkeydown = (ev) => { if (ev.key === 'Enter') commit(); if (ev.key === 'Escape') i.remove(); };
-                setTimeout(() => {
-                    const h = (ev) => { if (ev.target !== i) { commit(); document.removeEventListener('pointerdown', h); } };
-                    document.addEventListener('pointerdown', h);
-                }, 100);
-            }
-
-            function startDrawing(e) {
-                if (!enabled || !canvas || ['pan', 'sun'].includes(window.__drawConfig.tool)) return;
-                const tool = window.__drawConfig.tool;
-                const x = e.pageX, y = e.pageY;
-                if (tool === 'text') { showTextInput(e.clientX, e.clientY, x, y); return; }
-                if (tool === 'stamp') { strokes.push({ tool, points: [{x, y}], stampIcon: window.__drawConfig.stampIcon, color: '#000', width: 1 }); redraw(); return; }
-
-                isDrawing = true;
-                if (canvas.setPointerCapture) try { canvas.setPointerCapture(e.pointerId); } catch(err) {}
-                currentStroke = {
-                    tool, color: window.__drawConfig.color, 
-                    width: tool === 'highlighter' ? window.__drawConfig.width * 5 : tool === 'eraser' ? window.__drawConfig.width * 10 : window.__drawConfig.width,
-                    fillEnabled: window.__drawConfig.fillEnabled,
-                    points: [{x, y}]
-                };
-            }
-
-            function draw(e) {
-                if (!enabled || !canvas) return;
-                if (window.__drawConfig.tool === 'sun') { drawLaser(e.clientX, e.clientY); return; }
-                if (!isDrawing || !currentStroke) return;
-                const x = e.pageX, y = e.pageY;
-                const last = currentStroke.points[currentStroke.points.length - 1];
-                if (Math.hypot(x - last.x, y - last.y) < 0.5) return; 
-                currentStroke.points.push({x, y});
-                
-                // PERFORMANCE OPTIMIZATION: Use buffer instead of full strokes loop
-                const dpr = window.devicePixelRatio || 1;
-                ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-                ctx.drawImage(bufferCanvas, 0, 0, canvas.width / dpr, canvas.height / dpr);
-                drawStroke(ctx, currentStroke);
-            }
-
-            function stopDrawing(e) {
-                if (laserCanvas) laserCtx.clearRect(0,0,laserCanvas.width, laserCanvas.height);
-                if (isDrawing && currentStroke) {
-                    strokes.push(currentStroke);
-                    drawStroke(bufferCtx, currentStroke); // Permanent to buffer
-                }
-                isDrawing = false; currentStroke = null;
-                if (e && e.pointerId && canvas.releasePointerCapture) try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
-            }
-
-            function undoDrawing() { strokes.pop(); redraw(); }
-            function clearDrawing() { strokes = []; redraw(); }
-
-            _cleanup = () => {
-                clearInterval(_intCheck);
-                if (_resizeObserver) _resizeObserver.disconnect();
-                window.removeEventListener('resize', resize);
-                window.removeEventListener('hashchange', checkPage);
-                if (laserCanvas) laserCanvas.remove();
-            };
+            window.parent.postMessage({ type: 'DRAWING_READY' }, '*');
         })();
+    </script>
     </script>
 </head>
 <body>
@@ -932,6 +667,226 @@ const ResultsModal = ({ isOpen, onClose, activityId }: { isOpen: boolean, onClos
 };
 
 // =======================
+// GLOBAL DRAWING CANVAS (Z-Kitap Layer)
+// =======================
+const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whiteboardMode: boolean }>(({ config, enabled, whiteboardMode }, ref) => {
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    const bufferCanvasRef = React.useRef<HTMLCanvasElement>(null);
+    const laserCanvasRef = React.useRef<HTMLCanvasElement>(null);
+    const [strokes, setStrokes] = React.useState<any[]>([]);
+    const [currentStroke, setCurrentStroke] = React.useState<any>(null);
+    const [isDrawing, setIsDrawing] = React.useState(false);
+
+    // Refs for non-react state (performance)
+    const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null);
+    const bufferCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
+    const laserCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
+    const strokesRef = React.useRef<any[]>([]);
+
+    React.useImperativeHandle(ref, () => ({
+        undo: () => {
+            strokesRef.current.pop();
+            setStrokes([...strokesRef.current]);
+            redraw();
+        },
+        clear: () => {
+            strokesRef.current = [];
+            setStrokes([]);
+            redraw();
+        }
+    }));
+
+    const resize = React.useCallback(() => {
+        const canvas = canvasRef.current;
+        const buffer = bufferCanvasRef.current;
+        const laser = laserCanvasRef.current;
+        if (!canvas || !buffer) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        [canvas, buffer, laser].forEach(c => {
+            if (!c) return;
+            c.width = w * dpr;
+            c.height = h * dpr;
+            c.style.width = w + 'px';
+            c.style.height = h + 'px';
+        });
+
+        ctxRef.current = canvas.getContext('2d');
+        if (ctxRef.current) {
+            ctxRef.current.setTransform(1,0,0,1,0,0);
+            ctxRef.current.scale(dpr, dpr);
+        }
+
+        bufferCtxRef.current = buffer.getContext('2d');
+        if (bufferCtxRef.current) {
+            bufferCtxRef.current.setTransform(1,0,0,1,0,0);
+            bufferCtxRef.current.scale(dpr, dpr);
+        }
+
+        if (laser) {
+            laserCtxRef.current = laser.getContext('2d');
+            if (laserCtxRef.current) {
+                laserCtxRef.current.setTransform(1,0,0,1,0,0);
+                laserCtxRef.current.scale(dpr, dpr);
+            }
+        }
+        redraw();
+    }, []);
+
+    React.useEffect(() => {
+        window.addEventListener('resize', resize);
+        resize();
+        return () => window.removeEventListener('resize', resize);
+    }, [resize]);
+
+    const drawStroke = (tCtx: CanvasRenderingContext2D, s: any) => {
+        if (!s || s.points.length < 1) return;
+        tCtx.save();
+        tCtx.strokeStyle = s.color; tCtx.fillStyle = s.color; tCtx.lineWidth = s.width;
+        tCtx.lineCap = 'round'; tCtx.lineJoin = 'round';
+        if (s.tool === 'eraser') tCtx.globalCompositeOperation = 'destination-out';
+        if (s.tool === 'highlighter') tCtx.globalAlpha = 0.4;
+        if (s.tool === 'dashed') tCtx.setLineDash([12, 6]);
+
+        if (['pencil', 'highlighter', 'eraser'].includes(s.tool)) {
+            if (s.points.length < 2) {
+                tCtx.beginPath(); tCtx.arc(s.points[0].x, s.points[0].y, s.width/2, 0, Math.PI*2); tCtx.fill();
+            } else {
+                tCtx.beginPath(); tCtx.moveTo(s.points[0].x, s.points[0].y);
+                for (let i = 1; i < s.points.length - 1; i++) {
+                    const mid = { x: (s.points[i].x + s.points[i+1].x)/2, y: (s.points[i].y + s.points[i+1].y)/2 };
+                    tCtx.quadraticCurveTo(s.points[i].x, s.points[i].y, mid.x, mid.y);
+                }
+                const last = s.points[s.points.length - 1];
+                tCtx.lineTo(last.x, last.y);
+                tCtx.stroke();
+            }
+        } else if (s.tool === 'text') {
+            tCtx.font = 'bold 20px Arial'; tCtx.fillText(s.text, s.points[0].x, s.points[0].y);
+        } else if (s.tool === 'stamp') {
+            tCtx.font = '44px serif'; tCtx.textAlign = 'center'; tCtx.textBaseline = 'middle';
+            tCtx.fillText(s.stampIcon, s.points[0].x, s.points[0].y);
+        } else {
+            const p1 = s.points[0], p2 = s.points[s.points.length - 1];
+            drawShape(tCtx, s.tool, p1.x, p1.y, p2.x, p2.y, s.fillEnabled);
+        }
+        tCtx.restore();
+    };
+
+    const drawShape = (tCtx: CanvasRenderingContext2D, tool: string, x1: number, y1: number, x2: number, y2: number, fill: boolean) => {
+        tCtx.beginPath();
+        if (tool === 'rect') tCtx.rect(x1, y1, x2 - x1, y2 - y1);
+        else if (tool === 'circle') tCtx.arc(x1, y1, Math.sqrt(Math.pow(x2-x1,2)+Math.pow(y2-y1,2)), 0, Math.PI*2);
+        else if (tool === 'triangle') { tCtx.moveTo((x1+x2)/2,y1); tCtx.lineTo(x2,y2); tCtx.lineTo(x1,y2); tCtx.closePath(); }
+        else if (tool === 'line' || tool === 'dashed') { tCtx.moveTo(x1, y1); tCtx.lineTo(x2, y2); }
+        else if (tool === 'arrow' || tool === 'double_arrow') {
+            const h = 15, a = Math.atan2(y2-y1, x2-x1);
+            tCtx.moveTo(x1, y1); tCtx.lineTo(x2, y2); tCtx.stroke();
+            tCtx.beginPath(); tCtx.moveTo(x2, y2); 
+            tCtx.lineTo(x2-h*Math.cos(a-Math.PI/6), y2-h*Math.sin(a-Math.PI/6));
+            tCtx.moveTo(x2, y2); tCtx.lineTo(x2-h*Math.cos(a+Math.PI/6), y2-h*Math.sin(a+Math.PI/6));
+            if (tool === 'double_arrow') {
+                tCtx.moveTo(x1, y1); tCtx.lineTo(x1+h*Math.cos(a-Math.PI/6), y1+h*Math.sin(a-Math.PI/6));
+                tCtx.moveTo(x1, y1); tCtx.lineTo(x1+h*Math.cos(a+Math.PI/6), y1+h*Math.sin(a+Math.PI/6));
+            }
+        }
+        if (fill && !['line', 'dashed', 'arrow', 'double_arrow'].includes(tool)) { tCtx.save(); tCtx.globalAlpha = 0.2; tCtx.fill(); tCtx.restore(); }
+        tCtx.stroke();
+    };
+
+    const redraw = () => {
+        const bCtx = bufferCtxRef.current;
+        const mainCtx = ctxRef.current;
+        const canvas = bufferCanvasRef.current;
+        if (!bCtx || !mainCtx || !canvas) return;
+        
+        bCtx.clearRect(0,0, 4000, 4000);
+        strokesRef.current.forEach(s => drawStroke(bCtx, s));
+        
+        mainCtx.clearRect(0,0, 4000, 4000);
+        mainCtx.drawImage(canvas, 0, 0, window.innerWidth, window.innerHeight);
+    };
+
+    const startDrawing = (e: React.PointerEvent) => {
+        if (!enabled || ['pan', 'sun'].includes(config.tool)) return;
+        const x = e.clientX, y = e.clientY;
+        if (config.tool === 'text') {
+            const val = prompt('Metin girin:');
+            if (val) {
+                const s = { tool: 'text', text: val, color: config.color, points: [{x, y}] };
+                strokesRef.current.push(s);
+                setStrokes([...strokesRef.current]);
+                redraw();
+            }
+            return;
+        }
+        if (config.tool === 'stamp') {
+            const s = { tool: 'stamp', stampIcon: config.stampIcon, color: '#000', points: [{x, y}] };
+            strokesRef.current.push(s);
+            setStrokes([...strokesRef.current]);
+            redraw();
+            return;
+        }
+        setIsDrawing(true);
+        const newStroke = {
+            tool: config.tool, color: config.color,
+            width: config.tool === 'highlighter' ? config.width * 5 : config.tool === 'eraser' ? config.width * 10 : config.width,
+            fillEnabled: config.fillEnabled, points: [{x, y}]
+        };
+        setCurrentStroke(newStroke);
+    };
+
+    const draw = (e: React.PointerEvent) => {
+        if (config.tool === 'sun') {
+            const lCtx = laserCtxRef.current;
+            if (lCtx) {
+                lCtx.clearRect(0,0, window.innerWidth, window.innerHeight);
+                const cx = e.clientX, cy = e.clientY, r = 12;
+                const g = lCtx.createRadialGradient(cx, cy, 0, cx, cy, r * 3);
+                g.addColorStop(0, 'rgba(255,50,50,1)'); g.addColorStop(0.3, 'rgba(255,80,80,0.4)'); g.addColorStop(1, 'rgba(255,0,0,0)');
+                lCtx.fillStyle = g; lCtx.beginPath(); lCtx.arc(cx, cy, r * 3, 0, Math.PI * 2); lCtx.fill();
+                lCtx.fillStyle = '#fff'; lCtx.beginPath(); lCtx.arc(cx, cy, 2, 0, Math.PI * 2); lCtx.fill();
+            }
+            return;
+        }
+        if (!isDrawing || !currentStroke) return;
+        const x = e.clientX, y = e.clientY;
+        const last = currentStroke.points[currentStroke.points.length - 1];
+        if (Math.hypot(x - last.x, y - last.y) < 0.5) return;
+        currentStroke.points.push({x, y});
+        const mainCtx = ctxRef.current;
+        if (mainCtx && bufferCanvasRef.current) {
+            mainCtx.clearRect(0,0, window.innerWidth, window.innerHeight);
+            mainCtx.drawImage(bufferCanvasRef.current, 0, 0, window.innerWidth, window.innerHeight);
+            drawStroke(mainCtx, currentStroke);
+        }
+    };
+
+    const stopDrawing = () => {
+        if (isDrawing && currentStroke) {
+            strokesRef.current.push(currentStroke);
+            setStrokes([...strokesRef.current]);
+            if (bufferCtxRef.current) drawStroke(bufferCtxRef.current, currentStroke);
+        }
+        setIsDrawing(false); setCurrentStroke(null);
+        if (laserCtxRef.current) laserCtxRef.current.clearRect(0,0, window.innerWidth, window.innerHeight);
+    };
+
+    return (
+        <>
+            <canvas ref={bufferCanvasRef} style={{ display: 'none' }} />
+            <canvas ref={canvasRef} onPointerDown={startDrawing} onPointerMove={draw} onPointerUp={stopDrawing} onPointerLeave={stopDrawing}
+                className={cn("fixed top-0 left-0 z-[2000] touch-none transition-opacity", enabled ? (config.tool === 'pan' ? "pointer-events-none opacity-100" : "pointer-events-auto opacity-100") : "pointer-events-none opacity-0")}
+                style={{ backgroundColor: whiteboardMode ? 'white' : 'transparent' }} />
+            <canvas ref={laserCanvasRef} className="fixed top-0 left-0 z-[2001] pointer-events-none touch-none" />
+        </>
+    );
+});
+
+// =======================
 // STUDENT VIEW COMPONENT
 // =======================
 const StudentPortal = ({ act }: { act: any }) => {
@@ -941,11 +896,12 @@ const StudentPortal = ({ act }: { act: any }) => {
     const [isFinished, setIsFinished] = useState(false);
     const [submissionId, setSubmissionId] = useState<string | null>(null);
     const [isDrawingMode, setIsDrawingMode] = useState(false);
-    const [drawConfig, setDrawConfig] = useState({ tool: 'pencil', color: '#4f46e5', width: 3 });
+    const [drawConfig, setDrawConfig] = useState({ tool: 'pencil', color: '#ff4d4d', width: 3, fillEnabled: false, stampIcon: '✅' });
+    const [showWhiteboard, setShowWhiteboard] = useState(false);
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
+    const canvasRef = React.useRef<any>(null);
     const submissionsHandler = useFirestore('submissions');
 
-    // Timer logic
     useEffect(() => {
         if (isStarted && act.is_test && act.has_timer && act.duration_minutes) {
             setTimeLeft(parseInt(act.duration_minutes) * 60);
@@ -953,73 +909,31 @@ const StudentPortal = ({ act }: { act: any }) => {
     }, [isStarted, act]);
 
     useEffect(() => {
-        if (act.is_test && timeLeft === 0 && !isFinished) {
-            handleSubmit();
-        }
+        if (act.is_test && timeLeft === 0 && !isFinished) handleSubmit();
         if (act.is_test && timeLeft !== null && timeLeft > 0 && !isFinished) {
             const timer = setInterval(() => setTimeLeft(prev => (prev !== null ? prev - 1 : null)), 1000);
             return () => clearInterval(timer);
         }
     }, [timeLeft, isFinished, act.is_test]);
 
-    // Listen for answers from simulation
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
             if (event.data.type === 'SIM_ANSWER' && submissionId) {
-                const newAnswer = event.data.data;
-                submissionsHandler.update(submissionId, {
-                    answers: newAnswer // Simulation should send current full state
-                });
-            }
-            if (event.data.type === 'DRAWING_READY' && iframeRef.current?.contentWindow) {
-                iframeRef.current.contentWindow.postMessage({ 
-                    type: 'TOGGLE_DRAWING', 
-                    enabled: isDrawingMode 
-                }, '*');
-                iframeRef.current.contentWindow.postMessage({ 
-                    type: 'SET_DRAW_CONFIG', 
-                    config: drawConfig 
-                }, '*');
+                submissionsHandler.update(submissionId, { answers: event.data.data });
             }
         };
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
     }, [submissionId]);
 
-    // Handle Drawing Mode toggle
-    useEffect(() => {
-        if (iframeRef.current?.contentWindow) {
-            iframeRef.current.contentWindow.postMessage({ 
-                type: 'TOGGLE_DRAWING', 
-                enabled: isDrawingMode 
-            }, '*');
-        }
-    }, [isDrawingMode]);
-
-    useEffect(() => {
-        if (iframeRef.current?.contentWindow) {
-            iframeRef.current.contentWindow.postMessage({ 
-                type: 'SET_DRAW_CONFIG', 
-                config: drawConfig 
-            }, '*');
-        }
-    }, [drawConfig]);
-
-    const handleDrawingCommand = (type: string, data?: any) => {
-        if (iframeRef.current?.contentWindow) {
-            iframeRef.current.contentWindow.postMessage({ type, ...data }, '*');
-        }
+    const handleToolbarCommand = (type: string) => {
+        if (type === 'undo') canvasRef.current?.undo();
+        else if (type === 'clear') canvasRef.current?.clear();
     };
 
     const handleStart = async () => {
         if (!name.trim()) return alert('Lütfen isminizi girin.');
-        const res = await submissionsHandler.add({
-            activity_id: act.id,
-            student_name: name,
-            started_at: new Date().toISOString(),
-            answers: {},
-            submitted_at: null
-        });
+        const res = await submissionsHandler.add({ activity_id: act.id, student_name: name, started_at: new Date().toISOString(), answers: {}, submitted_at: null });
         setSubmissionId(res.id);
         setIsStarted(true);
     };
@@ -1027,23 +941,14 @@ const StudentPortal = ({ act }: { act: any }) => {
     const handleSubmit = async () => {
         if (isFinished) return;
         setIsFinished(true);
-        if (submissionId) {
-            await submissionsHandler.update(submissionId, {
-                submitted_at: new Date().toISOString()
-            });
-        }
+        if (submissionId) await submissionsHandler.update(submissionId, { submitted_at: new Date().toISOString() });
     };
 
     if (isFinished) {
         return (
             <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8 text-center space-y-6">
-                <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center shadow-xl shadow-emerald-100">
-                    <Zap className="w-10 h-10" />
-                </div>
-                <div className="space-y-2">
-                    <h1 className="text-3xl font-black text-slate-800 tracking-tight">Test Tamamlandı!</h1>
-                    <p className="text-slate-500 font-medium uppercase tracking-widest text-xs">Cevapların başarıyla kaydedildi.</p>
-                </div>
+                <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center shadow-xl shadow-emerald-100"><Zap className="w-10 h-10" /></div>
+                <div className="space-y-2"><h1 className="text-3xl font-black text-slate-800 tracking-tight">Test Tamamlandı!</h1><p className="text-slate-500 font-medium uppercase tracking-widest text-xs">Cevapların başarıyla kaydedildi.</p></div>
                 <p className="text-slate-500 max-w-sm">Dersi takip ettiğin için teşekkürler. Şimdi bu sekmeyi kapatabilirsin.</p>
             </div>
         );
@@ -1053,26 +958,11 @@ const StudentPortal = ({ act }: { act: any }) => {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md bg-white rounded-3xl p-10 shadow-2xl border border-slate-100 text-center space-y-8">
-                    <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-indigo-200">
-                        <User className="w-8 h-8 text-white" />
-                    </div>
-                    <div className="space-y-2">
-                        <h1 className="text-2xl font-black text-slate-800 tracking-tight">{act.title}</h1>
-                        <p className="text-slate-500 text-sm font-medium">Başlamadan önce lütfen adınızı girin</p>
-                    </div>
+                    <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-indigo-200"><User className="w-8 h-8 text-white" /></div>
+                    <div className="space-y-2"><h1 className="text-2xl font-black text-slate-800 tracking-tight">{act.title}</h1><p className="text-slate-500 text-sm font-medium">Başlamadan önce lütfen adınızı girin</p></div>
                     <div className="space-y-4">
-                        <input 
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            placeholder="Adınız Soyadınız"
-                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 text-center text-lg font-bold text-slate-800 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-slate-300"
-                        />
-                        <button 
-                            onClick={handleStart}
-                            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-indigo-200"
-                        >
-                            Teste Başla
-                        </button>
+                        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Adınız Soyadınız" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 text-center text-lg font-bold text-slate-800 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-slate-300" />
+                        <button onClick={handleStart} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-indigo-200">Teste Başla</button>
                     </div>
                 </motion.div>
             </div>
@@ -1080,77 +970,28 @@ const StudentPortal = ({ act }: { act: any }) => {
     }
 
     return (
-        <div className="min-h-screen bg-white flex flex-col h-screen overflow-hidden">
-            {act.is_test && (
-                <header className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white/80 backdrop-blur-md z-10 shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center">
-                            <User className="w-4 h-4" />
-                        </div>
-                        <span className="font-bold text-slate-700">{name}</span>
-                    </div>
-                    
+        <div className="fixed inset-0 bg-[#0f172a] z-[3000] flex flex-col h-screen overflow-hidden">
+            <header className="h-16 px-6 border-b border-white/5 flex justify-between items-center bg-slate-900 z-[3001] shrink-0">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-indigo-500/10 text-indigo-400 rounded-lg flex items-center justify-center"><User className="w-4 h-4" /></div>
+                    <span className="font-bold text-slate-200">{name || act.title}</span>
+                </div>
+                
+                <div className="flex items-center gap-3">
                     {act.has_timer && timeLeft !== null && (
-                        <div className={cn(
-                            "font-black tabular-nums transition-colors px-4 py-2 rounded-xl flex items-center gap-2",
-                            timeLeft < 60 ? "bg-red-50 text-red-500 animate-pulse" : "bg-slate-50 text-slate-600"
-                        )}>
-                            <Clock className="w-4 h-4" />
-                            {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                        <div className={cn("font-black tabular-nums px-4 py-2 rounded-xl flex items-center gap-2", timeLeft < 60 ? "bg-red-500/20 text-red-400" : "bg-white/5 text-slate-300")}>
+                            <Clock className="w-4 h-4" />{Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
                         </div>
                     )}
-                    <div className="flex items-center gap-3">
-                        <button 
-                            onClick={() => setIsDrawingMode(!isDrawingMode)}
-                            className={cn(
-                                "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
-                                isDrawingMode ? "bg-indigo-600 text-white shadow-lg" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-                            )}
-                        >
-                            <Pencil className="w-4 h-4" />
-                            {isDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}
-                        </button>
-                        
-                        <button onClick={handleSubmit} className="ml-2 px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">
-                            Sınavı Bitir
-                        </button>
-                    </div>
-                </header>
-            )}
-            
-            {!act.is_test && (
-                <div className="fixed top-4 right-4 z-[100] flex gap-2">
-                    <button 
-                        onClick={() => setIsDrawingMode(!isDrawingMode)}
-                        className={cn(
-                            "flex items-center gap-2 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all shadow-xl",
-                            isDrawingMode ? "bg-indigo-600 text-white" : "bg-white/90 backdrop-blur-md text-slate-600 border border-slate-200 hover:bg-white"
-                        )}
-                    >
-                        <Pencil className="w-4 h-4" />
-                        {isDrawingMode ? 'Modu Kapat' : 'Kalem Modu'}
-                    </button>
+                    <button onClick={() => setIsDrawingMode(!isDrawingMode)} className={cn("flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all", isDrawingMode ? "bg-indigo-600 text-white shadow-lg" : "bg-white/5 text-slate-300 hover:bg-white/10")}><Pencil className="w-4 h-4" />{isDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}</button>
+                    {act.is_test && <button onClick={handleSubmit} className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors">Sınavı Bitir</button>}
                 </div>
-            )}
-
-            {isDrawingMode && (
-                <DrawingToolbar 
-                    config={drawConfig} 
-                    setConfig={setDrawConfig} 
-                    onCommand={handleDrawingCommand} 
-                />
-            )}
+            </header>
             
-            <main className={cn("flex-1 min-h-0 bg-slate-50", act.is_test ? "p-4" : "p-0")}>
-                <div className={cn("w-full h-full bg-white overflow-hidden relative", act.is_test ? "rounded-3xl shadow-sm border border-slate-100" : "")}>
-                    <iframe 
-                        ref={iframeRef}
-                        srcDoc={getFormattedHtml(act)} 
-                        className="w-full h-full border-0" 
-                        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" 
-                        allowFullScreen 
-                    />
-                </div>
+            <main className="flex-1 relative bg-white overflow-hidden">
+                <iframe ref={iframeRef} srcDoc={getFormattedHtml(act)} className={cn("w-full h-full border-0 transition-all", isDrawingMode && drawConfig.tool !== 'pan' ? "pointer-events-none" : "pointer-events-auto")} />
+                <DrawingCanvas ref={canvasRef} config={drawConfig} enabled={isDrawingMode} whiteboardMode={showWhiteboard} />
+                <AnimatePresence>{isDrawingMode && <DrawingToolbar onCommand={handleToolbarCommand} config={drawConfig} setConfig={setDrawConfig} showWhiteboard={showWhiteboard} setShowWhiteboard={setShowWhiteboard} />}</AnimatePresence>
             </main>
         </div>
     );
@@ -1173,6 +1014,7 @@ export default function App() {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [showWhiteboard, setShowWhiteboard] = useState(false);
     const previewIframeRef = React.useRef<HTMLIFrameElement>(null);
+    const previewCanvasRef = React.useRef<any>(null);
 
     // Form States
     const [isScienceOpen, setIsScienceOpen] = useState(false);
@@ -1187,52 +1029,6 @@ export default function App() {
         const unsubS = scienceHandler.sync(setScience);
         return () => { unsubA(); unsubS(); };
     }, []);
-
-    // Sync isPreviewDrawingMode state to iframe when it changes
-    useEffect(() => {
-        if (previewIframeRef.current?.contentWindow) {
-            previewIframeRef.current.contentWindow.postMessage({ 
-                type: 'TOGGLE_DRAWING', 
-                enabled: isPreviewDrawingMode 
-            }, '*');
-        }
-    }, [isPreviewDrawingMode, previewId]);
-
-    useEffect(() => {
-        if (previewIframeRef.current?.contentWindow) {
-            previewIframeRef.current.contentWindow.postMessage({ 
-                type: 'SET_DRAW_CONFIG', 
-                config: previewDrawConfig 
-            }, '*');
-        }
-    }, [previewDrawConfig]);
-
-    useEffect(() => {
-        const handleMessage = (event: MessageEvent) => {
-            if (event.data.type === 'DRAWING_READY' && previewIframeRef.current?.contentWindow) {
-                previewIframeRef.current.contentWindow.postMessage({ 
-                    type: 'TOGGLE_DRAWING', 
-                    enabled: isPreviewDrawingMode 
-                }, '*');
-                previewIframeRef.current.contentWindow.postMessage({ 
-                    type: 'SET_DRAW_CONFIG', 
-                    config: previewDrawConfig 
-                }, '*');
-                previewIframeRef.current.contentWindow.postMessage({ 
-                    type: 'SET_WHITEBOARD', 
-                    enabled: showWhiteboard 
-                }, '*');
-            }
-        };
-        window.addEventListener('message', handleMessage);
-        return () => window.removeEventListener('message', handleMessage);
-    }, [isPreviewDrawingMode, previewDrawConfig, showWhiteboard]);
-
-    const handlePreviewDrawingCommand = (type: string, data?: any) => {
-        if (previewIframeRef.current?.contentWindow) {
-            previewIframeRef.current.contentWindow.postMessage({ type, ...data }, '*');
-        }
-    };
 
     const filteredScience = useMemo(() => {
         const grades = ["1. Sınıf", "2. Sınıf", "3. Sınıf", "4. Sınıf"];
@@ -1639,89 +1435,21 @@ export default function App() {
 
             {/* FULL PREVIEW MODAL */}
             {previewId && (
-                <div className="fixed inset-0 z-[300] flex items-center justify-center p-0 pointer-events-none">
-                    {/* Backdrop — enter animasyonu var, exit yok: kapanınca React anında siler, AnimatePresence asılı kalmaz */}
-                    <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                        transition={{ duration: 0.15 }}
-                        onClick={() => {
-                            const cw = previewIframeRef.current?.contentWindow;
-                            if (cw) {
-                                cw.postMessage({ type: 'TOGGLE_DRAWING', enabled: false }, '*');
-                                cw.postMessage({ type: 'CLEANUP' }, '*');
-                            }
-                            setPreviewId(null);
-                            setIsPreviewDrawingMode(false);
-                            setShowWhiteboard(false);
-                        }}
-                        className="absolute inset-0 bg-neutral-900/80 pointer-events-auto"
-                    />
-                    <div className="relative w-full h-full bg-white overflow-hidden pointer-events-auto">
-                        <div className="absolute top-4 right-4 z-[400] flex gap-2">
-                            <button
-                                onClick={() => setIsPreviewDrawingMode(!isPreviewDrawingMode)}
-                                className={cn(
-                                    "h-10 px-4 bg-white border border-neutral-200 text-neutral-900 flex items-center gap-2 rounded-full hover:bg-neutral-100 transition-colors shadow-lg text-xs font-bold uppercase tracking-widest",
-                                    isPreviewDrawingMode ? "bg-indigo-600 !text-white !border-indigo-600" : ""
-                                )}
-                            >
-                                <Pencil className="w-4 h-4" />
-                                {isPreviewDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}
-                            </button>
-                            <button
-                                onClick={() => {
-                                    const cw = previewIframeRef.current?.contentWindow;
-                                    if (cw) {
-                                        cw.postMessage({ type: 'TOGGLE_DRAWING', enabled: false }, '*');
-                                        cw.postMessage({ type: 'CLEANUP' }, '*');
-                                    }
-                                    setPreviewId(null);
-                                    setIsPreviewDrawingMode(false);
-                                    setShowWhiteboard(false);
-                                }}
-                                className="w-10 h-10 bg-white border border-neutral-200 text-neutral-900 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors shadow-lg"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        {isPreviewDrawingMode && (
-                            <DrawingToolbar
-                                config={previewDrawConfig}
-                                setConfig={setPreviewDrawConfig}
-                                onCommand={(type, data) => {
-                                    if (type === 'TOGGLE_WHITEBOARD') {
-                                        const newVal = !showWhiteboard;
-                                        setShowWhiteboard(newVal);
-                                        handlePreviewDrawingCommand('SET_WHITEBOARD', { enabled: newVal });
-                                    } else {
-                                        handlePreviewDrawingCommand(type, data);
-                                    }
-                                }}
-                                showWhiteboard={showWhiteboard}
-                                setShowWhiteboard={(val) => {
-                                    setShowWhiteboard(val);
-                                    handlePreviewDrawingCommand('SET_WHITEBOARD', { enabled: val });
-                                }}
-                            />
-                        )}
-                        <div className="relative w-full h-full bg-white overflow-hidden">
-                            <iframe
-                                ref={previewIframeRef}
-                                srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))}
-                                className="w-full h-full border-0"
-                                onLoad={() => {
-                                    const cw = previewIframeRef.current?.contentWindow;
-                                    if (cw) {
-                                        cw.postMessage({ type: 'TOGGLE_DRAWING', enabled: isPreviewDrawingMode }, '*');
-                                        cw.postMessage({ type: 'SET_WHITEBOARD', enabled: showWhiteboard }, '*');
-                                        cw.postMessage({ type: 'SET_DRAW_CONFIG', config: previewDrawConfig }, '*');
-                                    }
-                                }}
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                            />
-                        </div>
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-0 overflow-hidden">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => { setPreviewId(null); setIsPreviewDrawingMode(false); setShowWhiteboard(false); }} className="absolute inset-0 bg-neutral-900/90" />
+                    <div className="relative w-full h-full bg-white overflow-hidden flex flex-col">
+                        <header className="h-14 px-6 bg-slate-900 border-b border-white/5 flex justify-between items-center shrink-0 z-[10001]">
+                            <h3 className="text-white font-bold">{activities.find(a => a.id === previewId)?.title}</h3>
+                            <div className="flex items-center gap-3">
+                                <button onClick={() => setIsPreviewDrawingMode(!isPreviewDrawingMode)} className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all", isPreviewDrawingMode ? "bg-indigo-600 text-white shadow-lg" : "bg-white/5 text-slate-300 hover:bg-white/10")}><Pencil className="w-4 h-4" />{isPreviewDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}</button>
+                                <button onClick={() => { setPreviewId(null); setIsPreviewDrawingMode(false); setShowWhiteboard(false); }} className="p-2 text-slate-400 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
+                            </div>
+                        </header>
+                        <main className="flex-1 relative bg-white">
+                            <iframe ref={previewIframeRef} srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} className={cn("w-full h-full border-0 transition-all", isPreviewDrawingMode && previewDrawConfig.tool !== 'pan' ? "pointer-events-none" : "pointer-events-auto")} />
+                            <DrawingCanvas ref={previewCanvasRef} config={previewDrawConfig} enabled={isPreviewDrawingMode} whiteboardMode={showWhiteboard} />
+                            <AnimatePresence>{isPreviewDrawingMode && <DrawingToolbar onCommand={(type) => { if(type==='undo') previewCanvasRef.current?.undo(); if(type==='clear') previewCanvasRef.current?.clear(); }} config={previewDrawConfig} setConfig={setPreviewDrawConfig} showWhiteboard={showWhiteboard} setShowWhiteboard={setShowWhiteboard} />}</AnimatePresence>
+                        </main>
                     </div>
                 </div>
             )}
