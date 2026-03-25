@@ -58,12 +58,11 @@ export const getFormattedHtml = (act?: any) => {
 
         (function() {
             let isDrawing = false, enabled = false;
-            let canvas = null, ctx = null, previewLayer = null;
+            let canvas = null, ctx = null, bufferCanvas = null, bufferCtx = null;
             let laserCanvas = null, laserCtx = null, _resizeObserver = null, _cleanup = null;
             
             let strokes = []; // Vector storage
             let currentStroke = null;
-            let lastPoint = null;
 
             window.addEventListener('message', (e) => {
                 const d = e.data;
@@ -114,11 +113,16 @@ export const getFormattedHtml = (act?: any) => {
                 canvas.style.cssText = 'position:absolute;top:0;left:0;z-index:2147483647;pointer-events:none;background:transparent;';
                 document.body.appendChild(canvas);
                 ctx = canvas.getContext('2d');
+                
+                bufferCanvas = document.createElement('canvas');
+                bufferCtx = bufferCanvas.getContext('2d');
+                
                 resize();
                 if (window.ResizeObserver) {
                     _resizeObserver = new ResizeObserver(() => requestAnimationFrame(resize));
                     _resizeObserver.observe(document.body);
                 } else window.addEventListener('resize', resize);
+                
                 canvas.addEventListener('pointerdown', startDrawing);
                 canvas.addEventListener('pointermove', draw);
                 canvas.addEventListener('pointerup', stopDrawing);
@@ -150,11 +154,20 @@ export const getFormattedHtml = (act?: any) => {
                 laserCtx.fillStyle = '#fff'; laserCtx.beginPath(); laserCtx.arc(cx, cy, 2, 0, Math.PI * 2); laserCtx.fill();
             }
 
+            function updateBuffer() {
+                if (!bufferCtx) return;
+                const dpr = window.devicePixelRatio || 1;
+                bufferCtx.clearRect(0, 0, bufferCanvas.width / dpr, bufferCanvas.height / dpr);
+                strokes.forEach(s => drawStroke(bufferCtx, s));
+            }
+
             function redraw() {
                 if (!ctx) return;
+                updateBuffer();
                 const dpr = window.devicePixelRatio || 1;
                 ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-                strokes.forEach(s => drawStroke(ctx, s));
+                ctx.drawImage(bufferCanvas, 0, 0, canvas.width / dpr, canvas.height / dpr);
+                if (currentStroke) drawStroke(ctx, currentStroke);
             }
 
             function drawStroke(tCtx, s) {
@@ -166,7 +179,7 @@ export const getFormattedHtml = (act?: any) => {
                 if (s.tool === 'highlighter') tCtx.globalAlpha = 0.4;
                 if (s.tool === 'dashed') tCtx.setLineDash([12, 6]);
 
-                if (s.tool === 'pencil' || s.tool === 'highlighter' || s.tool === 'eraser') {
+                if (['pencil', 'highlighter', 'eraser'].includes(s.tool)) {
                     if (s.points.length < 2) {
                         tCtx.beginPath(); tCtx.arc(s.points[0].x, s.points[0].y, s.width/2, 0, Math.PI*2); tCtx.fill();
                     } else {
@@ -219,6 +232,8 @@ export const getFormattedHtml = (act?: any) => {
                 const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight);
                 canvas.width = w * dpr; canvas.height = h * dpr;
                 canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+                bufferCanvas.width = canvas.width; bufferCanvas.height = canvas.height;
+                bufferCtx = bufferCanvas.getContext('2d'); bufferCtx.setTransform(1,0,0,1,0,0); bufferCtx.scale(dpr, dpr);
                 ctx = canvas.getContext('2d'); ctx.setTransform(1,0,0,1,0,0); ctx.scale(dpr, dpr);
                 redraw();
             }
@@ -226,10 +241,7 @@ export const getFormattedHtml = (act?: any) => {
             let drawingCache = {}; // Page-based vector storage
             let currentPage = '';
 
-            function saveCurrentPage() {
-                if (currentPage) drawingCache[currentPage] = [...strokes];
-            }
-
+            function saveCurrentPage() { if (currentPage) drawingCache[currentPage] = [...strokes]; }
             function loadPage(id) {
                 if (drawingCache[id]) strokes = [...drawingCache[id]];
                 else { strokes = []; saveCurrentPage(); }
@@ -240,54 +252,11 @@ export const getFormattedHtml = (act?: any) => {
                 try {
                     if (enabled && (!canvas || !canvas.parentElement)) { initCanvas(); return; }
                     const newId = window.location.hash || window.location.href;
-                    if (newId !== currentPage) {
-                        saveCurrentPage();
-                        currentPage = newId;
-                        loadPage(newId);
-                    }
+                    if (newId !== currentPage) { saveCurrentPage(); currentPage = newId; loadPage(newId); }
                 } catch(e) {}
             }
             const _intCheck = setInterval(checkPage, 1500);
             window.addEventListener('hashchange', checkPage);
-
-            function startDrawing(e) {
-                if (!enabled || !canvas || ['pan', 'sun'].includes(window.__drawConfig.tool)) return;
-                const tool = window.__drawConfig.tool;
-                const x = e.pageX, y = e.pageY;
-                if (tool === 'text') { showTextInput(e.clientX, e.clientY, x, y); return; }
-                if (tool === 'stamp') { strokes.push({ tool, points: [{x, y}], stampIcon: window.__drawConfig.stampIcon, color: '#000', width: 1 }); redraw(); return; }
-
-                isDrawing = true;
-                if (canvas.setPointerCapture) try { canvas.setPointerCapture(e.pointerId); } catch(err) {}
-                currentStroke = {
-                    tool, color: window.__drawConfig.color, 
-                    width: tool === 'highlighter' ? window.__drawConfig.width * 5 : tool === 'eraser' ? window.__drawConfig.width * 10 : window.__drawConfig.width,
-                    fillEnabled: window.__drawConfig.fillEnabled,
-                    points: [{x, y}]
-                };
-                strokes.push(currentStroke);
-            }
-
-            function draw(e) {
-                if (!enabled || !canvas) return;
-                if (window.__drawConfig.tool === 'sun') { drawLaser(e.clientX, e.clientY); return; }
-                if (!isDrawing || !currentStroke) return;
-                const x = e.pageX, y = e.pageY;
-                const lastIdx = currentStroke.points.length - 1;
-                const last = currentStroke.points[lastIdx];
-                if (Math.hypot(x - last.x, y - last.y) < 2) return; // Optimization
-                currentStroke.points.push({x, y});
-                redraw();
-            }
-
-            function stopDrawing(e) {
-                if (laserCanvas) laserCtx.clearRect(0,0,laserCanvas.width, laserCanvas.height);
-                isDrawing = false; currentStroke = null;
-                if (e && e.pointerId && canvas.releasePointerCapture) try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
-            }
-
-            function undoDrawing() { strokes.pop(); redraw(); }
-            function clearDrawing() { strokes = []; redraw(); }
 
             function showTextInput(vx, vy, dx, dy) {
                 const ex = document.getElementById('canvas-text-input'); if (ex) ex.remove();
@@ -305,6 +274,52 @@ export const getFormattedHtml = (act?: any) => {
                     document.addEventListener('pointerdown', h);
                 }, 100);
             }
+
+            function startDrawing(e) {
+                if (!enabled || !canvas || ['pan', 'sun'].includes(window.__drawConfig.tool)) return;
+                const tool = window.__drawConfig.tool;
+                const x = e.pageX, y = e.pageY;
+                if (tool === 'text') { showTextInput(e.clientX, e.clientY, x, y); return; }
+                if (tool === 'stamp') { strokes.push({ tool, points: [{x, y}], stampIcon: window.__drawConfig.stampIcon, color: '#000', width: 1 }); redraw(); return; }
+
+                isDrawing = true;
+                if (canvas.setPointerCapture) try { canvas.setPointerCapture(e.pointerId); } catch(err) {}
+                currentStroke = {
+                    tool, color: window.__drawConfig.color, 
+                    width: tool === 'highlighter' ? window.__drawConfig.width * 5 : tool === 'eraser' ? window.__drawConfig.width * 10 : window.__drawConfig.width,
+                    fillEnabled: window.__drawConfig.fillEnabled,
+                    points: [{x, y}]
+                };
+            }
+
+            function draw(e) {
+                if (!enabled || !canvas) return;
+                if (window.__drawConfig.tool === 'sun') { drawLaser(e.clientX, e.clientY); return; }
+                if (!isDrawing || !currentStroke) return;
+                const x = e.pageX, y = e.pageY;
+                const last = currentStroke.points[currentStroke.points.length - 1];
+                if (Math.hypot(x - last.x, y - last.y) < 0.5) return; 
+                currentStroke.points.push({x, y});
+                
+                // PERFORMANCE OPTIMIZATION: Use buffer instead of full strokes loop
+                const dpr = window.devicePixelRatio || 1;
+                ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+                ctx.drawImage(bufferCanvas, 0, 0, canvas.width / dpr, canvas.height / dpr);
+                drawStroke(ctx, currentStroke);
+            }
+
+            function stopDrawing(e) {
+                if (laserCanvas) laserCtx.clearRect(0,0,laserCanvas.width, laserCanvas.height);
+                if (isDrawing && currentStroke) {
+                    strokes.push(currentStroke);
+                    drawStroke(bufferCtx, currentStroke); // Permanent to buffer
+                }
+                isDrawing = false; currentStroke = null;
+                if (e && e.pointerId && canvas.releasePointerCapture) try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
+            }
+
+            function undoDrawing() { strokes.pop(); redraw(); }
+            function clearDrawing() { strokes = []; redraw(); }
 
             _cleanup = () => {
                 clearInterval(_intCheck);
