@@ -930,8 +930,9 @@ const StudentPortal = ({ act }: { act: any }) => {
     }, [submissionId]);
 
     const handleToolbarCommand = (type: string) => {
-        if (type === 'undo') canvasRef.current?.undo();
-        else if (type === 'clear') canvasRef.current?.clear();
+        if (type === 'UNDO_DRAWING') canvasRef.current?.undo();
+        else if (type === 'CLEAR_DRAWING') canvasRef.current?.clear();
+        else if (type === 'TOGGLE_WHITEBOARD') setShowWhiteboard(v => !v);
     };
 
     const handleStart = async () => {
@@ -1451,7 +1452,7 @@ export default function App() {
                         <main className="flex-1 relative bg-white">
                             <iframe ref={previewIframeRef} srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} className={cn("w-full h-full border-0 transition-all", isPreviewDrawingMode && previewDrawConfig.tool !== 'pan' ? "pointer-events-none" : "pointer-events-auto")} />
                             <DrawingCanvas ref={previewCanvasRef} config={previewDrawConfig} enabled={isPreviewDrawingMode} whiteboardMode={showWhiteboard} />
-                            <AnimatePresence>{isPreviewDrawingMode && <DrawingToolbar onCommand={(type) => { if(type==='undo') previewCanvasRef.current?.undo(); if(type==='clear') previewCanvasRef.current?.clear(); }} config={previewDrawConfig} setConfig={setPreviewDrawConfig} showWhiteboard={showWhiteboard} setShowWhiteboard={setShowWhiteboard} />}</AnimatePresence>
+                            <AnimatePresence>{isPreviewDrawingMode && <DrawingToolbar onCommand={(type) => { if(type==='UNDO_DRAWING') previewCanvasRef.current?.undo(); if(type==='CLEAR_DRAWING') previewCanvasRef.current?.clear(); if(type==='TOGGLE_WHITEBOARD') setShowWhiteboard(!showWhiteboard); }} config={previewDrawConfig} setConfig={setPreviewDrawConfig} showWhiteboard={showWhiteboard} setShowWhiteboard={setShowWhiteboard} />}</AnimatePresence>
                         </main>
                     </div>
                 </div>
