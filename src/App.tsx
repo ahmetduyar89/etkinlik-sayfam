@@ -5,7 +5,7 @@ import {
     Target, Zap, Globe, Settings, Bell, User, ArrowRight, HelpCircle, Eye,
     MoreVertical, X, Save, Clock, BookOpen, Anchor, Book, FlaskConical, Command, Blocks, Pencil, Eraser,
     Hand, Highlighter, Type, Shapes, Undo, History, Sun, Square, Circle, Triangle, MousePointer2,
-    MoveRight, ArrowRightLeft, Minus, PaintBucket
+    MoveRight, ArrowRightLeft, Minus, PaintBucket, List, LayoutList, LayoutGrid
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, useFirestore } from './lib/firebase';
@@ -1053,6 +1053,71 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
     );
 };
 
+const ActivityListItem = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activitiesHandler, showResultsId, setShowResultsId }: any) => {
+    return (
+        <PortalCard className="p-4 flex flex-col sm:flex-row items-center gap-4 bg-white border-2 border-indigo-50 hover:border-indigo-300 shadow-md !rounded-2xl transition-all group">
+            <div 
+                className="w-full sm:w-24 h-24 shrink-0 bg-indigo-50/50 rounded-xl border-2 border-indigo-100 flex items-center justify-center cursor-pointer overflow-hidden relative"
+                onClick={() => setPreviewId(act.id)}
+            >
+                {act.image_url ? (
+                    <img src={act.image_url} alt={act.title} className="w-full h-full object-cover" />
+                ) : (
+                    <LayoutDashboard className="w-8 h-8 text-indigo-200" />
+                )}
+                <div className="absolute inset-0 bg-indigo-900/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Eye className="w-4 h-4 text-white" />
+                </div>
+            </div>
+
+            <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-bold text-slate-800 truncate">{act.title}</h3>
+                    {act.is_test && (
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded-md uppercase tracking-widest border border-amber-200">TEST</span>
+                    )}
+                    <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[9px] font-bold rounded-md uppercase tracking-wider">{act.category || 'Genel'}</span>
+                </div>
+                <p className="text-sm text-slate-500 line-clamp-1 font-medium">{act.description || 'Açıklama girilmedi.'}</p>
+                <div className="flex items-center gap-4 pt-1">
+                    <button 
+                         onClick={() => {
+                             const studentLink = `${window.location.origin}${window.location.pathname}?view=student&id=${act.id}`;
+                             navigator.clipboard.writeText(studentLink);
+                             alert('Öğrenci giriş linki kopyalandı!');
+                         }}
+                         className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 uppercase tracking-tight hover:text-indigo-800 transition-colors"
+                    >
+                        <Share2 className="w-3.5 h-3.5" /> Linki Kopyala
+                    </button>
+                    {act.is_test && (
+                        <button 
+                            onClick={() => setShowResultsId(act.id)}
+                            className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 uppercase tracking-tight hover:text-emerald-800 transition-colors"
+                        >
+                            <BarChart3 className="w-3.5 h-3.5" /> Sonuçlar
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <div className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-xl border border-slate-100">
+                <IconButton icon={Copy} onClick={() => navigator.clipboard.writeText(act.html_code)} title="HTML Kodunu Kopyala" />
+                <IconButton icon={Edit3} onClick={() => { setEditItem(act); setIsActivityOpen(true); }} title="Düzenle" />
+                <IconButton
+                    icon={Trash2}
+                    onClick={() => {
+                        if (window.confirm('Bu interaktif etkinliği silmek istediğinizden emin misiniz?')) {
+                            activitiesHandler.remove(act.id);
+                        }
+                    }}
+                    className="hover:bg-red-50 hover:text-red-500 text-neutral-400"
+                />
+            </div>
+        </PortalCard>
+    );
+};
+
 // =======================
 // RESULTS MODAL COMPONENT
 // =======================
@@ -1353,6 +1418,7 @@ export default function App() {
     const [showResultsId, setShowResultsId] = useState<string | null>(null);
     const [isPreviewDrawingMode, setIsPreviewDrawingMode] = useState(false);
     const [previewDrawConfig, setPreviewDrawConfig] = useState({ tool: 'pencil', color: '#4f46e5', width: 3 });
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [showWhiteboard, setShowWhiteboard] = useState(false);
     const previewIframeRef = React.useRef<HTMLIFrameElement>(null);
 
@@ -1592,18 +1658,62 @@ export default function App() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
+                                <div className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Blocks className="w-4 h-4" /> {activities.filter(a => a.title.toLowerCase().includes(search.toLowerCase())).length} İçerik Bulundu
+                                </div>
+                                <div className="flex bg-white/50 backdrop-blur-sm border border-slate-200 rounded-xl p-1 gap-1">
+                                    <button 
+                                        onClick={() => setViewMode('grid')}
+                                        className={cn(
+                                            "p-2 rounded-lg transition-all",
+                                            viewMode === 'grid' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
+                                        )}
+                                        title="Izgara Görünümü"
+                                    >
+                                        <LayoutGrid className="w-4 h-4" />
+                                    </button>
+                                    <button 
+                                        onClick={() => setViewMode('list')}
+                                        className={cn(
+                                            "p-2 rounded-lg transition-all",
+                                            viewMode === 'list' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
+                                        )}
+                                        title="Liste Görünümü"
+                                    >
+                                        <LayoutList className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className={cn(
+                                "grid gap-6",
+                                viewMode === 'grid' ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
+                            )}>
                                 {activities.filter(a => a.title.toLowerCase().includes(search.toLowerCase())).map((act, i) => (
-                                    <ActivityCard 
-                                        key={act.id} 
-                                        act={act} 
-                                        setPreviewId={setPreviewId} 
-                                        setEditItem={setEditItem} 
-                                        setIsActivityOpen={setIsActivityOpen} 
-                                        activitiesHandler={activitiesHandler} 
-                                        showResultsId={showResultsId}
-                                        setShowResultsId={setShowResultsId}
-                                    />
+                                    viewMode === 'grid' ? (
+                                        <ActivityCard 
+                                            key={act.id} 
+                                            act={act} 
+                                            setPreviewId={setPreviewId} 
+                                            setEditItem={setEditItem} 
+                                            setIsActivityOpen={setIsActivityOpen} 
+                                            activitiesHandler={activitiesHandler} 
+                                            showResultsId={showResultsId}
+                                            setShowResultsId={setShowResultsId}
+                                        />
+                                    ) : (
+                                        <ActivityListItem 
+                                            key={act.id} 
+                                            act={act} 
+                                            setPreviewId={setPreviewId} 
+                                            setEditItem={setEditItem} 
+                                            setIsActivityOpen={setIsActivityOpen} 
+                                            activitiesHandler={activitiesHandler} 
+                                            showResultsId={showResultsId}
+                                            setShowResultsId={setShowResultsId}
+                                        />
+                                    )
                                 ))}
                             </div>
                         </motion.div>
