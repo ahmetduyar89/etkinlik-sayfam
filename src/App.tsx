@@ -39,8 +39,9 @@ export const getFormattedHtml = (act?: any) => {
         }
         ${css_code || ''}
         #drawing-canvas {
-            touch-action: none;
+            touch-action: none !important;
             cursor: crosshair;
+            z-index: 2147483647 !important;
         }
         body.whiteboard-active {
             background-color: white !important;
@@ -61,29 +62,28 @@ export const getFormattedHtml = (act?: any) => {
         // Drawing Script
         (function() {
             let isDrawing = false;
-            let canvas, ctx, previewLayer;
+            let canvas = null, ctx = null, previewLayer = null;
             let enabled = false;
             let _cleanup = null;
             let laserCanvas = null, laserCtx = null;
             let _resizeObserver = null;
 
             window.addEventListener('message', (e) => {
-                if (e.data.type === 'TOGGLE_DRAWING') {
-                    toggleDrawingMode(e.data.enabled);
-                } else if (e.data.type === 'CLEAR_DRAWING') {
+                const d = e.data;
+                if (d.type === 'TOGGLE_DRAWING') {
+                    toggleDrawingMode(d.enabled);
+                } else if (d.type === 'CLEAR_DRAWING') {
                     clearDrawing();
-                } else if (e.data.type === 'UNDO_DRAWING') {
+                } else if (d.type === 'UNDO_DRAWING') {
                     undoDrawing();
-                } else if (e.data.type === 'SET_DRAW_CONFIG') {
-                    window.__drawConfig = Object.assign({}, window.__drawConfig, e.data.config);
+                } else if (d.type === 'SET_DRAW_CONFIG') {
+                    window.__drawConfig = Object.assign({}, window.__drawConfig, d.config);
                     updateCanvasInteractivity();
-                } else if (e.data.type === 'SET_WHITEBOARD') {
-                    if (e.data.enabled) {
-                        document.body.classList.add('whiteboard-active');
-                    } else {
-                        document.body.classList.remove('whiteboard-active');
-                    }
-                } else if (e.data.type === 'CLEANUP') {
+                } else if (d.type === 'SET_WHITEBOARD') {
+                    if (d.enabled) document.body.classList.add('whiteboard-active');
+                    else document.body.classList.remove('whiteboard-active');
+                    resize();
+                } else if (d.type === 'CLEANUP') {
                     if (_cleanup) _cleanup();
                 }
             });
@@ -91,17 +91,18 @@ export const getFormattedHtml = (act?: any) => {
             function toggleDrawingMode(state) {
                 enabled = state;
                 if (enabled) {
-                    if (!canvas) {
+                    if (!canvas || !canvas.parentElement) {
                         initCanvas();
                     } else {
                         canvas.style.display = 'block';
                         updateCanvasInteractivity();
+                        resize();
                     }
                 } else {
                     if (canvas) canvas.style.display = 'none';
                     if (laserCanvas) {
                         laserCanvas.style.display = 'none';
-                        laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
+                        if (laserCtx) laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
                     }
                     updateCanvasInteractivity();
                 }
@@ -115,7 +116,8 @@ export const getFormattedHtml = (act?: any) => {
                 canvas.style.pointerEvents = (enabled && !isPan) ? 'all' : 'none';
                 
                 const behavior = (enabled && !isPan) ? 'none' : 'auto';
-                canvas.style.touchAction = behavior;
+                canvas.style.touchAction = (enabled && !isPan) ? 'none' : 'auto';
+                
                 if (document.body) {
                     document.body.style.touchAction = behavior;
                     document.documentElement.style.touchAction = behavior;
@@ -126,10 +128,6 @@ export const getFormattedHtml = (act?: any) => {
                         document.body.style.overflow = '';
                         document.documentElement.style.overflow = '';
                     }
-                }
-
-                if (enabled && !isPan) {
-                    resize();
                 }
             }
 
@@ -145,7 +143,7 @@ export const getFormattedHtml = (act?: any) => {
             }
 
             function undoDrawing() {
-                if (history.length > 0) {
+                if (history.length > 0 && ctx) {
                     const hCanvas = history.pop();
                     const dpr = window.devicePixelRatio || 1;
                     ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
@@ -159,17 +157,17 @@ export const getFormattedHtml = (act?: any) => {
                     return;
                 }
                 
+                // Remove existing to avoid duplicates
+                const old = document.getElementById('drawing-canvas');
+                if (old) old.remove();
+
                 canvas = document.createElement('canvas');
                 canvas.id = 'drawing-canvas';
-                canvas.style.position = 'absolute';
-                canvas.style.top = '0';
-                canvas.style.left = '0';
-                canvas.style.zIndex = '2147483640';
-                canvas.style.pointerEvents = 'none';
+                canvas.className = 'ignore-html2canvas'; // For future usage
+                canvas.style.cssText = 'position:absolute;top:0;left:0;z-index:2147483647;pointer-events:none;background:transparent;';
                 document.body.appendChild(canvas);
 
                 ctx = canvas.getContext('2d');
-                
                 previewLayer = document.createElement('canvas');
                 
                 resize();
@@ -181,15 +179,15 @@ export const getFormattedHtml = (act?: any) => {
                     window.addEventListener('resize', resize);
                 }
 
-                canvas.addEventListener('pointerdown', startDrawing);
-                canvas.addEventListener('pointermove', draw);
+                canvas.addEventListener('pointerdown', startDrawing, { passive: false });
+                canvas.addEventListener('pointermove', draw, { passive: false });
                 canvas.addEventListener('pointerup', stopDrawing);
                 canvas.addEventListener('pointercancel', stopDrawing);
                 window.addEventListener('pointerup', stopDrawing);
                 
                 updateCanvasInteractivity();
 
-                // Notify parent that we are ready
+                // Notify parent immediately
                 window.parent.postMessage({ type: 'DRAWING_READY' }, '*');
             }
 
@@ -236,10 +234,10 @@ export const getFormattedHtml = (act?: any) => {
 
             function resize() {
                 if (!canvas) return;
+                const dpr = window.devicePixelRatio || 1;
                 const w = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth, window.innerWidth);
                 const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight);
-                const dpr = window.devicePixelRatio || 1;
-                
+
                 if (canvas.width === w * dpr && canvas.height === h * dpr) return;
 
                 const temp = document.createElement('canvas');
@@ -255,6 +253,7 @@ export const getFormattedHtml = (act?: any) => {
                 canvas.style.height = h + 'px';
 
                 ctx = canvas.getContext('2d');
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.scale(dpr, dpr);
                 if (temp.width > 0) {
                     ctx.drawImage(temp, 0, 0, temp.width / dpr, temp.height / dpr);
@@ -268,13 +267,13 @@ export const getFormattedHtml = (act?: any) => {
                     tempCanvas.width = canvas.width;
                     tempCanvas.height = canvas.height;
                     tempCtx = tempCanvas.getContext('2d');
-                    tempCtx.setTransform(1, 0, 0, 1, 0, 0); 
+                    tempCtx.setTransform(1, 0, 0, 1, 0, 0);
                     tempCtx.scale(dpr, dpr);
                 }
             }
 
             let startX, startY;
-            window.__drawConfig = { tool: 'pencil', color: '#000000', width: 3, fillEnabled: false, stampIcon: '✅' };
+            window.__drawConfig = { tool: 'pencil', color: '#4f46e5', width: 3, fillEnabled: false, stampIcon: '✅' };
 
             let tempCanvas, tempCtx, lastPoint, midPoint, currentPage = '';
             let drawingCache = {};
@@ -307,12 +306,17 @@ export const getFormattedHtml = (act?: any) => {
                 ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
                 if (drawingCache[id]) {
                     ctx.drawImage(drawingCache[id], 0, 0, drawingCache[id].width / dpr, drawingCache[id].height / dpr);
+                } else {
+                    saveCurrentPage();
                 }
             }
 
             function checkPage() {
                 try {
-                    if (enabled && (!canvas || !canvas.parentElement)) initCanvas();
+                    if (enabled && (!canvas || !canvas.parentElement)) {
+                        initCanvas();
+                        return;
+                    }
                     const newId = window.location.hash || window.location.href;
                     if (newId !== currentPage) {
                         saveCurrentPage();
@@ -321,7 +325,7 @@ export const getFormattedHtml = (act?: any) => {
                     }
                 } catch(e) {}
             }
-            const _intCheck = setInterval(checkPage, 2000);
+            const _intCheck = setInterval(checkPage, 1500);
             window.addEventListener('hashchange', checkPage);
 
             function showTextInput(vx, vy, dx, dy) {
@@ -329,7 +333,7 @@ export const getFormattedHtml = (act?: any) => {
                 if (existing) existing.remove();
                 const input = document.createElement('input');
                 input.id = 'canvas-text-input';
-                input.style.cssText = 'position:fixed; left:' + Math.min(vx, window.innerWidth-260) + 'px; top:' + Math.max(vy-44,8) + 'px; font:bold 18px Arial; color:' + window.__drawConfig.color + '; background:rgba(255,255,255,0.9); border:2px solid ' + window.__drawConfig.color + '; border-radius:10px; padding:8px 14px; outline:none; min-width:240px; z-index:2147483647;';
+                input.style.cssText = 'position:fixed; left:' + Math.min(vx, window.innerWidth-260) + 'px; top:' + Math.max(vy-44,8) + 'px; font:bold 18px Arial; color:' + window.__drawConfig.color + '; background:rgba(255,255,255,0.95); border:2px solid ' + window.__drawConfig.color + '; border-radius:10px; padding:10px 15px; outline:none; min-width:240px; z-index:2147483647; box-shadow:0 10px 25px rgba(0,0,0,0.1);';
                 document.body.appendChild(input);
                 input.focus();
                 const commit = function() {
@@ -352,7 +356,7 @@ export const getFormattedHtml = (act?: any) => {
             }
 
             function startDrawing(e) {
-                if (!enabled || window.__drawConfig.tool === 'pan' || window.__drawConfig.tool === 'sun') return;
+                if (!enabled || !canvas || window.__drawConfig.tool === 'pan' || window.__drawConfig.tool === 'sun') return;
                 if (window.__drawConfig.tool === 'text') {
                     showTextInput(e.clientX, e.clientY, e.pageX, e.pageY);
                     return;
@@ -382,12 +386,12 @@ export const getFormattedHtml = (act?: any) => {
             }
 
             function draw(e) {
-                if (!enabled) return;
+                if (!enabled || !canvas) return;
                 if (window.__drawConfig.tool === 'sun') { drawLaser(e.clientX, e.clientY); return; }
                 if (!isDrawing) return;
 
                 const x = e.pageX, y = e.pageY, tool = window.__drawConfig.tool;
-                const pressure = (e.pointerType === 'pen' && e.pressure > 0) ? e.pressure : 0.5;
+                const pressure = (e.pointerType === 'pen' && e.pressure > 0) ? e.pressure : 1.0;
 
                 if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser') {
                     const currentMid = { x: (lastPoint.x + x) / 2, y: (lastPoint.y + y) / 2 };
