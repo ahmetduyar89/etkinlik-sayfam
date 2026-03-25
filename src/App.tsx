@@ -5,9 +5,9 @@ import {
     Target, Zap, Globe, Settings, Bell, User, ArrowRight, HelpCircle, Eye,
     MoreVertical, X, Save, Clock, BookOpen, Anchor, Book, FlaskConical, Command, Blocks, Pencil, Eraser,
     Hand, Highlighter, Type, Shapes, Undo, History, Sun, Square, Circle, Triangle, MousePointer2,
-    MoveRight, ArrowRightLeft, Minus, PaintBucket, List, LayoutList, LayoutGrid
+    MoveRight, ArrowRightLeft, Minus, PaintBucket, List, LayoutList, LayoutGrid, GripVertical
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { db, useFirestore } from './lib/firebase';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -74,6 +74,18 @@ export const getFormattedHtml = (act?: any) => {
         } catch (e) {
             console.error('Simülasyon Hatası:', e);
         }
+
+        // Otomatik Yükseklik Senkronizasyonu
+        (function() {
+            const sendHeight = () => {
+                const height = document.documentElement.scrollHeight;
+                window.parent.postMessage({ type: 'IFRAME_HEIGHT_SYNC', height }, '*');
+            };
+            const observer = new ResizeObserver(() => sendHeight());
+            observer.observe(document.body);
+            window.addEventListener('load', sendHeight);
+            setInterval(sendHeight, 1000); // Yedek senkronizasyon
+        })();
     </script>
 </body>
 </html>`;
@@ -108,6 +120,8 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
     setShowWhiteboard?: (val: boolean) => void
 }) => {
     const [showShapes, setShowShapes] = React.useState(false);
+    const dragControls = useDragControls();
+    
     // Sarı ve İndigo eklendi
     const colors = ['#ffffff', '#ff4d4d', '#ffff00', '#ffa500', '#2ecc71', '#3498db', '#4f46e5', '#9b59b6', '#000000'];
     const mainTools = [
@@ -147,16 +161,14 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
     return (
         <motion.div 
             drag
+            dragControls={dragControls}
+            dragListener={false}
             dragMomentum={false}
             dragElastic={0}
-            onPointerDown={(e) => e.stopPropagation()}
-            onPointerMove={(e) => e.stopPropagation()}
-            onPointerUp={(e) => e.stopPropagation()}
-            initial={{ x: -100, y: -20, opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="fixed bottom-10 left-1/2 z-[5000] flex flex-col items-center gap-3 cursor-move active:cursor-grabbing pointer-events-auto"
+            initial={{ left: '50%', x: '-50%', y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="fixed bottom-10 z-[5000] flex flex-col items-center gap-3 pointer-events-auto"
             style={{ 
-                translateX: '-50%',
                 touchAction: 'none'
             }}
         >
@@ -232,6 +244,13 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
 
             {/* Ana toolbar */}
             <div className="flex items-center gap-1 bg-[#1a1b26] p-1.5 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5 transition-all duration-300">
+                <div 
+                    onPointerDown={(e) => dragControls.start(e)}
+                    className="p-2.5 text-slate-500 hover:text-white cursor-grab active:cursor-grabbing border-r border-white/10"
+                    title="Taşı"
+                >
+                    <GripVertical className="w-5 h-5" />
+                </div>
                 <div className="flex items-center gap-0.5 px-2 border-r border-white/10">
                     {mainTools.map(tool => (
                         <button
@@ -706,8 +725,9 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         if (!canvas || !buffer) return;
 
         const dpr = window.devicePixelRatio || 1;
-        const w = window.innerWidth;
-        const h = window.innerHeight;
+        const parent = canvas.parentElement;
+        const w = parent ? parent.offsetWidth : window.innerWidth;
+        const h = parent ? parent.offsetHeight : window.innerHeight;
 
         [canvas, buffer, laser].forEach(c => {
             if (!c) return;
@@ -740,6 +760,12 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
     }, []);
 
     React.useEffect(() => {
+        const parent = canvasRef.current?.parentElement;
+        if (parent) {
+            const obs = new ResizeObserver(() => resize());
+            obs.observe(parent);
+            return () => obs.disconnect();
+        }
         window.addEventListener('resize', resize);
         resize();
         return () => window.removeEventListener('resize', resize);
@@ -804,18 +830,21 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         const bCtx = bufferCtxRef.current;
         const mainCtx = ctxRef.current;
         const canvas = bufferCanvasRef.current;
-        if (!bCtx || !mainCtx || !canvas) return;
+        const mainCanvas = canvasRef.current;
+        if (!bCtx || !mainCtx || !canvas || !mainCanvas) return;
         
-        bCtx.clearRect(0,0, 4000, 4000);
+        bCtx.clearRect(0,0, 4000, 8000);
         strokesRef.current.forEach(s => drawStroke(bCtx, s));
         
-        mainCtx.clearRect(0,0, 4000, 4000);
-        mainCtx.drawImage(canvas, 0, 0, window.innerWidth, window.innerHeight);
+        mainCtx.clearRect(0,0, 4000, 8000);
+        mainCtx.drawImage(canvas, 0, 0, mainCanvas.width / (window.devicePixelRatio || 1), mainCanvas.height / (window.devicePixelRatio || 1));
     };
 
     const startDrawing = (e: React.PointerEvent) => {
         if (!enabled || ['pan', 'sun'].includes(config.tool)) return;
-        const x = e.clientX, y = e.clientY;
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const x = e.clientX - rect.left, y = e.clientY - rect.top;
         if (config.tool === 'text') {
             const val = prompt('Metin girin:');
             if (val) {
@@ -843,11 +872,15 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
     };
 
     const draw = (e: React.PointerEvent) => {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const x = e.clientX - rect.left, y = e.clientY - rect.top;
+
         if (config.tool === 'sun') {
             const lCtx = laserCtxRef.current;
             if (lCtx) {
-                lCtx.clearRect(0,0, window.innerWidth, window.innerHeight);
-                const cx = e.clientX, cy = e.clientY, r = 12;
+                lCtx.clearRect(0,0, rect.width, rect.height);
+                const cx = x, cy = y, r = 12;
                 const g = lCtx.createRadialGradient(cx, cy, 0, cx, cy, r * 3);
                 g.addColorStop(0, 'rgba(255,50,50,1)'); g.addColorStop(0.3, 'rgba(255,80,80,0.4)'); g.addColorStop(1, 'rgba(255,0,0,0)');
                 lCtx.fillStyle = g; lCtx.beginPath(); lCtx.arc(cx, cy, r * 3, 0, Math.PI * 2); lCtx.fill();
@@ -856,14 +889,13 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
             return;
         }
         if (!isDrawing || !currentStroke) return;
-        const x = e.clientX, y = e.clientY;
         const last = currentStroke.points[currentStroke.points.length - 1];
         if (Math.hypot(x - last.x, y - last.y) < 0.5) return;
         currentStroke.points.push({x, y});
         const mainCtx = ctxRef.current;
         if (mainCtx && bufferCanvasRef.current) {
-            mainCtx.clearRect(0,0, window.innerWidth, window.innerHeight);
-            mainCtx.drawImage(bufferCanvasRef.current, 0, 0, window.innerWidth, window.innerHeight);
+            mainCtx.clearRect(0,0, rect.width, rect.height);
+            mainCtx.drawImage(bufferCanvasRef.current, 0, 0, rect.width, rect.height);
             drawStroke(mainCtx, currentStroke);
         }
     };
@@ -875,16 +907,19 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
             if (bufferCtxRef.current) drawStroke(bufferCtxRef.current, currentStroke);
         }
         setIsDrawing(false); setCurrentStroke(null);
-        if (laserCtxRef.current) laserCtxRef.current.clearRect(0,0, window.innerWidth, window.innerHeight);
+        if (laserCtxRef.current) {
+            const rect = canvasRef.current?.getBoundingClientRect();
+            if (rect) laserCtxRef.current.clearRect(0,0, rect.width, rect.height);
+        }
     };
 
     return (
         <>
             <canvas ref={bufferCanvasRef} style={{ display: 'none' }} />
             <canvas ref={canvasRef} onPointerDown={startDrawing} onPointerMove={draw} onPointerUp={stopDrawing} onPointerLeave={stopDrawing}
-                className={cn("fixed top-0 left-0 z-[4000] touch-none transition-opacity", enabled ? (config.tool === 'pan' ? "pointer-events-none opacity-100" : "pointer-events-auto opacity-100") : "pointer-events-none opacity-0")}
+                className={cn("absolute top-0 left-0 z-[4000] touch-none transition-opacity", enabled ? (config.tool === 'pan' ? "pointer-events-none opacity-100" : "pointer-events-auto opacity-100") : "pointer-events-none opacity-0")}
                 style={{ backgroundColor: whiteboardMode ? 'white' : 'transparent' }} />
-            <canvas ref={laserCanvasRef} className="fixed top-0 left-0 z-[4001] pointer-events-none touch-none" />
+            <canvas ref={laserCanvasRef} className="absolute top-0 left-0 z-[4001] pointer-events-none touch-none" />
         </>
     );
 });
@@ -901,6 +936,7 @@ const StudentPortal = ({ act }: { act: any }) => {
     const [isDrawingMode, setIsDrawingMode] = useState(false);
     const [drawConfig, setDrawConfig] = useState({ tool: 'pencil', color: '#ff4d4d', width: 3, fillEnabled: false, stampIcon: '✅' });
     const [showWhiteboard, setShowWhiteboard] = useState(false);
+    const [iframeHeight, setIframeHeight] = useState(1000);
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const canvasRef = React.useRef<any>(null);
     const submissionsHandler = useFirestore('submissions');
@@ -921,6 +957,9 @@ const StudentPortal = ({ act }: { act: any }) => {
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
+            if (event.data.type === 'IFRAME_HEIGHT_SYNC' && event.data.height > 0) {
+                setIframeHeight(event.data.height);
+            }
             if (event.data.type === 'SIM_ANSWER' && submissionId) {
                 submissionsHandler.update(submissionId, { answers: event.data.data });
             }
@@ -992,9 +1031,16 @@ const StudentPortal = ({ act }: { act: any }) => {
                 </div>
             </header>
             
-            <main className="flex-1 relative bg-white overflow-hidden">
-                <iframe ref={iframeRef} srcDoc={getFormattedHtml(act)} className={cn("w-full h-full border-0 transition-all", isDrawingMode && drawConfig.tool !== 'pan' ? "pointer-events-none" : "pointer-events-auto")} />
-                <DrawingCanvas ref={canvasRef} config={drawConfig} enabled={isDrawingMode} whiteboardMode={showWhiteboard} />
+            <main className="flex-1 relative bg-white overflow-y-auto overflow-x-hidden custom-scroll">
+                <div style={{ position: 'relative', width: '100%', minHeight: '100%', height: iframeHeight }}>
+                    <iframe 
+                        ref={iframeRef} 
+                        srcDoc={getFormattedHtml(act)} 
+                        className={cn("w-full h-full border-0 transition-opacity", isDrawingMode && drawConfig.tool !== 'pan' ? "pointer-events-none opacity-40" : "pointer-events-auto")}
+                        scrolling="no"
+                    />
+                    <DrawingCanvas ref={canvasRef} config={drawConfig} enabled={isDrawingMode} whiteboardMode={showWhiteboard} />
+                </div>
                 <AnimatePresence>{isDrawingMode && <DrawingToolbar onCommand={handleToolbarCommand} config={drawConfig} setConfig={setDrawConfig} showWhiteboard={showWhiteboard} setShowWhiteboard={setShowWhiteboard} />}</AnimatePresence>
             </main>
         </div>
@@ -1017,8 +1063,19 @@ export default function App() {
     const [previewDrawConfig, setPreviewDrawConfig] = useState({ tool: 'pencil', color: '#4f46e5', width: 3 });
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [showWhiteboard, setShowWhiteboard] = useState(false);
+    const [previewIframeHeight, setPreviewIframeHeight] = useState(1000);
     const previewIframeRef = React.useRef<HTMLIFrameElement>(null);
     const previewCanvasRef = React.useRef<any>(null);
+
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            if (event.data.type === 'IFRAME_HEIGHT_SYNC' && event.data.height > 0) {
+                setPreviewIframeHeight(event.data.height);
+            }
+        };
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, []);
 
     // Form States
     const [isScienceOpen, setIsScienceOpen] = useState(false);
@@ -1449,10 +1506,17 @@ export default function App() {
                                 <button onClick={() => { setPreviewId(null); setIsPreviewDrawingMode(false); setShowWhiteboard(false); }} className="p-2 text-slate-400 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
                             </div>
                         </header>
-                        <main className="flex-1 relative bg-white">
-                            <iframe ref={previewIframeRef} srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} className={cn("w-full h-full border-0 transition-all", isPreviewDrawingMode && previewDrawConfig.tool !== 'pan' ? "pointer-events-none" : "pointer-events-auto")} />
-                            <DrawingCanvas ref={previewCanvasRef} config={previewDrawConfig} enabled={isPreviewDrawingMode} whiteboardMode={showWhiteboard} />
-                            <AnimatePresence>{isPreviewDrawingMode && <DrawingToolbar onCommand={(type) => { if(type==='UNDO_DRAWING') previewCanvasRef.current?.undo(); if(type==='CLEAR_DRAWING') previewCanvasRef.current?.clear(); if(type==='TOGGLE_WHITEBOARD') setShowWhiteboard(!showWhiteboard); }} config={previewDrawConfig} setConfig={setPreviewDrawConfig} showWhiteboard={showWhiteboard} setShowWhiteboard={setShowWhiteboard} />}</AnimatePresence>
+                        <main className="flex-1 relative bg-white overflow-y-auto overflow-x-hidden custom-scroll">
+                            <div style={{ position: 'relative', width: '100%', minHeight: '100%', height: previewIframeHeight }}>
+                                <iframe 
+                                    ref={previewIframeRef} 
+                                    srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} 
+                                    className={cn("w-full h-full border-0 transition-opacity", isPreviewDrawingMode && previewDrawConfig.tool !== 'pan' ? "pointer-events-none opacity-40" : "pointer-events-auto")} 
+                                    scrolling="no"
+                                />
+                                <DrawingCanvas ref={previewCanvasRef} config={previewDrawConfig} enabled={isPreviewDrawingMode} whiteboardMode={showWhiteboard} />
+                            </div>
+                            <AnimatePresence>{isPreviewDrawingMode && <DrawingToolbar onCommand={(type) => { if(type==='UNDO_DRAWING') previewCanvasRef.current?.undo(); if(type==='CLEAR_DRAWING') previewCanvasRef.current?.clear(); if(type==='TOGGLE_WHITEBOARD') setShowWhiteboard(v => !v); }} config={previewDrawConfig} setConfig={setPreviewDrawConfig} showWhiteboard={showWhiteboard} setShowWhiteboard={setShowWhiteboard} />}</AnimatePresence>
                         </main>
                     </div>
                 </div>
