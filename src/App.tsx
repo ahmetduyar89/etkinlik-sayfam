@@ -704,6 +704,7 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
     const bufferCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
     const laserCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
     const strokesRef = React.useRef<any[]>([]);
+    const isDrawingRef = React.useRef(false);
 
     React.useImperativeHandle(ref, () => ({
         undo: () => {
@@ -719,15 +720,17 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
     }));
 
     const resize = React.useCallback(() => {
+        if (isDrawingRef.current) return; // Çizim sırasında canvas'ı yeniden başlatma
         const canvas = canvasRef.current;
         const buffer = bufferCanvasRef.current;
         const laser = laserCanvasRef.current;
         if (!canvas || !buffer) return;
 
         const dpr = window.devicePixelRatio || 1;
-        const parent = canvas.parentElement;
-        const w = parent ? parent.offsetWidth : window.innerWidth;
-        const h = parent ? parent.offsetHeight : window.innerHeight;
+        // Dinamik yüksekliği değişen parent div yerine, sabit scroll konteynerini (grandparent) kullan
+        const scrollContainer = canvas.parentElement?.parentElement;
+        const w = scrollContainer ? scrollContainer.clientWidth : (canvas.parentElement ? canvas.parentElement.offsetWidth : window.innerWidth);
+        const h = scrollContainer ? scrollContainer.clientHeight : (canvas.parentElement ? canvas.parentElement.offsetHeight : window.innerHeight);
 
         [canvas, buffer, laser].forEach(c => {
             if (!c) return;
@@ -760,16 +763,33 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
     }, []);
 
     React.useEffect(() => {
-        const parent = canvasRef.current?.parentElement;
-        if (parent) {
+        // Sabit scroll konteynerini (grandparent) izle; iframeHeight değiştiğinde yeniden boyutlandırma yapma
+        const scrollContainer = canvasRef.current?.parentElement?.parentElement;
+        const target = scrollContainer || canvasRef.current?.parentElement;
+        if (target) {
             const obs = new ResizeObserver(() => resize());
-            obs.observe(parent);
+            obs.observe(target);
+            resize();
             return () => obs.disconnect();
         }
         window.addEventListener('resize', resize);
         resize();
         return () => window.removeEventListener('resize', resize);
     }, [resize]);
+
+    // Kaydırma sırasında canvas'ı görünür alana senkronize et
+    React.useEffect(() => {
+        const scrollContainer = canvasRef.current?.parentElement?.parentElement;
+        if (!scrollContainer) return;
+        const handleScroll = () => {
+            const top = scrollContainer.scrollTop;
+            canvasRectRef.current = null; // Önbelleğe alınan rect'i geçersiz kıl
+            if (canvasRef.current) canvasRef.current.style.top = `${top}px`;
+            if (laserCanvasRef.current) laserCanvasRef.current.style.top = `${top}px`;
+        };
+        scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+        return () => scrollContainer.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const drawStroke = (tCtx: CanvasRenderingContext2D, s: any) => {
         if (!s || s.points.length < 1) return;
@@ -863,6 +883,7 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
             redraw();
             return;
         }
+        isDrawingRef.current = true;
         setIsDrawing(true);
         const newStroke = {
             tool: config.tool, color: config.color,
@@ -907,6 +928,7 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
             setStrokes([...strokesRef.current]);
             if (bufferCtxRef.current) drawStroke(bufferCtxRef.current, currentStroke);
         }
+        isDrawingRef.current = false;
         setIsDrawing(false); setCurrentStroke(null);
         if (laserCtxRef.current) {
             const rect = canvasRef.current?.getBoundingClientRect();
@@ -918,9 +940,9 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         <>
             <canvas ref={bufferCanvasRef} style={{ display: 'none' }} />
             <canvas ref={canvasRef} onPointerDown={startDrawing} onPointerMove={draw} onPointerUp={stopDrawing} onPointerLeave={stopDrawing}
-                className={cn("absolute top-0 left-0 z-[4000] touch-none transition-opacity", enabled ? (config.tool === 'pan' ? "pointer-events-none opacity-100" : "pointer-events-auto opacity-100") : "pointer-events-none opacity-0")}
-                style={{ backgroundColor: whiteboardMode ? 'white' : 'transparent' }} />
-            <canvas ref={laserCanvasRef} className="absolute top-0 left-0 z-[4001] pointer-events-none touch-none" />
+                className={cn("absolute left-0 z-[4000] touch-none transition-opacity", enabled ? (config.tool === 'pan' ? "pointer-events-none opacity-100" : "pointer-events-auto opacity-100") : "pointer-events-none opacity-0")}
+                style={{ top: 0, backgroundColor: whiteboardMode ? 'white' : 'transparent' }} />
+            <canvas ref={laserCanvasRef} className="absolute left-0 z-[4001] pointer-events-none touch-none" style={{ top: 0 }} />
         </>
     );
 });
