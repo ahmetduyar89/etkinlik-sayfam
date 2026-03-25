@@ -84,7 +84,6 @@ export const getFormattedHtml = (act?: any) => {
             const observer = new ResizeObserver(() => sendHeight());
             observer.observe(document.body);
             window.addEventListener('load', sendHeight);
-            setInterval(sendHeight, 1000); // Yedek senkronizasyon
         })();
     </script>
 </body>
@@ -698,6 +697,7 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
     const [strokes, setStrokes] = React.useState<any[]>([]);
     const [currentStroke, setCurrentStroke] = React.useState<any>(null);
     const [isDrawing, setIsDrawing] = React.useState(false);
+    const canvasRectRef = React.useRef<DOMRect | null>(null);
 
     // Refs for non-react state (performance)
     const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null);
@@ -844,6 +844,7 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         if (!enabled || ['pan', 'sun'].includes(config.tool)) return;
         const rect = canvasRef.current?.getBoundingClientRect();
         if (!rect) return;
+        canvasRectRef.current = rect;
         const x = e.clientX - rect.left, y = e.clientY - rect.top;
         if (config.tool === 'text') {
             const val = prompt('Metin girin:');
@@ -872,7 +873,7 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
     };
 
     const draw = (e: React.PointerEvent) => {
-        const rect = canvasRef.current?.getBoundingClientRect();
+        const rect = canvasRectRef.current || canvasRef.current?.getBoundingClientRect();
         if (!rect) return;
         const x = e.clientX - rect.left, y = e.clientY - rect.top;
 
@@ -1036,7 +1037,7 @@ const StudentPortal = ({ act }: { act: any }) => {
                     <iframe 
                         ref={iframeRef} 
                         srcDoc={getFormattedHtml(act)} 
-                        className={cn("w-full h-full border-0 transition-opacity", isDrawingMode && drawConfig.tool !== 'pan' ? "pointer-events-none opacity-40" : "pointer-events-auto")}
+                        className={cn("w-full h-full border-0", isDrawingMode && drawConfig.tool !== 'pan' ? "pointer-events-none" : "pointer-events-auto")}
                         scrolling="no"
                     />
                     <DrawingCanvas ref={canvasRef} config={drawConfig} enabled={isDrawingMode} whiteboardMode={showWhiteboard} />
@@ -1511,7 +1512,7 @@ export default function App() {
                                 <iframe 
                                     ref={previewIframeRef} 
                                     srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} 
-                                    className={cn("w-full h-full border-0 transition-opacity", isPreviewDrawingMode && previewDrawConfig.tool !== 'pan' ? "pointer-events-none opacity-40" : "pointer-events-auto")} 
+                                    className={cn("w-full h-full border-0", isPreviewDrawingMode && previewDrawConfig.tool !== 'pan' ? "pointer-events-none" : "pointer-events-auto")} 
                                     scrolling="no"
                                 />
                                 <DrawingCanvas ref={previewCanvasRef} config={previewDrawConfig} enabled={isPreviewDrawingMode} whiteboardMode={showWhiteboard} />
