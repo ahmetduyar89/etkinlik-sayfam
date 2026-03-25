@@ -61,11 +61,11 @@ export const getFormattedHtml = (act?: any) => {
         // Drawing Script
         (function() {
             let isDrawing = false;
-            let canvas, ctx;
+            let canvas, ctx, previewLayer;
             let enabled = false;
-            let currentImageData = null;
             let _cleanup = null;
             let laserCanvas = null, laserCtx = null;
+            let _resizeObserver = null;
 
             window.addEventListener('message', (e) => {
                 if (e.data.type === 'TOGGLE_DRAWING') {
@@ -75,13 +75,8 @@ export const getFormattedHtml = (act?: any) => {
                 } else if (e.data.type === 'UNDO_DRAWING') {
                     undoDrawing();
                 } else if (e.data.type === 'SET_DRAW_CONFIG') {
-                    window.__drawConfig = { ...window.__drawConfig, ...e.data.config };
+                    window.__drawConfig = Object.assign({}, window.__drawConfig, e.data.config);
                     updateCanvasInteractivity();
-                    updateTouchAction();
-                    // Lazer dışı araca geçilince lazer izini temizle
-                    if (laserCanvas && e.data.config.tool && e.data.config.tool !== 'sun') {
-                        laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
-                    }
                 } else if (e.data.type === 'SET_WHITEBOARD') {
                     if (e.data.enabled) {
                         document.body.classList.add('whiteboard-active');
@@ -95,43 +90,49 @@ export const getFormattedHtml = (act?: any) => {
 
             function toggleDrawingMode(state) {
                 enabled = state;
-                if (enabled && !canvas) {
-                    initCanvas();
-                }
-
-                if (canvas) {
-                    canvas.style.display = enabled ? 'block' : 'none';
+                if (enabled) {
+                    if (!canvas) {
+                        initCanvas();
+                    } else {
+                        canvas.style.display = 'block';
+                        updateCanvasInteractivity();
+                    }
+                } else {
+                    if (canvas) canvas.style.display = 'none';
+                    if (laserCanvas) {
+                        laserCanvas.style.display = 'none';
+                        laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
+                    }
                     updateCanvasInteractivity();
                 }
-                if (laserCanvas) {
-                    laserCanvas.style.display = enabled ? 'block' : 'none';
-                    if (!enabled) laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
-                }
-                updateTouchAction();
             }
 
             function updateCanvasInteractivity() {
                 if (!canvas) return;
-                const tool = window.__drawConfig.tool;
-                if (tool === 'pan') {
-                    canvas.style.pointerEvents = 'none';
-                    canvas.style.touchAction = 'auto';
-                    document.documentElement.style.overflow = 'auto';
-                    document.body.style.overflow = 'auto';
-                    document.documentElement.style.touchAction = 'auto';
-                    document.body.style.touchAction = 'auto';
-                } else {
-                    canvas.style.pointerEvents = enabled ? 'all' : 'none';
-                    canvas.style.touchAction = 'none';
-                    if (enabled) {
-                        resize();
-                        document.documentElement.style.touchAction = 'none';
-                        document.body.style.touchAction = 'none';
+                const tool = (window.__drawConfig && window.__drawConfig.tool) || 'pencil';
+                const isPan = tool === 'pan';
+                
+                canvas.style.pointerEvents = (enabled && !isPan) ? 'all' : 'none';
+                
+                const behavior = (enabled && !isPan) ? 'none' : 'auto';
+                canvas.style.touchAction = behavior;
+                if (document.body) {
+                    document.body.style.touchAction = behavior;
+                    document.documentElement.style.touchAction = behavior;
+                    if (enabled && !isPan) {
+                        document.body.style.overflow = 'hidden';
+                        document.documentElement.style.overflow = 'hidden';
+                    } else {
+                        document.body.style.overflow = '';
+                        document.documentElement.style.overflow = '';
                     }
+                }
+
+                if (enabled && !isPan) {
+                    resize();
                 }
             }
 
-            // History
             let history = [];
             function saveHistory() {
                 if (!canvas) return;
@@ -140,43 +141,58 @@ export const getFormattedHtml = (act?: any) => {
                 hCanvas.height = canvas.height;
                 hCanvas.getContext('2d').drawImage(canvas, 0, 0);
                 history.push(hCanvas);
-                if (history.length > 10) history.shift();
+                if (history.length > 20) history.shift();
             }
 
             function undoDrawing() {
                 if (history.length > 0) {
                     const hCanvas = history.pop();
-                    const dpr = window.devicePixelRatio;
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    const dpr = window.devicePixelRatio || 1;
+                    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
                     ctx.drawImage(hCanvas, 0, 0, hCanvas.width / dpr, hCanvas.height / dpr);
                 }
             }
 
             function initCanvas() {
+                if (!document.body) {
+                    setTimeout(initCanvas, 50);
+                    return;
+                }
+                
                 canvas = document.createElement('canvas');
                 canvas.id = 'drawing-canvas';
                 canvas.style.position = 'absolute';
                 canvas.style.top = '0';
                 canvas.style.left = '0';
-                canvas.style.zIndex = '2147483647';
+                canvas.style.zIndex = '2147483640';
                 canvas.style.pointerEvents = 'none';
                 document.body.appendChild(canvas);
 
                 ctx = canvas.getContext('2d');
-                resize();
+                
                 previewLayer = document.createElement('canvas');
-                previewLayer.width = canvas.width;
-                previewLayer.height = canvas.height;
-                window.addEventListener('resize', resize);
+                
+                resize();
+
+                if (window.ResizeObserver) {
+                    _resizeObserver = new ResizeObserver(function() { requestAnimationFrame(resize); });
+                    _resizeObserver.observe(document.body);
+                } else {
+                    window.addEventListener('resize', resize);
+                }
 
                 canvas.addEventListener('pointerdown', startDrawing);
                 canvas.addEventListener('pointermove', draw);
                 canvas.addEventListener('pointerup', stopDrawing);
                 canvas.addEventListener('pointercancel', stopDrawing);
                 window.addEventListener('pointerup', stopDrawing);
+                
+                updateCanvasInteractivity();
+
+                // Notify parent that we are ready
+                window.parent.postMessage({ type: 'DRAWING_READY' }, '*');
             }
 
-            // FIX 1: Ayrı lazer canvas — çizim katmanına iz bırakmaz
             function initLaserCanvas() {
                 if (laserCanvas) return;
                 laserCanvas = document.createElement('canvas');
@@ -187,45 +203,52 @@ export const getFormattedHtml = (act?: any) => {
                 laserCanvas.style.pointerEvents = 'none';
                 document.body.appendChild(laserCanvas);
                 laserCtx = laserCanvas.getContext('2d');
-                laserCanvas.width = canvas.width;
-                laserCanvas.height = canvas.height;
-                laserCanvas.style.width = canvas.style.width;
-                laserCanvas.style.height = canvas.style.height;
             }
 
             function drawLaser(x, y) {
                 initLaserCanvas();
-                laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
-                const dpr = window.devicePixelRatio;
-                const cx = x * dpr, cy = y * dpr, r = 14 * dpr;
+                laserCanvas.style.display = 'block';
+                const dpr = window.devicePixelRatio || 1;
+                if (laserCanvas.width !== window.innerWidth * dpr) {
+                    laserCanvas.width = window.innerWidth * dpr;
+                    laserCanvas.height = window.innerHeight * dpr;
+                    laserCanvas.style.width = window.innerWidth + 'px';
+                    laserCanvas.style.height = window.innerHeight + 'px';
+                    laserCtx.scale(dpr, dpr);
+                }
+                laserCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+                const cx = x, cy = y, r = 14;
                 const glow = laserCtx.createRadialGradient(cx, cy, 0, cx, cy, r * 3);
-                glow.addColorStop(0,    'rgba(255,50,50,0.95)');
+                glow.addColorStop(0, 'rgba(255,50,50,0.95)');
                 glow.addColorStop(0.25, 'rgba(255,80,80,0.55)');
-                glow.addColorStop(0.6,  'rgba(255,20,20,0.15)');
-                glow.addColorStop(1,    'rgba(255,0,0,0)');
+                glow.addColorStop(1, 'rgba(255,0,0,0)');
                 laserCtx.save();
                 laserCtx.fillStyle = glow;
                 laserCtx.beginPath();
                 laserCtx.arc(cx, cy, r * 3, 0, Math.PI * 2);
                 laserCtx.fill();
-                // Parlak merkez nokta
                 laserCtx.fillStyle = 'rgba(255,240,240,0.95)';
                 laserCtx.beginPath();
-                laserCtx.arc(cx, cy, r * 0.35, 0, Math.PI * 2);
+                laserCtx.arc(cx, cy, r * 0.3, 0, Math.PI * 2);
                 laserCtx.fill();
                 laserCtx.restore();
             }
 
             function resize() {
                 if (!canvas) return;
+                const w = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth, window.innerWidth);
+                const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight);
+                const dpr = window.devicePixelRatio || 1;
+                
+                if (canvas.width === w * dpr && canvas.height === h * dpr) return;
+
                 const temp = document.createElement('canvas');
                 temp.width = canvas.width;
                 temp.height = canvas.height;
-                temp.getContext('2d').drawImage(canvas, 0, 0);
+                if (canvas.width > 0 && canvas.height > 0) {
+                    temp.getContext('2d').drawImage(canvas, 0, 0);
+                }
 
-                const w = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth, window.innerWidth);
-                const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight);
-                const dpr = window.devicePixelRatio;
                 canvas.width = w * dpr;
                 canvas.height = h * dpr;
                 canvas.style.width = w + 'px';
@@ -233,8 +256,9 @@ export const getFormattedHtml = (act?: any) => {
 
                 ctx = canvas.getContext('2d');
                 ctx.scale(dpr, dpr);
-                // Eski içeriği orijinal boyutunda geri yaz (ölçekleme yok)
-                ctx.drawImage(temp, 0, 0, temp.width / dpr, temp.height / dpr);
+                if (temp.width > 0) {
+                    ctx.drawImage(temp, 0, 0, temp.width / dpr, temp.height / dpr);
+                }
 
                 if (previewLayer) {
                     previewLayer.width = canvas.width;
@@ -243,38 +267,27 @@ export const getFormattedHtml = (act?: any) => {
                 if (tempCanvas) {
                     tempCanvas.width = canvas.width;
                     tempCanvas.height = canvas.height;
-                    // canvas.width/height değişince transform sıfırlanır — yeniden uygula
                     tempCtx = tempCanvas.getContext('2d');
-                    tempCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
-                }
-                if (laserCanvas) {
-                    laserCanvas.width = canvas.width;
-                    laserCanvas.height = canvas.height;
-                    laserCanvas.style.width = w + 'px';
-                    laserCanvas.style.height = h + 'px';
+                    tempCtx.setTransform(1, 0, 0, 1, 0, 0); 
+                    tempCtx.scale(dpr, dpr);
                 }
             }
 
             let startX, startY;
             window.__drawConfig = { tool: 'pencil', color: '#000000', width: 3, fillEnabled: false, stampIcon: '✅' };
 
-            let tempCanvas, tempCtx;
-            let lastPoint, midPoint;
-            let currentPage = '';
+            let tempCanvas, tempCtx, lastPoint, midPoint, currentPage = '';
             let drawingCache = {};
-            let previewLayer = null;
 
             function initLayer() {
-                const dpr = window.devicePixelRatio;
+                const dpr = window.devicePixelRatio || 1;
                 if (!tempCanvas) {
                     tempCanvas = document.createElement('canvas');
                     tempCanvas.width = canvas.width;
                     tempCanvas.height = canvas.height;
                     tempCtx = tempCanvas.getContext('2d');
-                    // Ana canvas ile aynı DPR ölçeği — CSS koordinatları doğru konuma çizer
                     tempCtx.scale(dpr, dpr);
                 }
-                // clearRect CSS boyutlarıyla (scale uygulandığı için)
                 tempCtx.clearRect(0, 0, tempCanvas.width / dpr, tempCanvas.height / dpr);
             }
 
@@ -290,28 +303,16 @@ export const getFormattedHtml = (act?: any) => {
 
             function loadPage(id) {
                 if (!ctx) return;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const dpr = window.devicePixelRatio || 1;
+                ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
                 if (drawingCache[id]) {
-                    const snap = drawingCache[id];
-                    const dpr = window.devicePixelRatio;
-                    ctx.drawImage(snap, 0, 0, snap.width / dpr, snap.height / dpr);
+                    ctx.drawImage(drawingCache[id], 0, 0, drawingCache[id].width / dpr, drawingCache[id].height / dpr);
                 }
             }
 
             function checkPage() {
                 try {
-                    if (enabled && (!canvas || !canvas.parentElement)) {
-                        initCanvas();
-                        if (enabled) canvas.style.display = 'block';
-                        updateCanvasInteractivity();
-                    }
-
-                    // Sayfa boyutu 15px'den fazla değişirse yeniden boyutlandır (Daha güvenli)
-                    const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight);
-                    if (canvas && Math.abs(canvas.height / window.devicePixelRatio - h) > 15) {
-                        resize();
-                    }
-
+                    if (enabled && (!canvas || !canvas.parentElement)) initCanvas();
                     const newId = window.location.hash || window.location.href;
                     if (newId !== currentPage) {
                         saveCurrentPage();
@@ -320,281 +321,169 @@ export const getFormattedHtml = (act?: any) => {
                     }
                 } catch(e) {}
             }
-            const _intCheck = setInterval(checkPage, 1500);
+            const _intCheck = setInterval(checkPage, 2000);
             window.addEventListener('hashchange', checkPage);
 
-            // FIX 5: prompt() yerine inline metin girişi
-            // vx/vy = viewport (input kutusu yeri), dx/dy = belge koordinatı (çizim yeri)
             function showTextInput(vx, vy, dx, dy) {
                 const existing = document.getElementById('canvas-text-input');
                 if (existing) existing.remove();
                 const input = document.createElement('input');
                 input.id = 'canvas-text-input';
-                input.type = 'text';
-                input.placeholder = 'Yazın, Enter ile onayla';
-                input.style.cssText = [
-                    'position:fixed',
-                    'left:' + Math.min(vx, window.innerWidth - 260) + 'px',
-                    'top:' + Math.max(vy - 44, 8) + 'px',
-                    'font:bold 18px Arial',
-                    'color:' + window.__drawConfig.color,
-                    'background:rgba(15,15,25,0.88)',
-                    'border:2px solid ' + window.__drawConfig.color,
-                    'border-radius:10px',
-                    'padding:8px 14px',
-                    'outline:none',
-                    'min-width:240px',
-                    'z-index:9999999',
-                    'backdrop-filter:blur(8px)',
-                ].join(';');
+                input.style.cssText = 'position:fixed; left:' + Math.min(vx, window.innerWidth-260) + 'px; top:' + Math.max(vy-44,8) + 'px; font:bold 18px Arial; color:' + window.__drawConfig.color + '; background:rgba(255,255,255,0.9); border:2px solid ' + window.__drawConfig.color + '; border-radius:10px; padding:8px 14px; outline:none; min-width:240px; z-index:2147483647;';
                 document.body.appendChild(input);
                 input.focus();
-
-                function commit() {
+                const commit = function() {
                     const text = input.value.trim();
                     if (text) {
+                        saveHistory();
                         ctx.save();
                         ctx.font = 'bold 20px Arial';
                         ctx.fillStyle = window.__drawConfig.color;
-                        // Belge koordinatında çiz — sayfayla birlikte kayar
                         ctx.fillText(text, dx, dy);
                         ctx.restore();
                     }
                     input.remove();
-                    document.removeEventListener('pointerdown', outsideHandler);
-                }
-                function outsideHandler(ev) {
-                    if (ev.target !== input) commit();
-                }
-                input.addEventListener('keydown', (ev) => {
-                    if (ev.key === 'Enter') commit();
-                    if (ev.key === 'Escape') { input.remove(); document.removeEventListener('pointerdown', outsideHandler); }
-                    ev.stopPropagation();
-                });
-                setTimeout(() => document.addEventListener('pointerdown', outsideHandler), 150);
+                };
+                input.addEventListener('keydown', function(ev) { if (ev.key === 'Enter') commit(); if (ev.key === 'Escape') input.remove(); });
+                setTimeout(function() {
+                    const h = function(ev) { if (ev.target !== input) { commit(); document.removeEventListener('pointerdown', h); } };
+                    document.addEventListener('pointerdown', h);
+                }, 100);
             }
 
             function startDrawing(e) {
-                if (!enabled || window.__drawConfig.tool === 'pan') return;
-
-                // FIX 1: Lazer basım gerektirmez, sadece hover ile takip eder
-                if (window.__drawConfig.tool === 'sun') return;
-                // FIX 5: Metin aracı inline input kullanır
+                if (!enabled || window.__drawConfig.tool === 'pan' || window.__drawConfig.tool === 'sun') return;
                 if (window.__drawConfig.tool === 'text') {
-                    saveHistory();
-                    // Input kutusu: viewport (fixed); çizim: belge koordinatı (page)
                     showTextInput(e.clientX, e.clientY, e.pageX, e.pageY);
                     return;
                 }
-
                 if (window.__drawConfig.tool === 'stamp') {
                     saveHistory();
-                    const icon = window.__drawConfig.stampIcon || '✅';
                     ctx.save();
                     ctx.font = '44px serif';
                     ctx.textBaseline = 'middle';
                     ctx.textAlign = 'center';
-                    ctx.fillText(icon, e.pageX, e.pageY);
+                    ctx.fillText(window.__drawConfig.stampIcon || '✅', e.pageX, e.pageY);
                     ctx.restore();
                     return;
                 }
 
                 saveHistory();
                 isDrawing = true;
-                e.preventDefault();
-                // FIX 3: Pointer capture — hızlı çizimde event kaybolmaz
-                canvas.setPointerCapture(e.pointerId);
-
-                // Belge koordinatı: çizim sayfayla birlikte kayar
-                startX = e.pageX;
-                startY = e.pageY;
+                if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch(err) {} }
+                startX = e.pageX; startY = e.pageY;
                 lastPoint = { x: startX, y: startY };
                 midPoint = { x: startX, y: startY };
-                window.__currentPath = [lastPoint];
 
-                const previewCtx = previewLayer.getContext('2d');
-                previewCtx.clearRect(0, 0, previewLayer.width, previewLayer.height);
-                previewCtx.drawImage(canvas, 0, 0);
-
+                const pCtx = previewLayer.getContext('2d');
+                pCtx.clearRect(0, 0, previewLayer.width, previewLayer.height);
+                pCtx.drawImage(canvas, 0, 0);
                 initLayer();
             }
 
             function draw(e) {
                 if (!enabled) return;
-
-                // FIX 1: Lazer — isDrawing gerektirmez, hover'da da çalışır
-                if (window.__drawConfig.tool === 'sun') {
-                    drawLaser(e.clientX, e.clientY);
-                    return;
-                }
-
+                if (window.__drawConfig.tool === 'sun') { drawLaser(e.clientX, e.clientY); return; }
                 if (!isDrawing) return;
 
-                const tool = window.__drawConfig.tool;
-                // Belge koordinatı: scrollY dahil
-                const x = e.pageX;
-                const y = e.pageY;
-                const newPoint = { x, y };
-                // FIX 6: Kalem baskısı (Apple Pencil / S Pen)
+                const x = e.pageX, y = e.pageY, tool = window.__drawConfig.tool;
                 const pressure = (e.pointerType === 'pen' && e.pressure > 0) ? e.pressure : 0.5;
 
                 if (tool === 'pencil' || tool === 'highlighter' || tool === 'eraser') {
-                    window.__currentPath.push(newPoint);
                     const currentMid = { x: (lastPoint.x + x) / 2, y: (lastPoint.y + y) / 2 };
-
                     const tCtx = tool === 'highlighter' ? tempCtx : ctx;
-
-                    // Kalem: basınç aralığı daraltıldı → daha yumuşak, daha tutarlı çizgi
-                    // Fosforlu: sabit geniş çizgi, basınç etkisiz
-                    const baseWidth = tool === 'highlighter'
-                        ? window.__drawConfig.width * 5
-                        : tool === 'eraser'
-                            ? window.__drawConfig.width
-                            : window.__drawConfig.width * (0.85 + pressure * 0.3);
+                    const baseWidth = tool === 'highlighter' ? window.__drawConfig.width * 5 : tool === 'eraser' ? window.__drawConfig.width * 10 : window.__drawConfig.width * (0.8 + pressure * 0.4);
 
                     tCtx.save();
                     tCtx.beginPath();
-                    tCtx.setLineDash([]);
                     tCtx.strokeStyle = window.__drawConfig.color;
                     tCtx.lineWidth = baseWidth;
                     tCtx.lineCap = 'round';
                     tCtx.lineJoin = 'round';
-                    tCtx.globalAlpha = 1.0;
-                    tCtx.globalCompositeOperation = 'source-over';
-
-                    if (tool === 'eraser') {
-                        tCtx.globalCompositeOperation = 'destination-out';
-                        tCtx.lineWidth = baseWidth * 10;
-                    }
-
+                    if (tool === 'eraser') tCtx.globalCompositeOperation = 'destination-out';
                     tCtx.moveTo(midPoint.x, midPoint.y);
                     tCtx.quadraticCurveTo(lastPoint.x, lastPoint.y, currentMid.x, currentMid.y);
                     tCtx.stroke();
                     tCtx.restore();
 
-                    // OPTİMAZASYON: Highlighter her adımda tüm canvas'ı yeniden çizmek yerine 
-                    // ana canvas'a sadece son parçayı basalım (globalAlpha ile).
                     if (tool === 'highlighter') {
                         ctx.save();
-                        ctx.globalAlpha = 0.45;
-                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.globalAlpha = 0.4;
                         ctx.beginPath();
                         ctx.lineWidth = baseWidth;
                         ctx.lineCap = 'round';
-                        ctx.lineJoin = 'round';
                         ctx.strokeStyle = window.__drawConfig.color;
                         ctx.moveTo(midPoint.x, midPoint.y);
                         ctx.quadraticCurveTo(lastPoint.x, lastPoint.y, currentMid.x, currentMid.y);
                         ctx.stroke();
                         ctx.restore();
                     }
-
-                    lastPoint = newPoint;
-                    midPoint = currentMid;
+                    lastPoint = { x: x, y: y }; midPoint = currentMid;
                 } else if (tool !== 'pan') {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(previewLayer, 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
+                    const dpr = window.devicePixelRatio || 1;
+                    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+                    ctx.drawImage(previewLayer, 0, 0, canvas.width / dpr, canvas.height / dpr);
                     drawShape(tool, startX, startY, x, y);
                 }
             }
 
             function drawShape(tool, x1, y1, x2, y2) {
-                const fillEnabled = window.__drawConfig.fillEnabled;
                 ctx.save();
-                ctx.setLineDash(tool === 'dashed' ? [12, 6] : []);
-                ctx.globalAlpha = 1.0;
-                ctx.globalCompositeOperation = 'source-over';
                 ctx.strokeStyle = window.__drawConfig.color;
-                ctx.fillStyle  = window.__drawConfig.color;
-                ctx.lineWidth  = window.__drawConfig.width;
-                ctx.lineCap    = 'round';
-                ctx.lineJoin   = 'round';
-
+                ctx.fillStyle = window.__drawConfig.color;
+                ctx.lineWidth = window.__drawConfig.width;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                if (tool === 'dashed') ctx.setLineDash([12, 6]);
+                
                 if (tool === 'arrow' || tool === 'double_arrow') {
                     ctx.beginPath();
-                    drawArrow(x1, y1, x2, y2, tool === 'double_arrow');
+                    const headlen = 15, angle = Math.atan2(y2 - y1, x2 - x1);
+                    ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(x2, y2);
+                    ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
+                    ctx.moveTo(x2, y2);
+                    ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
+                    ctx.stroke();
+                    if (tool === 'double_arrow') {
+                        ctx.beginPath(); ctx.moveTo(x1, y1);
+                        ctx.lineTo(x1 + headlen * Math.cos(angle - Math.PI / 6), y1 + headlen * Math.sin(angle - Math.PI / 6));
+                        ctx.moveTo(x1, y1);
+                        ctx.lineTo(x1 + headlen * Math.cos(angle + Math.PI / 6), y1 + headlen * Math.sin(angle + Math.PI / 6));
+                        ctx.stroke();
+                    }
                 } else {
                     ctx.beginPath();
-                    if (tool === 'rect') {
-                        ctx.rect(x1, y1, x2 - x1, y2 - y1);
-                    } else if (tool === 'circle') {
-                        const r = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-                        ctx.arc(x1, y1, r, 0, 2 * Math.PI);
-                    } else if (tool === 'triangle') {
-                        ctx.moveTo((x1 + x2) / 2, y1);
-                        ctx.lineTo(x2, y2);
-                        ctx.lineTo(x1, y2);
-                        ctx.closePath();
-                    } else if (tool === 'line' || tool === 'dashed') {
-                        ctx.moveTo(x1, y1);
-                        ctx.lineTo(x2, y2);
-                    }
-                    // Şekil doldurma (çizgiler hariç)
-                    if (fillEnabled && tool !== 'line' && tool !== 'dashed') {
-                        ctx.globalAlpha = 0.22;
-                        ctx.fill();
-                        ctx.globalAlpha = 1.0;
-                    }
+                    if (tool === 'rect') ctx.rect(x1, y1, x2 - x1, y2 - y1);
+                    else if (tool === 'circle') ctx.arc(x1, y1, Math.sqrt(Math.pow(x2-x1,2) + Math.pow(y2-y1,2)), 0, 2*Math.PI);
+                    else if (tool === 'triangle') { ctx.moveTo((x1+x2)/2,y1); ctx.lineTo(x2,y2); ctx.lineTo(x1,y2); ctx.closePath(); }
+                    else if (tool === 'line' || tool === 'dashed') { ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }
+                    if (window.__drawConfig.fillEnabled && !['line', 'dashed'].includes(tool)) { ctx.globalAlpha = 0.2; ctx.fill(); ctx.globalAlpha = 1; }
                     ctx.stroke();
                 }
                 ctx.restore();
             }
 
-            function drawArrow(x1, y1, x2, y2, double) {
-                const headlen = 15;
-                const angle = Math.atan2(y2 - y1, x2 - x1);
-                ctx.moveTo(x1, y1);
-                ctx.lineTo(x2, y2);
-                ctx.stroke();
-
-                ctx.beginPath();
-                ctx.moveTo(x2, y2);
-                ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
-                ctx.moveTo(x2, y2);
-                ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
-                ctx.stroke();
-
-                if (double) {
-                    ctx.beginPath();
-                    ctx.moveTo(x1, y1);
-                    ctx.lineTo(x1 + headlen * Math.cos(angle - Math.PI / 6), y1 + headlen * Math.sin(angle - Math.PI / 6));
-                    ctx.moveTo(x1, y1);
-                    ctx.lineTo(x1 + headlen * Math.cos(angle + Math.PI / 6), y1 + headlen * Math.sin(angle + Math.PI / 6));
-                    ctx.stroke();
-                }
-            }
-
-            function stopDrawing() {
-                // FIX 1: Lazer noktasını kaldır
+            function stopDrawing(e) {
                 if (laserCanvas) laserCtx.clearRect(0, 0, laserCanvas.width, laserCanvas.height);
                 if (!isDrawing) return;
                 isDrawing = false;
-                currentImageData = null;
-                window.__currentPath = null;
+                if (e && e.pointerId && canvas.releasePointerCapture) { try { canvas.releasePointerCapture(e.pointerId); } catch(err) {} }
             }
 
             function clearDrawing() {
-                if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-                if (currentPage) delete drawingCache[currentPage];
+                if (ctx) {
+                    const dpr = window.devicePixelRatio || 1;
+                    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+                }
+                drawingCache = {};
             }
-
-            // Set touch action based on tool
-            function updateTouchAction() {
-                if (!canvas) return;
-                // Pan modunda scroll açık; diğer modlarda 'none' → çizim sırasında sayfa kaymaz
-                canvas.style.touchAction = (window.__drawConfig.tool === 'pan') ? 'auto' : 'none';
-                document.body.style.touchAction = (window.__drawConfig.tool === 'pan') ? 'auto' : 'none';
-                document.documentElement.style.touchAction = (window.__drawConfig.tool === 'pan') ? 'auto' : 'none';
-            }
-            // Interval kaldırıldı, toggleDrawingMode ve SET_DRAW_CONFIG içinde çağrılacak.
 
             _cleanup = function() {
                 clearInterval(_intCheck);
+                if (_resizeObserver) _resizeObserver.disconnect();
+                window.removeEventListener('resize', resize);
                 window.removeEventListener('hashchange', checkPage);
-                history.length = 0;
-                for (const key in drawingCache) delete drawingCache[key];
-                if (previewLayer) { previewLayer.width = 1; previewLayer.height = 1; }
-                if (tempCanvas) { tempCanvas.width = 1; tempCanvas.height = 1; }
                 if (laserCanvas) { laserCanvas.remove(); laserCanvas = null; }
             };
         })();
@@ -1229,6 +1118,16 @@ const StudentPortal = ({ act }: { act: any }) => {
                     answers: newAnswer // Simulation should send current full state
                 });
             }
+            if (event.data.type === 'DRAWING_READY' && iframeRef.current?.contentWindow) {
+                iframeRef.current.contentWindow.postMessage({ 
+                    type: 'TOGGLE_DRAWING', 
+                    enabled: isDrawingMode 
+                }, '*');
+                iframeRef.current.contentWindow.postMessage({ 
+                    type: 'SET_DRAW_CONFIG', 
+                    config: drawConfig 
+                }, '*');
+            }
         };
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
@@ -1454,6 +1353,27 @@ export default function App() {
             }, '*');
         }
     }, [previewDrawConfig]);
+
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            if (event.data.type === 'DRAWING_READY' && previewIframeRef.current?.contentWindow) {
+                previewIframeRef.current.contentWindow.postMessage({ 
+                    type: 'TOGGLE_DRAWING', 
+                    enabled: isPreviewDrawingMode 
+                }, '*');
+                previewIframeRef.current.contentWindow.postMessage({ 
+                    type: 'SET_DRAW_CONFIG', 
+                    config: previewDrawConfig 
+                }, '*');
+                previewIframeRef.current.contentWindow.postMessage({ 
+                    type: 'SET_WHITEBOARD', 
+                    enabled: showWhiteboard 
+                }, '*');
+            }
+        };
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, [isPreviewDrawingMode, previewDrawConfig, showWhiteboard]);
 
     const handlePreviewDrawingCommand = (type: string, data?: any) => {
         if (previewIframeRef.current?.contentWindow) {
