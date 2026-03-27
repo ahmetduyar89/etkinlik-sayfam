@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Sparkles, Search, ExternalLink, Copy, Share2, Trash2, Edit3, Grid, Filter, Plus,
-    LayoutDashboard, ChevronLeft, ChevronRight, Database, BarChart3, CalendarDays,
+    LayoutDashboard, Database, BarChart3,
     Target, Zap, Globe, Settings, Bell, User, ArrowRight, HelpCircle, Eye,
-    MoreVertical, X, Save, Clock, BookOpen, Anchor, Book, FlaskConical, Command, Blocks, Pencil, Eraser,
+    MoreVertical, X, Save, Clock, BookOpen, Anchor, Command, Blocks, Pencil, Eraser,
     Hand, Highlighter, Type, Shapes, Undo, History, Sun, Square, Circle, Triangle, MousePointer2,
     MoveRight, ArrowRightLeft, Minus, PaintBucket, List, LayoutList, LayoutGrid, GripVertical
 } from 'lucide-react';
@@ -362,7 +362,7 @@ const IconButton = ({ icon: Icon, onClick, className, title }: { icon: any, onCl
     </button>
 );
 
-const Navbar = ({ activeTab, setTab }: { activeTab: string, setTab: (t: string) => void }) => (
+const Navbar = () => (
     <header className="fixed top-0 left-0 right-0 z-[100] px-4 py-4 pointer-events-none">
         <div className="container mx-auto max-w-6xl flex justify-between items-center pointer-events-auto glass-effect rounded-2xl px-6 py-3">
             <div className="flex items-center gap-3">
@@ -371,33 +371,12 @@ const Navbar = ({ activeTab, setTab }: { activeTab: string, setTab: (t: string) 
                 </div>
                 <div>
                     <h1 className="text-sm font-bold tracking-wider text-slate-800 uppercase">A. Duyar</h1>
+                    <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase">İnteraktif Merkez</p>
                 </div>
             </div>
 
-            <nav className="hidden md:flex items-center gap-2 bg-neutral-100/50 p-1 rounded-xl">
-                {[
-                    { id: 'dashboard', label: 'Müfredat Planı', icon: Book },
-                    { id: 'interactive', label: 'İnteraktif Merkez', icon: Blocks }
-                ].map((item) => (
-                    <button
-                        key={item.id}
-                        onClick={() => setTab(item.id)}
-                        className={cn(
-                            "px-5 py-2 rounded-xl text-[13px] font-bold flex items-center gap-2 transition-all duration-300",
-                            activeTab === item.id 
-                                ? "bg-white text-indigo-600 shadow-md border border-indigo-100" 
-                                : "text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/50"
-                        )}
-                    >
-                        <item.icon className="w-3.5 h-3.5" />
-                        {item.label}
-                    </button>
-                ))}
-            </nav>
-
             <div className="flex items-center gap-2">
                 <div className="hidden lg:flex items-center gap-1 mr-2">
-                    <IconButton icon={Search} />
                     <IconButton icon={Settings} />
                 </div>
                 <div className="w-8 h-8 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center cursor-pointer hover:bg-neutral-200 transition-colors">
@@ -464,9 +443,9 @@ const LivePreview = ({ act }: { act: any }) => (
 // =======================
 const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activitiesHandler, showResultsId, setShowResultsId }: any) => {
     const [isHovered, setIsHovered] = useState(false);
-    
+
     return (
-        <PortalCard className="p-0 h-full flex flex-col justify-between border-2 border-indigo-50 hover:border-indigo-300 shadow-lg shadow-indigo-100/20">
+        <PortalCard className="p-0 h-full flex flex-col justify-between border-2 border-indigo-50 hover:border-indigo-300 shadow-lg shadow-indigo-100/20 cursor-pointer" onClick={() => setPreviewId(act.id)}>
             <div className="p-6 space-y-5">
                 <div className="flex justify-between items-start gap-3">
                     <h3 className="text-[17px] font-bold tracking-tight leading-snug text-slate-800 line-clamp-2">{act.title}</h3>
@@ -477,14 +456,13 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
                         <span className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded-lg uppercase tracking-wider">{act.category || 'Genel'}</span>
                     </div>
                 </div>
-                
+
                 <p className="text-[13px] text-slate-500 line-clamp-2 leading-relaxed h-[40px] font-medium">{act.description || 'Açıklama girilmedi.'}</p>
 
-                <div 
-                    className="aspect-[16/10] bg-indigo-50/50 rounded-2xl border-2 border-indigo-100 relative group overflow-hidden flex items-center justify-center cursor-pointer shadow-inner"
+                <div
+                    className="aspect-[16/10] bg-indigo-50/50 rounded-2xl border-2 border-indigo-100 relative group overflow-hidden flex items-center justify-center shadow-inner"
                     onMouseEnter={() => setIsHovered(true)}
                     onMouseLeave={() => setIsHovered(false)}
-                    onClick={() => setPreviewId(act.id)}
                 >
                     {act.image_url ? (
                         <div className="absolute inset-0 w-full h-full">
@@ -498,11 +476,9 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
                             ) : (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-indigo-50/30">
                                     <LayoutDashboard className="w-8 h-8 text-indigo-200" />
-                                    <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Önizleme için üzerine gel</span>
+                                    <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Tıkla veya üzerine gel</span>
                                 </div>
                             )}
-                            
-                            {/* Overlay for better text legibility and interaction feel */}
                             <div className={cn(
                                 "absolute inset-0 transition-opacity duration-300",
                                 isHovered ? "bg-indigo-900/5" : "bg-transparent"
@@ -513,16 +489,16 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
                             <LayoutDashboard className="w-10 h-10 text-indigo-200" />
                         </div>
                     )}
-                    
+
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all bg-indigo-900/10 backdrop-blur-[2px] z-10">
-                        <button onClick={(e) => { e.stopPropagation(); setPreviewId(act.id); }} className="w-12 h-12 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all shadow-xl shadow-indigo-300/50">
+                        <div className="w-12 h-12 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white shadow-xl shadow-indigo-300/50">
                             <Eye className="w-4 h-4" />
-                        </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t-2 border-slate-100 flex justify-between items-center z-20">
+            <div className="px-6 py-4 bg-slate-50 border-t-2 border-slate-100 flex justify-between items-center z-20" onClick={e => e.stopPropagation()}>
                 <div className="flex gap-1">
                     <IconButton icon={Copy} onClick={() => {
                         navigator.clipboard.writeText(act.html_code);
@@ -1075,10 +1051,7 @@ const StudentPortal = ({ act }: { act: any }) => {
 // =======================
 export default function App() {
     const params = new URLSearchParams(window.location.search);
-    const [tab, setTab] = useState('dashboard');
-    const [selectedWeek, setSelectedWeek] = useState(1);
     const [activities, setActivities] = useState<any[]>([]);
-    const [science, setScience] = useState<any[]>([]);
     const [search, setSearch] = useState('');
     const [previewId, setPreviewId] = useState<string | null>(null);
     const [showResultsId, setShowResultsId] = useState<string | null>(null);
@@ -1101,44 +1074,15 @@ export default function App() {
     }, []);
 
     // Form States
-    const [isScienceOpen, setIsScienceOpen] = useState(false);
     const [isActivityOpen, setIsActivityOpen] = useState(false);
     const [editItem, setEditItem] = useState<any>(null);
 
     const activitiesHandler = useFirestore('activities');
-    const scienceHandler = useFirestore('science_activities');
 
     useEffect(() => {
         const unsubA = activitiesHandler.sync(setActivities);
-        const unsubS = scienceHandler.sync(setScience);
-        return () => { unsubA(); unsubS(); };
+        return () => { unsubA(); };
     }, []);
-
-    const filteredScience = useMemo(() => {
-        const grades = ["1. Sınıf", "2. Sınıf", "3. Sınıf", "4. Sınıf"];
-        return grades.map(grade => ({
-            grade,
-            items: science.filter(s =>
-                s.class_level === grade &&
-                (parseInt(s.week_number) <= selectedWeek &&
-                    (parseInt(s.week_number) + (parseInt(s.duration_weeks) || 1) > selectedWeek))
-            )
-        }));
-    }, [science, selectedWeek]);
-
-    const handleScienceSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const formData = new FormData(e.target as HTMLFormElement);
-        const payload = Object.fromEntries(formData.entries());
-
-        if (editItem) {
-            await scienceHandler.update(editItem.id, payload);
-        } else {
-            await scienceHandler.add(payload);
-        }
-        setIsScienceOpen(false);
-        setEditItem(null);
-    };
 
     const handleActivitySubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -1164,16 +1108,6 @@ export default function App() {
     const inputClasses = "w-full bg-white border-2 border-indigo-50 rounded-xl px-4 py-3 text-[14px] text-slate-800 font-medium focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400";
     const labelClasses = "block text-[11px] font-bold text-indigo-600 uppercase tracking-wider mb-2";
 
-    const getColColor = (idx: number) => {
-        switch(idx) {
-            case 0: return { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', hover: 'hover:border-emerald-300', icon: 'text-emerald-500', button: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' };
-            case 1: return { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', hover: 'hover:border-blue-300', icon: 'text-blue-500', button: 'bg-blue-100 text-blue-700 hover:bg-blue-200' };
-            case 2: return { bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', hover: 'hover:border-violet-300', icon: 'text-violet-500', button: 'bg-violet-100 text-violet-700 hover:bg-violet-200' };
-            case 3: return { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', hover: 'hover:border-orange-300', icon: 'text-orange-500', button: 'bg-orange-100 text-orange-700 hover:bg-orange-200' };
-            default: return { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-700', hover: 'hover:border-slate-300', icon: 'text-slate-500', button: 'bg-slate-100 text-slate-700 hover:bg-slate-200' };
-        }
-    };
-
     if (params.get('view') === 'student' && params.get('id')) {
         const activity = activities.find(a => a.id === params.get('id'));
         if (activity) return <StudentPortal act={activity} />;
@@ -1183,195 +1117,96 @@ export default function App() {
     return (
         <div className="min-h-screen pt-28 pb-16 px-4 bg-slate-50 relative">
             <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-br from-indigo-100 via-transparent to-pink-50 opacity-60 pointer-events-none" />
-            
-            <Navbar activeTab={tab} setTab={setTab} />
+
+            <Navbar />
 
             <main className="container mx-auto max-w-6xl relative z-10">
-                <AnimatePresence mode="wait">
-                    {tab === 'dashboard' ? (
-                        <motion.div key="dashboard" initial={{ opacity: 0, filter: 'blur(4px)' }} animate={{ opacity: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, filter: 'blur(4px)' }} transition={{ duration: 0.3 }} className="space-y-10">
-                            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                                <div className="space-y-3">
-                                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-100 border border-indigo-200 text-[11px] font-bold uppercase tracking-wider text-indigo-700 shadow-sm">
-                                        <CalendarDays className="w-3.5 h-3.5" /> Yıllık Bilim Müfredatı
-                                    </div>
-                                    <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-800">Müfredat Planı</h2>
-                                    <p className="text-[15px] text-slate-500 max-w-md font-medium leading-relaxed">
-                                        1-36 haftalık eğitim-öğretim dönemi için her sınıf düzeyine özel olarak hazırlanmış bilim deney ve proje akışı.
-                                    </p>
-                                </div>
-
-                                <div className="inline-flex bg-white border-2 border-indigo-50 rounded-2xl p-1.5 shadow-lg shadow-indigo-100/50">
-                                    <button onClick={() => setSelectedWeek(Math.max(1, selectedWeek - 1))} className="p-3 rounded-xl hover:bg-indigo-50 transition-colors text-indigo-600">
-                                        <ChevronLeft className="w-5 h-5" />
-                                    </button>
-                                    <div className="flex flex-col items-center justify-center px-8 min-w-[140px]">
-                                        <span className="text-[11px] font-bold uppercase text-indigo-400 tracking-widest hidden md:block mb-1">HAFTA</span>
-                                        <span className="text-2xl font-black tracking-tight text-indigo-700">{selectedWeek}</span>
-                                    </div>
-                                    <button onClick={() => setSelectedWeek(Math.min(36, selectedWeek + 1))} className="p-3 rounded-xl hover:bg-indigo-50 transition-colors text-indigo-600">
-                                        <ChevronRight className="w-5 h-5" />
-                                    </button>
-                                </div>
+                <div className="space-y-10">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                        <div className="space-y-3">
+                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-100 border border-violet-200 text-[11px] font-bold uppercase tracking-wider text-violet-700 shadow-sm">
+                                <Grid className="w-3.5 h-3.5" /> Dijital İçerikler
                             </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                {filteredScience.map((col, idx) => {
-                                    const colors = getColColor(idx);
-                                    return (
-                                    <div key={col.grade} className={cn("flex flex-col gap-4 p-5 rounded-3xl border-2 shadow-sm transition-all", colors.bg, colors.border, colors.hover)}>
-                                        <div className="flex items-center justify-between pb-3 border-b-2 border-inherit">
-                                            <h4 className={cn("text-lg font-black tracking-tight flex items-center gap-2", colors.text)}>
-                                                {col.grade}
-                                            </h4>
-                                            <span className={cn("text-xs font-bold px-3 py-1 bg-white rounded-full shadow-sm", colors.text)}>{col.items.length} Plan</span>
-                                        </div>
-
-                                        <div className="space-y-4">
-                                            {col.items.length > 0 ? (
-                                                col.items.map((act) => (
-                                                    <PortalCard key={act.id} className="p-5 flex flex-col gap-4 bg-white border-2 hover:border-indigo-300 shadow-md !rounded-2xl">
-                                                        <div>
-                                                            <div className={cn("text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5", colors.text)}>
-                                                                <FlaskConical className="w-3.5 h-3.5" /> {act.theme}
-                                                            </div>
-                                                            <h5 className="text-[16px] font-bold text-slate-800 leading-snug">{act.name}</h5>
-                                                        </div>
-                                                        <p className="text-[13px] text-slate-600 font-medium line-clamp-3 leading-relaxed">
-                                                            {act.content}
-                                                        </p>
-                                                        <div className="flex items-center justify-between pt-3 border-t-2 border-slate-100 mt-auto">
-                                                            <button 
-                                                                onClick={() => { setEditItem(act); setIsScienceOpen(true); }}
-                                                                className={cn("text-[11px] font-bold uppercase transition-colors", colors.text)}
-                                                            >
-                                                                Düzenle
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => {
-                                                                    if (window.confirm('Emin misiniz?')) scienceHandler.remove(act.id);
-                                                                }}
-                                                                className="text-[11px] font-bold uppercase text-red-400 hover:text-red-600 transition-colors"
-                                                            >
-                                                                Sil
-                                                            </button>
-                                                        </div>
-                                                    </PortalCard>
-                                                ))
-                                            ) : (
-                                                <button
-                                                    onClick={() => { setEditItem(null); setIsScienceOpen(true); }}
-                                                    className={cn("w-full h-32 border-2 border-dashed bg-white shadow-sm hover:shadow-md rounded-2xl flex flex-col items-center justify-center gap-3 transition-all group", colors.border, colors.text)}
-                                                >
-                                                    <div className={cn("p-2 rounded-xl", colors.button)}>
-                                                        <Plus className="w-6 h-6 group-hover:scale-125 transition-transform" />
-                                                    </div>
-                                                    <span className="text-[12px] font-black uppercase tracking-widest">Plan Ekle</span>
-                                                </button>
-                                            )}
-                                            
-                                            {col.items.length > 0 && (
-                                                <button
-                                                    onClick={() => { setEditItem(null); setIsScienceOpen(true); }}
-                                                    className={cn("w-full py-3.5 border-2 border-dashed bg-white shadow-sm hover:shadow-md rounded-2xl text-[12px] font-black uppercase transition-all flex items-center justify-center gap-2", colors.border, colors.text)}
-                                                >
-                                                    <Plus className="w-4 h-4" /> Yeni Ekle
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                )})}
+                            <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-800">İnteraktif Merkez</h2>
+                            <p className="text-[15px] text-slate-500 max-w-md font-medium leading-relaxed">
+                                Konu anlatımları, deneyler, animasyonlar ve simülasyonlarla dolu dijital arşiv.
+                            </p>
+                        </div>
+                        <div className="flex w-full md:w-auto gap-4 items-center">
+                            <div className="relative flex-1 md:w-72">
+                                <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    placeholder="İçerik ara..."
+                                    className="w-full bg-white border-2 border-indigo-100 rounded-2xl pl-12 pr-4 py-3.5 text-[14px] text-slate-800 font-medium focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400 shadow-sm"
+                                />
                             </div>
-                        </motion.div>
-                    ) : (
-                        <motion.div key="interactive" initial={{ opacity: 0, filter: 'blur(4px)' }} animate={{ opacity: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, filter: 'blur(4px)' }} transition={{ duration: 0.3 }}  className="space-y-10">
-                            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                                <div className="space-y-3">
-                                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-100 border border-violet-200 text-[11px] font-bold uppercase tracking-wider text-violet-700 shadow-sm">
-                                        <Grid className="w-3.5 h-3.5" /> Dijital İçerikler
-                                    </div>
-                                    <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-800">İnteraktif Merkez</h2>
-                                    <p className="text-[15px] text-slate-500 max-w-md font-medium leading-relaxed">
-                                        Oyunlar, testler ve HTML tabanlı eğitici materyallerle dolu dijital havuz.
-                                    </p>
-                                </div>
-                                <div className="flex w-full md:w-auto gap-4 items-center">
-                                    <div className="relative flex-1 md:w-72">
-                                        <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input 
-                                            value={search} 
-                                            onChange={e => setSearch(e.target.value)} 
-                                            placeholder="İçerik ara..." 
-                                            className="w-full bg-white border-2 border-indigo-100 rounded-2xl pl-12 pr-4 py-3.5 text-[14px] text-slate-800 font-medium focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400 shadow-sm"
-                                        />
-                                    </div>
-                                    <button onClick={() => { setEditItem(null); setIsActivityOpen(true); }} className="px-6 py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[14px] font-bold rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-200 flex items-center gap-2 whitespace-nowrap">
-                                        <Plus className="w-5 h-5" /> İçerik Ekle
-                                    </button>
-                                </div>
-                            </div>
+                            <button onClick={() => { setEditItem(null); setIsActivityOpen(true); }} className="px-6 py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[14px] font-bold rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-200 flex items-center gap-2 whitespace-nowrap">
+                                <Plus className="w-5 h-5" /> İçerik Ekle
+                            </button>
+                        </div>
+                    </div>
 
-                            <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
-                                <div className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                    <Blocks className="w-4 h-4" /> {activities.filter(a => a.title.toLowerCase().includes(search.toLowerCase())).length} İçerik Bulundu
-                                </div>
-                                <div className="flex bg-white/50 backdrop-blur-sm border border-slate-200 rounded-xl p-1 gap-1">
-                                    <button 
-                                        onClick={() => setViewMode('grid')}
-                                        className={cn(
-                                            "p-2 rounded-lg transition-all",
-                                            viewMode === 'grid' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
-                                        )}
-                                        title="Izgara Görünümü"
-                                    >
-                                        <LayoutGrid className="w-4 h-4" />
-                                    </button>
-                                    <button 
-                                        onClick={() => setViewMode('list')}
-                                        className={cn(
-                                            "p-2 rounded-lg transition-all",
-                                            viewMode === 'list' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
-                                        )}
-                                        title="Liste Görünümü"
-                                    >
-                                        <LayoutList className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
+                    <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
+                        <div className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <Blocks className="w-4 h-4" /> {activities.filter(a => a.title.toLowerCase().includes(search.toLowerCase())).length} İçerik Bulundu
+                        </div>
+                        <div className="flex bg-white/50 backdrop-blur-sm border border-slate-200 rounded-xl p-1 gap-1">
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={cn(
+                                    "p-2 rounded-lg transition-all",
+                                    viewMode === 'grid' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
+                                )}
+                                title="Izgara Görünümü"
+                            >
+                                <LayoutGrid className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('list')}
+                                className={cn(
+                                    "p-2 rounded-lg transition-all",
+                                    viewMode === 'list' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
+                                )}
+                                title="Liste Görünümü"
+                            >
+                                <LayoutList className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
 
-                            <div className={cn(
-                                "grid gap-6",
-                                viewMode === 'grid' ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
-                            )}>
-                                {activities.filter(a => a.title.toLowerCase().includes(search.toLowerCase())).map((act, i) => (
-                                    viewMode === 'grid' ? (
-                                        <ActivityCard 
-                                            key={act.id} 
-                                            act={act} 
-                                            setPreviewId={setPreviewId} 
-                                            setEditItem={setEditItem} 
-                                            setIsActivityOpen={setIsActivityOpen} 
-                                            activitiesHandler={activitiesHandler} 
-                                            showResultsId={showResultsId}
-                                            setShowResultsId={setShowResultsId}
-                                        />
-                                    ) : (
-                                        <ActivityListItem 
-                                            key={act.id} 
-                                            act={act} 
-                                            setPreviewId={setPreviewId} 
-                                            setEditItem={setEditItem} 
-                                            setIsActivityOpen={setIsActivityOpen} 
-                                            activitiesHandler={activitiesHandler} 
-                                            showResultsId={showResultsId}
-                                            setShowResultsId={setShowResultsId}
-                                        />
-                                    )
-                                ))}
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                    <div className={cn(
+                        "grid gap-6",
+                        viewMode === 'grid' ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
+                    )}>
+                        {activities.filter(a => a.title.toLowerCase().includes(search.toLowerCase())).map((act) => (
+                            viewMode === 'grid' ? (
+                                <ActivityCard
+                                    key={act.id}
+                                    act={act}
+                                    setPreviewId={setPreviewId}
+                                    setEditItem={setEditItem}
+                                    setIsActivityOpen={setIsActivityOpen}
+                                    activitiesHandler={activitiesHandler}
+                                    showResultsId={showResultsId}
+                                    setShowResultsId={setShowResultsId}
+                                />
+                            ) : (
+                                <ActivityListItem
+                                    key={act.id}
+                                    act={act}
+                                    setPreviewId={setPreviewId}
+                                    setEditItem={setEditItem}
+                                    setIsActivityOpen={setIsActivityOpen}
+                                    activitiesHandler={activitiesHandler}
+                                    showResultsId={showResultsId}
+                                    setShowResultsId={setShowResultsId}
+                                />
+                            )
+                        ))}
+                    </div>
+                </div>
                 <ResultsModal isOpen={!!showResultsId} onClose={() => setShowResultsId(null)} activityId={showResultsId || ''} />
             </main>
 
@@ -1385,57 +1220,6 @@ export default function App() {
             </footer>
 
             {/* MODALS */}
-            <Modal isOpen={isScienceOpen} onClose={() => setIsScienceOpen(false)} title={editItem ? "Planı Güncelle" : "Yeni Müfredat Planı"}>
-                <form onSubmit={handleScienceSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label className={labelClasses}>Sınıf Seviyesi</label>
-                            <select name="class_level" defaultValue={editItem?.class_level || "1. Sınıf"} className={inputClasses}>
-                                <option value="1. Sınıf">1. Sınıf</option>
-                                <option value="2. Sınıf">2. Sınıf</option>
-                                <option value="3. Sınıf">3. Sınıf</option>
-                                <option value="4. Sınıf">4. Sınıf</option>
-                            </select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className={labelClasses}>Hafta (1-36)</label>
-                                <input name="week_number" type="number" defaultValue={editItem?.week_number || selectedWeek} min="1" max="36" className={inputClasses} />
-                            </div>
-                            <div>
-                                <label className={labelClasses}>Süre (Hafta)</label>
-                                <input name="duration_weeks" type="number" defaultValue={editItem?.duration_weeks || 1} min="1" className={inputClasses} />
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label className={labelClasses}>Etkinlik Adı</label>
-                            <input name="name" defaultValue={editItem?.name} required placeholder="Örn: Balon Roket" className={inputClasses} />
-                        </div>
-                        <div>
-                            <label className={labelClasses}>Tema / Konu</label>
-                            <input name="theme" defaultValue={editItem?.theme} required placeholder="Örn: Kuvvet" className={inputClasses} />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className={labelClasses}>Uygulama Adımları</label>
-                        <textarea name="content" defaultValue={editItem?.content} required rows={5} className={cn(inputClasses, "resize-none")} placeholder="Detaylı adımları girin..." />
-                    </div>
-
-                    <div className="flex justify-end gap-3 pt-2">
-                        <button type="button" onClick={() => setIsScienceOpen(false)} className="px-5 py-2.5 text-[13px] font-medium text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors">
-                            İptal
-                        </button>
-                        <button type="submit" className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[14px] font-bold rounded-xl hover:scale-105 transition-all shadow-lg shadow-indigo-200">
-                            {editItem ? 'Değişiklikleri Kaydet' : 'Planı Oluştur'}
-                        </button>
-                    </div>
-                </form>
-            </Modal>
-
             <Modal isOpen={isActivityOpen} onClose={() => setIsActivityOpen(false)} title={editItem ? "Etkinliği Güncelle" : "Yeni İnteraktif İçerik"}>
                 <form onSubmit={handleActivitySubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1523,10 +1307,26 @@ export default function App() {
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => { setPreviewId(null); setIsPreviewDrawingMode(false); setShowWhiteboard(false); }} className="absolute inset-0 bg-neutral-900/90" />
                     <div className="relative w-full h-full bg-white overflow-hidden flex flex-col">
                         <header className="h-14 px-6 bg-slate-900 border-b border-white/5 flex justify-between items-center shrink-0 z-[11000]">
-                            <h3 className="text-white font-bold">{activities.find(a => a.id === previewId)?.title}</h3>
                             <div className="flex items-center gap-3">
-                                <button onClick={() => setIsPreviewDrawingMode(!isPreviewDrawingMode)} className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all", isPreviewDrawingMode ? "bg-indigo-600 text-white shadow-lg" : "bg-white/5 text-slate-300 hover:bg-white/10")}><Pencil className="w-4 h-4" />{isPreviewDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}</button>
-                                <button onClick={() => { setPreviewId(null); setIsPreviewDrawingMode(false); setShowWhiteboard(false); }} className="p-2 text-slate-400 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
+                                <div className="w-7 h-7 bg-indigo-500/20 rounded-lg flex items-center justify-center">
+                                    <Blocks className="w-3.5 h-3.5 text-indigo-400" />
+                                </div>
+                                <h3 className="text-white font-bold">{activities.find(a => a.id === previewId)?.title}</h3>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setIsPreviewDrawingMode(!isPreviewDrawingMode)}
+                                    className={cn(
+                                        "flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border",
+                                        isPreviewDrawingMode
+                                            ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 border-indigo-500"
+                                            : "bg-white/5 text-slate-300 hover:bg-indigo-600/20 hover:text-indigo-300 border-white/10 hover:border-indigo-500/50"
+                                    )}
+                                >
+                                    <Pencil className="w-4 h-4" />
+                                    {isPreviewDrawingMode ? 'Kalemi Kapat' : 'Kalem Modu'}
+                                </button>
+                                <button onClick={() => { setPreviewId(null); setIsPreviewDrawingMode(false); setShowWhiteboard(false); }} className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/10"><X className="w-5 h-5" /></button>
                             </div>
                         </header>
                         <main className="flex-1 relative bg-white overflow-y-auto overflow-x-hidden custom-scroll">
