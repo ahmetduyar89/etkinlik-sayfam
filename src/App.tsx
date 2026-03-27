@@ -124,6 +124,7 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
     // Sarı ve İndigo eklendi
     const colors = ['#ffffff', '#ff4d4d', '#ffff00', '#ffa500', '#2ecc71', '#3498db', '#4f46e5', '#9b59b6', '#000000'];
     const mainTools = [
+        { id: 'select',      icon: MousePointer2, label: 'Seç & Düzenle' },
         { id: 'pencil',      icon: Pencil,      label: 'Kalem' },
         { id: 'pan',         icon: Hand,        label: 'El' },
         { id: 'highlighter', icon: Highlighter, label: 'Fosforlu' },
@@ -673,7 +674,11 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
     const [strokes, setStrokes] = React.useState<any[]>([]);
     const [currentStroke, setCurrentStroke] = React.useState<any>(null);
     const [isDrawing, setIsDrawing] = React.useState(false);
+    const [selectedIdx, setSelectedIdx] = React.useState<number | null>(null);
+    const [selBB, setSelBB] = React.useState<any>(null);
     const canvasRectRef = React.useRef<DOMRect | null>(null);
+    const selectedIdxRef = React.useRef<number | null>(null);
+    const dragStateRef = React.useRef<any>(null);
 
     // Refs for non-react state (performance)
     const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null);
@@ -682,8 +687,49 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
     const strokesRef = React.useRef<any[]>([]);
     const isDrawingRef = React.useRef(false);
 
+    const getBB = (s: any) => {
+        const xs = s.points.map((p: any) => p.x);
+        const ys = s.points.map((p: any) => p.y);
+        const pad = Math.max((s.width || 2) / 2 + 6, 14);
+        return { x1: Math.min(...xs) - pad, y1: Math.min(...ys) - pad, x2: Math.max(...xs) + pad, y2: Math.max(...ys) + pad };
+    };
+
+    const hitTest = (s: any, x: number, y: number): boolean => {
+        const bb = getBB(s);
+        return x >= bb.x1 && x <= bb.x2 && y >= bb.y1 && y <= bb.y2;
+    };
+
+    const getHandlePositions = (bb: any) => {
+        const { x1, y1, x2, y2 } = bb;
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        return [
+            { id: 'nw', x: x1, y: y1 }, { id: 'n', x: mx, y: y1 }, { id: 'ne', x: x2, y: y1 },
+            { id: 'w', x: x1, y: my },                               { id: 'e', x: x2, y: my },
+            { id: 'sw', x: x1, y: y2 }, { id: 's', x: mx, y: y2 }, { id: 'se', x: x2, y: y2 },
+        ];
+    };
+
+    const resizePoints = (origPoints: any[], origBB: any, handle: string, dx: number, dy: number) => {
+        const { x1, y1, x2, y2 } = origBB;
+        const w = x2 - x1 || 1, h = y2 - y1 || 1;
+        const nb = { x1, y1, x2, y2 };
+        if (handle.includes('e')) nb.x2 = x2 + dx;
+        if (handle.includes('w')) nb.x1 = x1 + dx;
+        if (handle.includes('s')) nb.y2 = y2 + dy;
+        if (handle.includes('n')) nb.y1 = y1 + dy;
+        const sx = (nb.x2 - nb.x1) / w, sy = (nb.y2 - nb.y1) / h;
+        return origPoints.map((p: any) => ({ x: nb.x1 + (p.x - x1) * sx, y: nb.y1 + (p.y - y1) * sy }));
+    };
+
+    const deselect = () => {
+        selectedIdxRef.current = null;
+        setSelectedIdx(null);
+        setSelBB(null);
+    };
+
     React.useImperativeHandle(ref, () => ({
         undo: () => {
+            deselect();
             strokesRef.current.pop();
             setStrokes([...strokesRef.current]);
             redraw();
@@ -691,8 +737,39 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         clear: () => {
             strokesRef.current = [];
             setStrokes([]);
+            deselect();
             redraw();
-        }
+        },
+        deleteSelected: () => {
+            if (selectedIdxRef.current !== null) {
+                strokesRef.current.splice(selectedIdxRef.current, 1);
+                setStrokes([...strokesRef.current]);
+                deselect();
+                redraw();
+            }
+        },
+        setSelectedColor: (color: string) => {
+            if (selectedIdxRef.current !== null && strokesRef.current[selectedIdxRef.current]) {
+                strokesRef.current[selectedIdxRef.current].color = color;
+                setStrokes([...strokesRef.current]);
+                const newBB = getBB(strokesRef.current[selectedIdxRef.current]);
+                setSelBB(newBB);
+                redraw();
+            }
+        },
+        duplicateSelected: () => {
+            if (selectedIdxRef.current !== null && strokesRef.current[selectedIdxRef.current]) {
+                const copy = JSON.parse(JSON.stringify(strokesRef.current[selectedIdxRef.current]));
+                copy.points = copy.points.map((p: any) => ({ x: p.x + 20, y: p.y + 20 }));
+                strokesRef.current.push(copy);
+                const newIdx = strokesRef.current.length - 1;
+                selectedIdxRef.current = newIdx;
+                setStrokes([...strokesRef.current]);
+                setSelectedIdx(newIdx);
+                setSelBB(getBB(copy));
+                redraw();
+            }
+        },
     }));
 
     const resize = React.useCallback(() => {
@@ -828,12 +905,23 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         const canvas = bufferCanvasRef.current;
         const mainCanvas = canvasRef.current;
         if (!bCtx || !mainCtx || !canvas || !mainCanvas) return;
-        
+
         bCtx.clearRect(0,0, 4000, 8000);
         strokesRef.current.forEach(s => drawStroke(bCtx, s));
-        
+
         mainCtx.clearRect(0,0, 4000, 8000);
         mainCtx.drawImage(canvas, 0, 0, mainCanvas.width / (window.devicePixelRatio || 1), mainCanvas.height / (window.devicePixelRatio || 1));
+
+        // Draw selection highlight
+        if (selectedIdxRef.current !== null && strokesRef.current[selectedIdxRef.current]) {
+            const bb = getBB(strokesRef.current[selectedIdxRef.current]);
+            mainCtx.save();
+            mainCtx.strokeStyle = '#4f46e5';
+            mainCtx.lineWidth = 1.5;
+            mainCtx.setLineDash([5, 3]);
+            mainCtx.strokeRect(bb.x1, bb.y1, bb.x2 - bb.x1, bb.y2 - bb.y1);
+            mainCtx.restore();
+        }
     };
 
     const startDrawing = (e: React.PointerEvent) => {
@@ -842,6 +930,42 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         if (!rect) return;
         canvasRectRef.current = rect;
         const x = e.clientX - rect.left, y = e.clientY - rect.top;
+
+        if (config.tool === 'select') {
+            // Check resize handles first
+            if (selectedIdxRef.current !== null && selBB) {
+                for (const h of getHandlePositions(selBB)) {
+                    if (Math.hypot(x - h.x, y - h.y) < 10) {
+                        const s = strokesRef.current[selectedIdxRef.current];
+                        dragStateRef.current = { type: 'resize', handle: h.id, startX: x, startY: y, origPoints: JSON.parse(JSON.stringify(s.points)), origBB: { ...selBB } };
+                        return;
+                    }
+                }
+                // Check if inside bbox → move
+                if (x >= selBB.x1 && x <= selBB.x2 && y >= selBB.y1 && y <= selBB.y2) {
+                    const s = strokesRef.current[selectedIdxRef.current];
+                    dragStateRef.current = { type: 'move', startX: x, startY: y, origPoints: JSON.parse(JSON.stringify(s.points)) };
+                    return;
+                }
+            }
+            // Hit test strokes (topmost first)
+            for (let i = strokesRef.current.length - 1; i >= 0; i--) {
+                if (hitTest(strokesRef.current[i], x, y)) {
+                    selectedIdxRef.current = i;
+                    setSelectedIdx(i);
+                    setSelBB(getBB(strokesRef.current[i]));
+                    redraw();
+                    return;
+                }
+            }
+            deselect();
+            redraw();
+            return;
+        }
+
+        // Deselect when switching to another tool action
+        if (selectedIdxRef.current !== null) { deselect(); redraw(); }
+
         if (config.tool === 'text') {
             const val = prompt('Metin girin:');
             if (val) {
@@ -874,6 +998,21 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         if (!rect) return;
         const x = e.clientX - rect.left, y = e.clientY - rect.top;
 
+        if (config.tool === 'select' && dragStateRef.current && selectedIdxRef.current !== null) {
+            const drag = dragStateRef.current;
+            const dx = x - drag.startX, dy = y - drag.startY;
+            const s = strokesRef.current[selectedIdxRef.current];
+            if (drag.type === 'move') {
+                s.points = drag.origPoints.map((p: any) => ({ x: p.x + dx, y: p.y + dy }));
+            } else if (drag.type === 'resize') {
+                s.points = resizePoints(drag.origPoints, drag.origBB, drag.handle, dx, dy);
+            }
+            const newBB = getBB(s);
+            setSelBB(newBB);
+            redraw();
+            return;
+        }
+
         if (config.tool === 'sun') {
             const lCtx = laserCtxRef.current;
             if (lCtx) {
@@ -899,6 +1038,13 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
     };
 
     const stopDrawing = () => {
+        if (config.tool === 'select') {
+            if (dragStateRef.current) {
+                dragStateRef.current = null;
+                setStrokes([...strokesRef.current]);
+            }
+            return;
+        }
         if (isDrawing && currentStroke) {
             strokesRef.current.push(currentStroke);
             setStrokes([...strokesRef.current]);
@@ -912,13 +1058,115 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         }
     };
 
+    const handleCursorStyle = () => {
+        if (!enabled) return 'default';
+        if (config.tool === 'pan') return 'grab';
+        if (config.tool === 'select') return 'default';
+        return 'crosshair';
+    };
+
+    const selectionColors = ['#ffffff', '#ff4d4d', '#ffff00', '#ffa500', '#2ecc71', '#3498db', '#4f46e5', '#9b59b6', '#000000'];
+    const handleCursors: Record<string, string> = { nw: 'nw-resize', n: 'n-resize', ne: 'ne-resize', w: 'w-resize', e: 'e-resize', sw: 'sw-resize', s: 's-resize', se: 'se-resize' };
+
+    const selStroke = selectedIdx !== null ? strokesRef.current[selectedIdx] : null;
+
     return (
         <>
             <canvas ref={bufferCanvasRef} style={{ display: 'none' }} />
             <canvas ref={canvasRef} onPointerDown={startDrawing} onPointerMove={draw} onPointerUp={stopDrawing} onPointerLeave={stopDrawing}
-                className={cn("absolute left-0 z-[4000] touch-none transition-opacity", enabled ? (config.tool === 'pan' ? "pointer-events-none opacity-100" : "pointer-events-auto opacity-100") : "pointer-events-none opacity-0")}
-                style={{ top: 0, backgroundColor: whiteboardMode ? 'white' : 'transparent' }} />
+                className={cn("absolute left-0 z-[4000] touch-none transition-opacity",
+                    enabled ? (config.tool === 'pan' ? "pointer-events-none opacity-100" : "pointer-events-auto opacity-100") : "pointer-events-none opacity-0"
+                )}
+                style={{ top: 0, backgroundColor: whiteboardMode ? 'white' : 'transparent', cursor: handleCursorStyle() }} />
             <canvas ref={laserCanvasRef} className="absolute left-0 z-[4001] pointer-events-none touch-none" style={{ top: 0 }} />
+
+            {/* Selection overlay */}
+            {enabled && selectedIdx !== null && selBB && selStroke && (
+                <div className="absolute left-0 top-0 z-[4500] pointer-events-none" style={{ width: '100%', height: '100%' }}>
+                    {/* Resize handles */}
+                    {getHandlePositions(selBB).map(h => (
+                        <div
+                            key={h.id}
+                            className="absolute pointer-events-auto bg-white border-2 border-indigo-500 rounded-sm shadow-md hover:bg-indigo-100 transition-colors"
+                            style={{ left: h.x - 5, top: h.y - 5, width: 10, height: 10, cursor: handleCursors[h.id], zIndex: 4600 }}
+                            onPointerDown={(e) => {
+                                e.stopPropagation();
+                                e.currentTarget.setPointerCapture(e.pointerId);
+                                const s = strokesRef.current[selectedIdxRef.current!];
+                                dragStateRef.current = { type: 'resize', handle: h.id, startX: e.clientX, startY: e.clientY, origPoints: JSON.parse(JSON.stringify(s.points)), origBB: { ...selBB } };
+                            }}
+                            onPointerMove={(e) => {
+                                if (!dragStateRef.current || selectedIdxRef.current === null) return;
+                                const drag = dragStateRef.current;
+                                const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+                                const s = strokesRef.current[selectedIdxRef.current];
+                                s.points = resizePoints(drag.origPoints, drag.origBB, drag.handle, dx, dy);
+                                setSelBB(getBB(s));
+                                redraw();
+                            }}
+                            onPointerUp={(e) => {
+                                e.currentTarget.releasePointerCapture(e.pointerId);
+                                dragStateRef.current = null;
+                                setStrokes([...strokesRef.current]);
+                            }}
+                        />
+                    ))}
+
+                    {/* Mini toolbar above selection */}
+                    <div
+                        className="absolute pointer-events-auto flex items-center gap-1 bg-[#1a1b26]/95 backdrop-blur-md px-2 py-1.5 rounded-xl border border-white/10 shadow-xl"
+                        style={{ left: selBB.x1, top: Math.max(0, selBB.y1 - 52), zIndex: 4700 }}
+                        onPointerDown={e => e.stopPropagation()}
+                    >
+                        {selectionColors.map(color => (
+                            <button
+                                key={color}
+                                className={cn("w-5 h-5 rounded-full border-2 transition-all hover:scale-110 shrink-0",
+                                    selStroke.color === color ? "border-white scale-110" : "border-transparent")}
+                                style={{ backgroundColor: color }}
+                                onClick={() => {
+                                    if (selectedIdxRef.current !== null) {
+                                        strokesRef.current[selectedIdxRef.current].color = color;
+                                        setStrokes([...strokesRef.current]);
+                                        setSelBB({ ...getBB(strokesRef.current[selectedIdxRef.current]) });
+                                        redraw();
+                                    }
+                                }}
+                            />
+                        ))}
+                        <div className="w-px h-4 bg-white/20 mx-1 shrink-0" />
+                        <button
+                            title="Çoğalt"
+                            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+                            onClick={() => {
+                                if (selectedIdxRef.current !== null && strokesRef.current[selectedIdxRef.current]) {
+                                    const copy = JSON.parse(JSON.stringify(strokesRef.current[selectedIdxRef.current]));
+                                    copy.points = copy.points.map((p: any) => ({ x: p.x + 20, y: p.y + 20 }));
+                                    strokesRef.current.push(copy);
+                                    const ni = strokesRef.current.length - 1;
+                                    selectedIdxRef.current = ni;
+                                    setStrokes([...strokesRef.current]);
+                                    setSelectedIdx(ni);
+                                    setSelBB(getBB(copy));
+                                    redraw();
+                                }
+                            }}
+                        ><Copy className="w-3.5 h-3.5" /></button>
+                        <button
+                            title="Seçili öğeyi sil"
+                            className="p-1 text-red-400 hover:text-red-300 rounded-lg hover:bg-red-400/10 transition-colors"
+                            onClick={() => {
+                                if (selectedIdxRef.current !== null) {
+                                    strokesRef.current.splice(selectedIdxRef.current, 1);
+                                    setStrokes([...strokesRef.current]);
+                                    deselect();
+                                    redraw();
+                                }
+                            }}
+                        ><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                </div>
+            )}
         </>
     );
 });
