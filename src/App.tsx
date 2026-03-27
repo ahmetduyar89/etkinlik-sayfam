@@ -5,7 +5,9 @@ import {
     Target, Zap, Globe, Settings, Bell, User, ArrowRight, HelpCircle, Eye,
     MoreVertical, X, Save, Clock, BookOpen, Anchor, Command, Blocks, Pencil, Eraser,
     Hand, Highlighter, Type, Shapes, Undo, History, Sun, Square, Circle, Triangle, MousePointer2,
-    MoveRight, ArrowRightLeft, Minus, PaintBucket, List, LayoutList, LayoutGrid, GripVertical
+    MoveRight, ArrowRightLeft, Minus, PaintBucket, List, LayoutList, LayoutGrid, GripVertical,
+    ZoomIn, ZoomOut, Focus, AlarmClock, Camera, Layers, StickyNote, ChevronLeft, ChevronRight,
+    Play, Pause, RotateCcw, GripHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { db, useFirestore } from './lib/firebase';
@@ -111,15 +113,235 @@ const DashedLineIcon = () => (
     </svg>
 );
 
-const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowWhiteboard }: {
+// =======================
+// SPOTLIGHT OVERLAY
+// =======================
+const SpotlightOverlay = ({ pos, radius }: { pos: { x: number; y: number }; radius: number }) => (
+    <div
+        className="absolute inset-0 z-[3900] pointer-events-none select-none"
+        style={{
+            background: `radial-gradient(circle ${radius}px at ${pos.x}px ${pos.y}px, transparent 0%, transparent 35%, rgba(0,0,0,0.84) 100%)`,
+        }}
+    />
+);
+
+// =======================
+// OVERLAY TIMER
+// =======================
+const OverlayTimer = ({ secs, running, total, onToggle, onReset, onSetTotal, onClose }: {
+    secs: number; running: boolean; total: number;
+    onToggle: () => void; onReset: () => void; onSetTotal: (s: number) => void; onClose: () => void;
+}) => {
+    const [showSetup, setShowSetup] = React.useState(false);
+    const [inputMins, setInputMins] = React.useState(String(Math.round(total / 60)));
+    const dragControls = useDragControls();
+    const isLow = secs > 0 && secs < 60;
+    const pct = total > 0 ? Math.max(0, secs / total) : 0;
+    const r = 28, circ = 2 * Math.PI * r;
+
+    return (
+        <motion.div drag dragControls={dragControls} dragListener={false} dragMomentum={false} dragElastic={0}
+            className="fixed z-[12000] pointer-events-auto select-none"
+            style={{ top: 80, right: 24, touchAction: 'none' }}
+        >
+            <div className={cn("flex flex-col items-center gap-2 px-5 py-4 rounded-2xl shadow-2xl border backdrop-blur-md",
+                isLow ? "bg-red-950/95 border-red-500/60" : "bg-[#1a1b26]/95 border-white/10")}>
+                <div onPointerDown={e => dragControls.start(e)} className="cursor-grab active:cursor-grabbing self-stretch flex justify-between items-center pb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Sayaç</span>
+                    <div className="flex gap-1">
+                        <button onClick={() => setShowSetup(s => !s)} className="p-1 rounded text-slate-500 hover:text-white hover:bg-white/10 transition-colors"><Settings className="w-3 h-3" /></button>
+                        <button onClick={onClose} className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"><X className="w-3 h-3" /></button>
+                    </div>
+                </div>
+
+                {/* Circular progress + time */}
+                <div className="relative flex items-center justify-center" style={{ width: 80, height: 80 }}>
+                    <svg width="80" height="80" className="absolute -rotate-90">
+                        <circle cx="40" cy="40" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
+                        <circle cx="40" cy="40" r={r} fill="none"
+                            stroke={isLow ? '#ef4444' : '#4f46e5'} strokeWidth="4"
+                            strokeDasharray={circ} strokeDashoffset={circ * (1 - pct)}
+                            strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.5s' }} />
+                    </svg>
+                    <span className={cn("text-xl font-black tabular-nums", isLow ? "text-red-400" : "text-white")}>
+                        {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}
+                    </span>
+                </div>
+
+                {/* Setup panel */}
+                <AnimatePresence>
+                    {showSetup && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden w-full">
+                            <div className="flex items-center gap-2 pt-1">
+                                <input type="number" min="1" max="90" value={inputMins}
+                                    onChange={e => setInputMins(e.target.value)}
+                                    className="w-16 bg-white/10 border border-white/20 rounded-lg px-2 py-1 text-white text-sm text-center focus:outline-none focus:border-indigo-500"
+                                />
+                                <span className="text-xs text-slate-400">dk</span>
+                                <button onClick={() => { const s = parseInt(inputMins) * 60; if (s > 0) { onSetTotal(s); setShowSetup(false); } }}
+                                    className="px-3 py-1 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 transition-colors font-bold">
+                                    Ayarla
+                                </button>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Controls */}
+                <div className="flex items-center gap-2">
+                    <button onClick={onToggle}
+                        className={cn("p-2 rounded-xl transition-all", running ? "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30" : "bg-indigo-600/30 text-indigo-400 hover:bg-indigo-600/50")}>
+                        {running ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    </button>
+                    <button onClick={onReset} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all">
+                        <RotateCcw className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+        </motion.div>
+    );
+};
+
+// =======================
+// TEXT BOX LAYER
+// =======================
+const TEXTBOX_COLORS = ['#fff9c4', '#f8d7da', '#d4edda', '#d1ecf1', '#e2d9f3', '#1a1b26'];
+const TEXTBOX_TEXT_COLORS: Record<string, string> = {
+    '#1a1b26': '#ffffff', default: '#1a1b26'
+};
+
+const TextBoxItem = ({ box, onUpdate, onDelete }: any) => {
+    const [editing, setEditing] = React.useState(box.text === '');
+    const textRef = React.useRef<HTMLTextAreaElement>(null);
+    const dragControls = useDragControls();
+
+    React.useEffect(() => {
+        if (editing) textRef.current?.focus();
+    }, [editing]);
+
+    const textColor = TEXTBOX_TEXT_COLORS[box.color] || TEXTBOX_TEXT_COLORS.default;
+
+    return (
+        <motion.div drag dragControls={dragControls} dragListener={false} dragMomentum={false} dragElastic={0}
+            className="absolute group pointer-events-auto"
+            style={{ left: box.x, top: box.y, zIndex: 4800, minWidth: 120, maxWidth: 320, touchAction: 'none' }}
+            onPointerDown={e => e.stopPropagation()}
+        >
+            <div className="relative rounded-xl shadow-xl border border-black/10 overflow-visible"
+                style={{ backgroundColor: box.color, padding: '8px 12px' }}>
+                {/* Drag handle */}
+                <div onPointerDown={e => { e.stopPropagation(); dragControls.start(e); }}
+                    className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-3 rounded-full bg-black/20 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <GripHorizontal className="w-3 h-2" style={{ color: textColor }} />
+                </div>
+
+                {editing ? (
+                    <textarea ref={textRef} value={box.text}
+                        onChange={e => onUpdate({ ...box, text: e.target.value })}
+                        onBlur={() => { if (box.text.trim()) setEditing(false); }}
+                        className="bg-transparent resize-none outline-none w-full min-w-[100px]"
+                        style={{ color: textColor, fontSize: box.fontSize, lineHeight: 1.4, minHeight: 40 }}
+                        rows={3}
+                    />
+                ) : (
+                    <p onDoubleClick={() => setEditing(true)} style={{ color: textColor, fontSize: box.fontSize, lineHeight: 1.4, cursor: 'text', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        {box.text || <span className="opacity-40">Çift tıkla…</span>}
+                    </p>
+                )}
+
+                {/* Actions */}
+                <div className="absolute -top-3 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Color swatches */}
+                    <div className="flex gap-0.5 bg-[#1a1b26]/90 backdrop-blur-sm rounded-full px-1.5 py-1 border border-white/10">
+                        {TEXTBOX_COLORS.map(c => (
+                            <button key={c} onClick={() => onUpdate({ ...box, color: c })}
+                                className={cn("w-4 h-4 rounded-full border transition-all hover:scale-125",
+                                    box.color === c ? "border-white scale-125" : "border-transparent")}
+                                style={{ backgroundColor: c }} />
+                        ))}
+                    </div>
+                    <button onClick={onDelete}
+                        className="w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow">
+                        <X className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        </motion.div>
+    );
+};
+
+const TextBoxLayer = ({ boxes, onUpdate, onDelete, onAdd, enabled }: any) => {
+    const handleClick = (e: React.MouseEvent) => {
+        if (!enabled) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        onAdd({ id: Date.now().toString(), x: e.clientX - rect.left - 60, y: e.clientY - rect.top - 20, text: '', color: '#fff9c4', fontSize: 15 });
+    };
+
+    return (
+        <div className={cn("absolute inset-0 z-[4800]", enabled ? "pointer-events-auto cursor-text" : "pointer-events-none")}
+            onClick={handleClick}>
+            {boxes.map((b: any) => (
+                <TextBoxItem key={b.id} box={b}
+                    onUpdate={(upd: any) => onUpdate(b.id, upd)}
+                    onDelete={() => onDelete(b.id)}
+                />
+            ))}
+        </div>
+    );
+};
+
+// =======================
+// PAGE NAVIGATION
+// =======================
+const PageNav = ({ current, total, onPrev, onNext, onAdd, onDelete }: any) => (
+    <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[5100] flex items-center gap-2 bg-[#1a1b26]/95 backdrop-blur-md px-3 py-2 rounded-2xl border border-white/10 shadow-xl pointer-events-auto">
+        <button onClick={onPrev} disabled={current === 0}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-all">
+            <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="text-xs font-bold text-white tabular-nums px-2">{current + 1} / {total}</span>
+        <button onClick={onNext} disabled={current === total - 1}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-all">
+            <ChevronRight className="w-4 h-4" />
+        </button>
+        <div className="w-px h-4 bg-white/20 mx-1" />
+        <button onClick={onAdd} title="Yeni sayfa ekle"
+            className="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-400/10 transition-all">
+            <Plus className="w-4 h-4" />
+        </button>
+        {total > 1 && (
+            <button onClick={onDelete} title="Bu sayfayı sil"
+                className="p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-400/10 transition-all">
+                <Trash2 className="w-4 h-4" />
+            </button>
+        )}
+    </div>
+);
+
+// =======================
+// DRAWING TOOLBAR
+// =======================
+const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowWhiteboard, bgColor, onBgColorChange, onScreenshot, isTextBoxMode, onTextBoxModeToggle }: {
     onCommand: (type: string, data?: any) => void,
     config: any,
     setConfig: (c: any) => void,
     showWhiteboard?: boolean,
-    setShowWhiteboard?: (val: boolean) => void
+    setShowWhiteboard?: (val: boolean) => void,
+    bgColor?: string,
+    onBgColorChange?: (c: string) => void,
+    onScreenshot?: () => void,
+    isTextBoxMode?: boolean,
+    onTextBoxModeToggle?: () => void,
 }) => {
     const [showShapes, setShowShapes] = React.useState(false);
+    const [showExtras, setShowExtras] = React.useState(false);
     const dragControls = useDragControls();
+
+    const bgColors = [
+        { color: '#ffffff', label: 'Beyaz' }, { color: '#fffde7', label: 'Krem' },
+        { color: '#e8f5e9', label: 'Yeşil' }, { color: '#e3f2fd', label: 'Mavi' },
+        { color: '#1a1a2e', label: 'Gece' }, { color: '#111827', label: 'Siyah' },
+    ];
     
     // Sarı ve İndigo eklendi
     const colors = ['#ffffff', '#ff4d4d', '#ffff00', '#ffa500', '#2ecc71', '#3498db', '#4f46e5', '#9b59b6', '#000000'];
@@ -322,7 +544,7 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
                 </div>
 
                 {/* İşlemler */}
-                <div className="flex items-center gap-1.5 px-2">
+                <div className="flex items-center gap-1.5 px-2 border-r border-white/10">
                     <button onClick={() => onCommand('UNDO_DRAWING')} className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all" title="Geri Al">
                         <Undo className="w-5 h-5" />
                     </button>
@@ -332,17 +554,55 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
                     {setShowWhiteboard && (
                         <button
                             onClick={() => onCommand('TOGGLE_WHITEBOARD')}
-                            className={cn(
-                                "p-2.5 rounded-xl transition-all",
-                                showWhiteboard ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-white hover:bg-white/5"
-                            )}
+                            className={cn("p-2.5 rounded-xl transition-all", showWhiteboard ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-white hover:bg-white/5")}
                             title="Yazı Tahtası"
                         >
                             <Grid className="w-5 h-5" />
                         </button>
                     )}
                 </div>
+
+                {/* Ekstra araçlar */}
+                <div className="flex items-center gap-1 px-2">
+                    {onTextBoxModeToggle && (
+                        <button onClick={onTextBoxModeToggle}
+                            className={cn("p-2.5 rounded-xl transition-all", isTextBoxMode ? "bg-amber-500 text-white" : "text-slate-400 hover:text-white hover:bg-white/5")}
+                            title="Metin Kutusu Ekle">
+                            <StickyNote className="w-5 h-5" />
+                        </button>
+                    )}
+                    {onScreenshot && (
+                        <button onClick={onScreenshot}
+                            className="p-2.5 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 transition-all"
+                            title="Çizimi PNG Olarak İndir">
+                            <Camera className="w-5 h-5" />
+                        </button>
+                    )}
+                    {onBgColorChange && (
+                        <button onClick={() => setShowExtras(s => !s)}
+                            className={cn("p-2.5 rounded-xl transition-all relative", showExtras ? "bg-white/10 text-white" : "text-slate-400 hover:text-white hover:bg-white/5")}
+                            title="Arka Plan Rengi">
+                            <div className="w-5 h-5 rounded-full border-2 border-white/40" style={{ backgroundColor: bgColor || '#ffffff' }} />
+                        </button>
+                    )}
+                </div>
             </div>
+
+            {/* Arka plan rengi paneli */}
+            <AnimatePresence>
+                {showExtras && onBgColorChange && (
+                    <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="flex items-center gap-2 bg-[#1a1b26]/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 shadow-2xl">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider shrink-0">Arka Plan</span>
+                        {bgColors.map(({ color, label }) => (
+                            <button key={color} onClick={() => { onBgColorChange(color); }}
+                                className={cn("w-7 h-7 rounded-full border-2 transition-all hover:scale-110 shrink-0",
+                                    (bgColor || '#ffffff') === color ? "border-white scale-110" : "border-transparent")}
+                                style={{ backgroundColor: color }} title={label} />
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 };
@@ -667,7 +927,7 @@ const ResultsModal = ({ isOpen, onClose, activityId }: { isOpen: boolean, onClos
 // =======================
 // GLOBAL DRAWING CANVAS (Z-Kitap Layer)
 // =======================
-const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whiteboardMode: boolean }>(({ config, enabled, whiteboardMode }, ref) => {
+const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whiteboardMode: boolean, bgColor?: string, onPageChange?: (current: number, total: number) => void }>(({ config, enabled, whiteboardMode, bgColor, onPageChange }, ref) => {
     const canvasRef = React.useRef<HTMLCanvasElement>(null);
     const bufferCanvasRef = React.useRef<HTMLCanvasElement>(null);
     const laserCanvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -679,6 +939,9 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
     const canvasRectRef = React.useRef<DOMRect | null>(null);
     const selectedIdxRef = React.useRef<number | null>(null);
     const dragStateRef = React.useRef<any>(null);
+    // Page management
+    const pagesRef = React.useRef<any[][]>([[]]); // array of stroke arrays
+    const currentPageRef = React.useRef(0);
 
     // Refs for non-react state (performance)
     const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null);
@@ -727,6 +990,21 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         setSelBB(null);
     };
 
+    const notifyPageChange = React.useCallback(() => {
+        onPageChange?.(currentPageRef.current, pagesRef.current.length);
+    }, [onPageChange]);
+
+    const switchPage = (idx: number) => {
+        pagesRef.current[currentPageRef.current] = [...strokesRef.current];
+        currentPageRef.current = idx;
+        strokesRef.current = [...(pagesRef.current[idx] || [])];
+        setStrokes([...strokesRef.current]);
+        deselect();
+        // Use setTimeout to let state settle before redraw
+        setTimeout(redraw, 0);
+        notifyPageChange();
+    };
+
     React.useImperativeHandle(ref, () => ({
         undo: () => {
             deselect();
@@ -752,8 +1030,7 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
             if (selectedIdxRef.current !== null && strokesRef.current[selectedIdxRef.current]) {
                 strokesRef.current[selectedIdxRef.current].color = color;
                 setStrokes([...strokesRef.current]);
-                const newBB = getBB(strokesRef.current[selectedIdxRef.current]);
-                setSelBB(newBB);
+                setSelBB({ ...getBB(strokesRef.current[selectedIdxRef.current]) });
                 redraw();
             }
         },
@@ -769,6 +1046,44 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
                 setSelBB(getBB(copy));
                 redraw();
             }
+        },
+        // Pages
+        nextPage: () => { if (currentPageRef.current < pagesRef.current.length - 1) switchPage(currentPageRef.current + 1); },
+        prevPage: () => { if (currentPageRef.current > 0) switchPage(currentPageRef.current - 1); },
+        addPage: () => {
+            pagesRef.current[currentPageRef.current] = [...strokesRef.current];
+            pagesRef.current.push([]);
+            switchPage(pagesRef.current.length - 1);
+        },
+        deletePage: () => {
+            if (pagesRef.current.length <= 1) { strokesRef.current = []; setStrokes([]); redraw(); return; }
+            pagesRef.current.splice(currentPageRef.current, 1);
+            const newIdx = Math.min(currentPageRef.current, pagesRef.current.length - 1);
+            currentPageRef.current = newIdx;
+            strokesRef.current = [...pagesRef.current[newIdx]];
+            setStrokes([...strokesRef.current]);
+            deselect();
+            setTimeout(redraw, 0);
+            notifyPageChange();
+        },
+        getCurrentPage: () => currentPageRef.current,
+        getPageCount: () => pagesRef.current.length,
+        // Screenshot
+        screenshot: (wbMode: boolean, color: string) => {
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const exp = document.createElement('canvas');
+            exp.width = canvas.width; exp.height = canvas.height;
+            const ctx = exp.getContext('2d');
+            if (!ctx) return;
+            const dpr = window.devicePixelRatio || 1;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            if (wbMode) { ctx.fillStyle = color || '#ffffff'; ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr); }
+            ctx.drawImage(canvas, 0, 0, canvas.width / dpr, canvas.height / dpr);
+            const link = document.createElement('a');
+            link.download = `cizim-sayfa${currentPageRef.current + 1}.png`;
+            link.href = exp.toDataURL('image/png');
+            link.click();
         },
     }));
 
@@ -1077,7 +1392,7 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
                 className={cn("absolute left-0 z-[4000] touch-none transition-opacity",
                     enabled ? (config.tool === 'pan' ? "pointer-events-none opacity-100" : "pointer-events-auto opacity-100") : "pointer-events-none opacity-0"
                 )}
-                style={{ top: 0, backgroundColor: whiteboardMode ? 'white' : 'transparent', cursor: handleCursorStyle() }} />
+                style={{ top: 0, backgroundColor: whiteboardMode ? (bgColor || '#ffffff') : 'transparent', cursor: handleCursorStyle() }} />
             <canvas ref={laserCanvasRef} className="absolute left-0 z-[4001] pointer-events-none touch-none" style={{ top: 0 }} />
 
             {/* Selection overlay */}
@@ -1304,12 +1619,31 @@ export default function App() {
     const [previewId, setPreviewId] = useState<string | null>(null);
     const [showResultsId, setShowResultsId] = useState<string | null>(null);
     const [isPreviewDrawingMode, setIsPreviewDrawingMode] = useState(false);
-    const [previewDrawConfig, setPreviewDrawConfig] = useState({ tool: 'pencil', color: '#4f46e5', width: 3 });
+    const [previewDrawConfig, setPreviewDrawConfig] = useState({ tool: 'pencil', color: '#4f46e5', width: 3, fillEnabled: false, stampIcon: '✅' });
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [showWhiteboard, setShowWhiteboard] = useState(false);
     const [previewIframeHeight, setPreviewIframeHeight] = useState(1000);
     const previewIframeRef = React.useRef<HTMLIFrameElement>(null);
     const previewCanvasRef = React.useRef<any>(null);
+    // Zoom
+    const [zoomLevel, setZoomLevel] = useState(1.0);
+    // Spotlight
+    const [spotlightActive, setSpotlightActive] = useState(false);
+    const [spotlightPos, setSpotlightPos] = useState({ x: 0, y: 0 });
+    const [spotlightRadius, setSpotlightRadius] = useState(180);
+    const previewMainRef = React.useRef<HTMLDivElement>(null);
+    // Timer
+    const [timerTotal, setTimerTotal] = useState(300);
+    const [timerSecs, setTimerSecs] = useState(300);
+    const [timerRunning, setTimerRunning] = useState(false);
+    const [showTimer, setShowTimer] = useState(false);
+    // Text Boxes
+    const [textBoxes, setTextBoxes] = useState<any[]>([]);
+    const [isTextBoxMode, setIsTextBoxMode] = useState(false);
+    // Background color
+    const [bgColor, setBgColor] = useState('#ffffff');
+    // Page info (read from canvas ref)
+    const [pageInfo, setPageInfo] = useState({ current: 0, total: 1 });
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
@@ -1320,6 +1654,28 @@ export default function App() {
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
     }, []);
+
+    // Timer countdown
+    useEffect(() => {
+        if (!timerRunning || timerSecs <= 0) return;
+        const id = setInterval(() => setTimerSecs(s => s > 0 ? s - 1 : 0), 1000);
+        return () => clearInterval(id);
+    }, [timerRunning, timerSecs]);
+
+    // Reset state when preview closes
+    useEffect(() => {
+        if (!previewId) {
+            setIsPreviewDrawingMode(false);
+            setShowWhiteboard(false);
+            setZoomLevel(1);
+            setSpotlightActive(false);
+            setTimerRunning(false);
+            setShowTimer(false);
+            setTextBoxes([]);
+            setIsTextBoxMode(false);
+            setPageInfo({ current: 0, total: 1 });
+        }
+    }, [previewId]);
 
     // Form States
     const [isActivityOpen, setIsActivityOpen] = useState(false);
@@ -1552,44 +1908,173 @@ export default function App() {
             {/* FULL PREVIEW MODAL */}
             {previewId && (
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center p-0 overflow-hidden">
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => { setPreviewId(null); setIsPreviewDrawingMode(false); setShowWhiteboard(false); }} className="absolute inset-0 bg-neutral-900/90" />
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                        onClick={() => setPreviewId(null)}
+                        className="absolute inset-0 bg-neutral-900/90" />
                     <div className="relative w-full h-full bg-white overflow-hidden flex flex-col">
-                        <header className="h-14 px-6 bg-slate-900 border-b border-white/5 flex justify-between items-center shrink-0 z-[11000]">
-                            <div className="flex items-center gap-3">
-                                <div className="w-7 h-7 bg-indigo-500/20 rounded-lg flex items-center justify-center">
+
+                        {/* Header */}
+                        <header className="h-14 px-4 bg-slate-900 border-b border-white/5 flex justify-between items-center shrink-0 z-[11000] gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-7 h-7 bg-indigo-500/20 rounded-lg flex items-center justify-center shrink-0">
                                     <Blocks className="w-3.5 h-3.5 text-indigo-400" />
                                 </div>
-                                <h3 className="text-white font-bold">{activities.find(a => a.id === previewId)?.title}</h3>
+                                <h3 className="text-white font-bold truncate text-sm">{activities.find(a => a.id === previewId)?.title}</h3>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => setIsPreviewDrawingMode(!isPreviewDrawingMode)}
-                                    className={cn(
-                                        "flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border",
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                {/* Zoom */}
+                                <div className="flex items-center gap-1 bg-white/5 rounded-xl px-1 border border-white/10">
+                                    <button onClick={() => setZoomLevel(z => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))}
+                                        className="p-1.5 text-slate-400 hover:text-white transition-colors" title="Uzaklaştır">
+                                        <ZoomOut className="w-4 h-4" />
+                                    </button>
+                                    <span className="text-xs font-bold text-slate-300 tabular-nums w-10 text-center">{Math.round(zoomLevel * 100)}%</span>
+                                    <button onClick={() => setZoomLevel(z => Math.min(3.0, Math.round((z + 0.25) * 100) / 100))}
+                                        className="p-1.5 text-slate-400 hover:text-white transition-colors" title="Yakınlaştır">
+                                        <ZoomIn className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                {/* Spotlight */}
+                                <button onClick={() => setSpotlightActive(s => !s)}
+                                    className={cn("p-2 rounded-xl transition-all border text-xs font-bold",
+                                        spotlightActive ? "bg-yellow-500 text-white border-yellow-400 shadow-lg shadow-yellow-500/30" : "bg-white/5 text-slate-300 hover:bg-white/10 border-white/10")}
+                                    title="Spotlight Modu">
+                                    <Focus className="w-4 h-4" />
+                                </button>
+
+                                {/* Timer */}
+                                <button onClick={() => { setShowTimer(s => !s); if (!showTimer) { setTimerSecs(timerTotal); setTimerRunning(false); } }}
+                                    className={cn("p-2 rounded-xl transition-all border",
+                                        showTimer ? "bg-indigo-600 text-white border-indigo-500" : "bg-white/5 text-slate-300 hover:bg-white/10 border-white/10")}
+                                    title="Sayaç">
+                                    <AlarmClock className="w-4 h-4" />
+                                </button>
+
+                                {/* Kalem Modu */}
+                                <button onClick={() => setIsPreviewDrawingMode(m => !m)}
+                                    className={cn("flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border",
                                         isPreviewDrawingMode
                                             ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 border-indigo-500"
-                                            : "bg-white/5 text-slate-300 hover:bg-indigo-600/20 hover:text-indigo-300 border-white/10 hover:border-indigo-500/50"
-                                    )}
-                                >
+                                            : "bg-white/5 text-slate-300 hover:bg-indigo-600/20 hover:text-indigo-300 border-white/10"
+                                    )}>
                                     <Pencil className="w-4 h-4" />
                                     {isPreviewDrawingMode ? 'Kalemi Kapat' : 'Kalem Modu'}
                                 </button>
-                                <button onClick={() => { setPreviewId(null); setIsPreviewDrawingMode(false); setShowWhiteboard(false); }} className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/10"><X className="w-5 h-5" /></button>
+
+                                <button onClick={() => setPreviewId(null)} className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/10">
+                                    <X className="w-5 h-5" />
+                                </button>
                             </div>
                         </header>
-                        <main className="flex-1 relative bg-white overflow-y-auto overflow-x-hidden custom-scroll">
-                            <div style={{ position: 'relative', width: '100%', minHeight: '100%', height: previewIframeHeight }}>
-                                <iframe 
-                                    ref={previewIframeRef} 
-                                    srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} 
-                                    className={cn("w-full h-full border-0", isPreviewDrawingMode && previewDrawConfig.tool !== 'pan' ? "pointer-events-none" : "pointer-events-auto")} 
-                                    scrolling="no"
-                                />
-                                <DrawingCanvas ref={previewCanvasRef} config={previewDrawConfig} enabled={isPreviewDrawingMode} whiteboardMode={showWhiteboard} />
+
+                        {/* Main Content */}
+                        <main ref={previewMainRef} className="flex-1 relative overflow-y-auto overflow-x-hidden custom-scroll"
+                            style={{ backgroundColor: showWhiteboard ? (bgColor || '#ffffff') : '#ffffff' }}
+                            onMouseMove={(e) => {
+                                if (!spotlightActive) return;
+                                const rect = previewMainRef.current?.getBoundingClientRect();
+                                if (rect) setSpotlightPos({ x: e.clientX - rect.left, y: e.clientY - rect.top + (previewMainRef.current?.scrollTop || 0) });
+                            }}
+                        >
+                            {/* Zoom wrapper */}
+                            <div style={{
+                                transform: `scale(${zoomLevel})`,
+                                transformOrigin: 'top center',
+                                width: `${100 / zoomLevel}%`,
+                                minHeight: `${100 / zoomLevel}%`,
+                                position: 'relative',
+                            }}>
+                                <div style={{ position: 'relative', width: '100%', minHeight: '100%', height: previewIframeHeight }}>
+                                    <iframe
+                                        ref={previewIframeRef}
+                                        srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))}
+                                        className={cn("w-full h-full border-0",
+                                            (isPreviewDrawingMode && previewDrawConfig.tool !== 'pan') || isTextBoxMode ? "pointer-events-none" : "pointer-events-auto")}
+                                        scrolling="no"
+                                    />
+                                    <DrawingCanvas
+                                        ref={previewCanvasRef}
+                                        config={previewDrawConfig}
+                                        enabled={isPreviewDrawingMode}
+                                        whiteboardMode={showWhiteboard}
+                                        bgColor={bgColor}
+                                        onPageChange={(cur, tot) => setPageInfo({ current: cur, total: tot })}
+                                    />
+                                    <TextBoxLayer
+                                        boxes={textBoxes}
+                                        enabled={isTextBoxMode}
+                                        onAdd={(b: any) => setTextBoxes(prev => [...prev, b])}
+                                        onUpdate={(id: string, upd: any) => setTextBoxes(prev => prev.map(b => b.id === id ? upd : b))}
+                                        onDelete={(id: string) => setTextBoxes(prev => prev.filter(b => b.id !== id))}
+                                    />
+                                </div>
                             </div>
-                            <AnimatePresence>{isPreviewDrawingMode && <DrawingToolbar onCommand={(type) => { if(type==='UNDO_DRAWING') previewCanvasRef.current?.undo(); if(type==='CLEAR_DRAWING') previewCanvasRef.current?.clear(); if(type==='TOGGLE_WHITEBOARD') setShowWhiteboard(v => !v); }} config={previewDrawConfig} setConfig={setPreviewDrawConfig} showWhiteboard={showWhiteboard} setShowWhiteboard={setShowWhiteboard} />}</AnimatePresence>
+
+                            {/* Spotlight */}
+                            {spotlightActive && <SpotlightOverlay pos={spotlightPos} radius={spotlightRadius} />}
+
+                            {/* Spotlight radius slider (shown when spotlight is active) */}
+                            {spotlightActive && (
+                                <div className="fixed bottom-6 right-6 z-[11500] flex items-center gap-2 bg-[#1a1b26]/90 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10 shadow-xl">
+                                    <Focus className="w-4 h-4 text-yellow-400 shrink-0" />
+                                    <input type="range" min={80} max={400} value={spotlightRadius}
+                                        onChange={e => setSpotlightRadius(Number(e.target.value))}
+                                        className="w-28 accent-yellow-400" />
+                                </div>
+                            )}
+
+                            {/* Drawing Toolbar */}
+                            <AnimatePresence>
+                                {isPreviewDrawingMode && (
+                                    <DrawingToolbar
+                                        onCommand={(type) => {
+                                            if (type === 'UNDO_DRAWING') previewCanvasRef.current?.undo();
+                                            if (type === 'CLEAR_DRAWING') previewCanvasRef.current?.clear();
+                                            if (type === 'TOGGLE_WHITEBOARD') setShowWhiteboard(v => !v);
+                                        }}
+                                        config={previewDrawConfig}
+                                        setConfig={setPreviewDrawConfig}
+                                        showWhiteboard={showWhiteboard}
+                                        setShowWhiteboard={setShowWhiteboard}
+                                        bgColor={bgColor}
+                                        onBgColorChange={setBgColor}
+                                        onScreenshot={() => previewCanvasRef.current?.screenshot(showWhiteboard, bgColor)}
+                                        isTextBoxMode={isTextBoxMode}
+                                        onTextBoxModeToggle={() => setIsTextBoxMode(m => !m)}
+                                    />
+                                )}
+                            </AnimatePresence>
+
+                            {/* Page Navigation */}
+                            <AnimatePresence>
+                                {isPreviewDrawingMode && (
+                                    <PageNav
+                                        current={pageInfo.current}
+                                        total={pageInfo.total}
+                                        onPrev={() => previewCanvasRef.current?.prevPage()}
+                                        onNext={() => previewCanvasRef.current?.nextPage()}
+                                        onAdd={() => previewCanvasRef.current?.addPage()}
+                                        onDelete={() => previewCanvasRef.current?.deletePage()}
+                                    />
+                                )}
+                            </AnimatePresence>
                         </main>
                     </div>
+
+                    {/* Overlay Timer */}
+                    {showTimer && (
+                        <OverlayTimer
+                            secs={timerSecs}
+                            running={timerRunning}
+                            total={timerTotal}
+                            onToggle={() => setTimerRunning(r => !r)}
+                            onReset={() => { setTimerSecs(timerTotal); setTimerRunning(false); }}
+                            onSetTotal={(s) => { setTimerTotal(s); setTimerSecs(s); setTimerRunning(false); }}
+                            onClose={() => { setShowTimer(false); setTimerRunning(false); }}
+                        />
+                    )}
                 </div>
             )}
 
