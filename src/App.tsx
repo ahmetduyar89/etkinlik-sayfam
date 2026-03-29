@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Sparkles, Search, ExternalLink, Copy, Share2, Trash2, Edit3, Grid, Filter, Plus,
     LayoutDashboard, Database, BarChart3,
@@ -7,7 +7,7 @@ import {
     Hand, Highlighter, Type, Shapes, Undo, History, Sun, Square, Circle, Triangle, MousePointer2,
     MoveRight, ArrowRightLeft, Minus, PaintBucket, List, LayoutList, LayoutGrid, GripVertical,
     ZoomIn, ZoomOut, Focus, AlarmClock, Camera, Layers, StickyNote, ChevronLeft, ChevronRight,
-    Play, Pause, RotateCcw, GripHorizontal
+    Play, Pause, RotateCcw, GripHorizontal, Ruler, Tag, Tags
 } from 'lucide-react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { db, useFirestore } from './lib/firebase';
@@ -124,6 +124,111 @@ const SpotlightOverlay = ({ pos, radius }: { pos: { x: number; y: number }; radi
         }}
     />
 );
+
+// =======================
+// RULER TOOL
+// =======================
+const RulerTool = ({ onClose }: { onClose: () => void }) => {
+    const [vertical, setVertical] = React.useState(false);
+    const dragControls = useDragControls();
+    const cmCount = 20;
+    const pxPerCm = 32;
+    const totalPx = cmCount * pxPerCm;
+
+    const ticks: { x: number; h: number; label: number | null }[] = [];
+    for (let mm = 0; mm <= cmCount * 10; mm++) {
+        const x = mm * (pxPerCm / 10);
+        const isCm = mm % 10 === 0;
+        const isMid = mm % 5 === 0;
+        ticks.push({ x, h: isCm ? 22 : isMid ? 15 : 8, label: isCm && mm > 0 ? mm / 10 : null });
+    }
+
+    const svgW = totalPx + 40, svgH = 52;
+
+    return (
+        <motion.div drag dragControls={dragControls} dragListener={false} dragMomentum={false} dragElastic={0}
+            className="fixed z-[11500] pointer-events-auto select-none"
+            style={{ top: 180, left: 80, touchAction: 'none', transformOrigin: 'center center', transform: vertical ? 'rotate(90deg)' : 'none' }}>
+            <div onPointerDown={e => dragControls.start(e)} className="cursor-grab active:cursor-grabbing relative">
+                <svg width={svgW} height={svgH} style={{ display: 'block', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))' }}>
+                    <rect x="0" y="0" width={svgW} height={svgH} rx="4" fill="rgba(254,243,199,0.97)" stroke="#d97706" strokeWidth="1.5" />
+                    {ticks.map((t, i) => (
+                        <g key={i}>
+                            <line x1={t.x + 20} y1={svgH} x2={t.x + 20} y2={svgH - t.h} stroke="#92400e" strokeWidth={t.label !== null ? 1.5 : 0.8} />
+                            {t.label !== null && (
+                                <text x={t.x + 20} y={svgH - t.h - 3} textAnchor="middle" fontSize="8" fill="#92400e" fontWeight="bold">{t.label}</text>
+                            )}
+                        </g>
+                    ))}
+                    <text x="10" y="14" fontSize="8" fill="#b45309" fontWeight="bold">cm</text>
+                </svg>
+                <div className="absolute top-1 right-1 flex gap-1" onPointerDown={e => e.stopPropagation()}>
+                    <button onClick={() => setVertical(v => !v)}
+                        className="w-5 h-5 bg-amber-400 rounded text-amber-900 text-[11px] flex items-center justify-center hover:bg-amber-500 font-bold leading-none" title="Döndür">↺</button>
+                    <button onClick={onClose}
+                        className="w-5 h-5 bg-red-400 rounded text-white text-[11px] flex items-center justify-center hover:bg-red-500 font-bold leading-none" title="Kapat">×</button>
+                </div>
+            </div>
+        </motion.div>
+    );
+};
+
+// =======================
+// PROTRACTOR TOOL
+// =======================
+const ProtractorTool = ({ onClose }: { onClose: () => void }) => {
+    const dragControls = useDragControls();
+    const r = 110;
+    const cx = r + 10, cy = r + 10;
+
+    const marks = Array.from({ length: 19 }, (_, i) => {
+        const deg = i * 10;
+        const rad = Math.PI - (deg * Math.PI / 180);
+        const isMajor = deg % 30 === 0;
+        const innerR = isMajor ? r - 20 : r - 13;
+        const textR = r - 28;
+        return { deg, rad, innerR, textR, isMajor };
+    });
+
+    return (
+        <motion.div drag dragControls={dragControls} dragListener={false} dragMomentum={false} dragElastic={0}
+            className="fixed z-[11500] pointer-events-auto select-none"
+            style={{ top: 250, left: 200, touchAction: 'none' }}>
+            <div onPointerDown={e => dragControls.start(e)} className="cursor-grab active:cursor-grabbing relative">
+                <svg width={r * 2 + 20} height={r + 30} style={{ display: 'block', filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.35))' }}>
+                    {/* Semicircle fill */}
+                    <path d={`M ${cx - r},${cy} A ${r},${r} 0 0,1 ${cx + r},${cy} Z`} fill="rgba(147,197,253,0.88)" stroke="#2563eb" strokeWidth="2" />
+                    {/* Degree marks */}
+                    {marks.map(m => {
+                        const x1 = cx + r * Math.cos(m.rad), y1 = cy - r * Math.sin(m.rad);
+                        const x2 = cx + m.innerR * Math.cos(m.rad), y2 = cy - m.innerR * Math.sin(m.rad);
+                        const tx = cx + m.textR * Math.cos(m.rad), ty = cy - m.textR * Math.sin(m.rad);
+                        return (
+                            <g key={m.deg}>
+                                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#1e40af" strokeWidth={m.isMajor ? 1.5 : 0.8} />
+                                {m.isMajor && <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fontSize="9" fill="#1e40af" fontWeight="bold">{m.deg}°</text>}
+                            </g>
+                        );
+                    })}
+                    {/* 5-degree minor marks */}
+                    {Array.from({ length: 37 }, (_, i) => {
+                        const deg = i * 5;
+                        if (deg % 10 === 0) return null;
+                        const rad = Math.PI - (deg * Math.PI / 180);
+                        return <line key={deg} x1={cx + r * Math.cos(rad)} y1={cy - r * Math.sin(rad)} x2={cx + (r - 8) * Math.cos(rad)} y2={cy - (r - 8) * Math.sin(rad)} stroke="#1e40af" strokeWidth="0.6" />;
+                    })}
+                    {/* Baseline */}
+                    <line x1={cx - r} y1={cy} x2={cx + r} y2={cy} stroke="#1e40af" strokeWidth="2" />
+                    <circle cx={cx} cy={cy} r="3" fill="#1e40af" />
+                    <text x={cx - r + 4} y={cy + 14} fontSize="8" fill="#1e40af" fontWeight="bold">0°</text>
+                    <text x={cx + r - 14} y={cy + 14} fontSize="8" fill="#1e40af" fontWeight="bold">180°</text>
+                </svg>
+                <button onClick={onClose} onPointerDown={e => e.stopPropagation()}
+                    className="absolute top-0 right-0 w-5 h-5 bg-red-400 rounded-full text-white text-[11px] flex items-center justify-center hover:bg-red-500 font-bold leading-none" title="Kapat">×</button>
+            </div>
+        </motion.div>
+    );
+};
 
 // =======================
 // OVERLAY TIMER
@@ -365,18 +470,54 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
         { id: 'dashed',      Svg: DashedLineIcon, label: 'Kesikli' },
     ];
 
-    const stamps = [
-        { emoji: '✅', label: 'Doğru' },
-        { emoji: '❌', label: 'Yanlış' },
-        { emoji: '⭐', label: 'Harika' },
-        { emoji: '❤️', label: 'Sevdim' },
-        { emoji: '❓', label: 'Soru' },
-        { emoji: '❗', label: 'Dikkat' },
-        { emoji: '💡', label: 'Fikir' },
-        { emoji: '📌', label: 'Önemli' },
-        { emoji: '🔥', label: 'Muhteşem' },
-        { emoji: '👍', label: 'Tebrikler' },
+    const stampCategories = [
+        {
+            label: 'Değerlendirme',
+            items: [
+                { emoji: '✅', label: 'Doğru' },
+                { emoji: '❌', label: 'Yanlış' },
+                { emoji: '⭐', label: 'Harika' },
+                { emoji: '❤️', label: 'Sevdim' },
+                { emoji: '❓', label: 'Soru' },
+                { emoji: '❗', label: 'Dikkat' },
+                { emoji: '💡', label: 'Fikir' },
+                { emoji: '📌', label: 'Önemli' },
+                { emoji: '🔥', label: 'Muhteşem' },
+                { emoji: '👍', label: 'Tebrikler' },
+            ],
+        },
+        {
+            label: 'Fen',
+            items: [
+                { emoji: '⚛️', label: 'Atom' },
+                { emoji: '🧪', label: 'Deney' },
+                { emoji: '🔬', label: 'Mikroskop' },
+                { emoji: '🧲', label: 'Mıknatıs' },
+                { emoji: '⚡', label: 'Elektrik' },
+                { emoji: '🌡️', label: 'Termometre' },
+                { emoji: '🧬', label: 'DNA' },
+                { emoji: '☢️', label: 'Radyoaktif' },
+                { emoji: '🦠', label: 'Bakteri' },
+                { emoji: '🌍', label: 'Dünya' },
+            ],
+        },
+        {
+            label: 'Matematik',
+            items: [
+                { emoji: 'π', label: 'Pi' },
+                { emoji: '√', label: 'Kök' },
+                { emoji: '∑', label: 'Sigma' },
+                { emoji: '∫', label: 'İntegral' },
+                { emoji: '∞', label: 'Sonsuz' },
+                { emoji: '≤', label: 'Küçük Eşit' },
+                { emoji: '≥', label: 'Büyük Eşit' },
+                { emoji: '≠', label: 'Eşit Değil' },
+                { emoji: '△', label: 'Üçgen' },
+                { emoji: '∠', label: 'Açı' },
+            ],
+        },
     ];
+    const stamps = stampCategories.flatMap(c => c.items);
 
     const isShapeTool = shapeTools.some(t => t.id === config.tool) || config.tool === 'stamp';
 
@@ -439,27 +580,29 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
                             </div>
                         </div>
 
-                        {/* Damgalar satırı */}
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-slate-500 font-medium w-12 shrink-0">Damga</span>
-                            <div className="flex items-center gap-0.5 flex-wrap">
-                                {stamps.map(stamp => (
-                                    <button
-                                        key={stamp.emoji}
-                                        onClick={() => { setConfig({ ...config, tool: 'stamp', stampIcon: stamp.emoji }); setShowShapes(false); }}
-                                        className={cn(
-                                            "w-9 h-9 rounded-xl text-xl transition-all hover:bg-white/10 flex items-center justify-center",
-                                            config.tool === 'stamp' && config.stampIcon === stamp.emoji
-                                                ? "bg-[#2d3045] ring-2 ring-indigo-500"
-                                                : ""
-                                        )}
-                                        title={stamp.label}
-                                    >
-                                        {stamp.emoji}
-                                    </button>
-                                ))}
+                        {/* Damgalar - kategorili */}
+                        {stampCategories.map(cat => (
+                            <div key={cat.label} className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-500 font-medium w-12 shrink-0">{cat.label}</span>
+                                <div className="flex items-center gap-0.5 flex-wrap">
+                                    {cat.items.map(stamp => (
+                                        <button
+                                            key={stamp.emoji}
+                                            onClick={() => { setConfig({ ...config, tool: 'stamp', stampIcon: stamp.emoji }); setShowShapes(false); }}
+                                            className={cn(
+                                                "w-9 h-9 rounded-xl text-xl transition-all hover:bg-white/10 flex items-center justify-center",
+                                                config.tool === 'stamp' && config.stampIcon === stamp.emoji
+                                                    ? "bg-[#2d3045] ring-2 ring-indigo-500"
+                                                    : ""
+                                            )}
+                                            title={stamp.label}
+                                        >
+                                            {stamp.emoji}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        ))}
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -719,6 +862,14 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
                 </div>
 
                 <p className="text-[13px] text-slate-500 line-clamp-2 leading-relaxed h-[40px] font-medium">{act.description || 'Açıklama girilmedi.'}</p>
+
+                {act.tags && (
+                    <div className="flex flex-wrap gap-1">
+                        {act.tags.split(',').map((t: string) => t.trim()).filter(Boolean).map((tag: string) => (
+                            <span key={tag} className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-md border border-emerald-200">{tag}</span>
+                        ))}
+                    </div>
+                )}
 
                 <div
                     className="aspect-[16/10] bg-indigo-50/50 rounded-2xl border-2 border-indigo-100 relative group overflow-hidden flex items-center justify-center shadow-inner"
@@ -1644,6 +1795,16 @@ export default function App() {
     const [bgColor, setBgColor] = useState('#ffffff');
     // Page info (read from canvas ref)
     const [pageInfo, setPageInfo] = useState({ current: 0, total: 1 });
+    // Tag filter
+    const [selectedTag, setSelectedTag] = useState<string | null>(null);
+    // Ruler / Protractor
+    const [showRuler, setShowRuler] = useState(false);
+    const [showProtractor, setShowProtractor] = useState(false);
+    // HTML file upload refs
+    const htmlCodeRef = React.useRef<HTMLTextAreaElement>(null);
+    const jsCodeRef = React.useRef<HTMLTextAreaElement>(null);
+    const cssCodeRef = React.useRef<HTMLTextAreaElement>(null);
+    const externalLibsRef = React.useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
@@ -1674,6 +1835,8 @@ export default function App() {
             setTextBoxes([]);
             setIsTextBoxMode(false);
             setPageInfo({ current: 0, total: 1 });
+            setShowRuler(false);
+            setShowProtractor(false);
         }
     }, [previewId]);
 
@@ -1687,6 +1850,88 @@ export default function App() {
         const unsubA = activitiesHandler.sync(setActivities);
         return () => { unsubA(); };
     }, []);
+
+    const allTags = useMemo(() => {
+        const tagSet = new Set<string>();
+        activities.forEach(a => {
+            if (a.tags) {
+                (a.tags as string).split(',').map((t: string) => t.trim()).filter(Boolean).forEach((t: string) => tagSet.add(t));
+            }
+        });
+        return Array.from(tagSet).sort();
+    }, [activities]);
+
+    // Spotlight: document-level mouse tracking (works over iframes)
+    useEffect(() => {
+        if (!spotlightActive) return;
+        const handleMouseMove = (e: MouseEvent) => {
+            const rect = previewMainRef.current?.getBoundingClientRect();
+            if (rect) {
+                setSpotlightPos({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top + (previewMainRef.current?.scrollTop || 0),
+                });
+            }
+        };
+        document.addEventListener('mousemove', handleMouseMove);
+        return () => document.removeEventListener('mousemove', handleMouseMove);
+    }, [spotlightActive]);
+
+    // Screenshot with html2canvas (captures iframe + canvas layer)
+    const handleScreenshot = async () => {
+        const container = previewMainRef.current;
+        if (!container) return;
+        let h2c: any = (window as any).html2canvas;
+        if (!h2c) {
+            await new Promise<void>((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                s.onload = () => resolve();
+                s.onerror = reject;
+                document.head.appendChild(s);
+            });
+            h2c = (window as any).html2canvas;
+        }
+        try {
+            const cvs = await h2c(container, { useCORS: true, allowTaint: true, scale: 1, logging: false });
+            const link = document.createElement('a');
+            link.download = 'etkinlik-ekran.png';
+            link.href = cvs.toDataURL('image/png');
+            link.click();
+        } catch {
+            previewCanvasRef.current?.screenshot(showWhiteboard, bgColor);
+        }
+    };
+
+    // HTML file upload handler
+    const handleHtmlFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const text = ev.target?.result as string;
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, 'text/html');
+            // Extract body HTML (remove style/script)
+            const clone = doc.body.cloneNode(true) as HTMLElement;
+            clone.querySelectorAll('script, style').forEach(el => el.remove());
+            const bodyHtml = clone.innerHTML.trim();
+            // Extract CSS
+            const cssContent = Array.from(doc.querySelectorAll('style')).map(s => s.innerHTML).join('\n').trim();
+            // Extract inline JS
+            const jsContent = Array.from(doc.querySelectorAll('script:not([src])')).map(s => s.innerHTML).join('\n').trim();
+            // Extract external libs
+            const extScripts = Array.from(doc.querySelectorAll('script[src]')).map(s => (s as HTMLScriptElement).getAttribute('src') || '');
+            const extCss = Array.from(doc.querySelectorAll('link[rel="stylesheet"]')).map(l => (l as HTMLLinkElement).getAttribute('href') || '');
+            const extLibs = [...extScripts, ...extCss].filter(Boolean).join('\n');
+            if (htmlCodeRef.current) htmlCodeRef.current.value = bodyHtml;
+            if (jsCodeRef.current) jsCodeRef.current.value = jsContent;
+            if (cssCodeRef.current) cssCodeRef.current.value = cssContent;
+            if (externalLibsRef.current) externalLibsRef.current.value = extLibs;
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    };
 
     const handleActivitySubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -1752,39 +1997,72 @@ export default function App() {
                         </div>
                     </div>
 
-                    <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
-                        <div className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                            <Blocks className="w-4 h-4" /> {activities.filter(a => a.title.toLowerCase().includes(search.toLowerCase())).length} İçerik Bulundu
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
+                            <div className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <Blocks className="w-4 h-4" /> {activities.filter(a =>
+                                    a.title.toLowerCase().includes(search.toLowerCase()) &&
+                                    (!selectedTag || (a.tags && (a.tags as string).split(',').map((t: string) => t.trim()).includes(selectedTag)))
+                                ).length} İçerik Bulundu
+                            </div>
+                            <div className="flex bg-white/50 backdrop-blur-sm border border-slate-200 rounded-xl p-1 gap-1">
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={cn(
+                                        "p-2 rounded-lg transition-all",
+                                        viewMode === 'grid' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
+                                    )}
+                                    title="Izgara Görünümü"
+                                >
+                                    <LayoutGrid className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('list')}
+                                    className={cn(
+                                        "p-2 rounded-lg transition-all",
+                                        viewMode === 'list' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
+                                    )}
+                                    title="Liste Görünümü"
+                                >
+                                    <LayoutList className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex bg-white/50 backdrop-blur-sm border border-slate-200 rounded-xl p-1 gap-1">
-                            <button
-                                onClick={() => setViewMode('grid')}
-                                className={cn(
-                                    "p-2 rounded-lg transition-all",
-                                    viewMode === 'grid' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
-                                )}
-                                title="Izgara Görünümü"
-                            >
-                                <LayoutGrid className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => setViewMode('list')}
-                                className={cn(
-                                    "p-2 rounded-lg transition-all",
-                                    viewMode === 'list' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
-                                )}
-                                title="Liste Görünümü"
-                            >
-                                <LayoutList className="w-4 h-4" />
-                            </button>
-                        </div>
+
+                        {allTags.length > 0 && (
+                            <div className="flex flex-wrap gap-2 py-1">
+                                <button
+                                    onClick={() => setSelectedTag(null)}
+                                    className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border",
+                                        selectedTag === null
+                                            ? "bg-indigo-600 text-white border-indigo-500 shadow-md"
+                                            : "bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600"
+                                    )}>
+                                    <Tags className="w-3 h-3" /> Tümü
+                                </button>
+                                {allTags.map(tag => (
+                                    <button key={tag}
+                                        onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                                        className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border",
+                                            selectedTag === tag
+                                                ? "bg-emerald-600 text-white border-emerald-500 shadow-md"
+                                                : "bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-600"
+                                        )}>
+                                        <Tag className="w-3 h-3" /> {tag}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className={cn(
                         "grid gap-6",
                         viewMode === 'grid' ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
                     )}>
-                        {activities.filter(a => a.title.toLowerCase().includes(search.toLowerCase())).map((act) => (
+                        {activities.filter(a =>
+                            a.title.toLowerCase().includes(search.toLowerCase()) &&
+                            (!selectedTag || (a.tags && (a.tags as string).split(',').map((t: string) => t.trim()).includes(selectedTag)))
+                        ).map((act) => (
                             viewMode === 'grid' ? (
                                 <ActivityCard
                                     key={act.id}
@@ -1847,6 +2125,12 @@ export default function App() {
                             <textarea name="description" defaultValue={editItem?.description} rows={2} className={cn(inputClasses, "resize-none")} placeholder="Etkinliğin amacını özetleyin" />
                         </div>
                     </div>
+
+                    <div>
+                        <label className={labelClasses}>Etiketler (virgülle ayırın)</label>
+                        <input name="tags" defaultValue={editItem?.tags} className={inputClasses} placeholder="Fen 7. Sınıf, Moleküller, Sınav" />
+                        <p className="text-[11px] text-slate-400 mt-1.5">Etiketler etkinlikleri hızlıca filtrelemek için kullanılır.</p>
+                    </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 px-6 py-4 bg-slate-50/50 rounded-2xl border-2 border-slate-100">
                         <div className="flex items-center gap-4">
@@ -1872,25 +2156,35 @@ export default function App() {
                         </div>
                     </div>
 
+                    {/* HTML Dosya Yükleme */}
+                    <div className="p-4 bg-indigo-50/50 rounded-2xl border-2 border-dashed border-indigo-200 text-center space-y-2">
+                        <label className={labelClasses + ' block'}>HTML Dosyası Yükle</label>
+                        <p className="text-[12px] text-slate-500">Bir <strong>.html</strong> dosyası yükleyin — kod alanları otomatik doldurulur</p>
+                        <label className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-[13px] font-bold rounded-xl cursor-pointer hover:bg-indigo-700 transition-colors shadow-md">
+                            <Plus className="w-4 h-4" /> Dosya Seç
+                            <input type="file" accept=".html,.htm" className="sr-only" onChange={handleHtmlFileUpload} />
+                        </label>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
                             <label className={labelClasses}>HTML Kodu</label>
-                            <textarea name="html_code" defaultValue={editItem?.html_code} rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="<div id='uygulama'></div>" />
+                            <textarea ref={htmlCodeRef} name="html_code" defaultValue={editItem?.html_code} rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="<div id='uygulama'></div>" />
                         </div>
                         <div>
                             <label className={labelClasses}>JavaScript Kodu</label>
-                            <textarea name="js_code" defaultValue={editItem?.js_code} rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="// console.log('Merhaba Dünya');" />
+                            <textarea ref={jsCodeRef} name="js_code" defaultValue={editItem?.js_code} rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="// console.log('Merhaba Dünya');" />
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
                             <label className={labelClasses}>CSS Kodu (Opsiyonel)</label>
-                            <textarea name="css_code" defaultValue={editItem?.css_code} rows={3} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="body { background: #f0f; }" />
+                            <textarea ref={cssCodeRef} name="css_code" defaultValue={editItem?.css_code} rows={3} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="body { background: #f0f; }" />
                         </div>
                         <div>
                             <label className={labelClasses}>Dış Kütüphaneler (Her satıra bir link)</label>
-                            <textarea name="external_libs" defaultValue={editItem?.external_libs} rows={3} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js" />
+                            <textarea ref={externalLibsRef} name="external_libs" defaultValue={editItem?.external_libs} rows={3} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js" />
                         </div>
                     </div>
                     
@@ -1936,6 +2230,25 @@ export default function App() {
                                     </button>
                                 </div>
 
+                                {/* Cetvel */}
+                                <button onClick={() => setShowRuler(r => !r)}
+                                    className={cn("p-2 rounded-xl transition-all border",
+                                        showRuler ? "bg-amber-500 text-white border-amber-400" : "bg-white/5 text-slate-300 hover:bg-white/10 border-white/10")}
+                                    title="Cetvel">
+                                    <Ruler className="w-4 h-4" />
+                                </button>
+
+                                {/* Açıölçer */}
+                                <button onClick={() => setShowProtractor(p => !p)}
+                                    className={cn("p-2 rounded-xl transition-all border",
+                                        showProtractor ? "bg-sky-500 text-white border-sky-400" : "bg-white/5 text-slate-300 hover:bg-white/10 border-white/10")}
+                                    title="Açıölçer">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                        <path d="M2 20 L12 4 L22 20 Z" /><line x1="2" y1="20" x2="22" y2="20" />
+                                        <line x1="12" y1="4" x2="12" y2="20" strokeDasharray="3 2" />
+                                    </svg>
+                                </button>
+
                                 {/* Spotlight */}
                                 <button onClick={() => setSpotlightActive(s => !s)}
                                     className={cn("p-2 rounded-xl transition-all border text-xs font-bold",
@@ -1972,11 +2285,6 @@ export default function App() {
                         {/* Main Content */}
                         <main ref={previewMainRef} className="flex-1 relative overflow-y-auto overflow-x-hidden custom-scroll"
                             style={{ backgroundColor: showWhiteboard ? (bgColor || '#ffffff') : '#ffffff' }}
-                            onMouseMove={(e) => {
-                                if (!spotlightActive) return;
-                                const rect = previewMainRef.current?.getBoundingClientRect();
-                                if (rect) setSpotlightPos({ x: e.clientX - rect.left, y: e.clientY - rect.top + (previewMainRef.current?.scrollTop || 0) });
-                            }}
                         >
                             {/* Zoom wrapper */}
                             <div style={{
@@ -2040,7 +2348,7 @@ export default function App() {
                                         setShowWhiteboard={setShowWhiteboard}
                                         bgColor={bgColor}
                                         onBgColorChange={setBgColor}
-                                        onScreenshot={() => previewCanvasRef.current?.screenshot(showWhiteboard, bgColor)}
+                                        onScreenshot={handleScreenshot}
                                         isTextBoxMode={isTextBoxMode}
                                         onTextBoxModeToggle={() => setIsTextBoxMode(m => !m)}
                                     />
@@ -2075,6 +2383,12 @@ export default function App() {
                             onClose={() => { setShowTimer(false); setTimerRunning(false); }}
                         />
                     )}
+
+                    {/* Ruler */}
+                    {showRuler && <RulerTool onClose={() => setShowRuler(false)} />}
+
+                    {/* Protractor */}
+                    {showProtractor && <ProtractorTool onClose={() => setShowProtractor(false)} />}
                 </div>
             )}
 
