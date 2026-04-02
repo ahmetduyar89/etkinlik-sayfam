@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     Sparkles, Search, ExternalLink, Copy, Share2, Trash2, Edit3, Grid, Filter, Plus,
-    LayoutDashboard, ChevronLeft, ChevronRight, Database, BarChart3, CalendarDays,
+    LayoutDashboard, Database, BarChart3,
     Target, Zap, Globe, Settings, Bell, User, ArrowRight, HelpCircle, Eye,
-    MoreVertical, X, Save, Clock, BookOpen, Anchor, Book, FlaskConical, Command, Blocks, Pencil, Eraser,
+    MoreVertical, X, Save, Clock, BookOpen, Anchor, Command, Blocks, Pencil, Eraser,
     Hand, Highlighter, Type, Shapes, Undo, History, Sun, Square, Circle, Triangle, MousePointer2,
-    MoveRight, ArrowRightLeft, Minus, PaintBucket, List, LayoutList, LayoutGrid, GripVertical
+    MoveRight, ArrowRightLeft, Minus, PaintBucket, List, LayoutList, LayoutGrid, GripVertical,
+    ZoomIn, ZoomOut, Focus, AlarmClock, Camera, Layers, StickyNote, ChevronLeft, ChevronRight,
+    Play, Pause, RotateCcw, GripHorizontal, Ruler, Tag, Tags, FlaskConical
 } from 'lucide-react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { db, useFirestore } from './lib/firebase';
@@ -110,19 +112,345 @@ const DashedLineIcon = () => (
     </svg>
 );
 
-const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowWhiteboard }: {
+// =======================
+// SPOTLIGHT OVERLAY
+// =======================
+const SpotlightOverlay = ({ pos, radius }: { pos: { x: number; y: number }; radius: number }) => (
+    <div
+        className="absolute inset-0 z-[3900] pointer-events-none select-none"
+        style={{
+            background: `radial-gradient(circle ${radius}px at ${pos.x}px ${pos.y}px, transparent 0%, transparent 35%, rgba(0,0,0,0.84) 100%)`,
+        }}
+    />
+);
+
+// =======================
+// RULER TOOL
+// =======================
+const RulerTool = ({ onClose }: { onClose: () => void }) => {
+    const [vertical, setVertical] = React.useState(false);
+    const dragControls = useDragControls();
+    const cmCount = 20;
+    const pxPerCm = 32;
+    const totalPx = cmCount * pxPerCm;
+
+    const ticks: { x: number; h: number; label: number | null }[] = [];
+    for (let mm = 0; mm <= cmCount * 10; mm++) {
+        const x = mm * (pxPerCm / 10);
+        const isCm = mm % 10 === 0;
+        const isMid = mm % 5 === 0;
+        ticks.push({ x, h: isCm ? 22 : isMid ? 15 : 8, label: isCm && mm > 0 ? mm / 10 : null });
+    }
+
+    const svgW = totalPx + 40, svgH = 52;
+
+    return (
+        <motion.div drag dragControls={dragControls} dragListener={false} dragMomentum={false} dragElastic={0}
+            className="fixed z-[11500] pointer-events-auto select-none"
+            style={{ top: 180, left: 80, touchAction: 'none', transformOrigin: 'center center', transform: vertical ? 'rotate(90deg)' : 'none' }}>
+            <div onPointerDown={e => dragControls.start(e)} className="cursor-grab active:cursor-grabbing relative">
+                <svg width={svgW} height={svgH} style={{ display: 'block', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))' }}>
+                    <rect x="0" y="0" width={svgW} height={svgH} rx="4" fill="rgba(254,243,199,0.97)" stroke="#d97706" strokeWidth="1.5" />
+                    {ticks.map((t, i) => (
+                        <g key={i}>
+                            <line x1={t.x + 20} y1={svgH} x2={t.x + 20} y2={svgH - t.h} stroke="#92400e" strokeWidth={t.label !== null ? 1.5 : 0.8} />
+                            {t.label !== null && (
+                                <text x={t.x + 20} y={svgH - t.h - 3} textAnchor="middle" fontSize="8" fill="#92400e" fontWeight="bold">{t.label}</text>
+                            )}
+                        </g>
+                    ))}
+                    <text x="10" y="14" fontSize="8" fill="#b45309" fontWeight="bold">cm</text>
+                </svg>
+                <div className="absolute top-1 right-1 flex gap-1" onPointerDown={e => e.stopPropagation()}>
+                    <button onClick={() => setVertical(v => !v)}
+                        className="w-5 h-5 bg-amber-400 rounded text-amber-900 text-[11px] flex items-center justify-center hover:bg-amber-500 font-bold leading-none" title="Döndür">↺</button>
+                    <button onClick={onClose}
+                        className="w-5 h-5 bg-red-400 rounded text-white text-[11px] flex items-center justify-center hover:bg-red-500 font-bold leading-none" title="Kapat">×</button>
+                </div>
+            </div>
+        </motion.div>
+    );
+};
+
+// =======================
+// PROTRACTOR TOOL
+// =======================
+const ProtractorTool = ({ onClose }: { onClose: () => void }) => {
+    const dragControls = useDragControls();
+    const r = 110;
+    const cx = r + 10, cy = r + 10;
+
+    const marks = Array.from({ length: 19 }, (_, i) => {
+        const deg = i * 10;
+        const rad = Math.PI - (deg * Math.PI / 180);
+        const isMajor = deg % 30 === 0;
+        const innerR = isMajor ? r - 20 : r - 13;
+        const textR = r - 28;
+        return { deg, rad, innerR, textR, isMajor };
+    });
+
+    return (
+        <motion.div drag dragControls={dragControls} dragListener={false} dragMomentum={false} dragElastic={0}
+            className="fixed z-[11500] pointer-events-auto select-none"
+            style={{ top: 250, left: 200, touchAction: 'none' }}>
+            <div onPointerDown={e => dragControls.start(e)} className="cursor-grab active:cursor-grabbing relative">
+                <svg width={r * 2 + 20} height={r + 30} style={{ display: 'block', filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.35))' }}>
+                    {/* Semicircle fill */}
+                    <path d={`M ${cx - r},${cy} A ${r},${r} 0 0,1 ${cx + r},${cy} Z`} fill="rgba(147,197,253,0.88)" stroke="#2563eb" strokeWidth="2" />
+                    {/* Degree marks */}
+                    {marks.map(m => {
+                        const x1 = cx + r * Math.cos(m.rad), y1 = cy - r * Math.sin(m.rad);
+                        const x2 = cx + m.innerR * Math.cos(m.rad), y2 = cy - m.innerR * Math.sin(m.rad);
+                        const tx = cx + m.textR * Math.cos(m.rad), ty = cy - m.textR * Math.sin(m.rad);
+                        return (
+                            <g key={m.deg}>
+                                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#1e40af" strokeWidth={m.isMajor ? 1.5 : 0.8} />
+                                {m.isMajor && <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fontSize="9" fill="#1e40af" fontWeight="bold">{m.deg}°</text>}
+                            </g>
+                        );
+                    })}
+                    {/* 5-degree minor marks */}
+                    {Array.from({ length: 37 }, (_, i) => {
+                        const deg = i * 5;
+                        if (deg % 10 === 0) return null;
+                        const rad = Math.PI - (deg * Math.PI / 180);
+                        return <line key={deg} x1={cx + r * Math.cos(rad)} y1={cy - r * Math.sin(rad)} x2={cx + (r - 8) * Math.cos(rad)} y2={cy - (r - 8) * Math.sin(rad)} stroke="#1e40af" strokeWidth="0.6" />;
+                    })}
+                    {/* Baseline */}
+                    <line x1={cx - r} y1={cy} x2={cx + r} y2={cy} stroke="#1e40af" strokeWidth="2" />
+                    <circle cx={cx} cy={cy} r="3" fill="#1e40af" />
+                    <text x={cx - r + 4} y={cy + 14} fontSize="8" fill="#1e40af" fontWeight="bold">0°</text>
+                    <text x={cx + r - 14} y={cy + 14} fontSize="8" fill="#1e40af" fontWeight="bold">180°</text>
+                </svg>
+                <button onClick={onClose} onPointerDown={e => e.stopPropagation()}
+                    className="absolute top-0 right-0 w-5 h-5 bg-red-400 rounded-full text-white text-[11px] flex items-center justify-center hover:bg-red-500 font-bold leading-none" title="Kapat">×</button>
+            </div>
+        </motion.div>
+    );
+};
+
+// =======================
+// OVERLAY TIMER
+// =======================
+const OverlayTimer = ({ secs, running, total, onToggle, onReset, onSetTotal, onClose }: {
+    secs: number; running: boolean; total: number;
+    onToggle: () => void; onReset: () => void; onSetTotal: (s: number) => void; onClose: () => void;
+}) => {
+    const [showSetup, setShowSetup] = React.useState(false);
+    const [inputMins, setInputMins] = React.useState(String(Math.round(total / 60)));
+    const dragControls = useDragControls();
+    const isLow = secs > 0 && secs < 60;
+    const pct = total > 0 ? Math.max(0, secs / total) : 0;
+    const r = 28, circ = 2 * Math.PI * r;
+
+    return (
+        <motion.div drag dragControls={dragControls} dragListener={false} dragMomentum={false} dragElastic={0}
+            className="fixed z-[12000] pointer-events-auto select-none"
+            style={{ top: 80, right: 24, touchAction: 'none' }}
+        >
+            <div className={cn("flex flex-col items-center gap-2 px-5 py-4 rounded-2xl shadow-2xl border backdrop-blur-md",
+                isLow ? "bg-red-950/95 border-red-500/60" : "bg-[#1a1b26]/95 border-white/10")}>
+                <div onPointerDown={e => dragControls.start(e)} className="cursor-grab active:cursor-grabbing self-stretch flex justify-between items-center pb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Sayaç</span>
+                    <div className="flex gap-1">
+                        <button onClick={() => setShowSetup(s => !s)} className="p-1 rounded text-slate-500 hover:text-white hover:bg-white/10 transition-colors"><Settings className="w-3 h-3" /></button>
+                        <button onClick={onClose} className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"><X className="w-3 h-3" /></button>
+                    </div>
+                </div>
+
+                {/* Circular progress + time */}
+                <div className="relative flex items-center justify-center" style={{ width: 80, height: 80 }}>
+                    <svg width="80" height="80" className="absolute -rotate-90">
+                        <circle cx="40" cy="40" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
+                        <circle cx="40" cy="40" r={r} fill="none"
+                            stroke={isLow ? '#ef4444' : '#4f46e5'} strokeWidth="4"
+                            strokeDasharray={circ} strokeDashoffset={circ * (1 - pct)}
+                            strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.5s' }} />
+                    </svg>
+                    <span className={cn("text-xl font-black tabular-nums", isLow ? "text-red-400" : "text-white")}>
+                        {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}
+                    </span>
+                </div>
+
+                {/* Setup panel */}
+                <AnimatePresence>
+                    {showSetup && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden w-full">
+                            <div className="flex items-center gap-2 pt-1">
+                                <input type="number" min="1" max="90" value={inputMins}
+                                    onChange={e => setInputMins(e.target.value)}
+                                    className="w-16 bg-white/10 border border-white/20 rounded-lg px-2 py-1 text-white text-sm text-center focus:outline-none focus:border-indigo-500"
+                                />
+                                <span className="text-xs text-slate-400">dk</span>
+                                <button onClick={() => { const s = parseInt(inputMins) * 60; if (s > 0) { onSetTotal(s); setShowSetup(false); } }}
+                                    className="px-3 py-1 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 transition-colors font-bold">
+                                    Ayarla
+                                </button>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Controls */}
+                <div className="flex items-center gap-2">
+                    <button onClick={onToggle}
+                        className={cn("p-2 rounded-xl transition-all", running ? "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30" : "bg-indigo-600/30 text-indigo-400 hover:bg-indigo-600/50")}>
+                        {running ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    </button>
+                    <button onClick={onReset} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all">
+                        <RotateCcw className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+        </motion.div>
+    );
+};
+
+// =======================
+// TEXT BOX LAYER
+// =======================
+const TEXTBOX_COLORS = ['#fff9c4', '#f8d7da', '#d4edda', '#d1ecf1', '#e2d9f3', '#1a1b26'];
+const TEXTBOX_TEXT_COLORS: Record<string, string> = {
+    '#1a1b26': '#ffffff', default: '#1a1b26'
+};
+
+const TextBoxItem = ({ box, onUpdate, onDelete }: any) => {
+    const [editing, setEditing] = React.useState(box.text === '');
+    const textRef = React.useRef<HTMLTextAreaElement>(null);
+    const dragControls = useDragControls();
+
+    React.useEffect(() => {
+        if (editing) textRef.current?.focus();
+    }, [editing]);
+
+    const textColor = TEXTBOX_TEXT_COLORS[box.color] || TEXTBOX_TEXT_COLORS.default;
+
+    return (
+        <motion.div drag dragControls={dragControls} dragListener={false} dragMomentum={false} dragElastic={0}
+            className="absolute group pointer-events-auto"
+            style={{ left: box.x, top: box.y, zIndex: 4800, minWidth: 120, maxWidth: 320, touchAction: 'none' }}
+            onPointerDown={e => e.stopPropagation()}
+        >
+            <div className="relative rounded-xl shadow-xl border border-black/10 overflow-visible"
+                style={{ backgroundColor: box.color, padding: '8px 12px' }}>
+                {/* Drag handle */}
+                <div onPointerDown={e => { e.stopPropagation(); dragControls.start(e); }}
+                    className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-3 rounded-full bg-black/20 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <GripHorizontal className="w-3 h-2" style={{ color: textColor }} />
+                </div>
+
+                {editing ? (
+                    <textarea ref={textRef} value={box.text}
+                        onChange={e => onUpdate({ ...box, text: e.target.value })}
+                        onBlur={() => { if (box.text.trim()) setEditing(false); }}
+                        className="bg-transparent resize-none outline-none w-full min-w-[100px]"
+                        style={{ color: textColor, fontSize: box.fontSize, lineHeight: 1.4, minHeight: 40 }}
+                        rows={3}
+                    />
+                ) : (
+                    <p onDoubleClick={() => setEditing(true)} style={{ color: textColor, fontSize: box.fontSize, lineHeight: 1.4, cursor: 'text', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        {box.text || <span className="opacity-40">Çift tıkla…</span>}
+                    </p>
+                )}
+
+                {/* Actions */}
+                <div className="absolute -top-3 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Color swatches */}
+                    <div className="flex gap-0.5 bg-[#1a1b26]/90 backdrop-blur-sm rounded-full px-1.5 py-1 border border-white/10">
+                        {TEXTBOX_COLORS.map(c => (
+                            <button key={c} onClick={() => onUpdate({ ...box, color: c })}
+                                className={cn("w-4 h-4 rounded-full border transition-all hover:scale-125",
+                                    box.color === c ? "border-white scale-125" : "border-transparent")}
+                                style={{ backgroundColor: c }} />
+                        ))}
+                    </div>
+                    <button onClick={onDelete}
+                        className="w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow">
+                        <X className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+        </motion.div>
+    );
+};
+
+const TextBoxLayer = ({ boxes, onUpdate, onDelete, onAdd, enabled }: any) => {
+    const handleClick = (e: React.MouseEvent) => {
+        if (!enabled) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        onAdd({ id: Date.now().toString(), x: e.clientX - rect.left - 60, y: e.clientY - rect.top - 20, text: '', color: '#fff9c4', fontSize: 15 });
+    };
+
+    return (
+        <div className={cn("absolute inset-0 z-[4800]", enabled ? "pointer-events-auto cursor-text" : "pointer-events-none")}
+            onClick={handleClick}>
+            {boxes.map((b: any) => (
+                <TextBoxItem key={b.id} box={b}
+                    onUpdate={(upd: any) => onUpdate(b.id, upd)}
+                    onDelete={() => onDelete(b.id)}
+                />
+            ))}
+        </div>
+    );
+};
+
+// =======================
+// PAGE NAVIGATION
+// =======================
+const PageNav = ({ current, total, onPrev, onNext, onAdd, onDelete }: any) => (
+    <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[5100] flex items-center gap-2 bg-[#1a1b26]/95 backdrop-blur-md px-3 py-2 rounded-2xl border border-white/10 shadow-xl pointer-events-auto">
+        <button onClick={onPrev} disabled={current === 0}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-all">
+            <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="text-xs font-bold text-white tabular-nums px-2">{current + 1} / {total}</span>
+        <button onClick={onNext} disabled={current === total - 1}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-all">
+            <ChevronRight className="w-4 h-4" />
+        </button>
+        <div className="w-px h-4 bg-white/20 mx-1" />
+        <button onClick={onAdd} title="Yeni sayfa ekle"
+            className="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-400/10 transition-all">
+            <Plus className="w-4 h-4" />
+        </button>
+        {total > 1 && (
+            <button onClick={onDelete} title="Bu sayfayı sil"
+                className="p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-400/10 transition-all">
+                <Trash2 className="w-4 h-4" />
+            </button>
+        )}
+    </div>
+);
+
+// =======================
+// DRAWING TOOLBAR
+// =======================
+const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowWhiteboard, bgColor, onBgColorChange, onScreenshot, isTextBoxMode, onTextBoxModeToggle }: {
     onCommand: (type: string, data?: any) => void,
     config: any,
     setConfig: (c: any) => void,
     showWhiteboard?: boolean,
-    setShowWhiteboard?: (val: boolean) => void
+    setShowWhiteboard?: (val: boolean) => void,
+    bgColor?: string,
+    onBgColorChange?: (c: string) => void,
+    onScreenshot?: () => void,
+    isTextBoxMode?: boolean,
+    onTextBoxModeToggle?: () => void,
 }) => {
     const [showShapes, setShowShapes] = React.useState(false);
+    const [showExtras, setShowExtras] = React.useState(false);
     const dragControls = useDragControls();
+
+    const bgColors = [
+        { color: '#ffffff', label: 'Beyaz' }, { color: '#fffde7', label: 'Krem' },
+        { color: '#e8f5e9', label: 'Yeşil' }, { color: '#e3f2fd', label: 'Mavi' },
+        { color: '#1a1a2e', label: 'Gece' }, { color: '#111827', label: 'Siyah' },
+    ];
     
     // Sarı ve İndigo eklendi
     const colors = ['#ffffff', '#ff4d4d', '#ffff00', '#ffa500', '#2ecc71', '#3498db', '#4f46e5', '#9b59b6', '#000000'];
     const mainTools = [
+        { id: 'select',      icon: MousePointer2, label: 'Seç & Düzenle' },
         { id: 'pencil',      icon: Pencil,      label: 'Kalem' },
         { id: 'pan',         icon: Hand,        label: 'El' },
         { id: 'highlighter', icon: Highlighter, label: 'Fosforlu' },
@@ -141,18 +469,54 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
         { id: 'dashed',      Svg: DashedLineIcon, label: 'Kesikli' },
     ];
 
-    const stamps = [
-        { emoji: '✅', label: 'Doğru' },
-        { emoji: '❌', label: 'Yanlış' },
-        { emoji: '⭐', label: 'Harika' },
-        { emoji: '❤️', label: 'Sevdim' },
-        { emoji: '❓', label: 'Soru' },
-        { emoji: '❗', label: 'Dikkat' },
-        { emoji: '💡', label: 'Fikir' },
-        { emoji: '📌', label: 'Önemli' },
-        { emoji: '🔥', label: 'Muhteşem' },
-        { emoji: '👍', label: 'Tebrikler' },
+    const stampCategories = [
+        {
+            label: 'Değerlendirme',
+            items: [
+                { emoji: '✅', label: 'Doğru' },
+                { emoji: '❌', label: 'Yanlış' },
+                { emoji: '⭐', label: 'Harika' },
+                { emoji: '❤️', label: 'Sevdim' },
+                { emoji: '❓', label: 'Soru' },
+                { emoji: '❗', label: 'Dikkat' },
+                { emoji: '💡', label: 'Fikir' },
+                { emoji: '📌', label: 'Önemli' },
+                { emoji: '🔥', label: 'Muhteşem' },
+                { emoji: '👍', label: 'Tebrikler' },
+            ],
+        },
+        {
+            label: 'Fen',
+            items: [
+                { emoji: '⚛️', label: 'Atom' },
+                { emoji: '🧪', label: 'Deney' },
+                { emoji: '🔬', label: 'Mikroskop' },
+                { emoji: '🧲', label: 'Mıknatıs' },
+                { emoji: '⚡', label: 'Elektrik' },
+                { emoji: '🌡️', label: 'Termometre' },
+                { emoji: '🧬', label: 'DNA' },
+                { emoji: '☢️', label: 'Radyoaktif' },
+                { emoji: '🦠', label: 'Bakteri' },
+                { emoji: '🌍', label: 'Dünya' },
+            ],
+        },
+        {
+            label: 'Matematik',
+            items: [
+                { emoji: 'π', label: 'Pi' },
+                { emoji: '√', label: 'Kök' },
+                { emoji: '∑', label: 'Sigma' },
+                { emoji: '∫', label: 'İntegral' },
+                { emoji: '∞', label: 'Sonsuz' },
+                { emoji: '≤', label: 'Küçük Eşit' },
+                { emoji: '≥', label: 'Büyük Eşit' },
+                { emoji: '≠', label: 'Eşit Değil' },
+                { emoji: '△', label: 'Üçgen' },
+                { emoji: '∠', label: 'Açı' },
+            ],
+        },
     ];
+    const stamps = stampCategories.flatMap(c => c.items);
 
     const isShapeTool = shapeTools.some(t => t.id === config.tool) || config.tool === 'stamp';
 
@@ -215,27 +579,29 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
                             </div>
                         </div>
 
-                        {/* Damgalar satırı */}
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-slate-500 font-medium w-12 shrink-0">Damga</span>
-                            <div className="flex items-center gap-0.5 flex-wrap">
-                                {stamps.map(stamp => (
-                                    <button
-                                        key={stamp.emoji}
-                                        onClick={() => { setConfig({ ...config, tool: 'stamp', stampIcon: stamp.emoji }); setShowShapes(false); }}
-                                        className={cn(
-                                            "w-9 h-9 rounded-xl text-xl transition-all hover:bg-white/10 flex items-center justify-center",
-                                            config.tool === 'stamp' && config.stampIcon === stamp.emoji
-                                                ? "bg-[#2d3045] ring-2 ring-indigo-500"
-                                                : ""
-                                        )}
-                                        title={stamp.label}
-                                    >
-                                        {stamp.emoji}
-                                    </button>
-                                ))}
+                        {/* Damgalar - kategorili */}
+                        {stampCategories.map(cat => (
+                            <div key={cat.label} className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-500 font-medium w-12 shrink-0">{cat.label}</span>
+                                <div className="flex items-center gap-0.5 flex-wrap">
+                                    {cat.items.map(stamp => (
+                                        <button
+                                            key={stamp.emoji}
+                                            onClick={() => { setConfig({ ...config, tool: 'stamp', stampIcon: stamp.emoji }); setShowShapes(false); }}
+                                            className={cn(
+                                                "w-9 h-9 rounded-xl text-xl transition-all hover:bg-white/10 flex items-center justify-center",
+                                                config.tool === 'stamp' && config.stampIcon === stamp.emoji
+                                                    ? "bg-[#2d3045] ring-2 ring-indigo-500"
+                                                    : ""
+                                            )}
+                                            title={stamp.label}
+                                        >
+                                            {stamp.emoji}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        ))}
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -320,7 +686,7 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
                 </div>
 
                 {/* İşlemler */}
-                <div className="flex items-center gap-1.5 px-2">
+                <div className="flex items-center gap-1.5 px-2 border-r border-white/10">
                     <button onClick={() => onCommand('UNDO_DRAWING')} className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all" title="Geri Al">
                         <Undo className="w-5 h-5" />
                     </button>
@@ -330,17 +696,55 @@ const DrawingToolbar = ({ onCommand, config, setConfig, showWhiteboard, setShowW
                     {setShowWhiteboard && (
                         <button
                             onClick={() => onCommand('TOGGLE_WHITEBOARD')}
-                            className={cn(
-                                "p-2.5 rounded-xl transition-all",
-                                showWhiteboard ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-white hover:bg-white/5"
-                            )}
+                            className={cn("p-2.5 rounded-xl transition-all", showWhiteboard ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-white hover:bg-white/5")}
                             title="Yazı Tahtası"
                         >
                             <Grid className="w-5 h-5" />
                         </button>
                     )}
                 </div>
+
+                {/* Ekstra araçlar */}
+                <div className="flex items-center gap-1 px-2">
+                    {onTextBoxModeToggle && (
+                        <button onClick={onTextBoxModeToggle}
+                            className={cn("p-2.5 rounded-xl transition-all", isTextBoxMode ? "bg-amber-500 text-white" : "text-slate-400 hover:text-white hover:bg-white/5")}
+                            title="Metin Kutusu Ekle">
+                            <StickyNote className="w-5 h-5" />
+                        </button>
+                    )}
+                    {onScreenshot && (
+                        <button onClick={onScreenshot}
+                            className="p-2.5 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 transition-all"
+                            title="Çizimi PNG Olarak İndir">
+                            <Camera className="w-5 h-5" />
+                        </button>
+                    )}
+                    {onBgColorChange && (
+                        <button onClick={() => setShowExtras(s => !s)}
+                            className={cn("p-2.5 rounded-xl transition-all relative", showExtras ? "bg-white/10 text-white" : "text-slate-400 hover:text-white hover:bg-white/5")}
+                            title="Arka Plan Rengi">
+                            <div className="w-5 h-5 rounded-full border-2 border-white/40" style={{ backgroundColor: bgColor || '#ffffff' }} />
+                        </button>
+                    )}
+                </div>
             </div>
+
+            {/* Arka plan rengi paneli */}
+            <AnimatePresence>
+                {showExtras && onBgColorChange && (
+                    <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="flex items-center gap-2 bg-[#1a1b26]/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 shadow-2xl">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider shrink-0">Arka Plan</span>
+                        {bgColors.map(({ color, label }) => (
+                            <button key={color} onClick={() => { onBgColorChange(color); }}
+                                className={cn("w-7 h-7 rounded-full border-2 transition-all hover:scale-110 shrink-0",
+                                    (bgColor || '#ffffff') === color ? "border-white scale-110" : "border-transparent")}
+                                style={{ backgroundColor: color }} title={label} />
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 };
@@ -361,7 +765,7 @@ const IconButton = ({ icon: Icon, onClick, className, title }: { icon: any, onCl
     </button>
 );
 
-const Navbar = ({ activeTab, setTab }: { activeTab: string, setTab: (t: string) => void }) => (
+const Navbar = () => (
     <header className="fixed top-0 left-0 right-0 z-[100] px-4 py-4 pointer-events-none">
         <div className="container mx-auto max-w-6xl flex justify-between items-center pointer-events-auto glass-effect rounded-2xl px-6 py-3">
             <div className="flex items-center gap-3">
@@ -370,33 +774,12 @@ const Navbar = ({ activeTab, setTab }: { activeTab: string, setTab: (t: string) 
                 </div>
                 <div>
                     <h1 className="text-sm font-bold tracking-wider text-slate-800 uppercase">A. Duyar</h1>
+                    <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase">İnteraktif Merkez</p>
                 </div>
             </div>
 
-            <nav className="hidden md:flex items-center gap-2 bg-neutral-100/50 p-1 rounded-xl">
-                {[
-                    { id: 'dashboard', label: 'Müfredat Planı', icon: Book },
-                    { id: 'interactive', label: 'İnteraktif Merkez', icon: Blocks }
-                ].map((item) => (
-                    <button
-                        key={item.id}
-                        onClick={() => setTab(item.id)}
-                        className={cn(
-                            "px-5 py-2 rounded-xl text-[13px] font-bold flex items-center gap-2 transition-all duration-300",
-                            activeTab === item.id 
-                                ? "bg-white text-indigo-600 shadow-md border border-indigo-100" 
-                                : "text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/50"
-                        )}
-                    >
-                        <item.icon className="w-3.5 h-3.5" />
-                        {item.label}
-                    </button>
-                ))}
-            </nav>
-
             <div className="flex items-center gap-2">
                 <div className="hidden lg:flex items-center gap-1 mr-2">
-                    <IconButton icon={Search} />
                     <IconButton icon={Settings} />
                 </div>
                 <div className="w-8 h-8 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center cursor-pointer hover:bg-neutral-200 transition-colors">
@@ -463,9 +846,9 @@ const LivePreview = ({ act }: { act: any }) => (
 // =======================
 const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activitiesHandler, showResultsId, setShowResultsId }: any) => {
     const [isHovered, setIsHovered] = useState(false);
-    
+
     return (
-        <PortalCard className="p-0 h-full flex flex-col justify-between border-2 border-indigo-50 hover:border-indigo-300 shadow-lg shadow-indigo-100/20">
+        <PortalCard className="p-0 h-full flex flex-col justify-between border-2 border-indigo-50 hover:border-indigo-300 shadow-lg shadow-indigo-100/20 cursor-pointer" onClick={() => setPreviewId(act.id)}>
             <div className="p-6 space-y-5">
                 <div className="flex justify-between items-start gap-3 cursor-pointer" onClick={() => setPreviewId(act.id)}>
                     <h3 className="text-[17px] font-bold tracking-tight leading-snug text-slate-800 line-clamp-2">{act.title}</h3>
@@ -476,14 +859,20 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
                         <span className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded-lg uppercase tracking-wider">{act.category || 'Genel'}</span>
                     </div>
                 </div>
-                
                 <p className="text-[13px] text-slate-500 line-clamp-2 leading-relaxed h-[40px] font-medium cursor-pointer" onClick={() => setPreviewId(act.id)}>{act.description || 'Açıklama girilmedi.'}</p>
 
-                <div 
-                    className="aspect-[16/10] bg-indigo-50/50 rounded-2xl border-2 border-indigo-100 relative group overflow-hidden flex items-center justify-center cursor-pointer shadow-inner"
+                {act.tags && (
+                    <div className="flex flex-wrap gap-1">
+                        {act.tags.split(',').map((t: string) => t.trim()).filter(Boolean).map((tag: string) => (
+                            <span key={tag} className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-md border border-emerald-200">{tag}</span>
+                        ))}
+                    </div>
+                )}
+
+                <div
+                    className="aspect-[16/10] bg-indigo-50/50 rounded-2xl border-2 border-indigo-100 relative group overflow-hidden flex items-center justify-center shadow-inner"
                     onMouseEnter={() => setIsHovered(true)}
                     onMouseLeave={() => setIsHovered(false)}
-                    onClick={() => setPreviewId(act.id)}
                 >
                     {act.image_url ? (
                         <div className="absolute inset-0 w-full h-full">
@@ -497,11 +886,9 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
                             ) : (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-indigo-50/30">
                                     <LayoutDashboard className="w-8 h-8 text-indigo-200" />
-                                    <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Önizleme için üzerine gel</span>
+                                    <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Tıkla veya üzerine gel</span>
                                 </div>
                             )}
-                            
-                            {/* Overlay for better text legibility and interaction feel */}
                             <div className={cn(
                                 "absolute inset-0 transition-opacity duration-300",
                                 isHovered ? "bg-indigo-900/5" : "bg-transparent"
@@ -512,16 +899,16 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
                             <LayoutDashboard className="w-10 h-10 text-indigo-200" />
                         </div>
                     )}
-                    
+
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all bg-indigo-900/10 backdrop-blur-[2px] z-10">
-                        <button onClick={(e) => { e.stopPropagation(); setPreviewId(act.id); }} className="w-12 h-12 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all shadow-xl shadow-indigo-300/50">
+                        <div className="w-12 h-12 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white shadow-xl shadow-indigo-300/50">
                             <Eye className="w-4 h-4" />
-                        </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t-2 border-slate-100 flex justify-between items-center z-20">
+            <div className="px-6 py-4 bg-slate-50 border-t-2 border-slate-100 flex justify-between items-center z-20" onClick={e => e.stopPropagation()}>
                 <div className="flex gap-1">
                     <IconButton icon={Copy} onClick={() => {
                         navigator.clipboard.writeText(act.html_code);
@@ -689,23 +1076,87 @@ const ResultsModal = ({ isOpen, onClose, activityId }: { isOpen: boolean, onClos
 // =======================
 // GLOBAL DRAWING CANVAS (Z-Kitap Layer)
 // =======================
-const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whiteboardMode: boolean }>(({ config, enabled, whiteboardMode }, ref) => {
+const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whiteboardMode: boolean, bgColor?: string, onPageChange?: (current: number, total: number) => void }>(({ config, enabled, whiteboardMode, bgColor, onPageChange }, ref) => {
     const canvasRef = React.useRef<HTMLCanvasElement>(null);
     const bufferCanvasRef = React.useRef<HTMLCanvasElement>(null);
     const laserCanvasRef = React.useRef<HTMLCanvasElement>(null);
     const [strokes, setStrokes] = React.useState<any[]>([]);
     const [currentStroke, setCurrentStroke] = React.useState<any>(null);
     const [isDrawing, setIsDrawing] = React.useState(false);
+    const [selectedIdx, setSelectedIdx] = React.useState<number | null>(null);
+    const [selBB, setSelBB] = React.useState<any>(null);
     const canvasRectRef = React.useRef<DOMRect | null>(null);
+    const selectedIdxRef = React.useRef<number | null>(null);
+    const dragStateRef = React.useRef<any>(null);
+    // Page management
+    const pagesRef = React.useRef<any[][]>([[]]); // array of stroke arrays
+    const currentPageRef = React.useRef(0);
 
     // Refs for non-react state (performance)
     const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null);
     const bufferCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
     const laserCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
     const strokesRef = React.useRef<any[]>([]);
+    const isDrawingRef = React.useRef(false);
+
+    const getBB = (s: any) => {
+        const xs = s.points.map((p: any) => p.x);
+        const ys = s.points.map((p: any) => p.y);
+        const pad = Math.max((s.width || 2) / 2 + 6, 14);
+        return { x1: Math.min(...xs) - pad, y1: Math.min(...ys) - pad, x2: Math.max(...xs) + pad, y2: Math.max(...ys) + pad };
+    };
+
+    const hitTest = (s: any, x: number, y: number): boolean => {
+        const bb = getBB(s);
+        return x >= bb.x1 && x <= bb.x2 && y >= bb.y1 && y <= bb.y2;
+    };
+
+    const getHandlePositions = (bb: any) => {
+        const { x1, y1, x2, y2 } = bb;
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        return [
+            { id: 'nw', x: x1, y: y1 }, { id: 'n', x: mx, y: y1 }, { id: 'ne', x: x2, y: y1 },
+            { id: 'w', x: x1, y: my },                               { id: 'e', x: x2, y: my },
+            { id: 'sw', x: x1, y: y2 }, { id: 's', x: mx, y: y2 }, { id: 'se', x: x2, y: y2 },
+        ];
+    };
+
+    const resizePoints = (origPoints: any[], origBB: any, handle: string, dx: number, dy: number) => {
+        const { x1, y1, x2, y2 } = origBB;
+        const w = x2 - x1 || 1, h = y2 - y1 || 1;
+        const nb = { x1, y1, x2, y2 };
+        if (handle.includes('e')) nb.x2 = x2 + dx;
+        if (handle.includes('w')) nb.x1 = x1 + dx;
+        if (handle.includes('s')) nb.y2 = y2 + dy;
+        if (handle.includes('n')) nb.y1 = y1 + dy;
+        const sx = (nb.x2 - nb.x1) / w, sy = (nb.y2 - nb.y1) / h;
+        return origPoints.map((p: any) => ({ x: nb.x1 + (p.x - x1) * sx, y: nb.y1 + (p.y - y1) * sy }));
+    };
+
+    const deselect = () => {
+        selectedIdxRef.current = null;
+        setSelectedIdx(null);
+        setSelBB(null);
+    };
+
+    const notifyPageChange = React.useCallback(() => {
+        onPageChange?.(currentPageRef.current, pagesRef.current.length);
+    }, [onPageChange]);
+
+    const switchPage = (idx: number) => {
+        pagesRef.current[currentPageRef.current] = [...strokesRef.current];
+        currentPageRef.current = idx;
+        strokesRef.current = [...(pagesRef.current[idx] || [])];
+        setStrokes([...strokesRef.current]);
+        deselect();
+        // Use setTimeout to let state settle before redraw
+        setTimeout(redraw, 0);
+        notifyPageChange();
+    };
 
     React.useImperativeHandle(ref, () => ({
         undo: () => {
+            deselect();
             strokesRef.current.pop();
             setStrokes([...strokesRef.current]);
             redraw();
@@ -713,20 +1164,90 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         clear: () => {
             strokesRef.current = [];
             setStrokes([]);
+            deselect();
             redraw();
-        }
+        },
+        deleteSelected: () => {
+            if (selectedIdxRef.current !== null) {
+                strokesRef.current.splice(selectedIdxRef.current, 1);
+                setStrokes([...strokesRef.current]);
+                deselect();
+                redraw();
+            }
+        },
+        setSelectedColor: (color: string) => {
+            if (selectedIdxRef.current !== null && strokesRef.current[selectedIdxRef.current]) {
+                strokesRef.current[selectedIdxRef.current].color = color;
+                setStrokes([...strokesRef.current]);
+                setSelBB({ ...getBB(strokesRef.current[selectedIdxRef.current]) });
+                redraw();
+            }
+        },
+        duplicateSelected: () => {
+            if (selectedIdxRef.current !== null && strokesRef.current[selectedIdxRef.current]) {
+                const copy = JSON.parse(JSON.stringify(strokesRef.current[selectedIdxRef.current]));
+                copy.points = copy.points.map((p: any) => ({ x: p.x + 20, y: p.y + 20 }));
+                strokesRef.current.push(copy);
+                const newIdx = strokesRef.current.length - 1;
+                selectedIdxRef.current = newIdx;
+                setStrokes([...strokesRef.current]);
+                setSelectedIdx(newIdx);
+                setSelBB(getBB(copy));
+                redraw();
+            }
+        },
+        // Pages
+        nextPage: () => { if (currentPageRef.current < pagesRef.current.length - 1) switchPage(currentPageRef.current + 1); },
+        prevPage: () => { if (currentPageRef.current > 0) switchPage(currentPageRef.current - 1); },
+        addPage: () => {
+            pagesRef.current[currentPageRef.current] = [...strokesRef.current];
+            pagesRef.current.push([]);
+            switchPage(pagesRef.current.length - 1);
+        },
+        deletePage: () => {
+            if (pagesRef.current.length <= 1) { strokesRef.current = []; setStrokes([]); redraw(); return; }
+            pagesRef.current.splice(currentPageRef.current, 1);
+            const newIdx = Math.min(currentPageRef.current, pagesRef.current.length - 1);
+            currentPageRef.current = newIdx;
+            strokesRef.current = [...pagesRef.current[newIdx]];
+            setStrokes([...strokesRef.current]);
+            deselect();
+            setTimeout(redraw, 0);
+            notifyPageChange();
+        },
+        getCurrentPage: () => currentPageRef.current,
+        getPageCount: () => pagesRef.current.length,
+        // Screenshot
+        screenshot: (wbMode: boolean, color: string) => {
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const exp = document.createElement('canvas');
+            exp.width = canvas.width; exp.height = canvas.height;
+            const ctx = exp.getContext('2d');
+            if (!ctx) return;
+            const dpr = window.devicePixelRatio || 1;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            if (wbMode) { ctx.fillStyle = color || '#ffffff'; ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr); }
+            ctx.drawImage(canvas, 0, 0, canvas.width / dpr, canvas.height / dpr);
+            const link = document.createElement('a');
+            link.download = `cizim-sayfa${currentPageRef.current + 1}.png`;
+            link.href = exp.toDataURL('image/png');
+            link.click();
+        },
     }));
 
     const resize = React.useCallback(() => {
+        if (isDrawingRef.current) return; // Çizim sırasında canvas'ı yeniden başlatma
         const canvas = canvasRef.current;
         const buffer = bufferCanvasRef.current;
         const laser = laserCanvasRef.current;
         if (!canvas || !buffer) return;
 
         const dpr = window.devicePixelRatio || 1;
-        const parent = canvas.parentElement;
-        const w = parent ? parent.offsetWidth : window.innerWidth;
-        const h = parent ? parent.offsetHeight : window.innerHeight;
+        // Dinamik yüksekliği değişen parent div yerine, sabit scroll konteynerini (grandparent) kullan
+        const scrollContainer = canvas.parentElement?.parentElement;
+        const w = scrollContainer ? scrollContainer.clientWidth : (canvas.parentElement ? canvas.parentElement.offsetWidth : window.innerWidth);
+        const h = scrollContainer ? scrollContainer.clientHeight : (canvas.parentElement ? canvas.parentElement.offsetHeight : window.innerHeight);
 
         [canvas, buffer, laser].forEach(c => {
             if (!c) return;
@@ -759,16 +1280,33 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
     }, []);
 
     React.useEffect(() => {
-        const parent = canvasRef.current?.parentElement;
-        if (parent) {
+        // Sabit scroll konteynerini (grandparent) izle; iframeHeight değiştiğinde yeniden boyutlandırma yapma
+        const scrollContainer = canvasRef.current?.parentElement?.parentElement;
+        const target = scrollContainer || canvasRef.current?.parentElement;
+        if (target) {
             const obs = new ResizeObserver(() => resize());
-            obs.observe(parent);
+            obs.observe(target);
+            resize();
             return () => obs.disconnect();
         }
         window.addEventListener('resize', resize);
         resize();
         return () => window.removeEventListener('resize', resize);
     }, [resize]);
+
+    // Kaydırma sırasında canvas'ı görünür alana senkronize et
+    React.useEffect(() => {
+        const scrollContainer = canvasRef.current?.parentElement?.parentElement;
+        if (!scrollContainer) return;
+        const handleScroll = () => {
+            const top = scrollContainer.scrollTop;
+            canvasRectRef.current = null; // Önbelleğe alınan rect'i geçersiz kıl
+            if (canvasRef.current) canvasRef.current.style.top = `${top}px`;
+            if (laserCanvasRef.current) laserCanvasRef.current.style.top = `${top}px`;
+        };
+        scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+        return () => scrollContainer.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const drawStroke = (tCtx: CanvasRenderingContext2D, s: any) => {
         if (!s || s.points.length < 1) return;
@@ -831,12 +1369,23 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         const canvas = bufferCanvasRef.current;
         const mainCanvas = canvasRef.current;
         if (!bCtx || !mainCtx || !canvas || !mainCanvas) return;
-        
+
         bCtx.clearRect(0,0, 4000, 8000);
         strokesRef.current.forEach(s => drawStroke(bCtx, s));
-        
+
         mainCtx.clearRect(0,0, 4000, 8000);
         mainCtx.drawImage(canvas, 0, 0, mainCanvas.width / (window.devicePixelRatio || 1), mainCanvas.height / (window.devicePixelRatio || 1));
+
+        // Draw selection highlight
+        if (selectedIdxRef.current !== null && strokesRef.current[selectedIdxRef.current]) {
+            const bb = getBB(strokesRef.current[selectedIdxRef.current]);
+            mainCtx.save();
+            mainCtx.strokeStyle = '#4f46e5';
+            mainCtx.lineWidth = 1.5;
+            mainCtx.setLineDash([5, 3]);
+            mainCtx.strokeRect(bb.x1, bb.y1, bb.x2 - bb.x1, bb.y2 - bb.y1);
+            mainCtx.restore();
+        }
     };
 
     const startDrawing = (e: React.PointerEvent) => {
@@ -845,6 +1394,42 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         if (!rect) return;
         canvasRectRef.current = rect;
         const x = e.clientX - rect.left, y = e.clientY - rect.top;
+
+        if (config.tool === 'select') {
+            // Check resize handles first
+            if (selectedIdxRef.current !== null && selBB) {
+                for (const h of getHandlePositions(selBB)) {
+                    if (Math.hypot(x - h.x, y - h.y) < 10) {
+                        const s = strokesRef.current[selectedIdxRef.current];
+                        dragStateRef.current = { type: 'resize', handle: h.id, startX: x, startY: y, origPoints: JSON.parse(JSON.stringify(s.points)), origBB: { ...selBB } };
+                        return;
+                    }
+                }
+                // Check if inside bbox → move
+                if (x >= selBB.x1 && x <= selBB.x2 && y >= selBB.y1 && y <= selBB.y2) {
+                    const s = strokesRef.current[selectedIdxRef.current];
+                    dragStateRef.current = { type: 'move', startX: x, startY: y, origPoints: JSON.parse(JSON.stringify(s.points)) };
+                    return;
+                }
+            }
+            // Hit test strokes (topmost first)
+            for (let i = strokesRef.current.length - 1; i >= 0; i--) {
+                if (hitTest(strokesRef.current[i], x, y)) {
+                    selectedIdxRef.current = i;
+                    setSelectedIdx(i);
+                    setSelBB(getBB(strokesRef.current[i]));
+                    redraw();
+                    return;
+                }
+            }
+            deselect();
+            redraw();
+            return;
+        }
+
+        // Deselect when switching to another tool action
+        if (selectedIdxRef.current !== null) { deselect(); redraw(); }
+
         if (config.tool === 'text') {
             const val = prompt('Metin girin:');
             if (val) {
@@ -862,6 +1447,7 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
             redraw();
             return;
         }
+        isDrawingRef.current = true;
         setIsDrawing(true);
         const newStroke = {
             tool: config.tool, color: config.color,
@@ -875,6 +1461,21 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         const rect = canvasRectRef.current || canvasRef.current?.getBoundingClientRect();
         if (!rect) return;
         const x = e.clientX - rect.left, y = e.clientY - rect.top;
+
+        if (config.tool === 'select' && dragStateRef.current && selectedIdxRef.current !== null) {
+            const drag = dragStateRef.current;
+            const dx = x - drag.startX, dy = y - drag.startY;
+            const s = strokesRef.current[selectedIdxRef.current];
+            if (drag.type === 'move') {
+                s.points = drag.origPoints.map((p: any) => ({ x: p.x + dx, y: p.y + dy }));
+            } else if (drag.type === 'resize') {
+                s.points = resizePoints(drag.origPoints, drag.origBB, drag.handle, dx, dy);
+            }
+            const newBB = getBB(s);
+            setSelBB(newBB);
+            redraw();
+            return;
+        }
 
         if (config.tool === 'sun') {
             const lCtx = laserCtxRef.current;
@@ -901,11 +1502,19 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
     };
 
     const stopDrawing = () => {
+        if (config.tool === 'select') {
+            if (dragStateRef.current) {
+                dragStateRef.current = null;
+                setStrokes([...strokesRef.current]);
+            }
+            return;
+        }
         if (isDrawing && currentStroke) {
             strokesRef.current.push(currentStroke);
             setStrokes([...strokesRef.current]);
             if (bufferCtxRef.current) drawStroke(bufferCtxRef.current, currentStroke);
         }
+        isDrawingRef.current = false;
         setIsDrawing(false); setCurrentStroke(null);
         if (laserCtxRef.current) {
             const rect = canvasRef.current?.getBoundingClientRect();
@@ -913,13 +1522,115 @@ const DrawingCanvas = React.forwardRef<any, { config: any, enabled: boolean, whi
         }
     };
 
+    const handleCursorStyle = () => {
+        if (!enabled) return 'default';
+        if (config.tool === 'pan') return 'grab';
+        if (config.tool === 'select') return 'default';
+        return 'crosshair';
+    };
+
+    const selectionColors = ['#ffffff', '#ff4d4d', '#ffff00', '#ffa500', '#2ecc71', '#3498db', '#4f46e5', '#9b59b6', '#000000'];
+    const handleCursors: Record<string, string> = { nw: 'nw-resize', n: 'n-resize', ne: 'ne-resize', w: 'w-resize', e: 'e-resize', sw: 'sw-resize', s: 's-resize', se: 'se-resize' };
+
+    const selStroke = selectedIdx !== null ? strokesRef.current[selectedIdx] : null;
+
     return (
         <>
             <canvas ref={bufferCanvasRef} style={{ display: 'none' }} />
             <canvas ref={canvasRef} onPointerDown={startDrawing} onPointerMove={draw} onPointerUp={stopDrawing} onPointerLeave={stopDrawing}
-                className={cn("absolute top-0 left-0 z-[4000] touch-none transition-opacity", enabled ? (config.tool === 'pan' ? "pointer-events-none opacity-100" : "pointer-events-auto opacity-100") : "pointer-events-none opacity-0")}
-                style={{ backgroundColor: whiteboardMode ? 'white' : 'transparent' }} />
-            <canvas ref={laserCanvasRef} className="absolute top-0 left-0 z-[4001] pointer-events-none touch-none" />
+                className={cn("absolute left-0 z-[4000] touch-none transition-opacity",
+                    enabled ? (config.tool === 'pan' ? "pointer-events-none opacity-100" : "pointer-events-auto opacity-100") : "pointer-events-none opacity-0"
+                )}
+                style={{ top: 0, backgroundColor: whiteboardMode ? (bgColor || '#ffffff') : 'transparent', cursor: handleCursorStyle() }} />
+            <canvas ref={laserCanvasRef} className="absolute left-0 z-[4001] pointer-events-none touch-none" style={{ top: 0 }} />
+
+            {/* Selection overlay */}
+            {enabled && selectedIdx !== null && selBB && selStroke && (
+                <div className="absolute left-0 top-0 z-[4500] pointer-events-none" style={{ width: '100%', height: '100%' }}>
+                    {/* Resize handles */}
+                    {getHandlePositions(selBB).map(h => (
+                        <div
+                            key={h.id}
+                            className="absolute pointer-events-auto bg-white border-2 border-indigo-500 rounded-sm shadow-md hover:bg-indigo-100 transition-colors"
+                            style={{ left: h.x - 5, top: h.y - 5, width: 10, height: 10, cursor: handleCursors[h.id], zIndex: 4600 }}
+                            onPointerDown={(e) => {
+                                e.stopPropagation();
+                                e.currentTarget.setPointerCapture(e.pointerId);
+                                const s = strokesRef.current[selectedIdxRef.current!];
+                                dragStateRef.current = { type: 'resize', handle: h.id, startX: e.clientX, startY: e.clientY, origPoints: JSON.parse(JSON.stringify(s.points)), origBB: { ...selBB } };
+                            }}
+                            onPointerMove={(e) => {
+                                if (!dragStateRef.current || selectedIdxRef.current === null) return;
+                                const drag = dragStateRef.current;
+                                const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+                                const s = strokesRef.current[selectedIdxRef.current];
+                                s.points = resizePoints(drag.origPoints, drag.origBB, drag.handle, dx, dy);
+                                setSelBB(getBB(s));
+                                redraw();
+                            }}
+                            onPointerUp={(e) => {
+                                e.currentTarget.releasePointerCapture(e.pointerId);
+                                dragStateRef.current = null;
+                                setStrokes([...strokesRef.current]);
+                            }}
+                        />
+                    ))}
+
+                    {/* Mini toolbar above selection */}
+                    <div
+                        className="absolute pointer-events-auto flex items-center gap-1 bg-[#1a1b26]/95 backdrop-blur-md px-2 py-1.5 rounded-xl border border-white/10 shadow-xl"
+                        style={{ left: selBB.x1, top: Math.max(0, selBB.y1 - 52), zIndex: 4700 }}
+                        onPointerDown={e => e.stopPropagation()}
+                    >
+                        {selectionColors.map(color => (
+                            <button
+                                key={color}
+                                className={cn("w-5 h-5 rounded-full border-2 transition-all hover:scale-110 shrink-0",
+                                    selStroke.color === color ? "border-white scale-110" : "border-transparent")}
+                                style={{ backgroundColor: color }}
+                                onClick={() => {
+                                    if (selectedIdxRef.current !== null) {
+                                        strokesRef.current[selectedIdxRef.current].color = color;
+                                        setStrokes([...strokesRef.current]);
+                                        setSelBB({ ...getBB(strokesRef.current[selectedIdxRef.current]) });
+                                        redraw();
+                                    }
+                                }}
+                            />
+                        ))}
+                        <div className="w-px h-4 bg-white/20 mx-1 shrink-0" />
+                        <button
+                            title="Çoğalt"
+                            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+                            onClick={() => {
+                                if (selectedIdxRef.current !== null && strokesRef.current[selectedIdxRef.current]) {
+                                    const copy = JSON.parse(JSON.stringify(strokesRef.current[selectedIdxRef.current]));
+                                    copy.points = copy.points.map((p: any) => ({ x: p.x + 20, y: p.y + 20 }));
+                                    strokesRef.current.push(copy);
+                                    const ni = strokesRef.current.length - 1;
+                                    selectedIdxRef.current = ni;
+                                    setStrokes([...strokesRef.current]);
+                                    setSelectedIdx(ni);
+                                    setSelBB(getBB(copy));
+                                    redraw();
+                                }
+                            }}
+                        ><Copy className="w-3.5 h-3.5" /></button>
+                        <button
+                            title="Seçili öğeyi sil"
+                            className="p-1 text-red-400 hover:text-red-300 rounded-lg hover:bg-red-400/10 transition-colors"
+                            onClick={() => {
+                                if (selectedIdxRef.current !== null) {
+                                    strokesRef.current.splice(selectedIdxRef.current, 1);
+                                    setStrokes([...strokesRef.current]);
+                                    deselect();
+                                    redraw();
+                                }
+                            }}
+                        ><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                </div>
+            )}
         </>
     );
 });
@@ -1052,22 +1763,70 @@ const StudentPortal = ({ act }: { act: any }) => {
 // =======================
 export default function App() {
     const params = new URLSearchParams(window.location.search);
-    const [tab, setTab] = useState('dashboard');
-    const [selectedWeek, setSelectedWeek] = useState(1);
     const [activities, setActivities] = useState<any[]>([]);
-    const [science, setScience] = useState<any[]>([]);
     const [search, setSearch] = useState('');
     const [previewId, setPreviewId] = useState<string | null>(null);
     const [showResultsId, setShowResultsId] = useState<string | null>(null);
     const [scienceDetail, setScienceDetail] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isPreviewDrawingMode, setIsPreviewDrawingMode] = useState(false);
-    const [previewDrawConfig, setPreviewDrawConfig] = useState({ tool: 'pencil', color: '#4f46e5', width: 3 });
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+    const [previewDrawConfig, setPreviewDrawConfig] = useState({ tool: 'pencil', color: '#4f46e5', width: 3, fillEnabled: false, stampIcon: '✅' });
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [science, setScience] = useState<any[]>([]);
+    const [activeTab, setActiveTab] = useState<'interactive' | 'science'>('interactive');
+    const [isScienceOpen, setIsScienceOpen] = useState(false);
+    const scienceHandler = useFirestore('science_activities');
+
+    const filteredScience = useMemo(() => {
+        const grades = ['5. Sınıf', '6. Sınıf', '7. Sınıf', '8. Sınıf'];
+        return grades.map(g => ({
+            grade: g,
+            items: science.filter(s => s.grade === g)
+        }));
+    }, [science]);
+
+    const getColColor = (idx: number) => {
+        const sets = [
+            { bg: 'bg-emerald-50/50', border: 'border-emerald-100', text: 'text-emerald-700', hover: 'hover:border-emerald-300', button: 'bg-emerald-100' },
+            { bg: 'bg-blue-50/50', border: 'border-blue-100', text: 'text-blue-700', hover: 'hover:border-blue-300', button: 'bg-blue-100' },
+            { bg: 'bg-amber-50/50', border: 'border-amber-100', text: 'text-amber-700', hover: 'hover:border-amber-300', button: 'bg-amber-100' },
+            { bg: 'bg-purple-50/50', border: 'border-purple-100', text: 'text-purple-700', hover: 'hover:border-purple-300', button: 'bg-purple-100' }
+        ];
+        return sets[idx % sets.length];
+    };
     const [showWhiteboard, setShowWhiteboard] = useState(false);
     const [previewIframeHeight, setPreviewIframeHeight] = useState(1000);
     const previewIframeRef = React.useRef<HTMLIFrameElement>(null);
     const previewCanvasRef = React.useRef<any>(null);
+    // Zoom
+    const [zoomLevel, setZoomLevel] = useState(1.0);
+    // Spotlight
+    const [spotlightActive, setSpotlightActive] = useState(false);
+    const [spotlightPos, setSpotlightPos] = useState({ x: 0, y: 0 });
+    const [spotlightRadius, setSpotlightRadius] = useState(180);
+    const previewMainRef = React.useRef<HTMLDivElement>(null);
+    // Timer
+    const [timerTotal, setTimerTotal] = useState(300);
+    const [timerSecs, setTimerSecs] = useState(300);
+    const [timerRunning, setTimerRunning] = useState(false);
+    const [showTimer, setShowTimer] = useState(false);
+    // Text Boxes
+    const [textBoxes, setTextBoxes] = useState<any[]>([]);
+    const [isTextBoxMode, setIsTextBoxMode] = useState(false);
+    // Background color
+    const [bgColor, setBgColor] = useState('#ffffff');
+    // Page info (read from canvas ref)
+    const [pageInfo, setPageInfo] = useState({ current: 0, total: 1 });
+    // Tag filter
+    const [selectedTag, setSelectedTag] = useState<string | null>(null);
+    // Ruler / Protractor
+    const [showRuler, setShowRuler] = useState(false);
+    const [showProtractor, setShowProtractor] = useState(false);
+    // HTML file upload refs
+    const htmlCodeRef = React.useRef<HTMLTextAreaElement>(null);
+    const jsCodeRef = React.useRef<HTMLTextAreaElement>(null);
+    const cssCodeRef = React.useRef<HTMLTextAreaElement>(null);
+    const externalLibsRef = React.useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
@@ -1079,13 +1838,35 @@ export default function App() {
         return () => window.removeEventListener('message', handleMessage);
     }, []);
 
+    // Timer countdown
+    useEffect(() => {
+        if (!timerRunning || timerSecs <= 0) return;
+        const id = setInterval(() => setTimerSecs(s => s > 0 ? s - 1 : 0), 1000);
+        return () => clearInterval(id);
+    }, [timerRunning, timerSecs]);
+
+    // Reset state when preview closes
+    useEffect(() => {
+        if (!previewId) {
+            setIsPreviewDrawingMode(false);
+            setShowWhiteboard(false);
+            setZoomLevel(1);
+            setSpotlightActive(false);
+            setTimerRunning(false);
+            setShowTimer(false);
+            setTextBoxes([]);
+            setIsTextBoxMode(false);
+            setPageInfo({ current: 0, total: 1 });
+            setShowRuler(false);
+            setShowProtractor(false);
+        }
+    }, [previewId]);
+
     // Form States
-    const [isScienceOpen, setIsScienceOpen] = useState(false);
     const [isActivityOpen, setIsActivityOpen] = useState(false);
     const [editItem, setEditItem] = useState<any>(null);
 
     const activitiesHandler = useFirestore('activities');
-    const scienceHandler = useFirestore('science_activities');
 
     useEffect(() => {
         const unsubA = activitiesHandler.sync((data) => {
@@ -1096,30 +1877,86 @@ export default function App() {
         return () => { unsubA(); unsubS(); };
     }, []);
 
-    const filteredScience = useMemo(() => {
-        const grades = ["1. Sınıf", "2. Sınıf", "3. Sınıf", "4. Sınıf"];
-        return grades.map(grade => ({
-            grade,
-            items: science.filter(s =>
-                s.class_level === grade &&
-                (parseInt(s.week_number) <= selectedWeek &&
-                    (parseInt(s.week_number) + (parseInt(s.duration_weeks) || 1) > selectedWeek))
-            )
-        }));
-    }, [science, selectedWeek]);
+    const allTags = useMemo(() => {
+        const tagSet = new Set<string>();
+        activities.forEach(a => {
+            if (a.tags) {
+                (a.tags as string).split(',').map((t: string) => t.trim()).filter(Boolean).forEach((t: string) => tagSet.add(t));
+            }
+        });
+        return Array.from(tagSet).sort();
+    }, [activities]);
 
-    const handleScienceSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const formData = new FormData(e.target as HTMLFormElement);
-        const payload = Object.fromEntries(formData.entries());
+    // Spotlight: document-level mouse tracking (works over iframes)
+    useEffect(() => {
+        if (!spotlightActive) return;
+        const handleMouseMove = (e: MouseEvent) => {
+            const rect = previewMainRef.current?.getBoundingClientRect();
+            if (rect) {
+                setSpotlightPos({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top + (previewMainRef.current?.scrollTop || 0),
+                });
+            }
+        };
+        document.addEventListener('mousemove', handleMouseMove);
+        return () => document.removeEventListener('mousemove', handleMouseMove);
+    }, [spotlightActive]);
 
-        if (editItem) {
-            await scienceHandler.update(editItem.id, payload);
-        } else {
-            await scienceHandler.add(payload);
+    // Screenshot with html2canvas (captures iframe + canvas layer)
+    const handleScreenshot = async () => {
+        const container = previewMainRef.current;
+        if (!container) return;
+        let h2c: any = (window as any).html2canvas;
+        if (!h2c) {
+            await new Promise<void>((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                s.onload = () => resolve();
+                s.onerror = reject;
+                document.head.appendChild(s);
+            });
+            h2c = (window as any).html2canvas;
         }
-        setIsScienceOpen(false);
-        setEditItem(null);
+        try {
+            const cvs = await h2c(container, { useCORS: true, allowTaint: true, scale: 1, logging: false });
+            const link = document.createElement('a');
+            link.download = 'etkinlik-ekran.png';
+            link.href = cvs.toDataURL('image/png');
+            link.click();
+        } catch {
+            previewCanvasRef.current?.screenshot(showWhiteboard, bgColor);
+        }
+    };
+
+    // HTML file upload handler
+    const handleHtmlFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const text = ev.target?.result as string;
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, 'text/html');
+            // Extract body HTML (remove style/script)
+            const clone = doc.body.cloneNode(true) as HTMLElement;
+            clone.querySelectorAll('script, style').forEach(el => el.remove());
+            const bodyHtml = clone.innerHTML.trim();
+            // Extract CSS
+            const cssContent = Array.from(doc.querySelectorAll('style')).map(s => s.innerHTML).join('\n').trim();
+            // Extract inline JS
+            const jsContent = Array.from(doc.querySelectorAll('script:not([src])')).map(s => s.innerHTML).join('\n').trim();
+            // Extract external libs
+            const extScripts = Array.from(doc.querySelectorAll('script[src]')).map(s => (s as HTMLScriptElement).getAttribute('src') || '');
+            const extCss = Array.from(doc.querySelectorAll('link[rel="stylesheet"]')).map(l => (l as HTMLLinkElement).getAttribute('href') || '');
+            const extLibs = [...extScripts, ...extCss].filter(Boolean).join('\n');
+            if (htmlCodeRef.current) htmlCodeRef.current.value = bodyHtml;
+            if (jsCodeRef.current) jsCodeRef.current.value = jsContent;
+            if (cssCodeRef.current) cssCodeRef.current.value = cssContent;
+            if (externalLibsRef.current) externalLibsRef.current.value = extLibs;
+        };
+        reader.readAsText(file);
+        e.target.value = '';
     };
 
     const handleActivitySubmit = async (e: React.FormEvent) => {
@@ -1146,16 +1983,6 @@ export default function App() {
     const inputClasses = "w-full bg-white border-2 border-indigo-50 rounded-xl px-4 py-3 text-[14px] text-slate-800 font-medium focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400";
     const labelClasses = "block text-[11px] font-bold text-indigo-600 uppercase tracking-wider mb-2";
 
-    const getColColor = (idx: number) => {
-        switch(idx) {
-            case 0: return { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', hover: 'hover:border-emerald-300', icon: 'text-emerald-500', button: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' };
-            case 1: return { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', hover: 'hover:border-blue-300', icon: 'text-blue-500', button: 'bg-blue-100 text-blue-700 hover:bg-blue-200' };
-            case 2: return { bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', hover: 'hover:border-violet-300', icon: 'text-violet-500', button: 'bg-violet-100 text-violet-700 hover:bg-violet-200' };
-            case 3: return { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', hover: 'hover:border-orange-300', icon: 'text-orange-500', button: 'bg-orange-100 text-orange-700 hover:bg-orange-200' };
-            default: return { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-700', hover: 'hover:border-slate-300', icon: 'text-slate-500', button: 'bg-slate-100 text-slate-700 hover:bg-slate-200' };
-        }
-    };
-
     if (params.get('view') === 'student' && params.get('id')) {
         if (isLoading) return <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
             <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
@@ -1169,195 +1996,211 @@ export default function App() {
     return (
         <div className="min-h-screen pt-28 pb-16 px-4 bg-slate-50 relative">
             <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-br from-indigo-100 via-transparent to-pink-50 opacity-60 pointer-events-none" />
-            
-            <Navbar activeTab={tab} setTab={setTab} />
+
+            <Navbar />
 
             <main className="container mx-auto max-w-6xl relative z-10">
-                <AnimatePresence mode="wait">
-                    {tab === 'dashboard' ? (
-                        <motion.div key="dashboard" initial={{ opacity: 0, filter: 'blur(4px)' }} animate={{ opacity: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, filter: 'blur(4px)' }} transition={{ duration: 0.3 }} className="space-y-10">
-                            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                                <div className="space-y-3">
-                                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-100 border border-indigo-200 text-[11px] font-bold uppercase tracking-wider text-indigo-700 shadow-sm">
-                                        <CalendarDays className="w-3.5 h-3.5" /> Yıllık Bilim Müfredatı
-                                    </div>
-                                    <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-800">Müfredat Planı</h2>
-                                    <p className="text-[15px] text-slate-500 max-w-md font-medium leading-relaxed">
-                                        1-36 haftalık eğitim-öğretim dönemi için her sınıf düzeyine özel olarak hazırlanmış bilim deney ve proje akışı.
+                <div className="space-y-10">
+                    <div className="flex bg-white/50 backdrop-blur-sm border border-slate-200 rounded-2xl p-1 w-full max-w-sm mx-auto flex-shrink-0">
+                        <button
+                            onClick={() => setActiveTab('interactive')}
+                            className={cn(
+                                "flex-1 py-3 px-6 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2",
+                                activeTab === 'interactive' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
+                            )}
+                        >
+                            <Blocks className="w-4 h-4" /> İnteraktif Merkez
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('science')}
+                            className={cn(
+                                "flex-1 py-3 px-6 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2",
+                                activeTab === 'science' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
+                            )}
+                        >
+                            <FlaskConical className="w-4 h-4" /> Müfredat Planı
+                        </button>
+                    </div>
+
+                    <AnimatePresence mode="wait">
+                        {activeTab === 'science' ? (
+                            <motion.div key="science" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-10">
+                                <div className="space-y-3 text-center">
+                                    <h2 className="text-4xl font-extrabold tracking-tight text-slate-800">Müfredat Planı</h2>
+                                    <p className="text-[15px] text-slate-500 max-w-lg mx-auto font-medium leading-relaxed">
+                                        Fen Bilimleri dersi için hazırlanmış haftalık etkinlik ve uygulama planları.
                                     </p>
                                 </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    {filteredScience.map((col, idx) => {
+                                        const colors = getColColor(idx);
+                                        return (
+                                        <div key={col.grade} className={cn("flex flex-col gap-4 p-5 rounded-3xl border-2 shadow-sm transition-all", colors.bg, colors.border, colors.hover)}>
+                                            <div className="flex items-center justify-between pb-3 border-b-2 border-inherit">
+                                                <h4 className={cn("text-lg font-black tracking-tight flex items-center gap-2", colors.text)}>
+                                                    {col.grade}
+                                                </h4>
+                                                <span className={cn("text-xs font-bold px-3 py-1 bg-white rounded-full shadow-sm", colors.text)}>{col.items.length} Plan</span>
+                                            </div>
 
-                                <div className="inline-flex bg-white border-2 border-indigo-50 rounded-2xl p-1.5 shadow-lg shadow-indigo-100/50">
-                                    <button onClick={() => setSelectedWeek(Math.max(1, selectedWeek - 1))} className="p-3 rounded-xl hover:bg-indigo-50 transition-colors text-indigo-600">
-                                        <ChevronLeft className="w-5 h-5" />
-                                    </button>
-                                    <div className="flex flex-col items-center justify-center px-8 min-w-[140px]">
-                                        <span className="text-[11px] font-bold uppercase text-indigo-400 tracking-widest hidden md:block mb-1">HAFTA</span>
-                                        <span className="text-2xl font-black tracking-tight text-indigo-700">{selectedWeek}</span>
-                                    </div>
-                                    <button onClick={() => setSelectedWeek(Math.min(36, selectedWeek + 1))} className="p-3 rounded-xl hover:bg-indigo-50 transition-colors text-indigo-600">
-                                        <ChevronRight className="w-5 h-5" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                {filteredScience.map((col, idx) => {
-                                    const colors = getColColor(idx);
-                                    return (
-                                    <div key={col.grade} className={cn("flex flex-col gap-4 p-5 rounded-3xl border-2 shadow-sm transition-all", colors.bg, colors.border, colors.hover)}>
-                                        <div className="flex items-center justify-between pb-3 border-b-2 border-inherit">
-                                            <h4 className={cn("text-lg font-black tracking-tight flex items-center gap-2", colors.text)}>
-                                                {col.grade}
-                                            </h4>
-                                            <span className={cn("text-xs font-bold px-3 py-1 bg-white rounded-full shadow-sm", colors.text)}>{col.items.length} Plan</span>
-                                        </div>
-
-                                        <div className="space-y-4">
-                                            {col.items.length > 0 ? (
-                                                col.items.map((act) => (
-                                                    <PortalCard key={act.id} className="p-5 flex flex-col gap-4 bg-white border-2 hover:border-indigo-300 shadow-md !rounded-2xl">
-                                                        <div>
-                                                            <div className={cn("text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5", colors.text)}>
-                                                                <FlaskConical className="w-3.5 h-3.5" /> {act.theme}
+                                            <div className="space-y-4">
+                                                {col.items.length > 0 ? (
+                                                    col.items.map((act) => (
+                                                        <PortalCard key={act.id} className="p-5 flex flex-col gap-4 bg-white border-2 hover:border-indigo-300 shadow-md !rounded-2xl h-full">
+                                                            <div>
+                                                                <div className={cn("text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5", colors.text)}>
+                                                                    <FlaskConical className="w-3.5 h-3.5" /> {act.theme}
+                                                                </div>
+                                                                <h5 className="text-[16px] font-bold text-slate-800 leading-snug cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => setScienceDetail(act)}>{act.name}</h5>
                                                             </div>
-                                                            <h5 className="text-[16px] font-bold text-slate-800 leading-snug cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => setScienceDetail(act)}>{act.name}</h5>
+                                                            <p className="text-[13px] text-slate-600 font-medium line-clamp-3 leading-relaxed cursor-pointer" onClick={() => setScienceDetail(act)}>
+                                                                {act.content}
+                                                            </p>
+                                                            <div className="flex items-center justify-between pt-3 border-t-2 border-slate-100 mt-auto">
+                                                                <button 
+                                                                    onClick={() => { setEditItem(act); setIsScienceOpen(true); }}
+                                                                    className={cn("text-[11px] font-bold uppercase transition-colors", colors.text)}
+                                                                >
+                                                                    Düzenle
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        if (window.confirm('Emin misiniz?')) scienceHandler.remove(act.id);
+                                                                    }}
+                                                                    className="text-[11px] font-bold uppercase text-red-400 hover:text-red-600 transition-colors"
+                                                                >
+                                                                    Sil
+                                                                </button>
+                                                            </div>
+                                                        </PortalCard>
+                                                    ))
+                                                ) : (
+                                                    <button
+                                                        onClick={() => { setEditItem(null); setIsScienceOpen(true); }}
+                                                        className={cn("w-full h-32 border-2 border-dashed bg-white shadow-sm hover:shadow-md rounded-2xl flex flex-col items-center justify-center gap-3 transition-all group", colors.border, colors.text)}
+                                                    >
+                                                        <div className={cn("p-2 rounded-xl", colors.button)}>
+                                                            <Plus className="w-6 h-6 group-hover:scale-125 transition-transform" />
                                                         </div>
-                                                        <p className="text-[13px] text-slate-600 font-medium line-clamp-3 leading-relaxed cursor-pointer" onClick={() => setScienceDetail(act)}>
-                                                            {act.content}
-                                                        </p>
-                                                        <div className="flex items-center justify-between pt-3 border-t-2 border-slate-100 mt-auto">
-                                                            <button 
-                                                                onClick={() => { setEditItem(act); setIsScienceOpen(true); }}
-                                                                className={cn("text-[11px] font-bold uppercase transition-colors", colors.text)}
-                                                            >
-                                                                Düzenle
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => {
-                                                                    if (window.confirm('Emin misiniz?')) scienceHandler.remove(act.id);
-                                                                }}
-                                                                className="text-[11px] font-bold uppercase text-red-400 hover:text-red-600 transition-colors"
-                                                            >
-                                                                Sil
-                                                            </button>
-                                                        </div>
-                                                    </PortalCard>
-                                                ))
-                                            ) : (
-                                                <button
-                                                    onClick={() => { setEditItem(null); setIsScienceOpen(true); }}
-                                                    className={cn("w-full h-32 border-2 border-dashed bg-white shadow-sm hover:shadow-md rounded-2xl flex flex-col items-center justify-center gap-3 transition-all group", colors.border, colors.text)}
-                                                >
-                                                    <div className={cn("p-2 rounded-xl", colors.button)}>
-                                                        <Plus className="w-6 h-6 group-hover:scale-125 transition-transform" />
-                                                    </div>
-                                                    <span className="text-[12px] font-black uppercase tracking-widest">Plan Ekle</span>
-                                                </button>
-                                            )}
-                                            
-                                            {col.items.length > 0 && (
-                                                <button
-                                                    onClick={() => { setEditItem(null); setIsScienceOpen(true); }}
-                                                    className={cn("w-full py-3.5 border-2 border-dashed bg-white shadow-sm hover:shadow-md rounded-2xl text-[12px] font-black uppercase transition-all flex items-center justify-center gap-2", colors.border, colors.text)}
-                                                >
-                                                    <Plus className="w-4 h-4" /> Yeni Ekle
-                                                </button>
-                                            )}
+                                                        <span className="text-[12px] font-black uppercase tracking-widest">Plan Ekle</span>
+                                                    </button>
+                                                )}
+                                                
+                                                {col.items.length > 0 && (
+                                                    <button
+                                                        onClick={() => { setEditItem(null); setIsScienceOpen(true); }}
+                                                        className={cn("w-full py-3.5 border-2 border-dashed bg-white shadow-sm hover:shadow-md rounded-2xl text-[12px] font-black uppercase transition-all flex items-center justify-center gap-2", colors.border, colors.text)}
+                                                    >
+                                                        <Plus className="w-4 h-4" /> Yeni Ekle
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )})}
+                                </div>
+                            </motion.div>
+                        ) : (
+                            <motion.div key="interactive" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-10">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                                    <div className="space-y-3">
+                                        <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-800">İnteraktif Merkez</h2>
+                                        <p className="text-[15px] text-slate-500 max-w-md font-medium leading-relaxed">
+                                            Oyunlar, testler ve HTML tabanlı eğitici materyallerle dolu dijital havuz.
+                                        </p>
+                                    </div>
+                                    <div className="flex w-full md:w-auto gap-4 items-center">
+                                        <div className="relative flex-1 md:w-72">
+                                            <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input 
+                                                value={search} 
+                                                onChange={e => setSearch(e.target.value)} 
+                                                placeholder="İçerik ara..." 
+                                                className="w-full bg-white border-2 border-indigo-100 rounded-2xl pl-12 pr-4 py-3.5 text-[14px] text-slate-800 font-medium focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400 shadow-sm"
+                                            />
+                                        </div>
+                                        <button onClick={() => { setEditItem(null); setIsActivityOpen(true); }} className="px-6 py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[14px] font-bold rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-200 flex items-center gap-2 whitespace-nowrap">
+                                            <Plus className="w-5 h-5" /> İçerik Ekle
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
+                                        <div className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                            <Blocks className="w-4 h-4" /> {activities.filter(a =>
+                                                (a.title || '').toLowerCase().includes(search.toLowerCase()) &&
+                                                (!selectedTag || (a.tags && (a.tags as string).split(',').map((t: string) => t.trim()).includes(selectedTag)))
+                                            ).length} İçerik Bulundu
+                                        </div>
+                                        <div className="flex bg-white/50 backdrop-blur-sm border border-slate-200 rounded-xl p-1 gap-1">
+                                            <button
+                                                onClick={() => setViewMode('grid')}
+                                                className={cn(
+                                                    "p-2 rounded-lg transition-all",
+                                                    viewMode === 'grid' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
+                                                )}
+                                                title="Izgara Görünümü"
+                                            >
+                                                <LayoutGrid className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => setViewMode('list')}
+                                                className={cn(
+                                                    "p-2 rounded-lg transition-all",
+                                                    viewMode === 'list' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
+                                                )}
+                                                title="Liste Görünümü"
+                                            >
+                                                <LayoutList className="w-4 h-4" />
+                                            </button>
                                         </div>
                                     </div>
-                                )})}
-                            </div>
-                        </motion.div>
-                    ) : (
-                        <motion.div key="interactive" initial={{ opacity: 0, filter: 'blur(4px)' }} animate={{ opacity: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, filter: 'blur(4px)' }} transition={{ duration: 0.3 }}  className="space-y-10">
-                            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                                <div className="space-y-3">
-                                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-100 border border-violet-200 text-[11px] font-bold uppercase tracking-wider text-violet-700 shadow-sm">
-                                        <Grid className="w-3.5 h-3.5" /> Dijital İçerikler
-                                    </div>
-                                    <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-800">İnteraktif Merkez</h2>
-                                    <p className="text-[15px] text-slate-500 max-w-md font-medium leading-relaxed">
-                                        Oyunlar, testler ve HTML tabanlı eğitici materyallerle dolu dijital havuz.
-                                    </p>
-                                </div>
-                                <div className="flex w-full md:w-auto gap-4 items-center">
-                                    <div className="relative flex-1 md:w-72">
-                                        <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input 
-                                            value={search} 
-                                            onChange={e => setSearch(e.target.value)} 
-                                            placeholder="İçerik ara..." 
-                                            className="w-full bg-white border-2 border-indigo-100 rounded-2xl pl-12 pr-4 py-3.5 text-[14px] text-slate-800 font-medium focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400 shadow-sm"
-                                        />
-                                    </div>
-                                    <button onClick={() => { setEditItem(null); setIsActivityOpen(true); }} className="px-6 py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[14px] font-bold rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-200 flex items-center gap-2 whitespace-nowrap">
-                                        <Plus className="w-5 h-5" /> İçerik Ekle
-                                    </button>
-                                </div>
-                            </div>
 
-                            <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
-                                <div className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                    <Blocks className="w-4 h-4" /> {activities.filter(a => a.title.toLowerCase().includes(search.toLowerCase())).length} İçerik Bulundu
+                                    {allTags.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 py-1">
+                                            <button
+                                                onClick={() => setSelectedTag(null)}
+                                                className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border",
+                                                    selectedTag === null
+                                                        ? "bg-indigo-600 text-white border-indigo-500 shadow-md"
+                                                        : "bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600"
+                                                )}>
+                                                <Tags className="w-3 h-3" /> Tümü
+                                            </button>
+                                            {allTags.map(tag => (
+                                                <button key={tag}
+                                                    onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                                                    className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border",
+                                                        selectedTag === tag
+                                                            ? "bg-emerald-600 text-white border-emerald-500 shadow-md"
+                                                            : "bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-600"
+                                                    )}>
+                                                    <Tag className="w-3 h-3" /> {tag}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="flex bg-white/50 backdrop-blur-sm border border-slate-200 rounded-xl p-1 gap-1">
-                                    <button 
-                                        onClick={() => setViewMode('grid')}
-                                        className={cn(
-                                            "p-2 rounded-lg transition-all",
-                                            viewMode === 'grid' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
-                                        )}
-                                        title="Izgara Görünümü"
-                                    >
-                                        <LayoutGrid className="w-4 h-4" />
-                                    </button>
-                                    <button 
-                                        onClick={() => setViewMode('list')}
-                                        className={cn(
-                                            "p-2 rounded-lg transition-all",
-                                            viewMode === 'list' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "text-slate-400 hover:bg-slate-100"
-                                        )}
-                                        title="Liste Görünümü"
-                                    >
-                                        <LayoutList className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
 
-                            <div className={cn(
-                                "grid gap-6",
-                                viewMode === 'grid' ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
-                            )}>
-                                {activities.filter(a => (a.title || '').toLowerCase().includes(search.toLowerCase())).map((act, i) => (
-                                    viewMode === 'grid' ? (
-                                        <ActivityCard 
-                                            key={act.id} 
-                                            act={act} 
-                                            setPreviewId={setPreviewId} 
-                                            setEditItem={setEditItem} 
-                                            setIsActivityOpen={setIsActivityOpen} 
-                                            activitiesHandler={activitiesHandler} 
-                                            showResultsId={showResultsId}
-                                            setShowResultsId={setShowResultsId}
-                                        />
-                                    ) : (
-                                        <ActivityListItem 
-                                            key={act.id} 
-                                            act={act} 
-                                            setPreviewId={setPreviewId} 
-                                            setEditItem={setEditItem} 
-                                            setIsActivityOpen={setIsActivityOpen} 
-                                            activitiesHandler={activitiesHandler} 
-                                            showResultsId={showResultsId}
-                                            setShowResultsId={setShowResultsId}
-                                        />
-                                    )
-                                ))}
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                                <div className={cn(
+                                    "grid gap-6",
+                                    viewMode === 'grid' ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
+                                )}>
+                                    {activities.filter(a => 
+                                        (a.title || '').toLowerCase().includes(search.toLowerCase()) &&
+                                        (!selectedTag || (a.tags && (a.tags as string).split(',').map((t: string) => t.trim()).includes(selectedTag)))
+                                    ).map((act) => (
+                                        viewMode === 'grid' ? (
+                                            <ActivityCard key={act.id} act={act} setPreviewId={setPreviewId} setEditItem={setEditItem} setIsActivityOpen={setIsActivityOpen} activitiesHandler={activitiesHandler} showResultsId={showResultsId} setShowResultsId={setShowResultsId} />
+                                        ) : (
+                                            <ActivityListItem key={act.id} act={act} setPreviewId={setPreviewId} setEditItem={setEditItem} setIsActivityOpen={setIsActivityOpen} activitiesHandler={activitiesHandler} showResultsId={showResultsId} setShowResultsId={setShowResultsId} />
+                                        )
+                                    ))}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
                 <ResultsModal isOpen={!!showResultsId} onClose={() => setShowResultsId(null)} activityId={showResultsId || ''} />
                 
                 {/* Science Detail Modal */}
@@ -1392,57 +2235,6 @@ export default function App() {
             </footer>
 
             {/* MODALS */}
-            <Modal isOpen={isScienceOpen} onClose={() => setIsScienceOpen(false)} title={editItem ? "Planı Güncelle" : "Yeni Müfredat Planı"}>
-                <form onSubmit={handleScienceSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label className={labelClasses}>Sınıf Seviyesi</label>
-                            <select name="class_level" defaultValue={editItem?.class_level || "1. Sınıf"} className={inputClasses}>
-                                <option value="1. Sınıf">1. Sınıf</option>
-                                <option value="2. Sınıf">2. Sınıf</option>
-                                <option value="3. Sınıf">3. Sınıf</option>
-                                <option value="4. Sınıf">4. Sınıf</option>
-                            </select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className={labelClasses}>Hafta (1-36)</label>
-                                <input name="week_number" type="number" defaultValue={editItem?.week_number || selectedWeek} min="1" max="36" className={inputClasses} />
-                            </div>
-                            <div>
-                                <label className={labelClasses}>Süre (Hafta)</label>
-                                <input name="duration_weeks" type="number" defaultValue={editItem?.duration_weeks || 1} min="1" className={inputClasses} />
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label className={labelClasses}>Etkinlik Adı</label>
-                            <input name="name" defaultValue={editItem?.name} required placeholder="Örn: Balon Roket" className={inputClasses} />
-                        </div>
-                        <div>
-                            <label className={labelClasses}>Tema / Konu</label>
-                            <input name="theme" defaultValue={editItem?.theme} required placeholder="Örn: Kuvvet" className={inputClasses} />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className={labelClasses}>Uygulama Adımları</label>
-                        <textarea name="content" defaultValue={editItem?.content} required rows={5} className={cn(inputClasses, "resize-none")} placeholder="Detaylı adımları girin..." />
-                    </div>
-
-                    <div className="flex justify-end gap-3 pt-2">
-                        <button type="button" onClick={() => setIsScienceOpen(false)} className="px-5 py-2.5 text-[13px] font-medium text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors">
-                            İptal
-                        </button>
-                        <button type="submit" className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[14px] font-bold rounded-xl hover:scale-105 transition-all shadow-lg shadow-indigo-200">
-                            {editItem ? 'Değişiklikleri Kaydet' : 'Planı Oluştur'}
-                        </button>
-                    </div>
-                </form>
-            </Modal>
-
             <Modal isOpen={isActivityOpen} onClose={() => setIsActivityOpen(false)} title={editItem ? "Etkinliği Güncelle" : "Yeni İnteraktif İçerik"}>
                 <form onSubmit={handleActivitySubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1465,6 +2257,12 @@ export default function App() {
                             <label className={labelClasses}>Kısa Açıklama</label>
                             <textarea name="description" defaultValue={editItem?.description} rows={2} className={cn(inputClasses, "resize-none")} placeholder="Etkinliğin amacını özetleyin" />
                         </div>
+                    </div>
+
+                    <div>
+                        <label className={labelClasses}>Etiketler (virgülle ayırın)</label>
+                        <input name="tags" defaultValue={editItem?.tags} className={inputClasses} placeholder="Fen 7. Sınıf, Moleküller, Sınav" />
+                        <p className="text-[11px] text-slate-400 mt-1.5">Etiketler etkinlikleri hızlıca filtrelemek için kullanılır.</p>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 px-6 py-4 bg-slate-50/50 rounded-2xl border-2 border-slate-100">
@@ -1491,25 +2289,35 @@ export default function App() {
                         </div>
                     </div>
 
+                    {/* HTML Dosya Yükleme */}
+                    <div className="p-4 bg-indigo-50/50 rounded-2xl border-2 border-dashed border-indigo-200 text-center space-y-2">
+                        <label className={labelClasses + ' block'}>HTML Dosyası Yükle</label>
+                        <p className="text-[12px] text-slate-500">Bir <strong>.html</strong> dosyası yükleyin — kod alanları otomatik doldurulur</p>
+                        <label className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-[13px] font-bold rounded-xl cursor-pointer hover:bg-indigo-700 transition-colors shadow-md">
+                            <Plus className="w-4 h-4" /> Dosya Seç
+                            <input type="file" accept=".html,.htm" className="sr-only" onChange={handleHtmlFileUpload} />
+                        </label>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
                             <label className={labelClasses}>HTML Kodu</label>
-                            <textarea name="html_code" defaultValue={editItem?.html_code} rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="<div id='uygulama'></div>" />
+                            <textarea ref={htmlCodeRef} name="html_code" defaultValue={editItem?.html_code} rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="<div id='uygulama'></div>" />
                         </div>
                         <div>
                             <label className={labelClasses}>JavaScript Kodu</label>
-                            <textarea name="js_code" defaultValue={editItem?.js_code} rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="// console.log('Merhaba Dünya');" />
+                            <textarea ref={jsCodeRef} name="js_code" defaultValue={editItem?.js_code} rows={5} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="// console.log('Merhaba Dünya');" />
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
                             <label className={labelClasses}>CSS Kodu (Opsiyonel)</label>
-                            <textarea name="css_code" defaultValue={editItem?.css_code} rows={3} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="body { background: #f0f; }" />
+                            <textarea ref={cssCodeRef} name="css_code" defaultValue={editItem?.css_code} rows={3} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="body { background: #f0f; }" />
                         </div>
                         <div>
                             <label className={labelClasses}>Dış Kütüphaneler (Her satıra bir link)</label>
-                            <textarea name="external_libs" defaultValue={editItem?.external_libs} rows={3} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js" />
+                            <textarea ref={externalLibsRef} name="external_libs" defaultValue={editItem?.external_libs} rows={3} className={cn(inputClasses, "font-mono text-[11px] text-neutral-600 resize-none")} placeholder="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js" />
                         </div>
                     </div>
                     
@@ -1527,28 +2335,193 @@ export default function App() {
             {/* FULL PREVIEW MODAL */}
             {previewId && (
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center p-0 overflow-hidden">
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => { setPreviewId(null); setIsPreviewDrawingMode(false); setShowWhiteboard(false); }} className="absolute inset-0 bg-neutral-900/90" />
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                        onClick={() => setPreviewId(null)}
+                        className="absolute inset-0 bg-neutral-900/90" />
                     <div className="relative w-full h-full bg-white overflow-hidden flex flex-col">
-                        <header className="h-14 px-6 bg-slate-900 border-b border-white/5 flex justify-between items-center shrink-0 z-[11000]">
-                            <h3 className="text-white font-bold">{activities.find(a => a.id === previewId)?.title}</h3>
-                            <div className="flex items-center gap-3">
-                                <button onClick={() => setIsPreviewDrawingMode(!isPreviewDrawingMode)} className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all", isPreviewDrawingMode ? "bg-indigo-600 text-white shadow-lg" : "bg-white/5 text-slate-300 hover:bg-white/10")}><Pencil className="w-4 h-4" />{isPreviewDrawingMode ? 'Çizim Kapat' : 'Kalem Modu'}</button>
-                                <button onClick={() => { setPreviewId(null); setIsPreviewDrawingMode(false); setShowWhiteboard(false); }} className="p-2 text-slate-400 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
+
+                        {/* Header */}
+                        <header className="h-14 px-4 bg-slate-900 border-b border-white/5 flex justify-between items-center shrink-0 z-[11000] gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-7 h-7 bg-indigo-500/20 rounded-lg flex items-center justify-center shrink-0">
+                                    <Blocks className="w-3.5 h-3.5 text-indigo-400" />
+                                </div>
+                                <h3 className="text-white font-bold truncate text-sm">{activities.find(a => a.id === previewId)?.title}</h3>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                {/* Zoom */}
+                                <div className="flex items-center gap-1 bg-white/5 rounded-xl px-1 border border-white/10">
+                                    <button onClick={() => setZoomLevel(z => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))}
+                                        className="p-1.5 text-slate-400 hover:text-white transition-colors" title="Uzaklaştır">
+                                        <ZoomOut className="w-4 h-4" />
+                                    </button>
+                                    <span className="text-xs font-bold text-slate-300 tabular-nums w-10 text-center">{Math.round(zoomLevel * 100)}%</span>
+                                    <button onClick={() => setZoomLevel(z => Math.min(3.0, Math.round((z + 0.25) * 100) / 100))}
+                                        className="p-1.5 text-slate-400 hover:text-white transition-colors" title="Yakınlaştır">
+                                        <ZoomIn className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                {/* Cetvel */}
+                                <button onClick={() => setShowRuler(r => !r)}
+                                    className={cn("p-2 rounded-xl transition-all border",
+                                        showRuler ? "bg-amber-500 text-white border-amber-400" : "bg-white/5 text-slate-300 hover:bg-white/10 border-white/10")}
+                                    title="Cetvel">
+                                    <Ruler className="w-4 h-4" />
+                                </button>
+
+                                {/* Açıölçer */}
+                                <button onClick={() => setShowProtractor(p => !p)}
+                                    className={cn("p-2 rounded-xl transition-all border",
+                                        showProtractor ? "bg-sky-500 text-white border-sky-400" : "bg-white/5 text-slate-300 hover:bg-white/10 border-white/10")}
+                                    title="Açıölçer">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                        <path d="M2 20 L12 4 L22 20 Z" /><line x1="2" y1="20" x2="22" y2="20" />
+                                        <line x1="12" y1="4" x2="12" y2="20" strokeDasharray="3 2" />
+                                    </svg>
+                                </button>
+
+                                {/* Spotlight */}
+                                <button onClick={() => setSpotlightActive(s => !s)}
+                                    className={cn("p-2 rounded-xl transition-all border text-xs font-bold",
+                                        spotlightActive ? "bg-yellow-500 text-white border-yellow-400 shadow-lg shadow-yellow-500/30" : "bg-white/5 text-slate-300 hover:bg-white/10 border-white/10")}
+                                    title="Spotlight Modu">
+                                    <Focus className="w-4 h-4" />
+                                </button>
+
+                                {/* Timer */}
+                                <button onClick={() => { setShowTimer(s => !s); if (!showTimer) { setTimerSecs(timerTotal); setTimerRunning(false); } }}
+                                    className={cn("p-2 rounded-xl transition-all border",
+                                        showTimer ? "bg-indigo-600 text-white border-indigo-500" : "bg-white/5 text-slate-300 hover:bg-white/10 border-white/10")}
+                                    title="Sayaç">
+                                    <AlarmClock className="w-4 h-4" />
+                                </button>
+
+                                {/* Kalem Modu */}
+                                <button onClick={() => setIsPreviewDrawingMode(m => !m)}
+                                    className={cn("flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border",
+                                        isPreviewDrawingMode
+                                            ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 border-indigo-500"
+                                            : "bg-white/5 text-slate-300 hover:bg-indigo-600/20 hover:text-indigo-300 border-white/10"
+                                    )}>
+                                    <Pencil className="w-4 h-4" />
+                                    {isPreviewDrawingMode ? 'Kalemi Kapat' : 'Kalem Modu'}
+                                </button>
+
+                                <button onClick={() => setPreviewId(null)} className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/10">
+                                    <X className="w-5 h-5" />
+                                </button>
                             </div>
                         </header>
-                        <main className="flex-1 relative bg-white overflow-y-auto overflow-x-hidden custom-scroll">
-                            <div style={{ position: 'relative', width: '100%', minHeight: '100%', height: previewIframeHeight }}>
-                                <iframe 
-                                    ref={previewIframeRef} 
-                                    srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))} 
-                                    className={cn("w-full h-full border-0", isPreviewDrawingMode && previewDrawConfig.tool !== 'pan' ? "pointer-events-none" : "pointer-events-auto")} 
-                                    scrolling="no"
-                                />
-                                <DrawingCanvas ref={previewCanvasRef} config={previewDrawConfig} enabled={isPreviewDrawingMode} whiteboardMode={showWhiteboard} />
+
+                        {/* Main Content */}
+                        <main ref={previewMainRef} className="flex-1 relative overflow-y-auto overflow-x-hidden custom-scroll"
+                            style={{ backgroundColor: showWhiteboard ? (bgColor || '#ffffff') : '#ffffff' }}
+                        >
+                            {/* Zoom wrapper */}
+                            <div style={{
+                                transform: `scale(${zoomLevel})`,
+                                transformOrigin: 'top center',
+                                width: `${100 / zoomLevel}%`,
+                                minHeight: `${100 / zoomLevel}%`,
+                                position: 'relative',
+                            }}>
+                                <div style={{ position: 'relative', width: '100%', minHeight: '100%', height: previewIframeHeight }}>
+                                    <iframe
+                                        ref={previewIframeRef}
+                                        srcDoc={getFormattedHtml(activities.find(a => a.id === previewId))}
+                                        className={cn("w-full h-full border-0",
+                                            (isPreviewDrawingMode && previewDrawConfig.tool !== 'pan') || isTextBoxMode ? "pointer-events-none" : "pointer-events-auto")}
+                                        scrolling="no"
+                                    />
+                                    <DrawingCanvas
+                                        ref={previewCanvasRef}
+                                        config={previewDrawConfig}
+                                        enabled={isPreviewDrawingMode}
+                                        whiteboardMode={showWhiteboard}
+                                        bgColor={bgColor}
+                                        onPageChange={(cur, tot) => setPageInfo({ current: cur, total: tot })}
+                                    />
+                                    <TextBoxLayer
+                                        boxes={textBoxes}
+                                        enabled={isTextBoxMode}
+                                        onAdd={(b: any) => setTextBoxes(prev => [...prev, b])}
+                                        onUpdate={(id: string, upd: any) => setTextBoxes(prev => prev.map(b => b.id === id ? upd : b))}
+                                        onDelete={(id: string) => setTextBoxes(prev => prev.filter(b => b.id !== id))}
+                                    />
+                                </div>
                             </div>
-                            <AnimatePresence>{isPreviewDrawingMode && <DrawingToolbar onCommand={(type) => { if(type==='UNDO_DRAWING') previewCanvasRef.current?.undo(); if(type==='CLEAR_DRAWING') previewCanvasRef.current?.clear(); if(type==='TOGGLE_WHITEBOARD') setShowWhiteboard(v => !v); }} config={previewDrawConfig} setConfig={setPreviewDrawConfig} showWhiteboard={showWhiteboard} setShowWhiteboard={setShowWhiteboard} />}</AnimatePresence>
+
+                            {/* Spotlight */}
+                            {spotlightActive && <SpotlightOverlay pos={spotlightPos} radius={spotlightRadius} />}
+
+                            {/* Spotlight radius slider (shown when spotlight is active) */}
+                            {spotlightActive && (
+                                <div className="fixed bottom-6 right-6 z-[11500] flex items-center gap-2 bg-[#1a1b26]/90 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10 shadow-xl">
+                                    <Focus className="w-4 h-4 text-yellow-400 shrink-0" />
+                                    <input type="range" min={80} max={400} value={spotlightRadius}
+                                        onChange={e => setSpotlightRadius(Number(e.target.value))}
+                                        className="w-28 accent-yellow-400" />
+                                </div>
+                            )}
+
+                            {/* Drawing Toolbar */}
+                            <AnimatePresence>
+                                {isPreviewDrawingMode && (
+                                    <DrawingToolbar
+                                        onCommand={(type) => {
+                                            if (type === 'UNDO_DRAWING') previewCanvasRef.current?.undo();
+                                            if (type === 'CLEAR_DRAWING') previewCanvasRef.current?.clear();
+                                            if (type === 'TOGGLE_WHITEBOARD') setShowWhiteboard(v => !v);
+                                        }}
+                                        config={previewDrawConfig}
+                                        setConfig={setPreviewDrawConfig}
+                                        showWhiteboard={showWhiteboard}
+                                        setShowWhiteboard={setShowWhiteboard}
+                                        bgColor={bgColor}
+                                        onBgColorChange={setBgColor}
+                                        onScreenshot={handleScreenshot}
+                                        isTextBoxMode={isTextBoxMode}
+                                        onTextBoxModeToggle={() => setIsTextBoxMode(m => !m)}
+                                    />
+                                )}
+                            </AnimatePresence>
+
+                            {/* Page Navigation */}
+                            <AnimatePresence>
+                                {isPreviewDrawingMode && (
+                                    <PageNav
+                                        current={pageInfo.current}
+                                        total={pageInfo.total}
+                                        onPrev={() => previewCanvasRef.current?.prevPage()}
+                                        onNext={() => previewCanvasRef.current?.nextPage()}
+                                        onAdd={() => previewCanvasRef.current?.addPage()}
+                                        onDelete={() => previewCanvasRef.current?.deletePage()}
+                                    />
+                                )}
+                            </AnimatePresence>
                         </main>
                     </div>
+
+                    {/* Overlay Timer */}
+                    {showTimer && (
+                        <OverlayTimer
+                            secs={timerSecs}
+                            running={timerRunning}
+                            total={timerTotal}
+                            onToggle={() => setTimerRunning(r => !r)}
+                            onReset={() => { setTimerSecs(timerTotal); setTimerRunning(false); }}
+                            onSetTotal={(s) => { setTimerTotal(s); setTimerSecs(s); setTimerRunning(false); }}
+                            onClose={() => { setShowTimer(false); setTimerRunning(false); }}
+                        />
+                    )}
+
+                    {/* Ruler */}
+                    {showRuler && <RulerTool onClose={() => setShowRuler(false)} />}
+
+                    {/* Protractor */}
+                    {showProtractor && <ProtractorTool onClose={() => setShowProtractor(false)} />}
                 </div>
             )}
 
