@@ -64,7 +64,6 @@ export const getFormattedHtml = (act?: any) => {
             window.parent.postMessage({ type: 'DRAWING_READY' }, '*');
         })();
     </script>
-    </script>
 </head>
 <body>
     ${html_code || ''}
@@ -468,7 +467,7 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
     return (
         <PortalCard className="p-0 h-full flex flex-col justify-between border-2 border-indigo-50 hover:border-indigo-300 shadow-lg shadow-indigo-100/20">
             <div className="p-6 space-y-5">
-                <div className="flex justify-between items-start gap-3">
+                <div className="flex justify-between items-start gap-3 cursor-pointer" onClick={() => setPreviewId(act.id)}>
                     <h3 className="text-[17px] font-bold tracking-tight leading-snug text-slate-800 line-clamp-2">{act.title}</h3>
                     <div className="flex gap-2 shrink-0">
                         {act.is_test && (
@@ -478,7 +477,7 @@ const ActivityCard = ({ act, setPreviewId, setEditItem, setIsActivityOpen, activ
                     </div>
                 </div>
                 
-                <p className="text-[13px] text-slate-500 line-clamp-2 leading-relaxed h-[40px] font-medium">{act.description || 'Açıklama girilmedi.'}</p>
+                <p className="text-[13px] text-slate-500 line-clamp-2 leading-relaxed h-[40px] font-medium cursor-pointer" onClick={() => setPreviewId(act.id)}>{act.description || 'Açıklama girilmedi.'}</p>
 
                 <div 
                     className="aspect-[16/10] bg-indigo-50/50 rounded-2xl border-2 border-indigo-100 relative group overflow-hidden flex items-center justify-center cursor-pointer shadow-inner"
@@ -568,7 +567,7 @@ const ActivityListItem = ({ act, setPreviewId, setEditItem, setIsActivityOpen, a
                 </div>
             </div>
 
-            <div className="flex-1 min-w-0 space-y-1">
+            <div className="flex-1 min-w-0 space-y-1 cursor-pointer" onClick={() => setPreviewId(act.id)}>
                 <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-lg font-bold text-slate-800 truncate">{act.title}</h3>
                     {act.is_test && (
@@ -1060,6 +1059,8 @@ export default function App() {
     const [search, setSearch] = useState('');
     const [previewId, setPreviewId] = useState<string | null>(null);
     const [showResultsId, setShowResultsId] = useState<string | null>(null);
+    const [scienceDetail, setScienceDetail] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
     const [isPreviewDrawingMode, setIsPreviewDrawingMode] = useState(false);
     const [previewDrawConfig, setPreviewDrawConfig] = useState({ tool: 'pencil', color: '#4f46e5', width: 3 });
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
@@ -1087,7 +1088,10 @@ export default function App() {
     const scienceHandler = useFirestore('science_activities');
 
     useEffect(() => {
-        const unsubA = activitiesHandler.sync(setActivities);
+        const unsubA = activitiesHandler.sync((data) => {
+            setActivities(data);
+            setIsLoading(false);
+        });
         const unsubS = scienceHandler.sync(setScience);
         return () => { unsubA(); unsubS(); };
     }, []);
@@ -1153,6 +1157,10 @@ export default function App() {
     };
 
     if (params.get('view') === 'student' && params.get('id')) {
+        if (isLoading) return <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
+            <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Etkinlik Yükleniyor...</p>
+        </div>;
         const activity = activities.find(a => a.id === params.get('id'));
         if (activity) return <StudentPortal act={activity} />;
         return <div className="p-20 text-center font-bold text-slate-400">Etkinlik bulunamadı veya silinmiş olabilir.</div>;
@@ -1213,9 +1221,9 @@ export default function App() {
                                                             <div className={cn("text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5", colors.text)}>
                                                                 <FlaskConical className="w-3.5 h-3.5" /> {act.theme}
                                                             </div>
-                                                            <h5 className="text-[16px] font-bold text-slate-800 leading-snug">{act.name}</h5>
+                                                            <h5 className="text-[16px] font-bold text-slate-800 leading-snug cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => setScienceDetail(act)}>{act.name}</h5>
                                                         </div>
-                                                        <p className="text-[13px] text-slate-600 font-medium line-clamp-3 leading-relaxed">
+                                                        <p className="text-[13px] text-slate-600 font-medium line-clamp-3 leading-relaxed cursor-pointer" onClick={() => setScienceDetail(act)}>
                                                             {act.content}
                                                         </p>
                                                         <div className="flex items-center justify-between pt-3 border-t-2 border-slate-100 mt-auto">
@@ -1321,7 +1329,7 @@ export default function App() {
                                 "grid gap-6",
                                 viewMode === 'grid' ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
                             )}>
-                                {activities.filter(a => a.title.toLowerCase().includes(search.toLowerCase())).map((act, i) => (
+                                {activities.filter(a => (a.title || '').toLowerCase().includes(search.toLowerCase())).map((act, i) => (
                                     viewMode === 'grid' ? (
                                         <ActivityCard 
                                             key={act.id} 
@@ -1351,6 +1359,27 @@ export default function App() {
                     )}
                 </AnimatePresence>
                 <ResultsModal isOpen={!!showResultsId} onClose={() => setShowResultsId(null)} activityId={showResultsId || ''} />
+                
+                {/* Science Detail Modal */}
+                <Modal isOpen={!!scienceDetail} onClose={() => setScienceDetail(null)} title="Plan Detayları">
+                    <div className="space-y-6">
+                        <div className="flex items-center gap-3 p-4 bg-indigo-50 rounded-2xl">
+                            <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
+                                <FlaskConical className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400">{scienceDetail?.theme}</p>
+                                <h4 className="text-lg font-bold text-slate-800">{scienceDetail?.name}</h4>
+                            </div>
+                        </div>
+                        <div className="space-y-3">
+                            <h5 className="text-xs font-black uppercase tracking-widest text-slate-400">Uygulama İçeriği</h5>
+                            <div className="text-slate-600 text-[15px] leading-relaxed whitespace-pre-wrap font-medium bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                {scienceDetail?.content}
+                            </div>
+                        </div>
+                    </div>
+                </Modal>
             </main>
 
             {/* NEW MINIMALIST FOOTER */}
