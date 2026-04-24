@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import {
-    getFirestore,
+    initializeFirestore,
     collection,
     onSnapshot,
     addDoc,
@@ -23,7 +23,9 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+export const db = initializeFirestore(app, {
+    ignoreUndefinedProperties: true,
+});
 
 export interface FirestoreHandler<T extends { id: string }> {
     sync: (onUpdate: (data: T[]) => void) => () => void;
