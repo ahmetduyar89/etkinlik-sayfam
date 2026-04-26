@@ -100,20 +100,14 @@ export function ActivityPreviewModal({
 
     React.useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
-            const data = event.data as { type?: string; height?: number; error?: string };
+            const data = event.data as { type?: string; height?: number };
             if (data?.type === 'IFRAME_HEIGHT_SYNC' && (data.height ?? 0) > 0) {
                 setIframeHeight(data.height as number);
-            }
-            if (data?.type === 'JS_ERROR') {
-                const msg = data.error || '';
-                if (msg && msg !== 'Script error.' && msg !== 'Script error') {
-                    toast.error(`İçerik hatası: ${msg}`);
-                }
             }
         };
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, [toast]);
+    }, []);
 
     React.useEffect(() => {
         if (!timerRunning || timerSecs <= 0) return;
@@ -370,7 +364,6 @@ export function ActivityPreviewModal({
                             }}
                         >
                             <iframe
-                                key={activity.id}
                                 srcDoc={getFormattedHtml(activity)}
                                 title={activity.title}
                                 sandbox="allow-scripts"
@@ -382,7 +375,7 @@ export function ActivityPreviewModal({
                                         ? 'pointer-events-none'
                                         : 'pointer-events-auto'
                                 )}
-                                scrolling="auto"
+                                scrolling="no"
                             />
                             <DrawingCanvas
                                 ref={canvasRef}

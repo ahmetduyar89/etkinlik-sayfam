@@ -8,6 +8,14 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
     if (!act) return '';
     const { html_code, css_code, js_code, external_libs } = act;
 
+    // Kullanıcı tam HTML dokümanı yapıştırmışsa içindeki body içeriğini ayıkla
+    let cleanHtml = html_code || '';
+    if (cleanHtml.includes('<body') || cleanHtml.includes('<html')) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(cleanHtml, 'text/html');
+        cleanHtml = doc.body.innerHTML;
+    }
+
     const isCssUrl = (url: string): boolean => {
         if (url.startsWith('css:')) return true;
         const bare = url.split('?')[0].split('#')[0];
@@ -33,15 +41,21 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
         : '';
 
     return `<!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
     ${libs}
     <style>
         body, html {
-            margin: 0; padding: 0; width: 100vw; min-height: 100vh;
+            margin: 0; padding: 0; width: 100%; min-height: 100vh;
             background-color: transparent;
+            overflow-x: hidden;
+        }
+        #content-wrapper {
+            width: 100%;
+            overflow: visible;
+            position: relative;
         }
         ${css_code || ''}
         #drawing-canvas {
@@ -60,7 +74,6 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
         }
     </style>
     <script>
-        // localStorage/sessionStorage polyfill for sandboxed iframes
         (function() {
             function makeStorage() {
                 var s = {};
@@ -99,7 +112,9 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
     </script>
 </head>
 <body>
-    ${html_code || ''}
+    <div id="content-wrapper">
+        ${cleanHtml}
+    </div>
     <script>
         try {
             ${js_code || ''}
@@ -109,13 +124,32 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
         }
 
         (function() {
+            let lastHeight = 0;
             const sendHeight = () => {
-                const height = document.documentElement.scrollHeight;
-                window.parent.postMessage({ type: 'IFRAME_HEIGHT_SYNC', height }, '*');
+                const wrapper = document.getElementById('content-wrapper');
+                const height = Math.max(
+                    wrapper.scrollHeight,
+                    wrapper.offsetHeight,
+                    document.documentElement.scrollHeight,
+                    document.body.scrollHeight
+                );
+                if (Math.abs(lastHeight - height) > 2) {
+                    lastHeight = height;
+                    window.parent.postMessage({ type: 'IFRAME_HEIGHT_SYNC', height }, '*');
+                }
             };
+            
+            // ResizeObserver content-wrapper'ı izlesin
             const observer = new ResizeObserver(() => sendHeight());
-            observer.observe(document.body);
+            const wrapper = document.getElementById('content-wrapper');
+            if (wrapper) observer.observe(wrapper);
+            
             window.addEventListener('load', sendHeight);
+            // Resimlerin yüklenmesini bekle
+            window.addEventListener('DOMContentLoaded', sendHeight);
+            
+            // Periyodik kontrol (bazı dinamik içerikler için yedek)
+            setInterval(sendHeight, 1000);
         })();
     </script>
 </body>
