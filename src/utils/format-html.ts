@@ -9,18 +9,17 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
     const { html_code, css_code, js_code, external_libs } = act;
 
     let cleanHtml = html_code || '';
-    let extractedStyles = '';
-    let extractedScripts = '';
-    let extractedLibs = '';
+    let headContent = '';
+    let bodyScripts = '';
     let bodyAttrs = '';
     let htmlAttrs = '';
 
-    // Kullanıcı tam HTML dokümanı yapıştırmışsa içindeki head elemanlarını ve body içeriğini ayıklayıp birleştir
+    // Kullanıcı tam HTML dokümanı yapıştırmışsa içeriği ayıkla
     if (cleanHtml.includes('<body') || cleanHtml.includes('<html')) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(cleanHtml, 'text/html');
         
-        // Attr'ları al
+        // HTML ve Body özelliklerini al
         const htmlEl = doc.querySelector('html');
         const bodyEl = doc.querySelector('body');
         
@@ -33,40 +32,22 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
             Array.from(bodyEl.attributes).forEach(attr => {
                 bodyAttrs += ` ${attr.name}="${attr.value}"`;
             });
+            
+            // Body içindeki scriptleri ayır (sona eklemek için)
+            bodyEl.querySelectorAll('script').forEach((script) => {
+                if (script.src) {
+                    bodyScripts += `<script src="${script.src}" ${script.crossOrigin ? `crossorigin="${script.crossOrigin}"` : ''}></script>\n`;
+                } else {
+                    bodyScripts += `<script>${script.innerHTML}</script>\n`;
+                }
+                script.remove();
+            });
             cleanHtml = bodyEl.innerHTML;
         }
 
-        // Head içindeki stil, script ve linkleri ayıkla
-        doc.head.childNodes.forEach((node) => {
-            if (node.nodeName === 'STYLE') {
-                extractedStyles += (node as HTMLElement).innerHTML + '\n';
-            } else if (node.nodeName === 'SCRIPT') {
-                const scriptNode = node as HTMLScriptElement;
-                if (scriptNode.src) {
-                    extractedLibs += `<script src="${scriptNode.src}" ${scriptNode.crossOrigin ? `crossorigin="${scriptNode.crossOrigin}"` : ''}></script>\n`;
-                } else {
-                    extractedScripts += scriptNode.innerHTML + '\n';
-                }
-            } else if (node.nodeName === 'LINK') {
-                const linkNode = node as HTMLLinkElement;
-                if (linkNode.rel === 'stylesheet') {
-                    extractedLibs += `<link rel="stylesheet" href="${linkNode.href}" ${linkNode.crossOrigin ? `crossorigin="${linkNode.crossOrigin}"` : ''}>\n`;
-                } else {
-                    extractedLibs += linkNode.outerHTML + '\n';
-                }
-            }
-        });
-        
-        // Body içindeki scriptleri de ayıkla
-        doc.body.querySelectorAll('script').forEach((script) => {
-            if (script.src) {
-                extractedLibs += `<script src="${script.src}" ${script.crossOrigin ? `crossorigin="${script.crossOrigin}"` : ''}></script>\n`;
-            } else {
-                extractedScripts += script.innerHTML + '\n';
-            }
-            script.remove();
-        });
-        if (bodyEl) cleanHtml = bodyEl.innerHTML;
+        // Head içeriğini (stil, script, link) olduğu gibi al
+        // Tailwind config gibi scriptlerin head'de kalması kritik
+        headContent = doc.head.innerHTML;
     }
 
     const isCssUrl = (url: string): boolean => {
@@ -91,16 +72,13 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
         })
         .join('\n');
 
-    const allLibs = extractedLibs + libs;
-    const allStyles = extractedStyles + (css_code || '');
-    const allScripts = extractedScripts + (js_code || '');
-
     return `<!DOCTYPE html>
 <html lang="tr"${htmlAttrs}>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
-    ${allLibs}
+    ${headContent}
+    ${libs}
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%;
@@ -111,7 +89,7 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
             overflow: visible;
             position: relative;
         }
-        ${allStyles}
+        ${css_code || ''}
         #drawing-canvas {
             touch-action: none !important;
             cursor: crosshair;
@@ -169,9 +147,10 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
     <div id="content-wrapper">
         ${cleanHtml}
     </div>
+    ${bodyScripts}
     <script>
         try {
-            ${allScripts}
+            ${js_code || ''}
         } catch (e) {
             console.error('Simülasyon Hatası:', e);
             window.parent.postMessage({ type: 'JS_ERROR', error: String(e) }, '*');
@@ -183,8 +162,6 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
                 const wrapper = document.getElementById('content-wrapper');
                 if (!wrapper) return;
                 
-                // scrollHeight bazen vh birimleri yüzünden hatalı büyüyebilir
-                // Bu yüzden çocukların toplam yüksekliğini de kontrol ediyoruz
                 let childrenHeight = 0;
                 Array.from(wrapper.children).forEach(child => {
                     const rect = child.getBoundingClientRect();
@@ -209,7 +186,7 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
             
             window.addEventListener('load', sendHeight);
             window.addEventListener('DOMContentLoaded', sendHeight);
-            setInterval(sendHeight, 1500); // Daha seyrek kontrol
+            setInterval(sendHeight, 1500);
         })();
     </script>
 </body>
