@@ -100,14 +100,17 @@ export function ActivityPreviewModal({
 
     React.useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
-            const data = event.data as { type?: string; height?: number };
+            const data = event.data as { type?: string; height?: number; error?: string };
             if (data?.type === 'IFRAME_HEIGHT_SYNC' && (data.height ?? 0) > 0) {
                 setIframeHeight(data.height as number);
+            }
+            if (data?.type === 'JS_ERROR') {
+                toast.error(`İçerik hatası: ${data.error || 'Bilinmeyen hata'}`);
             }
         };
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, []);
+    }, [toast]);
 
     React.useEffect(() => {
         if (!timerRunning || timerSecs <= 0) return;
