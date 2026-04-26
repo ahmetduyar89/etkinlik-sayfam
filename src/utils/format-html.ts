@@ -12,14 +12,29 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
     let extractedStyles = '';
     let extractedScripts = '';
     let extractedLibs = '';
+    let bodyAttrs = '';
+    let htmlAttrs = '';
 
     // Kullanıcı tam HTML dokümanı yapıştırmışsa içindeki head elemanlarını ve body içeriğini ayıklayıp birleştir
     if (cleanHtml.includes('<body') || cleanHtml.includes('<html')) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(cleanHtml, 'text/html');
         
-        // Body içeriğini al
-        cleanHtml = doc.body.innerHTML;
+        // Attr'ları al
+        const htmlEl = doc.querySelector('html');
+        const bodyEl = doc.querySelector('body');
+        
+        if (htmlEl) {
+            Array.from(htmlEl.attributes).forEach(attr => {
+                if (attr.name !== 'lang') htmlAttrs += ` ${attr.name}="${attr.value}"`;
+            });
+        }
+        if (bodyEl) {
+            Array.from(bodyEl.attributes).forEach(attr => {
+                bodyAttrs += ` ${attr.name}="${attr.value}"`;
+            });
+            cleanHtml = bodyEl.innerHTML;
+        }
 
         // Head içindeki stil, script ve linkleri ayıkla
         doc.head.childNodes.forEach((node) => {
@@ -42,18 +57,16 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
             }
         });
         
-        // Body içindeki scriptleri de ayıkla (bazı kütüphaneler body sonunda olabilir)
+        // Body içindeki scriptleri de ayıkla
         doc.body.querySelectorAll('script').forEach((script) => {
             if (script.src) {
                 extractedLibs += `<script src="${script.src}" ${script.crossOrigin ? `crossorigin="${script.crossOrigin}"` : ''}></script>\n`;
             } else {
                 extractedScripts += script.innerHTML + '\n';
             }
-            // Body içeriğinden scripti temizle (çünkü sona ekleyeceğiz)
             script.remove();
         });
-        // Script temizlendikten sonra body içeriğini güncelle
-        cleanHtml = doc.body.innerHTML;
+        if (bodyEl) cleanHtml = bodyEl.innerHTML;
     }
 
     const isCssUrl = (url: string): boolean => {
@@ -83,16 +96,15 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
     const allScripts = extractedScripts + (js_code || '');
 
     return `<!DOCTYPE html>
-<html lang="tr">
+<html lang="tr"${htmlAttrs}>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
     ${allLibs}
     <style>
         body, html {
-            margin: 0; padding: 0; width: 100%; min-height: 100vh;
+            margin: 0; padding: 0; width: 100%;
             background-color: transparent;
-            overflow-x: hidden;
         }
         #content-wrapper {
             width: 100%;
@@ -153,7 +165,7 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
         })();
     </script>
 </head>
-<body>
+<body${bodyAttrs}>
     <div id="content-wrapper">
         ${cleanHtml}
     </div>
@@ -169,13 +181,23 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
             let lastHeight = 0;
             const sendHeight = () => {
                 const wrapper = document.getElementById('content-wrapper');
+                if (!wrapper) return;
+                
+                // scrollHeight bazen vh birimleri yüzünden hatalı büyüyebilir
+                // Bu yüzden çocukların toplam yüksekliğini de kontrol ediyoruz
+                let childrenHeight = 0;
+                Array.from(wrapper.children).forEach(child => {
+                    const rect = child.getBoundingClientRect();
+                    childrenHeight = Math.max(childrenHeight, child.offsetTop + rect.height);
+                });
+
                 const height = Math.max(
-                    wrapper.scrollHeight,
+                    childrenHeight,
                     wrapper.offsetHeight,
-                    document.documentElement.scrollHeight,
-                    document.body.scrollHeight
+                    document.body.offsetHeight
                 );
-                if (Math.abs(lastHeight - height) > 2) {
+                
+                if (Math.abs(lastHeight - height) > 5) {
                     lastHeight = height;
                     window.parent.postMessage({ type: 'IFRAME_HEIGHT_SYNC', height }, '*');
                 }
@@ -187,7 +209,7 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
             
             window.addEventListener('load', sendHeight);
             window.addEventListener('DOMContentLoaded', sendHeight);
-            setInterval(sendHeight, 1000);
+            setInterval(sendHeight, 1500); // Daha seyrek kontrol
         })();
     </script>
 </body>
