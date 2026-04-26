@@ -14,40 +14,45 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
     let bodyAttrs = '';
     let htmlAttrs = '';
 
-    // Kullanıcı tam HTML dokümanı yapıştırmışsa içeriği ayıkla
-    if (cleanHtml.includes('<body') || cleanHtml.includes('<html')) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(cleanHtml, 'text/html');
-        
-        // HTML ve Body özelliklerini al
-        const htmlEl = doc.querySelector('html');
-        const bodyEl = doc.querySelector('body');
-        
-        if (htmlEl) {
-            Array.from(htmlEl.attributes).forEach(attr => {
-                if (attr.name !== 'lang') htmlAttrs += ` ${attr.name}="${attr.value}"`;
-            });
-        }
-        if (bodyEl) {
-            Array.from(bodyEl.attributes).forEach(attr => {
-                bodyAttrs += ` ${attr.name}="${attr.value}"`;
-            });
+    // Doküman yapısını analiz et ve ayıkla
+    if (cleanHtml.includes('<body') || cleanHtml.includes('<html') || cleanHtml.includes('<head')) {
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(cleanHtml, 'text/html');
             
-            // Body içindeki scriptleri ayır (sona eklemek için)
-            bodyEl.querySelectorAll('script').forEach((script) => {
-                if (script.src) {
-                    bodyScripts += `<script src="${script.src}" ${script.crossOrigin ? `crossorigin="${script.crossOrigin}"` : ''}></script>\n`;
-                } else {
-                    bodyScripts += `<script>${script.innerHTML}</script>\n`;
-                }
-                script.remove();
-            });
-            cleanHtml = bodyEl.innerHTML;
-        }
+            const htmlEl = doc.querySelector('html');
+            const headEl = doc.querySelector('head');
+            const bodyEl = doc.querySelector('body');
+            
+            if (htmlEl) {
+                Array.from(htmlEl.attributes).forEach(attr => {
+                    if (attr.name !== 'lang') htmlAttrs += ` ${attr.name}="${attr.value}"`;
+                });
+            }
+            
+            if (headEl) {
+                headContent = headEl.innerHTML;
+            }
 
-        // Head içeriğini (stil, script, link) olduğu gibi al
-        // Tailwind config gibi scriptlerin head'de kalması kritik
-        headContent = doc.head.innerHTML;
+            if (bodyEl) {
+                Array.from(bodyEl.attributes).forEach(attr => {
+                    bodyAttrs += ` ${attr.name}="${attr.value}"`;
+                });
+                
+                // Body içindeki scriptleri sona taşımak için ayır
+                bodyEl.querySelectorAll('script').forEach((script) => {
+                    if (script.src) {
+                        bodyScripts += `<script src="${script.src}" ${script.crossOrigin ? `crossorigin="${script.crossOrigin}"` : ''}></script>\n`;
+                    } else {
+                        bodyScripts += `<script>${script.innerHTML}</script>\n`;
+                    }
+                    script.remove();
+                });
+                cleanHtml = bodyEl.innerHTML;
+            }
+        } catch (e) {
+            console.warn('HTML parsing error, using raw content:', e);
+        }
     }
 
     const isCssUrl = (url: string): boolean => {
@@ -80,6 +85,7 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
     ${headContent}
     ${libs}
     <style>
+        /* Base Reset */
         body, html {
             margin: 0; padding: 0; width: 100%;
             background-color: transparent;
@@ -88,6 +94,7 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
             width: 100%;
             overflow: visible;
             position: relative;
+            min-height: 1px;
         }
         ${css_code || ''}
         #drawing-canvas {
@@ -158,18 +165,25 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
 
         (function() {
             let lastHeight = 0;
+            let resizeTimer = null;
+
             const sendHeight = () => {
                 const wrapper = document.getElementById('content-wrapper');
                 if (!wrapper) return;
                 
-                let childrenHeight = 0;
+                // Hassas yükseklik hesaplama: Tüm çocukların sınırlarını kontrol et
+                let maxBottom = 0;
+                const children = wrapper.querySelectorAll('*');
+                // Sadece en üst seviye görünür çocukları ve mutlak pozisyonlu olanları kontrol et
                 Array.from(wrapper.children).forEach(child => {
                     const rect = child.getBoundingClientRect();
-                    childrenHeight = Math.max(childrenHeight, child.offsetTop + rect.height);
+                    const bottom = child.offsetTop + rect.height;
+                    if (bottom > maxBottom) maxBottom = bottom;
                 });
 
                 const height = Math.max(
-                    childrenHeight,
+                    maxBottom,
+                    wrapper.scrollHeight,
                     wrapper.offsetHeight,
                     document.body.offsetHeight
                 );
@@ -180,13 +194,30 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
                 }
             };
             
-            const observer = new ResizeObserver(() => sendHeight());
+            // Debounced height sync
+            const debouncedSync = () => {
+                if (resizeTimer) clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(sendHeight, 100);
+            };
+
+            // 1. ResizeObserver: Kapsayıcı boyutunu izler
+            const ro = new ResizeObserver(debouncedSync);
             const wrapper = document.getElementById('content-wrapper');
-            if (wrapper) observer.observe(wrapper);
+            if (wrapper) ro.observe(wrapper);
             
+            // 2. MutationObserver: DOM değişikliklerini izler (dinamik içerik)
+            const mo = new MutationObserver(debouncedSync);
+            mo.observe(document.body, { attributes: true, childList: true, subtree: true });
+            
+            // 3. Standart Eventler
             window.addEventListener('load', sendHeight);
             window.addEventListener('DOMContentLoaded', sendHeight);
-            setInterval(sendHeight, 1500);
+            
+            // 4. Periyodik Kontrol (Yedek)
+            setInterval(sendHeight, 2000);
+            
+            // İlk tetikleme
+            sendHeight();
         })();
     </script>
 </body>
