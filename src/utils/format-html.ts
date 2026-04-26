@@ -8,16 +8,27 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
     if (!act) return '';
     const { html_code, css_code, js_code, external_libs } = act;
 
+    const isCssUrl = (url: string): boolean => {
+        if (url.startsWith('css:')) return true;
+        const bare = url.split('?')[0].split('#')[0];
+        return (
+            bare.endsWith('.css') ||
+            /fonts\.(googleapis|bunny|gstatic)\.com/.test(url) ||
+            /\/(css|styles?)[/?#]?$/i.test(bare)
+        );
+    };
+
     const libs = external_libs
         ? external_libs
               .split('\n')
               .map((l) => l.trim())
               .filter(Boolean)
-              .map((lib) =>
-                  lib.endsWith('.css')
-                      ? `<link rel="stylesheet" href="${lib}">`
-                      : `<script src="${lib}"></script>`
-              )
+              .map((lib) => {
+                  const href = lib.startsWith('css:') ? lib.slice(4) : lib;
+                  return isCssUrl(lib)
+                      ? `<link rel="stylesheet" href="${href}">`
+                      : `<script src="${lib}"></script>`;
+              })
               .join('\n')
         : '';
 
@@ -49,7 +60,35 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
         }
     </style>
     <script>
+        // localStorage/sessionStorage polyfill for sandboxed iframes
+        (function() {
+            function makeStorage() {
+                var s = {};
+                return {
+                    getItem: function(k) { return Object.prototype.hasOwnProperty.call(s, k) ? s[k] : null; },
+                    setItem: function(k, v) { s[k] = String(v); },
+                    removeItem: function(k) { delete s[k]; },
+                    clear: function() { s = {}; },
+                    key: function(i) { return Object.keys(s)[i] || null; },
+                    get length() { return Object.keys(s).length; }
+                };
+            }
+            try { localStorage.getItem('__test__'); } catch(e) {
+                try { Object.defineProperty(window, 'localStorage', { value: makeStorage() }); } catch(_) {}
+            }
+            try { sessionStorage.getItem('__test__'); } catch(e) {
+                try { Object.defineProperty(window, 'sessionStorage', { value: makeStorage() }); } catch(_) {}
+            }
+        })();
+
         window.sendAnswer = (data) => window.parent.postMessage({ type: 'SIM_ANSWER', data }, '*');
+
+        window.addEventListener('error', function(e) {
+            window.parent.postMessage({ type: 'JS_ERROR', error: e.message + (e.lineno ? ' (satır: ' + e.lineno + ')' : '') }, '*');
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            window.parent.postMessage({ type: 'JS_ERROR', error: 'Promise hatası: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)) }, '*');
+        });
 
         (function() {
             window.addEventListener('message', (e) => {
@@ -66,6 +105,7 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
             ${js_code || ''}
         } catch (e) {
             console.error('Simülasyon Hatası:', e);
+            window.parent.postMessage({ type: 'JS_ERROR', error: String(e) }, '*');
         }
 
         (function() {

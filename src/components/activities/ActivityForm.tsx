@@ -47,6 +47,10 @@ export function ActivityForm({
                     .join('\n')
                     .trim();
                 const jsContent = Array.from(doc.querySelectorAll('script:not([src])'))
+                    .filter((s) => {
+                        const t = (s as HTMLScriptElement).type;
+                        return !t || t === 'text/javascript' || t === 'application/javascript';
+                    })
                     .map((s) => s.innerHTML)
                     .join('\n')
                     .trim();
@@ -55,7 +59,10 @@ export function ActivityForm({
                 );
                 const extCss = Array.from(
                     doc.querySelectorAll('link[rel="stylesheet"]')
-                ).map((l) => (l as HTMLLinkElement).getAttribute('href') || '');
+                ).map((l) => {
+                    const href = (l as HTMLLinkElement).getAttribute('href') || '';
+                    return href ? `css:${href}` : '';
+                });
                 const extLibs = [...extScripts, ...extCss].filter(Boolean).join('\n');
                 if (htmlCodeRef.current) htmlCodeRef.current.value = bodyHtml;
                 if (jsCodeRef.current) jsCodeRef.current.value = jsContent;

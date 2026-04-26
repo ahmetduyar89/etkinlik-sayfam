@@ -79,7 +79,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
-            const data = event.data as { type?: string; height?: number; data?: unknown };
+            const data = event.data as { type?: string; height?: number; data?: unknown; error?: string };
             if (data?.type === 'IFRAME_HEIGHT_SYNC' && (data.height ?? 0) > 0) {
                 setIframeHeight(data.height as number);
             }
@@ -89,6 +89,9 @@ export function StudentPortal({ act }: StudentPortalProps) {
                         answers: (data.data ?? {}) as Record<string, unknown>,
                     })
                     .catch((err) => console.error('Answer sync error:', err));
+            }
+            if (data?.type === 'JS_ERROR') {
+                toast.error(`İçerik hatası: ${data.error || 'Bilinmeyen hata'}`);
             }
         };
         window.addEventListener('message', handleMessage);
