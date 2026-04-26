@@ -91,7 +91,10 @@ export function StudentPortal({ act }: StudentPortalProps) {
                     .catch((err) => console.error('Answer sync error:', err));
             }
             if (data?.type === 'JS_ERROR') {
-                toast.error(`İçerik hatası: ${data.error || 'Bilinmeyen hata'}`);
+                const msg = data.error || '';
+                if (msg && msg !== 'Script error.' && msg !== 'Script error') {
+                    toast.error(`İçerik hatası: ${msg}`);
+                }
             }
         };
         window.addEventListener('message', handleMessage);

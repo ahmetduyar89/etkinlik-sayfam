@@ -26,8 +26,8 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
               .map((lib) => {
                   const href = lib.startsWith('css:') ? lib.slice(4) : lib;
                   return isCssUrl(lib)
-                      ? `<link rel="stylesheet" href="${href}">`
-                      : `<script src="${lib}"></script>`;
+                      ? `<link rel="stylesheet" href="${href}" crossorigin="anonymous">`
+                      : `<script src="${lib}" crossorigin="anonymous"></script>`;
               })
               .join('\n')
         : '';
