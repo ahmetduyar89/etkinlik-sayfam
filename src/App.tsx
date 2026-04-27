@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Blocks, LayoutGrid, LayoutList, Plus, Search, Tag, Tags } from 'lucide-react';
+import { Blocks, LayoutGrid, LayoutList, Plus, Search, Tag, Tags, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useFirestore } from './lib/firebase';
 import { cn } from './utils/cn';
 import { useDebounce } from './hooks/useDebounce';
@@ -44,7 +44,6 @@ export default function App() {
         return () => {
             unsub();
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const allTags = useMemo(() => {
@@ -94,7 +93,7 @@ export default function App() {
                 await navigator.clipboard.writeText(link);
                 toast.success('Öğrenci giriş linki kopyalandı.');
             } catch {
-                toast.error('Link kopyalanamadı. Tarayıcı izinlerini kontrol edin.');
+                toast.error('Link kopyalanamadı.');
             }
         },
         [toast]
@@ -106,7 +105,7 @@ export default function App() {
                 await navigator.clipboard.writeText(act.html_code || '');
                 toast.success('HTML kodu kopyalandı.');
             } catch {
-                toast.error('Kopyalanamadı. Tarayıcı izinlerini kontrol edin.');
+                toast.error('Kopyalanamadı.');
             }
         },
         [toast]
@@ -116,7 +115,7 @@ export default function App() {
         async (act: Activity) => {
             const ok = await confirm({
                 title: 'Etkinliği sil?',
-                message: `"${act.title}" adlı etkinlik kalıcı olarak silinecek. Bu işlem geri alınamaz.`,
+                message: `"${act.title}" adlı etkinlik kalıcı olarak silinecek.`,
                 confirmLabel: 'Sil',
                 cancelLabel: 'Vazgeç',
                 variant: 'danger',
@@ -126,8 +125,7 @@ export default function App() {
                 await activitiesHandler.remove(act.id);
                 toast.success('Etkinlik silindi.');
             } catch (err) {
-                console.error('Delete error:', err);
-                toast.error('Etkinlik silinemedi. Lütfen tekrar deneyin.');
+                toast.error('Etkinlik silinemedi.');
             }
         },
         [activitiesHandler, confirm, toast]
@@ -147,10 +145,7 @@ export default function App() {
                 setIsActivityOpen(false);
                 setEditItem(null);
             } catch (err) {
-                console.error('Save error:', err);
-                toast.error(
-                    'Etkinlik kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.'
-                );
+                toast.error('Etkinlik kaydedilemedi.');
             } finally {
                 setIsSubmitting(false);
             }
@@ -165,270 +160,219 @@ export default function App() {
     if (isStudentView) {
         if (isLoading) {
             return (
-                <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
-                    <div
-                        className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"
-                        role="status"
-                        aria-label="Yükleniyor"
-                    />
-                    <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">
-                        Etkinlik yükleniyor…
-                    </p>
+                <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#0b1326]">
+                    <div className="w-12 h-12 border-4 border-primary-container border-t-transparent rounded-full animate-spin" />
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Yükleniyor…</p>
                 </div>
             );
         }
         const activity = activities.find((a) => a.id === studentId);
         if (activity) return <StudentPortal act={activity} />;
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50 p-8 text-center">
-                <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-3xl font-black">
-                    ?
-                </div>
-                <h1 className="text-lg font-bold text-slate-700">Etkinlik bulunamadı</h1>
-                <p className="text-sm text-slate-500 max-w-sm">
-                    Aradığınız etkinlik silinmiş veya bağlantı hatalı olabilir.
-                </p>
-            </div>
-        );
     }
 
     return (
-        <div className="min-h-screen pt-28 pb-16 px-4 bg-slate-50 relative overflow-hidden hero-gradient">
-            {/* Dynamic Background Elements */}
-            <div
-                aria-hidden="true"
-                className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-200/30 rounded-full blur-[120px] animate-pulse-soft"
-            />
-            <div
-                aria-hidden="true"
-                className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-purple-200/30 rounded-full blur-[120px] animate-pulse-soft"
-            />
-
+        <div className="min-h-screen bg-background text-on-background selection:bg-primary-container selection:text-white pb-24 md:pb-0">
             <Navbar />
 
-            <main className="container mx-auto max-w-6xl relative z-10">
-                <div className="space-y-12">
-                    <div className="flex flex-col lg:flex-row justify-between items-center lg:items-end gap-8">
-                        <div className="space-y-6 text-center lg:text-left">
-                            <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-100 rounded-full animate-float">
-                                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                                <span className="text-[11px] font-black text-indigo-600 uppercase tracking-widest">Profesyonel Eğitim Portalı</span>
-                            </div>
-                            <div className="space-y-4">
-                                <h2 className="text-5xl lg:text-7xl font-black tracking-tight text-slate-900 leading-[1.1]">
-                                    Fen Bilimleri <br />
-                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-                                        İnteraktif Merkez
-                                    </span>
-                                </h2>
-                                <p className="text-lg text-slate-500 max-w-xl font-medium leading-relaxed mx-auto lg:mx-0">
-                                    Ahmet DUYAR ile öğrenmeyi eğlenceli ve kalıcı hale getiren oyunlaştırılmış içerikler, 
-                                    interaktif simülasyonlar ve zenginleştirilmiş eğitim materyalleri.
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex flex-col sm:flex-row w-full lg:w-auto gap-4 items-center">
-                            <div className="relative w-full sm:w-72 group">
-                                <Search
-                                    className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors"
-                                    aria-hidden="true"
-                                />
-                                <input
-                                    id="activity-search"
-                                    type="search"
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Simülasyon veya konu ara..."
-                                    className="w-full bg-white/80 backdrop-blur-md border-2 border-indigo-100 rounded-2xl pl-12 pr-4 py-4 text-[14px] text-slate-800 font-semibold focus:ring-8 focus:ring-indigo-500/5 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400 shadow-xl shadow-indigo-100/20"
-                                />
-                            </div>
-                            <button
-                                type="button"
-                                onClick={openCreate}
-                                className="w-full sm:w-auto px-8 py-4 bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 text-white text-[15px] font-black rounded-2xl hover:shadow-2xl hover:shadow-indigo-300 hover:-translate-y-1 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xl shadow-indigo-200 group"
-                            >
-                                <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" aria-hidden="true" /> 
-                                <span className="tracking-wide">Yeni İçerik Oluştur</span>
-                            </button>
-                        </div>
-                    </div>
+            <main className="max-w-screen-2xl mx-auto px-6 py-12">
+                <div className="flex flex-col lg:flex-row gap-8">
+                    {/* Sidebar Filters */}
+                    <aside className="w-full lg:w-72 flex-shrink-0 space-y-8">
+                        <div className="glass-card p-6 rounded-2xl">
+                            <h3 className="font-headline-md text-headline-md mb-6 flex items-center gap-2 text-white">
+                                <span className="material-symbols-outlined text-primary">tune</span> Filtreler
+                            </h3>
+                            
+                            <div className="space-y-8">
+                                {/* Search */}
+                                <div className="space-y-2">
+                                    <label className="font-label-md text-label-md text-slate-400 uppercase tracking-widest text-[10px]">İçerik Ara</label>
+                                    <div className="relative">
+                                        <input 
+                                            className="w-full bg-surface-container-highest border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-tertiary transition-all" 
+                                            placeholder="Simülasyon, test..." 
+                                            type="text"
+                                            value={search}
+                                            onChange={(e) => setSearch(e.target.value)}
+                                        />
+                                        <span className="material-symbols-outlined absolute right-3 top-3 text-slate-400">search</span>
+                                    </div>
+                                </div>
 
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
-                            <div className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                <Blocks className="w-4 h-4" aria-hidden="true" />{' '}
-                                {filteredActivities.length} İçerik Bulundu
+                                {/* Categories / Tags */}
+                                <div className="space-y-3">
+                                    <label className="font-label-md text-label-md text-slate-400 uppercase tracking-widest text-[10px]">Etiketler</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button 
+                                            onClick={() => setSelectedTag(null)}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-full font-label-md text-xs transition-all",
+                                                selectedTag === null ? "bg-primary-container text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
+                                            )}
+                                        >
+                                            Tümü
+                                        </button>
+                                        {allTags.map(tag => (
+                                            <button 
+                                                key={tag}
+                                                onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                                                className={cn(
+                                                    "px-3 py-1.5 rounded-full font-label-md text-xs transition-all",
+                                                    selectedTag === tag ? "bg-primary-container text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
+                                                )}
+                                            >
+                                                {tag}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <button 
+                                    onClick={openCreate}
+                                    className="w-full py-4 bg-gradient-to-br from-primary-container to-secondary-container text-white font-bold rounded-xl shadow-xl shadow-primary-container/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Plus className="w-5 h-5" /> İçerik Ekle
+                                </button>
                             </div>
-                            <div
-                                role="radiogroup"
-                                aria-label="Görünüm modu"
-                                className="flex bg-white/50 backdrop-blur-sm border border-slate-200 rounded-xl p-1 gap-1"
-                            >
-                                <button
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={viewMode === 'grid'}
+                        </div>
+                    </aside>
+
+                    {/* Main Content */}
+                    <section className="flex-1 space-y-8">
+                        {/* Header & View Switcher */}
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div>
+                                <h1 className="font-headline-xl text-headline-xl text-white tracking-tight">Etkinlikleri Keşfet</h1>
+                                <p className="text-body-lg text-slate-400">{filteredActivities.length} interaktif içerik bulundu</p>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 glass-card p-1 rounded-xl">
+                                <button 
                                     onClick={() => setViewMode('grid')}
                                     className={cn(
-                                        'p-2 rounded-lg transition-all',
-                                        viewMode === 'grid'
-                                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
-                                            : 'text-slate-400 hover:bg-slate-100'
+                                        "p-2 rounded-lg transition-all",
+                                        viewMode === 'grid' ? "bg-primary-container text-white" : "text-slate-400 hover:text-white"
                                     )}
-                                    aria-label="Izgara görünümü"
-                                    title="Izgara Görünümü"
                                 >
-                                    <LayoutGrid className="w-4 h-4" />
+                                    <LayoutGrid className="w-5 h-5" />
                                 </button>
-                                <button
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={viewMode === 'list'}
+                                <button 
                                     onClick={() => setViewMode('list')}
                                     className={cn(
-                                        'p-2 rounded-lg transition-all',
-                                        viewMode === 'list'
-                                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
-                                            : 'text-slate-400 hover:bg-slate-100'
+                                        "p-2 rounded-lg transition-all",
+                                        viewMode === 'list' ? "bg-primary-container text-white" : "text-slate-400 hover:text-white"
                                     )}
-                                    aria-label="Liste görünümü"
-                                    title="Liste Görünümü"
                                 >
-                                    <LayoutList className="w-4 h-4" />
+                                    <LayoutList className="w-5 h-5" />
                                 </button>
                             </div>
                         </div>
 
-                        {allTags.length > 0 && (
-                            <div
-                                role="group"
-                                aria-label="Etiket filtreleri"
-                                className="flex flex-wrap gap-2 py-1"
-                            >
-                                <button
-                                    type="button"
-                                    onClick={() => setSelectedTag(null)}
-                                    aria-pressed={selectedTag === null}
-                                    className={cn(
-                                        'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border',
-                                        selectedTag === null
-                                            ? 'bg-indigo-600 text-white border-indigo-500 shadow-md'
-                                            : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
-                                    )}
-                                >
-                                    <Tags className="w-3 h-3" aria-hidden="true" /> Tümü
-                                </button>
-                                {allTags.map((tag) => (
-                                    <button
-                                        key={tag}
-                                        type="button"
-                                        onClick={() =>
-                                            setSelectedTag(selectedTag === tag ? null : tag)
-                                        }
-                                        aria-pressed={selectedTag === tag}
-                                        className={cn(
-                                            'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border',
-                                            selectedTag === tag
-                                                ? 'bg-emerald-600 text-white border-emerald-500 shadow-md'
-                                                : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-600'
-                                        )}
-                                    >
-                                        <Tag className="w-3 h-3" aria-hidden="true" /> {tag}
-                                    </button>
+                        {/* Grid */}
+                        {isLoading ? (
+                            <div className="py-20 flex flex-col items-center justify-center gap-3">
+                                <div className="w-10 h-10 border-4 border-primary-container border-t-transparent rounded-full animate-spin" />
+                                <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Yükleniyor…</p>
+                            </div>
+                        ) : filteredActivities.length === 0 ? (
+                            <div className="py-20 glass-card rounded-3xl flex flex-col items-center justify-center text-center gap-4">
+                                <div className="w-16 h-16 rounded-full bg-white/5 text-slate-400 flex items-center justify-center">
+                                    <Blocks className="w-8 h-8" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-white">Sonuç bulunamadı</h3>
+                                    <p className="text-slate-400 max-w-sm mt-1">Arama veya filtreleri temizleyip tekrar deneyin.</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className={cn(
+                                "grid gap-8",
+                                viewMode === 'grid' ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"
+                            )}>
+                                {filteredActivities.map((act) => (
+                                    <ActivityCard 
+                                        key={act.id}
+                                        act={act}
+                                        onOpenPreview={setPreviewId}
+                                        onEdit={openEdit}
+                                        onRequestDelete={handleRequestDelete}
+                                        onShowResults={setShowResultsId}
+                                        onCopyLink={handleCopyLink}
+                                        onCopyHtml={handleCopyHtml}
+                                    />
                                 ))}
                             </div>
                         )}
-                    </div>
-
-                    {isLoading ? (
-                        <div className="py-20 flex flex-col items-center justify-center gap-3">
-                            <div
-                                className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"
-                                role="status"
-                                aria-label="Yükleniyor"
-                            />
-                            <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">
-                                Yükleniyor…
-                            </p>
-                        </div>
-                    ) : filteredActivities.length === 0 ? (
-                        <div className="py-20 flex flex-col items-center justify-center text-center gap-3">
-                            <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
-                                <Blocks className="w-7 h-7" aria-hidden="true" />
-                            </div>
-                            <h3 className="text-base font-bold text-slate-700">
-                                Sonuç bulunamadı
-                            </h3>
-                            <p className="text-sm text-slate-500 max-w-sm">
-                                Arama veya etiket filtresini temizleyip yeniden deneyin.
-                            </p>
-                        </div>
-                    ) : (
-                        <div
-                            className={cn(
-                                'grid gap-6',
-                                viewMode === 'grid'
-                                    ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-                                    : 'grid-cols-1'
-                            )}
-                        >
-                            {filteredActivities.map((act) =>
-                                viewMode === 'grid' ? (
-                                    <ActivityCard
-                                        key={act.id}
-                                        act={act}
-                                        onOpenPreview={setPreviewId}
-                                        onEdit={openEdit}
-                                        onRequestDelete={handleRequestDelete}
-                                        onShowResults={setShowResultsId}
-                                        onCopyLink={handleCopyLink}
-                                        onCopyHtml={handleCopyHtml}
-                                    />
-                                ) : (
-                                    <ActivityListItem
-                                        key={act.id}
-                                        act={act}
-                                        onOpenPreview={setPreviewId}
-                                        onEdit={openEdit}
-                                        onRequestDelete={handleRequestDelete}
-                                        onShowResults={setShowResultsId}
-                                        onCopyLink={handleCopyLink}
-                                        onCopyHtml={handleCopyHtml}
-                                    />
-                                )
-                            )}
-                        </div>
-                    )}
+                    </section>
                 </div>
-
-                <ResultsModal
-                    isOpen={!!showResultsId}
-                    onClose={() => setShowResultsId(null)}
-                    activityId={showResultsId || ''}
-                />
             </main>
 
-            <footer className="fixed bottom-0 left-0 right-0 z-[50] py-5 bg-white/60 backdrop-blur-xl border-t border-slate-200/50 flex justify-center text-center">
-                <div className="flex items-center gap-6 text-[12px] font-bold text-slate-400">
-                    <span className="flex items-center gap-2">
-                        <span
-                            className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"
-                            aria-hidden="true"
-                        />{' '}
-                        Sistem Aktif
-                    </span>
-                    <span
-                        className="w-1.5 h-1.5 rounded-full bg-slate-200"
-                        aria-hidden="true"
-                    />
-                    <span>© 2024 Ahmet DUYAR</span>
-                    <span
-                        className="w-1.5 h-1.5 rounded-full bg-slate-200"
-                        aria-hidden="true"
-                    />
-                    <span className="text-indigo-600/60 uppercase tracking-widest text-[10px]">Premium Eğitim Deneyimi</span>
+            {/* Footer */}
+            <footer className="bg-slate-950 full-width py-12 px-8 border-t border-white/5 mt-20 text-center md:text-left">
+                <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
+                    <div className="space-y-4">
+                        <div className="text-2xl font-black text-white font-headline-xl italic tracking-tighter">Ahmet DUYAR</div>
+                        <p className="font-body-md text-sm text-slate-500 leading-relaxed max-w-xs">Eğitimi interaktif ve eğlenceli hale getiren yeni nesil simülasyon platformu.</p>
+                    </div>
+                    <div>
+                        <h4 className="text-white font-bold mb-6 font-headline-md text-lg">Hızlı Erişim</h4>
+                        <ul className="space-y-3">
+                            <li><a className="text-sm text-slate-500 hover:text-primary transition-all" href="#">Keşfet</a></li>
+                            <li><a className="text-sm text-slate-500 hover:text-primary transition-all" href="#">Kategoriler</a></li>
+                            <li><a className="text-sm text-slate-500 hover:text-primary transition-all" href="#">Ders Notları</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 className="text-white font-bold mb-6 font-headline-md text-lg">Destek</h4>
+                        <ul className="space-y-3">
+                            <li><a className="text-sm text-slate-500 hover:text-primary transition-all" href="#">Yardım Merkezi</a></li>
+                            <li><a className="text-sm text-slate-500 hover:text-primary transition-all" href="#">İletişim</a></li>
+                            <li><a className="text-sm text-slate-500 hover:text-primary transition-all" href="#">Gizlilik Politikası</a></li>
+                        </ul>
+                    </div>
+                    <div className="space-y-4">
+                        <h4 className="text-white font-bold mb-6 font-headline-md text-lg">Bülten</h4>
+                        <p className="text-sm text-slate-500">Yeni etkinliklerden haberdar olun.</p>
+                        <div className="flex gap-2">
+                            <input className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white w-full focus:outline-none focus:ring-1 focus:ring-primary" placeholder="E-posta adresi" type="email"/>
+                            <button className="bg-primary-container text-white px-4 py-2 rounded-lg hover:bg-primary-container/80 transition-all">Abone Ol</button>
+                        </div>
+                    </div>
+                </div>
+                <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-white/5 text-center">
+                    <p className="text-sm text-slate-500">© 2024 Ahmet DUYAR. Tüm hakları saklıdır.</p>
                 </div>
             </footer>
+
+            {/* Mobile Bottom Nav */}
+            <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-slate-950/90 backdrop-blur-2xl border-t border-white/10 rounded-t-3xl md:hidden z-50">
+                <button className="flex flex-col items-center text-primary-container">
+                    <span className="material-symbols-outlined">home</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest mt-1">Ana Sayfa</span>
+                </button>
+                <button className="flex flex-col items-center text-slate-500">
+                    <span className="material-symbols-outlined">search</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest mt-1">Ara</span>
+                </button>
+                <button onClick={openCreate} className="w-12 h-12 bg-primary-container rounded-2xl flex items-center justify-center text-white -mt-12 shadow-xl shadow-primary-container/40 border-4 border-[#0b1326]">
+                    <Plus className="w-6 h-6" />
+                </button>
+                <button className="flex flex-col items-center text-slate-500">
+                    <span className="material-symbols-outlined">favorite</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest mt-1">Favoriler</span>
+                </button>
+                <button className="flex flex-col items-center text-slate-500">
+                    <span className="material-symbols-outlined">account_circle</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest mt-1">Profil</span>
+                </button>
+            </nav>
+
+            <ResultsModal
+                isOpen={!!showResultsId}
+                onClose={() => setShowResultsId(null)}
+                activityId={showResultsId || ''}
+            />
+
             <Modal
                 isOpen={isActivityOpen}
                 onClose={() => {

@@ -27,7 +27,7 @@ export function IconButton({
             title={title}
             aria-label={ariaLabel || title}
             className={cn(
-                'p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors group focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500',
+                'p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all active:scale-95 group focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/50',
                 className
             )}
         >

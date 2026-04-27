@@ -3,61 +3,41 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 0 0% 98%;
-    --foreground: 0 0% 9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
-
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45%;
-
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 9%;
-
-    --radius: 1rem;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border selection:bg-neutral-900 selection:text-white;
-  }
   body, html {
-    @apply bg-[#FAFAFA] text-neutral-900 antialiased font-sans;
+    @apply bg-background text-on-background font-body-md antialiased;
     min-height: 100vh;
   }
 }
 
-/* Modern Minimalist Card Utilities */
-.glass-effect {
-  @apply bg-white/70 backdrop-blur-2xl border border-white/20 shadow-[0_8px_32px_-4px_rgba(0,0,0,0.05)];
+.glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.portal-card {
-  @apply bg-white border border-neutral-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_20px_40px_rgba(99,102,241,0.08)] hover:border-indigo-200/50 hover:-translate-y-1 transition-all duration-500 rounded-3xl;
+.neon-glow-hover:hover {
+  box-shadow: 0 0 20px rgba(124, 58, 237, 0.4);
+}
+
+.live-indicator {
+  width: 8px;
+  height: 8px;
+  background-color: #ff007f;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 10px #ff007f;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.7; }
+  70% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.7; }
 }
 
 .hero-gradient {
-  background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.1), transparent),
-              radial-gradient(circle at bottom left, rgba(168, 85, 247, 0.1), transparent);
+  background: radial-gradient(circle at top right, rgba(124, 58, 237, 0.15), transparent),
+              radial-gradient(circle at bottom left, rgba(0, 219, 231, 0.1), transparent);
 }
 
 @keyframes float {
@@ -79,7 +59,7 @@
   animation: pulse-soft 8s ease-in-out infinite;
 }
 
-/* Custom Minimalist Scrollbar */
+/* Custom Scrollbar for Dark Theme */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -88,7 +68,14 @@
   @apply bg-transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-neutral-300/50 rounded-full hover:bg-neutral-400/50 transition-colors;
+  @apply bg-white/10 rounded-full hover:bg-white/20 transition-colors;
 }
 
-
+/* Material Symbols sizing */
+.material-symbols-outlined {
+  font-variation-settings:
+  'FILL' 0,
+  'wght' 400,
+  'GRAD' 0,
+  'opsz' 24
+}

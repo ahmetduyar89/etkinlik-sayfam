@@ -8,8 +8,8 @@ import {
     Share2,
     Trash2,
 } from 'lucide-react';
-import { PortalCard } from '../common/PortalCard';
 import { IconButton } from '../common/IconButton';
+import { cn } from '../../utils/cn';
 import type { Activity } from '../../types';
 
 interface ActivityListItemProps {
@@ -32,111 +32,73 @@ function ActivityListItemBase({
     onCopyHtml,
 }: ActivityListItemProps) {
     return (
-        <PortalCard className="p-4 flex flex-col sm:flex-row items-center gap-4 bg-white border-2 border-indigo-50 hover:border-indigo-300 shadow-md !rounded-2xl transition-all group">
-            <button
-                type="button"
-                className="w-full sm:w-24 h-24 shrink-0 bg-indigo-50/50 rounded-xl border-2 border-indigo-100 flex items-center justify-center cursor-pointer overflow-hidden relative focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-                onClick={() => onOpenPreview(act.id)}
-                aria-label={`${act.title} önizlemesini aç`}
-            >
+        <div 
+            className="group glass-card p-4 rounded-2xl flex flex-col sm:flex-row items-center gap-6 hover:border-primary/30 transition-all cursor-pointer neon-glow-hover"
+            onClick={() => onOpenPreview(act.id)}
+        >
+            <div className="w-full sm:w-28 h-24 shrink-0 rounded-xl bg-surface-container-highest flex items-center justify-center overflow-hidden relative">
                 {act.image_url ? (
-                    <img
-                        src={act.image_url}
-                        alt={act.title}
-                        loading="lazy"
-                        className="w-full h-full object-cover"
-                    />
+                    <img src={act.image_url} alt={act.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                 ) : (
-                    <LayoutDashboard className="w-8 h-8 text-indigo-200" aria-hidden="true" />
+                    <LayoutDashboard className="w-8 h-8 text-slate-600" />
                 )}
-                <div className="absolute inset-0 bg-indigo-900/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Eye className="w-4 h-4 text-white" aria-hidden="true" />
+                <div className="absolute inset-0 bg-primary-container/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Eye className="w-5 h-5 text-white" />
                 </div>
-            </button>
+            </div>
 
-            <button
-                type="button"
-                className="flex-1 min-w-0 space-y-1 cursor-pointer text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-lg"
-                onClick={() => onOpenPreview(act.id)}
-            >
-                <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-lg font-bold text-slate-800 truncate">{act.title}</h3>
+            <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex flex-wrap items-center gap-3">
+                    <h3 className="text-lg font-bold text-white group-hover:text-primary transition-colors">{act.title}</h3>
                     {act.is_test && (
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded-md uppercase tracking-widest border border-amber-200">
+                        <span className="px-2 py-0.5 bg-primary-container/20 text-primary text-[9px] font-black rounded-md uppercase tracking-widest border border-primary/20 flex items-center gap-1">
+                            <div className="live-indicator w-1 h-1"></div>
                             TEST
                         </span>
                     )}
-                    <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[9px] font-bold rounded-md uppercase tracking-wider">
+                    <span className="px-2 py-0.5 bg-white/5 text-slate-400 text-[9px] font-bold rounded-md uppercase tracking-wider border border-white/5">
                         {act.category || 'Genel'}
                     </span>
                 </div>
-                <p className="text-sm text-slate-500 line-clamp-1 font-medium">
+                <p className="text-sm text-slate-400 line-clamp-1">
                     {act.description || 'Açıklama girilmedi.'}
                 </p>
-                <div className="flex items-center gap-4 pt-1">
-                    <span
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onCopyLink(act);
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onCopyLink(act);
-                            }
-                        }}
-                        className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 uppercase tracking-tight hover:text-indigo-800 transition-colors"
+                <div className="flex items-center gap-4 pt-1" onClick={(e) => e.stopPropagation()}>
+                    <button 
+                        onClick={() => onCopyLink(act)}
+                        className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest hover:text-white transition-colors"
                     >
-                        <Share2 className="w-3.5 h-3.5" aria-hidden="true" /> Linki Kopyala
-                    </span>
+                        <Share2 className="w-3.5 h-3.5" /> Linki Kopyala
+                    </button>
                     {act.is_test && (
-                        <span
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onShowResults(act.id);
-                            }}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    onShowResults(act.id);
-                                }
-                            }}
-                            className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 uppercase tracking-tight hover:text-emerald-800 transition-colors"
+                        <button 
+                            onClick={() => onShowResults(act.id)}
+                            className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-500 uppercase tracking-widest hover:text-emerald-400 transition-colors"
                         >
-                            <BarChart3 className="w-3.5 h-3.5" aria-hidden="true" /> Sonuçlar
-                        </span>
+                            <BarChart3 className="w-3.5 h-3.5" /> Sonuçlar
+                        </button>
                     )}
                 </div>
-            </button>
+            </div>
 
-            <div className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="flex items-center gap-2 p-1 bg-white/5 rounded-xl border border-white/5" onClick={(e) => e.stopPropagation()}>
                 <IconButton
                     icon={Copy}
                     onClick={() => onCopyHtml(act)}
-                    aria-label="HTML kodunu kopyala"
-                    title="HTML Kodunu Kopyala"
+                    className="bg-transparent hover:bg-white/5 text-slate-500 hover:text-white"
                 />
                 <IconButton
                     icon={Edit3}
                     onClick={() => onEdit(act)}
-                    aria-label="Düzenle"
-                    title="Düzenle"
+                    className="bg-transparent hover:bg-white/5 text-slate-500 hover:text-white"
                 />
                 <IconButton
                     icon={Trash2}
                     onClick={() => onRequestDelete(act)}
-                    className="hover:bg-red-50 hover:text-red-500 text-neutral-400"
-                    aria-label="Sil"
-                    title="Sil"
+                    className="bg-transparent hover:bg-red-500/10 text-slate-500 hover:text-red-400"
                 />
             </div>
-        </PortalCard>
+        </div>
     );
 }
 
