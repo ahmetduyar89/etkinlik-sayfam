@@ -77,6 +77,37 @@ export function StudentPortal({ act }: StudentPortalProps) {
         }
     }, [timeLeft, isFinished, act.is_test, handleSubmit]);
 
+    const [formattedHtml, setFormattedHtml] = useState<string>('');
+    const [isLoadingContent, setIsLoadingContent] = useState(true);
+
+    useEffect(() => {
+        const loadContent = async () => {
+            setIsLoadingContent(true);
+            try {
+                let data = {
+                    html_code: act.html_code,
+                    js_code: act.js_code,
+                    css_code: act.css_code,
+                    external_libs: act.external_libs
+                };
+
+                if (act.storage_url) {
+                    const res = await fetch(act.storage_url);
+                    const storageData = await res.json();
+                    data = { ...data, ...storageData };
+                }
+                
+                setFormattedHtml(getFormattedHtml(data));
+            } catch (err) {
+                console.error('Failed to load activity content:', err);
+                toast.error('İçerik yüklenemedi.');
+            } finally {
+                setIsLoadingContent(false);
+            }
+        };
+        loadContent();
+    }, [act, toast]);
+
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
             const data = event.data as { type?: string; height?: number; data?: unknown; error?: string };
@@ -99,7 +130,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
         };
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, [submissionId, submissionsHandler]);
+    }, [submissionId, submissionsHandler, toast]);
 
     const handleToolbarCommand = (type: string) => {
         if (type === 'UNDO_DRAWING') canvasRef.current?.undo();
@@ -291,20 +322,27 @@ export function StudentPortal({ act }: StudentPortalProps) {
                         height: iframeHeight,
                     }}
                 >
-                    <iframe
-                        key={act.id}
-                        ref={iframeRef}
-                        srcDoc={getFormattedHtml(act)}
-                        title={act.title}
-                        sandbox="allow-scripts"
-                        className={cn(
-                            'w-full h-full border-0',
-                            isDrawingMode && drawConfig.tool !== 'pan'
-                                ? 'pointer-events-none'
-                                : 'pointer-events-auto'
-                        )}
-                        scrolling="auto"
-                    />
+                    {isLoadingContent ? (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 gap-3">
+                            <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">İçerik yükleniyor...</p>
+                        </div>
+                    ) : (
+                        <iframe
+                            key={act.id}
+                            ref={iframeRef}
+                            srcDoc={formattedHtml}
+                            title={act.title}
+                            sandbox="allow-scripts"
+                            className={cn(
+                                'w-full h-full border-0',
+                                isDrawingMode && drawConfig.tool !== 'pan'
+                                    ? 'pointer-events-none'
+                                    : 'pointer-events-auto'
+                            )}
+                            scrolling="auto"
+                        />
+                    )}
                     <DrawingCanvas
                         ref={canvasRef}
                         config={drawConfig}

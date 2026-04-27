@@ -98,6 +98,37 @@ export function ActivityPreviewModal({
     const prompt = usePrompt();
     const toast = useToast();
 
+    const [formattedHtml, setFormattedHtml] = React.useState<string>('');
+    const [isLoadingContent, setIsLoadingContent] = React.useState(true);
+
+    React.useEffect(() => {
+        const loadContent = async () => {
+            setIsLoadingContent(true);
+            try {
+                let data = {
+                    html_code: activity.html_code,
+                    js_code: activity.js_code,
+                    css_code: activity.css_code,
+                    external_libs: activity.external_libs
+                };
+
+                if (activity.storage_url) {
+                    const res = await fetch(activity.storage_url);
+                    const storageData = await res.json();
+                    data = { ...data, ...storageData };
+                }
+                
+                setFormattedHtml(getFormattedHtml(data));
+            } catch (err) {
+                console.error('Failed to load activity content:', err);
+                toast.error('İçerik yüklenemedi.');
+            } finally {
+                setIsLoadingContent(false);
+            }
+        };
+        loadContent();
+    }, [activity, toast]);
+
     React.useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
             const data = event.data as { type?: string; height?: number; error?: string };
@@ -369,21 +400,28 @@ export function ActivityPreviewModal({
                                 height: iframeHeight,
                             }}
                         >
-                            <iframe
-                                key={activity.id}
-                                srcDoc={getFormattedHtml(activity)}
-                                title={activity.title}
-                                sandbox="allow-scripts"
-                                className={cn(
-                                    'w-full h-full border-0',
-                                    (isPreviewDrawingMode &&
-                                        previewDrawConfig.tool !== 'pan') ||
-                                        isTextBoxMode
-                                        ? 'pointer-events-none'
-                                        : 'pointer-events-auto'
-                                )}
-                                scrolling="auto"
-                            />
+                            {isLoadingContent ? (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 gap-3">
+                                    <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">İçerik yükleniyor...</p>
+                                </div>
+                            ) : (
+                                <iframe
+                                    key={activity.id}
+                                    srcDoc={formattedHtml}
+                                    title={activity.title}
+                                    sandbox="allow-scripts"
+                                    className={cn(
+                                        'w-full h-full border-0',
+                                        (isPreviewDrawingMode &&
+                                            previewDrawConfig.tool !== 'pan') ||
+                                            isTextBoxMode
+                                            ? 'pointer-events-none'
+                                            : 'pointer-events-auto'
+                                    )}
+                                    scrolling="auto"
+                                />
+                            )}
                             <DrawingCanvas
                                 ref={canvasRef}
                                 config={previewDrawConfig}

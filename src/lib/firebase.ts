@@ -10,8 +10,8 @@ import {
     query,
     orderBy,
     Timestamp,
-    DocumentReference,
 } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -26,6 +26,7 @@ const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {
     ignoreUndefinedProperties: true,
 });
+export const storage = getStorage(app);
 
 export interface FirestoreHandler<T extends { id: string }> {
     sync: (onUpdate: (data: T[]) => void) => () => void;

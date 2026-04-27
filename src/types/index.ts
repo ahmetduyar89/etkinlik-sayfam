@@ -12,6 +12,7 @@ export interface Activity {
     js_code?: string;
     css_code?: string;
     external_libs?: string;
+    storage_url?: string;
     created_at?: string;
 }
 
