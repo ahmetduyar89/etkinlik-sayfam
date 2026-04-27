@@ -193,50 +193,62 @@ export default function App() {
     }
 
     return (
-        <div className="min-h-screen pt-28 pb-16 px-4 bg-slate-50 relative">
+        <div className="min-h-screen pt-28 pb-16 px-4 bg-slate-50 relative overflow-hidden hero-gradient">
+            {/* Dynamic Background Elements */}
             <div
                 aria-hidden="true"
-                className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-br from-indigo-100 via-transparent to-pink-50 opacity-60 pointer-events-none"
+                className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-200/30 rounded-full blur-[120px] animate-pulse-soft"
+            />
+            <div
+                aria-hidden="true"
+                className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-purple-200/30 rounded-full blur-[120px] animate-pulse-soft"
             />
 
             <Navbar />
 
             <main className="container mx-auto max-w-6xl relative z-10">
-                <div className="space-y-10">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                        <div className="space-y-3">
-                            <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-800">
-                                İnteraktif Merkez
-                            </h2>
-                            <p className="text-[15px] text-slate-500 max-w-md font-medium leading-relaxed">
-                                Oyunlar, testler ve HTML tabanlı eğitici materyallerle dolu
-                                dijital havuz.
-                            </p>
+                <div className="space-y-12">
+                    <div className="flex flex-col lg:flex-row justify-between items-center lg:items-end gap-8">
+                        <div className="space-y-6 text-center lg:text-left">
+                            <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-100 rounded-full animate-float">
+                                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                                <span className="text-[11px] font-black text-indigo-600 uppercase tracking-widest">Profesyonel Eğitim Portalı</span>
+                            </div>
+                            <div className="space-y-4">
+                                <h2 className="text-5xl lg:text-7xl font-black tracking-tight text-slate-900 leading-[1.1]">
+                                    Fen Bilimleri <br />
+                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+                                        İnteraktif Merkez
+                                    </span>
+                                </h2>
+                                <p className="text-lg text-slate-500 max-w-xl font-medium leading-relaxed mx-auto lg:mx-0">
+                                    Ahmet DUYAR ile öğrenmeyi eğlenceli ve kalıcı hale getiren oyunlaştırılmış içerikler, 
+                                    interaktif simülasyonlar ve zenginleştirilmiş eğitim materyalleri.
+                                </p>
+                            </div>
                         </div>
-                        <div className="flex w-full md:w-auto gap-4 items-center">
-                            <div className="relative flex-1 md:w-72">
+                        <div className="flex flex-col sm:flex-row w-full lg:w-auto gap-4 items-center">
+                            <div className="relative w-full sm:w-72 group">
                                 <Search
-                                    className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                                    className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors"
                                     aria-hidden="true"
                                 />
-                                <label htmlFor="activity-search" className="sr-only">
-                                    İçerik ara
-                                </label>
                                 <input
                                     id="activity-search"
                                     type="search"
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="İçerik ara..."
-                                    className="w-full bg-white border-2 border-indigo-100 rounded-2xl pl-12 pr-4 py-3.5 text-[14px] text-slate-800 font-medium focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400 shadow-sm"
+                                    placeholder="Simülasyon veya konu ara..."
+                                    className="w-full bg-white/80 backdrop-blur-md border-2 border-indigo-100 rounded-2xl pl-12 pr-4 py-4 text-[14px] text-slate-800 font-semibold focus:ring-8 focus:ring-indigo-500/5 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400 shadow-xl shadow-indigo-100/20"
                                 />
                             </div>
                             <button
                                 type="button"
                                 onClick={openCreate}
-                                className="px-6 py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[14px] font-bold rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-200 flex items-center gap-2 whitespace-nowrap focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-500/30"
+                                className="w-full sm:w-auto px-8 py-4 bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 text-white text-[15px] font-black rounded-2xl hover:shadow-2xl hover:shadow-indigo-300 hover:-translate-y-1 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xl shadow-indigo-200 group"
                             >
-                                <Plus className="w-5 h-5" aria-hidden="true" /> İçerik Ekle
+                                <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" aria-hidden="true" /> 
+                                <span className="tracking-wide">Yeni İçerik Oluştur</span>
                             </button>
                         </div>
                     </div>
@@ -396,23 +408,27 @@ export default function App() {
                 />
             </main>
 
-            <footer className="fixed bottom-0 left-0 right-0 z-[50] py-4 bg-[#FAFAFA]/80 backdrop-blur-md border-t border-neutral-200/50 flex justify-center text-center">
-                <div className="flex items-center gap-4 text-[11px] font-medium text-neutral-400">
-                    <span className="flex items-center gap-1.5">
+            <footer className="fixed bottom-0 left-0 right-0 z-[50] py-5 bg-white/60 backdrop-blur-xl border-t border-slate-200/50 flex justify-center text-center">
+                <div className="flex items-center gap-6 text-[12px] font-bold text-slate-400">
+                    <span className="flex items-center gap-2">
                         <span
-                            className="w-1.5 h-1.5 rounded-full bg-emerald-500"
+                            className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"
                             aria-hidden="true"
                         />{' '}
                         Sistem Aktif
                     </span>
                     <span
-                        className="w-1 h-1 rounded-full bg-neutral-300"
+                        className="w-1.5 h-1.5 rounded-full bg-slate-200"
                         aria-hidden="true"
                     />
-                    <span>V3 Minimalist Tasarım</span>
+                    <span>© 2024 Ahmet DUYAR</span>
+                    <span
+                        className="w-1.5 h-1.5 rounded-full bg-slate-200"
+                        aria-hidden="true"
+                    />
+                    <span className="text-indigo-600/60 uppercase tracking-widest text-[10px]">Premium Eğitim Deneyimi</span>
                 </div>
             </footer>
-
             <Modal
                 isOpen={isActivityOpen}
                 onClose={() => {

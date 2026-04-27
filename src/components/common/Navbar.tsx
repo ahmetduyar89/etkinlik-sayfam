@@ -1,4 +1,4 @@
-import { Command, Settings, User } from 'lucide-react';
+import { Settings, User } from 'lucide-react';
 import { IconButton } from './IconButton';
 
 export function Navbar() {
@@ -9,15 +9,15 @@ export function Navbar() {
                 className="container mx-auto max-w-6xl flex justify-between items-center pointer-events-auto glass-effect rounded-2xl px-6 py-3"
             >
                 <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
-                        <Command className="w-5 h-5 text-white" aria-hidden="true" />
+                    <div className="w-11 h-11 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100 overflow-hidden border border-slate-100 p-1">
+                        <img src="/src/assets/logo.png" alt="Logo" className="w-full h-full object-contain" />
                     </div>
                     <div>
-                        <h1 className="text-sm font-bold tracking-wider text-slate-800 uppercase">
-                            A. Duyar
+                        <h1 className="text-[15px] font-black tracking-tight text-slate-800 leading-none">
+                            Ahmet DUYAR
                         </h1>
-                        <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase">
-                            İnteraktif Merkez
+                        <p className="text-[10px] text-indigo-600 font-bold tracking-widest uppercase mt-1">
+                            Eğitim & Fen Bilimleri
                         </p>
                     </div>
                 </div>
