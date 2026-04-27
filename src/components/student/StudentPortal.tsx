@@ -92,7 +92,9 @@ export function StudentPortal({ act }: StudentPortalProps) {
                 };
 
                 if (act.storage_url) {
-                    const res = await fetch(act.storage_url);
+                    console.log('Fetching from storage:', act.storage_url);
+                    const res = await fetch(act.storage_url, { cache: 'no-cache' });
+                    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                     const storageData = await res.json();
                     data = { ...data, ...storageData };
                 }
@@ -100,7 +102,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
                 setFormattedHtml(getFormattedHtml(data));
             } catch (err) {
                 console.error('Failed to load activity content:', err);
-                toast.error('İçerik yüklenemedi.');
+                toast.error(`İçerik yüklenemedi: ${err instanceof Error ? err.message : 'Bilinmeyen hata'}`);
             } finally {
                 setIsLoadingContent(false);
             }
