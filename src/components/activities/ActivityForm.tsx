@@ -89,7 +89,7 @@ export function ActivityForm({
                     const jsContent = Array.from(doc.querySelectorAll('script:not([src])'))
                         .filter(s => {
                             const t = (s as HTMLScriptElement).type;
-                            return !t || t.includes('javascript');
+                            return !t || t.includes('javascript') || t.includes('babel');
                         })
                         .map(s => s.innerHTML)
                         .join('\n')

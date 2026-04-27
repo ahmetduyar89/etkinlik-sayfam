@@ -86,6 +86,10 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
         })
         .join('\n');
 
+    const isBabel = (external_libs || '').toLowerCase().includes('babel');
+    const scriptType = isBabel ? 'text/babel' : 'text/javascript';
+    const babelData = isBabel ? 'data-presets="react"' : '';
+
     const result = `<!DOCTYPE html>
 <html lang="tr"${htmlAttrs}>
 <head>
@@ -119,6 +123,7 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
         body.whiteboard-active > *:not(#drawing-canvas):not(script):not(style) {
             opacity: 0 !important;
             pointer-events: none !important;
+            display: none !important;
         }
     </style>
     <script>
@@ -164,13 +169,15 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
         ${cleanHtml}
     </div>
     ${bodyScripts}
-    <script>
+    <script type="${scriptType}" ${babelData}>
+        ${isBabel ? js_code : `
         try {
             ${js_code || ''}
         } catch (e) {
             console.error('Simülasyon Hatası:', e);
             window.parent.postMessage({ type: 'JS_ERROR', error: String(e) }, '*');
-        }
+        }`}
+    </script>
 
         (function() {
             let lastHeight = 0;
