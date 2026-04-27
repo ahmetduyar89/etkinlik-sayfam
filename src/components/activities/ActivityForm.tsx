@@ -32,28 +32,61 @@ export function ActivityForm({
     const handleHtmlFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        // Dosya boyutu kontrolü (1MB limit)
+        if (file.size > 1.5 * 1024 * 1024) {
+            setUploadError('Dosya boyutu çok büyük (Maksimum 1.5MB).');
+            return;
+        }
+
         setUploadError(null);
         const reader = new FileReader();
+
         reader.onload = (ev) => {
             try {
                 const text = ev.target?.result as string;
+                if (!text || text.trim().length === 0) {
+                    throw new Error('Dosya içeriği boş.');
+                }
+
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(text, 'text/html');
-                const clone = doc.body.cloneNode(true) as HTMLElement;
-                clone.querySelectorAll('script, style').forEach((el) => el.remove());
-                const bodyHtml = clone.innerHTML.trim();
+
+                // Parser hatası kontrolü
+                const parserError = doc.querySelector('parsererror');
+                if (parserError) {
+                    throw new Error('HTML dosyası geçersiz veya bozuk.');
+                }
+
+                // Body içeriğini ayıkla (Script ve Style etiketleri hariç)
+                const body = doc.body;
+                if (!body) throw new Error('HTML gövdesi (body) bulunamadı.');
+
+                const bodyClone = body.cloneNode(true) as HTMLElement;
+                const scripts = bodyClone.querySelectorAll('script');
+                const styles = bodyClone.querySelectorAll('style');
+                scripts.forEach((s) => s.remove());
+                styles.forEach((s) => s.remove());
+
+                const bodyHtml = bodyClone.innerHTML.trim();
+
+                // CSS İçeriği
                 const cssContent = Array.from(doc.querySelectorAll('style'))
                     .map((s) => s.innerHTML)
                     .join('\n')
                     .trim();
+
+                // JS İçeriği
                 const jsContent = Array.from(doc.querySelectorAll('script:not([src])'))
                     .filter((s) => {
                         const t = (s as HTMLScriptElement).type;
-                        return !t || t === 'text/javascript' || t === 'application/javascript';
+                        return !t || t.includes('javascript');
                     })
                     .map((s) => s.innerHTML)
                     .join('\n')
                     .trim();
+
+                // Dış kütüphaneler
                 const extScripts = Array.from(doc.querySelectorAll('script[src]')).map(
                     (s) => (s as HTMLScriptElement).getAttribute('src') || ''
                 );
@@ -63,16 +96,26 @@ export function ActivityForm({
                     const href = (l as HTMLLinkElement).getAttribute('href') || '';
                     return href ? `css:${href}` : '';
                 });
+
                 const extLibs = [...extScripts, ...extCss].filter(Boolean).join('\n');
+
+                // Form alanlarını güncelle
                 if (htmlCodeRef.current) htmlCodeRef.current.value = bodyHtml;
                 if (jsCodeRef.current) jsCodeRef.current.value = jsContent;
                 if (cssCodeRef.current) cssCodeRef.current.value = cssContent;
                 if (externalLibsRef.current) externalLibsRef.current.value = extLibs;
+
+                // Başarı durumunda scroll'u aşağı kaydır ki dolan alanlar görünsün
+                setTimeout(() => {
+                    htmlCodeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+
             } catch (err) {
                 console.error('HTML parse error:', err);
-                setUploadError('HTML dosyası okunamadı.');
+                setUploadError(err instanceof Error ? err.message : 'HTML dosyası işlenemedi.');
             }
         };
+
         reader.onerror = () => setUploadError('Dosya okunurken bir hata oluştu.');
         reader.readAsText(file);
         e.target.value = '';

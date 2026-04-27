@@ -4,18 +4,27 @@ type FormatSource = Partial<
     Pick<Activity, 'html_code' | 'css_code' | 'js_code' | 'external_libs'>
 >;
 
+const htmlCache = new Map<string, string>();
+
 export const getFormattedHtml = (act?: FormatSource | null): string => {
     if (!act) return '';
-    const { html_code, css_code, js_code, external_libs } = act;
+    const { html_code = '', css_code = '', js_code = '', external_libs = '' } = act;
 
-    let cleanHtml = html_code || '';
+    // Cache anahtarı oluştur (kod içeriklerinin birleşimi)
+    const cacheKey = `${html_code}|${css_code}|${js_code}|${external_libs}`;
+    if (htmlCache.has(cacheKey)) {
+        return htmlCache.get(cacheKey)!;
+    }
+
+    let cleanHtml = html_code;
     let headContent = '';
     let bodyScripts = '';
     let bodyAttrs = '';
     let htmlAttrs = '';
 
     // Doküman yapısını analiz et ve ayıkla
-    if (cleanHtml.includes('<body') || cleanHtml.includes('<html') || cleanHtml.includes('<head')) {
+    const hasStructure = /<html|<head|<body|<!DOCTYPE/i.test(cleanHtml);
+    if (hasStructure) {
         try {
             const parser = new DOMParser();
             const doc = parser.parseFromString(cleanHtml, 'text/html');
@@ -77,7 +86,7 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
         })
         .join('\n');
 
-    return `<!DOCTYPE html>
+    const result = `<!DOCTYPE html>
 <html lang="tr"${htmlAttrs}>
 <head>
     <meta charset="utf-8">
@@ -222,4 +231,14 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
     </script>
 </body>
 </html>`;
+
+    htmlCache.set(cacheKey, result);
+
+    // Limit cache size to 50 items to prevent memory leaks
+    if (htmlCache.size > 50) {
+        const firstKey = htmlCache.keys().next().value;
+        if (firstKey !== undefined) htmlCache.delete(firstKey);
+    }
+
+    return result;
 };
