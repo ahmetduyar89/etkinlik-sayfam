@@ -178,7 +178,7 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
             window.parent.postMessage({ type: 'JS_ERROR', error: String(e) }, '*');
         }`}
     </script>
-
+    <script>
         (function() {
             let lastHeight = 0;
             let resizeTimer = null;
