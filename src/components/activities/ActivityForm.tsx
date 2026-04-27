@@ -28,95 +28,111 @@ export function ActivityForm({
     const cssCodeRef = React.useRef<HTMLTextAreaElement>(null);
     const externalLibsRef = React.useRef<HTMLTextAreaElement>(null);
     const [uploadError, setUploadError] = React.useState<string | null>(null);
+    const [isProcessing, setIsProcessing] = React.useState(false);
 
     const handleHtmlFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Dosya boyutu kontrolü (1MB limit)
-        if (file.size > 1.5 * 1024 * 1024) {
-            setUploadError('Dosya boyutu çok büyük (Maksimum 1.5MB).');
+        // Dosya boyutu kontrolü (5MB limit)
+        if (file.size > 5 * 1024 * 1024) {
+            setUploadError('Dosya boyutu çok büyük (Maksimum 5MB).');
             return;
         }
 
         setUploadError(null);
+        setIsProcessing(true);
         const reader = new FileReader();
 
         reader.onload = (ev) => {
-            try {
-                const text = ev.target?.result as string;
-                if (!text || text.trim().length === 0) {
-                    throw new Error('Dosya içeriği boş.');
+            // UI'ın "İşleniyor" durumunu gösterebilmesi için kısa bir gecikme
+            setTimeout(() => {
+                try {
+                    const text = ev.target?.result as string;
+                    if (!text || text.trim().length === 0) {
+                        throw new Error('Dosya içeriği boş.');
+                    }
+
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(text, 'text/html');
+
+                    // Parser hatası kontrolü
+                    const parserError = doc.querySelector('parsererror');
+                    if (parserError) {
+                        throw new Error('HTML dosyası geçersiz veya bozuk.');
+                    }
+
+                    // Body içeriğini ayıkla (Script ve Style etiketleri hariç)
+                    const body = doc.body;
+                    if (!body) throw new Error('HTML gövdesi (body) bulunamadı.');
+
+                    const bodyClone = body.cloneNode(true) as HTMLElement;
+                    const scripts = bodyClone.querySelectorAll('script');
+                    const styles = bodyClone.querySelectorAll('style');
+                    scripts.forEach((s) => s.remove());
+                    styles.forEach((s) => s.remove());
+
+                    const bodyHtml = bodyClone.innerHTML.trim();
+
+                    // CSS İçeriği
+                    const cssContent = Array.from(doc.querySelectorAll('style'))
+                        .map((s) => s.innerHTML)
+                        .join('\n')
+                        .trim();
+
+                    // JS İçeriği
+                    const jsContent = Array.from(doc.querySelectorAll('script:not([src])'))
+                        .filter((s) => {
+                            const t = (s as HTMLScriptElement).type;
+                            return !t || t.includes('javascript');
+                        })
+                        .map((s) => s.innerHTML)
+                        .join('\n')
+                        .trim();
+
+                    // Dış kütüphaneler
+                    const extScripts = Array.from(doc.querySelectorAll('script[src]')).map(
+                        (s) => (s as HTMLScriptElement).getAttribute('src') || ''
+                    );
+                    const extCss = Array.from(
+                        doc.querySelectorAll('link[rel="stylesheet"]')
+                    ).map((l) => {
+                        const href = (l as HTMLLinkElement).getAttribute('href') || '';
+                        return href ? `css:${href}` : '';
+                    });
+
+                    const extLibs = [...extScripts, ...extCss].filter(Boolean).join('\n');
+
+                    // Form alanlarını güncelle
+                    if (htmlCodeRef.current) htmlCodeRef.current.value = bodyHtml;
+                    if (jsCodeRef.current) jsCodeRef.current.value = jsContent;
+                    if (cssCodeRef.current) cssCodeRef.current.value = cssContent;
+                    if (externalLibsRef.current) externalLibsRef.current.value = extLibs;
+
+                    // Firestore limit uyarısı (1MB)
+                    const totalSize = bodyHtml.length + jsContent.length + cssContent.length;
+                    if (totalSize > 0.9 * 1024 * 1024) {
+                        setUploadError('Uyarı: İçerik 1MB sınırına çok yakın. Kaydedilirken hata oluşabilir.');
+                    }
+
+                    // Başarı durumunda scroll'u aşağı kaydır
+                    setTimeout(() => {
+                        htmlCodeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+
+                } catch (err) {
+                    console.error('HTML parse error:', err);
+                    setUploadError(err instanceof Error ? err.message : 'HTML dosyası işlenemedi.');
+                } finally {
+                    setIsProcessing(false);
                 }
-
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(text, 'text/html');
-
-                // Parser hatası kontrolü
-                const parserError = doc.querySelector('parsererror');
-                if (parserError) {
-                    throw new Error('HTML dosyası geçersiz veya bozuk.');
-                }
-
-                // Body içeriğini ayıkla (Script ve Style etiketleri hariç)
-                const body = doc.body;
-                if (!body) throw new Error('HTML gövdesi (body) bulunamadı.');
-
-                const bodyClone = body.cloneNode(true) as HTMLElement;
-                const scripts = bodyClone.querySelectorAll('script');
-                const styles = bodyClone.querySelectorAll('style');
-                scripts.forEach((s) => s.remove());
-                styles.forEach((s) => s.remove());
-
-                const bodyHtml = bodyClone.innerHTML.trim();
-
-                // CSS İçeriği
-                const cssContent = Array.from(doc.querySelectorAll('style'))
-                    .map((s) => s.innerHTML)
-                    .join('\n')
-                    .trim();
-
-                // JS İçeriği
-                const jsContent = Array.from(doc.querySelectorAll('script:not([src])'))
-                    .filter((s) => {
-                        const t = (s as HTMLScriptElement).type;
-                        return !t || t.includes('javascript');
-                    })
-                    .map((s) => s.innerHTML)
-                    .join('\n')
-                    .trim();
-
-                // Dış kütüphaneler
-                const extScripts = Array.from(doc.querySelectorAll('script[src]')).map(
-                    (s) => (s as HTMLScriptElement).getAttribute('src') || ''
-                );
-                const extCss = Array.from(
-                    doc.querySelectorAll('link[rel="stylesheet"]')
-                ).map((l) => {
-                    const href = (l as HTMLLinkElement).getAttribute('href') || '';
-                    return href ? `css:${href}` : '';
-                });
-
-                const extLibs = [...extScripts, ...extCss].filter(Boolean).join('\n');
-
-                // Form alanlarını güncelle
-                if (htmlCodeRef.current) htmlCodeRef.current.value = bodyHtml;
-                if (jsCodeRef.current) jsCodeRef.current.value = jsContent;
-                if (cssCodeRef.current) cssCodeRef.current.value = cssContent;
-                if (externalLibsRef.current) externalLibsRef.current.value = extLibs;
-
-                // Başarı durumunda scroll'u aşağı kaydır ki dolan alanlar görünsün
-                setTimeout(() => {
-                    htmlCodeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 100);
-
-            } catch (err) {
-                console.error('HTML parse error:', err);
-                setUploadError(err instanceof Error ? err.message : 'HTML dosyası işlenemedi.');
-            }
+            }, 100);
         };
 
-        reader.onerror = () => setUploadError('Dosya okunurken bir hata oluştu.');
+        reader.onerror = () => {
+            setUploadError('Dosya okunurken bir hata oluştu.');
+            setIsProcessing(false);
+        };
         reader.readAsText(file);
         e.target.value = '';
     };
@@ -283,13 +299,26 @@ export function ActivityForm({
                     Bir <strong>.html</strong> dosyası yükleyin — kod alanları otomatik
                     doldurulur.
                 </p>
-                <label className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-[13px] font-bold rounded-xl cursor-pointer hover:bg-indigo-700 transition-colors shadow-md">
-                    <Plus className="w-4 h-4" aria-hidden="true" /> Dosya Seç
+                <label className={cn(
+                    "inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-[13px] font-bold rounded-xl cursor-pointer hover:bg-indigo-700 transition-colors shadow-md",
+                    isProcessing && "opacity-60 cursor-not-allowed pointer-events-none"
+                )}>
+                    {isProcessing ? (
+                        <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            İşleniyor...
+                        </>
+                    ) : (
+                        <>
+                            <Plus className="w-4 h-4" aria-hidden="true" /> Dosya Seç
+                        </>
+                    )}
                     <input
                         type="file"
                         accept=".html,.htm"
                         className="sr-only"
                         onChange={handleHtmlFileUpload}
+                        disabled={isProcessing}
                     />
                 </label>
                 {uploadError && (
