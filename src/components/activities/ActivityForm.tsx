@@ -82,6 +82,13 @@ export function ActivityForm({
                     bodyClone.querySelectorAll('script, style').forEach(el => el.remove());
 
                     const bodyHtml = bodyClone.innerHTML.trim();
+                    
+                    // Body özniteliklerini (class, style vb.) topla
+                    const bodyAttrs: Record<string, string> = {};
+                    Array.from(body.attributes).forEach(attr => {
+                        bodyAttrs[attr.name] = attr.value;
+                    });
+
                     const cssContent = Array.from(doc.querySelectorAll('style'))
                         .map(s => s.innerHTML)
                         .join('\n')
@@ -104,7 +111,18 @@ export function ActivityForm({
                         });
                     const extLibs = [...extScripts, ...extCss].filter(Boolean).join('\n');
 
-                    if (htmlCodeRef.current) htmlCodeRef.current.value = bodyHtml;
+                    if (htmlCodeRef.current) {
+                        // Body özniteliklerini (class, style vb.) korumak için içeriği bir div ile sarmala
+                        let attrsString = '';
+                        Object.entries(bodyAttrs).forEach(([name, value]) => {
+                            attrsString += ` ${name}="${value}"`;
+                        });
+                        
+                        // Eğer body'de öznitelik varsa sarmala, yoksa direkt içeriği koy
+                        htmlCodeRef.current.value = attrsString.trim() 
+                            ? `<div${attrsString}>${bodyHtml}</div>` 
+                            : bodyHtml;
+                    }
                     if (jsCodeRef.current) jsCodeRef.current.value = jsContent;
                     if (cssCodeRef.current) cssCodeRef.current.value = cssContent;
                     if (external_libsRef.current) external_libsRef.current.value = extLibs;
