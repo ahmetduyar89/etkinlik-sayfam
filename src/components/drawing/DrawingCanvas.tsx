@@ -189,8 +189,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const bufferCanvasRef = React.useRef<HTMLCanvasElement>(null);
         const laserCanvasRef = React.useRef<HTMLCanvasElement>(null);
         const [, setStrokes] = React.useState<Stroke[]>([]);
-        const [currentStroke, setCurrentStroke] = React.useState<Stroke | null>(null);
-        const [isDrawing, setIsDrawing] = React.useState(false);
+        const currentStrokeRef = React.useRef<Stroke | null>(null);
         const [selectedIdx, setSelectedIdx] = React.useState<number | null>(null);
         const [selBB, setSelBB] = React.useState<BoundingBox | null>(null);
         const canvasRectRef = React.useRef<DOMRect | null>(null);
@@ -386,17 +385,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (!canvas || !buffer) return;
 
             const dpr = window.devicePixelRatio || 1;
-            const scrollContainer = canvas.parentElement?.parentElement;
-            const w = scrollContainer
-                ? scrollContainer.clientWidth
-                : canvas.parentElement
-                ? canvas.parentElement.offsetWidth
-                : window.innerWidth;
-            const h = scrollContainer
-                ? scrollContainer.clientHeight
-                : canvas.parentElement
-                ? canvas.parentElement.offsetHeight
-                : window.innerHeight;
+            const parent = canvas.parentElement;
+            const w = parent ? parent.offsetWidth : window.innerWidth;
+            const h = parent ? parent.offsetHeight : window.innerHeight;
 
             [canvas, buffer, laser].forEach((c) => {
                 if (!c) return;
@@ -429,8 +420,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         }, [redraw]);
 
         React.useEffect(() => {
-            const scrollContainer = canvasRef.current?.parentElement?.parentElement;
-            const target = scrollContainer || canvasRef.current?.parentElement;
+            const target = canvasRef.current?.parentElement;
             if (target) {
                 const obs = new ResizeObserver(() => resize());
                 obs.observe(target);
@@ -442,26 +432,15 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             return () => window.removeEventListener('resize', resize);
         }, [resize]);
 
-        React.useEffect(() => {
-            const scrollContainer = canvasRef.current?.parentElement?.parentElement;
-            if (!scrollContainer) return;
-            const handleScroll = () => {
-                const top = scrollContainer.scrollTop;
-                canvasRectRef.current = null;
-                if (canvasRef.current) canvasRef.current.style.top = `${top}px`;
-                if (laserCanvasRef.current) laserCanvasRef.current.style.top = `${top}px`;
-            };
-            scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
-            return () => scrollContainer.removeEventListener('scroll', handleScroll);
-        }, []);
-
         const startDrawing = async (e: React.PointerEvent) => {
             if (!enabled || ['pan', 'sun'].includes(config.tool)) return;
             const rect = canvasRef.current?.getBoundingClientRect();
             if (!rect) return;
             canvasRectRef.current = rect;
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const scaleX = rect.width ? (canvasRef.current?.offsetWidth || 1) / rect.width : 1;
+            const scaleY = rect.height ? (canvasRef.current?.offsetHeight || 1) / rect.height : 1;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
 
             if (config.tool === 'select') {
                 if (selectedIdxRef.current !== null && selBB) {
@@ -539,8 +518,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
             isDrawingRef.current = true;
-            setIsDrawing(true);
-            const newStroke: Stroke = {
+            currentStrokeRef.current = {
                 tool: config.tool,
                 color: config.color,
                 width:
@@ -552,14 +530,15 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 fillEnabled: config.fillEnabled,
                 points: [{ x, y }],
             };
-            setCurrentStroke(newStroke);
         };
 
         const draw = (e: React.PointerEvent) => {
             const rect = canvasRectRef.current || canvasRef.current?.getBoundingClientRect();
             if (!rect) return;
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const scaleX = rect.width ? (canvasRef.current?.offsetWidth || 1) / rect.width : 1;
+            const scaleY = rect.height ? (canvasRef.current?.offsetHeight || 1) / rect.height : 1;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
 
             if (
                 config.tool === 'select' &&
@@ -584,10 +563,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
 
+            const cssW = canvasRef.current?.offsetWidth || rect.width;
+            const cssH = canvasRef.current?.offsetHeight || rect.height;
+
             if (config.tool === 'sun') {
                 const lCtx = laserCtxRef.current;
                 if (lCtx) {
-                    lCtx.clearRect(0, 0, rect.width, rect.height);
+                    lCtx.clearRect(0, 0, cssW, cssH);
                     const cx = x;
                     const cy = y;
                     const r = 12;
@@ -606,15 +588,16 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 }
                 return;
             }
-            if (!isDrawing || !currentStroke) return;
-            const last = currentStroke.points[currentStroke.points.length - 1];
+            if (!isDrawingRef.current || !currentStrokeRef.current) return;
+            const stroke = currentStrokeRef.current;
+            const last = stroke.points[stroke.points.length - 1];
             if (!last || Math.hypot(x - last.x, y - last.y) < 0.5) return;
-            currentStroke.points.push({ x, y });
+            stroke.points.push({ x, y });
             const mainCtx = ctxRef.current;
             if (mainCtx && bufferCanvasRef.current) {
-                mainCtx.clearRect(0, 0, rect.width, rect.height);
-                mainCtx.drawImage(bufferCanvasRef.current, 0, 0, rect.width, rect.height);
-                drawStroke(mainCtx, currentStroke);
+                mainCtx.clearRect(0, 0, cssW, cssH);
+                mainCtx.drawImage(bufferCanvasRef.current, 0, 0, cssW, cssH);
+                drawStroke(mainCtx, stroke);
             }
         };
 
@@ -626,17 +609,17 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 }
                 return;
             }
-            if (isDrawing && currentStroke) {
-                strokesRef.current.push(currentStroke);
+            if (isDrawingRef.current && currentStrokeRef.current) {
+                strokesRef.current.push(currentStrokeRef.current);
                 setStrokes([...strokesRef.current]);
-                if (bufferCtxRef.current) drawStroke(bufferCtxRef.current, currentStroke);
+                if (bufferCtxRef.current) drawStroke(bufferCtxRef.current, currentStrokeRef.current);
             }
             isDrawingRef.current = false;
-            setIsDrawing(false);
-            setCurrentStroke(null);
+            currentStrokeRef.current = null;
             if (laserCtxRef.current) {
-                const rect = canvasRef.current?.getBoundingClientRect();
-                if (rect) laserCtxRef.current.clearRect(0, 0, rect.width, rect.height);
+                const cssW = canvasRef.current?.offsetWidth || 0;
+                const cssH = canvasRef.current?.offsetHeight || 0;
+                laserCtxRef.current.clearRect(0, 0, cssW, cssH);
             }
         };
 
