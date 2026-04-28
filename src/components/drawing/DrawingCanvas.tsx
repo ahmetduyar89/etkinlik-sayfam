@@ -24,14 +24,27 @@ interface DrawingCanvasProps {
 }
 
 const getBB = (s: Stroke): BoundingBox => {
-    const xs = s.points.map((p) => p.x);
-    const ys = s.points.map((p) => p.y);
-    const pad = Math.max((s.width || 2) / 2 + 6, 14);
+    let x1 = Math.min(...s.points.map((p) => p.x));
+    let y1 = Math.min(...s.points.map((p) => p.y));
+    let x2 = Math.max(...s.points.map((p) => p.x));
+    let y2 = Math.max(...s.points.map((p) => p.y));
+
+    if (s.tool === 'circle' && s.points.length >= 2) {
+        const p1 = s.points[0];
+        const p2 = s.points[s.points.length - 1];
+        const r = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+        x1 = Math.min(x1, p1.x - r);
+        y1 = Math.min(y1, p1.y - r);
+        x2 = Math.max(x2, p1.x + r);
+        y2 = Math.max(y2, p1.y + r);
+    }
+
+    const pad = Math.max((s.width || 2) / 2 + 6, 24);
     return {
-        x1: Math.min(...xs) - pad,
-        y1: Math.min(...ys) - pad,
-        x2: Math.max(...xs) + pad,
-        y2: Math.max(...ys) + pad,
+        x1: x1 - pad,
+        y1: y1 - pad,
+        x2: x2 + pad,
+        y2: y2 + pad,
     };
 };
 
@@ -592,11 +605,42 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const stroke = currentStrokeRef.current;
             const last = stroke.points[stroke.points.length - 1];
             if (!last || Math.hypot(x - last.x, y - last.y) < 0.5) return;
+            
+            const oldBB = getBB(stroke);
             stroke.points.push({ x, y });
+            const newBB = getBB(stroke);
+            
+            const minX = Math.min(oldBB.x1, newBB.x1);
+            const minY = Math.min(oldBB.y1, newBB.y1);
+            const maxX = Math.max(oldBB.x2, newBB.x2);
+            const maxY = Math.max(oldBB.y2, newBB.y2);
+            const width = maxX - minX;
+            const height = maxY - minY;
+
             const mainCtx = ctxRef.current;
             if (mainCtx && bufferCanvasRef.current) {
-                mainCtx.clearRect(0, 0, cssW, cssH);
-                mainCtx.drawImage(bufferCanvasRef.current, 0, 0, cssW, cssH);
+                const dpr = window.devicePixelRatio || 1;
+                let sx = Math.floor(minX * dpr);
+                let sy = Math.floor(minY * dpr);
+                let sw = Math.ceil(width * dpr);
+                let sh = Math.ceil(height * dpr);
+
+                const imgW = bufferCanvasRef.current.width;
+                const imgH = bufferCanvasRef.current.height;
+                
+                if (sx < 0) { sw += sx; sx = 0; }
+                if (sy < 0) { sh += sy; sy = 0; }
+                if (sx + sw > imgW) { sw = imgW - sx; }
+                if (sy + sh > imgH) { sh = imgH - sy; }
+
+                mainCtx.clearRect(minX, minY, width, height);
+                if (sw > 0 && sh > 0) {
+                    mainCtx.drawImage(
+                        bufferCanvasRef.current,
+                        sx, sy, sw, sh,
+                        sx / dpr, sy / dpr, sw / dpr, sh / dpr
+                    );
+                }
                 drawStroke(mainCtx, stroke);
             }
         };
