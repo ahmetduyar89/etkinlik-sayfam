@@ -15,9 +15,9 @@ interface ActivityFormProps {
 }
 
 const inputClasses =
-    'w-full bg-white border-2 border-indigo-50 rounded-xl px-4 py-3 text-[14px] text-slate-800 font-medium focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400';
+    'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white font-medium focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all placeholder:text-slate-500';
 const labelClasses =
-    'block text-[11px] font-bold text-indigo-600 uppercase tracking-wider mb-2';
+    'block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2';
 
 export function ActivityForm({
     editItem,
@@ -217,33 +217,33 @@ export function ActivityForm({
                 <input id="activity-tags" name="tags" defaultValue={editItem?.tags} className={inputClasses} />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 px-6 py-4 bg-slate-50/50 rounded-2xl border-2 border-slate-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 px-6 py-4 bg-white/5 rounded-2xl border border-white/10">
                 <div className="flex items-center gap-6">
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" name="is_test" defaultChecked={editItem?.is_test} className="sr-only peer" />
-                        <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-indigo-600 relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full" />
-                        <span className="text-[11px] font-bold text-indigo-600 uppercase">Test Modu</span>
+                        <div className="w-11 h-6 bg-white/10 rounded-full peer peer-checked:bg-primary-container relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full" />
+                        <span className="text-[11px] font-bold text-slate-300 uppercase">Test Modu</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" name="has_timer" defaultChecked={editItem?.has_timer} className="sr-only peer" />
-                        <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-indigo-600 relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full" />
-                        <span className="text-[11px] font-bold text-indigo-600 uppercase">Süre Sınırı</span>
+                        <div className="w-11 h-6 bg-white/10 rounded-full peer peer-checked:bg-primary-container relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full" />
+                        <span className="text-[11px] font-bold text-slate-300 uppercase">Süre Sınırı</span>
                     </label>
                 </div>
                 <input name="duration_minutes" type="number" defaultValue={editItem?.duration_minutes || 20} className={inputClasses} />
             </div>
 
-            <div className="p-4 bg-indigo-50/50 rounded-2xl border-2 border-dashed border-indigo-200 text-center space-y-2">
+            <div className="p-4 bg-white/5 rounded-2xl border-2 border-dashed border-white/20 text-center space-y-2">
                 <span className={labelClasses}>HTML Dosyası Yükle</span>
-                <p className="text-xs text-slate-500">Maksimum 10MB .html dosyası yükleyebilirsiniz.</p>
+                <p className="text-xs text-slate-400">Maksimum 10MB .html dosyası yükleyebilirsiniz.</p>
                 <label className={cn(
-                    "inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-[13px] font-bold rounded-xl cursor-pointer hover:bg-indigo-700 transition-colors shadow-md",
+                    "inline-flex items-center gap-2 px-5 py-2.5 bg-primary-container text-white text-[13px] font-bold rounded-xl cursor-pointer hover:bg-primary-container/80 transition-colors shadow-md",
                     isProcessing && "opacity-60 cursor-not-allowed pointer-events-none"
                 )}>
                     {isProcessing ? "İşleniyor..." : "Dosya Seç"}
                     <input type="file" accept=".html,.htm" className="sr-only" onChange={handleHtmlFileUpload} disabled={isProcessing} />
                 </label>
-                {uploadError && <p className="text-xs font-medium text-red-500">{uploadError}</p>}
+                {uploadError && <p className="text-xs font-medium text-red-400">{uploadError}</p>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -257,8 +257,8 @@ export function ActivityForm({
             </div>
 
             <div className="flex justify-end gap-3">
-                <button type="button" onClick={onCancel} className="px-5 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg">Vazgeç</button>
-                <button type="submit" disabled={isSubmitting || isProcessing} className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 disabled:opacity-50">
+                <button type="button" onClick={onCancel} className="px-5 py-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Vazgeç</button>
+                <button type="submit" disabled={isSubmitting || isProcessing} className="px-6 py-3 bg-primary-container text-white font-bold rounded-xl shadow-lg hover:bg-primary-container/80 disabled:opacity-50 transition-colors">
                     {isSubmitting ? 'Kaydediliyor...' : editItem ? 'Güncelle' : 'Ekle'}
                 </button>
             </div>
