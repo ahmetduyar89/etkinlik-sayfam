@@ -6,6 +6,16 @@
   body, html {
     @apply bg-background text-on-background font-body-md antialiased;
     min-height: 100vh;
+    -webkit-touch-callout: none; /* Disable iOS touch callout */
+    -webkit-user-select: none; /* Disable iOS text selection */
+    user-select: none; /* Disable text selection globally */
+    -webkit-tap-highlight-color: transparent; /* Disable tap highlight */
+  }
+
+  /* Re-enable text selection for input fields */
+  input, textarea, [contenteditable="true"] {
+    -webkit-user-select: auto;
+    user-select: auto;
   }
 }
 
