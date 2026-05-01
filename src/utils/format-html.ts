@@ -86,9 +86,23 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
         })
         .join('\n');
 
-    const isBabel = (external_libs || '').toLowerCase().includes('babel');
+    const isBabel =
+        (external_libs || '').toLowerCase().includes('babel') ||
+        (external_libs || '').toLowerCase().includes('react') ||
+        /import\s+.*from\s+['"]react['"]/.test(js_code || '') ||
+        /React\.createRoot|ReactDOM\.render/.test(js_code || '') ||
+        /<\s*\/?[A-Z][a-zA-Z0-9]*\b/.test(js_code || '') ||
+        /<\s*\/[a-z][a-zA-Z0-9]*\b[^>]*>/.test(js_code || '') ||
+        /(?:return|=)\s*<\s*[a-z][a-zA-Z0-9]*\b[^>]*>/i.test(js_code || '');
+
     const scriptType = isBabel ? 'text/babel' : 'text/javascript';
-    const babelData = isBabel ? 'data-presets="react"' : '';
+    const babelData = isBabel ? 'data-presets="env,react"' : '';
+
+    const extraLibs = isBabel
+        ? `${!(external_libs || '').includes('react') ? '<script src="https://unpkg.com/react@18/umd/react.development.js"></script>\n    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>\n' : ''}${!(external_libs || '').includes('babel') ? '<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>\n' : ''}`
+        : '';
+
+    const allLibs = extraLibs + libs;
 
     const result = `<!DOCTYPE html>
 <html lang="tr"${htmlAttrs}>
@@ -96,7 +110,7 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
     ${headContent}
-    ${libs}
+    ${allLibs}
     <style>
         /* Base Reset */
         body, html {
