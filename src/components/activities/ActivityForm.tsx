@@ -19,6 +19,9 @@ const inputClasses =
 const labelClasses =
     'block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2';
 const STORAGE_SIZE_LIMIT = 800 * 1024;
+const FULL_HTML_TEXTAREA_LIMIT = 200 * 1024;
+const isFullHtmlDocumentText = (text: string) =>
+    /<html[\s>]|<head[\s>]|<!DOCTYPE/i.test(text);
 
 export function ActivityForm({
     editItem,
@@ -30,20 +33,33 @@ export function ActivityForm({
     const jsCodeRef = React.useRef<HTMLTextAreaElement>(null);
     const cssCodeRef = React.useRef<HTMLTextAreaElement>(null);
     const external_libsRef = React.useRef<HTMLTextAreaElement>(null);
+    const uploadedFullHtmlRef = React.useRef<string | null>(null);
     const [uploadError, setUploadError] = React.useState<string | null>(null);
     const [isProcessing, setIsProcessing] = React.useState(false);
     const [storageLoadFailed, setStorageLoadFailed] = React.useState(false);
+    const [uploadedFullHtmlLabel, setUploadedFullHtmlLabel] = React.useState<string | null>(null);
 
     // Eğer düzenleme modundaysak ve storage_url varsa veriyi çek
     React.useEffect(() => {
         setStorageLoadFailed(false);
         setUploadError(null);
+        uploadedFullHtmlRef.current = null;
+        setUploadedFullHtmlLabel(null);
         if (editItem?.storage_url) {
             setIsProcessing(true);
             fetch(editItem.storage_url)
                 .then(res => res.json())
                 .then(data => {
-                    if (htmlCodeRef.current) htmlCodeRef.current.value = data.html_code || '';
+                    const htmlCode = String(data.html_code || '');
+                    if (htmlCodeRef.current) {
+                        if (isFullHtmlDocumentText(htmlCode) && htmlCode.length > FULL_HTML_TEXTAREA_LIMIT) {
+                            uploadedFullHtmlRef.current = htmlCode;
+                            setUploadedFullHtmlLabel('Kayıtlı tam HTML içerik');
+                            htmlCodeRef.current.value = `Tam HTML içerik hazır (${Math.round(htmlCode.length / 1024)} KB). Metin alanına basılmadı; güncellerseniz yeni dosya yükleyin veya bu alana manuel HTML yazın.`;
+                        } else {
+                            htmlCodeRef.current.value = htmlCode;
+                        }
+                    }
                     if (jsCodeRef.current) jsCodeRef.current.value = data.js_code || '';
                     if (cssCodeRef.current) cssCodeRef.current.value = data.css_code || '';
                     if (external_libsRef.current) external_libsRef.current.value = data.external_libs || '';
@@ -67,6 +83,8 @@ export function ActivityForm({
         }
 
         setUploadError(null);
+        uploadedFullHtmlRef.current = null;
+        setUploadedFullHtmlLabel(null);
         setIsProcessing(true);
         const reader = new FileReader();
 
@@ -76,20 +94,24 @@ export function ActivityForm({
                     const text = ev.target?.result as string;
                     if (!text) throw new Error('Dosya okunamadı.');
 
+                    const isFullHtmlDocument = isFullHtmlDocumentText(text);
+                    if (isFullHtmlDocument) {
+                        uploadedFullHtmlRef.current = text;
+                        setUploadedFullHtmlLabel(file.name);
+                        if (htmlCodeRef.current) {
+                            htmlCodeRef.current.value = `Tam HTML dosyası yüklendi: ${file.name} (${Math.round(text.length / 1024)} KB). Performans için metin alanına basılmadı.`;
+                        }
+                        if (jsCodeRef.current) jsCodeRef.current.value = '';
+                        if (cssCodeRef.current) cssCodeRef.current.value = '';
+                        if (external_libsRef.current) external_libsRef.current.value = '';
+                        return;
+                    }
+
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(text, 'text/html');
 
                     if (doc.querySelector('parsererror')) {
                         throw new Error('Geçersiz HTML formatı.');
-                    }
-
-                    const isFullHtmlDocument = /<html[\s>]|<head[\s>]|<!DOCTYPE/i.test(text);
-                    if (isFullHtmlDocument) {
-                        if (htmlCodeRef.current) htmlCodeRef.current.value = text;
-                        if (jsCodeRef.current) jsCodeRef.current.value = '';
-                        if (cssCodeRef.current) cssCodeRef.current.value = '';
-                        if (external_libsRef.current) external_libsRef.current.value = '';
-                        return;
                     }
 
                     const body = doc.body;
@@ -160,7 +182,7 @@ export function ActivityForm({
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
         
-        const html_code = String(formData.get('html_code') || '');
+        const html_code = uploadedFullHtmlRef.current ?? String(formData.get('html_code') || '');
         const js_code = String(formData.get('js_code') || '');
         const css_code = String(formData.get('css_code') || '');
         const external_libs = String(formData.get('external_libs') || '');
@@ -266,11 +288,28 @@ export function ActivityForm({
                     {isProcessing ? "İşleniyor..." : "Dosya Seç"}
                     <input type="file" accept=".html,.htm" className="sr-only" onChange={handleHtmlFileUpload} disabled={isProcessing} />
                 </label>
+                {uploadedFullHtmlLabel && (
+                    <p className="text-xs font-medium text-emerald-300">
+                        {uploadedFullHtmlLabel} tam HTML olarak hızlı modda hazır.
+                    </p>
+                )}
                 {uploadError && <p className="text-xs font-medium text-red-400">{uploadError}</p>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <textarea id="activity-html" ref={htmlCodeRef} name="html_code" rows={5} defaultValue={editItem?.html_code || ''} className={cn(inputClasses, 'font-mono text-xs')} placeholder="HTML Kodu" />
+                <textarea
+                    id="activity-html"
+                    ref={htmlCodeRef}
+                    name="html_code"
+                    rows={5}
+                    defaultValue={editItem?.html_code || ''}
+                    onChange={() => {
+                        uploadedFullHtmlRef.current = null;
+                        setUploadedFullHtmlLabel(null);
+                    }}
+                    className={cn(inputClasses, 'font-mono text-xs')}
+                    placeholder="HTML Kodu"
+                />
                 <textarea id="activity-js" ref={jsCodeRef} name="js_code" rows={5} defaultValue={editItem?.js_code || ''} className={cn(inputClasses, 'font-mono text-xs')} placeholder="JS Kodu" />
             </div>
 
