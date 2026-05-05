@@ -341,7 +341,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
                             ref={iframeRef}
                             srcDoc={formattedHtml}
                             title={act.title}
-                            sandbox="allow-scripts allow-same-origin allow-forms"
+                            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads allow-pointer-lock"
                             className={cn(
                                 'w-full h-full border-0',
                                 isDrawingMode && drawConfig.tool !== 'pan'

@@ -14,7 +14,7 @@ function LivePreviewBase({ act }: LivePreviewProps) {
                 className="w-[1000px] h-[625px] border-0 origin-top-left scale-[0.28] sm:scale-[0.32] lg:scale-[0.35]"
                 title={`${act.title} önizleme`}
                 loading="lazy"
-                sandbox="allow-scripts"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads allow-pointer-lock"
             />
             <div className="absolute inset-0 bg-transparent" />
         </div>

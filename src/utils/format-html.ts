@@ -1,7 +1,7 @@
 import type { Activity } from '../types';
 
 type FormatSource = Partial<
-    Pick<Activity, 'html_code' | 'css_code' | 'js_code' | 'external_libs'>
+    Pick<Activity, 'html_code' | 'css_code' | 'js_code' | 'external_libs' | 'content_mode'>
 >;
 
 const htmlCache = new Map<string, string>();
@@ -9,7 +9,7 @@ const htmlCache = new Map<string, string>();
 const isFullHtmlDocument = (html: string): boolean =>
     /<html[\s>]|<head[\s>]|<body[\s>]|<!DOCTYPE/i.test(html);
 
-const rawDocumentBridge = `
+const rawDocumentPrelude = `
 <script>
     (function() {
         function makeStorage() {
@@ -38,7 +38,12 @@ const rawDocumentBridge = `
         window.addEventListener('unhandledrejection', function(e) {
             window.parent.postMessage({ type: 'JS_ERROR', error: 'Promise hatası: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)) }, '*');
         });
+    })();
+</script>`;
 
+const rawDocumentBridge = `
+<script>
+    (function() {
         function sendHeight() {
             var doc = document.documentElement;
             var body = document.body;
@@ -64,28 +69,43 @@ const rawDocumentBridge = `
     })();
 </script>`;
 
-const appendRawDocumentBridge = (html: string): string => {
+const injectRawDocumentHelpers = (html: string): string => {
+    let result = html;
+    if (/<head\b[^>]*>/i.test(result)) {
+        result = result.replace(/<head\b[^>]*>/i, (match) => `${match}\n${rawDocumentPrelude}`);
+    } else if (/<script\b/i.test(result)) {
+        result = result.replace(/<script\b/i, `${rawDocumentPrelude}\n<script`);
+    } else {
+        result = `${rawDocumentPrelude}\n${result}`;
+    }
+
     if (/<\/body>/i.test(html)) {
-        return html.replace(/<\/body>/i, `${rawDocumentBridge}\n</body>`);
+        return result.replace(/<\/body>/i, `${rawDocumentBridge}\n</body>`);
     }
-    if (/<\/html>/i.test(html)) {
-        return html.replace(/<\/html>/i, `${rawDocumentBridge}\n</html>`);
+    if (/<\/html>/i.test(result)) {
+        return result.replace(/<\/html>/i, `${rawDocumentBridge}\n</html>`);
     }
-    return `${html}\n${rawDocumentBridge}`;
+    return `${result}\n${rawDocumentBridge}`;
 };
 
 export const getFormattedHtml = (act?: FormatSource | null): string => {
     if (!act) return '';
-    const { html_code = '', css_code = '', js_code = '', external_libs = '' } = act;
+    const {
+        html_code = '',
+        css_code = '',
+        js_code = '',
+        external_libs = '',
+        content_mode,
+    } = act;
 
     // Cache anahtarı oluştur (kod içeriklerinin birleşimi)
-    const cacheKey = `${html_code}|${css_code}|${js_code}|${external_libs}`;
+    const cacheKey = `${content_mode || ''}|${html_code}|${css_code}|${js_code}|${external_libs}`;
     if (htmlCache.has(cacheKey)) {
         return htmlCache.get(cacheKey)!;
     }
 
-    if (isFullHtmlDocument(html_code) && !css_code && !js_code && !external_libs) {
-        const rawResult = appendRawDocumentBridge(html_code);
+    if ((content_mode === 'raw_html' || isFullHtmlDocument(html_code)) && !css_code && !js_code && !external_libs) {
+        const rawResult = injectRawDocumentHelpers(html_code);
         htmlCache.set(cacheKey, rawResult);
         if (htmlCache.size > 50) {
             const firstKey = htmlCache.keys().next().value;

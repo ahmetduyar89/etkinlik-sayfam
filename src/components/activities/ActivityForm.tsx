@@ -34,6 +34,7 @@ export function ActivityForm({
     const cssCodeRef = React.useRef<HTMLTextAreaElement>(null);
     const external_libsRef = React.useRef<HTMLTextAreaElement>(null);
     const uploadedFullHtmlRef = React.useRef<string | null>(null);
+    const uploadedRawHtmlRef = React.useRef(false);
     const [uploadError, setUploadError] = React.useState<string | null>(null);
     const [isProcessing, setIsProcessing] = React.useState(false);
     const [storageLoadFailed, setStorageLoadFailed] = React.useState(false);
@@ -44,6 +45,7 @@ export function ActivityForm({
         setStorageLoadFailed(false);
         setUploadError(null);
         uploadedFullHtmlRef.current = null;
+        uploadedRawHtmlRef.current = editItem?.content_mode === 'raw_html';
         setUploadedFullHtmlLabel(null);
         if (editItem?.storage_url) {
             setIsProcessing(true);
@@ -84,6 +86,7 @@ export function ActivityForm({
 
         setUploadError(null);
         uploadedFullHtmlRef.current = null;
+        uploadedRawHtmlRef.current = false;
         setUploadedFullHtmlLabel(null);
         setIsProcessing(true);
         const reader = new FileReader();
@@ -94,83 +97,21 @@ export function ActivityForm({
                     const text = ev.target?.result as string;
                     if (!text) throw new Error('Dosya okunamadı.');
 
-                    const isFullHtmlDocument = isFullHtmlDocumentText(text);
-                    if (isFullHtmlDocument) {
-                        if (htmlCodeRef.current) {
-                            if (text.length > FULL_HTML_TEXTAREA_LIMIT) {
-                                uploadedFullHtmlRef.current = text;
-                                setUploadedFullHtmlLabel(file.name);
-                                htmlCodeRef.current.value = `Tam HTML dosyası yüklendi: ${file.name} (${Math.round(text.length / 1024)} KB). Performans için metin alanına basılmadı.`;
-                            } else {
-                                uploadedFullHtmlRef.current = null;
-                                setUploadedFullHtmlLabel(null);
-                                htmlCodeRef.current.value = text;
-                            }
-                        }
-                        if (jsCodeRef.current) jsCodeRef.current.value = '';
-                        if (cssCodeRef.current) cssCodeRef.current.value = '';
-                        if (external_libsRef.current) external_libsRef.current.value = '';
-                        return;
-                    }
-
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(text, 'text/html');
-
-                    if (doc.querySelector('parsererror')) {
-                        throw new Error('Geçersiz HTML formatı.');
-                    }
-
-                    const body = doc.body;
-                    if (!body) throw new Error('Body bulunamadı.');
-
-                    const bodyClone = body.cloneNode(true) as HTMLElement;
-                    bodyClone.querySelectorAll('script, style').forEach(el => el.remove());
-
-                    const bodyHtml = bodyClone.innerHTML.trim();
-                    
-                    // Body özniteliklerini (class, style vb.) topla
-                    const bodyAttrs: Record<string, string> = {};
-                    Array.from(body.attributes).forEach(attr => {
-                        bodyAttrs[attr.name] = attr.value;
-                    });
-
-                    const cssContent = Array.from(doc.querySelectorAll('style'))
-                        .map(s => s.innerHTML)
-                        .join('\n')
-                        .trim();
-                    const jsContent = Array.from(doc.querySelectorAll('script:not([src])'))
-                        .filter(s => {
-                            const t = (s as HTMLScriptElement).type;
-                            return !t || t.includes('javascript') || t.includes('babel');
-                        })
-                        .map(s => s.innerHTML)
-                        .join('\n')
-                        .trim();
-
-                    const extScripts = Array.from(doc.querySelectorAll('script[src]'))
-                        .map(s => (s as HTMLScriptElement).getAttribute('src') || '');
-                    const extCss = Array.from(doc.querySelectorAll('link[rel="stylesheet"]'))
-                        .map(l => {
-                            const href = (l as HTMLLinkElement).getAttribute('href') || '';
-                            return href ? `css:${href}` : '';
-                        });
-                    const extLibs = [...extScripts, ...extCss].filter(Boolean).join('\n');
-
+                    uploadedRawHtmlRef.current = true;
                     if (htmlCodeRef.current) {
-                        // Body özniteliklerini (class, style vb.) korumak için içeriği bir div ile sarmala
-                        let attrsString = '';
-                        Object.entries(bodyAttrs).forEach(([name, value]) => {
-                            attrsString += ` ${name}="${value}"`;
-                        });
-                        
-                        // Eğer body'de öznitelik varsa sarmala, yoksa direkt içeriği koy
-                        htmlCodeRef.current.value = attrsString.trim() 
-                            ? `<div${attrsString}>${bodyHtml}</div>` 
-                            : bodyHtml;
+                        if (text.length > FULL_HTML_TEXTAREA_LIMIT) {
+                            uploadedFullHtmlRef.current = text;
+                            setUploadedFullHtmlLabel(file.name);
+                            htmlCodeRef.current.value = `HTML dosyası yüklendi: ${file.name} (${Math.round(text.length / 1024)} KB). Performans için metin alanına basılmadı; kaydedince dosya olduğu gibi kullanılacak.`;
+                        } else {
+                            uploadedFullHtmlRef.current = null;
+                            setUploadedFullHtmlLabel(null);
+                            htmlCodeRef.current.value = text;
+                        }
                     }
-                    if (jsCodeRef.current) jsCodeRef.current.value = jsContent;
-                    if (cssCodeRef.current) cssCodeRef.current.value = cssContent;
-                    if (external_libsRef.current) external_libsRef.current.value = extLibs;
+                    if (jsCodeRef.current) jsCodeRef.current.value = '';
+                    if (cssCodeRef.current) cssCodeRef.current.value = '';
+                    if (external_libsRef.current) external_libsRef.current.value = '';
 
                 } catch (err) {
                     console.error('Parse error:', err);
@@ -192,6 +133,10 @@ export function ActivityForm({
         const js_code = String(formData.get('js_code') || '');
         const css_code = String(formData.get('css_code') || '');
         const external_libs = String(formData.get('external_libs') || '');
+        const content_mode =
+            uploadedRawHtmlRef.current || (isFullHtmlDocumentText(html_code) && !js_code && !css_code && !external_libs)
+                ? 'raw_html'
+                : 'composed';
 
         if (storageLoadFailed) {
             setUploadError('Kayıtlı içerik yüklenmeden güncelleme yapılamaz.');
@@ -208,7 +153,7 @@ export function ActivityForm({
                 setIsProcessing(true);
                 const storagePath = `activities/${Date.now()}_code.json`;
                 const storageRef = ref(storage, storagePath);
-                const content = JSON.stringify({ html_code, js_code, css_code, external_libs });
+                const content = JSON.stringify({ html_code, js_code, css_code, external_libs, content_mode });
                 await uploadString(storageRef, content, 'raw', { contentType: 'application/json' });
                 storage_url = await getDownloadURL(storageRef);
             } catch (err) {
@@ -231,6 +176,7 @@ export function ActivityForm({
             js_code: shouldUseStorage ? '' : js_code,
             css_code: shouldUseStorage ? '' : css_code,
             external_libs: shouldUseStorage ? '' : external_libs,
+            content_mode,
             storage_url: storage_url || '',
             is_test: formData.get('is_test') === 'on',
             has_timer: formData.get('has_timer') === 'on',
@@ -311,6 +257,7 @@ export function ActivityForm({
                     defaultValue={editItem?.html_code || ''}
                     onChange={() => {
                         uploadedFullHtmlRef.current = null;
+                        uploadedRawHtmlRef.current = false;
                         setUploadedFullHtmlLabel(null);
                     }}
                     className={cn(inputClasses, 'font-mono text-xs')}
