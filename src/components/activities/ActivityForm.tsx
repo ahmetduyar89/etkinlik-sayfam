@@ -18,6 +18,7 @@ const inputClasses =
     'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white font-medium focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all placeholder:text-slate-500';
 const labelClasses =
     'block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2';
+const STORAGE_SIZE_LIMIT = 800 * 1024;
 
 export function ActivityForm({
     editItem,
@@ -31,9 +32,12 @@ export function ActivityForm({
     const external_libsRef = React.useRef<HTMLTextAreaElement>(null);
     const [uploadError, setUploadError] = React.useState<string | null>(null);
     const [isProcessing, setIsProcessing] = React.useState(false);
+    const [storageLoadFailed, setStorageLoadFailed] = React.useState(false);
 
     // Eğer düzenleme modundaysak ve storage_url varsa veriyi çek
     React.useEffect(() => {
+        setStorageLoadFailed(false);
+        setUploadError(null);
         if (editItem?.storage_url) {
             setIsProcessing(true);
             fetch(editItem.storage_url)
@@ -44,7 +48,11 @@ export function ActivityForm({
                     if (cssCodeRef.current) cssCodeRef.current.value = data.css_code || '';
                     if (external_libsRef.current) external_libsRef.current.value = data.external_libs || '';
                 })
-                .catch(err => console.error('Failed to load storage content:', err))
+                .catch(err => {
+                    console.error('Failed to load storage content:', err);
+                    setStorageLoadFailed(true);
+                    setUploadError('Kayıtlı büyük içerik yüklenemedi. Güncellemeden önce bağlantıyı kontrol edin.');
+                })
                 .finally(() => setIsProcessing(false));
         }
     }, [editItem]);
@@ -148,11 +156,17 @@ export function ActivityForm({
         const css_code = String(formData.get('css_code') || '');
         const external_libs = String(formData.get('external_libs') || '');
 
-        const totalSize = html_code.length + js_code.length + css_code.length;
-        let storage_url = editItem?.storage_url || undefined;
+        if (storageLoadFailed) {
+            setUploadError('Kayıtlı içerik yüklenmeden güncelleme yapılamaz.');
+            return;
+        }
 
-        // Eğer içerik 200KB'dan büyükse Storage'a taşı
-        if (totalSize > 200 * 1024) {
+        const totalSize = html_code.length + js_code.length + css_code.length + external_libs.length;
+        const shouldUseStorage = totalSize > STORAGE_SIZE_LIMIT;
+        let storage_url: string | undefined;
+
+        // Eğer içerik Firestore güvenli sınırını aşarsa Storage'a taşı
+        if (shouldUseStorage) {
             try {
                 setIsProcessing(true);
                 const storagePath = `activities/${Date.now()}_code.json`;
@@ -176,11 +190,11 @@ export function ActivityForm({
             category: String(formData.get('category') || '').trim() || undefined,
             description: String(formData.get('description') || '').trim() || undefined,
             tags: String(formData.get('tags') || '').trim() || undefined,
-            html_code: storage_url ? '' : html_code,
-            js_code: storage_url ? '' : js_code,
-            css_code: storage_url ? '' : css_code,
-            external_libs: storage_url ? '' : external_libs,
-            storage_url,
+            html_code: shouldUseStorage ? '' : html_code,
+            js_code: shouldUseStorage ? '' : js_code,
+            css_code: shouldUseStorage ? '' : css_code,
+            external_libs: shouldUseStorage ? '' : external_libs,
+            storage_url: storage_url || '',
             is_test: formData.get('is_test') === 'on',
             has_timer: formData.get('has_timer') === 'on',
             duration_minutes: Number(formData.get('duration_minutes')) || undefined,
@@ -247,18 +261,18 @@ export function ActivityForm({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <textarea id="activity-html" ref={htmlCodeRef} name="html_code" rows={5} className={cn(inputClasses, 'font-mono text-xs')} placeholder="HTML Kodu" />
-                <textarea id="activity-js" ref={jsCodeRef} name="js_code" rows={5} className={cn(inputClasses, 'font-mono text-xs')} placeholder="JS Kodu" />
+                <textarea id="activity-html" ref={htmlCodeRef} name="html_code" rows={5} defaultValue={editItem?.html_code || ''} className={cn(inputClasses, 'font-mono text-xs')} placeholder="HTML Kodu" />
+                <textarea id="activity-js" ref={jsCodeRef} name="js_code" rows={5} defaultValue={editItem?.js_code || ''} className={cn(inputClasses, 'font-mono text-xs')} placeholder="JS Kodu" />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <textarea id="activity-css" ref={cssCodeRef} name="css_code" rows={3} className={cn(inputClasses, 'font-mono text-xs')} placeholder="CSS Kodu" />
-                <textarea id="activity-libs" ref={external_libsRef} name="external_libs" rows={3} className={cn(inputClasses, 'font-mono text-xs')} placeholder="Dış Kütüphaneler" />
+                <textarea id="activity-css" ref={cssCodeRef} name="css_code" rows={3} defaultValue={editItem?.css_code || ''} className={cn(inputClasses, 'font-mono text-xs')} placeholder="CSS Kodu" />
+                <textarea id="activity-libs" ref={external_libsRef} name="external_libs" rows={3} defaultValue={editItem?.external_libs || ''} className={cn(inputClasses, 'font-mono text-xs')} placeholder="Dış Kütüphaneler" />
             </div>
 
             <div className="flex justify-end gap-3">
                 <button type="button" onClick={onCancel} className="px-5 py-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Vazgeç</button>
-                <button type="submit" disabled={isSubmitting || isProcessing} className="px-6 py-3 bg-primary-container text-white font-bold rounded-xl shadow-lg hover:bg-primary-container/80 disabled:opacity-50 transition-colors">
+                <button type="submit" disabled={isSubmitting || isProcessing || storageLoadFailed} className="px-6 py-3 bg-primary-container text-white font-bold rounded-xl shadow-lg hover:bg-primary-container/80 disabled:opacity-50 transition-colors">
                     {isSubmitting ? 'Kaydediliyor...' : editItem ? 'Güncelle' : 'Ekle'}
                 </button>
             </div>

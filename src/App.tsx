@@ -382,6 +382,7 @@ export default function App() {
                 title={editItem ? 'Etkinliği Güncelle' : 'Yeni İnteraktif İçerik'}
             >
                 <ActivityForm
+                    key={editItem?.id || 'new'}
                     editItem={editItem}
                     isSubmitting={isSubmitting}
                     onSubmit={handleActivitySubmit}

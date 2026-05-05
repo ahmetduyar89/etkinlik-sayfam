@@ -110,6 +110,28 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
     ${headContent}
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18",
+        "react-dom": "https://esm.sh/react-dom@18",
+        "react-dom/client": "https://esm.sh/react-dom@18/client"
+      }
+    }
+    </script>
+    <script>
+        // Babel transpilation requires CommonJS fallback mapping
+        window.require = function(moduleName) {
+            if (moduleName === 'react') return window.React;
+            if (moduleName === 'react-dom') return window.ReactDOM;
+            if (moduleName === 'react-dom/client') return {
+                createRoot: function(el) { return window.ReactDOM.createRoot(el); }
+            };
+            return window[moduleName];
+        };
+        window.exports = {};
+        window.module = { exports: window.exports };
+    </script>
     ${allLibs}
     <style>
         /* Base Reset */
@@ -138,6 +160,7 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
             opacity: 0 !important;
             pointer-events: none !important;
             display: none !important;
+            overflow: hidden !important;
         }
     </style>
     <script>

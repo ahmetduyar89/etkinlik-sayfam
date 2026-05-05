@@ -92,11 +92,17 @@ export function StudentPortal({ act }: StudentPortalProps) {
                 };
 
                 if (act.storage_url) {
-                    console.log('Fetching from storage:', act.storage_url);
-                    const res = await fetch(act.storage_url, { cache: 'no-cache' });
-                    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                    const storageData = await res.json();
-                    data = { ...data, ...storageData };
+                    try {
+                        const res = await fetch(act.storage_url, { cache: 'no-cache' });
+                        if (res.ok) {
+                            const storageData = await res.json();
+                            data = { ...data, ...storageData };
+                        } else {
+                            console.warn(`Storage URL returned non-ok: ${res.status}`);
+                        }
+                    } catch (err) {
+                        console.warn('Storage content could not be loaded, using Firestore fallback:', err);
+                    }
                 }
                 
                 setFormattedHtml(getFormattedHtml(data));

@@ -113,9 +113,17 @@ export function ActivityPreviewModal({
                 };
 
                 if (activity.storage_url) {
-                    const res = await fetch(activity.storage_url);
-                    const storageData = await res.json();
-                    data = { ...data, ...storageData };
+                    try {
+                        const res = await fetch(activity.storage_url, { cache: 'no-cache' });
+                        if (res.ok) {
+                            const storageData = await res.json();
+                            data = { ...data, ...storageData };
+                        } else {
+                            console.warn(`Storage URL returned non-ok: ${res.status}`);
+                        }
+                    } catch (err) {
+                        console.warn('CORS or network error fetching storage_url, using Firestore content fallback:', err);
+                    }
                 }
                 
                 setFormattedHtml(getFormattedHtml(data));
