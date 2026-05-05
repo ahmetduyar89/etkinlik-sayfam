@@ -103,6 +103,20 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
         : '';
 
     const allLibs = extraLibs + libs;
+    const babelRuntime = isBabel
+        ? `<script>
+        window.require = function(moduleName) {
+            if (moduleName === 'react') return window.React;
+            if (moduleName === 'react-dom') return window.ReactDOM;
+            if (moduleName === 'react-dom/client') return {
+                createRoot: function(el) { return window.ReactDOM.createRoot(el); }
+            };
+            return window[moduleName];
+        };
+        window.exports = {};
+        window.module = { exports: window.exports };
+    </script>`
+        : '';
 
     const result = `<!DOCTYPE html>
 <html lang="tr"${htmlAttrs}>
@@ -119,19 +133,7 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
       }
     }
     </script>
-    <script>
-        // Babel transpilation requires CommonJS fallback mapping
-        window.require = function(moduleName) {
-            if (moduleName === 'react') return window.React;
-            if (moduleName === 'react-dom') return window.ReactDOM;
-            if (moduleName === 'react-dom/client') return {
-                createRoot: function(el) { return window.ReactDOM.createRoot(el); }
-            };
-            return window[moduleName];
-        };
-        window.exports = {};
-        window.module = { exports: window.exports };
-    </script>
+    ${babelRuntime}
     ${allLibs}
     <style>
         /* Base Reset */

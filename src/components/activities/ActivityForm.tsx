@@ -83,6 +83,15 @@ export function ActivityForm({
                         throw new Error('Geçersiz HTML formatı.');
                     }
 
+                    const isFullHtmlDocument = /<html[\s>]|<head[\s>]|<!DOCTYPE/i.test(text);
+                    if (isFullHtmlDocument) {
+                        if (htmlCodeRef.current) htmlCodeRef.current.value = text;
+                        if (jsCodeRef.current) jsCodeRef.current.value = '';
+                        if (cssCodeRef.current) cssCodeRef.current.value = '';
+                        if (external_libsRef.current) external_libsRef.current.value = '';
+                        return;
+                    }
+
                     const body = doc.body;
                     if (!body) throw new Error('Body bulunamadı.');
 
