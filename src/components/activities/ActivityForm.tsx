@@ -96,10 +96,16 @@ export function ActivityForm({
 
                     const isFullHtmlDocument = isFullHtmlDocumentText(text);
                     if (isFullHtmlDocument) {
-                        uploadedFullHtmlRef.current = text;
-                        setUploadedFullHtmlLabel(file.name);
                         if (htmlCodeRef.current) {
-                            htmlCodeRef.current.value = `Tam HTML dosyası yüklendi: ${file.name} (${Math.round(text.length / 1024)} KB). Performans için metin alanına basılmadı.`;
+                            if (text.length > FULL_HTML_TEXTAREA_LIMIT) {
+                                uploadedFullHtmlRef.current = text;
+                                setUploadedFullHtmlLabel(file.name);
+                                htmlCodeRef.current.value = `Tam HTML dosyası yüklendi: ${file.name} (${Math.round(text.length / 1024)} KB). Performans için metin alanına basılmadı.`;
+                            } else {
+                                uploadedFullHtmlRef.current = null;
+                                setUploadedFullHtmlLabel(null);
+                                htmlCodeRef.current.value = text;
+                            }
                         }
                         if (jsCodeRef.current) jsCodeRef.current.value = '';
                         if (cssCodeRef.current) cssCodeRef.current.value = '';
