@@ -6,6 +6,74 @@ type FormatSource = Partial<
 
 const htmlCache = new Map<string, string>();
 
+const isFullHtmlDocument = (html: string): boolean =>
+    /<html[\s>]|<head[\s>]|<body[\s>]|<!DOCTYPE/i.test(html);
+
+const rawDocumentBridge = `
+<script>
+    (function() {
+        function makeStorage() {
+            var s = {};
+            return {
+                getItem: function(k) { return Object.prototype.hasOwnProperty.call(s, k) ? s[k] : null; },
+                setItem: function(k, v) { s[k] = String(v); },
+                removeItem: function(k) { delete s[k]; },
+                clear: function() { s = {}; },
+                key: function(i) { return Object.keys(s)[i] || null; },
+                get length() { return Object.keys(s).length; }
+            };
+        }
+        try { localStorage.getItem('__test__'); } catch(e) {
+            try { Object.defineProperty(window, 'localStorage', { value: makeStorage() }); } catch(_) {}
+        }
+        try { sessionStorage.getItem('__test__'); } catch(e) {
+            try { Object.defineProperty(window, 'sessionStorage', { value: makeStorage() }); } catch(_) {}
+        }
+
+        window.sendAnswer = (data) => window.parent.postMessage({ type: 'SIM_ANSWER', data }, '*');
+
+        window.addEventListener('error', function(e) {
+            window.parent.postMessage({ type: 'JS_ERROR', error: e.message + (e.lineno ? ' (satır: ' + e.lineno + ')' : '') }, '*');
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            window.parent.postMessage({ type: 'JS_ERROR', error: 'Promise hatası: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)) }, '*');
+        });
+
+        function sendHeight() {
+            var doc = document.documentElement;
+            var body = document.body;
+            var height = Math.max(
+                doc ? doc.scrollHeight : 0,
+                doc ? doc.offsetHeight : 0,
+                body ? body.scrollHeight : 0,
+                body ? body.offsetHeight : 0,
+                window.innerHeight || 0
+            );
+            if (height > 0) {
+                window.parent.postMessage({ type: 'IFRAME_HEIGHT_SYNC', height: height }, '*');
+            }
+        }
+
+        window.addEventListener('load', sendHeight);
+        window.addEventListener('resize', sendHeight);
+        window.addEventListener('DOMContentLoaded', sendHeight);
+        setTimeout(sendHeight, 0);
+        setTimeout(sendHeight, 300);
+        setInterval(sendHeight, 2000);
+        window.parent.postMessage({ type: 'DRAWING_READY' }, '*');
+    })();
+</script>`;
+
+const appendRawDocumentBridge = (html: string): string => {
+    if (/<\/body>/i.test(html)) {
+        return html.replace(/<\/body>/i, `${rawDocumentBridge}\n</body>`);
+    }
+    if (/<\/html>/i.test(html)) {
+        return html.replace(/<\/html>/i, `${rawDocumentBridge}\n</html>`);
+    }
+    return `${html}\n${rawDocumentBridge}`;
+};
+
 export const getFormattedHtml = (act?: FormatSource | null): string => {
     if (!act) return '';
     const { html_code = '', css_code = '', js_code = '', external_libs = '' } = act;
@@ -14,6 +82,16 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
     const cacheKey = `${html_code}|${css_code}|${js_code}|${external_libs}`;
     if (htmlCache.has(cacheKey)) {
         return htmlCache.get(cacheKey)!;
+    }
+
+    if (isFullHtmlDocument(html_code) && !css_code && !js_code && !external_libs) {
+        const rawResult = appendRawDocumentBridge(html_code);
+        htmlCache.set(cacheKey, rawResult);
+        if (htmlCache.size > 50) {
+            const firstKey = htmlCache.keys().next().value;
+            if (firstKey !== undefined) htmlCache.delete(firstKey);
+        }
+        return rawResult;
     }
 
     let cleanHtml = html_code;
