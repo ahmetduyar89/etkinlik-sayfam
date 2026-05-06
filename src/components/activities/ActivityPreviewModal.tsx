@@ -100,6 +100,7 @@ export function ActivityPreviewModal({
 
     const [formattedHtml, setFormattedHtml] = React.useState<string>('');
     const [isLoadingContent, setIsLoadingContent] = React.useState(true);
+    const isRawHtml = activity.content_mode === 'raw_html';
 
     React.useEffect(() => {
         const loadContent = async () => {
@@ -109,7 +110,8 @@ export function ActivityPreviewModal({
                     html_code: activity.html_code,
                     js_code: activity.js_code,
                     css_code: activity.css_code,
-                    external_libs: activity.external_libs
+                    external_libs: activity.external_libs,
+                    content_mode: activity.content_mode
                 };
 
                 if (activity.storage_url) {
@@ -404,8 +406,8 @@ export function ActivityPreviewModal({
                             style={{
                                 position: 'relative',
                                 width: '100%',
-                                minHeight: '100%',
-                                height: iframeHeight,
+                                minHeight: isRawHtml ? '100%' : iframeHeight,
+                                height: isRawHtml ? '100%' : iframeHeight,
                             }}
                         >
                             {isLoadingContent ? (

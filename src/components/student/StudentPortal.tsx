@@ -79,6 +79,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
 
     const [formattedHtml, setFormattedHtml] = useState<string>('');
     const [isLoadingContent, setIsLoadingContent] = useState(true);
+    const isRawHtml = act.content_mode === 'raw_html';
 
     useEffect(() => {
         const loadContent = async () => {
@@ -88,7 +89,8 @@ export function StudentPortal({ act }: StudentPortalProps) {
                     html_code: act.html_code,
                     js_code: act.js_code,
                     css_code: act.css_code,
-                    external_libs: act.external_libs
+                    external_libs: act.external_libs,
+                    content_mode: act.content_mode
                 };
 
                 if (act.storage_url) {
@@ -326,8 +328,8 @@ export function StudentPortal({ act }: StudentPortalProps) {
                     style={{
                         position: 'relative',
                         width: '100%',
-                        minHeight: '100%',
-                        height: iframeHeight,
+                        minHeight: isRawHtml ? '100%' : iframeHeight,
+                        height: isRawHtml ? '100%' : iframeHeight,
                     }}
                 >
                     {isLoadingContent ? (

@@ -1,9 +1,9 @@
 import React from 'react';
-import { Plus } from 'lucide-react';
-import { cn } from '../../utils/cn';
-import type { Activity } from '../../types';
+import { FileCode2, Upload } from 'lucide-react';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../lib/firebase';
+import { cn } from '../../utils/cn';
+import type { Activity } from '../../types';
 
 export type ActivityFormValues = Omit<Activity, 'id' | 'created_at'>;
 
@@ -15,13 +15,23 @@ interface ActivityFormProps {
 }
 
 const inputClasses =
-    'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white font-medium focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all placeholder:text-slate-500';
+    'w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-[14px] text-white font-medium focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all placeholder:text-slate-500';
 const labelClasses =
     'block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2';
 const STORAGE_SIZE_LIMIT = 800 * 1024;
-const FULL_HTML_TEXTAREA_LIMIT = 200 * 1024;
-const isFullHtmlDocumentText = (text: string) =>
-    /<html[\s>]|<head[\s>]|<!DOCTYPE/i.test(text);
+const FILE_SIZE_LIMIT = 10 * 1024 * 1024;
+
+function getInlineHtml(editItem: Activity | null) {
+    if (!editItem?.html_code) return '';
+    if (editItem.content_mode === 'raw_html') return editItem.html_code;
+    return [
+        editItem.html_code,
+        editItem.css_code ? `<style>\n${editItem.css_code}\n</style>` : '',
+        editItem.js_code ? `<script>\n${editItem.js_code}\n</script>` : '',
+    ]
+        .filter(Boolean)
+        .join('\n\n');
+}
 
 export function ActivityForm({
     editItem,
@@ -29,136 +39,104 @@ export function ActivityForm({
     onSubmit,
     onCancel,
 }: ActivityFormProps) {
-    const htmlCodeRef = React.useRef<HTMLTextAreaElement>(null);
-    const jsCodeRef = React.useRef<HTMLTextAreaElement>(null);
-    const cssCodeRef = React.useRef<HTMLTextAreaElement>(null);
-    const external_libsRef = React.useRef<HTMLTextAreaElement>(null);
-    const uploadedFullHtmlRef = React.useRef<string | null>(null);
-    const uploadedRawHtmlRef = React.useRef(false);
+    const [html, setHtml] = React.useState(() => getInlineHtml(editItem));
     const [uploadError, setUploadError] = React.useState<string | null>(null);
     const [isProcessing, setIsProcessing] = React.useState(false);
     const [storageLoadFailed, setStorageLoadFailed] = React.useState(false);
-    const [uploadedFullHtmlLabel, setUploadedFullHtmlLabel] = React.useState<string | null>(null);
 
-    // Eğer düzenleme modundaysak ve storage_url varsa veriyi çek
     React.useEffect(() => {
-        setStorageLoadFailed(false);
+        let ignore = false;
         setUploadError(null);
-        uploadedFullHtmlRef.current = null;
-        uploadedRawHtmlRef.current = editItem?.content_mode === 'raw_html';
-        setUploadedFullHtmlLabel(null);
-        if (editItem?.storage_url) {
-            setIsProcessing(true);
-            fetch(editItem.storage_url)
-                .then(res => res.json())
-                .then(data => {
-                    const htmlCode = String(data.html_code || '');
-                    if (htmlCodeRef.current) {
-                        if (isFullHtmlDocumentText(htmlCode) && htmlCode.length > FULL_HTML_TEXTAREA_LIMIT) {
-                            uploadedFullHtmlRef.current = htmlCode;
-                            setUploadedFullHtmlLabel('Kayıtlı tam HTML içerik');
-                            htmlCodeRef.current.value = `Tam HTML içerik hazır (${Math.round(htmlCode.length / 1024)} KB). Metin alanına basılmadı; güncellerseniz yeni dosya yükleyin veya bu alana manuel HTML yazın.`;
-                        } else {
-                            htmlCodeRef.current.value = htmlCode;
-                        }
-                    }
-                    if (jsCodeRef.current) jsCodeRef.current.value = data.js_code || '';
-                    if (cssCodeRef.current) cssCodeRef.current.value = data.css_code || '';
-                    if (external_libsRef.current) external_libsRef.current.value = data.external_libs || '';
-                })
-                .catch(err => {
-                    console.error('Failed to load storage content:', err);
+        setStorageLoadFailed(false);
+        setHtml(getInlineHtml(editItem));
+
+        if (!editItem?.storage_url) return;
+
+        setIsProcessing(true);
+        fetch(editItem.storage_url, { cache: 'no-cache' })
+            .then((res) => {
+                if (!res.ok) throw new Error('Kayıtlı HTML dosyası okunamadı.');
+                return res.json();
+            })
+            .then((data) => {
+                if (!ignore) setHtml(String(data.html_code || ''));
+            })
+            .catch((err) => {
+                console.error('Stored HTML load error:', err);
+                if (!ignore) {
                     setStorageLoadFailed(true);
-                    setUploadError('Kayıtlı büyük içerik yüklenemedi. Güncellemeden önce bağlantıyı kontrol edin.');
-                })
-                .finally(() => setIsProcessing(false));
-        }
+                    setUploadError('Kayıtlı HTML yüklenemedi. Güncellemeden önce bağlantıyı kontrol edin.');
+                }
+            })
+            .finally(() => {
+                if (!ignore) setIsProcessing(false);
+            });
+
+        return () => {
+            ignore = true;
+        };
     }, [editItem]);
 
     const handleHtmlFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
+        e.target.value = '';
         if (!file) return;
 
-        if (file.size > 10 * 1024 * 1024) {
-            setUploadError('Dosya boyutu çok büyük (Maksimum 10MB).');
+        if (file.size > FILE_SIZE_LIMIT) {
+            setUploadError('Dosya boyutu çok büyük. Maksimum 10MB HTML yükleyebilirsiniz.');
             return;
         }
 
         setUploadError(null);
-        uploadedFullHtmlRef.current = null;
-        uploadedRawHtmlRef.current = false;
-        setUploadedFullHtmlLabel(null);
         setIsProcessing(true);
+
         const reader = new FileReader();
-
-        reader.onload = (ev) => {
-            setTimeout(() => {
-                try {
-                    const text = ev.target?.result as string;
-                    if (!text) throw new Error('Dosya okunamadı.');
-
-                    uploadedRawHtmlRef.current = true;
-                    if (htmlCodeRef.current) {
-                        if (text.length > FULL_HTML_TEXTAREA_LIMIT) {
-                            uploadedFullHtmlRef.current = text;
-                            setUploadedFullHtmlLabel(file.name);
-                            htmlCodeRef.current.value = `HTML dosyası yüklendi: ${file.name} (${Math.round(text.length / 1024)} KB). Performans için metin alanına basılmadı; kaydedince dosya olduğu gibi kullanılacak.`;
-                        } else {
-                            uploadedFullHtmlRef.current = null;
-                            setUploadedFullHtmlLabel(null);
-                            htmlCodeRef.current.value = text;
-                        }
-                    }
-                    if (jsCodeRef.current) jsCodeRef.current.value = '';
-                    if (cssCodeRef.current) cssCodeRef.current.value = '';
-                    if (external_libsRef.current) external_libsRef.current.value = '';
-
-                } catch (err) {
-                    console.error('Parse error:', err);
-                    setUploadError(err instanceof Error ? err.message : 'Hata oluştu.');
-                } finally {
-                    setIsProcessing(false);
-                }
-            }, 100);
+        reader.onload = (event) => {
+            setHtml(String(event.target?.result || ''));
+            setIsProcessing(false);
+        };
+        reader.onerror = () => {
+            setUploadError('HTML dosyası okunamadı.');
+            setIsProcessing(false);
         };
         reader.readAsText(file);
-        e.target.value = '';
     };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const formData = new FormData(e.currentTarget);
-        
-        const html_code = uploadedFullHtmlRef.current ?? String(formData.get('html_code') || '');
-        const js_code = String(formData.get('js_code') || '');
-        const css_code = String(formData.get('css_code') || '');
-        const external_libs = String(formData.get('external_libs') || '');
-        const content_mode =
-            uploadedRawHtmlRef.current || (isFullHtmlDocumentText(html_code) && !js_code && !css_code && !external_libs)
-                ? 'raw_html'
-                : 'composed';
 
         if (storageLoadFailed) {
-            setUploadError('Kayıtlı içerik yüklenmeden güncelleme yapılamaz.');
+            setUploadError('Kayıtlı HTML yüklenmeden güncelleme yapılamaz.');
             return;
         }
 
-        const totalSize = html_code.length + js_code.length + css_code.length + external_libs.length;
-        const shouldUseStorage = totalSize > STORAGE_SIZE_LIMIT;
-        let storage_url: string | undefined;
+        const formData = new FormData(e.currentTarget);
+        const title = String(formData.get('title') || '').trim();
+        const html_code = html;
 
-        // Eğer içerik Firestore güvenli sınırını aşarsa Storage'a taşı
+        if (!title || !html_code.trim()) {
+            setUploadError('Başlık ve HTML içeriği zorunludur.');
+            return;
+        }
+
+        const shouldUseStorage = html_code.length > STORAGE_SIZE_LIMIT;
+        let storage_url = '';
+
         if (shouldUseStorage) {
             try {
                 setIsProcessing(true);
-                const storagePath = `activities/${Date.now()}_code.json`;
+                const storagePath = `activities/${Date.now()}_raw_html.json`;
                 const storageRef = ref(storage, storagePath);
-                const content = JSON.stringify({ html_code, js_code, css_code, external_libs, content_mode });
-                await uploadString(storageRef, content, 'raw', { contentType: 'application/json' });
+                await uploadString(
+                    storageRef,
+                    JSON.stringify({ html_code, content_mode: 'raw_html' }),
+                    'raw',
+                    { contentType: 'application/json' }
+                );
                 storage_url = await getDownloadURL(storageRef);
             } catch (err) {
-                console.error('Upload error:', err);
-                setUploadError('Veri kaydedilemedi. Boyut çok büyük olabilir.');
+                console.error('HTML upload error:', err);
+                setUploadError('HTML kaydedilemedi. Dosya boyutu veya bağlantıyı kontrol edin.');
                 setIsProcessing(false);
                 return;
             } finally {
@@ -166,23 +144,22 @@ export function ActivityForm({
             }
         }
 
-        const payload: ActivityFormValues = {
-            title: String(formData.get('title') || '').trim(),
+        onSubmit({
+            title,
             image_url: String(formData.get('image_url') || '').trim() || undefined,
             category: String(formData.get('category') || '').trim() || undefined,
             description: String(formData.get('description') || '').trim() || undefined,
             tags: String(formData.get('tags') || '').trim() || undefined,
             html_code: shouldUseStorage ? '' : html_code,
-            js_code: shouldUseStorage ? '' : js_code,
-            css_code: shouldUseStorage ? '' : css_code,
-            external_libs: shouldUseStorage ? '' : external_libs,
-            content_mode,
-            storage_url: storage_url || '',
+            js_code: '',
+            css_code: '',
+            external_libs: '',
+            content_mode: 'raw_html',
+            storage_url,
             is_test: formData.get('is_test') === 'on',
             has_timer: formData.get('has_timer') === 'on',
             duration_minutes: Number(formData.get('duration_minutes')) || undefined,
-        };
-        onSubmit(payload);
+        });
     };
 
     return (
@@ -214,7 +191,7 @@ export function ActivityForm({
                 <input id="activity-tags" name="tags" defaultValue={editItem?.tags} className={inputClasses} />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 px-6 py-4 bg-white/5 rounded-2xl border border-white/10">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-5 px-5 py-4 bg-white/5 rounded-lg border border-white/10">
                 <div className="flex items-center gap-6">
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" name="is_test" defaultChecked={editItem?.is_test} className="sr-only peer" />
@@ -227,53 +204,47 @@ export function ActivityForm({
                         <span className="text-[11px] font-bold text-slate-300 uppercase">Süre Sınırı</span>
                     </label>
                 </div>
-                <input name="duration_minutes" type="number" defaultValue={editItem?.duration_minutes || 20} className={inputClasses} />
+                <input name="duration_minutes" type="number" min={1} defaultValue={editItem?.duration_minutes || 20} className={inputClasses} />
             </div>
 
-            <div className="p-4 bg-white/5 rounded-2xl border-2 border-dashed border-white/20 text-center space-y-2">
-                <span className={labelClasses}>HTML Dosyası Yükle</span>
-                <p className="text-xs text-slate-400">Maksimum 10MB .html dosyası yükleyebilirsiniz.</p>
-                <label className={cn(
-                    "inline-flex items-center gap-2 px-5 py-2.5 bg-primary-container text-white text-[13px] font-bold rounded-xl cursor-pointer hover:bg-primary-container/80 transition-colors shadow-md",
-                    isProcessing && "opacity-60 cursor-not-allowed pointer-events-none"
-                )}>
-                    {isProcessing ? "İşleniyor..." : "Dosya Seç"}
-                    <input type="file" accept=".html,.htm" className="sr-only" onChange={handleHtmlFileUpload} disabled={isProcessing} />
-                </label>
-                {uploadedFullHtmlLabel && (
-                    <p className="text-xs font-medium text-emerald-300">
-                        {uploadedFullHtmlLabel} tam HTML olarak hızlı modda hazır.
-                    </p>
-                )}
-                {uploadError && <p className="text-xs font-medium text-red-400">{uploadError}</p>}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <section className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+                    <div>
+                        <label htmlFor="activity-html" className={labelClasses}>HTML İçeriği</label>
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                            <FileCode2 className="w-4 h-4" />
+                            <span>Buraya yapıştırılan veya yüklenen HTML değiştirilmeden gösterilir.</span>
+                        </div>
+                    </div>
+                    <label className={cn(
+                        'inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 text-white text-[13px] font-bold rounded-lg cursor-pointer hover:bg-white/15 transition-colors border border-white/10',
+                        isProcessing && 'opacity-60 cursor-not-allowed pointer-events-none'
+                    )}>
+                        <Upload className="w-4 h-4" />
+                        {isProcessing ? 'Yükleniyor...' : 'HTML Dosyası Seç'}
+                        <input type="file" accept=".html,.htm,text/html" className="sr-only" onChange={handleHtmlFileUpload} disabled={isProcessing} />
+                    </label>
+                </div>
                 <textarea
                     id="activity-html"
-                    ref={htmlCodeRef}
                     name="html_code"
-                    rows={5}
-                    defaultValue={editItem?.html_code || ''}
-                    onChange={() => {
-                        uploadedFullHtmlRef.current = null;
-                        uploadedRawHtmlRef.current = false;
-                        setUploadedFullHtmlLabel(null);
+                    rows={16}
+                    required
+                    value={html}
+                    onChange={(event) => {
+                        setHtml(event.target.value);
+                        if (uploadError) setUploadError(null);
                     }}
-                    className={cn(inputClasses, 'font-mono text-xs')}
-                    placeholder="HTML Kodu"
+                    className={cn(inputClasses, 'font-mono text-xs leading-relaxed resize-y min-h-[360px]')}
+                    placeholder="Tam HTML dosyanızı buraya yapıştırın."
+                    spellCheck={false}
                 />
-                <textarea id="activity-js" ref={jsCodeRef} name="js_code" rows={5} defaultValue={editItem?.js_code || ''} className={cn(inputClasses, 'font-mono text-xs')} placeholder="JS Kodu" />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <textarea id="activity-css" ref={cssCodeRef} name="css_code" rows={3} defaultValue={editItem?.css_code || ''} className={cn(inputClasses, 'font-mono text-xs')} placeholder="CSS Kodu" />
-                <textarea id="activity-libs" ref={external_libsRef} name="external_libs" rows={3} defaultValue={editItem?.external_libs || ''} className={cn(inputClasses, 'font-mono text-xs')} placeholder="Dış Kütüphaneler" />
-            </div>
+                {uploadError && <p className="text-xs font-medium text-red-400">{uploadError}</p>}
+            </section>
 
             <div className="flex justify-end gap-3">
                 <button type="button" onClick={onCancel} className="px-5 py-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Vazgeç</button>
-                <button type="submit" disabled={isSubmitting || isProcessing || storageLoadFailed} className="px-6 py-3 bg-primary-container text-white font-bold rounded-xl shadow-lg hover:bg-primary-container/80 disabled:opacity-50 transition-colors">
+                <button type="submit" disabled={isSubmitting || isProcessing || storageLoadFailed} className="px-6 py-3 bg-primary-container text-white font-bold rounded-lg shadow-lg hover:bg-primary-container/80 disabled:opacity-50 transition-colors">
                     {isSubmitting ? 'Kaydediliyor...' : editItem ? 'Güncelle' : 'Ekle'}
                 </button>
             </div>
