@@ -217,6 +217,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const laserCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
         const strokesRef = React.useRef<Stroke[]>([]);
         const isDrawingRef = React.useRef(false);
+        const resizeFrameRef = React.useRef<number | null>(null);
 
         const getCanvasSize = () => {
             const c = canvasRef.current;
@@ -237,8 +238,11 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const buffer = bufferCanvasRef.current;
             const mainCanvas = canvasRef.current;
             if (!bCtx || !mainCtx || !buffer || !mainCanvas) return;
+            if (buffer.width === 0 || buffer.height === 0) return;
 
             const { w, h } = getCanvasSize();
+            if (w <= 0 || h <= 0) return;
+
             bCtx.clearRect(0, 0, w, h);
             strokesRef.current.forEach((s) => drawStroke(bCtx, s));
 
@@ -401,6 +405,15 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const parent = canvas.parentElement;
             const w = parent ? parent.offsetWidth : window.innerWidth;
             const h = parent ? parent.offsetHeight : window.innerHeight;
+            if (w <= 0 || h <= 0) {
+                if (resizeFrameRef.current === null) {
+                    resizeFrameRef.current = window.requestAnimationFrame(() => {
+                        resizeFrameRef.current = null;
+                        resize();
+                    });
+                }
+                return;
+            }
 
             [canvas, buffer, laser].forEach((c) => {
                 if (!c) return;
@@ -438,11 +451,21 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 const obs = new ResizeObserver(() => resize());
                 obs.observe(target);
                 resize();
-                return () => obs.disconnect();
+                return () => {
+                    obs.disconnect();
+                    if (resizeFrameRef.current !== null) {
+                        window.cancelAnimationFrame(resizeFrameRef.current);
+                    }
+                };
             }
             window.addEventListener('resize', resize);
             resize();
-            return () => window.removeEventListener('resize', resize);
+            return () => {
+                window.removeEventListener('resize', resize);
+                if (resizeFrameRef.current !== null) {
+                    window.cancelAnimationFrame(resizeFrameRef.current);
+                }
+            };
         }, [resize]);
 
         const startDrawing = async (e: React.PointerEvent) => {

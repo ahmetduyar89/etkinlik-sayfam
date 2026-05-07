@@ -406,8 +406,8 @@ export function ActivityPreviewModal({
                             style={{
                                 position: 'relative',
                                 width: '100%',
-                                minHeight: isRawHtml ? '100%' : iframeHeight,
-                                height: isRawHtml ? '100%' : iframeHeight,
+                                minHeight: isRawHtml ? 'calc(100vh - 3.5rem)' : iframeHeight,
+                                height: isRawHtml ? 'calc(100vh - 3.5rem)' : iframeHeight,
                             }}
                         >
                             {isLoadingContent ? (
