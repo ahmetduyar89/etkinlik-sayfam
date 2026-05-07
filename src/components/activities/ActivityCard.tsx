@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo } from 'react';
 import {
     BarChart3,
     Copy,
@@ -32,8 +32,6 @@ function ActivityCardBase({
     onCopyLink,
     onCopyHtml,
 }: ActivityCardProps) {
-    const [isHovered, setIsHovered] = useState(false);
-
     const tags = act.tags
         ? act.tags
               .split(',')
@@ -45,8 +43,6 @@ function ActivityCardBase({
         <div 
             className="group glass-card rounded-2xl overflow-hidden flex flex-col transition-all duration-500 hover:-translate-y-2 neon-glow-hover cursor-pointer h-full"
             onClick={() => onOpenPreview(act.id)}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
         >
             <div className="relative h-56 overflow-hidden">
                 {act.image_url ? (
@@ -57,7 +53,7 @@ function ActivityCardBase({
                     />
                 ) : (
                     <div className="w-full h-full bg-surface-container-highest flex items-center justify-center transition-all duration-500 overflow-hidden">
-                         {isHovered && (act.html_code || act.js_code) ? (
+                         {act.html_code || act.js_code || act.storage_url ? (
                             <LivePreview act={act} />
                         ) : (
                             <div className="flex flex-col items-center gap-2 text-slate-500">
