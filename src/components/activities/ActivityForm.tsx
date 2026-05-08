@@ -3,6 +3,7 @@ import { FileCode2, Upload } from 'lucide-react';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../lib/firebase';
 import { cn } from '../../utils/cn';
+import { GRADE_LEVELS, SUBJECTS, formatGradeLevel } from '../../constants/education';
 import type { Activity } from '../../types';
 
 export type ActivityFormValues = Omit<Activity, 'id' | 'created_at'>;
@@ -148,6 +149,8 @@ export function ActivityForm({
             title,
             image_url: String(formData.get('image_url') || '').trim() || undefined,
             category: String(formData.get('category') || '').trim() || undefined,
+            grade_level: String(formData.get('grade_level') || '').trim() || undefined,
+            subject: String(formData.get('subject') || '').trim() || undefined,
             description: String(formData.get('description') || '').trim() || undefined,
             tags: String(formData.get('tags') || '').trim() || undefined,
             html_code: shouldUseStorage ? '' : html_code,
@@ -175,15 +178,44 @@ export function ActivityForm({
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div>
                     <label htmlFor="activity-category" className={labelClasses}>Kategori</label>
-                    <input id="activity-category" name="category" defaultValue={editItem?.category} className={inputClasses} />
+                    <input id="activity-category" name="category" defaultValue={editItem?.category} className={inputClasses} placeholder="Örn. Etkinlik, Simülasyon" />
                 </div>
                 <div>
-                    <label htmlFor="activity-description" className={labelClasses}>Açıklama</label>
-                    <textarea id="activity-description" name="description" defaultValue={editItem?.description} rows={2} className={cn(inputClasses, 'resize-none')} />
+                    <label htmlFor="activity-grade-level" className={labelClasses}>Sınıf</label>
+                    <select
+                        id="activity-grade-level"
+                        name="grade_level"
+                        defaultValue={editItem?.grade_level || ''}
+                        className={inputClasses}
+                    >
+                        <option value="" className="text-slate-900">Sınıf seçin</option>
+                        {GRADE_LEVELS.map((grade) => (
+                            <option key={grade} value={grade} className="text-slate-900">{formatGradeLevel(grade)}</option>
+                        ))}
+                    </select>
                 </div>
+                <div>
+                    <label htmlFor="activity-subject" className={labelClasses}>Ders</label>
+                    <select
+                        id="activity-subject"
+                        name="subject"
+                        defaultValue={editItem?.subject || ''}
+                        className={inputClasses}
+                    >
+                        <option value="" className="text-slate-900">Ders seçin</option>
+                        {SUBJECTS.map((subject) => (
+                            <option key={subject} value={subject} className="text-slate-900">{subject}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label htmlFor="activity-description" className={labelClasses}>Açıklama</label>
+                <textarea id="activity-description" name="description" defaultValue={editItem?.description} rows={2} className={cn(inputClasses, 'resize-none')} />
             </div>
 
             <div>

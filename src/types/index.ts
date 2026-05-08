@@ -3,6 +3,8 @@ export interface Activity {
     title: string;
     description?: string;
     category?: string;
+    grade_level?: string;
+    subject?: string;
     tags?: string;
     image_url?: string;
     is_test?: boolean;

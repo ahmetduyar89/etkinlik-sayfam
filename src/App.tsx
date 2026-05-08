@@ -13,6 +13,13 @@ import { ResultsModal } from './components/activities/ResultsModal';
 import { ActivityForm, type ActivityFormValues } from './components/activities/ActivityForm';
 import { ActivityPreviewModal } from './components/activities/ActivityPreviewModal';
 import { StudentPortal } from './components/student/StudentPortal';
+import {
+    GRADE_LEVELS,
+    SUBJECTS,
+    formatGradeLevel,
+    getGradeSortIndex,
+    getSubjectSortIndex,
+} from './constants/education';
 import type { Activity } from './types';
 
 export default function App() {
@@ -28,6 +35,9 @@ export default function App() {
     const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [selectedTag, setSelectedTag] = useState<string | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [selectedGradeLevel, setSelectedGradeLevel] = useState<string | null>(null);
+    const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
     const [isActivityOpen, setIsActivityOpen] = useState(false);
     const [editItem, setEditItem] = useState<Activity | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,11 +70,30 @@ export default function App() {
         return Array.from(tagSet).sort();
     }, [activities]);
 
+    const allCategories = useMemo(() => {
+        const categorySet = new Set<string>();
+        activities.forEach((a) => categorySet.add(a.category?.trim() || 'Genel'));
+        return Array.from(categorySet).sort((a, b) => a.localeCompare(b, 'tr'));
+    }, [activities]);
+
     const filteredActivities = useMemo(() => {
-        const needle = debouncedSearch.toLowerCase();
+        const needle = debouncedSearch.trim().toLocaleLowerCase('tr');
         return activities.filter((a) => {
-            const titleMatch = (a.title || '').toLowerCase().includes(needle);
-            if (!titleMatch) return false;
+            const haystack = [
+                a.title,
+                a.description,
+                a.category,
+                a.grade_level ? formatGradeLevel(a.grade_level) : '',
+                a.subject,
+                a.tags,
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLocaleLowerCase('tr');
+            if (needle && !haystack.includes(needle)) return false;
+            if (selectedCategory && (a.category?.trim() || 'Genel') !== selectedCategory) return false;
+            if (selectedGradeLevel && a.grade_level !== selectedGradeLevel) return false;
+            if (selectedSubject && a.subject !== selectedSubject) return false;
             if (!selectedTag) return true;
             const tags = a.tags
                 ? a.tags
@@ -74,7 +103,41 @@ export default function App() {
                 : [];
             return tags.includes(selectedTag);
         });
-    }, [activities, debouncedSearch, selectedTag]);
+    }, [activities, debouncedSearch, selectedCategory, selectedGradeLevel, selectedSubject, selectedTag]);
+
+    const groupedActivities = useMemo(() => {
+        const categoryGroups = new Map<string, Activity[]>();
+        filteredActivities.forEach((activity) => {
+            const category = activity.category?.trim() || 'Genel';
+            const current = categoryGroups.get(category) || [];
+            current.push(activity);
+            categoryGroups.set(category, current);
+        });
+
+        return Array.from(categoryGroups.entries())
+            .sort(([a], [b]) => a.localeCompare(b, 'tr'))
+            .map(([category, categoryActivities]) => {
+                const educationGroups = new Map<string, Activity[]>();
+                categoryActivities.forEach((activity) => {
+                    const label = `${formatGradeLevel(activity.grade_level)} / ${activity.subject || 'Ders yok'}`;
+                    const current = educationGroups.get(label) || [];
+                    current.push(activity);
+                    educationGroups.set(label, current);
+                });
+                return [
+                    category,
+                    Array.from(educationGroups.entries()).sort(([, aItems], [, bItems]) => {
+                        const a = aItems[0];
+                        const b = bItems[0];
+                        const gradeDiff = getGradeSortIndex(a?.grade_level) - getGradeSortIndex(b?.grade_level);
+                        if (gradeDiff !== 0) return gradeDiff;
+                        const subjectDiff = getSubjectSortIndex(a?.subject) - getSubjectSortIndex(b?.subject);
+                        if (subjectDiff !== 0) return subjectDiff;
+                        return (a?.subject || '').localeCompare(b?.subject || '', 'tr');
+                    }),
+                ] as const;
+            });
+    }, [filteredActivities]);
 
     const openEdit = useCallback((act: Activity) => {
         setEditItem(act);
@@ -199,7 +262,82 @@ export default function App() {
                                     </div>
                                 </div>
 
-                                {/* Categories / Tags */}
+                                {/* Categories */}
+                                <div className="space-y-3">
+                                    <label className="font-label-md text-label-md text-slate-400 uppercase tracking-widest text-[10px]">Kategoriler</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button
+                                            onClick={() => setSelectedCategory(null)}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-full font-label-md text-xs transition-all",
+                                                selectedCategory === null ? "bg-primary-container text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
+                                            )}
+                                        >
+                                            Tümü
+                                        </button>
+                                        {allCategories.map(category => (
+                                            <button
+                                                key={category}
+                                                onClick={() => setSelectedCategory(selectedCategory === category ? null : category)}
+                                                className={cn(
+                                                    "px-3 py-1.5 rounded-full font-label-md text-xs transition-all",
+                                                    selectedCategory === category ? "bg-primary-container text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
+                                                )}
+                                            >
+                                                {category}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Grade Levels */}
+                                <div className="space-y-3">
+                                    <label className="font-label-md text-label-md text-slate-400 uppercase tracking-widest text-[10px]">Sınıflar</label>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {GRADE_LEVELS.map(grade => (
+                                            <button
+                                                key={grade}
+                                                onClick={() => setSelectedGradeLevel(selectedGradeLevel === grade ? null : grade)}
+                                                className={cn(
+                                                    "px-2 py-2 rounded-lg font-label-md text-xs transition-all border border-white/5",
+                                                    selectedGradeLevel === grade ? "bg-primary-container text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
+                                                )}
+                                            >
+                                                {grade}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Subjects */}
+                                <div className="space-y-3">
+                                    <label className="font-label-md text-label-md text-slate-400 uppercase tracking-widest text-[10px]">Dersler</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button
+                                            onClick={() => setSelectedSubject(null)}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-full font-label-md text-xs transition-all",
+                                                selectedSubject === null ? "bg-primary-container text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
+                                            )}
+                                        >
+                                            Tümü
+                                        </button>
+                                        {SUBJECTS.map(subject => (
+                                            <button
+                                                key={subject}
+                                                onClick={() => setSelectedSubject(selectedSubject === subject ? null : subject)}
+                                                className={cn(
+                                                    "px-3 py-1.5 rounded-full font-label-md text-xs transition-all",
+                                                    selectedSubject === subject ? "bg-primary-container text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
+                                                )}
+                                            >
+                                                {subject}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Tags */}
                                 <div className="space-y-3">
                                     <label className="font-label-md text-label-md text-slate-400 uppercase tracking-widest text-[10px]">Etiketler</label>
                                     <div className="flex flex-wrap gap-2">
@@ -285,21 +423,59 @@ export default function App() {
                                 </div>
                             </div>
                         ) : (
-                            <div className={cn(
-                                "grid gap-8",
-                                viewMode === 'grid' ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"
-                            )}>
-                                {filteredActivities.map((act) => (
-                                    <ActivityCard 
-                                        key={act.id}
-                                        act={act}
-                                        onOpenPreview={setPreviewId}
-                                        onEdit={openEdit}
-                                        onRequestDelete={handleRequestDelete}
-                                        onShowResults={setShowResultsId}
-                                        onCopyLink={handleCopyLink}
-                                        onCopyHtml={handleCopyHtml}
-                                    />
+                            <div className="space-y-12">
+                                {groupedActivities.map(([category, educationGroups]) => (
+                                    <section key={category} className="space-y-5">
+                                        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 border-b border-white/10 pb-3">
+                                            <div>
+                                                <p className="font-label-md text-label-md text-slate-400 uppercase tracking-widest text-[10px]">Kategori</p>
+                                                <h2 className="text-2xl font-black text-white tracking-tight">{category}</h2>
+                                            </div>
+                                            <p className="text-sm font-bold text-slate-400">
+                                                {educationGroups.reduce((total, [, items]) => total + items.length, 0)} içerik
+                                            </p>
+                                        </div>
+
+                                        {educationGroups.map(([educationLabel, educationActivities]) => (
+                                            <div key={educationLabel} className="space-y-4">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <h3 className="text-sm font-black text-slate-300 uppercase tracking-widest">{educationLabel}</h3>
+                                                    <span className="text-xs font-bold text-slate-500">{educationActivities.length}</span>
+                                                </div>
+
+                                                <div className={cn(
+                                                    "grid gap-8",
+                                                    viewMode === 'grid' ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"
+                                                )}>
+                                                    {educationActivities.map((act) => (
+                                                        viewMode === 'grid' ? (
+                                                            <ActivityCard
+                                                                key={act.id}
+                                                                act={act}
+                                                                onOpenPreview={setPreviewId}
+                                                                onEdit={openEdit}
+                                                                onRequestDelete={handleRequestDelete}
+                                                                onShowResults={setShowResultsId}
+                                                                onCopyLink={handleCopyLink}
+                                                                onCopyHtml={handleCopyHtml}
+                                                            />
+                                                        ) : (
+                                                            <ActivityListItem
+                                                                key={act.id}
+                                                                act={act}
+                                                                onOpenPreview={setPreviewId}
+                                                                onEdit={openEdit}
+                                                                onRequestDelete={handleRequestDelete}
+                                                                onShowResults={setShowResultsId}
+                                                                onCopyLink={handleCopyLink}
+                                                                onCopyHtml={handleCopyHtml}
+                                                            />
+                                                        )
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </section>
                                 ))}
                             </div>
                         )}

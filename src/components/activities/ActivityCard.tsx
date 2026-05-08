@@ -11,6 +11,7 @@ import {
 import { IconButton } from '../common/IconButton';
 import { LivePreview } from './LivePreview';
 import { cn } from '../../utils/cn';
+import { formatGradeLevel } from '../../constants/education';
 import type { Activity } from '../../types';
 
 interface ActivityCardProps {
@@ -64,7 +65,7 @@ function ActivityCardBase({
                     </div>
                 )}
                 
-                <div className="absolute top-4 left-4 bg-tertiary text-on-tertiary-fixed font-bold text-[10px] px-3 py-1 rounded-full uppercase tracking-wider">
+                <div className="absolute top-4 left-4 bg-tertiary text-on-tertiary-fixed font-bold text-[10px] px-3 py-1 rounded-full uppercase tracking-wider max-w-[calc(100%-2rem)] truncate">
                     {act.category || 'Genel'}
                 </div>
                 
@@ -90,6 +91,20 @@ function ActivityCardBase({
                     <p className="text-body-md text-sm text-slate-400 line-clamp-2 leading-relaxed">
                         {act.description || 'Bu etkinlik için henüz bir açıklama girilmemiş.'}
                     </p>
+
+                    <div className="flex flex-wrap gap-2">
+                        <span className="px-2.5 py-1 rounded-md bg-white/5 text-slate-300 text-[10px] font-bold uppercase tracking-wider border border-white/5">
+                            {formatGradeLevel(act.grade_level)}
+                        </span>
+                        <span className={cn(
+                            'px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border',
+                            act.subject
+                                ? 'bg-primary-container/15 text-primary border-primary/20'
+                                : 'bg-white/5 text-slate-500 border-white/5'
+                        )}>
+                            {act.subject || 'Ders yok'}
+                        </span>
+                    </div>
                     
                     {tags.length > 0 && (
                         <div className="flex flex-wrap gap-2 pt-2">

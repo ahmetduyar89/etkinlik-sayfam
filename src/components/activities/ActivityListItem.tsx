@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { IconButton } from '../common/IconButton';
 import { cn } from '../../utils/cn';
+import { formatGradeLevel } from '../../constants/education';
 import type { Activity } from '../../types';
 
 interface ActivityListItemProps {
@@ -58,6 +59,17 @@ function ActivityListItemBase({
                     )}
                     <span className="px-2 py-0.5 bg-white/5 text-slate-400 text-[9px] font-bold rounded-md uppercase tracking-wider border border-white/5">
                         {act.category || 'Genel'}
+                    </span>
+                    <span className="px-2 py-0.5 bg-white/5 text-slate-400 text-[9px] font-bold rounded-md uppercase tracking-wider border border-white/5">
+                        {formatGradeLevel(act.grade_level)}
+                    </span>
+                    <span className={cn(
+                        'px-2 py-0.5 text-[9px] font-bold rounded-md uppercase tracking-wider border',
+                        act.subject
+                            ? 'bg-primary-container/15 text-primary border-primary/20'
+                            : 'bg-white/5 text-slate-500 border-white/5'
+                    )}>
+                        {act.subject || 'Ders yok'}
                     </span>
                 </div>
                 <p className="text-sm text-slate-400 line-clamp-1">
