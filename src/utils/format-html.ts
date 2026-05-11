@@ -4,23 +4,8 @@ type FormatSource = Partial<
     Pick<Activity, 'html_code' | 'css_code' | 'js_code' | 'external_libs' | 'content_mode'>
 >;
 
-const htmlCache = new Map<string, string>();
-
 const isFullHtmlDocument = (html: string): boolean =>
     /<html[\s>]|<head[\s>]|<body[\s>]|<!DOCTYPE/i.test(html);
-
-const getCached = (key: string, makeValue: () => string) => {
-    const cached = htmlCache.get(key);
-    if (cached !== undefined) return cached;
-
-    const value = makeValue();
-    htmlCache.set(key, value);
-    if (htmlCache.size > 50) {
-        const firstKey = htmlCache.keys().next().value;
-        if (firstKey !== undefined) htmlCache.delete(firstKey);
-    }
-    return value;
-};
 
 const buildLegacyHtml = ({
     html_code = '',
@@ -71,13 +56,10 @@ export const getFormattedHtml = (act?: FormatSource | null): string => {
         external_libs = '',
         content_mode,
     } = act;
-    const cacheKey = `${content_mode || ''}|${html_code}|${css_code}|${js_code}|${external_libs}`;
 
-    return getCached(cacheKey, () => {
-        if (content_mode === 'raw_html' || (isFullHtmlDocument(html_code) && !css_code && !js_code && !external_libs)) {
-            return html_code;
-        }
+    if (content_mode === 'raw_html' || (isFullHtmlDocument(html_code) && !css_code && !js_code && !external_libs)) {
+        return html_code;
+    }
 
-        return buildLegacyHtml(act);
-    });
+    return buildLegacyHtml(act);
 };

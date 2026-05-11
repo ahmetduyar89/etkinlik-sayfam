@@ -19,7 +19,7 @@ const inputClasses =
     'w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-[14px] text-white font-medium focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all placeholder:text-slate-500';
 const labelClasses =
     'block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2';
-const STORAGE_SIZE_LIMIT = 800 * 1024;
+const STORAGE_SIZE_LIMIT = 20 * 1024; // Lowered limit to force anything larger than 20KB to Cloud Storage
 const FILE_SIZE_LIMIT = 10 * 1024 * 1024;
 
 function getInlineHtml(editItem: Activity | null) {
@@ -40,7 +40,7 @@ export function ActivityForm({
     onSubmit,
     onCancel,
 }: ActivityFormProps) {
-    const [html, setHtml] = React.useState(() => getInlineHtml(editItem));
+    const textareaRef = React.useRef<HTMLTextAreaElement>(null);
     const [uploadError, setUploadError] = React.useState<string | null>(null);
     const [isProcessing, setIsProcessing] = React.useState(false);
     const [storageLoadFailed, setStorageLoadFailed] = React.useState(false);
@@ -49,7 +49,11 @@ export function ActivityForm({
         let ignore = false;
         setUploadError(null);
         setStorageLoadFailed(false);
-        setHtml(getInlineHtml(editItem));
+        
+        const initHtml = getInlineHtml(editItem);
+        if (textareaRef.current) {
+            textareaRef.current.value = initHtml;
+        }
 
         if (!editItem?.storage_url) return;
 
@@ -60,7 +64,9 @@ export function ActivityForm({
                 return res.json();
             })
             .then((data) => {
-                if (!ignore) setHtml(String(data.html_code || ''));
+                if (!ignore && textareaRef.current) {
+                    textareaRef.current.value = String(data.html_code || '');
+                }
             })
             .catch((err) => {
                 console.error('Stored HTML load error:', err);
@@ -93,7 +99,10 @@ export function ActivityForm({
 
         const reader = new FileReader();
         reader.onload = (event) => {
-            setHtml(String(event.target?.result || ''));
+            const content = String(event.target?.result || '');
+            if (textareaRef.current) {
+                textareaRef.current.value = content;
+            }
             setIsProcessing(false);
         };
         reader.onerror = () => {
@@ -113,7 +122,7 @@ export function ActivityForm({
 
         const formData = new FormData(e.currentTarget);
         const title = String(formData.get('title') || '').trim();
-        const html_code = html;
+        const html_code = textareaRef.current?.value || '';
 
         if (!title || !html_code.trim()) {
             setUploadError('Başlık ve HTML içeriği zorunludur.');
@@ -258,13 +267,13 @@ export function ActivityForm({
                     </label>
                 </div>
                 <textarea
+                    ref={textareaRef}
                     id="activity-html"
                     name="html_code"
                     rows={16}
                     required
-                    value={html}
-                    onChange={(event) => {
-                        setHtml(event.target.value);
+                    defaultValue={getInlineHtml(editItem)}
+                    onChange={() => {
                         if (uploadError) setUploadError(null);
                     }}
                     className={cn(inputClasses, 'font-mono text-xs leading-relaxed resize-y min-h-[360px]')}
