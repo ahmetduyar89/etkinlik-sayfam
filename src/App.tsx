@@ -346,8 +346,8 @@ export default function App() {
                     {/* Sidebar Filters (Redesigned to match Visual exactly) */}
                     <aside className="w-full lg:w-64 flex-shrink-0 space-y-6 pt-2">
                         <div className="space-y-1 mb-8 border-b border-white/5 pb-4">
-                            <h2 className="text-lg font-extrabold text-white uppercase tracking-wider">Filters</h2>
-                            <p className="text-xs text-[#8c909f] font-medium">Refine your search</p>
+                            <h2 className="text-lg font-extrabold text-white uppercase tracking-wider">Filtreler</h2>
+                            <p className="text-xs text-[#8c909f] font-medium">Aramanızı daraltın</p>
                         </div>
                         
                         <div className="flex flex-col gap-3">
@@ -362,7 +362,7 @@ export default function App() {
                                 )}
                             >
                                 <span className="material-symbols-outlined !text-[20px]">widgets</span>
-                                <span>Content Type</span>
+                                <span>İçerik Türü</span>
                             </button>
                             
                             {activeFilterGroup === 'category' && (
@@ -402,7 +402,7 @@ export default function App() {
                                 )}
                             >
                                 <span className="material-symbols-outlined !text-[20px]">school</span>
-                                <span>Grade Levels</span>
+                                <span>Sınıf Seviyeleri</span>
                             </button>
 
                             {activeFilterGroup === 'grade' && (
@@ -433,7 +433,7 @@ export default function App() {
                                 )}
                             >
                                 <span className="material-symbols-outlined !text-[20px]">menu_book</span>
-                                <span>Subjects</span>
+                                <span>Dersler</span>
                             </button>
 
                             {activeFilterGroup === 'subject' && (
@@ -473,7 +473,7 @@ export default function App() {
                                 )}
                             >
                                 <span className="material-symbols-outlined !text-[20px]">sell</span>
-                                <span>Tags</span>
+                                <span>Etiketler</span>
                             </button>
 
                             {activeFilterGroup === 'tag' && (
@@ -515,7 +515,7 @@ export default function App() {
                                 }}
                                 className="text-sm font-bold text-[#adc6ff] hover:text-[#4d8eff] transition-colors uppercase tracking-wider flex items-center gap-2 active:scale-95"
                             >
-                                Reset All
+                                Tümünü Sıfırla
                             </button>
                         </div>
 
