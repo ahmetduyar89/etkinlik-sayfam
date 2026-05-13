@@ -22,6 +22,129 @@ import {
 } from './constants/education';
 import type { Activity } from './types';
 
+const MOCK_ACTIVITIES: Activity[] = [
+    {
+        id: 'mock1',
+        title: 'Kuantum Alanları',
+        description: 'Elektronların gizemli dünyasını interaktif simülasyonla deneyimleyin.',
+        category: 'Simülasyon',
+        subject: 'Fizik',
+        grade_level: '12',
+        tags: 'kuantum, fizik, atom',
+        is_test: false,
+        image_url: '/images/quantum_glow.png',
+    },
+    {
+        id: 'mock2',
+        title: 'Genetik Temeller',
+        description: 'DNA sarmalı ve kalıtımın mekanizmalarını derinlemesine inceleyin.',
+        category: 'Ders Notları',
+        subject: 'Biyoloji',
+        grade_level: '10',
+        tags: 'dna, genetik, biyoloji',
+        is_test: false,
+        image_url: '/images/dna_helix.png',
+    },
+    {
+        id: 'mock3',
+        title: 'Mars Kolonisi',
+        description: 'Kızıl gezegende sürdürülebilir bir yaşam alanı inşa etme simülasyonu.',
+        category: 'Simülasyon',
+        subject: 'Uzay Bilimleri',
+        grade_level: '9',
+        tags: 'mars, uzay, koloni',
+        is_test: false,
+    },
+    {
+        id: 'mock4',
+        title: 'Asit-Baz Dengesi',
+        description: 'Etkileşimli titrasyon deneyi.',
+        category: 'Laboratuvar',
+        subject: 'Kimya',
+        grade_level: '11',
+        tags: 'kimya, asit, baz',
+        is_test: false,
+    },
+    {
+        id: 'mock5',
+        title: 'Haftalık Test',
+        description: 'Fizik ve Kimya üzerine haftalık değerlendirme testi.',
+        category: 'Test',
+        subject: 'Fizik & Kimya',
+        grade_level: 'Tümü',
+        tags: 'fizik, kimya, test',
+        is_test: true,
+    },
+    {
+        id: 'mock6',
+        title: 'Küresel Isınma Haritası',
+        description: 'Son 50 yıldaki iklim değişikliği verilerini dünya haritası üzerinde inceleyin.',
+        category: 'Simülasyon',
+        subject: 'Coğrafya',
+        grade_level: '9',
+        tags: 'iklim, dünya, çevre',
+        is_test: false,
+        image_url: '/images/holo_world_map.png',
+    },
+    {
+        id: 'mock7',
+        title: 'Matematik Lab',
+        description: 'Matematik formüllerini görselleştirin.',
+        category: 'Laboratuvar',
+        subject: 'Matematik',
+        grade_level: '8',
+        tags: 'matematik, geometri',
+        is_test: false,
+    },
+    {
+        id: 'mock8',
+        title: 'Zihin Oyunları',
+        description: 'Mantık ve problem çözme becerilerinizi geliştirin.',
+        category: 'Oyun',
+        subject: 'Genel Kültür',
+        grade_level: 'Tümü',
+        tags: 'mantık, bulmaca',
+        is_test: false,
+    },
+    {
+        id: 'mock9',
+        title: 'Mikro Dünya',
+        description: 'Mikroskobik organizmaları keşfedin.',
+        category: 'Laboratuvar',
+        subject: 'Biyoloji',
+        grade_level: '10',
+        tags: 'mikroskop, hücre',
+        is_test: false,
+    }
+];
+
+const getBentoVariables = (index: number) => {
+    const block = Math.floor(index / 9);
+    const offset = block * 4;
+    const pattern = index % 9;
+    
+    const positions = [
+        { colStart: 1, colSpan: 2, rowStart: offset + 1, rowSpan: 1 }, // 0
+        { colStart: 3, colSpan: 1, rowStart: offset + 1, rowSpan: 1 }, // 1
+        { colStart: 4, colSpan: 1, rowStart: offset + 1, rowSpan: 2 }, // 2 (Tall!)
+        { colStart: 1, colSpan: 1, rowStart: offset + 2, rowSpan: 1 }, // 3
+        { colStart: 2, colSpan: 1, rowStart: offset + 2, rowSpan: 1 }, // 4
+        // (Gap row 2 col 3)
+        { colStart: 1, colSpan: 2, rowStart: offset + 3, rowSpan: 1 }, // 5
+        { colStart: 3, colSpan: 1, rowStart: offset + 3, rowSpan: 1 }, // 6
+        { colStart: 4, colSpan: 1, rowStart: offset + 3, rowSpan: 1 }, // 7
+        { colStart: 1, colSpan: 1, rowStart: offset + 4, rowSpan: 1 }, // 8
+    ];
+    
+    const pos = positions[pattern];
+    return {
+        '--bento-col-start': pos.colStart,
+        '--bento-col-span': pos.colSpan,
+        '--bento-row-start': pos.rowStart,
+        '--bento-row-span': pos.rowSpan,
+    } as React.CSSProperties;
+};
+
 export default function App() {
     const params = new URLSearchParams(window.location.search);
     const isStudentView = params.get('view') === 'student' && !!params.get('id');
@@ -41,6 +164,7 @@ export default function App() {
     const [isActivityOpen, setIsActivityOpen] = useState(false);
     const [editItem, setEditItem] = useState<Activity | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [activeFilterGroup, setActiveFilterGroup] = useState<'category' | 'grade' | 'subject' | 'tag'>('category');
 
     const activitiesHandler = useFirestore<Activity>('activities');
     const toast = useToast();
@@ -48,7 +172,11 @@ export default function App() {
 
     useEffect(() => {
         const unsub = activitiesHandler.sync((data) => {
-            setActivities(data);
+            if (data && data.length > 0) {
+                setActivities(data);
+            } else {
+                setActivities(MOCK_ACTIVITIES);
+            }
             setIsLoading(false);
         });
         return () => {
@@ -234,250 +362,301 @@ export default function App() {
     }
 
     return (
-        <div className="min-h-screen bg-background text-on-background selection:bg-primary-container selection:text-white pb-24 md:pb-0">
+        <div className="min-h-screen bg-background text-on-background font-sans selection:bg-primary-container selection:text-white pb-24 md:pb-0">
             <Navbar />
 
-            <main className="max-w-screen-2xl mx-auto px-6 py-12">
-                <div className="flex flex-col lg:flex-row gap-8">
-                    {/* Sidebar Filters */}
-                    <aside className="w-full lg:w-72 flex-shrink-0 space-y-8">
-                        <div className="glass-card p-6 rounded-2xl">
-                            <h3 className="font-headline-md text-headline-md mb-6 flex items-center gap-2 text-white">
-                                <span className="material-symbols-outlined text-primary">tune</span> Filtreler
-                            </h3>
-                            
-                            <div className="space-y-8">
-                                {/* Search */}
-                                <div className="space-y-2">
-                                    <label className="font-label-md text-label-md text-slate-400 uppercase tracking-widest text-[10px]">İçerik Ara</label>
-                                    <div className="relative">
-                                        <input 
-                                            className="w-full bg-surface-container-highest border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-tertiary transition-all" 
-                                            placeholder="Simülasyon, test..." 
-                                            type="text"
-                                            value={search}
-                                            onChange={(e) => setSearch(e.target.value)}
-                                        />
-                                        <span className="material-symbols-outlined absolute right-3 top-3 text-slate-400">search</span>
-                                    </div>
-                                </div>
-
-                                {/* Categories */}
-                                <div className="space-y-3">
-                                    <label className="font-label-md text-label-md text-slate-400 uppercase tracking-widest text-[10px]">Kategoriler</label>
-                                    <div className="flex flex-wrap gap-2">
-                                        <button
-                                            onClick={() => setSelectedCategory(null)}
-                                            className={cn(
-                                                "px-3 py-1.5 rounded-full font-label-md text-xs transition-all",
-                                                selectedCategory === null ? "bg-primary-container text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
-                                            )}
-                                        >
-                                            Tümü
-                                        </button>
-                                        {allCategories.map(category => (
-                                            <button
-                                                key={category}
-                                                onClick={() => setSelectedCategory(selectedCategory === category ? null : category)}
-                                                className={cn(
-                                                    "px-3 py-1.5 rounded-full font-label-md text-xs transition-all",
-                                                    selectedCategory === category ? "bg-primary-container text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
-                                                )}
-                                            >
-                                                {category}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Grade Levels */}
-                                <div className="space-y-3">
-                                    <label className="font-label-md text-label-md text-slate-400 uppercase tracking-widest text-[10px]">Sınıflar</label>
-                                    <div className="grid grid-cols-4 gap-2">
-                                        {GRADE_LEVELS.map(grade => (
-                                            <button
-                                                key={grade}
-                                                onClick={() => setSelectedGradeLevel(selectedGradeLevel === grade ? null : grade)}
-                                                className={cn(
-                                                    "px-2 py-2 rounded-lg font-label-md text-xs transition-all border border-white/5",
-                                                    selectedGradeLevel === grade ? "bg-primary-container text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
-                                                )}
-                                            >
-                                                {grade}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Subjects */}
-                                <div className="space-y-3">
-                                    <label className="font-label-md text-label-md text-slate-400 uppercase tracking-widest text-[10px]">Dersler</label>
-                                    <div className="flex flex-wrap gap-2">
-                                        <button
-                                            onClick={() => setSelectedSubject(null)}
-                                            className={cn(
-                                                "px-3 py-1.5 rounded-full font-label-md text-xs transition-all",
-                                                selectedSubject === null ? "bg-primary-container text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
-                                            )}
-                                        >
-                                            Tümü
-                                        </button>
-                                        {SUBJECTS.map(subject => (
-                                            <button
-                                                key={subject}
-                                                onClick={() => setSelectedSubject(selectedSubject === subject ? null : subject)}
-                                                className={cn(
-                                                    "px-3 py-1.5 rounded-full font-label-md text-xs transition-all",
-                                                    selectedSubject === subject ? "bg-primary-container text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
-                                                )}
-                                            >
-                                                {subject}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Tags */}
-                                <div className="space-y-3">
-                                    <label className="font-label-md text-label-md text-slate-400 uppercase tracking-widest text-[10px]">Etiketler</label>
-                                    <div className="flex flex-wrap gap-2">
-                                        <button 
-                                            onClick={() => setSelectedTag(null)}
-                                            className={cn(
-                                                "px-3 py-1.5 rounded-full font-label-md text-xs transition-all",
-                                                selectedTag === null ? "bg-primary-container text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
-                                            )}
-                                        >
-                                            Tümü
-                                        </button>
-                                        {allTags.map(tag => (
-                                            <button 
-                                                key={tag}
-                                                onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
-                                                className={cn(
-                                                    "px-3 py-1.5 rounded-full font-label-md text-xs transition-all",
-                                                    selectedTag === tag ? "bg-primary-container text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
-                                                )}
-                                            >
-                                                {tag}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <button 
-                                    onClick={openCreate}
-                                    className="w-full py-4 bg-gradient-to-br from-primary-container to-secondary-container text-white font-bold rounded-xl shadow-xl shadow-primary-container/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
-                                >
-                                    <Plus className="w-5 h-5" /> İçerik Ekle
-                                </button>
-                            </div>
+            <main className="max-w-[1440px] mx-auto px-8 py-12">
+                <div className="flex flex-col lg:flex-row gap-12">
+                    
+                    {/* Sidebar Filters (Redesigned to match Visual exactly) */}
+                    <aside className="w-full lg:w-64 flex-shrink-0 space-y-6 pt-2">
+                        <div className="space-y-1 mb-8 border-b border-white/5 pb-4">
+                            <h2 className="text-lg font-extrabold text-white uppercase tracking-wider">Filters</h2>
+                            <p className="text-xs text-[#8c909f] font-medium">Refine your search</p>
                         </div>
+                        
+                        <div className="flex flex-col gap-3">
+                            {/* Content Type (Category) Button */}
+                            <button 
+                                onClick={() => setActiveFilterGroup(activeFilterGroup === 'category' ? null as any : 'category')}
+                                className={cn(
+                                    "w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[13px] font-extrabold transition-all text-left uppercase tracking-wider",
+                                    activeFilterGroup === 'category' 
+                                        ? "bg-[#571bc1] text-white shadow-lg shadow-[#571bc1]/20" 
+                                        : "text-[#c2c6d6] hover:bg-white/5"
+                                )}
+                            >
+                                <span className="material-symbols-outlined !text-[20px]">widgets</span>
+                                <span>Content Type</span>
+                            </button>
+                            
+                            {activeFilterGroup === 'category' && (
+                                <div className="pl-6 pr-2 py-2 flex flex-col gap-1 animate-fade-in border-l border-white/10 ml-6">
+                                    <button
+                                        onClick={() => setSelectedCategory(null)}
+                                        className={cn(
+                                            "text-left px-3 py-2 rounded-lg text-xs font-bold tracking-wide transition-colors",
+                                            selectedCategory === null ? "text-white bg-white/10" : "text-[#c2c6d6] hover:text-white"
+                                        )}
+                                    >
+                                        Tümü
+                                    </button>
+                                    {allCategories.map(category => (
+                                        <button
+                                            key={category}
+                                            onClick={() => setSelectedCategory(selectedCategory === category ? null : category)}
+                                            className={cn(
+                                                "text-left px-3 py-2 rounded-lg text-xs font-bold tracking-wide transition-colors",
+                                                selectedCategory === category ? "text-[#adc6ff] bg-white/10" : "text-[#c2c6d6] hover:text-white"
+                                            )}
+                                        >
+                                            {category}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Grade Levels Button */}
+                            <button 
+                                onClick={() => setActiveFilterGroup(activeFilterGroup === 'grade' ? null as any : 'grade')}
+                                className={cn(
+                                    "w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[13px] font-extrabold transition-all text-left uppercase tracking-wider",
+                                    activeFilterGroup === 'grade' 
+                                        ? "bg-[#571bc1] text-white shadow-lg shadow-[#571bc1]/20" 
+                                        : "text-[#c2c6d6] hover:bg-white/5"
+                                )}
+                            >
+                                <span className="material-symbols-outlined !text-[20px]">school</span>
+                                <span>Grade Levels</span>
+                            </button>
+
+                            {activeFilterGroup === 'grade' && (
+                                <div className="pl-6 py-2 grid grid-cols-3 gap-2 border-l border-white/10 ml-6">
+                                    {GRADE_LEVELS.map(grade => (
+                                        <button
+                                            key={grade}
+                                            onClick={() => setSelectedGradeLevel(selectedGradeLevel === grade ? null : grade)}
+                                            className={cn(
+                                                "py-2 rounded-lg text-xs font-bold text-center transition-all border",
+                                                selectedGradeLevel === grade ? "bg-[#adc6ff] text-[#002e6a] border-[#adc6ff]" : "bg-white/5 text-[#c2c6d6] border-white/5 hover:bg-white/10"
+                                            )}
+                                        >
+                                            {grade}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Subjects Button */}
+                            <button 
+                                onClick={() => setActiveFilterGroup(activeFilterGroup === 'subject' ? null as any : 'subject')}
+                                className={cn(
+                                    "w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[13px] font-extrabold transition-all text-left uppercase tracking-wider",
+                                    activeFilterGroup === 'subject' 
+                                        ? "bg-[#571bc1] text-white shadow-lg shadow-[#571bc1]/20" 
+                                        : "text-[#c2c6d6] hover:bg-white/5"
+                                )}
+                            >
+                                <span className="material-symbols-outlined !text-[20px]">menu_book</span>
+                                <span>Subjects</span>
+                            </button>
+
+                            {activeFilterGroup === 'subject' && (
+                                <div className="pl-6 pr-2 py-2 flex flex-col gap-1 border-l border-white/10 ml-6">
+                                    <button
+                                        onClick={() => setSelectedSubject(null)}
+                                        className={cn(
+                                            "text-left px-3 py-2 rounded-lg text-xs font-bold tracking-wide transition-colors",
+                                            selectedSubject === null ? "text-white bg-white/10" : "text-[#c2c6d6] hover:text-white"
+                                        )}
+                                    >
+                                        Tümü
+                                    </button>
+                                    {SUBJECTS.map(subject => (
+                                        <button
+                                            key={subject}
+                                            onClick={() => setSelectedSubject(selectedSubject === subject ? null : subject)}
+                                            className={cn(
+                                                "text-left px-3 py-2 rounded-lg text-xs font-bold tracking-wide transition-colors",
+                                                selectedSubject === subject ? "text-[#adc6ff] bg-white/10" : "text-[#c2c6d6] hover:text-white"
+                                            )}
+                                        >
+                                            {subject}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Tags Button */}
+                            <button 
+                                onClick={() => setActiveFilterGroup(activeFilterGroup === 'tag' ? null as any : 'tag')}
+                                className={cn(
+                                    "w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[13px] font-extrabold transition-all text-left uppercase tracking-wider",
+                                    activeFilterGroup === 'tag' 
+                                        ? "bg-[#571bc1] text-white shadow-lg shadow-[#571bc1]/20" 
+                                        : "text-[#c2c6d6] hover:bg-white/5"
+                                )}
+                            >
+                                <span className="material-symbols-outlined !text-[20px]">sell</span>
+                                <span>Tags</span>
+                            </button>
+
+                            {activeFilterGroup === 'tag' && (
+                                <div className="pl-6 pr-2 py-2 flex flex-wrap gap-2 border-l border-white/10 ml-6">
+                                    <button
+                                        onClick={() => setSelectedTag(null)}
+                                        className={cn(
+                                            "px-2.5 py-1 rounded-md text-xs font-bold tracking-wide transition-all border",
+                                            selectedTag === null ? "bg-white/20 text-white border-white/20" : "bg-white/5 text-[#c2c6d6] border-white/5 hover:bg-white/10"
+                                        )}
+                                    >
+                                        Tümü
+                                    </button>
+                                    {allTags.map(tag => (
+                                        <button
+                                            key={tag}
+                                            onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                                            className={cn(
+                                                "px-2.5 py-1 rounded-md text-xs font-bold tracking-wide transition-all border",
+                                                selectedTag === tag ? "bg-[#4edea3]/20 text-[#4edea3] border-[#4edea3]/20" : "bg-white/5 text-[#c2c6d6] border-white/5 hover:bg-white/10"
+                                            )}
+                                        >
+                                            {tag}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Reset All Button */}
+                        <div className="pt-6 border-t border-white/5 mt-4">
+                            <button 
+                                onClick={() => {
+                                    setSelectedCategory(null);
+                                    setSelectedGradeLevel(null);
+                                    setSelectedSubject(null);
+                                    setSelectedTag(null);
+                                    setSearch('');
+                                }}
+                                className="text-sm font-bold text-[#adc6ff] hover:text-[#4d8eff] transition-colors uppercase tracking-wider flex items-center gap-2 active:scale-95"
+                            >
+                                Reset All
+                            </button>
+                        </div>
+
+                        <button 
+                            onClick={openCreate}
+                            className="w-full mt-8 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-extrabold tracking-widest rounded-xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 uppercase"
+                        >
+                            <Plus className="w-4 h-4" /> İçerik Ekle
+                        </button>
                     </aside>
 
-                    {/* Main Content */}
-                    <section className="flex-1 space-y-8">
-                        {/* Header & View Switcher */}
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            <div>
-                                <h1 className="font-headline-xl text-headline-xl text-white tracking-tight">Etkinlikleri Keşfet</h1>
-                                <p className="text-body-lg text-slate-400">{filteredActivities.length} interaktif içerik bulundu</p>
+                    {/* Main Content Area (Bento & Premium UI) */}
+                    <section className="flex-1 space-y-10 pt-2">
+                        
+                        {/* Header matched exactly with Visual */}
+                        <div className="space-y-4">
+                            <h1 className="text-5xl font-black text-white tracking-tight leading-[1.15]">Bento-Box Laboratuvarı</h1>
+                            <p className="text-lg text-[#c2c6d6] leading-relaxed max-w-3xl">Etkileşimli simülasyonlar, derinlemesine videolar ve pratik testlerle bilim dünyasını keşfedin.</p>
+                        </div>
+
+                        {/* Search input placed below header as in Visual */}
+                        <div className="relative max-w-xl">
+                            <input 
+                                className="w-full bg-[#1d2027] hover:bg-[#272a31] border border-white/5 focus:border-[#adc6ff]/40 rounded-xl pl-12 pr-6 py-4 text-[#e1e2ec] font-medium text-base placeholder-[#8c909f] outline-none transition-all focus:shadow-[0_0_30px_rgba(173,198,255,0.05)]" 
+                                placeholder="Deney veya konu ara..." 
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8c909f]">search</span>
+                        </div>
+
+                        {/* View switcher & Result info */}
+                        <div className="flex items-center justify-between pb-2">
+                            <div className="text-xs text-[#8c909f] font-bold uppercase tracking-widest">
+                                {filteredActivities.length} İÇERİK BULUNDU
                             </div>
-                            
-                            <div className="flex items-center gap-2 glass-card p-1 rounded-xl">
+                            <div className="flex items-center gap-2 bg-[#1d2027]/60 p-1 rounded-xl border border-white/5">
                                 <button 
                                     onClick={() => setViewMode('grid')}
                                     className={cn(
                                         "p-2 rounded-lg transition-all",
-                                        viewMode === 'grid' ? "bg-primary-container text-white" : "text-slate-400 hover:text-white"
+                                        viewMode === 'grid' ? "bg-white/10 text-white" : "text-[#8c909f] hover:text-white"
                                     )}
+                                    title="Bento Modu"
                                 >
-                                    <LayoutGrid className="w-5 h-5" />
+                                    <LayoutGrid className="w-4 h-4" />
                                 </button>
                                 <button 
                                     onClick={() => setViewMode('list')}
                                     className={cn(
                                         "p-2 rounded-lg transition-all",
-                                        viewMode === 'list' ? "bg-primary-container text-white" : "text-slate-400 hover:text-white"
+                                        viewMode === 'list' ? "bg-white/10 text-white" : "text-[#8c909f] hover:text-white"
                                     )}
+                                    title="Liste Modu"
                                 >
-                                    <LayoutList className="w-5 h-5" />
+                                    <LayoutList className="w-4 h-4" />
                                 </button>
                             </div>
                         </div>
 
-                        {/* Grid */}
+                        {/* Content Render */}
                         {isLoading ? (
-                            <div className="py-20 flex flex-col items-center justify-center gap-3">
-                                <div className="w-10 h-10 border-4 border-primary-container border-t-transparent rounded-full animate-spin" />
-                                <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Yükleniyor…</p>
+                            <div className="py-24 flex flex-col items-center justify-center gap-4">
+                                <div className="w-12 h-12 border-4 border-[#adc6ff] border-t-transparent rounded-full animate-spin" />
+                                <p className="text-[#8c909f] font-extrabold uppercase tracking-widest text-[10px]">Laboratuvar Hazırlanıyor…</p>
                             </div>
                         ) : filteredActivities.length === 0 ? (
-                            <div className="py-20 glass-card rounded-3xl flex flex-col items-center justify-center text-center gap-4">
-                                <div className="w-16 h-16 rounded-full bg-white/5 text-slate-400 flex items-center justify-center">
+                            <div className="py-24 bg-surface-container/40 rounded-3xl border border-white/5 flex flex-col items-center justify-center text-center gap-6">
+                                <div className="w-16 h-16 rounded-2xl bg-white/5 text-[#8c909f] flex items-center justify-center border border-white/5">
                                     <Blocks className="w-8 h-8" />
                                 </div>
-                                <div>
-                                    <h3 className="text-xl font-bold text-white">Sonuç bulunamadı</h3>
-                                    <p className="text-slate-400 max-w-sm mt-1">Arama veya filtreleri temizleyip tekrar deneyin.</p>
+                                <div className="space-y-1">
+                                    <h3 className="text-lg font-extrabold text-white">Herhangi bir içerik bulunamadı</h3>
+                                    <p className="text-sm text-[#c2c6d6] max-w-xs leading-relaxed">Arama teriminizi değiştirin veya filtrelerinizi temizleyin.</p>
                                 </div>
                             </div>
                         ) : (
-                            <div className="space-y-12">
-                                {groupedActivities.map(([category, educationGroups]) => (
-                                    <section key={category} className="space-y-5">
-                                        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 border-b border-white/10 pb-3">
-                                            <div>
-                                                <p className="font-label-md text-label-md text-slate-400 uppercase tracking-widest text-[10px]">Kategori</p>
-                                                <h2 className="text-2xl font-black text-white tracking-tight">{category}</h2>
-                                            </div>
-                                            <p className="text-sm font-bold text-slate-400">
-                                                {educationGroups.reduce((total, [, items]) => total + items.length, 0)} içerik
-                                            </p>
+                            /* Responsive Grid Rendering */
+                            viewMode === 'grid' ? (
+                                <div className="bento-grid">
+                                    {filteredActivities.map((act, idx) => (
+                                        <div 
+                                            key={act.id} 
+                                            className="bento-item"
+                                            style={getBentoVariables(idx)}
+                                        >
+                                            <ActivityCard
+                                                act={act}
+                                                index={idx}
+                                                onOpenPreview={setPreviewId}
+                                                onEdit={openEdit}
+                                                onRequestDelete={handleRequestDelete}
+                                                onShowResults={setShowResultsId}
+                                                onCopyLink={handleCopyLink}
+                                                onCopyHtml={handleCopyHtml}
+                                            />
                                         </div>
-
-                                        {educationGroups.map(([educationLabel, educationActivities]) => (
-                                            <div key={educationLabel} className="space-y-4">
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <h3 className="text-sm font-black text-slate-300 uppercase tracking-widest">{educationLabel}</h3>
-                                                    <span className="text-xs font-bold text-slate-500">{educationActivities.length}</span>
-                                                </div>
-
-                                                <div className={cn(
-                                                    "grid gap-8",
-                                                    viewMode === 'grid' ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"
-                                                )}>
-                                                    {educationActivities.map((act) => (
-                                                        viewMode === 'grid' ? (
-                                                            <ActivityCard
-                                                                key={act.id}
-                                                                act={act}
-                                                                onOpenPreview={setPreviewId}
-                                                                onEdit={openEdit}
-                                                                onRequestDelete={handleRequestDelete}
-                                                                onShowResults={setShowResultsId}
-                                                                onCopyLink={handleCopyLink}
-                                                                onCopyHtml={handleCopyHtml}
-                                                            />
-                                                        ) : (
-                                                            <ActivityListItem
-                                                                key={act.id}
-                                                                act={act}
-                                                                onOpenPreview={setPreviewId}
-                                                                onEdit={openEdit}
-                                                                onRequestDelete={handleRequestDelete}
-                                                                onShowResults={setShowResultsId}
-                                                                onCopyLink={handleCopyLink}
-                                                                onCopyHtml={handleCopyHtml}
-                                                            />
-                                                        )
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </section>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-4">
+                                    {filteredActivities.map((act) => (
+                                        <ActivityListItem
+                                            key={act.id}
+                                            act={act}
+                                            onOpenPreview={setPreviewId}
+                                            onEdit={openEdit}
+                                            onRequestDelete={handleRequestDelete}
+                                            onShowResults={setShowResultsId}
+                                            onCopyLink={handleCopyLink}
+                                            onCopyHtml={handleCopyHtml}
+                                        />
+                                    ))}
+                                </div>
+                            )
                         )}
                     </section>
                 </div>

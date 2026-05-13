@@ -69,7 +69,97 @@
   animation: pulse-soft 8s ease-in-out infinite;
 }
 
-/* Custom Scrollbar for Dark Theme */
+/* Bento UI Styles */
+.bento-card {
+  @apply bg-surface-container/60 backdrop-blur-md rounded-2xl border relative overflow-hidden flex flex-col transition-all duration-300;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.bento-card:hover {
+  transform: scale(1.015);
+  @apply shadow-2xl;
+}
+
+.glow-purple {
+  border-color: rgba(173, 198, 255, 0.3);
+  box-shadow: 0 0 20px rgba(173, 198, 255, 0.05);
+}
+.glow-purple:hover {
+  border-color: rgba(173, 198, 255, 0.6);
+  box-shadow: 0 0 30px rgba(173, 198, 255, 0.15);
+}
+
+.glow-green {
+  border-color: rgba(78, 222, 163, 0.3);
+  box-shadow: 0 0 20px rgba(78, 222, 163, 0.05);
+}
+.glow-green:hover {
+  border-color: rgba(78, 222, 163, 0.6);
+  box-shadow: 0 0 30px rgba(78, 222, 163, 0.15);
+}
+
+.glow-pink {
+  border-color: rgba(255, 180, 171, 0.3);
+  box-shadow: 0 0 20px rgba(255, 180, 171, 0.05);
+}
+.glow-pink:hover {
+  border-color: rgba(255, 180, 171, 0.6);
+  box-shadow: 0 0 30px rgba(255, 180, 171, 0.15);
+}
+
+.glow-blue {
+  border-color: rgba(77, 142, 255, 0.3);
+  box-shadow: 0 0 20px rgba(77, 142, 255, 0.05);
+}
+.glow-blue:hover {
+  border-color: rgba(77, 142, 255, 0.6);
+  box-shadow: 0 0 30px rgba(77, 142, 255, 0.15);
+}
+
+.glow-indigo {
+  border-color: rgba(208, 188, 255, 0.3);
+  box-shadow: 0 0 20px rgba(208, 188, 255, 0.05);
+}
+.glow-indigo:hover {
+  border-color: rgba(208, 188, 255, 0.6);
+  box-shadow: 0 0 30px rgba(208, 188, 255, 0.15);
+}
+
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+@media (min-width: 1024px) {
+  .bento-item {
+    grid-column: var(--bento-col-start) / span var(--bento-col-span);
+    grid-row: var(--bento-row-start) / span var(--bento-row-span);
+  }
+}
+
+@media (max-width: 1024px) {
+  .bento-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .bento-item {
+    /* On tablet, standard grid flow */
+    grid-column: span var(--bento-col-span);
+    grid-row: span 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .bento-grid {
+    grid-template-columns: 1fr;
+  }
+  .bento-item {
+    grid-column: span 1;
+    grid-row: span 1;
+  }
+}
+
+/* Custom scrollbar and other styles preserve */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -81,7 +171,6 @@
   @apply bg-white/10 rounded-full hover:bg-white/20 transition-colors;
 }
 
-/* Material Symbols sizing */
 .material-symbols-outlined {
   font-variation-settings:
   'FILL' 0,
@@ -89,3 +178,4 @@
   'GRAD' 0,
   'opsz' 24
 }
+
