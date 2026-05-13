@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { IconButton } from '../common/IconButton';
 import { cn } from '../../utils/cn';
+import { LivePreview } from './LivePreview';
 import type { Activity } from '../../types';
 
 interface ActivityCardProps {
@@ -80,6 +81,20 @@ function ActivityCardBase({
         }
     };
 
+    const renderVisualSlot = (fallbackPath: string) => {
+        if (act.image_url) {
+            return <img src={act.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-110" alt="visual" />;
+        }
+        if (act.html_code || act.js_code || act.storage_url) {
+            return (
+                <div className="absolute inset-0 w-full h-full rounded-xl overflow-hidden select-none pointer-events-none">
+                    <LivePreview act={act} />
+                </div>
+            );
+        }
+        return <img src={fallbackPath} className="w-full h-full object-cover opacity-90 transition-transform duration-700 group-hover/card:scale-110" alt="visual" />;
+    };
+
     const renderCardContent = () => {
         switch (layoutType) {
             case 0: // Kuantum Alanları (2 Cols Wide, regular height)
@@ -106,8 +121,8 @@ function ActivityCardBase({
                         </div>
 
                         {/* BG Graphic */}
-                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[180px] h-[180px] bg-[#000]/40 rounded-xl overflow-hidden mr-6 flex items-center justify-center shadow-2xl border border-white/10">
-                            <img src={act.image_url || "/images/quantum_glow.png"} className="w-full h-full object-cover opacity-90 hover:scale-110 transition-transform duration-700" alt="visual" />
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[180px] h-[180px] bg-[#000]/40 rounded-xl overflow-hidden mr-6 flex items-center justify-center shadow-2xl border border-white/10 group/card">
+                            {renderVisualSlot("/images/quantum_glow.png")}
                         </div>
                     </div>
                 );
@@ -115,9 +130,9 @@ function ActivityCardBase({
             case 1: // Genetik Temeller (1 Col, Regular Height, Top graphic layout)
                 return (
                     <div className="flex-1 flex flex-col justify-end relative overflow-hidden h-full group/card">
-                        <div className="absolute inset-0 w-full h-[60%] overflow-hidden">
+                        <div className="absolute inset-0 w-full h-[60%] overflow-hidden border-b border-white/5">
                             <div className="absolute inset-0 bg-gradient-to-t from-surface-container via-transparent to-transparent z-10"></div>
-                            <img src={act.image_url || "/images/dna_helix.png"} className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-110" alt="visual" />
+                            {renderVisualSlot("/images/dna_helix.png")}
                         </div>
                         <div className="p-6 z-20 space-y-2 bg-surface-container/90 backdrop-blur-sm border-t border-white/5">
                             <p className="text-[11px] text-[#4edea3] font-black tracking-widest uppercase">{act.subject || "SCIENCE"}</p>
@@ -221,8 +236,8 @@ function ActivityCardBase({
                         </div>
 
                         {/* Map Visual right */}
-                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[180px] h-[130px] overflow-hidden mr-6 flex items-center justify-center rounded-xl border border-white/10 bg-black/40 shadow-2xl">
-                            <img src={act.image_url || "/images/holo_world_map.png"} className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" alt="map visual" />
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[180px] h-[130px] overflow-hidden mr-6 flex items-center justify-center rounded-xl border border-white/10 bg-black/40 shadow-2xl group/card">
+                            {renderVisualSlot("/images/holo_world_map.png")}
                         </div>
                     </div>
                 );
