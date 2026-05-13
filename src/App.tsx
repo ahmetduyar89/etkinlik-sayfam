@@ -118,32 +118,7 @@ const MOCK_ACTIVITIES: Activity[] = [
     }
 ];
 
-const getBentoVariables = (index: number) => {
-    const block = Math.floor(index / 9);
-    const offset = block * 4;
-    const pattern = index % 9;
-    
-    const positions = [
-        { colStart: 1, colSpan: 2, rowStart: offset + 1, rowSpan: 1 }, // 0
-        { colStart: 3, colSpan: 1, rowStart: offset + 1, rowSpan: 1 }, // 1
-        { colStart: 4, colSpan: 1, rowStart: offset + 1, rowSpan: 2 }, // 2 (Tall!)
-        { colStart: 1, colSpan: 1, rowStart: offset + 2, rowSpan: 1 }, // 3
-        { colStart: 2, colSpan: 1, rowStart: offset + 2, rowSpan: 1 }, // 4
-        // (Gap row 2 col 3)
-        { colStart: 1, colSpan: 2, rowStart: offset + 3, rowSpan: 1 }, // 5
-        { colStart: 3, colSpan: 1, rowStart: offset + 3, rowSpan: 1 }, // 6
-        { colStart: 4, colSpan: 1, rowStart: offset + 3, rowSpan: 1 }, // 7
-        { colStart: 1, colSpan: 1, rowStart: offset + 4, rowSpan: 1 }, // 8
-    ];
-    
-    const pos = positions[pattern];
-    return {
-        '--bento-col-start': pos.colStart,
-        '--bento-col-span': pos.colSpan,
-        '--bento-row-start': pos.rowStart,
-        '--bento-row-span': pos.rowSpan,
-    } as React.CSSProperties;
-};
+
 
 export default function App() {
     const params = new URLSearchParams(window.location.search);
@@ -557,7 +532,7 @@ export default function App() {
                         
                         {/* Header matched exactly with Visual */}
                         <div className="space-y-4">
-                            <h1 className="text-5xl font-black text-white tracking-tight leading-[1.15]">Bento-Box Laboratuvarı</h1>
+                            <h1 className="text-5xl font-black text-white tracking-tight leading-[1.15]">Etkinlik Laboratuvarı</h1>
                             <p className="text-lg text-[#c2c6d6] leading-relaxed max-w-3xl">Etkileşimli simülasyonlar, derinlemesine videolar ve pratik testlerle bilim dünyasını keşfedin.</p>
                         </div>
 
@@ -573,32 +548,10 @@ export default function App() {
                             <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8c909f]">search</span>
                         </div>
 
-                        {/* View switcher & Result info */}
+                        {/* Result info */}
                         <div className="flex items-center justify-between pb-2">
                             <div className="text-xs text-[#8c909f] font-bold uppercase tracking-widest">
                                 {filteredActivities.length} İÇERİK BULUNDU
-                            </div>
-                            <div className="flex items-center gap-2 bg-[#1d2027]/60 p-1 rounded-xl border border-white/5">
-                                <button 
-                                    onClick={() => setViewMode('grid')}
-                                    className={cn(
-                                        "p-2 rounded-lg transition-all",
-                                        viewMode === 'grid' ? "bg-white/10 text-white" : "text-[#8c909f] hover:text-white"
-                                    )}
-                                    title="Bento Modu"
-                                >
-                                    <LayoutGrid className="w-4 h-4" />
-                                </button>
-                                <button 
-                                    onClick={() => setViewMode('list')}
-                                    className={cn(
-                                        "p-2 rounded-lg transition-all",
-                                        viewMode === 'list' ? "bg-white/10 text-white" : "text-[#8c909f] hover:text-white"
-                                    )}
-                                    title="Liste Modu"
-                                >
-                                    <LayoutList className="w-4 h-4" />
-                                </button>
                             </div>
                         </div>
 
@@ -619,44 +572,22 @@ export default function App() {
                                 </div>
                             </div>
                         ) : (
-                            /* Responsive Grid Rendering */
-                            viewMode === 'grid' ? (
-                                <div className="bento-grid">
-                                    {filteredActivities.map((act, idx) => (
-                                        <div 
-                                            key={act.id} 
-                                            className="bento-item"
-                                            style={getBentoVariables(idx)}
-                                        >
-                                            <ActivityCard
-                                                act={act}
-                                                index={idx}
-                                                onOpenPreview={setPreviewId}
-                                                onEdit={openEdit}
-                                                onRequestDelete={handleRequestDelete}
-                                                onShowResults={setShowResultsId}
-                                                onCopyLink={handleCopyLink}
-                                                onCopyHtml={handleCopyHtml}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="flex flex-col gap-4">
-                                    {filteredActivities.map((act) => (
-                                        <ActivityListItem
-                                            key={act.id}
-                                            act={act}
-                                            onOpenPreview={setPreviewId}
-                                            onEdit={openEdit}
-                                            onRequestDelete={handleRequestDelete}
-                                            onShowResults={setShowResultsId}
-                                            onCopyLink={handleCopyLink}
-                                            onCopyHtml={handleCopyHtml}
-                                        />
-                                    ))}
-                                </div>
-                            )
+                            /* Horizontal List Stack Rendering */
+                            <div className="flex flex-col gap-6">
+                                {filteredActivities.map((act, idx) => (
+                                    <ActivityCard
+                                        key={act.id}
+                                        act={act}
+                                        index={idx}
+                                        onOpenPreview={setPreviewId}
+                                        onEdit={openEdit}
+                                        onRequestDelete={handleRequestDelete}
+                                        onShowResults={setShowResultsId}
+                                        onCopyLink={handleCopyLink}
+                                        onCopyHtml={handleCopyHtml}
+                                    />
+                                ))}
+                            </div>
                         )}
                     </section>
                 </div>
