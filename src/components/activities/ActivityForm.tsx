@@ -19,7 +19,7 @@ const inputClasses =
     'w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-[14px] text-white font-medium focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all placeholder:text-slate-500';
 const labelClasses =
     'block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2';
-const STORAGE_SIZE_LIMIT = 20 * 1024; // Lowered limit to force anything larger than 20KB to Cloud Storage
+const STORAGE_SIZE_LIMIT = 800 * 1024; // Firestore limit is 1MB, so we allow up to 800KB directly in Firestore
 const FILE_SIZE_LIMIT = 10 * 1024 * 1024;
 
 function getInlineHtml(editItem: Activity | null) {
@@ -144,9 +144,10 @@ export function ActivityForm({
                     { contentType: 'application/json' }
                 );
                 storage_url = await getDownloadURL(storageRef);
-            } catch (err) {
+            } catch (err: any) {
                 console.error('HTML upload error:', err);
-                setUploadError('HTML kaydedilemedi. Dosya boyutu veya bağlantıyı kontrol edin.');
+                const rawError = err?.message || String(err);
+                setUploadError(`HTML kaydedilemedi: ${rawError}. Firebase Storage yetkilerini, kurallarını veya bağlantınızı kontrol edin.`);
                 setIsProcessing(false);
                 return;
             } finally {
