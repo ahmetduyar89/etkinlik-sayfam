@@ -1,0 +1,302 @@
+/*
+ * TedrisEDU Design System — Colors & Typography
+ * Source: ahmetduyar89/tedris-egitim (React + Tailwind CSS)
+ * ─────────────────────────────────────────────────────────────
+ */
+
+/* ── Google Fonts ── */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap');
+
+/* ══════════════════════════════════════════════════════════════
+   1. BASE COLOR TOKENS
+   ══════════════════════════════════════════════════════════════ */
+:root {
+  /* ── Brand Blues / Primary ── */
+  --color-primary:         #6366f1;   /* Indigo 500 — primary CTA */
+  --color-primary-dark:    #4f46e5;   /* Indigo 600 — hover */
+  --color-primary-light:   #818cf8;   /* Indigo 400 — light accents */
+
+  /* ── Accent / Purple ── */
+  --color-accent:          #8b5cf6;   /* Violet 500 */
+  --color-accent-pink:     #ec4899;   /* Pink 500 */
+
+  /* ── Landing Page Blue (distinct from app primary) ── */
+  --color-lp-blue:         #2f6df0;   /* Landing page hero/CTA blue */
+  --color-lp-blue-lt:      #eef3fe;   /* Landing page blue tint bg */
+
+  /* ── Secondary / Info ── */
+  --color-secondary:       #3b82f6;   /* Blue 500 */
+
+  /* ── Subject / Category Colors ── */
+  --color-math:            #5AC8A8;   /* Teal green — Matematik */
+  --color-science:         #E8685A;   /* Coral red — Fen */
+  --color-turkish:         #E8C85A;   /* Amber yellow — Türkçe */
+
+  /* ── Semantic Status ── */
+  --color-success:         #10b981;   /* Emerald 500 */
+  --color-success-bg:      #ecfdf5;
+  --color-warning:         #f59e0b;   /* Amber 500 */
+  --color-warning-bg:      #fffbeb;
+  --color-error:           #ef4444;   /* Red 500 */
+  --color-error-bg:        #fef2f2;
+  --color-info:            #3b82f6;   /* Blue 500 */
+  --color-info-bg:         #eff6ff;
+
+  /* ── Gradient Combos (used on dashboard cards) ── */
+  --gradient-purple-indigo: linear-gradient(135deg, #a855f7, #6366f1);
+  --gradient-emerald-teal:  linear-gradient(135deg, #10b981, #0d9488);
+  --gradient-orange-pink:   linear-gradient(135deg, #f97316, #ec4899);
+  --gradient-blue-indigo:   linear-gradient(135deg, #3b82f6, #6366f1);
+  --gradient-violet-indigo: linear-gradient(135deg, #7c3aed, #4f46e5);
+  --gradient-primary-cta:   linear-gradient(to right, #6366f1, #8b5cf6);
+
+  /* ── Ink / Text (Landing Page system) ── */
+  --color-ink:             #0f1117;   /* Near-black body text */
+  --color-ink-2:           #4a4f5e;   /* Secondary text */
+  --color-ink-3:           #9299a8;   /* Tertiary/muted text */
+
+  /* ── Neutrals / Grays (App system) ── */
+  --color-gray-900:        #111827;
+  --color-gray-800:        #1f2937;
+  --color-gray-700:        #374151;
+  --color-gray-600:        #4b5563;
+  --color-gray-500:        #6b7280;
+  --color-gray-400:        #9ca3af;
+  --color-gray-300:        #d1d5db;
+  --color-gray-200:        #e5e7eb;
+  --color-gray-100:        #f3f4f6;
+  --color-gray-50:         #f9fafb;
+
+  /* ── Surface / Background ── */
+  --color-bg:              #f9fafb;   /* App background */
+  --color-surface:         #f5f6f8;   /* Landing surface */
+  --color-white:           #fcfcfd;   /* Landing page white */
+  --color-card:            #ffffff;   /* Card backgrounds */
+  --color-border:          #e5e7eb;   /* Default border */
+  --color-border-lp:       #e8eaee;   /* Landing page border */
+
+  /* ── Shadows ── */
+  --shadow-sm:    0 1px 2px 0 rgba(0,0,0,0.05);
+  --shadow-md:    0 4px 6px -1px rgba(0,0,0,0.10), 0 2px 4px -1px rgba(0,0,0,0.06);
+  --shadow-lg:    0 10px 15px -3px rgba(0,0,0,0.10), 0 4px 6px -2px rgba(0,0,0,0.05);
+  --shadow-xl:    0 20px 25px -5px rgba(0,0,0,0.10), 0 10px 10px -5px rgba(0,0,0,0.04);
+  --shadow-primary:   0px 4px 12px rgba(99, 102, 241, 0.25);
+  --shadow-secondary: 0px 4px 12px rgba(59, 130, 246, 0.25);
+  --shadow-accent:    0px 4px 12px rgba(139, 92, 246, 0.25);
+
+  /* ── Border Radius ── */
+  --radius-sm:   0.375rem;   /* 6px  */
+  --radius-md:   0.5rem;     /* 8px  */
+  --radius-lg:   0.75rem;    /* 12px */
+  --radius-xl:   1rem;       /* 16px */
+  --radius-2xl:  1.5rem;     /* 24px */
+  --radius-full: 9999px;
+
+  /* ── Spacing Scale (matches Tailwind defaults) ── */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.25rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   2. SEMANTIC COLOR VARIABLES
+   ══════════════════════════════════════════════════════════════ */
+:root {
+  /* Layout */
+  --bg-page:               var(--color-bg);
+  --bg-card:               var(--color-card);
+  --bg-surface:            var(--color-surface);
+  --border-default:        var(--color-border);
+
+  /* Text */
+  --text-primary:          var(--color-gray-900);
+  --text-secondary:        var(--color-gray-500);
+  --text-muted:            var(--color-gray-400);
+  --text-on-dark:          #ffffff;
+
+  /* Interactive */
+  --interactive-primary:   var(--color-primary);
+  --interactive-hover:     var(--color-primary-dark);
+  --interactive-focus-ring: rgba(99, 102, 241, 0.20);
+
+  /* Alerts */
+  --alert-success-text:    #065f46;
+  --alert-success-bg:      var(--color-success-bg);
+  --alert-success-border:  #a7f3d0;
+  --alert-error-text:      #b91c1c;
+  --alert-error-bg:        var(--color-error-bg);
+  --alert-error-border:    #fecaca;
+  --alert-warning-text:    #92400e;
+  --alert-warning-bg:      var(--color-warning-bg);
+  --alert-info-text:       #1e40af;
+  --alert-info-bg:         var(--color-info-bg);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   3. TYPOGRAPHY TOKENS
+   ══════════════════════════════════════════════════════════════ */
+:root {
+  /* Font Families */
+  --font-sans:      'DM Sans', 'Inter', sans-serif;       /* Landing page body */
+  --font-app:       'Inter', sans-serif;                  /* App UI body */
+  --font-display:   'DM Serif Display', Georgia, serif;   /* Landing headlines */
+  --font-heading:   'Poppins', sans-serif;                /* App headings (h1/h2) */
+  --font-mono:      'Courier New', monospace;
+
+  /* Font Sizes */
+  --text-xs:    0.75rem;     /* 12px */
+  --text-sm:    0.875rem;    /* 14px */
+  --text-base:  1rem;        /* 16px */
+  --text-lg:    1.125rem;    /* 18px */
+  --text-xl:    1.25rem;     /* 20px */
+  --text-2xl:   1.5rem;      /* 24px */
+  --text-3xl:   1.875rem;    /* 30px */
+  --text-4xl:   2.25rem;     /* 36px */
+  --text-5xl:   3rem;        /* 48px */
+
+  /* Line Heights */
+  --leading-tight:  1.08;
+  --leading-snug:   1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  /* Font Weights */
+  --weight-light:     300;
+  --weight-regular:   400;
+  --weight-medium:    500;
+  --weight-semibold:  600;
+  --weight-bold:      700;
+  --weight-extrabold: 800;
+
+  /* Letter Spacing */
+  --tracking-tight:  -0.6px;
+  --tracking-normal: 0;
+  --tracking-wide:   0.4px;
+  --tracking-wider:  1.2px;
+  --tracking-widest: 1.6px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   4. SEMANTIC TYPOGRAPHY ELEMENTS
+   ══════════════════════════════════════════════════════════════ */
+
+/* Landing Page Display Headline */
+.t-display {
+  font-family: var(--font-display);
+  font-size: clamp(42px, 6vw, 72px);
+  line-height: var(--leading-tight);
+  letter-spacing: -1px;
+  color: var(--color-ink);
+}
+
+/* App Section Headings */
+h1, .t-h1 {
+  font-family: var(--font-heading);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  color: var(--color-gray-900);
+  letter-spacing: var(--tracking-tight);
+}
+
+h2, .t-h2 {
+  font-family: var(--font-display);
+  font-size: clamp(26px, 3vw, 36px);
+  letter-spacing: -0.6px;
+  color: var(--color-ink);
+  line-height: 1.15;
+}
+
+h3, .t-h3 {
+  font-family: var(--font-app);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--color-gray-900);
+  letter-spacing: -0.3px;
+}
+
+h4, .t-h4 {
+  font-family: var(--font-app);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--color-gray-900);
+  letter-spacing: -0.2px;
+}
+
+p, .t-body {
+  font-family: var(--font-app);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--color-gray-500);
+}
+
+.t-label {
+  font-family: var(--font-app);
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-widest);
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+}
+
+.t-sm {
+  font-size: var(--text-xs);
+  color: var(--color-gray-500);
+}
+
+.t-code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--color-gray-100);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--color-gray-700);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   5. COMPONENT TOKENS
+   ══════════════════════════════════════════════════════════════ */
+:root {
+  /* Buttons */
+  --btn-radius:        var(--radius-lg);
+  --btn-font:          var(--font-sans);
+  --btn-font-weight:   var(--weight-semibold);
+  --btn-font-size:     14.5px;
+  --btn-padding-y:     12px;
+  --btn-padding-x:     28px;
+
+  /* Input fields */
+  --input-border:      var(--color-gray-200);
+  --input-border-focus: var(--color-primary);
+  --input-radius:      var(--radius-xl);
+  --input-padding:     12px 16px;
+  --input-font-size:   var(--text-sm);
+
+  /* Cards */
+  --card-radius:       var(--radius-2xl);
+  --card-bg:           var(--color-card);
+  --card-border:       var(--color-border);
+  --card-shadow:       var(--shadow-sm);
+  --card-padding:      1.5rem;
+
+  /* Badges / Tags */
+  --badge-radius:      var(--radius-full);
+  --badge-font-size:   var(--text-xs);
+  --badge-font-weight: var(--weight-semibold);
+  --badge-padding:     3px 10px;
+
+  /* Navigation / Sidebar */
+  --nav-bg:            var(--color-card);
+  --nav-border:        var(--color-border);
+  --nav-item-hover-bg: var(--color-gray-100);
+  --nav-active-bg:     var(--color-lp-blue-lt);
+  --nav-active-text:   var(--color-lp-blue);
+}
