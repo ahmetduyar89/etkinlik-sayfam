@@ -16,9 +16,9 @@ interface ActivityFormProps {
 }
 
 const inputClasses =
-    'w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-[14px] text-white font-medium focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all placeholder:text-slate-500';
+    'w-full bg-white border border-outline-variant rounded-lg px-4 py-3 text-[14px] text-on-surface font-medium focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all placeholder:text-on-surface-variant';
 const labelClasses =
-    'block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2';
+    'block text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-2';
 const STORAGE_SIZE_LIMIT = 800 * 1024; // Firestore limit is 1MB, so we allow up to 800KB directly in Firestore
 const FILE_SIZE_LIMIT = 10 * 1024 * 1024;
 
@@ -233,17 +233,17 @@ export function ActivityForm({
                 <input id="activity-tags" name="tags" defaultValue={editItem?.tags} className={inputClasses} />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-5 px-5 py-4 bg-white/5 rounded-lg border border-white/10">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-5 px-5 py-4 bg-surface-container-low rounded-lg border border-outline-variant">
                 <div className="flex items-center gap-6">
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" name="is_test" defaultChecked={editItem?.is_test} className="sr-only peer" />
-                        <div className="w-11 h-6 bg-white/10 rounded-full peer peer-checked:bg-primary-container relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full" />
-                        <span className="text-[11px] font-bold text-slate-300 uppercase">Test Modu</span>
+                        <div className="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:bg-primary relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:shadow after:transition-all peer-checked:after:translate-x-full" />
+                        <span className="text-[11px] font-bold text-on-surface-variant uppercase">Test Modu</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" name="has_timer" defaultChecked={editItem?.has_timer} className="sr-only peer" />
-                        <div className="w-11 h-6 bg-white/10 rounded-full peer peer-checked:bg-primary-container relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full" />
-                        <span className="text-[11px] font-bold text-slate-300 uppercase">Süre Sınırı</span>
+                        <div className="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:bg-primary relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:shadow after:transition-all peer-checked:after:translate-x-full" />
+                        <span className="text-[11px] font-bold text-on-surface-variant uppercase">Süre Sınırı</span>
                     </label>
                 </div>
                 <input name="duration_minutes" type="number" min={1} defaultValue={editItem?.duration_minutes || 20} className={inputClasses} />
@@ -253,13 +253,13 @@ export function ActivityForm({
                 <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
                     <div>
                         <label htmlFor="activity-html" className={labelClasses}>HTML İçeriği</label>
-                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <div className="flex items-center gap-2 text-xs text-on-surface-variant">
                             <FileCode2 className="w-4 h-4" />
                             <span>Buraya yapıştırılan veya yüklenen HTML değiştirilmeden gösterilir.</span>
                         </div>
                     </div>
                     <label className={cn(
-                        'inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 text-white text-[13px] font-bold rounded-lg cursor-pointer hover:bg-white/15 transition-colors border border-white/10',
+                        'inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-container-high text-on-surface text-[13px] font-bold rounded-lg cursor-pointer hover:bg-surface-container-highest transition-colors border border-outline-variant',
                         isProcessing && 'opacity-60 cursor-not-allowed pointer-events-none'
                     )}>
                         <Upload className="w-4 h-4" />
@@ -281,12 +281,12 @@ export function ActivityForm({
                     placeholder="Tam HTML dosyanızı buraya yapıştırın."
                     spellCheck={false}
                 />
-                {uploadError && <p className="text-xs font-medium text-red-400">{uploadError}</p>}
+                {uploadError && <p className="text-xs font-medium text-error">{uploadError}</p>}
             </section>
 
             <div className="flex justify-end gap-3">
-                <button type="button" onClick={onCancel} className="px-5 py-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Vazgeç</button>
-                <button type="submit" disabled={isSubmitting || isProcessing || storageLoadFailed} className="px-6 py-3 bg-primary-container text-white font-bold rounded-lg shadow-lg hover:bg-primary-container/80 disabled:opacity-50 transition-colors">
+                <button type="button" onClick={onCancel} className="px-5 py-2 text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors">Vazgeç</button>
+                <button type="submit" disabled={isSubmitting || isProcessing || storageLoadFailed} className="px-6 py-3 bg-primary text-white font-bold rounded-lg shadow-[0_4px_12px_rgba(99,102,241,0.28)] hover:brightness-105 disabled:opacity-50 transition-all">
                     {isSubmitting ? 'Kaydediliyor...' : editItem ? 'Güncelle' : 'Ekle'}
                 </button>
             </div>
