@@ -1,15 +1,25 @@
+// src/components/activities/ActivityCard.tsx — İÇERİK MERKEZİ RESKIN (açık tema)
+// Tüm props ve aksiyonlar AYNI. Sadece koyu/neon görünüm, açık İçerik Merkezi
+// stiline ve branş rengine çevrildi.
 import { memo } from 'react';
-import {
-    BarChart3,
-    Copy,
-    Edit3,
-    Share2,
-    Trash2,
-} from 'lucide-react';
+import { BarChart3, Copy, Edit3, Share2, Trash2, ChevronRight } from 'lucide-react';
 import { IconButton } from '../common/IconButton';
-import { cn } from '../../utils/cn';
 import { formatGradeLevel } from '../../constants/education';
 import type { Activity } from '../../types';
+
+// Branş → renk (tasarım sistemiyle uyumlu)
+const SUBJECT_COLOR: Record<string, string> = {
+    'Türkçe': '#E8C85A',
+    'Matematik': '#5AC8A8',
+    'Fen Bilimleri': '#E8685A',
+    'Sosyal Bilgiler': '#6366f1',
+    'İngilizce': '#3b82f6',
+    'Din Kültürü ve Ahlak Bilgisi': '#8b5cf6',
+    'Fizik': '#0ea5e9',
+    'Kimya': '#ec4899',
+    'Biyoloji': '#10b981',
+};
+const subjectColor = (s?: string) => (s && SUBJECT_COLOR[s]) || '#6366f1';
 
 interface ActivityCardProps {
     act: Activity;
@@ -24,7 +34,6 @@ interface ActivityCardProps {
 
 function ActivityCardBase({
     act,
-    index = 0,
     onOpenPreview,
     onEdit,
     onRequestDelete,
@@ -33,19 +42,8 @@ function ActivityCardBase({
     onCopyHtml,
 }: ActivityCardProps) {
     const titleLower = act.title.toLowerCase();
-    let colorType = index % 5; // Use index mod 5 to cycle neon accent colors
-    
-    // Accent color configurations based on index
-    const accents = [
-        { border: "bg-[#a855f7]", shadow: "shadow-[#a855f7]/20", text: "text-[#a855f7]", btn: "bg-[#a855f7] hover:bg-[#9333ea]", from: "#7e22ce", to: "#3b0764", fallback: "/images/quantum_glow.png" }, // Purple
-        { border: "bg-[#22c55e]", shadow: "shadow-[#22c55e]/20", text: "text-[#22c55e]", btn: "bg-[#15803d] hover:bg-[#16a34a]", from: "#15803d", to: "#052e16", fallback: "/images/dna_helix.png" },   // Green
-        { border: "bg-[#3b82f6]", shadow: "shadow-[#3b82f6]/20", text: "text-[#3b82f6]", btn: "bg-[#2563eb] hover:bg-[#1d4ed8]", from: "#1d4ed8", to: "#0a1a4a", fallback: "/images/holo_world_map.png" }, // Blue
-        { border: "bg-[#ec4899]", shadow: "shadow-[#ec4899]/20", text: "text-[#ec4899]", btn: "bg-[#db2777] hover:bg-[#be185d]", from: "#be185d", to: "#500724", fallback: "/images/quantum_glow.png" }, // Pink
-        { border: "bg-[#f59e0b]", shadow: "shadow-[#f59e0b]/20", text: "text-[#f59e0b]", btn: "bg-[#d97706] hover:bg-[#b45309]", from: "#b45309", to: "#451a03", fallback: "/images/holo_world_map.png" }, // Amber
-    ];
-    const currentAccent = accents[colorType];
+    const c = subjectColor(act.subject);
 
-    // İçerik türüne göre poster ikonu (material symbol adı)
     const getPosterIcon = () => {
         const cat = (act.category || '').toLowerCase();
         if (act.is_test) return 'quiz';
@@ -58,33 +56,26 @@ function ActivityCardBase({
     };
 
     const getActionText = () => {
-        if (act.is_test) return "Teste Başla";
-        if (titleLower.includes('harita')) return "Haritayı Aç";
-        if (titleLower.includes('ders') || titleLower.includes('video')) return "İzle / Oku";
-        return "Deneye Başla";
+        if (act.is_test) return 'Teste Başla';
+        if (titleLower.includes('harita')) return 'Haritayı Aç';
+        if (titleLower.includes('ders') || titleLower.includes('video')) return 'İzle / Oku';
+        return 'Aç';
     };
 
-    const renderVisualSlot = () => {
-        // Yüklenmiş bir kapak görseli varsa onu kullan
+    const renderPoster = () => {
         if (act.image_url) {
-            return <img src={act.image_url} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" alt="preview" loading="lazy" />;
+            return <img src={act.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="" loading="lazy" />;
         }
-        // Aksi halde hafif poster — canlı iframe YOK (performans için).
-        // İçerik yalnızca karta tıklanıp açıldığında canlı çalışır.
         return (
             <div
                 className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden select-none"
-                style={{ backgroundImage: `linear-gradient(135deg, ${currentAccent.from} 0%, ${currentAccent.to} 100%)` }}
+                style={{ backgroundImage: `linear-gradient(140deg, ${c}26, ${c}0d 65%, #ffffff00)` }}
             >
-                {/* yumuşak ışık efekti */}
-                <div
-                    className="absolute inset-0 opacity-60"
-                    style={{ backgroundImage: 'radial-gradient(circle at 28% 22%, rgba(255,255,255,0.35), transparent 55%)' }}
-                />
-                <span className="material-symbols-outlined relative !text-[64px] text-white/90 drop-shadow-lg group-hover:scale-110 transition-transform duration-500">
+                <div className="absolute inset-0" style={{ backgroundImage: `radial-gradient(115% 85% at 85% 12%, ${c}33, transparent 55%)` }} />
+                <span className="material-symbols-outlined relative !text-[52px] group-hover:scale-110 transition-transform duration-500" style={{ color: c, opacity: 0.92 }}>
                     {getPosterIcon()}
                 </span>
-                <span className="absolute bottom-3 right-4 text-[10px] font-extrabold uppercase tracking-widest text-white/60">
+                <span className="absolute bottom-2.5 right-3 text-[9.5px] font-extrabold uppercase tracking-widest" style={{ color: c, opacity: 0.62 }}>
                     {act.category || 'İçerik'}
                 </span>
             </div>
@@ -92,105 +83,68 @@ function ActivityCardBase({
     };
 
     return (
-        <div 
-            className="relative flex flex-col md:flex-row bg-surface-container/40 backdrop-blur-md border border-white/5 rounded-xl overflow-hidden hover:bg-surface-container/60 hover:border-white/10 transition-all duration-300 cursor-pointer shadow-lg shadow-black/20 hover:shadow-2xl group"
+        <div
+            className="group relative flex flex-col md:flex-row bg-white border border-outline-variant rounded-2xl overflow-hidden hover:border-primary hover:shadow-[0_16px_32px_rgba(15,23,42,0.10)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
             onClick={() => onOpenPreview(act.id)}
         >
-            {/* Left Color Stripe accent */}
-            <div className={cn("w-2 md:w-2.5 flex-shrink-0 h-full", currentAccent.border)} />
-            
-            {/* Görsel (Visual Slot) */}
-            <div className="w-full md:w-64 lg:w-72 aspect-video md:aspect-auto relative bg-black/30 border-b md:border-b-0 md:border-r border-white/5 flex-shrink-0 overflow-hidden">
-                {renderVisualSlot()}
-                
-                {/* Subtle Live Indicator */}
+            {/* Branş renk şeridi */}
+            <div className="w-1.5 md:w-2 flex-shrink-0" style={{ background: c }} />
+
+            {/* Poster */}
+            <div className="w-full md:w-60 lg:w-64 aspect-video md:aspect-auto relative bg-surface-container-low border-b md:border-b-0 md:border-r border-outline-variant flex-shrink-0 overflow-hidden">
+                {renderPoster()}
                 {act.is_test && (
-                    <div className="absolute top-3 left-3 bg-[#10131a]/80 border border-[#ec4899]/30 px-2.5 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-sm z-10">
-                        <div className="w-2 h-2 bg-[#ec4899] rounded-full animate-pulse"></div>
-                        <span className="text-[9px] font-extrabold text-white tracking-wider uppercase">Test</span>
+                    <div className="absolute top-3 left-3 bg-white/90 border border-error/30 px-2.5 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-sm z-10">
+                        <div className="w-2 h-2 bg-error rounded-full animate-pulse"></div>
+                        <span className="text-[9px] font-extrabold text-on-error-container tracking-wider uppercase">Test</span>
                     </div>
                 )}
             </div>
 
-            {/* Content Wrapper */}
+            {/* İçerik */}
             <div className="flex-1 flex flex-col min-w-0">
-                
-                {/* Header Band: ADI & DERS-SINIF */}
-                <div className="bg-[#0a0c10]/80 px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-white/5">
-                    <h3 className="text-xl lg:text-2xl font-extrabold text-white tracking-tight leading-tight truncate pr-4 group-hover:text-[#adc6ff] transition-colors">
+                <div className="px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-outline-variant">
+                    <h3 className="text-lg lg:text-xl font-bold text-on-surface tracking-tight leading-tight truncate pr-4 font-headline-md group-hover:text-primary transition-colors">
                         {act.title}
                     </h3>
-                    
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-2.5 flex-shrink-0">
                         {act.subject && (
-                            <span className="bg-white/5 text-[#c2c6d6] text-[10px] lg:text-[11px] font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-lg border border-white/5">
+                            <span className="inline-flex items-center gap-1.5 bg-surface-container-high text-on-surface-variant text-[10px] lg:text-[11px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg">
+                                <span className="w-2 h-2 rounded-full" style={{ background: c }} />
                                 {act.subject}
                             </span>
                         )}
-                        <span className="bg-[#adc6ff]/10 text-[#adc6ff] text-[10px] lg:text-[11px] font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-lg border border-[#adc6ff]/10">
+                        <span className="text-[10px] lg:text-[11px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg" style={{ background: `${c}1a`, color: c }}>
                             {formatGradeLevel(act.grade_level)}
                         </span>
                     </div>
                 </div>
 
-                {/* Body & Footer: AÇIKLAMA */}
-                <div className="flex-1 p-6 flex flex-col justify-between gap-6">
-                    <p className="text-sm lg:text-[15px] text-[#c2c6d6] leading-relaxed line-clamp-3 font-medium">
-                        {act.description || "Bu etkileşimli bilim içeriği için henüz bir açıklama girilmemiş. Keşfet butonunu kullanarak hemen içeriğe göz atabilirsiniz."}
+                <div className="flex-1 p-6 flex flex-col justify-between gap-5">
+                    <p className="text-sm lg:text-[15px] text-on-surface-variant leading-relaxed line-clamp-2 font-medium">
+                        {act.description || 'Bu interaktif içerik için henüz bir açıklama girilmemiş. Açmak için karta tıklayın.'}
                     </p>
 
-                    {/* Actions Row */}
-                    <div className="flex items-center justify-between mt-auto pt-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-between mt-auto" onClick={(e) => e.stopPropagation()}>
                         <button
                             onClick={() => onOpenPreview(act.id)}
-                            className={cn(
-                                "text-white font-extrabold px-6 py-2.5 rounded-xl text-[13px] tracking-wide shadow-lg hover:scale-105 transition-all active:scale-95 flex items-center gap-2",
-                                currentAccent.btn,
-                                currentAccent.shadow
-                            )}
+                            className="text-white font-bold px-5 py-2.5 rounded-xl text-[13px] tracking-wide shadow-[0_4px_12px_rgba(99,102,241,0.28)] bg-primary hover:brightness-105 hover:-translate-y-0.5 transition-all active:scale-95 flex items-center gap-1.5"
                         >
                             {getActionText()}
-                            <span className="material-symbols-outlined !text-[18px]">arrow_right_alt</span>
+                            <ChevronRight className="w-4 h-4" />
                         </button>
 
-                        {/* Admin Quick Controls */}
-                        <div className="flex items-center gap-1.5 bg-black/30 backdrop-blur border border-white/5 p-1 rounded-xl opacity-60 hover:opacity-100 transition-opacity">
-                            <IconButton
-                                icon={Copy}
-                                onClick={() => onCopyHtml(act)}
-                                className="w-8 h-8 text-[#c2c6d6] hover:text-white hover:bg-white/5"
-                                title="HTML Kopyala"
-                            />
-                            <IconButton
-                                icon={Share2}
-                                onClick={() => onCopyLink(act)}
-                                className="w-8 h-8 text-[#c2c6d6] hover:text-white hover:bg-white/5"
-                                title="Bağlantı Paylaş"
-                            />
-                            <IconButton
-                                icon={Edit3}
-                                onClick={() => onEdit(act)}
-                                className="w-8 h-8 text-[#c2c6d6] hover:text-white hover:bg-white/5"
-                                title="Düzenle"
-                            />
+                        <div className="flex items-center gap-1 bg-surface-container-low border border-outline-variant p-1 rounded-xl opacity-70 group-hover:opacity-100 transition-opacity">
+                            <IconButton icon={Copy} onClick={() => onCopyHtml(act)} className="w-8 h-8 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high" title="HTML Kopyala" />
+                            <IconButton icon={Share2} onClick={() => onCopyLink(act)} className="w-8 h-8 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high" title="Bağlantı Paylaş" />
+                            <IconButton icon={Edit3} onClick={() => onEdit(act)} className="w-8 h-8 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high" title="Düzenle" />
                             {act.is_test && (
-                                <IconButton
-                                    icon={BarChart3}
-                                    onClick={() => onShowResults(act.id)}
-                                    className="w-8 h-8 text-[#22c55e] hover:bg-[#22c55e]/10"
-                                    title="Sonuçlar"
-                                />
+                                <IconButton icon={BarChart3} onClick={() => onShowResults(act.id)} className="w-8 h-8 text-tertiary hover:bg-tertiary-container" title="Sonuçlar" />
                             )}
-                            <IconButton
-                                icon={Trash2}
-                                onClick={() => onRequestDelete(act)}
-                                className="w-8 h-8 text-[#ef4444] hover:bg-[#ef4444]/10"
-                                title="Sil"
-                            />
+                            <IconButton icon={Trash2} onClick={() => onRequestDelete(act)} className="w-8 h-8 text-error hover:bg-error-container" title="Sil" />
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
     );
