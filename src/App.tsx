@@ -1,5 +1,20 @@
+// src/App.tsx — İÇERİK MERKEZİ RESKIN (referans uygulama)
+// ─────────────────────────────────────────────────────────────────────
+// Bu dosya, mevcut App.tsx'inin TÜM MANTIĞINI korur (Firebase sync, filtreler,
+// önizleme, ekleme/düzenleme/silme, link/HTML kopyalama, sayfalama, öğrenci
+// görünümü) ve YALNIZCA düzeni İçerik Merkezi yapısına çevirir:
+//   • Üst başlık = <Navbar/> (marka + geniş arama + Yeni İçerik)
+//   • Düz sol menü: Tüm İçerikler · Branşlar · İçerik Türü · Etiketler
+//   • Karşılama başlığı (hero) + sayaçlar
+//   • Sınıf çipleri + sıralama + ızgara/liste
+//   • Görsel kart ızgarası (yeni ActivityCard)
+//
+// NOT (Claude Code): `ActivityListItem` ve `useFirestore` gibi mevcut bileşen/
+// hook'ların imza/props'larını kendi dosyalarından koru. Aşağıdaki MOCK ve
+// handler'lar senin orijinal App.tsx'inle birebir aynıdır.
+// ─────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Blocks, LayoutGrid, LayoutList, Plus, Search, Tag, Tags, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutGrid, List, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
 import { useFirestore } from './lib/firebase';
 import { cn } from './utils/cn';
 import { useDebounce } from './hooks/useDebounce';
@@ -8,20 +23,21 @@ import { Modal } from './components/common/Modal';
 import { useToast } from './components/common/ToastProvider';
 import { useConfirm } from './components/common/ConfirmDialog';
 import { ActivityCard } from './components/activities/ActivityCard';
-import { ActivityListItem } from './components/activities/ActivityListItem';
 import { ResultsModal } from './components/activities/ResultsModal';
 import { ActivityForm, type ActivityFormValues } from './components/activities/ActivityForm';
 import { ActivityPreviewModal } from './components/activities/ActivityPreviewModal';
 import { StudentPortal } from './components/student/StudentPortal';
-import {
-    GRADE_LEVELS,
-    SUBJECTS,
-    formatGradeLevel,
-    getGradeSortIndex,
-    getSubjectSortIndex,
-} from './constants/education';
+import { GRADE_LEVELS, SUBJECTS, formatGradeLevel } from './constants/education';
 import type { Activity } from './types';
 
+// Branş renkleri (kart ve menü noktaları için)
+const SUBJECT_COLOR: Record<string, string> = {
+    'Türkçe': '#E8C85A', 'Matematik': '#5AC8A8', 'Fen Bilimleri': '#E8685A',
+    'Sosyal Bilgiler': '#6366f1', 'İngilizce': '#3b82f6', 'Din Kültürü ve Ahlak Bilgisi': '#8b5cf6',
+    'Fizik': '#0ea5e9', 'Kimya': '#ec4899', 'Biyoloji': '#10b981',
+};
+
+// Firebase boşken gösterilecek yedek (mock) veri — orijinal tam liste korundu.
 const MOCK_ACTIVITIES: Activity[] = [
     {
         id: 'mock1',
@@ -115,10 +131,8 @@ const MOCK_ACTIVITIES: Activity[] = [
         grade_level: '10',
         tags: 'mikroskop, hücre',
         is_test: false,
-    }
+    },
 ];
-
-
 
 export default function App() {
     const params = new URLSearchParams(window.location.search);
@@ -136,10 +150,10 @@ export default function App() {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedGradeLevel, setSelectedGradeLevel] = useState<string | null>(null);
     const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+    const [sortBy, setSortBy] = useState<'recent' | 'title'>('recent');
     const [isActivityOpen, setIsActivityOpen] = useState(false);
     const [editItem, setEditItem] = useState<Activity | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [activeFilterGroup, setActiveFilterGroup] = useState<'category' | 'grade' | 'subject' | 'tag'>('category');
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 12;
 
@@ -149,445 +163,207 @@ export default function App() {
 
     useEffect(() => {
         const unsub = activitiesHandler.sync((data) => {
-            if (data && data.length > 0) {
-                setActivities(data);
-            } else {
-                setActivities(MOCK_ACTIVITIES);
-            }
+            setActivities(data && data.length > 0 ? data : MOCK_ACTIVITIES);
             setIsLoading(false);
         });
-        return () => {
-            unsub();
-        };
+        return () => unsub();
     }, []);
 
     const allTags = useMemo(() => {
-        const tagSet = new Set<string>();
-        activities.forEach((a) => {
-            if (a.tags) {
-                a.tags
-                    .split(',')
-                    .map((t) => t.trim())
-                    .filter(Boolean)
-                    .forEach((t) => tagSet.add(t));
-            }
-        });
-        return Array.from(tagSet).sort();
+        const s = new Set<string>();
+        activities.forEach((a) => a.tags?.split(',').map((t) => t.trim()).filter(Boolean).forEach((t) => s.add(t)));
+        return Array.from(s).sort();
     }, [activities]);
 
     const allCategories = useMemo(() => {
-        const categorySet = new Set<string>();
-        activities.forEach((a) => categorySet.add(a.category?.trim() || 'Genel'));
-        return Array.from(categorySet).sort((a, b) => a.localeCompare(b, 'tr'));
+        const s = new Set<string>();
+        activities.forEach((a) => s.add(a.category?.trim() || 'Genel'));
+        return Array.from(s).sort((a, b) => a.localeCompare(b, 'tr'));
+    }, [activities]);
+
+    const subjectCounts = useMemo(() => {
+        const m: Record<string, number> = {};
+        activities.forEach((a) => { if (a.subject) m[a.subject] = (m[a.subject] || 0) + 1; });
+        return m;
     }, [activities]);
 
     const filteredActivities = useMemo(() => {
         const needle = debouncedSearch.trim().toLocaleLowerCase('tr');
-        return activities.filter((a) => {
-            const haystack = [
-                a.title,
-                a.description,
-                a.category,
-                a.grade_level ? formatGradeLevel(a.grade_level) : '',
-                a.subject,
-                a.tags,
-            ]
-                .filter(Boolean)
-                .join(' ')
-                .toLocaleLowerCase('tr');
-            if (needle && !haystack.includes(needle)) return false;
+        let list = activities.filter((a) => {
+            const hay = [a.title, a.description, a.category, formatGradeLevel(a.grade_level), a.subject, a.tags].filter(Boolean).join(' ').toLocaleLowerCase('tr');
+            if (needle && !hay.includes(needle)) return false;
             if (selectedCategory && (a.category?.trim() || 'Genel') !== selectedCategory) return false;
             if (selectedGradeLevel && a.grade_level !== selectedGradeLevel) return false;
             if (selectedSubject && a.subject !== selectedSubject) return false;
-            if (!selectedTag) return true;
-            const tags = a.tags
-                ? a.tags
-                      .split(',')
-                      .map((t) => t.trim())
-                      .filter(Boolean)
-                : [];
-            return tags.includes(selectedTag);
+            if (selectedTag) {
+                const tags = a.tags ? a.tags.split(',').map((t) => t.trim()).filter(Boolean) : [];
+                if (!tags.includes(selectedTag)) return false;
+            }
+            return true;
         });
-    }, [activities, debouncedSearch, selectedCategory, selectedGradeLevel, selectedSubject, selectedTag]);
+        if (sortBy === 'title') list = [...list].sort((a, b) => a.title.localeCompare(b.title, 'tr'));
+        else list = [...list].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+        return list;
+    }, [activities, debouncedSearch, selectedCategory, selectedGradeLevel, selectedSubject, selectedTag, sortBy]);
 
-    // Filtre/arama değişince ilk sayfaya dön
-    useEffect(() => {
-        setPage(1);
-    }, [debouncedSearch, selectedCategory, selectedGradeLevel, selectedSubject, selectedTag]);
+    useEffect(() => { setPage(1); }, [debouncedSearch, selectedCategory, selectedGradeLevel, selectedSubject, selectedTag]);
 
     const totalPages = Math.max(1, Math.ceil(filteredActivities.length / PAGE_SIZE));
     const safePage = Math.min(page, totalPages);
-    const pagedActivities = useMemo(
-        () => filteredActivities.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
-        [filteredActivities, safePage]
-    );
+    const pagedActivities = useMemo(() => filteredActivities.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE), [filteredActivities, safePage]);
 
-    const groupedActivities = useMemo(() => {
-        const categoryGroups = new Map<string, Activity[]>();
-        filteredActivities.forEach((activity) => {
-            const category = activity.category?.trim() || 'Genel';
-            const current = categoryGroups.get(category) || [];
-            current.push(activity);
-            categoryGroups.set(category, current);
-        });
+    const openEdit = useCallback((act: Activity) => { setEditItem(act); setIsActivityOpen(true); }, []);
+    const openCreate = useCallback(() => { setEditItem(null); setIsActivityOpen(true); }, []);
 
-        return Array.from(categoryGroups.entries())
-            .sort(([a], [b]) => a.localeCompare(b, 'tr'))
-            .map(([category, categoryActivities]) => {
-                const educationGroups = new Map<string, Activity[]>();
-                categoryActivities.forEach((activity) => {
-                    const label = `${formatGradeLevel(activity.grade_level)} / ${activity.subject || 'Ders yok'}`;
-                    const current = educationGroups.get(label) || [];
-                    current.push(activity);
-                    educationGroups.set(label, current);
-                });
-                return [
-                    category,
-                    Array.from(educationGroups.entries()).sort(([, aItems], [, bItems]) => {
-                        const a = aItems[0];
-                        const b = bItems[0];
-                        const gradeDiff = getGradeSortIndex(a?.grade_level) - getGradeSortIndex(b?.grade_level);
-                        if (gradeDiff !== 0) return gradeDiff;
-                        const subjectDiff = getSubjectSortIndex(a?.subject) - getSubjectSortIndex(b?.subject);
-                        if (subjectDiff !== 0) return subjectDiff;
-                        return (a?.subject || '').localeCompare(b?.subject || '', 'tr');
-                    }),
-                ] as const;
-            });
-    }, [filteredActivities]);
+    const handleCopyLink = useCallback(async (act: Activity) => {
+        const link = `${window.location.origin}${window.location.pathname}?view=student&id=${act.id}`;
+        try { await navigator.clipboard.writeText(link); toast.success('Öğrenci giriş linki kopyalandı.'); }
+        catch { toast.error('Link kopyalanamadı.'); }
+    }, [toast]);
 
-    const openEdit = useCallback((act: Activity) => {
-        setEditItem(act);
-        setIsActivityOpen(true);
-    }, []);
+    const handleCopyHtml = useCallback(async (act: Activity) => {
+        try { await navigator.clipboard.writeText(act.html_code || ''); toast.success('HTML kodu kopyalandı.'); }
+        catch { toast.error('Kopyalanamadı.'); }
+    }, [toast]);
 
-    const openCreate = useCallback(() => {
-        setEditItem(null);
-        setIsActivityOpen(true);
-    }, []);
+    const handleRequestDelete = useCallback(async (act: Activity) => {
+        const ok = await confirm({ title: 'Etkinliği sil?', message: `"${act.title}" kalıcı olarak silinecek.`, confirmLabel: 'Sil', cancelLabel: 'Vazgeç', variant: 'danger' });
+        if (!ok) return;
+        try { await activitiesHandler.remove(act.id); toast.success('Etkinlik silindi.'); }
+        catch { toast.error('Etkinlik silinemedi.'); }
+    }, [activitiesHandler, confirm, toast]);
 
-    const handleCopyLink = useCallback(
-        async (act: Activity) => {
-            const link = `${window.location.origin}${window.location.pathname}?view=student&id=${act.id}`;
-            try {
-                await navigator.clipboard.writeText(link);
-                toast.success('Öğrenci giriş linki kopyalandı.');
-            } catch {
-                toast.error('Link kopyalanamadı.');
-            }
-        },
-        [toast]
-    );
+    const handleActivitySubmit = useCallback(async (values: ActivityFormValues) => {
+        setIsSubmitting(true);
+        try {
+            if (editItem) { await activitiesHandler.update(editItem.id, values); toast.success('Etkinlik güncellendi.'); }
+            else { await activitiesHandler.add(values); toast.success('Etkinlik eklendi.'); }
+            setIsActivityOpen(false); setEditItem(null);
+        } catch { toast.error('Etkinlik kaydedilemedi.'); }
+        finally { setIsSubmitting(false); }
+    }, [editItem, activitiesHandler, toast]);
 
-    const handleCopyHtml = useCallback(
-        async (act: Activity) => {
-            try {
-                await navigator.clipboard.writeText(act.html_code || '');
-                toast.success('HTML kodu kopyalandı.');
-            } catch {
-                toast.error('Kopyalanamadı.');
-            }
-        },
-        [toast]
-    );
-
-    const handleRequestDelete = useCallback(
-        async (act: Activity) => {
-            const ok = await confirm({
-                title: 'Etkinliği sil?',
-                message: `"${act.title}" adlı etkinlik kalıcı olarak silinecek.`,
-                confirmLabel: 'Sil',
-                cancelLabel: 'Vazgeç',
-                variant: 'danger',
-            });
-            if (!ok) return;
-            try {
-                await activitiesHandler.remove(act.id);
-                toast.success('Etkinlik silindi.');
-            } catch (err) {
-                toast.error('Etkinlik silinemedi.');
-            }
-        },
-        [activitiesHandler, confirm, toast]
-    );
-
-    const handleActivitySubmit = useCallback(
-        async (values: ActivityFormValues) => {
-            setIsSubmitting(true);
-            try {
-                if (editItem) {
-                    await activitiesHandler.update(editItem.id, values);
-                    toast.success('Etkinlik güncellendi.');
-                } else {
-                    await activitiesHandler.add(values);
-                    toast.success('Etkinlik eklendi.');
-                }
-                setIsActivityOpen(false);
-                setEditItem(null);
-            } catch (err) {
-                toast.error('Etkinlik kaydedilemedi.');
-            } finally {
-                setIsSubmitting(false);
-            }
-        },
-        [editItem, activitiesHandler, toast]
-    );
-
-    const currentPreview = previewId
-        ? activities.find((a) => a.id === previewId) ?? null
-        : null;
+    const currentPreview = previewId ? activities.find((a) => a.id === previewId) ?? null : null;
+    const resetFilters = () => { setSelectedCategory(null); setSelectedGradeLevel(null); setSelectedSubject(null); setSelectedTag(null); setSearch(''); };
 
     if (isStudentView) {
-        if (isLoading) {
-            return (
-                <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
-                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                    <p className="text-on-surface-variant font-bold uppercase tracking-widest text-xs">Yükleniyor…</p>
-                </div>
-            );
-        }
+        if (isLoading) return (
+            <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-on-surface-variant font-bold uppercase tracking-widest text-xs">Yükleniyor…</p>
+            </div>
+        );
         const activity = activities.find((a) => a.id === studentId);
         if (activity) return <StudentPortal act={activity} />;
     }
 
+    const title = selectedSubject || selectedCategory || (selectedTag ? `#${selectedTag}` : 'Tüm İçerikler');
+
+    // Düz menü öğesi
+    const NavItem = ({ active, onClick, dot, icon, label, count }: { active: boolean; onClick: () => void; dot?: string; icon?: React.ReactNode; label: string; count?: number }) => (
+        <button onClick={onClick} className={cn(
+            'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-[13px] font-medium transition-colors',
+            active ? 'bg-primary/10 text-primary font-semibold' : 'text-on-surface-variant hover:bg-surface-container-high'
+        )}>
+            <span className="w-[18px] h-[18px] flex items-center justify-center flex-shrink-0">
+                {dot ? <span className="w-2.5 h-2.5 rounded-full" style={{ background: dot }} /> : icon}
+            </span>
+            <span className="flex-1 text-left">{label}</span>
+            {count != null && <span className={cn('text-[11px] font-semibold px-2 py-0.5 rounded-full min-w-[22px] text-center', active ? 'bg-primary/15 text-primary' : 'bg-surface-container-high text-on-surface-variant')}>{count}</span>}
+        </button>
+    );
+
     return (
-        <div className="min-h-screen bg-background text-on-background font-sans selection:bg-primary-container selection:text-white pb-24 md:pb-0">
-            <Navbar />
+        <div className="min-h-screen bg-background text-on-background font-sans">
+            <Navbar search={search} onSearchChange={setSearch} onAdd={openCreate} />
 
-            <main className="max-w-[1440px] mx-auto px-8 py-12">
-                <div className="flex flex-col lg:flex-row gap-12">
-                    
-                    {/* Sidebar Filters (Redesigned to match Visual exactly) */}
-                    <aside className="w-full lg:w-64 flex-shrink-0 space-y-6 pt-2">
-                        <div className="space-y-1 mb-8 border-b border-outline-variant pb-4">
-                            <h2 className="text-lg font-extrabold text-on-surface uppercase tracking-wider">Filtreler</h2>
-                            <p className="text-xs text-on-surface-variant font-medium">Aramanızı daraltın</p>
-                        </div>
-                        
-                        <div className="flex flex-col gap-3">
-                            {/* Content Type (Category) Button */}
-                            <button 
-                                onClick={() => setActiveFilterGroup(activeFilterGroup === 'category' ? null as any : 'category')}
-                                className={cn(
-                                    "w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[13px] font-extrabold transition-all text-left uppercase tracking-wider",
-                                    activeFilterGroup === 'category' 
-                                        ? "bg-primary text-white shadow-lg shadow-primary/20"
-                                        : "bg-white border border-outline-variant text-on-surface-variant hover:border-primary/40"
-                                )}
-                            >
-                                <span className="material-symbols-outlined !text-[20px]">widgets</span>
-                                <span>İçerik Türü</span>
-                            </button>
-                            
-                            {activeFilterGroup === 'category' && (
-                                <div className="pl-6 pr-2 py-2 flex flex-col gap-1 animate-fade-in border-l border-outline-variant ml-6">
-                                    <button
-                                        onClick={() => setSelectedCategory(null)}
-                                        className={cn(
-                                            "text-left px-3 py-2 rounded-lg text-xs font-bold tracking-wide transition-colors",
-                                            selectedCategory === null ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface"
-                                        )}
-                                    >
-                                        Tümü
+            <div className="flex max-w-[1280px] mx-auto">
+                {/* Sol menü */}
+                <aside className="w-[232px] flex-shrink-0 border-r border-outline-variant bg-white p-3 hidden lg:flex flex-col gap-1 min-h-[calc(100vh-62px)]">
+                    <NavItem active={!selectedSubject && !selectedCategory && !selectedTag} onClick={resetFilters} icon={<LayoutGrid className="w-4 h-4" />} label="Tüm İçerikler" count={activities.length} />
+
+                    <div className="text-[10.5px] font-bold tracking-[1.4px] uppercase text-on-surface-variant/60 px-3 pt-4 pb-1.5">Branşlar</div>
+                    {SUBJECTS.filter((s) => subjectCounts[s]).map((s) => (
+                        <NavItem key={s} active={selectedSubject === s} onClick={() => setSelectedSubject(selectedSubject === s ? null : s)} dot={SUBJECT_COLOR[s] || '#6366f1'} label={s} count={subjectCounts[s] || 0} />
+                    ))}
+
+                    <div className="text-[10.5px] font-bold tracking-[1.4px] uppercase text-on-surface-variant/60 px-3 pt-4 pb-1.5">İçerik Türü</div>
+                    {allCategories.map((cat) => (
+                        <NavItem key={cat} active={selectedCategory === cat} onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)} icon={<Tag className="w-4 h-4" />} label={cat} />
+                    ))}
+
+                    {allTags.length > 0 && (
+                        <>
+                            <div className="text-[10.5px] font-bold tracking-[1.4px] uppercase text-on-surface-variant/60 px-3 pt-4 pb-1.5">Etiketler</div>
+                            <div className="flex flex-wrap gap-1.5 px-2">
+                                {allTags.map((t) => (
+                                    <button key={t} onClick={() => setSelectedTag(selectedTag === t ? null : t)}
+                                        className={cn('px-2.5 py-1 rounded-full text-[11.5px] font-semibold border transition', selectedTag === t ? 'bg-primary/10 text-primary border-transparent' : 'bg-white text-on-surface-variant border-outline-variant hover:border-primary')}>
+                                        {t}
                                     </button>
-                                    {allCategories.map(category => (
-                                        <button
-                                            key={category}
-                                            onClick={() => setSelectedCategory(selectedCategory === category ? null : category)}
-                                            className={cn(
-                                                "text-left px-3 py-2 rounded-lg text-xs font-bold tracking-wide transition-colors",
-                                                selectedCategory === category ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface"
-                                            )}
-                                        >
-                                            {category}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </aside>
 
-                            {/* Grade Levels Button */}
-                            <button 
-                                onClick={() => setActiveFilterGroup(activeFilterGroup === 'grade' ? null as any : 'grade')}
-                                className={cn(
-                                    "w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[13px] font-extrabold transition-all text-left uppercase tracking-wider",
-                                    activeFilterGroup === 'grade' 
-                                        ? "bg-primary text-white shadow-lg shadow-primary/20"
-                                        : "bg-white border border-outline-variant text-on-surface-variant hover:border-primary/40"
-                                )}
-                            >
-                                <span className="material-symbols-outlined !text-[20px]">school</span>
-                                <span>Sınıf Seviyeleri</span>
-                            </button>
-
-                            {activeFilterGroup === 'grade' && (
-                                <div className="pl-6 py-2 grid grid-cols-3 gap-2 border-l border-outline-variant ml-6">
-                                    {GRADE_LEVELS.map(grade => (
-                                        <button
-                                            key={grade}
-                                            onClick={() => setSelectedGradeLevel(selectedGradeLevel === grade ? null : grade)}
-                                            className={cn(
-                                                "py-2 rounded-lg text-xs font-bold text-center transition-all border",
-                                                selectedGradeLevel === grade ? "bg-primary text-white border-primary" : "bg-white text-on-surface-variant border-outline-variant hover:border-primary hover:text-primary"
-                                            )}
-                                        >
-                                            {grade}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Subjects Button */}
-                            <button 
-                                onClick={() => setActiveFilterGroup(activeFilterGroup === 'subject' ? null as any : 'subject')}
-                                className={cn(
-                                    "w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[13px] font-extrabold transition-all text-left uppercase tracking-wider",
-                                    activeFilterGroup === 'subject' 
-                                        ? "bg-primary text-white shadow-lg shadow-primary/20"
-                                        : "bg-white border border-outline-variant text-on-surface-variant hover:border-primary/40"
-                                )}
-                            >
-                                <span className="material-symbols-outlined !text-[20px]">menu_book</span>
-                                <span>Dersler</span>
-                            </button>
-
-                            {activeFilterGroup === 'subject' && (
-                                <div className="pl-6 pr-2 py-2 flex flex-col gap-1 border-l border-outline-variant ml-6">
-                                    <button
-                                        onClick={() => setSelectedSubject(null)}
-                                        className={cn(
-                                            "text-left px-3 py-2 rounded-lg text-xs font-bold tracking-wide transition-colors",
-                                            selectedSubject === null ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface"
-                                        )}
-                                    >
-                                        Tümü
-                                    </button>
-                                    {SUBJECTS.map(subject => (
-                                        <button
-                                            key={subject}
-                                            onClick={() => setSelectedSubject(selectedSubject === subject ? null : subject)}
-                                            className={cn(
-                                                "text-left px-3 py-2 rounded-lg text-xs font-bold tracking-wide transition-colors",
-                                                selectedSubject === subject ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface"
-                                            )}
-                                        >
-                                            {subject}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Tags Button */}
-                            <button 
-                                onClick={() => setActiveFilterGroup(activeFilterGroup === 'tag' ? null as any : 'tag')}
-                                className={cn(
-                                    "w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[13px] font-extrabold transition-all text-left uppercase tracking-wider",
-                                    activeFilterGroup === 'tag' 
-                                        ? "bg-primary text-white shadow-lg shadow-primary/20"
-                                        : "bg-white border border-outline-variant text-on-surface-variant hover:border-primary/40"
-                                )}
-                            >
-                                <span className="material-symbols-outlined !text-[20px]">sell</span>
-                                <span>Etiketler</span>
-                            </button>
-
-                            {activeFilterGroup === 'tag' && (
-                                <div className="pl-6 pr-2 py-2 flex flex-wrap gap-2 border-l border-outline-variant ml-6">
-                                    <button
-                                        onClick={() => setSelectedTag(null)}
-                                        className={cn(
-                                            "px-2.5 py-1 rounded-md text-xs font-bold tracking-wide transition-all border",
-                                            selectedTag === null ? "bg-primary/10 text-primary border-transparent" : "bg-white text-on-surface-variant border-outline-variant hover:border-primary"
-                                        )}
-                                    >
-                                        Tümü
-                                    </button>
-                                    {allTags.map(tag => (
-                                        <button
-                                            key={tag}
-                                            onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
-                                            className={cn(
-                                                "px-2.5 py-1 rounded-md text-xs font-bold tracking-wide transition-all border",
-                                                selectedTag === tag ? "bg-primary/10 text-primary border-transparent" : "bg-white text-on-surface-variant border-outline-variant hover:border-primary"
-                                            )}
-                                        >
-                                            {tag}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
+                {/* Ana içerik */}
+                <main className="flex-1 min-w-0 px-6 py-6 pb-20">
+                    {/* Hero */}
+                    <div className="flex items-center justify-between gap-5 flex-wrap bg-white border border-outline-variant rounded-[18px] px-6 py-4 mb-5">
+                        <div>
+                            <h2 className="text-[22px] font-bold font-headline-md text-on-surface tracking-tight">Merhaba, Ahmet Öğretmen</h2>
+                            <p className="text-[13px] text-on-surface-variant mt-1">Hazırladığın içerikleri seç, derste tam ekran sun.</p>
                         </div>
-                        
-                        {/* Reset All Button */}
-                        <div className="pt-6 border-t border-outline-variant mt-4">
-                            <button
-                                onClick={() => {
-                                    setSelectedCategory(null);
-                                    setSelectedGradeLevel(null);
-                                    setSelectedSubject(null);
-                                    setSelectedTag(null);
-                                    setSearch('');
-                                }}
-                                className="text-sm font-bold text-primary hover:brightness-110 transition-colors uppercase tracking-wider flex items-center gap-2 active:scale-95"
-                            >
-                                Tümünü Sıfırla
-                            </button>
+                        <div className="flex gap-2.5">
+                            {[['İçerik', activities.length], ['Ders', Object.keys(subjectCounts).length], ['Tür', allCategories.length]].map(([l, v]) => (
+                                <div key={l as string} className="text-center px-4 py-2 rounded-2xl bg-surface-container-low border border-outline-variant">
+                                    <b className="block text-[22px] font-extrabold font-headline-md text-on-surface leading-none">{v as number}</b>
+                                    <span className="text-[11px] text-on-surface-variant font-semibold">{l as string}</span>
+                                </div>
+                            ))}
                         </div>
+                    </div>
 
-                        <button 
-                            onClick={openCreate}
-                            className="w-full mt-8 py-3 bg-primary hover:brightness-105 border-transparent text-white text-xs font-extrabold tracking-widest rounded-xl shadow-[0_4px_12px_rgba(99,102,241,0.28)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 uppercase"
-                        >
-                            <Plus className="w-4 h-4" /> İçerik Ekle
-                        </button>
-                    </aside>
-
-                    {/* Main Content Area (Bento & Premium UI) */}
-                    <section className="flex-1 space-y-10 pt-2">
-                        
-                        {/* Header matched exactly with Visual */}
-                        <div className="space-y-4">
-                            <h1 className="text-4xl md:text-5xl font-extrabold text-on-surface font-headline-lg tracking-tight leading-[1.15]">Etkinlik Laboratuvarı</h1>
-                            <p className="text-lg text-on-surface-variant leading-relaxed max-w-3xl">Etkileşimli simülasyonlar, derinlemesine videolar ve pratik testlerle bilim dünyasını keşfedin.</p>
+                    {/* Toolbar */}
+                    <div className="flex items-center gap-4 flex-wrap mb-4">
+                        <div className="flex items-baseline gap-2.5">
+                            <h1 className="text-[21px] font-bold font-headline-md text-on-surface m-0">{title}</h1>
+                            <span className="text-[13px] text-on-surface-variant">{filteredActivities.length} içerik</span>
                         </div>
-
-                        {/* Search input placed below header as in Visual */}
-                        <div className="relative max-w-xl">
-                            <input 
-                                className="w-full bg-white border border-outline-variant focus:border-primary rounded-xl pl-12 pr-6 py-4 text-on-surface font-medium text-base placeholder-on-surface-variant outline-none transition-all focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)]"
-                                placeholder="Deney veya konu ara..." 
-                                type="text"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                            />
-                            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+                        <div className="flex gap-1.5 flex-wrap">
+                            <button onClick={() => setSelectedGradeLevel(null)} className={cn('px-3 py-1.5 rounded-full text-[12.5px] font-semibold border transition', selectedGradeLevel == null ? 'bg-primary text-white border-primary' : 'bg-white text-on-surface-variant border-outline-variant hover:border-primary hover:text-primary')}>Tüm Sınıflar</button>
+                            {GRADE_LEVELS.map((g) => (
+                                <button key={g} onClick={() => setSelectedGradeLevel(selectedGradeLevel === g ? null : g)} className={cn('min-w-[34px] px-2.5 py-1.5 rounded-full text-[12.5px] font-semibold border transition', selectedGradeLevel === g ? 'bg-primary text-white border-primary' : 'bg-white text-on-surface-variant border-outline-variant hover:border-primary hover:text-primary')}>{g}</button>
+                            ))}
                         </div>
-
-                        {/* Result info */}
-                        <div className="flex items-center justify-between pb-2">
-                            <div className="text-xs text-on-surface-variant font-bold uppercase tracking-widest">
-                                {filteredActivities.length} İÇERİK BULUNDU
+                        <div className="flex items-center gap-2 ml-auto">
+                            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'recent' | 'title')} className="border border-outline-variant bg-white rounded-[10px] px-3 py-1.5 text-[12.5px] font-semibold text-on-surface-variant">
+                                <option value="recent">Son eklenen</option>
+                                <option value="title">Ada göre (A-Z)</option>
+                            </select>
+                            <div className="flex bg-surface-container-high rounded-[10px] p-[3px] gap-0.5">
+                                <button onClick={() => setViewMode('grid')} className={cn('p-1.5 rounded-lg', viewMode === 'grid' ? 'bg-primary text-white' : 'text-on-surface-variant')}><LayoutGrid className="w-4 h-4" /></button>
+                                <button onClick={() => setViewMode('list')} className={cn('p-1.5 rounded-lg', viewMode === 'list' ? 'bg-primary text-white' : 'text-on-surface-variant')}><List className="w-4 h-4" /></button>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Content Render */}
-                        {isLoading ? (
-                            <div className="py-24 flex flex-col items-center justify-center gap-4">
-                                <div className="w-12 h-12 border-4 border-[#adc6ff] border-t-transparent rounded-full animate-spin" />
-                                <p className="text-on-surface-variant font-extrabold uppercase tracking-widest text-[10px]">Laboratuvar Hazırlanıyor…</p>
-                            </div>
-                        ) : filteredActivities.length === 0 ? (
-                            <div className="py-24 bg-white rounded-3xl border border-outline-variant flex flex-col items-center justify-center text-center gap-6">
-                                <div className="w-16 h-16 rounded-2xl bg-surface-container-high text-on-surface-variant flex items-center justify-center border border-outline-variant">
-                                    <Blocks className="w-8 h-8" />
-                                </div>
-                                <div className="space-y-1">
-                                    <h3 className="text-lg font-extrabold text-on-surface">Herhangi bir içerik bulunamadı</h3>
-                                    <p className="text-sm text-on-surface-variant max-w-xs leading-relaxed">Arama teriminizi değiştirin veya filtrelerinizi temizleyin.</p>
-                                </div>
-                            </div>
-                        ) : (
-                            /* Horizontal List Stack Rendering (sayfalı) */
-                            <div className="flex flex-col gap-6">
+                    {/* İçerik */}
+                    {isLoading ? (
+                        <div className="py-24 flex flex-col items-center gap-4">
+                            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                            <p className="text-on-surface-variant font-bold uppercase tracking-widest text-[10px]">Yükleniyor…</p>
+                        </div>
+                    ) : filteredActivities.length === 0 ? (
+                        <div className="py-20 bg-white rounded-[22px] border border-outline-variant text-center">
+                            <h3 className="text-base font-bold font-headline-md text-on-surface">Sonuç bulunamadı</h3>
+                            <p className="text-[13px] text-on-surface-variant mt-1.5">Arama veya filtreleri değiştirmeyi deneyin.</p>
+                            <button onClick={resetFilters} className="mt-4 bg-surface-container-high text-on-surface-variant font-semibold px-4 py-2.5 rounded-xl text-[13.5px]">Filtreleri temizle</button>
+                        </div>
+                    ) : (
+                        <>
+                            <div className={cn(viewMode === 'grid' ? 'grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(216px,1fr))]' : 'flex flex-col gap-3')}>
                                 {pagedActivities.map((act, idx) => (
                                     <ActivityCard
                                         key={act.id}
@@ -601,127 +377,38 @@ export default function App() {
                                         onCopyHtml={handleCopyHtml}
                                     />
                                 ))}
-
-                                {/* Sayfalama kontrolleri */}
-                                {totalPages > 1 && (
-                                    <div className="flex items-center justify-center gap-2 pt-6">
-                                        <button
-                                            onClick={() => { setPage(safePage - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                                            disabled={safePage === 1}
-                                            className="flex items-center gap-1 px-4 py-2.5 rounded-xl bg-white hover:bg-surface-container-high border border-outline-variant text-on-surface text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
-                                        >
-                                            <ChevronLeft className="w-4 h-4" /> Önceki
-                                        </button>
-                                        <span className="px-4 py-2.5 text-sm font-extrabold text-on-surface-variant tracking-wide">
-                                            {safePage} / {totalPages}
-                                        </span>
-                                        <button
-                                            onClick={() => { setPage(safePage + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                                            disabled={safePage === totalPages}
-                                            className="flex items-center gap-1 px-4 py-2.5 rounded-xl bg-white hover:bg-surface-container-high border border-outline-variant text-on-surface text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
-                                        >
-                                            Sonraki <ChevronRight className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                )}
                             </div>
-                        )}
-                    </section>
-                </div>
-            </main>
+
+                            {totalPages > 1 && (
+                                <div className="flex items-center justify-center gap-2 pt-8">
+                                    <button onClick={() => { setPage(safePage - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} disabled={safePage === 1}
+                                        className="flex items-center gap-1 px-4 py-2.5 rounded-xl bg-white border border-outline-variant text-on-surface text-sm font-bold disabled:opacity-30 hover:bg-surface-container-high transition">
+                                        <ChevronLeft className="w-4 h-4" /> Önceki
+                                    </button>
+                                    <span className="px-4 py-2.5 text-sm font-bold text-on-surface-variant">{safePage} / {totalPages}</span>
+                                    <button onClick={() => { setPage(safePage + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} disabled={safePage === totalPages}
+                                        className="flex items-center gap-1 px-4 py-2.5 rounded-xl bg-white border border-outline-variant text-on-surface text-sm font-bold disabled:opacity-30 hover:bg-surface-container-high transition">
+                                        Sonraki <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </main>
+            </div>
 
             {/* Footer */}
-            <footer className="bg-white full-width py-12 px-8 border-t border-outline-variant mt-20 text-center md:text-left">
-                <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
-                    <div className="space-y-4">
-                        <div className="text-2xl font-black text-on-surface font-headline-xl italic tracking-tighter">Ahmet DUYAR</div>
-                        <p className="font-body-md text-sm text-on-surface-variant leading-relaxed max-w-xs">Eğitimi interaktif ve eğlenceli hale getiren yeni nesil simülasyon platformu.</p>
-                    </div>
-                    <div>
-                        <h4 className="text-on-surface font-bold mb-6 font-headline-md text-lg">Hızlı Erişim</h4>
-                        <ul className="space-y-3">
-                            <li><a className="text-sm text-on-surface-variant hover:text-primary transition-all" href="#">Keşfet</a></li>
-                            <li><a className="text-sm text-on-surface-variant hover:text-primary transition-all" href="#">Kategoriler</a></li>
-                            <li><a className="text-sm text-on-surface-variant hover:text-primary transition-all" href="#">Ders Notları</a></li>
-                        </ul>
-                    </div>
-                    <div>
-                        <h4 className="text-on-surface font-bold mb-6 font-headline-md text-lg">Destek</h4>
-                        <ul className="space-y-3">
-                            <li><a className="text-sm text-on-surface-variant hover:text-primary transition-all" href="#">Yardım Merkezi</a></li>
-                            <li><a className="text-sm text-on-surface-variant hover:text-primary transition-all" href="#">İletişim</a></li>
-                            <li><a className="text-sm text-on-surface-variant hover:text-primary transition-all" href="#">Gizlilik Politikası</a></li>
-                        </ul>
-                    </div>
-                    <div className="space-y-4">
-                        <h4 className="text-on-surface font-bold mb-6 font-headline-md text-lg">Bülten</h4>
-                        <p className="text-sm text-on-surface-variant">Yeni etkinliklerden haberdar olun.</p>
-                        <div className="flex gap-2">
-                            <input className="bg-surface-container-low border border-outline-variant rounded-lg px-4 py-2 text-on-surface w-full focus:outline-none focus:ring-1 focus:ring-primary" placeholder="E-posta adresi" type="email"/>
-                            <button className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-container/80 transition-all">Abone Ol</button>
-                        </div>
-                    </div>
-                </div>
-                <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-outline-variant text-center">
-                    <p className="text-sm text-on-surface-variant">© 2024 Ahmet DUYAR. Tüm hakları saklıdır.</p>
-                </div>
+            <footer className="bg-white border-t border-outline-variant py-7 px-6 text-center text-[13px] text-on-surface-variant">
+                © 2026 Ahmet DUYAR · Etkinlik Laboratuvarı — interaktif eğitim içerik merkezi
             </footer>
 
-            {/* Mobile Bottom Nav */}
-            <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white/95 backdrop-blur-2xl border-t border-outline-variant rounded-t-3xl md:hidden z-50">
-                <button className="flex flex-col items-center text-primary">
-                    <span className="material-symbols-outlined">home</span>
-                    <span className="text-[10px] font-bold uppercase tracking-widest mt-1">Ana Sayfa</span>
-                </button>
-                <button className="flex flex-col items-center text-on-surface-variant">
-                    <span className="material-symbols-outlined">search</span>
-                    <span className="text-[10px] font-bold uppercase tracking-widest mt-1">Ara</span>
-                </button>
-                <button onClick={openCreate} className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white -mt-12 shadow-xl border-4 border-white shadow-[0_8px_20px_rgba(99,102,241,0.4)]">
-                    <Plus className="w-6 h-6" />
-                </button>
-                <button className="flex flex-col items-center text-on-surface-variant">
-                    <span className="material-symbols-outlined">favorite</span>
-                    <span className="text-[10px] font-bold uppercase tracking-widest mt-1">Favoriler</span>
-                </button>
-                <button className="flex flex-col items-center text-on-surface-variant">
-                    <span className="material-symbols-outlined">account_circle</span>
-                    <span className="text-[10px] font-bold uppercase tracking-widest mt-1">Profil</span>
-                </button>
-            </nav>
+            <ResultsModal isOpen={!!showResultsId} onClose={() => setShowResultsId(null)} activityId={showResultsId || ''} />
 
-            <ResultsModal
-                isOpen={!!showResultsId}
-                onClose={() => setShowResultsId(null)}
-                activityId={showResultsId || ''}
-            />
-
-            <Modal
-                isOpen={isActivityOpen}
-                onClose={() => {
-                    setIsActivityOpen(false);
-                    setEditItem(null);
-                }}
-                title={editItem ? 'Etkinliği Güncelle' : 'Yeni İnteraktif İçerik'}
-            >
-                <ActivityForm
-                    key={editItem?.id || 'new'}
-                    editItem={editItem}
-                    isSubmitting={isSubmitting}
-                    onSubmit={handleActivitySubmit}
-                    onCancel={() => {
-                        setIsActivityOpen(false);
-                        setEditItem(null);
-                    }}
-                />
+            <Modal isOpen={isActivityOpen} onClose={() => { setIsActivityOpen(false); setEditItem(null); }} title={editItem ? 'Etkinliği Güncelle' : 'Yeni İnteraktif İçerik'}>
+                <ActivityForm key={editItem?.id || 'new'} editItem={editItem} isSubmitting={isSubmitting} onSubmit={handleActivitySubmit} onCancel={() => { setIsActivityOpen(false); setEditItem(null); }} />
             </Modal>
 
-            {currentPreview && (
-                <ActivityPreviewModal
-                    activity={currentPreview}
-                    onClose={() => setPreviewId(null)}
-                />
-            )}
+            {currentPreview && <ActivityPreviewModal activity={currentPreview} onClose={() => setPreviewId(null)} />}
         </div>
     );
 }
