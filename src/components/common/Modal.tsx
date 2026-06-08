@@ -43,7 +43,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="absolute inset-0 bg-slate-950/40 backdrop-blur-md"
+                        className="absolute inset-0 bg-slate-900/30 backdrop-blur-md"
                     />
                     <motion.div
                         ref={contentRef}
@@ -51,12 +51,12 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.98, y: 10 }}
                         transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
-                        className="relative bg-surface-container-highest/90 backdrop-blur-2xl border border-white/10 rounded-3xl w-full max-w-3xl p-6 sm:p-8 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+                        className="relative bg-white border border-outline-variant rounded-3xl w-full max-w-3xl p-6 sm:p-8 shadow-[0_24px_60px_rgba(15,23,42,0.18)] overflow-hidden max-h-[90vh] flex flex-col"
                     >
                         <div className="flex justify-between items-center mb-6 shrink-0">
                             <h3
                                 id={titleId}
-                                className="font-headline-md text-xl text-white tracking-tight"
+                                className="font-headline-md text-xl text-on-surface tracking-tight"
                             >
                                 {title}
                             </h3>
@@ -64,7 +64,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
                                 type="button"
                                 onClick={onClose}
                                 aria-label="Kapat"
-                                className="p-2 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white"
+                                className="p-2 hover:bg-surface-container-high rounded-xl transition-all text-on-surface-variant hover:text-on-surface"
                             >
                                 <X className="w-5 h-5" />
                             </button>
