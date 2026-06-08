@@ -140,6 +140,8 @@ export default function App() {
     const [editItem, setEditItem] = useState<Activity | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [activeFilterGroup, setActiveFilterGroup] = useState<'category' | 'grade' | 'subject' | 'tag'>('category');
+    const [page, setPage] = useState(1);
+    const PAGE_SIZE = 12;
 
     const activitiesHandler = useFirestore<Activity>('activities');
     const toast = useToast();
@@ -207,6 +209,18 @@ export default function App() {
             return tags.includes(selectedTag);
         });
     }, [activities, debouncedSearch, selectedCategory, selectedGradeLevel, selectedSubject, selectedTag]);
+
+    // Filtre/arama değişince ilk sayfaya dön
+    useEffect(() => {
+        setPage(1);
+    }, [debouncedSearch, selectedCategory, selectedGradeLevel, selectedSubject, selectedTag]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredActivities.length / PAGE_SIZE));
+    const safePage = Math.min(page, totalPages);
+    const pagedActivities = useMemo(
+        () => filteredActivities.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+        [filteredActivities, safePage]
+    );
 
     const groupedActivities = useMemo(() => {
         const categoryGroups = new Map<string, Activity[]>();
@@ -572,13 +586,13 @@ export default function App() {
                                 </div>
                             </div>
                         ) : (
-                            /* Horizontal List Stack Rendering */
+                            /* Horizontal List Stack Rendering (sayfalı) */
                             <div className="flex flex-col gap-6">
-                                {filteredActivities.map((act, idx) => (
+                                {pagedActivities.map((act, idx) => (
                                     <ActivityCard
                                         key={act.id}
                                         act={act}
-                                        index={idx}
+                                        index={(safePage - 1) * PAGE_SIZE + idx}
                                         onOpenPreview={setPreviewId}
                                         onEdit={openEdit}
                                         onRequestDelete={handleRequestDelete}
@@ -587,6 +601,29 @@ export default function App() {
                                         onCopyHtml={handleCopyHtml}
                                     />
                                 ))}
+
+                                {/* Sayfalama kontrolleri */}
+                                {totalPages > 1 && (
+                                    <div className="flex items-center justify-center gap-2 pt-6">
+                                        <button
+                                            onClick={() => { setPage(safePage - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                            disabled={safePage === 1}
+                                            className="flex items-center gap-1 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
+                                        >
+                                            <ChevronLeft className="w-4 h-4" /> Önceki
+                                        </button>
+                                        <span className="px-4 py-2.5 text-sm font-extrabold text-[#c2c6d6] tracking-wide">
+                                            {safePage} / {totalPages}
+                                        </span>
+                                        <button
+                                            onClick={() => { setPage(safePage + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                            disabled={safePage === totalPages}
+                                            className="flex items-center gap-1 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
+                                        >
+                                            Sonraki <ChevronRight className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </section>

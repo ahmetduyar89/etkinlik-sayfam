@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import { IconButton } from '../common/IconButton';
 import { cn } from '../../utils/cn';
-import { LivePreview } from './LivePreview';
 import { formatGradeLevel } from '../../constants/education';
 import type { Activity } from '../../types';
 
@@ -38,13 +37,25 @@ function ActivityCardBase({
     
     // Accent color configurations based on index
     const accents = [
-        { border: "bg-[#a855f7]", shadow: "shadow-[#a855f7]/20", text: "text-[#a855f7]", btn: "bg-[#a855f7] hover:bg-[#9333ea]", fallback: "/images/quantum_glow.png" }, // Purple
-        { border: "bg-[#22c55e]", shadow: "shadow-[#22c55e]/20", text: "text-[#22c55e]", btn: "bg-[#15803d] hover:bg-[#16a34a]", fallback: "/images/dna_helix.png" },   // Green
-        { border: "bg-[#3b82f6]", shadow: "shadow-[#3b82f6]/20", text: "text-[#3b82f6]", btn: "bg-[#2563eb] hover:bg-[#1d4ed8]", fallback: "/images/holo_world_map.png" }, // Blue
-        { border: "bg-[#ec4899]", shadow: "shadow-[#ec4899]/20", text: "text-[#ec4899]", btn: "bg-[#db2777] hover:bg-[#be185d]", fallback: "/images/quantum_glow.png" }, // Pink
-        { border: "bg-[#f59e0b]", shadow: "shadow-[#f59e0b]/20", text: "text-[#f59e0b]", btn: "bg-[#d97706] hover:bg-[#b45309]", fallback: "/images/holo_world_map.png" }, // Amber
+        { border: "bg-[#a855f7]", shadow: "shadow-[#a855f7]/20", text: "text-[#a855f7]", btn: "bg-[#a855f7] hover:bg-[#9333ea]", from: "#7e22ce", to: "#3b0764", fallback: "/images/quantum_glow.png" }, // Purple
+        { border: "bg-[#22c55e]", shadow: "shadow-[#22c55e]/20", text: "text-[#22c55e]", btn: "bg-[#15803d] hover:bg-[#16a34a]", from: "#15803d", to: "#052e16", fallback: "/images/dna_helix.png" },   // Green
+        { border: "bg-[#3b82f6]", shadow: "shadow-[#3b82f6]/20", text: "text-[#3b82f6]", btn: "bg-[#2563eb] hover:bg-[#1d4ed8]", from: "#1d4ed8", to: "#0a1a4a", fallback: "/images/holo_world_map.png" }, // Blue
+        { border: "bg-[#ec4899]", shadow: "shadow-[#ec4899]/20", text: "text-[#ec4899]", btn: "bg-[#db2777] hover:bg-[#be185d]", from: "#be185d", to: "#500724", fallback: "/images/quantum_glow.png" }, // Pink
+        { border: "bg-[#f59e0b]", shadow: "shadow-[#f59e0b]/20", text: "text-[#f59e0b]", btn: "bg-[#d97706] hover:bg-[#b45309]", from: "#b45309", to: "#451a03", fallback: "/images/holo_world_map.png" }, // Amber
     ];
     const currentAccent = accents[colorType];
+
+    // İçerik türüne göre poster ikonu (material symbol adı)
+    const getPosterIcon = () => {
+        const cat = (act.category || '').toLowerCase();
+        if (act.is_test) return 'quiz';
+        if (titleLower.includes('harita') || cat.includes('coğraf')) return 'public';
+        if (cat.includes('oyun') || titleLower.includes('oyun')) return 'sports_esports';
+        if (cat.includes('ders') || titleLower.includes('ders') || titleLower.includes('video')) return 'menu_book';
+        if (cat.includes('lab') || cat.includes('deney')) return 'science';
+        if (cat.includes('sim')) return 'animation';
+        return 'rocket_launch';
+    };
 
     const getActionText = () => {
         if (act.is_test) return "Teste Başla";
@@ -54,17 +65,30 @@ function ActivityCardBase({
     };
 
     const renderVisualSlot = () => {
+        // Yüklenmiş bir kapak görseli varsa onu kullan
         if (act.image_url) {
-            return <img src={act.image_url} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" alt="preview" />;
+            return <img src={act.image_url} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" alt="preview" loading="lazy" />;
         }
-        if (act.html_code || act.js_code || act.storage_url) {
-            return (
-                <div className="absolute inset-0 w-full h-full select-none pointer-events-none">
-                    <LivePreview act={act} />
-                </div>
-            );
-        }
-        return <img src={currentAccent.fallback} className="w-full h-full object-cover opacity-80 saturate-[0.6] hover:scale-105 transition-all duration-700" alt="fallback visual" />;
+        // Aksi halde hafif poster — canlı iframe YOK (performans için).
+        // İçerik yalnızca karta tıklanıp açıldığında canlı çalışır.
+        return (
+            <div
+                className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden select-none"
+                style={{ backgroundImage: `linear-gradient(135deg, ${currentAccent.from} 0%, ${currentAccent.to} 100%)` }}
+            >
+                {/* yumuşak ışık efekti */}
+                <div
+                    className="absolute inset-0 opacity-60"
+                    style={{ backgroundImage: 'radial-gradient(circle at 28% 22%, rgba(255,255,255,0.35), transparent 55%)' }}
+                />
+                <span className="material-symbols-outlined relative !text-[64px] text-white/90 drop-shadow-lg group-hover:scale-110 transition-transform duration-500">
+                    {getPosterIcon()}
+                </span>
+                <span className="absolute bottom-3 right-4 text-[10px] font-extrabold uppercase tracking-widest text-white/60">
+                    {act.category || 'İçerik'}
+                </span>
+            </div>
+        );
     };
 
     return (
