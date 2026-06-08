@@ -340,9 +340,9 @@ export default function App() {
     if (isStudentView) {
         if (isLoading) {
             return (
-                <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#0b1326]">
-                    <div className="w-12 h-12 border-4 border-primary-container border-t-transparent rounded-full animate-spin" />
-                    <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Yükleniyor…</p>
+                <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                    <p className="text-on-surface-variant font-bold uppercase tracking-widest text-xs">Yükleniyor…</p>
                 </div>
             );
         }
@@ -359,9 +359,9 @@ export default function App() {
                     
                     {/* Sidebar Filters (Redesigned to match Visual exactly) */}
                     <aside className="w-full lg:w-64 flex-shrink-0 space-y-6 pt-2">
-                        <div className="space-y-1 mb-8 border-b border-white/5 pb-4">
-                            <h2 className="text-lg font-extrabold text-white uppercase tracking-wider">Filtreler</h2>
-                            <p className="text-xs text-[#8c909f] font-medium">Aramanızı daraltın</p>
+                        <div className="space-y-1 mb-8 border-b border-outline-variant pb-4">
+                            <h2 className="text-lg font-extrabold text-on-surface uppercase tracking-wider">Filtreler</h2>
+                            <p className="text-xs text-on-surface-variant font-medium">Aramanızı daraltın</p>
                         </div>
                         
                         <div className="flex flex-col gap-3">
@@ -371,8 +371,8 @@ export default function App() {
                                 className={cn(
                                     "w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[13px] font-extrabold transition-all text-left uppercase tracking-wider",
                                     activeFilterGroup === 'category' 
-                                        ? "bg-[#571bc1] text-white shadow-lg shadow-[#571bc1]/20" 
-                                        : "text-[#c2c6d6] hover:bg-white/5"
+                                        ? "bg-primary text-white shadow-lg shadow-primary/20"
+                                        : "bg-white border border-outline-variant text-on-surface-variant hover:border-primary/40"
                                 )}
                             >
                                 <span className="material-symbols-outlined !text-[20px]">widgets</span>
@@ -380,12 +380,12 @@ export default function App() {
                             </button>
                             
                             {activeFilterGroup === 'category' && (
-                                <div className="pl-6 pr-2 py-2 flex flex-col gap-1 animate-fade-in border-l border-white/10 ml-6">
+                                <div className="pl-6 pr-2 py-2 flex flex-col gap-1 animate-fade-in border-l border-outline-variant ml-6">
                                     <button
                                         onClick={() => setSelectedCategory(null)}
                                         className={cn(
                                             "text-left px-3 py-2 rounded-lg text-xs font-bold tracking-wide transition-colors",
-                                            selectedCategory === null ? "text-white bg-white/10" : "text-[#c2c6d6] hover:text-white"
+                                            selectedCategory === null ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface"
                                         )}
                                     >
                                         Tümü
@@ -396,7 +396,7 @@ export default function App() {
                                             onClick={() => setSelectedCategory(selectedCategory === category ? null : category)}
                                             className={cn(
                                                 "text-left px-3 py-2 rounded-lg text-xs font-bold tracking-wide transition-colors",
-                                                selectedCategory === category ? "text-[#adc6ff] bg-white/10" : "text-[#c2c6d6] hover:text-white"
+                                                selectedCategory === category ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface"
                                             )}
                                         >
                                             {category}
@@ -411,8 +411,8 @@ export default function App() {
                                 className={cn(
                                     "w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[13px] font-extrabold transition-all text-left uppercase tracking-wider",
                                     activeFilterGroup === 'grade' 
-                                        ? "bg-[#571bc1] text-white shadow-lg shadow-[#571bc1]/20" 
-                                        : "text-[#c2c6d6] hover:bg-white/5"
+                                        ? "bg-primary text-white shadow-lg shadow-primary/20"
+                                        : "bg-white border border-outline-variant text-on-surface-variant hover:border-primary/40"
                                 )}
                             >
                                 <span className="material-symbols-outlined !text-[20px]">school</span>
@@ -420,14 +420,14 @@ export default function App() {
                             </button>
 
                             {activeFilterGroup === 'grade' && (
-                                <div className="pl-6 py-2 grid grid-cols-3 gap-2 border-l border-white/10 ml-6">
+                                <div className="pl-6 py-2 grid grid-cols-3 gap-2 border-l border-outline-variant ml-6">
                                     {GRADE_LEVELS.map(grade => (
                                         <button
                                             key={grade}
                                             onClick={() => setSelectedGradeLevel(selectedGradeLevel === grade ? null : grade)}
                                             className={cn(
                                                 "py-2 rounded-lg text-xs font-bold text-center transition-all border",
-                                                selectedGradeLevel === grade ? "bg-[#adc6ff] text-[#002e6a] border-[#adc6ff]" : "bg-white/5 text-[#c2c6d6] border-white/5 hover:bg-white/10"
+                                                selectedGradeLevel === grade ? "bg-primary text-white border-primary" : "bg-white text-on-surface-variant border-outline-variant hover:border-primary hover:text-primary"
                                             )}
                                         >
                                             {grade}
@@ -442,8 +442,8 @@ export default function App() {
                                 className={cn(
                                     "w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[13px] font-extrabold transition-all text-left uppercase tracking-wider",
                                     activeFilterGroup === 'subject' 
-                                        ? "bg-[#571bc1] text-white shadow-lg shadow-[#571bc1]/20" 
-                                        : "text-[#c2c6d6] hover:bg-white/5"
+                                        ? "bg-primary text-white shadow-lg shadow-primary/20"
+                                        : "bg-white border border-outline-variant text-on-surface-variant hover:border-primary/40"
                                 )}
                             >
                                 <span className="material-symbols-outlined !text-[20px]">menu_book</span>
@@ -451,12 +451,12 @@ export default function App() {
                             </button>
 
                             {activeFilterGroup === 'subject' && (
-                                <div className="pl-6 pr-2 py-2 flex flex-col gap-1 border-l border-white/10 ml-6">
+                                <div className="pl-6 pr-2 py-2 flex flex-col gap-1 border-l border-outline-variant ml-6">
                                     <button
                                         onClick={() => setSelectedSubject(null)}
                                         className={cn(
                                             "text-left px-3 py-2 rounded-lg text-xs font-bold tracking-wide transition-colors",
-                                            selectedSubject === null ? "text-white bg-white/10" : "text-[#c2c6d6] hover:text-white"
+                                            selectedSubject === null ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface"
                                         )}
                                     >
                                         Tümü
@@ -467,7 +467,7 @@ export default function App() {
                                             onClick={() => setSelectedSubject(selectedSubject === subject ? null : subject)}
                                             className={cn(
                                                 "text-left px-3 py-2 rounded-lg text-xs font-bold tracking-wide transition-colors",
-                                                selectedSubject === subject ? "text-[#adc6ff] bg-white/10" : "text-[#c2c6d6] hover:text-white"
+                                                selectedSubject === subject ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface"
                                             )}
                                         >
                                             {subject}
@@ -482,8 +482,8 @@ export default function App() {
                                 className={cn(
                                     "w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[13px] font-extrabold transition-all text-left uppercase tracking-wider",
                                     activeFilterGroup === 'tag' 
-                                        ? "bg-[#571bc1] text-white shadow-lg shadow-[#571bc1]/20" 
-                                        : "text-[#c2c6d6] hover:bg-white/5"
+                                        ? "bg-primary text-white shadow-lg shadow-primary/20"
+                                        : "bg-white border border-outline-variant text-on-surface-variant hover:border-primary/40"
                                 )}
                             >
                                 <span className="material-symbols-outlined !text-[20px]">sell</span>
@@ -491,12 +491,12 @@ export default function App() {
                             </button>
 
                             {activeFilterGroup === 'tag' && (
-                                <div className="pl-6 pr-2 py-2 flex flex-wrap gap-2 border-l border-white/10 ml-6">
+                                <div className="pl-6 pr-2 py-2 flex flex-wrap gap-2 border-l border-outline-variant ml-6">
                                     <button
                                         onClick={() => setSelectedTag(null)}
                                         className={cn(
                                             "px-2.5 py-1 rounded-md text-xs font-bold tracking-wide transition-all border",
-                                            selectedTag === null ? "bg-white/20 text-white border-white/20" : "bg-white/5 text-[#c2c6d6] border-white/5 hover:bg-white/10"
+                                            selectedTag === null ? "bg-primary/10 text-primary border-transparent" : "bg-white text-on-surface-variant border-outline-variant hover:border-primary"
                                         )}
                                     >
                                         Tümü
@@ -507,7 +507,7 @@ export default function App() {
                                             onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
                                             className={cn(
                                                 "px-2.5 py-1 rounded-md text-xs font-bold tracking-wide transition-all border",
-                                                selectedTag === tag ? "bg-[#4edea3]/20 text-[#4edea3] border-[#4edea3]/20" : "bg-white/5 text-[#c2c6d6] border-white/5 hover:bg-white/10"
+                                                selectedTag === tag ? "bg-primary/10 text-primary border-transparent" : "bg-white text-on-surface-variant border-outline-variant hover:border-primary"
                                             )}
                                         >
                                             {tag}
@@ -518,8 +518,8 @@ export default function App() {
                         </div>
                         
                         {/* Reset All Button */}
-                        <div className="pt-6 border-t border-white/5 mt-4">
-                            <button 
+                        <div className="pt-6 border-t border-outline-variant mt-4">
+                            <button
                                 onClick={() => {
                                     setSelectedCategory(null);
                                     setSelectedGradeLevel(null);
@@ -527,7 +527,7 @@ export default function App() {
                                     setSelectedTag(null);
                                     setSearch('');
                                 }}
-                                className="text-sm font-bold text-[#adc6ff] hover:text-[#4d8eff] transition-colors uppercase tracking-wider flex items-center gap-2 active:scale-95"
+                                className="text-sm font-bold text-primary hover:brightness-110 transition-colors uppercase tracking-wider flex items-center gap-2 active:scale-95"
                             >
                                 Tümünü Sıfırla
                             </button>
@@ -535,7 +535,7 @@ export default function App() {
 
                         <button 
                             onClick={openCreate}
-                            className="w-full mt-8 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-extrabold tracking-widest rounded-xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 uppercase"
+                            className="w-full mt-8 py-3 bg-primary hover:brightness-105 border-transparent text-white text-xs font-extrabold tracking-widest rounded-xl shadow-[0_4px_12px_rgba(99,102,241,0.28)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 uppercase"
                         >
                             <Plus className="w-4 h-4" /> İçerik Ekle
                         </button>
@@ -546,25 +546,25 @@ export default function App() {
                         
                         {/* Header matched exactly with Visual */}
                         <div className="space-y-4">
-                            <h1 className="text-5xl font-black text-white tracking-tight leading-[1.15]">Etkinlik Laboratuvarı</h1>
-                            <p className="text-lg text-[#c2c6d6] leading-relaxed max-w-3xl">Etkileşimli simülasyonlar, derinlemesine videolar ve pratik testlerle bilim dünyasını keşfedin.</p>
+                            <h1 className="text-4xl md:text-5xl font-extrabold text-on-surface font-headline-lg tracking-tight leading-[1.15]">Etkinlik Laboratuvarı</h1>
+                            <p className="text-lg text-on-surface-variant leading-relaxed max-w-3xl">Etkileşimli simülasyonlar, derinlemesine videolar ve pratik testlerle bilim dünyasını keşfedin.</p>
                         </div>
 
                         {/* Search input placed below header as in Visual */}
                         <div className="relative max-w-xl">
                             <input 
-                                className="w-full bg-[#1d2027] hover:bg-[#272a31] border border-white/5 focus:border-[#adc6ff]/40 rounded-xl pl-12 pr-6 py-4 text-[#e1e2ec] font-medium text-base placeholder-[#8c909f] outline-none transition-all focus:shadow-[0_0_30px_rgba(173,198,255,0.05)]" 
+                                className="w-full bg-white border border-outline-variant focus:border-primary rounded-xl pl-12 pr-6 py-4 text-on-surface font-medium text-base placeholder-on-surface-variant outline-none transition-all focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)]"
                                 placeholder="Deney veya konu ara..." 
                                 type="text"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                             />
-                            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8c909f]">search</span>
+                            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
                         </div>
 
                         {/* Result info */}
                         <div className="flex items-center justify-between pb-2">
-                            <div className="text-xs text-[#8c909f] font-bold uppercase tracking-widest">
+                            <div className="text-xs text-on-surface-variant font-bold uppercase tracking-widest">
                                 {filteredActivities.length} İÇERİK BULUNDU
                             </div>
                         </div>
@@ -573,16 +573,16 @@ export default function App() {
                         {isLoading ? (
                             <div className="py-24 flex flex-col items-center justify-center gap-4">
                                 <div className="w-12 h-12 border-4 border-[#adc6ff] border-t-transparent rounded-full animate-spin" />
-                                <p className="text-[#8c909f] font-extrabold uppercase tracking-widest text-[10px]">Laboratuvar Hazırlanıyor…</p>
+                                <p className="text-on-surface-variant font-extrabold uppercase tracking-widest text-[10px]">Laboratuvar Hazırlanıyor…</p>
                             </div>
                         ) : filteredActivities.length === 0 ? (
-                            <div className="py-24 bg-surface-container/40 rounded-3xl border border-white/5 flex flex-col items-center justify-center text-center gap-6">
-                                <div className="w-16 h-16 rounded-2xl bg-white/5 text-[#8c909f] flex items-center justify-center border border-white/5">
+                            <div className="py-24 bg-white rounded-3xl border border-outline-variant flex flex-col items-center justify-center text-center gap-6">
+                                <div className="w-16 h-16 rounded-2xl bg-surface-container-high text-on-surface-variant flex items-center justify-center border border-outline-variant">
                                     <Blocks className="w-8 h-8" />
                                 </div>
                                 <div className="space-y-1">
-                                    <h3 className="text-lg font-extrabold text-white">Herhangi bir içerik bulunamadı</h3>
-                                    <p className="text-sm text-[#c2c6d6] max-w-xs leading-relaxed">Arama teriminizi değiştirin veya filtrelerinizi temizleyin.</p>
+                                    <h3 className="text-lg font-extrabold text-on-surface">Herhangi bir içerik bulunamadı</h3>
+                                    <p className="text-sm text-on-surface-variant max-w-xs leading-relaxed">Arama teriminizi değiştirin veya filtrelerinizi temizleyin.</p>
                                 </div>
                             </div>
                         ) : (
@@ -608,17 +608,17 @@ export default function App() {
                                         <button
                                             onClick={() => { setPage(safePage - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                                             disabled={safePage === 1}
-                                            className="flex items-center gap-1 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
+                                            className="flex items-center gap-1 px-4 py-2.5 rounded-xl bg-white hover:bg-surface-container-high border border-outline-variant text-on-surface text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
                                         >
                                             <ChevronLeft className="w-4 h-4" /> Önceki
                                         </button>
-                                        <span className="px-4 py-2.5 text-sm font-extrabold text-[#c2c6d6] tracking-wide">
+                                        <span className="px-4 py-2.5 text-sm font-extrabold text-on-surface-variant tracking-wide">
                                             {safePage} / {totalPages}
                                         </span>
                                         <button
                                             onClick={() => { setPage(safePage + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                                             disabled={safePage === totalPages}
-                                            className="flex items-center gap-1 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
+                                            className="flex items-center gap-1 px-4 py-2.5 rounded-xl bg-white hover:bg-surface-container-high border border-outline-variant text-on-surface text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
                                         >
                                             Sonraki <ChevronRight className="w-4 h-4" />
                                         </button>
@@ -631,60 +631,60 @@ export default function App() {
             </main>
 
             {/* Footer */}
-            <footer className="bg-slate-950 full-width py-12 px-8 border-t border-white/5 mt-20 text-center md:text-left">
+            <footer className="bg-white full-width py-12 px-8 border-t border-outline-variant mt-20 text-center md:text-left">
                 <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
                     <div className="space-y-4">
-                        <div className="text-2xl font-black text-white font-headline-xl italic tracking-tighter">Ahmet DUYAR</div>
-                        <p className="font-body-md text-sm text-slate-500 leading-relaxed max-w-xs">Eğitimi interaktif ve eğlenceli hale getiren yeni nesil simülasyon platformu.</p>
+                        <div className="text-2xl font-black text-on-surface font-headline-xl italic tracking-tighter">Ahmet DUYAR</div>
+                        <p className="font-body-md text-sm text-on-surface-variant leading-relaxed max-w-xs">Eğitimi interaktif ve eğlenceli hale getiren yeni nesil simülasyon platformu.</p>
                     </div>
                     <div>
-                        <h4 className="text-white font-bold mb-6 font-headline-md text-lg">Hızlı Erişim</h4>
+                        <h4 className="text-on-surface font-bold mb-6 font-headline-md text-lg">Hızlı Erişim</h4>
                         <ul className="space-y-3">
-                            <li><a className="text-sm text-slate-500 hover:text-primary transition-all" href="#">Keşfet</a></li>
-                            <li><a className="text-sm text-slate-500 hover:text-primary transition-all" href="#">Kategoriler</a></li>
-                            <li><a className="text-sm text-slate-500 hover:text-primary transition-all" href="#">Ders Notları</a></li>
+                            <li><a className="text-sm text-on-surface-variant hover:text-primary transition-all" href="#">Keşfet</a></li>
+                            <li><a className="text-sm text-on-surface-variant hover:text-primary transition-all" href="#">Kategoriler</a></li>
+                            <li><a className="text-sm text-on-surface-variant hover:text-primary transition-all" href="#">Ders Notları</a></li>
                         </ul>
                     </div>
                     <div>
-                        <h4 className="text-white font-bold mb-6 font-headline-md text-lg">Destek</h4>
+                        <h4 className="text-on-surface font-bold mb-6 font-headline-md text-lg">Destek</h4>
                         <ul className="space-y-3">
-                            <li><a className="text-sm text-slate-500 hover:text-primary transition-all" href="#">Yardım Merkezi</a></li>
-                            <li><a className="text-sm text-slate-500 hover:text-primary transition-all" href="#">İletişim</a></li>
-                            <li><a className="text-sm text-slate-500 hover:text-primary transition-all" href="#">Gizlilik Politikası</a></li>
+                            <li><a className="text-sm text-on-surface-variant hover:text-primary transition-all" href="#">Yardım Merkezi</a></li>
+                            <li><a className="text-sm text-on-surface-variant hover:text-primary transition-all" href="#">İletişim</a></li>
+                            <li><a className="text-sm text-on-surface-variant hover:text-primary transition-all" href="#">Gizlilik Politikası</a></li>
                         </ul>
                     </div>
                     <div className="space-y-4">
-                        <h4 className="text-white font-bold mb-6 font-headline-md text-lg">Bülten</h4>
-                        <p className="text-sm text-slate-500">Yeni etkinliklerden haberdar olun.</p>
+                        <h4 className="text-on-surface font-bold mb-6 font-headline-md text-lg">Bülten</h4>
+                        <p className="text-sm text-on-surface-variant">Yeni etkinliklerden haberdar olun.</p>
                         <div className="flex gap-2">
-                            <input className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white w-full focus:outline-none focus:ring-1 focus:ring-primary" placeholder="E-posta adresi" type="email"/>
-                            <button className="bg-primary-container text-white px-4 py-2 rounded-lg hover:bg-primary-container/80 transition-all">Abone Ol</button>
+                            <input className="bg-surface-container-low border border-outline-variant rounded-lg px-4 py-2 text-on-surface w-full focus:outline-none focus:ring-1 focus:ring-primary" placeholder="E-posta adresi" type="email"/>
+                            <button className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-container/80 transition-all">Abone Ol</button>
                         </div>
                     </div>
                 </div>
-                <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-white/5 text-center">
-                    <p className="text-sm text-slate-500">© 2024 Ahmet DUYAR. Tüm hakları saklıdır.</p>
+                <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-outline-variant text-center">
+                    <p className="text-sm text-on-surface-variant">© 2024 Ahmet DUYAR. Tüm hakları saklıdır.</p>
                 </div>
             </footer>
 
             {/* Mobile Bottom Nav */}
-            <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-slate-950/90 backdrop-blur-2xl border-t border-white/10 rounded-t-3xl md:hidden z-50">
-                <button className="flex flex-col items-center text-primary-container">
+            <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white/95 backdrop-blur-2xl border-t border-outline-variant rounded-t-3xl md:hidden z-50">
+                <button className="flex flex-col items-center text-primary">
                     <span className="material-symbols-outlined">home</span>
                     <span className="text-[10px] font-bold uppercase tracking-widest mt-1">Ana Sayfa</span>
                 </button>
-                <button className="flex flex-col items-center text-slate-500">
+                <button className="flex flex-col items-center text-on-surface-variant">
                     <span className="material-symbols-outlined">search</span>
                     <span className="text-[10px] font-bold uppercase tracking-widest mt-1">Ara</span>
                 </button>
-                <button onClick={openCreate} className="w-12 h-12 bg-primary-container rounded-2xl flex items-center justify-center text-white -mt-12 shadow-xl shadow-primary-container/40 border-4 border-[#0b1326]">
+                <button onClick={openCreate} className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white -mt-12 shadow-xl border-4 border-white shadow-[0_8px_20px_rgba(99,102,241,0.4)]">
                     <Plus className="w-6 h-6" />
                 </button>
-                <button className="flex flex-col items-center text-slate-500">
+                <button className="flex flex-col items-center text-on-surface-variant">
                     <span className="material-symbols-outlined">favorite</span>
                     <span className="text-[10px] font-bold uppercase tracking-widest mt-1">Favoriler</span>
                 </button>
-                <button className="flex flex-col items-center text-slate-500">
+                <button className="flex flex-col items-center text-on-surface-variant">
                     <span className="material-symbols-outlined">account_circle</span>
                     <span className="text-[10px] font-bold uppercase tracking-widest mt-1">Profil</span>
                 </button>
