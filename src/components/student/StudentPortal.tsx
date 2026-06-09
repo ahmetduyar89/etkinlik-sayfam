@@ -150,30 +150,34 @@ export function StudentPortal({ act }: StudentPortalProps) {
         const iframe = iframeRef.current;
         if (!iframe) return;
         let ro: ResizeObserver | null = null;
-        let intervalId: number | null = null;
-        const measure = () => {
+        let rafId: number | null = null;
+        const timeouts: number[] = [];
+        const apply = () => {
+            rafId = null;
             try {
                 const doc = iframe.contentDocument;
                 if (!doc) return;
-                const body = doc.body;
-                const html = doc.documentElement;
                 const h = Math.max(
-                    body?.scrollHeight || 0,
-                    body?.offsetHeight || 0,
-                    html?.scrollHeight || 0,
-                    html?.offsetHeight || 0
+                    doc.body?.scrollHeight || 0,
+                    doc.documentElement?.scrollHeight || 0
                 );
-                if (h > 0) setIframeHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
+                // Yalnızca anlamlı değişimde güncelle (gereksiz yeniden render/canvas
+                // resize'ı engeller — performans için kritik).
+                if (h > 0) setIframeHeight((prev) => (Math.abs(prev - h) > 4 ? h : prev));
             } catch {
                 /* cross-origin erişilemezse ölçümü atla */
             }
         };
+        // ResizeObserver fırtınasını tek rAF'a indirgeyerek ölçümü throttle ediyoruz.
+        const schedule = () => {
+            if (rafId === null) rafId = window.requestAnimationFrame(apply);
+        };
         const onLoad = () => {
-            measure();
+            schedule();
             try {
                 const doc = iframe.contentDocument;
                 if (doc?.body && 'ResizeObserver' in window) {
-                    ro = new ResizeObserver(() => measure());
+                    ro = new ResizeObserver(schedule);
                     ro.observe(doc.body);
                 }
             } catch {
@@ -182,19 +186,13 @@ export function StudentPortal({ act }: StudentPortalProps) {
         };
         iframe.addEventListener('load', onLoad);
         onLoad();
-        // Geç yüklenen içerik/görseller için birkaç kez tekrar ölç.
-        intervalId = window.setInterval(measure, 500);
-        const stopTimer = window.setTimeout(() => {
-            if (intervalId !== null) {
-                window.clearInterval(intervalId);
-                intervalId = null;
-            }
-        }, 5000);
+        // Geç yüklenen görsel/font için birkaç gecikmeli ölçüm (sürekli polling yok).
+        [300, 1000, 2500].forEach((d) => timeouts.push(window.setTimeout(schedule, d)));
         return () => {
             iframe.removeEventListener('load', onLoad);
             ro?.disconnect();
-            if (intervalId !== null) window.clearInterval(intervalId);
-            window.clearTimeout(stopTimer);
+            if (rafId !== null) window.cancelAnimationFrame(rafId);
+            timeouts.forEach((t) => window.clearTimeout(t));
         };
     }, [isLoadingContent, formattedHtml]);
 
