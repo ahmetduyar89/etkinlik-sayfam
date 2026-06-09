@@ -31,6 +31,9 @@ export function StudentPortal({ act }: StudentPortalProps) {
     });
     const [showWhiteboard, setShowWhiteboard] = useState(false);
     const [iframeHeight, setIframeHeight] = useState(1000);
+    // raw_html modunda iframe kendi içinde kaydığından çizimlerin içerikle
+    // birlikte kayması için iframe'in scroll konumunu takip ediyoruz.
+    const [scrollOffset, setScrollOffset] = useState({ x: 0, y: 0 });
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
     const submissionsHandler = useFirestore<Submission>('submissions');
@@ -141,6 +144,59 @@ export function StudentPortal({ act }: StudentPortalProps) {
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
     }, [submissionId, submissionsHandler, toast]);
+
+    // raw_html iframe'i kendi içinde kaydığından scroll konumunu takip edip
+    // DrawingCanvas'a aktarıyoruz; böylece çizimler içerikle birlikte kayar.
+    useEffect(() => {
+        if (!isRawHtml || isLoadingContent) {
+            setScrollOffset({ x: 0, y: 0 });
+            return;
+        }
+        const iframe = iframeRef.current;
+        if (!iframe) return;
+        let win: Window | null = null;
+        const handleScroll = () => {
+            try {
+                const doc = iframe.contentDocument;
+                const el = doc?.scrollingElement || doc?.documentElement;
+                setScrollOffset({ x: el?.scrollLeft || 0, y: el?.scrollTop || 0 });
+            } catch {
+                /* cross-origin erişimi engellenirse kaydırmayı atla */
+            }
+        };
+        const attach = () => {
+            try {
+                win = iframe.contentWindow;
+                win?.addEventListener('scroll', handleScroll, { passive: true });
+                handleScroll();
+            } catch {
+                /* erişilemezse sessizce geç */
+            }
+        };
+        iframe.addEventListener('load', attach);
+        attach();
+        return () => {
+            iframe.removeEventListener('load', attach);
+            try {
+                win?.removeEventListener('scroll', handleScroll);
+            } catch {
+                /* yoksay */
+            }
+        };
+    }, [isRawHtml, isLoadingContent, formattedHtml]);
+
+    // Kalem modunda canvas en üstte olduğundan tekerlek olayını yakalayıp
+    // raw_html içeriğini kaydırır; aksi halde sayfa kalem modunda kaydırılamaz.
+    const handleCanvasWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+        if (!isRawHtml) return;
+        const win = iframeRef.current?.contentWindow;
+        if (!win) return;
+        try {
+            win.scrollBy(e.deltaX, e.deltaY);
+        } catch {
+            /* erişilemezse yoksay */
+        }
+    };
 
     const handleToolbarCommand = (type: string) => {
         if (type === 'UNDO_DRAWING') canvasRef.current?.undo();
@@ -358,6 +414,9 @@ export function StudentPortal({ act }: StudentPortalProps) {
                         config={drawConfig}
                         enabled={isDrawingMode}
                         whiteboardMode={showWhiteboard}
+                        scrollX={scrollOffset.x}
+                        scrollY={scrollOffset.y}
+                        onWheel={handleCanvasWheel}
                     />
                 </div>
                 <AnimatePresence>
