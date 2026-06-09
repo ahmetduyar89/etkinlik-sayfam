@@ -19,8 +19,13 @@ interface DrawingCanvasProps {
     enabled: boolean;
     whiteboardMode: boolean;
     bgColor?: string;
+    /** İçeriğin (iframe) yatay kaydırma konumu. Çizimler belge ile birlikte kayar. */
+    scrollX?: number;
+    /** İçeriğin (iframe) dikey kaydırma konumu. Çizimler belge ile birlikte kayar. */
+    scrollY?: number;
     onPageChange?: (current: number, total: number) => void;
     onRequestText?: () => Promise<string | null>;
+    onWheel?: (e: React.WheelEvent<HTMLCanvasElement>) => void;
 }
 
 const getBB = (s: Stroke): BoundingBox => {
@@ -195,7 +200,17 @@ const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke) => {
 
 export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(
     function DrawingCanvas(
-        { config, enabled, whiteboardMode, bgColor, onPageChange, onRequestText },
+        {
+            config,
+            enabled,
+            whiteboardMode,
+            bgColor,
+            scrollX = 0,
+            scrollY = 0,
+            onPageChange,
+            onRequestText,
+            onWheel,
+        },
         ref
     ) {
         const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -218,6 +233,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const strokesRef = React.useRef<Stroke[]>([]);
         const isDrawingRef = React.useRef(false);
         const resizeFrameRef = React.useRef<number | null>(null);
+        // İçeriğin güncel kaydırma konumu. Çizimler belge koordinatlarında saklanır;
+        // render sırasında bu offset kadar kaydırılarak ekrana çizilir.
+        const scrollRef = React.useRef({ x: scrollX, y: scrollY });
 
         const getCanvasSize = () => {
             const c = canvasRef.current;
@@ -243,8 +261,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const { w, h } = getCanvasSize();
             if (w <= 0 || h <= 0) return;
 
+            const { x: ox, y: oy } = scrollRef.current;
+
             bCtx.clearRect(0, 0, w, h);
+            bCtx.save();
+            bCtx.translate(-ox, -oy);
             strokesRef.current.forEach((s) => drawStroke(bCtx, s));
+            bCtx.restore();
 
             mainCtx.clearRect(0, 0, w, h);
             mainCtx.drawImage(buffer, 0, 0, w, h);
@@ -252,6 +275,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (selectedIdxRef.current !== null && strokesRef.current[selectedIdxRef.current]) {
                 const bb = getBB(strokesRef.current[selectedIdxRef.current]);
                 mainCtx.save();
+                mainCtx.translate(-ox, -oy);
                 mainCtx.strokeStyle = '#4f46e5';
                 mainCtx.lineWidth = 1.5;
                 mainCtx.setLineDash([5, 3]);
@@ -468,6 +492,11 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             };
         }, [resize]);
 
+        React.useEffect(() => {
+            scrollRef.current = { x: scrollX, y: scrollY };
+            redraw();
+        }, [scrollX, scrollY, redraw]);
+
         const startDrawing = async (e: React.PointerEvent) => {
             if (!enabled || ['pan', 'sun'].includes(config.tool)) return;
             const rect = canvasRef.current?.getBoundingClientRect();
@@ -475,8 +504,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             canvasRectRef.current = rect;
             const scaleX = rect.width ? (canvasRef.current?.offsetWidth || 1) / rect.width : 1;
             const scaleY = rect.height ? (canvasRef.current?.offsetHeight || 1) / rect.height : 1;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
+            const x = (e.clientX - rect.left) * scaleX + scrollRef.current.x;
+            const y = (e.clientY - rect.top) * scaleY + scrollRef.current.y;
 
             if (config.tool === 'select') {
                 if (selectedIdxRef.current !== null && selBB) {
@@ -573,8 +602,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (!rect) return;
             const scaleX = rect.width ? (canvasRef.current?.offsetWidth || 1) / rect.width : 1;
             const scaleY = rect.height ? (canvasRef.current?.offsetHeight || 1) / rect.height : 1;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
+            const x = (e.clientX - rect.left) * scaleX + scrollRef.current.x;
+            const y = (e.clientY - rect.top) * scaleY + scrollRef.current.y;
 
             if (
                 config.tool === 'select' &&
@@ -606,8 +635,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 const lCtx = laserCtxRef.current;
                 if (lCtx) {
                     lCtx.clearRect(0, 0, cssW, cssH);
-                    const cx = x;
-                    const cy = y;
+                    // Lazer imleç efekti viewport konumunda çizilir (kaydırmadan bağımsız).
+                    const cx = x - scrollRef.current.x;
+                    const cy = y - scrollRef.current.y;
                     const r = 12;
                     const g = lCtx.createRadialGradient(cx, cy, 0, cx, cy, r * 3);
                     g.addColorStop(0, 'rgba(255,50,50,1)');
@@ -643,28 +673,33 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const mainCtx = ctxRef.current;
             if (mainCtx && bufferCanvasRef.current) {
                 const dpr = window.devicePixelRatio || 1;
-                let sx = Math.floor(minX * dpr);
-                let sy = Math.floor(minY * dpr);
+                const { x: ox, y: oy } = scrollRef.current;
+                // Buffer viewport koordinatında tutulduğundan kaynak pikselden offset çıkarılır.
+                let sx = Math.floor((minX - ox) * dpr);
+                let sy = Math.floor((minY - oy) * dpr);
                 let sw = Math.ceil(width * dpr);
                 let sh = Math.ceil(height * dpr);
 
                 const imgW = bufferCanvasRef.current.width;
                 const imgH = bufferCanvasRef.current.height;
-                
+
                 if (sx < 0) { sw += sx; sx = 0; }
                 if (sy < 0) { sh += sy; sy = 0; }
                 if (sx + sw > imgW) { sw = imgW - sx; }
                 if (sy + sh > imgH) { sh = imgH - sy; }
 
+                mainCtx.save();
+                mainCtx.translate(-ox, -oy);
                 mainCtx.clearRect(minX, minY, width, height);
                 if (sw > 0 && sh > 0) {
                     mainCtx.drawImage(
                         bufferCanvasRef.current,
                         sx, sy, sw, sh,
-                        sx / dpr, sy / dpr, sw / dpr, sh / dpr
+                        sx / dpr + ox, sy / dpr + oy, sw / dpr, sh / dpr
                     );
                 }
                 drawStroke(mainCtx, stroke);
+                mainCtx.restore();
             }
         };
 
@@ -679,7 +714,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (isDrawingRef.current && currentStrokeRef.current) {
                 strokesRef.current.push(currentStrokeRef.current);
                 setStrokes([...strokesRef.current]);
-                if (bufferCtxRef.current) drawStroke(bufferCtxRef.current, currentStrokeRef.current);
+                if (bufferCtxRef.current) {
+                    const { x: ox, y: oy } = scrollRef.current;
+                    bufferCtxRef.current.save();
+                    bufferCtxRef.current.translate(-ox, -oy);
+                    drawStroke(bufferCtxRef.current, currentStrokeRef.current);
+                    bufferCtxRef.current.restore();
+                }
             }
             isDrawingRef.current = false;
             currentStrokeRef.current = null;
@@ -709,6 +750,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     onPointerMove={draw}
                     onPointerUp={stopDrawing}
                     onPointerLeave={stopDrawing}
+                    onWheel={onWheel}
                     aria-label="Çizim alanı"
                     className={cn(
                         'absolute left-0 z-[4000] touch-none transition-opacity',
@@ -741,8 +783,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 key={h.id}
                                 className="absolute pointer-events-auto bg-white border-2 border-indigo-500 rounded-sm shadow-md hover:bg-indigo-100 transition-colors"
                                 style={{
-                                    left: h.x - 5,
-                                    top: h.y - 5,
+                                    left: h.x - scrollX - 5,
+                                    top: h.y - scrollY - 5,
                                     width: 10,
                                     height: 10,
                                     cursor: HANDLE_CURSORS[h.id],
@@ -792,8 +834,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                             aria-label="Seçim araçları"
                             className="absolute pointer-events-auto flex items-center gap-1 bg-[#1a1b26]/95 backdrop-blur-md px-2 py-1.5 rounded-xl border border-white/10 shadow-xl"
                             style={{
-                                left: selBB.x1,
-                                top: Math.max(0, selBB.y1 - 52),
+                                left: selBB.x1 - scrollX,
+                                top: Math.max(0, selBB.y1 - scrollY - 52),
                                 zIndex: 4700,
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
