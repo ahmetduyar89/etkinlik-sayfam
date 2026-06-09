@@ -30,9 +30,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
         stampIcon: '✅',
     });
     const [showWhiteboard, setShowWhiteboard] = useState(false);
-    // İçerik (iframe) kendi içinde kaydığından, çizimlerin içerikle birlikte
-    // kayması için iframe'in scroll konumunu takip edip canvas'a aktarıyoruz.
-    const [scrollOffset, setScrollOffset] = useState({ x: 0, y: 0 });
+    const [iframeHeight, setIframeHeight] = useState(1000);
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
     const submissionsHandler = useFirestore<Submission>('submissions');
@@ -81,6 +79,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
 
     const [formattedHtml, setFormattedHtml] = useState<string>('');
     const [isLoadingContent, setIsLoadingContent] = useState(true);
+    const isRawHtml = act.content_mode === 'raw_html';
 
     useEffect(() => {
         const loadContent = async () => {
@@ -122,6 +121,9 @@ export function StudentPortal({ act }: StudentPortalProps) {
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
             const data = event.data as { type?: string; height?: number; data?: unknown; error?: string };
+            if (data?.type === 'IFRAME_HEIGHT_SYNC' && (data.height ?? 0) > 0) {
+                setIframeHeight(data.height as number);
+            }
             if (data?.type === 'SIM_ANSWER' && submissionId) {
                 submissionsHandler
                     .update(submissionId, {
@@ -139,56 +141,6 @@ export function StudentPortal({ act }: StudentPortalProps) {
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
     }, [submissionId, submissionsHandler, toast]);
-
-    // iframe kendi içinde kaydığından scroll konumunu takip edip DrawingCanvas'a
-    // aktarıyoruz; böylece çizimler içerikle birlikte kayar. iframe ekran boyutunda
-    // kaldığı için (büyütülmediği için) render akıcı kalır.
-    useEffect(() => {
-        if (isLoadingContent) return;
-        const iframe = iframeRef.current;
-        if (!iframe) return;
-        let win: Window | null = null;
-        const handleScroll = () => {
-            try {
-                const doc = iframe.contentDocument;
-                const el = doc?.scrollingElement || doc?.documentElement;
-                setScrollOffset({ x: el?.scrollLeft || 0, y: el?.scrollTop || 0 });
-            } catch {
-                /* cross-origin erişimi engellenirse kaydırmayı atla */
-            }
-        };
-        const attach = () => {
-            try {
-                win = iframe.contentWindow;
-                win?.addEventListener('scroll', handleScroll, { passive: true });
-                handleScroll();
-            } catch {
-                /* yoksay */
-            }
-        };
-        iframe.addEventListener('load', attach);
-        attach();
-        return () => {
-            iframe.removeEventListener('load', attach);
-            try {
-                win?.removeEventListener('scroll', handleScroll);
-            } catch {
-                /* yoksay */
-            }
-        };
-    }, [isLoadingContent, formattedHtml]);
-
-    // Kalem modunda canvas en üstte olduğundan tekerlek olayını yakalayıp
-    // içeriği kaydırıyoruz; aksi halde kalem modunda sayfa kaydırılamaz.
-    const handleCanvasWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-        const win = iframeRef.current?.contentWindow;
-        if (!win) return;
-        try {
-            win.scrollBy(e.deltaX, e.deltaY);
-        } catch {
-            /* yoksay */
-        }
-    };
 
     const handleToolbarCommand = (type: string) => {
         if (type === 'UNDO_DRAWING') canvasRef.current?.undo();
@@ -376,8 +328,8 @@ export function StudentPortal({ act }: StudentPortalProps) {
                     style={{
                         position: 'relative',
                         width: '100%',
-                        minHeight: '100%',
-                        height: '100%',
+                        minHeight: isRawHtml ? '100%' : iframeHeight,
+                        height: isRawHtml ? '100%' : iframeHeight,
                     }}
                 >
                     {isLoadingContent ? (
@@ -406,9 +358,6 @@ export function StudentPortal({ act }: StudentPortalProps) {
                         config={drawConfig}
                         enabled={isDrawingMode}
                         whiteboardMode={showWhiteboard}
-                        scrollX={scrollOffset.x}
-                        scrollY={scrollOffset.y}
-                        onWheel={handleCanvasWheel}
                     />
                 </div>
                 <AnimatePresence>

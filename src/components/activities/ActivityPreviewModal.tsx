@@ -43,6 +43,8 @@ interface Html2Canvas {
             allowTaint?: boolean;
             scale?: number;
             logging?: boolean;
+            backgroundColor?: string | null;
+            ignoreElements?: (element: Element) => boolean;
         }
     ): Promise<HTMLCanvasElement>;
 }
@@ -94,6 +96,8 @@ export function ActivityPreviewModal({
     const [showProtractor, setShowProtractor] = React.useState(false);
 
     const mainRef = React.useRef<HTMLElement>(null);
+    const iframeRef = React.useRef<HTMLIFrameElement>(null);
+    const stageRef = React.useRef<HTMLDivElement>(null);
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
     const prompt = usePrompt();
     const toast = useToast();
@@ -189,19 +193,56 @@ export function ActivityPreviewModal({
     }, [onClose]);
 
     const handleScreenshot = async () => {
-        const container = mainRef.current;
-        if (!container) return;
+        const stage = stageRef.current;
+        const iframe = iframeRef.current;
+        if (!stage) return;
         try {
             const h2c = await loadHtml2Canvas();
-            const cvs = await h2c(container, {
+            const scale = window.devicePixelRatio || 1;
+
+            // 1) İçeriğin tamamını (iframe belgesi) ayrıca render ediyoruz; html2canvas
+            //    iframe içeriğini doğrudan yakalayamadığından bu gerekli.
+            let contentCanvas: HTMLCanvasElement | null = null;
+            const doc = iframe?.contentDocument;
+            if (doc?.documentElement) {
+                contentCanvas = await h2c(doc.documentElement, {
+                    useCORS: true,
+                    allowTaint: true,
+                    scale,
+                    logging: false,
+                    backgroundColor: showWhiteboard ? bgColor || '#ffffff' : '#ffffff',
+                });
+            }
+
+            // 2) Üst katmanı (çizimler + metin kutuları) iframe'i yok sayarak render et.
+            const overlayCanvas = await h2c(stage, {
                 useCORS: true,
                 allowTaint: true,
-                scale: 1,
+                scale,
                 logging: false,
+                backgroundColor: null,
+                ignoreElements: (el: Element) => el.tagName === 'IFRAME',
             });
+
+            // 3) İçerik + üst katmanı birleştir.
+            const w = Math.max(contentCanvas?.width || 0, overlayCanvas.width);
+            const h = Math.max(contentCanvas?.height || 0, overlayCanvas.height);
+            if (w <= 0 || h <= 0) throw new Error('Boş içerik');
+
+            const out = document.createElement('canvas');
+            out.width = w;
+            out.height = h;
+            const ctx = out.getContext('2d');
+            if (!ctx) throw new Error('Canvas bağlamı alınamadı');
+
+            ctx.fillStyle = showWhiteboard ? bgColor || '#ffffff' : '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+            if (contentCanvas) ctx.drawImage(contentCanvas, 0, 0);
+            ctx.drawImage(overlayCanvas, 0, 0);
+
             const link = document.createElement('a');
-            link.download = 'etkinlik-ekran.png';
-            link.href = cvs.toDataURL('image/png');
+            link.download = `${activity.title || 'etkinlik'}-ekran.png`;
+            link.href = out.toDataURL('image/png');
             link.click();
         } catch (err) {
             console.error('Screenshot error:', err);
@@ -403,6 +444,7 @@ export function ActivityPreviewModal({
                         }}
                     >
                         <div
+                            ref={stageRef}
                             style={{
                                 position: 'relative',
                                 width: '100%',
@@ -418,6 +460,7 @@ export function ActivityPreviewModal({
                             ) : (
                                 <iframe
                                     key={activity.id}
+                                    ref={iframeRef}
                                     srcDoc={formattedHtml}
                                     title={activity.title}
                                     sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads allow-pointer-lock"
