@@ -94,6 +94,7 @@ export function ActivityPreviewModal({
     const [showProtractor, setShowProtractor] = React.useState(false);
 
     const mainRef = React.useRef<HTMLElement>(null);
+    const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
     const prompt = usePrompt();
     const toast = useToast();
@@ -155,6 +156,61 @@ export function ActivityPreviewModal({
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
     }, [toast]);
+
+    // İçerik (iframe) gerçek yüksekliğini same-origin ölçüp iframe'i o boya
+    // getiriyoruz; böylece iframe kendi içinde kaymıyor, yalnızca dış <main>
+    // kayıyor ve çizim katmanı içerikle birlikte hareket ediyor.
+    React.useEffect(() => {
+        if (isLoadingContent) return;
+        const iframe = iframeRef.current;
+        if (!iframe) return;
+        let ro: ResizeObserver | null = null;
+        let intervalId: number | null = null;
+        const measure = () => {
+            try {
+                const doc = iframe.contentDocument;
+                if (!doc) return;
+                const body = doc.body;
+                const html = doc.documentElement;
+                const h = Math.max(
+                    body?.scrollHeight || 0,
+                    body?.offsetHeight || 0,
+                    html?.scrollHeight || 0,
+                    html?.offsetHeight || 0
+                );
+                if (h > 0) setIframeHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
+            } catch {
+                /* cross-origin erişilemezse ölçümü atla */
+            }
+        };
+        const onLoad = () => {
+            measure();
+            try {
+                const doc = iframe.contentDocument;
+                if (doc?.body && 'ResizeObserver' in window) {
+                    ro = new ResizeObserver(() => measure());
+                    ro.observe(doc.body);
+                }
+            } catch {
+                /* yoksay */
+            }
+        };
+        iframe.addEventListener('load', onLoad);
+        onLoad();
+        intervalId = window.setInterval(measure, 500);
+        const stopTimer = window.setTimeout(() => {
+            if (intervalId !== null) {
+                window.clearInterval(intervalId);
+                intervalId = null;
+            }
+        }, 5000);
+        return () => {
+            iframe.removeEventListener('load', onLoad);
+            ro?.disconnect();
+            if (intervalId !== null) window.clearInterval(intervalId);
+            window.clearTimeout(stopTimer);
+        };
+    }, [isLoadingContent, formattedHtml]);
 
     React.useEffect(() => {
         if (!timerRunning || timerSecs <= 0) return;
@@ -407,7 +463,7 @@ export function ActivityPreviewModal({
                                 position: 'relative',
                                 width: '100%',
                                 minHeight: isRawHtml ? 'calc(100vh - 3.5rem)' : iframeHeight,
-                                height: isRawHtml ? 'calc(100vh - 3.5rem)' : iframeHeight,
+                                height: iframeHeight,
                             }}
                         >
                             {isLoadingContent ? (
@@ -418,6 +474,7 @@ export function ActivityPreviewModal({
                             ) : (
                                 <iframe
                                     key={activity.id}
+                                    ref={iframeRef}
                                     srcDoc={formattedHtml}
                                     title={activity.title}
                                     sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads allow-pointer-lock"
