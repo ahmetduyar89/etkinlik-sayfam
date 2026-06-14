@@ -80,8 +80,8 @@ function ActivityCardBase({ act, onOpenPreview, onEdit, onRequestDelete, onShowR
                 )}
             </div>
 
-            {/* Gövde */}
-            <div className="p-4 flex flex-col flex-1">
+            {/* Content Wrapper */}
+            <div className="flex-1 flex flex-col min-w-0 p-4">
                 <h3 className="text-[15px] font-bold text-on-surface leading-snug line-clamp-2 min-h-[40px] font-sans">
                     {act.title}
                 </h3>
@@ -90,10 +90,17 @@ function ActivityCardBase({ act, onOpenPreview, onEdit, onRequestDelete, onShowR
                 </p>
 
                 <div className="flex items-center justify-between mt-3">
-                    <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-on-surface-variant">
-                        <span className="w-2 h-2 rounded-full" style={{ background: c }} />
-                        {act.subject}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-on-surface-variant">
+                            <span className="w-2 h-2 rounded-full" style={{ background: c }} />
+                            {act.subject}
+                        </span>
+                        {act.unit && (
+                            <span className="bg-emerald-500/10 text-emerald-700 text-[10.5px] font-bold uppercase tracking-wide px-2 py-0.5 rounded border border-emerald-500/10">
+                                {act.unit}
+                            </span>
+                        )}
+                    </div>
                     <span className="inline-flex items-center gap-1 text-[12.5px] font-bold text-primary">
                         Aç
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.4} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m9 5 7 7-7 7" /></svg>

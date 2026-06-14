@@ -28,7 +28,7 @@ import { ActivityForm, type ActivityFormValues } from './components/activities/A
 import { ActivityPreviewModal } from './components/activities/ActivityPreviewModal';
 import { StudentPortal } from './components/student/StudentPortal';
 import { GRADE_LEVELS, SUBJECTS, formatGradeLevel } from './constants/education';
-import type { Activity } from './types';
+import type { Activity, Unit } from './types';
 
 // Branş renkleri (kart ve menü noktaları için)
 const SUBJECT_COLOR: Record<string, string> = {
@@ -150,6 +150,7 @@ export default function App() {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedGradeLevel, setSelectedGradeLevel] = useState<string | null>(null);
     const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+    const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
     const [sortBy, setSortBy] = useState<'recent' | 'title'>('recent');
     const [isActivityOpen, setIsActivityOpen] = useState(false);
     const [editItem, setEditItem] = useState<Activity | null>(null);
@@ -158,8 +159,11 @@ export default function App() {
     const PAGE_SIZE = 12;
 
     const activitiesHandler = useFirestore<Activity>('activities');
+    const unitsHandler = useFirestore<Unit>('units');
     const toast = useToast();
     const confirm = useConfirm();
+
+    const [units, setUnits] = useState<Unit[]>([]);
 
     useEffect(() => {
         const unsub = activitiesHandler.sync((data) => {
@@ -168,6 +172,14 @@ export default function App() {
         });
         return () => unsub();
     }, []);
+
+    useEffect(() => {
+        const unsub = unitsHandler.sync((data) => {
+            setUnits(data || []);
+        });
+        return () => unsub();
+    }, []);
+
 
     const allTags = useMemo(() => {
         const s = new Set<string>();
@@ -187,14 +199,27 @@ export default function App() {
         return m;
     }, [activities]);
 
+    const filteredUnitsList = useMemo(() => {
+        const unitSet = new Set<string>();
+        activities.forEach((a) => {
+            if (a.unit) {
+                if (selectedGradeLevel && a.grade_level !== selectedGradeLevel) return;
+                if (selectedSubject && a.subject !== selectedSubject) return;
+                unitSet.add(a.unit.trim());
+            }
+        });
+        return Array.from(unitSet).sort((a, b) => a.localeCompare(b, 'tr'));
+    }, [activities, selectedGradeLevel, selectedSubject]);
+
     const filteredActivities = useMemo(() => {
         const needle = debouncedSearch.trim().toLocaleLowerCase('tr');
         let list = activities.filter((a) => {
-            const hay = [a.title, a.description, a.category, formatGradeLevel(a.grade_level), a.subject, a.tags].filter(Boolean).join(' ').toLocaleLowerCase('tr');
+            const hay = [a.title, a.description, a.category, formatGradeLevel(a.grade_level), a.subject, a.unit, a.tags].filter(Boolean).join(' ').toLocaleLowerCase('tr');
             if (needle && !hay.includes(needle)) return false;
             if (selectedCategory && (a.category?.trim() || 'Genel') !== selectedCategory) return false;
             if (selectedGradeLevel && a.grade_level !== selectedGradeLevel) return false;
             if (selectedSubject && a.subject !== selectedSubject) return false;
+            if (selectedUnit && a.unit !== selectedUnit) return false;
             if (selectedTag) {
                 const tags = a.tags ? a.tags.split(',').map((t) => t.trim()).filter(Boolean) : [];
                 if (!tags.includes(selectedTag)) return false;
@@ -204,9 +229,10 @@ export default function App() {
         if (sortBy === 'title') list = [...list].sort((a, b) => a.title.localeCompare(b.title, 'tr'));
         else list = [...list].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
         return list;
-    }, [activities, debouncedSearch, selectedCategory, selectedGradeLevel, selectedSubject, selectedTag, sortBy]);
+    }, [activities, debouncedSearch, selectedCategory, selectedGradeLevel, selectedSubject, selectedTag, selectedUnit, sortBy]);
 
-    useEffect(() => { setPage(1); }, [debouncedSearch, selectedCategory, selectedGradeLevel, selectedSubject, selectedTag]);
+    useEffect(() => { setPage(1); }, [debouncedSearch, selectedCategory, selectedGradeLevel, selectedSubject, selectedTag, selectedUnit]);
+
 
     const totalPages = Math.max(1, Math.ceil(filteredActivities.length / PAGE_SIZE));
     const safePage = Math.min(page, totalPages);
@@ -236,15 +262,32 @@ export default function App() {
     const handleActivitySubmit = useCallback(async (values: ActivityFormValues) => {
         setIsSubmitting(true);
         try {
+            if (values.unit && values.grade_level && values.subject) {
+                const exists = units.some(
+                    (u) =>
+                        u.grade_level === values.grade_level &&
+                        u.subject === values.subject &&
+                        u.name.toLowerCase().trim() === values.unit!.toLowerCase().trim()
+                );
+                if (!exists) {
+                    await unitsHandler.add({
+                        grade_level: values.grade_level,
+                        subject: values.subject,
+                        name: values.unit.trim(),
+                    });
+                }
+            }
+
             if (editItem) { await activitiesHandler.update(editItem.id, values); toast.success('Etkinlik güncellendi.'); }
             else { await activitiesHandler.add(values); toast.success('Etkinlik eklendi.'); }
             setIsActivityOpen(false); setEditItem(null);
         } catch { toast.error('Etkinlik kaydedilemedi.'); }
         finally { setIsSubmitting(false); }
-    }, [editItem, activitiesHandler, toast]);
+    }, [editItem, activitiesHandler, units, unitsHandler, toast]);
 
     const currentPreview = previewId ? activities.find((a) => a.id === previewId) ?? null : null;
-    const resetFilters = () => { setSelectedCategory(null); setSelectedGradeLevel(null); setSelectedSubject(null); setSelectedTag(null); setSearch(''); };
+    const resetFilters = () => { setSelectedCategory(null); setSelectedGradeLevel(null); setSelectedSubject(null); setSelectedUnit(null); setSelectedTag(null); setSearch(''); };
+
 
     if (isStudentView) {
         if (isLoading) return (
@@ -291,6 +334,15 @@ export default function App() {
                     {allCategories.map((cat) => (
                         <NavItem key={cat} active={selectedCategory === cat} onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)} icon={<Tag className="w-4 h-4" />} label={cat} />
                     ))}
+
+                    {filteredUnitsList.length > 0 && (
+                        <>
+                            <div className="text-[10.5px] font-bold tracking-[1.4px] uppercase text-on-surface-variant/60 px-3 pt-4 pb-1.5">Üniteler</div>
+                            {filteredUnitsList.map((unit) => (
+                                <NavItem key={unit} active={selectedUnit === unit} onClick={() => setSelectedUnit(selectedUnit === unit ? null : unit)} icon={<span className="material-symbols-outlined !text-[16px] text-on-surface-variant">layers</span>} label={unit} />
+                            ))}
+                        </>
+                    )}
 
                     {allTags.length > 0 && (
                         <>
@@ -405,7 +457,7 @@ export default function App() {
             <ResultsModal isOpen={!!showResultsId} onClose={() => setShowResultsId(null)} activityId={showResultsId || ''} />
 
             <Modal isOpen={isActivityOpen} onClose={() => { setIsActivityOpen(false); setEditItem(null); }} title={editItem ? 'Etkinliği Güncelle' : 'Yeni İnteraktif İçerik'}>
-                <ActivityForm key={editItem?.id || 'new'} editItem={editItem} isSubmitting={isSubmitting} onSubmit={handleActivitySubmit} onCancel={() => { setIsActivityOpen(false); setEditItem(null); }} />
+                <ActivityForm key={editItem?.id || 'new'} editItem={editItem} isSubmitting={isSubmitting} onSubmit={handleActivitySubmit} onCancel={() => { setIsActivityOpen(false); setEditItem(null); }} units={units} />
             </Modal>
 
             {currentPreview && <ActivityPreviewModal activity={currentPreview} onClose={() => setPreviewId(null)} />}

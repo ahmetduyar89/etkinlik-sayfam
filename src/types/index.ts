@@ -17,7 +17,17 @@ export interface Activity {
     content_mode?: 'raw_html' | 'composed';
     storage_url?: string;
     created_at?: string;
+    unit?: string;
 }
+
+export interface Unit {
+    id: string;
+    grade_level: string;
+    subject: string;
+    name: string;
+    created_at?: string;
+}
+
 
 export interface Submission {
     id: string;
