@@ -11,6 +11,7 @@ import {
     ZoomOut,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { FullscreenToggle } from '../common/FullscreenToggle';
 import { getFormattedHtml } from '../../utils/format-html';
 import { HTML2CANVAS_CDN } from '../../constants/drawing';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
@@ -415,6 +416,8 @@ export function ActivityPreviewModal({
                                 {isPreviewDrawingMode ? 'Kalemi Kapat' : 'Kalem Modu'}
                             </span>
                         </button>
+
+                        <FullscreenToggle variant="dark" />
 
                         <button
                             type="button"

@@ -2,6 +2,7 @@
 // Üst başlık = marka + GENİŞ ARAMA + "Yeni İçerik" + avatar.
 // Arama state'i App.tsx'te yaşar; buraya props ile gelir.
 import { Plus, Search } from 'lucide-react';
+import { FullscreenToggle } from './FullscreenToggle';
 
 interface NavbarProps {
     search: string;
@@ -36,6 +37,9 @@ export function Navbar({ search, onSearchChange, onAdd }: NavbarProps) {
                         <button onClick={() => onSearchChange('')} className="w-5 h-5 rounded-full bg-surface-container-highest text-on-surface-variant text-[11px] leading-none flex items-center justify-center">✕</button>
                     )}
                 </div>
+
+                {/* Tam ekran (yalnızca bilgisayarda görünür) */}
+                <FullscreenToggle />
 
                 {/* Yeni İçerik + avatar */}
                 <button

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Clock, Pencil, User, Zap } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { FullscreenToggle } from '../common/FullscreenToggle';
 import { getFormattedHtml } from '../../utils/format-html';
 import { useFirestore } from '../../lib/firebase';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
@@ -311,6 +312,8 @@ export function StudentPortal({ act }: StudentPortalProps) {
                             {isDrawingMode ? 'Çizimi Kapat' : 'Kalem Modu'}
                         </span>
                     </button>
+                    <FullscreenToggle variant="dark" />
+
                     {act.is_test && (
                         <button
                             type="button"
