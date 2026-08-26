@@ -1,8 +1,9 @@
 // src/components/common/Navbar.tsx — İÇERİK MERKEZİ RESKIN (açık tema)
 // Üst başlık = marka + GENİŞ ARAMA + "Yeni İçerik" + avatar.
 // Arama state'i App.tsx'te yaşar; buraya props ile gelir.
-import { Plus, Search } from 'lucide-react';
+import { LogOut, Plus, Search } from 'lucide-react';
 import { FullscreenToggle } from './FullscreenToggle';
+import { lockApp } from '../../utils/auth';
 
 interface NavbarProps {
     search: string;
@@ -51,6 +52,16 @@ export function Navbar({ search, onSearchChange, onAdd }: NavbarProps) {
                 <div className="w-[38px] h-[38px] rounded-full bg-gradient-to-br from-primary to-secondary text-white flex items-center justify-center font-bold text-[13px] flex-shrink-0">
                     AD
                 </div>
+
+                {/* Çıkış: şifre ekranına döner */}
+                <button
+                    onClick={lockApp}
+                    aria-label="Çıkış yap"
+                    title="Çıkış yap"
+                    className="flex-shrink-0 p-2 rounded-xl text-on-surface-variant hover:text-red-500 hover:bg-red-50 transition-colors"
+                >
+                    <LogOut className="w-4 h-4" />
+                </button>
             </div>
         </header>
     );
