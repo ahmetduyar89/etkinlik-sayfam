@@ -3,6 +3,7 @@
 // Arama state'i App.tsx'te yaşar; buraya props ile gelir.
 import { LogOut, Plus, Search } from 'lucide-react';
 import { FullscreenToggle } from './FullscreenToggle';
+import { InstallAppButton } from './InstallAppButton';
 import { lockApp } from '../../utils/auth';
 
 interface NavbarProps {
@@ -38,6 +39,9 @@ export function Navbar({ search, onSearchChange, onAdd }: NavbarProps) {
                         <button onClick={() => onSearchChange('')} className="w-5 h-5 rounded-full bg-surface-container-highest text-on-surface-variant text-[11px] leading-none flex items-center justify-center">✕</button>
                     )}
                 </div>
+
+                {/* Uygulama olarak yükle (tarayıcı destekliyorsa görünür) */}
+                <InstallAppButton />
 
                 {/* Tam ekran (yalnızca bilgisayarda görünür) */}
                 <FullscreenToggle />
