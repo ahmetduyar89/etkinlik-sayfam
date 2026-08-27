@@ -7,6 +7,11 @@ import { ToastProvider } from './components/common/ToastProvider';
 import { ConfirmDialogProvider } from './components/common/ConfirmDialog';
 import { PromptDialogProvider } from './components/common/PromptDialog';
 import { PasswordGate } from './components/common/PasswordGate';
+import { listenForInstallPrompt, registerServiceWorker } from './lib/pwa';
+
+// Uygulama olarak kurulum istemi + otomatik güncelleme (service worker)
+listenForInstallPrompt();
+registerServiceWorker();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
