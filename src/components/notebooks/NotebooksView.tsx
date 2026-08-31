@@ -26,6 +26,7 @@ import { useToast } from '../common/ToastProvider';
 import { useConfirm } from '../common/ConfirmDialog';
 import { usePrompt } from '../common/PromptDialog';
 import { NotebookEditor } from './NotebookEditor';
+import { firestoreErrorMessage } from './errors';
 import type { DriveFolder, Notebook, NotebookKind } from '../../types';
 
 type MoveTarget =
@@ -55,7 +56,7 @@ export function NotebooksView() {
     const [folders, setFolders] = React.useState<DriveFolder[]>([]);
     const [notebooks, setNotebooks] = React.useState<Notebook[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
-    const [loadError, setLoadError] = React.useState(false);
+    const [loadError, setLoadError] = React.useState<string | null>(null);
 
     const [currentFolderId, setCurrentFolderId] = React.useState<string | null>(null);
     const [search, setSearch] = React.useState('');
@@ -68,7 +69,7 @@ export function NotebooksView() {
     React.useEffect(() => {
         const unsub = foldersHandler.sync(
             (data) => setFolders(data || []),
-            () => setLoadError(true)
+            (e) => setLoadError(firestoreErrorMessage(e, 'Klasörler yüklenemedi.'))
         );
         return () => unsub();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -80,8 +81,8 @@ export function NotebooksView() {
                 setNotebooks(data || []);
                 setIsLoading(false);
             },
-            () => {
-                setLoadError(true);
+            (e) => {
+                setLoadError(firestoreErrorMessage(e, 'Defterler yüklenemedi.'));
                 setIsLoading(false);
             }
         );
@@ -162,8 +163,8 @@ export function NotebooksView() {
                 color: FOLDER_COLORS[folders.length % FOLDER_COLORS.length],
             });
             toast.success('Klasör oluşturuldu.');
-        } catch {
-            toast.error('Klasör oluşturulamadı.');
+        } catch (e) {
+            toast.error(firestoreErrorMessage(e, 'Klasör oluşturulamadı.'));
         }
     };
 
@@ -180,8 +181,13 @@ export function NotebooksView() {
                 updated_at: new Date().toISOString(),
             });
             setOpenNotebookId(ref.id);
-        } catch {
-            toast.error(isWb ? 'Beyaz tahta oluşturulamadı.' : 'Defter oluşturulamadı.');
+        } catch (e) {
+            toast.error(
+                firestoreErrorMessage(
+                    e,
+                    isWb ? 'Beyaz tahta oluşturulamadı.' : 'Defter oluşturulamadı.'
+                )
+            );
         }
     };
 
@@ -506,8 +512,7 @@ export function NotebooksView() {
 
             {loadError && (
                 <div className="mb-4 px-4 py-3 rounded-2xl bg-red-50 border border-red-200 text-[13px] text-red-700">
-                    Defterlere şu an ulaşılamıyor. İnternet bağlantını kontrol edip sayfayı
-                    yenile.
+                    {loadError}
                 </div>
             )}
 

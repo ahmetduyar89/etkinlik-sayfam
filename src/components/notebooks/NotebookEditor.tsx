@@ -27,6 +27,7 @@ import { fetchDocById, saveDocById } from '../../lib/firebase';
 import { cn } from '../../utils/cn';
 import { BG_COLORS } from '../../constants/drawing';
 import { PAPER_STYLES, paperBackground } from './paper';
+import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
     DrawingCanvasHandle,
@@ -140,9 +141,9 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             setSaveState('saved');
             if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
             savedTimerRef.current = window.setTimeout(() => setSaveState('idle'), 2000);
-        } catch {
+        } catch (e) {
             setSaveState('idle');
-            toast.error('Defter kaydedilemedi.');
+            toast.error(firestoreErrorMessage(e, 'Defter kaydedilemedi.'));
         }
     }, [notebook.id, onMetaChange, toast]);
 
