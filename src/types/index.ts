@@ -18,7 +18,13 @@ export interface Activity {
     storage_url?: string;
     created_at?: string;
     unit?: string;
-    /** Etkinlik "Defterlerim" içinde hangi klasöre eklendi (yoksa hiçbiri). */
+    /** Etkinliğin eklendiği klasörler ("Defterlerim"). Boşsa hiçbir klasörde değil. */
+    folder_ids?: string[];
+    /**
+     * Eski tek klasör alanı. Yeni kayıtlarda kullanılmaz; okurken
+     * `activityFolderIds()` yardımcısı bu alanı da hesaba katar.
+     * @deprecated `folder_ids` kullanın.
+     */
     folder_id?: string | null;
 }
 

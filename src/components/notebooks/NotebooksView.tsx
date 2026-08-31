@@ -30,6 +30,8 @@ import { useConfirm } from '../common/ConfirmDialog';
 import { usePrompt } from '../common/PromptDialog';
 import { NotebookEditor } from './NotebookEditor';
 import { ActivityPicker } from './ActivityPicker';
+import { ActivityFolderDialog } from './ActivityFolderDialog';
+import { activityFolderIds, isInFolder } from './activityFolders';
 import { firestoreErrorMessage } from './errors';
 import { ActivityPreviewModal } from '../activities/ActivityPreviewModal';
 import { formatGradeLevel } from '../../constants/education';
@@ -37,8 +39,7 @@ import type { Activity, DriveFolder, Notebook, NotebookKind } from '../../types'
 
 type MoveTarget =
     | { kind: 'folder'; id: string; name: string }
-    | { kind: 'notebook'; id: string; name: string }
-    | { kind: 'activity'; id: string; name: string };
+    | { kind: 'notebook'; id: string; name: string };
 
 const FOLDER_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#0ea5e9'];
 
@@ -76,6 +77,7 @@ export function NotebooksView() {
     const [activities, setActivities] = React.useState<Activity[]>([]);
     const [previewActivityId, setPreviewActivityId] = React.useState<string | null>(null);
     const [isPickerOpen, setIsPickerOpen] = React.useState(false);
+    const [folderEditActivityId, setFolderEditActivityId] = React.useState<string | null>(null);
 
     React.useEffect(() => {
         const unsub = foldersHandler.sync(
@@ -161,11 +163,11 @@ export function NotebooksView() {
      * listelenmezler (hepsi zaten "İçerikler" sekmesinde duruyor).
      */
     const visibleActivities = React.useMemo(() => {
-        const filed = activities.filter((a) => !!a.folder_id);
+        const filed = activities.filter((a) => activityFolderIds(a).length > 0);
         const list = needle
             ? filed.filter((a) => a.title.toLocaleLowerCase('tr').includes(needle))
             : currentFolderId
-            ? filed.filter((a) => a.folder_id === currentFolderId)
+            ? filed.filter((a) => isInFolder(a, currentFolderId))
             : [];
         return [...list].sort((a, b) => a.title.localeCompare(b.title, 'tr'));
     }, [activities, currentFolderId, needle]);
@@ -174,7 +176,7 @@ export function NotebooksView() {
         (folderId: string) => ({
             folders: folders.filter((f) => f.parent_id === folderId).length,
             notebooks: notebooks.filter((n) => n.parent_id === folderId).length,
-            activities: activities.filter((a) => a.folder_id === folderId).length,
+            activities: activities.filter((a) => isInFolder(a, folderId)).length,
         }),
         [folders, notebooks, activities]
     );
@@ -270,7 +272,7 @@ export function NotebooksView() {
                 .filter((n) => n.parent_id && folderIds.includes(n.parent_id))
                 .map((n) => n.id);
             const activityIds = activities
-                .filter((a) => a.folder_id && folderIds.includes(a.folder_id))
+                .filter((a) => activityFolderIds(a).some((id) => folderIds.includes(id)))
                 .map((a) => a.id);
             return { folderIds, notebookIds, activityIds };
         },
@@ -300,9 +302,15 @@ export function NotebooksView() {
                     await deleteDocById('notebook_content', id).catch(() => undefined);
                 })
             );
-            // Etkinlikler İçerikler sekmesinde kalmalı; sadece klasör bağı kopar.
+            // Etkinlikler İçerikler sekmesinde kalmalı; yalnızca silinen
+            // klasörlerin bağı kopar, diğer klasörlerdeki üyelik korunur.
             await Promise.all(
-                activityIds.map((id) => activitiesHandler.update(id, { folder_id: null }))
+                activityIds.map((id) => {
+                    const act = activities.find((a) => a.id === id);
+                    if (!act) return Promise.resolve();
+                    const kept = activityFolderIds(act).filter((fid) => !folderIds.includes(fid));
+                    return activitiesHandler.update(id, { folder_ids: kept, folder_id: null });
+                })
             );
             await Promise.all(folderIds.map((id) => foldersHandler.remove(id)));
             if (folderIds.includes(currentFolderId || '')) setCurrentFolderId(f.parent_id);
@@ -334,7 +342,15 @@ export function NotebooksView() {
         if (!currentFolderId) return;
         try {
             await Promise.all(
-                ids.map((id) => activitiesHandler.update(id, { folder_id: currentFolderId }))
+                ids.map((id) => {
+                    const act = activities.find((a) => a.id === id);
+                    const next = new Set(act ? activityFolderIds(act) : []);
+                    next.add(currentFolderId);
+                    return activitiesHandler.update(id, {
+                        folder_ids: Array.from(next),
+                        folder_id: null,
+                    });
+                })
             );
             setIsPickerOpen(false);
             toast.success(
@@ -345,12 +361,33 @@ export function NotebooksView() {
         }
     };
 
+    /** Etkinliği yalnızca bulunulan klasörden çıkarır; diğer klasörler kalır. */
     const removeActivityFromFolder = async (a: Activity) => {
+        if (!currentFolderId) return;
+        const kept = activityFolderIds(a).filter((id) => id !== currentFolderId);
         try {
-            await activitiesHandler.update(a.id, { folder_id: null });
-            toast.success('Etkinlik klasörden çıkarıldı. İçerikler sekmesinde duruyor.');
+            await activitiesHandler.update(a.id, { folder_ids: kept, folder_id: null });
+            toast.success(
+                kept.length
+                    ? `Etkinlik bu klasörden çıkarıldı. Hâlâ ${kept.length} klasörde duruyor.`
+                    : 'Etkinlik klasörden çıkarıldı. İçerikler sekmesinde duruyor.'
+            );
         } catch (e) {
             toast.error(firestoreErrorMessage(e, 'Etkinlik çıkarılamadı.'));
+        }
+    };
+
+    const saveActivityFolders = async (activityId: string, ids: string[]) => {
+        try {
+            await activitiesHandler.update(activityId, { folder_ids: ids, folder_id: null });
+            setFolderEditActivityId(null);
+            toast.success(
+                ids.length
+                    ? `Etkinlik ${ids.length} klasörde görünüyor.`
+                    : 'Etkinlik tüm klasörlerden çıkarıldı.'
+            );
+        } catch (e) {
+            toast.error(firestoreErrorMessage(e, 'Klasörler kaydedilemedi.'));
         }
     };
 
@@ -371,11 +408,9 @@ export function NotebooksView() {
     }, [moveTarget, collectDescendants]);
 
     const moveOptions = React.useMemo(() => {
-        const out: Array<{ id: string | null; label: string; depth: number }> = [];
-        // Etkinlikler ana klasörde listelenmez; onlar için "çıkar" eylemi vardır.
-        if (moveTarget?.kind !== 'activity') {
-            out.push({ id: null, label: 'Defterlerim (ana klasör)', depth: 0 });
-        }
+        const out: Array<{ id: string | null; label: string; depth: number }> = [
+            { id: null, label: 'Defterlerim (ana klasör)', depth: 0 },
+        ];
         const walk = (parent: string | null, depth: number) => {
             folders
                 .filter((f) => (f.parent_id ?? null) === parent)
@@ -387,17 +422,15 @@ export function NotebooksView() {
         };
         walk(null, 1);
         return out;
-    }, [folders, moveTarget]);
+    }, [folders]);
 
     const applyMove = async (destination: string | null) => {
         if (!moveTarget) return;
         try {
             if (moveTarget.kind === 'folder') {
                 await foldersHandler.update(moveTarget.id, { parent_id: destination });
-            } else if (moveTarget.kind === 'notebook') {
-                await notebooksHandler.update(moveTarget.id, { parent_id: destination });
             } else {
-                await activitiesHandler.update(moveTarget.id, { folder_id: destination });
+                await notebooksHandler.update(moveTarget.id, { parent_id: destination });
             }
             toast.success('Taşındı.');
         } catch (e) {
@@ -410,8 +443,26 @@ export function NotebooksView() {
     const openNotebook = notebooks.find((n) => n.id === openNotebookId) || null;
     const previewActivity = activities.find((a) => a.id === previewActivityId) || null;
     const currentFolder = currentFolderId ? folderById.get(currentFolderId) : undefined;
+    const folderOptions = React.useMemo(() => {
+        const out: Array<{ id: string; label: string; depth: number }> = [];
+        const walk = (parent: string | null, depth: number) => {
+            folders
+                .filter((f) => (f.parent_id ?? null) === parent)
+                .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
+                .forEach((f) => {
+                    out.push({ id: f.id, label: f.name, depth });
+                    walk(f.id, depth + 1);
+                });
+        };
+        walk(null, 0);
+        return out;
+    }, [folders]);
+
+    const folderEditActivity =
+        activities.find((a) => a.id === folderEditActivityId) || null;
+
     const activityIdsHere = React.useMemo(
-        () => new Set(activities.filter((a) => a.folder_id === currentFolderId).map((a) => a.id)),
+        () => new Set(activities.filter((a) => isInFolder(a, currentFolderId)).map((a) => a.id)),
         [activities, currentFolderId]
     );
 
@@ -754,12 +805,14 @@ export function NotebooksView() {
                                     {a.subject ? ` · ${a.subject}` : ''}
                                     {a.grade_level ? ` · ${formatGradeLevel(a.grade_level)}` : ''}
                                     {a.category ? ` · ${a.category}` : ''}
+                                    {activityFolderIds(a).length > 1 &&
+                                        ` · ${activityFolderIds(a).length} klasörde`}
                                 </p>
                             </div>
                             <RowMenu id={a.id}>
                                 <MenuAction icon={<Eye className="w-4 h-4" />} label="Aç / önizle" onClick={() => setPreviewActivityId(a.id)} />
                                 <MenuAction icon={<Link2 className="w-4 h-4" />} label="Öğrenci linkini kopyala" onClick={() => handleCopyActivityLink(a)} />
-                                <MenuAction icon={<FolderInput className="w-4 h-4" />} label="Başka klasöre taşı" onClick={() => setMoveTarget({ kind: 'activity', id: a.id, name: a.title })} />
+                                <MenuAction icon={<FolderInput className="w-4 h-4" />} label="Klasörlerini düzenle" onClick={() => setFolderEditActivityId(a.id)} />
                                 <MenuAction icon={<Trash2 className="w-4 h-4" />} label="Klasörden çıkar" danger onClick={() => removeActivityFromFolder(a)} />
                             </RowMenu>
                         </div>
@@ -862,12 +915,14 @@ export function NotebooksView() {
                                     <p className="text-[11.5px] text-on-surface-variant truncate">
                                         Etkinlik{a.subject ? ` · ${a.subject}` : ''}
                                         {a.grade_level ? ` · ${formatGradeLevel(a.grade_level)}` : ''}
+                                        {activityFolderIds(a).length > 1 &&
+                                            ` · ${activityFolderIds(a).length} klasörde`}
                                     </p>
                                 </div>
                                 <RowMenu id={a.id}>
                                     <MenuAction icon={<Eye className="w-4 h-4" />} label="Aç / önizle" onClick={() => setPreviewActivityId(a.id)} />
                                     <MenuAction icon={<Link2 className="w-4 h-4" />} label="Öğrenci linkini kopyala" onClick={() => handleCopyActivityLink(a)} />
-                                    <MenuAction icon={<FolderInput className="w-4 h-4" />} label="Başka klasöre taşı" onClick={() => setMoveTarget({ kind: 'activity', id: a.id, name: a.title })} />
+                                    <MenuAction icon={<FolderInput className="w-4 h-4" />} label="Klasörlerini düzenle" onClick={() => setFolderEditActivityId(a.id)} />
                                     <MenuAction icon={<Trash2 className="w-4 h-4" />} label="Klasörden çıkar" danger onClick={() => removeActivityFromFolder(a)} />
                                 </RowMenu>
                             </div>
@@ -919,6 +974,18 @@ export function NotebooksView() {
                 existingIds={activityIdsHere}
                 onAdd={addActivitiesToFolder}
             />
+
+            {/* Etkinliğin klasörleri */}
+            {folderEditActivity && (
+                <ActivityFolderDialog
+                    isOpen
+                    onClose={() => setFolderEditActivityId(null)}
+                    activityTitle={folderEditActivity.title}
+                    folders={folderOptions}
+                    selectedIds={activityFolderIds(folderEditActivity)}
+                    onSave={(ids) => saveActivityFolders(folderEditActivity.id, ids)}
+                />
+            )}
 
             {/* Etkinlik önizleme */}
             {previewActivity && (
