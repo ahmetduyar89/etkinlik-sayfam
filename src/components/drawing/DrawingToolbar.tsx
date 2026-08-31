@@ -4,8 +4,12 @@ import {
     Camera,
     GripVertical,
     Grid,
+    ImagePlus,
+    Loader2,
+    Minus,
     PaintBucket,
     PenTool,
+    Plus,
     Redo,
     Shapes,
     Sigma,
@@ -51,6 +55,15 @@ interface DrawingToolbarProps {
     onInsertMath?: (math: MathObject) => void;
     canUndo?: boolean;
     canRedo?: boolean;
+    /** Seçilen fotoğraf dosyalarını sayfaya ekler. */
+    onInsertImages?: (files: FileList | File[]) => void;
+    /** Fotoğraf işlenirken düğmede bekleme göstergesi çıkar. */
+    isInsertingImage?: boolean;
+    /** Yakınlaştırma kontrolleri (yalnızca defter/beyaz tahtada). */
+    zoom?: number;
+    onZoomIn?: () => void;
+    onZoomOut?: () => void;
+    onZoomReset?: () => void;
 }
 
 const shapeTools = makeShapeTools(SolidLineIcon, DashedLineIcon);
@@ -69,7 +82,14 @@ export function DrawingToolbar({
     onInsertMath,
     canUndo,
     canRedo,
+    onInsertImages,
+    isInsertingImage,
+    zoom,
+    onZoomIn,
+    onZoomOut,
+    onZoomReset,
 }: DrawingToolbarProps) {
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
     const [showShapes, setShowShapes] = React.useState(false);
     const [showExtras, setShowExtras] = React.useState(false);
     const [showPen, setShowPen] = React.useState(false);
@@ -95,18 +115,20 @@ export function DrawingToolbar({
         setShowShapes(false);
     };
 
-    return (
+    const bar = (
         <motion.div
             drag
             dragControls={dragControls}
             dragListener={false}
             dragMomentum={false}
             dragElastic={0}
-            initial={{ left: '50%', x: '-50%', y: 20, opacity: 0 }}
+            initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             role="toolbar"
             aria-label="Çizim araç çubuğu"
-            className="fixed bottom-10 z-[5000] flex flex-col items-center gap-3 pointer-events-auto"
+            // Tam genişlikte durur: `left: 50%` verilseydi kullanılabilir
+            // genişlik ekranın yarısına düşer ve çubuk erken satır atlardı.
+            className="fixed bottom-10 left-0 right-0 z-[5000] flex flex-col items-center gap-3 pointer-events-none"
             style={{ touchAction: 'none' }}
         >
             {onInsertMath && (
@@ -123,7 +145,7 @@ export function DrawingToolbar({
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="flex flex-col gap-2.5 bg-[#1a1b26]/95 backdrop-blur-md p-3 rounded-2xl border border-white/10 shadow-2xl w-[min(92vw,430px)]"
+                        className="pointer-events-auto flex flex-col gap-2.5 bg-[#1a1b26]/95 backdrop-blur-md p-3 rounded-2xl border border-white/10 shadow-2xl w-[min(92vw,430px)]"
                         onPointerDown={(e) => e.stopPropagation()}
                     >
                         <div>
@@ -259,7 +281,7 @@ export function DrawingToolbar({
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="flex flex-col gap-2 bg-[#1a1b26]/95 backdrop-blur-md p-3 rounded-2xl border border-white/10 shadow-2xl"
+                        className="pointer-events-auto flex flex-col gap-2 bg-[#1a1b26]/95 backdrop-blur-md p-3 rounded-2xl border border-white/10 shadow-2xl"
                     >
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] text-slate-500 font-medium w-12 shrink-0">
@@ -345,7 +367,7 @@ export function DrawingToolbar({
                 )}
             </AnimatePresence>
 
-            <div className="flex items-center gap-1 bg-[#1a1b26] p-1.5 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5 transition-all duration-300">
+            <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-1 max-w-[calc(100vw-20px)] bg-[#1a1b26] p-1.5 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5 transition-all duration-300">
                 <div
                     onPointerDown={(e) => dragControls.start(e)}
                     className="p-2.5 text-slate-500 hover:text-white cursor-grab active:cursor-grabbing border-r border-white/10"
@@ -355,7 +377,7 @@ export function DrawingToolbar({
                     <GripVertical className="w-5 h-5" />
                 </div>
 
-                <div className="flex items-center gap-0.5 px-2 border-r border-white/10">
+                <div className="flex items-center gap-0.5 px-2 border-white/10 lg:border-r">
                     {MAIN_TOOLS.map((tool) => (
                         <button
                             key={tool.id}
@@ -430,7 +452,7 @@ export function DrawingToolbar({
                 <div
                     role="radiogroup"
                     aria-label="Renk"
-                    className="flex items-center gap-2 px-4 border-r border-white/10"
+                    className="flex items-center gap-1.5 px-2 border-white/10 lg:border-r"
                 >
                     {DRAWING_COLORS.map((color) => (
                         <button
@@ -441,7 +463,7 @@ export function DrawingToolbar({
                             aria-label={`Renk ${color}`}
                             onClick={() => setConfig({ ...config, color })}
                             className={cn(
-                                'w-7 h-7 rounded-full border-2 transition-all hover:scale-110',
+                                'w-6 h-6 rounded-full border-2 transition-all hover:scale-110',
                                 config.color === color
                                     ? 'border-white scale-110'
                                     : 'border-transparent'
@@ -454,7 +476,7 @@ export function DrawingToolbar({
                 <div
                     role="radiogroup"
                     aria-label="Kalınlık"
-                    className="flex items-center gap-3 px-4 border-r border-white/10"
+                    className="flex items-center gap-2.5 px-2 border-white/10 lg:border-r"
                 >
                     {DRAWING_WIDTHS.map((size) => (
                         <button
@@ -476,7 +498,7 @@ export function DrawingToolbar({
                     ))}
                 </div>
 
-                <div className="flex items-center gap-1.5 px-2 border-r border-white/10">
+                <div className="flex items-center gap-1.5 px-2 border-white/10 lg:border-r">
                     <button
                         type="button"
                         onClick={() => onCommand('UNDO_DRAWING')}
@@ -544,6 +566,36 @@ export function DrawingToolbar({
                             <Sparkles className="w-2.5 h-2.5 absolute top-1 right-1 text-indigo-300" />
                         </button>
                     )}
+                    {onInsertImages && (
+                        <>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                className="hidden"
+                                onChange={(e) => {
+                                    if (e.target.files?.length) onInsertImages(e.target.files);
+                                    // Aynı dosya tekrar seçilebilsin diye sıfırla.
+                                    e.target.value = '';
+                                }}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isInsertingImage}
+                                aria-label="Sayfaya fotoğraf ekle"
+                                className="p-2.5 rounded-xl text-slate-400 hover:text-sky-300 hover:bg-sky-400/10 transition-all disabled:opacity-40"
+                                title="Fotoğraf Ekle"
+                            >
+                                {isInsertingImage ? (
+                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                ) : (
+                                    <ImagePlus className="w-5 h-5" />
+                                )}
+                            </button>
+                        </>
+                    )}
                     {onTextBoxModeToggle && (
                         <button
                             type="button"
@@ -593,6 +645,7 @@ export function DrawingToolbar({
                         </button>
                     )}
                 </div>
+
             </div>
 
             <AnimatePresence>
@@ -603,7 +656,7 @@ export function DrawingToolbar({
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                         role="radiogroup"
                         aria-label="Arka Plan"
-                        className="flex items-center gap-2 bg-[#1a1b26]/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 shadow-2xl"
+                        className="pointer-events-auto flex items-center gap-2 bg-[#1a1b26]/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 shadow-2xl"
                     >
                         <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider shrink-0">
                             Arka Plan
@@ -630,5 +683,48 @@ export function DrawingToolbar({
                 )}
             </AnimatePresence>
         </motion.div>
+    );
+
+    return (
+        <>
+            {bar}
+            {onZoomIn && onZoomOut && (
+                // Yakınlaştırma, sürüklenebilir çubuğu şişirmemesi için
+                // ekranın sağ alt köşesinde ayrı durur.
+                <div
+                    role="group"
+                    aria-label="Yakınlaştırma"
+                    className="fixed bottom-4 right-4 z-[5000] flex items-center gap-0.5 bg-[#1a1b26]/95 backdrop-blur-md p-1 rounded-xl border border-white/10 shadow-xl"
+                >
+                    <button
+                        type="button"
+                        onClick={onZoomOut}
+                        aria-label="Uzaklaştır"
+                        title="Uzaklaştır"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                    >
+                        <Minus className="w-4 h-4" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onZoomReset}
+                        aria-label="Yakınlaştırmayı sıfırla"
+                        title="%100'e dön"
+                        className="min-w-[44px] px-1 py-1 rounded-lg text-[11.5px] font-bold text-slate-300 hover:text-white hover:bg-white/10 transition-all tabular-nums"
+                    >
+                        %{Math.round((zoom ?? 1) * 100)}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onZoomIn}
+                        aria-label="Yakınlaştır"
+                        title="Yakınlaştır"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                    >
+                        <Plus className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
+        </>
     );
 }

@@ -13,6 +13,7 @@ import {
     ChevronRight,
     Cloud,
     LayoutTemplate,
+    Layers,
     Loader2,
     Plus,
     Redo2,
@@ -30,6 +31,8 @@ import { fetchDocById, saveDocById } from '../../lib/firebase';
 import { cn } from '../../utils/cn';
 import { BG_COLORS } from '../../constants/drawing';
 import { PAPER_STYLES, paperBackground } from './paper';
+import { PageThumbnails } from './PageThumbnails';
+import { CONTENT_LIMIT_BYTES, importImageFile } from '../drawing/imageStore';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
@@ -41,6 +44,7 @@ import type {
     PaperStyle,
     Stroke,
     TextBoxData,
+    Viewport,
 } from '../../types';
 
 interface NotebookEditorProps {
@@ -110,6 +114,12 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const [isTextBoxMode, setIsTextBoxMode] = React.useState(false);
     const [history, setHistory] = React.useState({ canUndo: false, canRedo: false });
     const [showPaperMenu, setShowPaperMenu] = React.useState(false);
+    const [showPages, setShowPages] = React.useState(false);
+    const [view, setView] = React.useState<Viewport>({ scale: 1, tx: 0, ty: 0 });
+    const [canvasSize, setCanvasSize] = React.useState({ w: 1000, h: 700 });
+    const [isInsertingImage, setIsInsertingImage] = React.useState(false);
+    /** Küçük resim panelinde gösterilen sayfa verisi (gecikmeli tazelenir). */
+    const [thumbPages, setThumbPages] = React.useState<Stroke[][]>([]);
 
     const boxesRef = React.useRef<TextBoxData[][]>([[]]);
     boxesRef.current = boxesByPage;
@@ -151,10 +161,21 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             strokes: strokePages[i] ?? [],
             boxes: boxes[i] ?? [],
         }));
+        const pagesJson = JSON.stringify(pages);
+        // Firestore doküman sınırı 1 MiB. Fotoğraflar sayfa verisine gömüldüğü
+        // için sınırı aşan içerik daha kaydetmeden burada yakalanır; aksi halde
+        // sunucu hatası kullanıcıya sebebini söylemez.
+        if (pagesJson.length > CONTENT_LIMIT_BYTES) {
+            setSaveState('idle');
+            toast.error(
+                'Defter çok büyüdü (fotoğraflar sınırı aşıyor). Kaydedebilmek için bazı fotoğrafları silin.'
+            );
+            return;
+        }
         setSaveState('saving');
         try {
             await saveDocById('notebook_content', notebook.id, {
-                pages_json: JSON.stringify(pages),
+                pages_json: pagesJson,
                 updated_at: new Date().toISOString(),
             });
             onMetaChange({ page_count: pages.length, updated_at: new Date().toISOString() });
@@ -239,6 +260,52 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         [config.color, scheduleSave]
     );
 
+    const handleInsertImages = React.useCallback(
+        async (files: FileList | File[]) => {
+            const list = Array.from(files).filter((f) => f.type.startsWith('image/'));
+            if (list.length === 0) return;
+            setIsInsertingImage(true);
+            try {
+                for (const file of list) {
+                    const img = await importImageFile(file);
+                    canvasRef.current?.insertImage(img.dataUrl, img.width, img.height);
+                }
+                setConfig((c) => ({ ...c, tool: 'select' }));
+                scheduleSave();
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Fotoğraf eklenemedi.');
+            } finally {
+                setIsInsertingImage(false);
+            }
+        },
+        [scheduleSave, toast]
+    );
+
+    // Panodan yapıştırma (ekran görüntüsü / kopyalanan fotoğraf).
+    React.useEffect(() => {
+        const onPaste = (e: ClipboardEvent) => {
+            const target = e.target as HTMLElement | null;
+            if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return;
+            const files = Array.from(e.clipboardData?.files ?? []).filter((f) =>
+                f.type.startsWith('image/')
+            );
+            if (files.length === 0) return;
+            e.preventDefault();
+            void handleInsertImages(files);
+        };
+        window.addEventListener('paste', onPaste);
+        return () => window.removeEventListener('paste', onPaste);
+    }, [handleInsertImages]);
+
+    // ── Görünüm (yakınlaştırma / kaydırma) ───────────────────────────
+    const handleViewChange = React.useCallback(
+        (next: Viewport, size: { w: number; h: number }) => {
+            setView(next);
+            setCanvasSize((prev) => (prev.w === size.w && prev.h === size.h ? prev : size));
+        },
+        []
+    );
+
     // ── Sayfa yönetimi ───────────────────────────────────────────────
     const currentBoxes = boxesByPage[pageInfo.current] ?? [];
 
@@ -258,23 +325,55 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         scheduleSave();
     };
 
-    const handleDeletePage = async () => {
+    /**
+     * Sayfayı siler. Çizimler canvas'ta, yapışkan notlar burada tutulduğu
+     * için iki taraf da aynı sırayla güncellenmeli.
+     */
+    const handleDeletePage = async (index = pageInfo.current) => {
         const ok = await confirm({
             title: 'Sayfayı sil?',
-            message: `${pageInfo.current + 1}. sayfadaki tüm çizim ve notlar silinecek.`,
+            message: `${index + 1}. sayfadaki tüm çizim ve notlar silinecek.`,
             confirmLabel: 'Sil',
             cancelLabel: 'Vazgeç',
             variant: 'danger',
         });
         if (!ok) return;
-        const idx = pageInfo.current;
+        canvasRef.current?.goToPage(index);
         setBoxesByPage((prev) => {
             if (prev.length <= 1) return [[]];
             const next = [...prev];
-            next.splice(idx, 1);
+            next.splice(index, 1);
             return next;
         });
         canvasRef.current?.deletePage();
+        scheduleSave();
+    };
+
+    const handleDuplicatePage = (index: number) => {
+        canvasRef.current?.goToPage(index);
+        setBoxesByPage((prev) => {
+            const next = [...prev];
+            const copy = (next[index] ?? []).map((b) => ({
+                ...b,
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            }));
+            next.splice(index + 1, 0, copy);
+            return next;
+        });
+        canvasRef.current?.duplicatePage();
+        scheduleSave();
+    };
+
+    const handleMovePage = (from: number, to: number) => {
+        if (to < 0 || to >= pageInfo.total || from === to) return;
+        setBoxesByPage((prev) => {
+            const next = [...prev];
+            while (next.length < pageInfo.total) next.push([]);
+            const [moved] = next.splice(from, 1);
+            next.splice(to, 0, moved ?? []);
+            return next;
+        });
+        canvasRef.current?.movePage(from, to);
         scheduleSave();
     };
 
@@ -283,6 +382,16 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         setTitle(clean);
         if (clean !== notebook.title) onMetaChange({ title: clean });
     };
+
+    // Küçük resim paneli açıkken sayfa verisini gecikmeli topla; getPages()
+    // derin kopya ürettiği için her çizim darbesinde çağrılmamalı.
+    React.useEffect(() => {
+        if (!showPages || isLoading) return;
+        const timer = window.setTimeout(() => {
+            setThumbPages(canvasRef.current?.getPages() ?? []);
+        }, 350);
+        return () => window.clearTimeout(timer);
+    }, [showPages, isLoading, pageInfo, saveState, boxesByPage]);
 
     const currentPaper = PAPER_STYLES.find((p) => p.id === paper);
 
@@ -469,6 +578,21 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             {/* Sayfa şeridi */}
             <div className="flex items-center justify-center gap-2 py-1.5 bg-white border-b border-outline-variant flex-shrink-0">
                 <button
+                    onClick={() => setShowPages((v) => !v)}
+                    aria-pressed={showPages}
+                    title="Sayfa küçük resimleri"
+                    className={cn(
+                        'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12.5px] font-semibold transition-colors',
+                        showPages
+                            ? 'bg-primary/10 text-primary'
+                            : 'text-on-surface-variant hover:bg-surface-container-high'
+                    )}
+                >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Sayfalar</span>
+                </button>
+                <div className="w-px h-4 bg-outline-variant mx-1" />
+                <button
                     onClick={() => canvasRef.current?.prevPage()}
                     disabled={pageInfo.current === 0}
                     aria-label="Önceki sayfa"
@@ -497,7 +621,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 </button>
                 {pageInfo.total > 1 && (
                     <button
-                        onClick={handleDeletePage}
+                        onClick={() => void handleDeletePage()}
                         title="Bu sayfayı sil"
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12.5px] font-semibold text-red-500 hover:bg-red-50"
                     >
@@ -507,8 +631,28 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             </div>
 
             {/* Çalışma alanı */}
-            <div className="flex-1 min-h-0 relative overflow-hidden">
-                <div className="absolute inset-0" style={paperBackground(paper, bgColor)} />
+            <div className="flex-1 min-h-0 flex">
+                <PageThumbnails
+                    open={showPages}
+                    onClose={() => setShowPages(false)}
+                    pages={thumbPages}
+                    boxesByPage={boxesByPage}
+                    paper={paper}
+                    bgColor={bgColor}
+                    canvasSize={canvasSize}
+                    current={pageInfo.current}
+                    onSelect={(i) => canvasRef.current?.goToPage(i)}
+                    onAdd={handleAddPage}
+                    onDuplicate={handleDuplicatePage}
+                    onDelete={(i) => void handleDeletePage(i)}
+                    onMove={handleMovePage}
+                />
+
+                <div className="flex-1 min-w-0 relative overflow-hidden">
+                <div
+                    className="absolute inset-0"
+                    style={paperBackground(paper, bgColor, view, canvasSize)}
+                />
 
                 {isLoading || initialStrokes === null ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
@@ -531,6 +675,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                                 setHistory({ canUndo, canRedo })
                             }
                             onPageChange={(current, total) => setPageInfo({ current, total })}
+                            panMode="viewport"
+                            onViewChange={handleViewChange}
                             onRequestText={() =>
                                 prompt({
                                     title: 'Metin ekle',
@@ -542,6 +688,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         <TextBoxLayer
                             boxes={currentBoxes}
                             enabled={isTextBoxMode}
+                            view={view}
                             onAdd={(b) => updateCurrentBoxes((list) => [...list, b])}
                             onUpdate={(id, upd) =>
                                 updateCurrentBoxes((list) =>
@@ -554,6 +701,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         />
                     </>
                 )}
+                </div>
             </div>
 
             {/* Çizim araç çubuğu (sürüklenebilir) */}
@@ -576,6 +724,12 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 onInsertMath={handleInsertMath}
                 canUndo={history.canUndo}
                 canRedo={history.canRedo}
+                onInsertImages={(files) => void handleInsertImages(files)}
+                isInsertingImage={isInsertingImage}
+                zoom={view.scale}
+                onZoomIn={() => canvasRef.current?.zoomBy(1.25)}
+                onZoomOut={() => canvasRef.current?.zoomBy(0.8)}
+                onZoomReset={() => canvasRef.current?.resetView()}
             />
         </div>
     );

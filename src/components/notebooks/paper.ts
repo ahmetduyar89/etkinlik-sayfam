@@ -4,7 +4,7 @@
 // Basit desenler CSS gradyanıyla, tekrar etmeyen ya da karmaşık olanlar
 // (koordinat düzlemi, Cornell, nota, izometrik) satır içi SVG ile üretilir.
 
-import type { PaperStyle } from '../../types';
+import type { PaperStyle, Viewport } from '../../types';
 
 export interface PaperOption {
     id: PaperStyle;
@@ -33,24 +33,14 @@ export const PAPER_STYLES: ReadonlyArray<PaperOption> = [
 
 const LINE = 'rgba(15, 23, 42, 0.10)';
 const STRONG = 'rgba(15, 23, 42, 0.22)';
+const AXIS = 'rgba(15, 23, 42, 0.42)';
+const GRID_MID = 'rgba(15, 23, 42, 0.2)';
+
+const IDENTITY: Viewport = { scale: 1, tx: 0, ty: 0 };
 
 /** SVG dizesini CSS `url(...)` değerine çevirir. */
 const svgUrl = (svg: string): string =>
     `url("data:image/svg+xml,${encodeURIComponent(svg.replace(/\s+/g, ' ').trim())}")`;
-
-/**
- * Kutunun (ya da desen karesinin) tam ortasından geçen bir çizgi katmanı.
- * `background-position: center` ile birlikte kullanıldığında çizgiler
- * sayfanın merkezine tam oturur — koordinat ekseni bu şekilde üretilir.
- */
-const centerLine = (color: string, thickness: number, axis: 'h' | 'v'): string => {
-    const half = thickness / 2;
-    const dir = axis === 'h' ? 'to bottom' : 'to right';
-    return (
-        `linear-gradient(${dir}, transparent calc(50% - ${half}px), ${color} calc(50% - ${half}px),` +
-        ` ${color} calc(50% + ${half}px), transparent calc(50% + ${half}px))`
-    );
-};
 
 /** Tekrar eden bir SVG desen katmanı. */
 function tile(width: number, height: number, body: string): string {
@@ -59,41 +49,61 @@ function tile(width: number, height: number, body: string): string {
     );
 }
 
+/** Negatif değerler için de doğru çalışan modülo. */
+const wrap = (value: number, size: number): number =>
+    size > 0 ? ((value % size) + size) % size : 0;
+
 /**
  * Seçilen kağıt desenini CSS arka planına çevirir.
- * Koordinat düzleminde eksenler sayfanın ortasına oturması için
- * `backgroundPosition: center` kullanılır.
+ *
+ * Desen, çizim katmanıyla aynı dünya koordinatlarında durur: `view` verilince
+ * yakınlaştırma desen sıklığını, kaydırma ise desen başlangıcını değiştirir.
+ * `size` yalnızca koordinat düzleminde gerekir — eksenler sayfanın ortasına
+ * (dünya koordinatında `size / 2`) oturtulur.
  */
-export function paperBackground(paper: PaperStyle, bgColor: string): React.CSSProperties {
+export function paperBackground(
+    paper: PaperStyle,
+    bgColor: string,
+    view: Viewport = IDENTITY,
+    size?: { w: number; h: number }
+): React.CSSProperties {
     const base: React.CSSProperties = { backgroundColor: bgColor };
+    const k = view.scale;
+    // Tekrar eden katmanların ortak başlangıç noktası.
+    const origin = `${view.tx}px ${view.ty}px`;
+    const px = (n: number) => `${n * k}px`;
 
     switch (paper) {
         case 'grid':
             return {
                 ...base,
                 backgroundImage: `linear-gradient(${LINE} 1px, transparent 1px), linear-gradient(90deg, ${LINE} 1px, transparent 1px)`,
-                backgroundSize: '26px 26px',
+                backgroundSize: `${px(26)} ${px(26)}, ${px(26)} ${px(26)}`,
+                backgroundPosition: origin,
             };
 
         case 'lined':
             return {
                 ...base,
                 backgroundImage: `linear-gradient(${LINE} 1px, transparent 1px)`,
-                backgroundSize: '100% 30px',
+                backgroundSize: `100% ${px(30)}`,
+                backgroundPosition: origin,
             };
 
         case 'wide_lined':
             return {
                 ...base,
                 backgroundImage: `linear-gradient(${LINE} 1.5px, transparent 1.5px)`,
-                backgroundSize: '100% 48px',
+                backgroundSize: `100% ${px(48)}`,
+                backgroundPosition: origin,
             };
 
         case 'dotted':
             return {
                 ...base,
-                backgroundImage: `radial-gradient(${STRONG} 1.2px, transparent 1.2px)`,
-                backgroundSize: '24px 24px',
+                backgroundImage: `radial-gradient(${STRONG} ${Math.max(1, 1.2 * k)}px, transparent ${Math.max(1, 1.2 * k)}px)`,
+                backgroundSize: `${px(24)} ${px(24)}`,
+                backgroundPosition: origin,
             };
 
         // Milimetrik: 1 mm ince, 5 mm orta, 10 mm kalın çizgiler.
@@ -108,29 +118,55 @@ export function paperBackground(paper: PaperStyle, bgColor: string): React.CSSPr
                     `linear-gradient(rgba(15,23,42,0.2) 1px, transparent 1px)`,
                     `linear-gradient(90deg, rgba(15,23,42,0.2) 1px, transparent 1px)`,
                 ].join(', '),
-                backgroundSize: '8px 8px, 8px 8px, 40px 40px, 40px 40px, 80px 80px, 80px 80px',
+                backgroundSize: [
+                    `${px(8)} ${px(8)}`,
+                    `${px(8)} ${px(8)}`,
+                    `${px(40)} ${px(40)}`,
+                    `${px(40)} ${px(40)}`,
+                    `${px(80)} ${px(80)}`,
+                    `${px(80)} ${px(80)}`,
+                ].join(', '),
+                backgroundPosition: Array(6).fill(origin).join(', '),
             };
 
-        // Koordinat: kareli zemin + sayfanın tam ortasından geçen eksenler.
-        case 'coordinate':
+        // Koordinat: eksenler sayfanın ortasında, ızgara eksenlere hizalı.
+        case 'coordinate': {
+            const w = size?.w ?? 0;
+            const h = size?.h ?? 0;
+            // Eksenlerin ekran üzerindeki konumu (dünya orta noktası).
+            const axisX = (w / 2) * k + view.tx;
+            const axisY = (h / 2) * k + view.ty;
+            const minor = 28 * k;
+            const major = 140 * k;
             return {
                 ...base,
                 backgroundImage: [
-                    // Sayfanın tam ortasından geçen x ve y eksenleri
-                    centerLine('rgba(15,23,42,0.42)', 1.6, 'h'),
-                    centerLine('rgba(15,23,42,0.42)', 1.6, 'v'),
-                    // Beşer karede bir kalınlaşan ana ızgara
-                    centerLine('rgba(15,23,42,0.2)', 1, 'h'),
-                    centerLine('rgba(15,23,42,0.2)', 1, 'v'),
-                    // İnce birim ızgara
-                    centerLine(LINE, 1, 'h'),
-                    centerLine(LINE, 1, 'v'),
+                    `linear-gradient(to right, ${AXIS} 0, ${AXIS} 2px, transparent 2px)`,
+                    `linear-gradient(to bottom, ${AXIS} 0, ${AXIS} 2px, transparent 2px)`,
+                    `linear-gradient(90deg, ${GRID_MID} 1px, transparent 1px)`,
+                    `linear-gradient(${GRID_MID} 1px, transparent 1px)`,
+                    `linear-gradient(90deg, ${LINE} 1px, transparent 1px)`,
+                    `linear-gradient(${LINE} 1px, transparent 1px)`,
                 ].join(', '),
-                backgroundSize:
-                    '100% 100%, 100% 100%, 140px 140px, 140px 140px, 28px 28px, 28px 28px',
-                backgroundPosition: 'center center',
-                backgroundRepeat: 'no-repeat, no-repeat, repeat, repeat, repeat, repeat',
+                backgroundSize: [
+                    '100% 100%',
+                    '100% 100%',
+                    `${major}px 100%`,
+                    `100% ${major}px`,
+                    `${minor}px 100%`,
+                    `100% ${minor}px`,
+                ].join(', '),
+                backgroundPosition: [
+                    `${axisX - 1}px 0`,
+                    `0 ${axisY - 1}px`,
+                    `${wrap(axisX, major)}px 0`,
+                    `0 ${wrap(axisY, major)}px`,
+                    `${wrap(axisX, minor)}px 0`,
+                    `0 ${wrap(axisY, minor)}px`,
+                ].join(', '),
+                backgroundRepeat: 'no-repeat, no-repeat, repeat-x, repeat-y, repeat-x, repeat-y',
             };
+        }
 
         // İzometrik: 60°/120° eğik çizgiler + dikeyler.
         case 'isometric':
@@ -145,7 +181,8 @@ export function paperBackground(paper: PaperStyle, bgColor: string): React.CSSPr
                         <path d="M0 26 L0 78 M30 43 L30 95 M60 26 L60 78 M30 -9 L30 9" />
                      </g>`
                 ),
-                backgroundSize: '60px 104px',
+                backgroundSize: `${px(60)} ${px(104)}`,
+                backgroundPosition: origin,
             };
 
         // Güzel yazı: dört çizgi, üç aralık (ortadaki kesikli).
@@ -162,7 +199,8 @@ export function paperBackground(paper: PaperStyle, bgColor: string): React.CSSPr
                         <line x1="0" y1="60" x2="40" y2="60" stroke="rgba(15,23,42,0.20)" stroke-width="1.4" />
                      </g>`
                 ),
-                backgroundSize: '40px 72px',
+                backgroundSize: `${px(40)} ${px(72)}`,
+                backgroundPosition: origin,
             };
 
         // Cornell: solda anahtar kelime sütunu, altta özet bandı.
@@ -171,17 +209,15 @@ export function paperBackground(paper: PaperStyle, bgColor: string): React.CSSPr
             return {
                 ...base,
                 backgroundImage: [
-                    // Sol anahtar-kelime sütununu ayıran dikey çizgi
                     `linear-gradient(to right, transparent calc(26% - 1px), ${rule} calc(26% - 1px),` +
                         ` ${rule} calc(26% + 1px), transparent calc(26% + 1px))`,
-                    // Alttaki özet bandını ayıran yatay çizgi
                     `linear-gradient(to bottom, transparent calc(82% - 1px), ${rule} calc(82% - 1px),` +
                         ` ${rule} calc(82% + 1px), transparent calc(82% + 1px))`,
                     `linear-gradient(${LINE} 1px, transparent 1px)`,
                 ].join(', '),
-                backgroundSize: '100% 82%, 100% 100%, 100% 32px',
+                backgroundSize: `100% 82%, 100% 100%, 100% ${px(32)}`,
                 backgroundRepeat: 'no-repeat, no-repeat, repeat',
-                backgroundPosition: 'left top, left top, left top',
+                backgroundPosition: `left top, left top, ${origin}`,
             };
         }
 
@@ -200,7 +236,8 @@ export function paperBackground(paper: PaperStyle, bgColor: string): React.CSSPr
                         <line x1="0" y1="56" x2="40" y2="56" />
                      </g>`
                 ),
-                backgroundSize: '40px 96px',
+                backgroundSize: `${px(40)} ${px(96)}`,
+                backgroundPosition: origin,
             };
 
         // Kontrol listesi: her satırın başında kutucuk.
@@ -208,7 +245,6 @@ export function paperBackground(paper: PaperStyle, bgColor: string): React.CSSPr
             return {
                 ...base,
                 backgroundImage: [
-                    // Kutucuklar yalnızca sol sütunda, satır başına bir tane
                     tile(
                         40,
                         40,
@@ -216,9 +252,9 @@ export function paperBackground(paper: PaperStyle, bgColor: string): React.CSSPr
                     ),
                     `linear-gradient(${LINE} 1px, transparent 1px)`,
                 ].join(', '),
-                backgroundSize: '40px 40px, 100% 40px',
+                backgroundSize: `${px(40)} ${px(40)}, 100% ${px(40)}`,
                 backgroundRepeat: 'repeat-y, repeat',
-                backgroundPosition: '14px 6px, left 6px',
+                backgroundPosition: `${view.tx + 14 * k}px ${view.ty + 6 * k}px, ${view.tx}px ${view.ty + 6 * k}px`,
             };
 
         case 'blank':
