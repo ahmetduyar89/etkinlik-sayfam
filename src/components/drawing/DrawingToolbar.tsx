@@ -5,25 +5,36 @@ import {
     GripVertical,
     Grid,
     PaintBucket,
+    PenTool,
+    Redo,
     Shapes,
+    Sigma,
+    Sparkles,
     StickyNote,
     Trash2,
     Undo,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import type { DrawConfig, DrawingTool } from '../../types';
+import type { DrawConfig, DrawingTool, MathObject, PenType } from '../../types';
 import {
     BG_COLORS,
     DRAWING_COLORS,
     DRAWING_WIDTHS,
+    ERASER_MODES,
     MAIN_TOOLS,
     SHAPE_TOOL_IDS,
     STAMP_CATEGORIES,
     makeShapeTools,
 } from '../../constants/drawing';
+import { PEN_TYPES } from './penEngine';
+import { MathLibraryPanel } from './MathLibraryPanel';
 import { DashedLineIcon, SolidLineIcon } from './DrawingIcons';
 
-export type ToolbarCommand = 'UNDO_DRAWING' | 'CLEAR_DRAWING' | 'TOGGLE_WHITEBOARD';
+export type ToolbarCommand =
+    | 'UNDO_DRAWING'
+    | 'REDO_DRAWING'
+    | 'CLEAR_DRAWING'
+    | 'TOGGLE_WHITEBOARD';
 
 interface DrawingToolbarProps {
     onCommand: (type: ToolbarCommand) => void;
@@ -36,6 +47,10 @@ interface DrawingToolbarProps {
     onScreenshot?: () => void;
     isTextBoxMode?: boolean;
     onTextBoxModeToggle?: () => void;
+    /** Matematik kütüphanesinden seçilen nesneyi sayfaya ekler. */
+    onInsertMath?: (math: MathObject) => void;
+    canUndo?: boolean;
+    canRedo?: boolean;
 }
 
 const shapeTools = makeShapeTools(SolidLineIcon, DashedLineIcon);
@@ -51,10 +66,26 @@ export function DrawingToolbar({
     onScreenshot,
     isTextBoxMode,
     onTextBoxModeToggle,
+    onInsertMath,
+    canUndo,
+    canRedo,
 }: DrawingToolbarProps) {
     const [showShapes, setShowShapes] = React.useState(false);
     const [showExtras, setShowExtras] = React.useState(false);
+    const [showPen, setShowPen] = React.useState(false);
+    const [showMath, setShowMath] = React.useState(false);
     const dragControls = useDragControls();
+
+    const penType: PenType = config.penType ?? 'ballpoint';
+    const eraserMode = config.eraserMode ?? 'pixel';
+
+    /** Aynı anda tek bir açılır panel görünsün. */
+    const openOnly = (which: 'shapes' | 'pen' | 'math' | 'extras' | null) => {
+        setShowShapes(which === 'shapes');
+        setShowPen(which === 'pen');
+        setShowMath(which === 'math');
+        setShowExtras(which === 'extras');
+    };
 
     const isShapeTool =
         SHAPE_TOOL_IDS.includes(config.tool) || config.tool === 'stamp';
@@ -78,6 +109,150 @@ export function DrawingToolbar({
             className="fixed bottom-10 z-[5000] flex flex-col items-center gap-3 pointer-events-auto"
             style={{ touchAction: 'none' }}
         >
+            {onInsertMath && (
+                <MathLibraryPanel
+                    open={showMath}
+                    onClose={() => setShowMath(false)}
+                    onInsert={onInsertMath}
+                />
+            )}
+
+            <AnimatePresence>
+                {showPen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="flex flex-col gap-2.5 bg-[#1a1b26]/95 backdrop-blur-md p-3 rounded-2xl border border-white/10 shadow-2xl w-[min(92vw,430px)]"
+                        onPointerDown={(e) => e.stopPropagation()}
+                    >
+                        <div>
+                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                                Kalem Ucu
+                            </span>
+                            <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                                {PEN_TYPES.map((pen) => (
+                                    <button
+                                        key={pen.id}
+                                        type="button"
+                                        onClick={() => setConfig({ ...config, penType: pen.id })}
+                                        aria-pressed={penType === pen.id}
+                                        className={cn(
+                                            'text-left px-2.5 py-1.5 rounded-xl border transition-all',
+                                            penType === pen.id
+                                                ? 'bg-indigo-600/30 border-indigo-500/60'
+                                                : 'bg-white/[0.03] border-white/10 hover:bg-white/10'
+                                        )}
+                                    >
+                                        <span className="block text-[12.5px] font-bold text-white">
+                                            {pen.label}
+                                        </span>
+                                        <span className="block text-[10.5px] text-slate-400 leading-tight">
+                                            {pen.hint}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                                Silgi
+                            </span>
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                                {ERASER_MODES.map((mode) => (
+                                    <button
+                                        key={mode.id}
+                                        type="button"
+                                        onClick={() => setConfig({ ...config, eraserMode: mode.id })}
+                                        title={mode.hint}
+                                        aria-pressed={eraserMode === mode.id}
+                                        className={cn(
+                                            'px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition-all',
+                                            eraserMode === mode.id
+                                                ? 'bg-indigo-600/30 border-indigo-500/60 text-white'
+                                                : 'bg-white/[0.03] border-white/10 text-slate-300 hover:bg-white/10'
+                                        )}
+                                    >
+                                        {mode.label} silgi
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5 border-t border-white/10 pt-2.5">
+                            <button
+                                type="button"
+                                onClick={() => setConfig({ ...config, snapShapes: !config.snapShapes })}
+                                aria-pressed={!!config.snapShapes}
+                                className={cn(
+                                    'flex items-center justify-between gap-3 px-2.5 py-2 rounded-xl border transition-all text-left',
+                                    config.snapShapes
+                                        ? 'bg-emerald-600/25 border-emerald-500/60'
+                                        : 'bg-white/[0.03] border-white/10 hover:bg-white/10'
+                                )}
+                            >
+                                <span>
+                                    <span className="block text-[12.5px] font-bold text-white">
+                                        Şekil düzeltme
+                                    </span>
+                                    <span className="block text-[10.5px] text-slate-400 leading-tight">
+                                        Elle çizilen daire, kare, üçgen ve çizgiyi düzgün şekle çevirir
+                                    </span>
+                                </span>
+                                <span
+                                    className={cn(
+                                        'shrink-0 w-9 h-5 rounded-full transition-colors relative',
+                                        config.snapShapes ? 'bg-emerald-500' : 'bg-white/20'
+                                    )}
+                                >
+                                    <span
+                                        className={cn(
+                                            'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all',
+                                            config.snapShapes ? 'left-[18px]' : 'left-0.5'
+                                        )}
+                                    />
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setConfig({ ...config, snapAngle: !config.snapAngle })}
+                                aria-pressed={!!config.snapAngle}
+                                className={cn(
+                                    'flex items-center justify-between gap-3 px-2.5 py-2 rounded-xl border transition-all text-left',
+                                    config.snapAngle
+                                        ? 'bg-emerald-600/25 border-emerald-500/60'
+                                        : 'bg-white/[0.03] border-white/10 hover:bg-white/10'
+                                )}
+                            >
+                                <span>
+                                    <span className="block text-[12.5px] font-bold text-white">
+                                        Açı kilidi (15°)
+                                    </span>
+                                    <span className="block text-[10.5px] text-slate-400 leading-tight">
+                                        Çizgi ve okları 15°nin katlarına oturtur
+                                    </span>
+                                </span>
+                                <span
+                                    className={cn(
+                                        'shrink-0 w-9 h-5 rounded-full transition-colors relative',
+                                        config.snapAngle ? 'bg-emerald-500' : 'bg-white/20'
+                                    )}
+                                >
+                                    <span
+                                        className={cn(
+                                            'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all',
+                                            config.snapAngle ? 'left-[18px]' : 'left-0.5'
+                                        )}
+                                    />
+                                </span>
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <AnimatePresence>
                 {showShapes && (
                     <motion.div
@@ -208,7 +383,7 @@ export function DrawingToolbar({
 
                     <button
                         type="button"
-                        onClick={() => setShowShapes(!showShapes)}
+                        onClick={() => openOnly(showShapes ? null : 'shapes')}
                         aria-label="Şekiller ve damgalar"
                         aria-expanded={showShapes}
                         className={cn(
@@ -229,6 +404,25 @@ export function DrawingToolbar({
                         )}
                         {isShapeTool && config.tool !== 'stamp' && (
                             <div className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full border border-[#1a1b26]" />
+                        )}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => openOnly(showPen ? null : 'pen')}
+                        aria-label="Kalem ucu ve yazma ayarları"
+                        aria-expanded={showPen}
+                        title="Kalem ucu, silgi, şekil düzeltme"
+                        className={cn(
+                            'p-2.5 rounded-xl transition-all duration-200 relative',
+                            showPen
+                                ? 'bg-white/10 text-white'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        )}
+                    >
+                        <PenTool className="w-5 h-5" />
+                        {(config.snapShapes || penType !== 'ballpoint') && (
+                            <div className="absolute top-1 right-1 w-2 h-2 bg-indigo-400 rounded-full border border-[#1a1b26]" />
                         )}
                     </button>
                 </div>
@@ -286,11 +480,22 @@ export function DrawingToolbar({
                     <button
                         type="button"
                         onClick={() => onCommand('UNDO_DRAWING')}
+                        disabled={canUndo === false}
                         aria-label="Geri Al"
-                        className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                        className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
                         title="Geri Al"
                     >
                         <Undo className="w-5 h-5" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => onCommand('REDO_DRAWING')}
+                        disabled={canRedo === false}
+                        aria-label="İleri Al"
+                        className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                        title="İleri Al"
+                    >
+                        <Redo className="w-5 h-5" />
                     </button>
                     <button
                         type="button"
@@ -321,6 +526,24 @@ export function DrawingToolbar({
                 </div>
 
                 <div className="flex items-center gap-1 px-2">
+                    {onInsertMath && (
+                        <button
+                            type="button"
+                            onClick={() => openOnly(showMath ? null : 'math')}
+                            aria-label="Matematik nesne kütüphanesi"
+                            aria-expanded={showMath}
+                            className={cn(
+                                'p-2.5 rounded-xl transition-all relative',
+                                showMath
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'text-slate-400 hover:text-indigo-300 hover:bg-indigo-400/10'
+                            )}
+                            title="Matematik Kütüphanesi"
+                        >
+                            <Sigma className="w-5 h-5" />
+                            <Sparkles className="w-2.5 h-2.5 absolute top-1 right-1 text-indigo-300" />
+                        </button>
+                    )}
                     {onTextBoxModeToggle && (
                         <button
                             type="button"
@@ -352,7 +575,7 @@ export function DrawingToolbar({
                     {onBgColorChange && (
                         <button
                             type="button"
-                            onClick={() => setShowExtras((s) => !s)}
+                            onClick={() => openOnly(showExtras ? null : 'extras')}
                             aria-label="Arka plan rengi"
                             aria-expanded={showExtras}
                             className={cn(

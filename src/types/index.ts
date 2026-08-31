@@ -56,6 +56,7 @@ export type DrawingTool =
     | 'eraser'
     | 'text'
     | 'stamp'
+    | 'math'
     | 'rect'
     | 'circle'
     | 'triangle'
@@ -64,9 +65,17 @@ export type DrawingTool =
     | 'double_arrow'
     | 'dashed';
 
+/** Kalem ucu karakteri: yazma hissini belirler. */
+export type PenType = 'ballpoint' | 'fountain' | 'brush' | 'marker';
+
+/** Silgi davranışı: piksel silgisi mi, çizgiyi komple silen silgi mi. */
+export type EraserMode = 'pixel' | 'stroke';
+
 export interface Point {
     x: number;
     y: number;
+    /** 0..1 arası uç baskısı; dolma/fırça kalemde kalınlığı belirler. */
+    p?: number;
 }
 
 export interface BoundingBox {
@@ -84,6 +93,62 @@ export interface Stroke {
     points: Point[];
     text?: string;
     stampIcon?: string;
+    /** Serbest çizim kalemlerinde uç karakteri (varsayılan: ballpoint). */
+    penType?: PenType;
+    /** `tool === 'math'` olduğunda çizilecek matematik nesnesi. */
+    math?: MathObject;
+}
+
+/** Kütüphaneden eklenebilen hazır matematik/geometri nesneleri. */
+export type MathObjectKind =
+    // Koordinat & grafik
+    | 'axes'
+    | 'axes_q1'
+    | 'number_line'
+    | 'function_plot'
+    | 'unit_circle'
+    | 'polar_grid'
+    // Geometri
+    | 'angle'
+    | 'triangle_labeled'
+    | 'right_triangle'
+    | 'circle_parts'
+    | 'polygon'
+    | 'ruler_strip'
+    // Cisimler
+    | 'cube'
+    | 'rect_prism'
+    | 'cylinder'
+    | 'cone'
+    | 'sphere'
+    | 'pyramid'
+    // Sayılar & modelleme
+    | 'fraction_circle'
+    | 'fraction_bar'
+    | 'base_ten'
+    | 'hundred_grid'
+    | 'times_table'
+    | 'venn'
+    | 'clock'
+    | 'balance';
+
+/**
+ * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile
+ * verilen dikdörtgenin içine çizilir; böylece mevcut taşı/ölçekle mantığı
+ * hiçbir değişiklik olmadan çalışır.
+ */
+export interface MathObject {
+    kind: MathObjectKind;
+    /** Bölme/dilim/kenar sayısı (kesir paydası, çokgen kenarı, tablo boyutu…). */
+    n?: number;
+    /** Vurgulanan miktar (kesir payı, açı derecesi, saat…). */
+    k?: number;
+    /** Ek değer (saatte dakika, fonksiyonda x aralığı…). */
+    m?: number;
+    /** Fonksiyon grafiği için ifade, ör. "x^2 - 3". */
+    expr?: string;
+    /** Etiketler (sayı, derece, isim) çizilsin mi. */
+    labels?: boolean;
 }
 
 export interface DrawConfig {
@@ -92,6 +157,14 @@ export interface DrawConfig {
     width: number;
     fillEnabled: boolean;
     stampIcon: string;
+    /** Serbest çizim kaleminin ucu. */
+    penType?: PenType;
+    /** Serbest çizilen şekli tanıyıp düzgün şekle çevir. */
+    snapShapes?: boolean;
+    /** Şekil/çizgi çizerken 15° açı kilidi. */
+    snapAngle?: boolean;
+    /** Silgi davranışı. */
+    eraserMode?: EraserMode;
 }
 
 export interface TextBoxData {
@@ -116,7 +189,13 @@ export type DragState =
 
 export interface DrawingCanvasHandle {
     undo: () => void;
+    redo: () => void;
+    /** Geri al / ileri al yığınlarında iş var mı. */
+    canUndo: () => boolean;
+    canRedo: () => boolean;
     clear: () => void;
+    /** Kütüphaneden seçilen matematik nesnesini sayfanın ortasına ekler. */
+    insertMath: (math: MathObject, color?: string) => void;
     deleteSelected: () => void;
     setSelectedColor: (color: string) => void;
     duplicateSelected: () => void;
@@ -144,7 +223,19 @@ export interface ToastMessage {
 // ── Defter / Klasör (Not Defteri modülü) ────────────────────────────────
 export type NotebookKind = 'notebook' | 'whiteboard';
 
-export type PaperStyle = 'grid' | 'lined' | 'dotted' | 'blank';
+export type PaperStyle =
+    | 'grid'
+    | 'lined'
+    | 'dotted'
+    | 'blank'
+    | 'graph_mm'
+    | 'isometric'
+    | 'coordinate'
+    | 'cornell'
+    | 'music'
+    | 'handwriting'
+    | 'wide_lined'
+    | 'todo';
 
 export interface DriveFolder {
     id: string;
