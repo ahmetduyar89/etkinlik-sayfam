@@ -57,6 +57,8 @@ export type DrawingTool =
     | 'text'
     | 'stamp'
     | 'math'
+    | 'image'
+    | 'lasso'
     | 'rect'
     | 'circle'
     | 'triangle'
@@ -97,6 +99,18 @@ export interface Stroke {
     penType?: PenType;
     /** `tool === 'math'` olduğunda çizilecek matematik nesnesi. */
     math?: MathObject;
+    /** `tool === 'image'` olduğunda görselin data URL'i. */
+    src?: string;
+}
+
+/** Çalışma alanının yakınlaştırma ve kaydırma durumu. */
+export interface Viewport {
+    /** 1 = %100. */
+    scale: number;
+    /** Ekran uzayındaki yatay kaydırma (px). */
+    tx: number;
+    /** Ekran uzayındaki dikey kaydırma (px). */
+    ty: number;
 }
 
 /** Kütüphaneden eklenebilen hazır matematik/geometri nesneleri. */
@@ -176,14 +190,18 @@ export interface TextBoxData {
     fontSize: number;
 }
 
+/**
+ * Sürükleme durumu. `orig`, seçili çizimlerin sürükleme başındaki nokta
+ * listeleridir (seçim sırasıyla aynı hizada).
+ */
 export type DragState =
-    | { type: 'move'; startX: number; startY: number; origPoints: Point[] }
+    | { type: 'move'; startX: number; startY: number; orig: Point[][] }
     | {
           type: 'resize';
           handle: string;
           startX: number;
           startY: number;
-          origPoints: Point[];
+          orig: Point[][];
           origBB: BoundingBox;
       };
 
@@ -196,6 +214,13 @@ export interface DrawingCanvasHandle {
     clear: () => void;
     /** Kütüphaneden seçilen matematik nesnesini sayfanın ortasına ekler. */
     insertMath: (math: MathObject, color?: string) => void;
+    /** Sıkıştırılmış bir görseli sayfanın ortasına ekler. */
+    insertImage: (src: string, width: number, height: number) => void;
+    /** Görünümü verilen çarpanla yakınlaştırır (ekranın ortasına göre). */
+    zoomBy: (factor: number) => void;
+    /** Yakınlaştırmayı %100'e döndürür ve kaydırmayı sıfırlar. */
+    resetView: () => void;
+    getView: () => Viewport;
     deleteSelected: () => void;
     setSelectedColor: (color: string) => void;
     duplicateSelected: () => void;
@@ -203,6 +228,12 @@ export interface DrawingCanvasHandle {
     prevPage: () => void;
     addPage: () => void;
     deletePage: () => void;
+    /** Belirtilen sayfaya geçer. */
+    goToPage: (index: number) => void;
+    /** Geçerli sayfanın bir kopyasını hemen arkasına ekler. */
+    duplicatePage: () => void;
+    /** Sayfayı yeni sıraya taşır. */
+    movePage: (from: number, to: number) => void;
     getCurrentPage: () => number;
     getPageCount: () => number;
     /** Tüm sayfaların çizim verisini (kayıt için) döndürür. */

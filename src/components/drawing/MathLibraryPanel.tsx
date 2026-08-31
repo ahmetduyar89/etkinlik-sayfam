@@ -113,7 +113,7 @@ export function MathLibraryPanel({ open, onClose, onInsert }: MathLibraryPanelPr
                     exit={{ opacity: 0, y: 14, scale: 0.97 }}
                     role="dialog"
                     aria-label="Matematik nesne kütüphanesi"
-                    className="w-[min(92vw,620px)] max-h-[62vh] flex flex-col bg-[#1a1b26]/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden"
+                    className="pointer-events-auto w-[min(92vw,620px)] max-h-[62vh] flex flex-col bg-[#1a1b26]/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden"
                     onPointerDown={(e) => e.stopPropagation()}
                 >
                     <div className="flex items-center gap-2 px-3 pt-3 pb-2 border-b border-white/10">

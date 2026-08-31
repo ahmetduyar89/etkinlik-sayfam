@@ -1,13 +1,22 @@
 import React from 'react';
 import { cn } from '../../utils/cn';
 import { Copy, Trash2 } from 'lucide-react';
-import {
-    DRAWING_COLORS,
-    HANDLE_CURSORS,
-} from '../../constants/drawing';
-import { drawVariableStroke, getPenProfile, samplePressure } from './penEngine';
+import { DRAWING_COLORS, HANDLE_CURSORS } from '../../constants/drawing';
+import { samplePressure } from './penEngine';
 import { recognizeShape, snapAngle } from './shapeRecognizer';
-import { drawMathObject, findMathItem } from './mathObjects';
+import { findMathItem } from './mathObjects';
+import { onImageReady } from './imageStore';
+import {
+    SHAPE_TOOLS,
+    drawStroke,
+    getBB,
+    getHandlePositions,
+    hitTest,
+    resizePoints,
+    strokeInPolygon,
+    strokeNearPoint,
+    unionBB,
+} from './strokeRenderer';
 import type {
     BoundingBox,
     DrawConfig,
@@ -16,6 +25,7 @@ import type {
     MathObject,
     Point,
     Stroke,
+    Viewport,
 } from '../../types';
 
 interface DrawingCanvasProps {
@@ -31,226 +41,27 @@ interface DrawingCanvasProps {
     onDirty?: () => void;
     /** Geri al / ileri al düğmelerinin durumunu dışarı bildirir. */
     onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
+    /**
+     * "El" aracının anlamı:
+     *  - `passthrough` (varsayılan): tuval tıklamaları geçirir, altındaki
+     *    etkinlik sayfası kaydırılabilir. Mevcut etkinlik ekranları böyle çalışır.
+     *  - `viewport`: el aracı çalışma alanını kaydırır, tekerlek ve çift parmak
+     *    yakınlaştırır. Defter/beyaz tahta bu kipi kullanır.
+     */
+    panMode?: 'passthrough' | 'viewport';
+    /**
+     * Yakınlaştırma/kaydırma ya da tuval boyutu değiştiğinde tetiklenir.
+     * `size`, kağıt deseninin çizimle aynı hizada durması için gerekir.
+     */
+    onViewChange?: (view: Viewport, size: { w: number; h: number }) => void;
 }
 
 /** Geri al yığınında tutulan en fazla adım sayısı. */
 const HISTORY_LIMIT = 80;
+const MIN_SCALE = 0.25;
+const MAX_SCALE = 5;
 
-const getBB = (s: Stroke): BoundingBox => {
-    let x1 = Math.min(...s.points.map((p) => p.x));
-    let y1 = Math.min(...s.points.map((p) => p.y));
-    let x2 = Math.max(...s.points.map((p) => p.x));
-    let y2 = Math.max(...s.points.map((p) => p.y));
-
-    if (s.tool === 'circle' && s.points.length >= 2) {
-        const p1 = s.points[0];
-        const p2 = s.points[s.points.length - 1];
-        const r = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
-        x1 = Math.min(x1, p1.x - r);
-        y1 = Math.min(y1, p1.y - r);
-        x2 = Math.max(x2, p1.x + r);
-        y2 = Math.max(y2, p1.y + r);
-    }
-
-    // Matematik nesneleri kutularına birebir oturur; serbest çizimde ise
-    // parmakla seçimi kolaylaştırmak için bol boşluk bırakılır.
-    const pad = s.tool === 'math' ? 6 : Math.max((s.width || 2) / 2 + 6, 24);
-    return {
-        x1: x1 - pad,
-        y1: y1 - pad,
-        x2: x2 + pad,
-        y2: y2 + pad,
-    };
-};
-
-const hitTest = (s: Stroke, x: number, y: number): boolean => {
-    const bb = getBB(s);
-    return x >= bb.x1 && x <= bb.x2 && y >= bb.y1 && y <= bb.y2;
-};
-
-const getHandlePositions = (bb: BoundingBox) => {
-    const { x1, y1, x2, y2 } = bb;
-    const mx = (x1 + x2) / 2;
-    const my = (y1 + y2) / 2;
-    return [
-        { id: 'nw', x: x1, y: y1 },
-        { id: 'n', x: mx, y: y1 },
-        { id: 'ne', x: x2, y: y1 },
-        { id: 'w', x: x1, y: my },
-        { id: 'e', x: x2, y: my },
-        { id: 'sw', x: x1, y: y2 },
-        { id: 's', x: mx, y: y2 },
-        { id: 'se', x: x2, y: y2 },
-    ];
-};
-
-const resizePoints = (
-    origPoints: Point[],
-    origBB: BoundingBox,
-    handle: string,
-    dx: number,
-    dy: number
-): Point[] => {
-    const { x1, y1, x2, y2 } = origBB;
-    const w = x2 - x1 || 1;
-    const h = y2 - y1 || 1;
-    const nb = { x1, y1, x2, y2 };
-    if (handle.includes('e')) nb.x2 = x2 + dx;
-    if (handle.includes('w')) nb.x1 = x1 + dx;
-    if (handle.includes('s')) nb.y2 = y2 + dy;
-    if (handle.includes('n')) nb.y1 = y1 + dy;
-    const sx = (nb.x2 - nb.x1) / w;
-    const sy = (nb.y2 - nb.y1) / h;
-    return origPoints.map((p) => ({
-        x: nb.x1 + (p.x - x1) * sx,
-        y: nb.y1 + (p.y - y1) * sy,
-    }));
-};
-
-const drawShape = (
-    tCtx: CanvasRenderingContext2D,
-    tool: string,
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    fill?: boolean
-) => {
-    tCtx.beginPath();
-    if (tool === 'rect') tCtx.rect(x1, y1, x2 - x1, y2 - y1);
-    else if (tool === 'circle')
-        tCtx.arc(
-            x1,
-            y1,
-            Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)),
-            0,
-            Math.PI * 2
-        );
-    else if (tool === 'triangle') {
-        tCtx.moveTo((x1 + x2) / 2, y1);
-        tCtx.lineTo(x2, y2);
-        tCtx.lineTo(x1, y2);
-        tCtx.closePath();
-    } else if (tool === 'line' || tool === 'dashed') {
-        tCtx.moveTo(x1, y1);
-        tCtx.lineTo(x2, y2);
-    } else if (tool === 'arrow' || tool === 'double_arrow') {
-        const h = 15;
-        const a = Math.atan2(y2 - y1, x2 - x1);
-        tCtx.moveTo(x1, y1);
-        tCtx.lineTo(x2, y2);
-        tCtx.stroke();
-        tCtx.beginPath();
-        tCtx.moveTo(x2, y2);
-        tCtx.lineTo(x2 - h * Math.cos(a - Math.PI / 6), y2 - h * Math.sin(a - Math.PI / 6));
-        tCtx.moveTo(x2, y2);
-        tCtx.lineTo(x2 - h * Math.cos(a + Math.PI / 6), y2 - h * Math.sin(a + Math.PI / 6));
-        if (tool === 'double_arrow') {
-            tCtx.moveTo(x1, y1);
-            tCtx.lineTo(x1 + h * Math.cos(a - Math.PI / 6), y1 + h * Math.sin(a - Math.PI / 6));
-            tCtx.moveTo(x1, y1);
-            tCtx.lineTo(x1 + h * Math.cos(a + Math.PI / 6), y1 + h * Math.sin(a + Math.PI / 6));
-        }
-    }
-    if (fill && !['line', 'dashed', 'arrow', 'double_arrow'].includes(tool)) {
-        tCtx.save();
-        tCtx.globalAlpha = 0.2;
-        tCtx.fill();
-        tCtx.restore();
-    }
-    tCtx.stroke();
-};
-
-/** Bir noktanın a–b doğru parçasına uzaklığı (çizgi silgisi için). */
-const distanceToSegment = (p: Point, a: Point, b: Point): number => {
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const lenSq = dx * dx + dy * dy;
-    if (lenSq < 1e-6) return Math.hypot(p.x - a.x, p.y - a.y);
-    let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
-    t = Math.max(0, Math.min(1, t));
-    return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
-};
-
-/**
- * Çizgi silgisi için gerçek yola göre isabet testi. Serbest çizim ve
- * doğru parçalarında segmentlere, diğerlerinde sınırlayıcı kutuya bakar.
- */
-const strokeNearPoint = (s: Stroke, x: number, y: number, radius: number): boolean => {
-    const p = { x, y };
-    const tolerance = radius + (s.width || 2) / 2;
-    if (['pencil', 'highlighter', 'eraser', 'line', 'dashed', 'arrow', 'double_arrow'].includes(s.tool)) {
-        if (s.points.length === 1) return Math.hypot(x - s.points[0].x, y - s.points[0].y) <= tolerance;
-        const pts =
-            ['line', 'dashed', 'arrow', 'double_arrow'].includes(s.tool)
-                ? [s.points[0], s.points[s.points.length - 1]]
-                : s.points;
-        for (let i = 1; i < pts.length; i++) {
-            if (distanceToSegment(p, pts[i - 1], pts[i]) <= tolerance) return true;
-        }
-        return false;
-    }
-    return hitTest(s, x, y);
-};
-
-const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke) => {
-    if (!s || s.points.length < 1) return;
-    if (s.tool === 'math') {
-        drawMathObject(tCtx, s);
-        return;
-    }
-    tCtx.save();
-    tCtx.strokeStyle = s.color;
-    tCtx.fillStyle = s.color;
-    tCtx.lineWidth = s.width || 2;
-    tCtx.lineCap = 'round';
-    tCtx.lineJoin = 'round';
-    if (s.tool === 'eraser') tCtx.globalCompositeOperation = 'destination-out';
-    if (s.tool === 'highlighter') tCtx.globalAlpha = 0.4;
-    if (s.tool === 'dashed') tCtx.setLineDash([12, 6]);
-
-    if (s.tool === 'pencil') {
-        // Kalem ucuna göre değişken kalınlık (dolma kalem / fırça hissi).
-        tCtx.globalAlpha *= getPenProfile(s.penType).alpha;
-        drawVariableStroke(tCtx, s, s.width || 2);
-        tCtx.restore();
-        return;
-    }
-
-    if (['highlighter', 'eraser'].includes(s.tool)) {
-        if (s.points.length < 2) {
-            tCtx.beginPath();
-            tCtx.arc(s.points[0].x, s.points[0].y, (s.width || 2) / 2, 0, Math.PI * 2);
-            tCtx.fill();
-        } else {
-            tCtx.beginPath();
-            tCtx.moveTo(s.points[0].x, s.points[0].y);
-            for (let i = 1; i < s.points.length - 1; i++) {
-                const mid = {
-                    x: (s.points[i].x + s.points[i + 1].x) / 2,
-                    y: (s.points[i].y + s.points[i + 1].y) / 2,
-                };
-                tCtx.quadraticCurveTo(s.points[i].x, s.points[i].y, mid.x, mid.y);
-            }
-            const last = s.points[s.points.length - 1];
-            if (last) tCtx.lineTo(last.x, last.y);
-            tCtx.stroke();
-        }
-    } else if (s.tool === 'text') {
-        tCtx.font = 'bold 20px Arial';
-        tCtx.fillText(s.text || '', s.points[0].x, s.points[0].y);
-    } else if (s.tool === 'stamp') {
-        tCtx.font = '44px serif';
-        tCtx.textAlign = 'center';
-        tCtx.textBaseline = 'middle';
-        tCtx.fillText(s.stampIcon || '', s.points[0].x, s.points[0].y);
-    } else {
-        const p1 = s.points[0];
-        const p2 = s.points[s.points.length - 1];
-        drawShape(tCtx, s.tool, p1.x, p1.y, p2.x, p2.y, s.fillEnabled);
-    }
-    tCtx.restore();
-};
+const IDENTITY_VIEW: Viewport = { scale: 1, tx: 0, ty: 0 };
 
 export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(
     function DrawingCanvas(
@@ -264,19 +75,39 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             initialPages,
             onDirty,
             onHistoryChange,
+            panMode = 'passthrough',
+            onViewChange,
         },
         ref
     ) {
         const canvasRef = React.useRef<HTMLCanvasElement>(null);
         const bufferCanvasRef = React.useRef<HTMLCanvasElement>(null);
-        const laserCanvasRef = React.useRef<HTMLCanvasElement>(null);
+        const overlayCanvasRef = React.useRef<HTMLCanvasElement>(null);
         const [, setStrokes] = React.useState<Stroke[]>([]);
         const currentStrokeRef = React.useRef<Stroke | null>(null);
-        const [selectedIdx, setSelectedIdx] = React.useState<number | null>(null);
+
+        const [selectedIdxs, setSelectedIdxs] = React.useState<number[]>([]);
         const [selBB, setSelBB] = React.useState<BoundingBox | null>(null);
-        const canvasRectRef = React.useRef<DOMRect | null>(null);
-        const selectedIdxRef = React.useRef<number | null>(null);
+        const selectedIdxsRef = React.useRef<number[]>([]);
+        const selBBRef = React.useRef<BoundingBox | null>(null);
         const dragStateRef = React.useRef<DragState | null>(null);
+        const lassoRef = React.useRef<Point[] | null>(null);
+
+        const viewportEnabled = panMode === 'viewport';
+        const viewRef = React.useRef<Viewport>({ ...IDENTITY_VIEW });
+        const [view, setViewState] = React.useState<Viewport>({ ...IDENTITY_VIEW });
+        const onViewChangeRef = React.useRef(onViewChange);
+        /** Aktif işaretçiler — çift parmak yakınlaştırmayı tanımak için. */
+        const pointersRef = React.useRef(new Map<number, Point>());
+        const pinchRef = React.useRef<{
+            dist: number;
+            scale: number;
+            centerX: number;
+            centerY: number;
+            tx: number;
+            ty: number;
+        } | null>(null);
+        const panRef = React.useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
 
         const pagesRef = React.useRef<Stroke[][]>(
             initialPages && initialPages.length ? initialPages.map((p) => [...p]) : [[]]
@@ -284,9 +115,6 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const currentPageRef = React.useRef(0);
         const onDirtyRef = React.useRef(onDirty);
 
-        // Geri al / ileri al: her adımda çizgi dizisinin sığ kopyası saklanır.
-        // Çizgiler asla yerinde değiştirilmez (kopyala-yaz), bu yüzden sığ
-        // kopya güvenlidir ve bellek maliyeti düşüktür.
         const historyRef = React.useRef<{ past: Stroke[][]; future: Stroke[][] }>({
             past: [],
             future: [],
@@ -295,17 +123,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
         const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null);
         const bufferCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
-        const laserCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
+        const overlayCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
         const strokesRef = React.useRef<Stroke[]>([...pagesRef.current[0]]);
         const isDrawingRef = React.useRef(false);
         const resizeFrameRef = React.useRef<number | null>(null);
         /** Sürükleme sırasında geçmişe yalnızca bir kez kayıt düşmek için. */
         const gestureDirtyRef = React.useRef(false);
-
-        const SHAPE_TOOLS = React.useMemo(
-            () => ['rect', 'circle', 'triangle', 'line', 'dashed', 'arrow', 'double_arrow'],
-            []
-        );
 
         const getCanvasSize = () => {
             const c = canvasRef.current;
@@ -314,10 +137,74 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             return { w: c.width / dpr, h: c.height / dpr };
         };
 
+        // ── Görünüm dönüşümleri ──────────────────────────────────────
+        const applyIdentity = (c: CanvasRenderingContext2D) => {
+            const dpr = window.devicePixelRatio || 1;
+            c.setTransform(dpr, 0, 0, dpr, 0, 0);
+        };
+
+        const applyView = (c: CanvasRenderingContext2D) => {
+            const dpr = window.devicePixelRatio || 1;
+            const v = viewRef.current;
+            c.setTransform(dpr * v.scale, 0, 0, dpr * v.scale, dpr * v.tx, dpr * v.ty);
+        };
+
+        /** İşaretçi olayını çalışma alanı (dünya) koordinatına çevirir. */
+        const toWorld = (clientX: number, clientY: number): Point => {
+            const canvas = canvasRef.current;
+            const rect = canvas?.getBoundingClientRect();
+            if (!canvas || !rect) return { x: 0, y: 0 };
+            // Üst katmanlarda CSS ölçeği varsa telafi et.
+            const cssX = rect.width ? canvas.offsetWidth / rect.width : 1;
+            const cssY = rect.height ? canvas.offsetHeight / rect.height : 1;
+            const sx = (clientX - rect.left) * cssX;
+            const sy = (clientY - rect.top) * cssY;
+            const v = viewRef.current;
+            return { x: (sx - v.tx) / v.scale, y: (sy - v.ty) / v.scale };
+        };
+
+        const toScreenPoint = (p: Point, v: Viewport): Point => ({
+            x: p.x * v.scale + v.tx,
+            y: p.y * v.scale + v.ty,
+        });
+
+        /** Şu anda görünen dünya dikdörtgeni. */
+        const visibleWorldRect = React.useCallback(() => {
+            const canvas = canvasRef.current;
+            const dpr = window.devicePixelRatio || 1;
+            const w = canvas ? canvas.width / dpr : 0;
+            const h = canvas ? canvas.height / dpr : 0;
+            const v = viewRef.current;
+            return { x: -v.tx / v.scale, y: -v.ty / v.scale, w: w / v.scale, h: h / v.scale };
+        }, []);
+
         const deselect = () => {
-            selectedIdxRef.current = null;
-            setSelectedIdx(null);
+            selectedIdxsRef.current = [];
+            selBBRef.current = null;
+            setSelectedIdxs([]);
             setSelBB(null);
+        };
+
+        const setSelection = (idxs: number[]) => {
+            selectedIdxsRef.current = idxs;
+            const bb = unionBB(
+                idxs.map((i) => strokesRef.current[i]).filter(Boolean).map(getBB)
+            );
+            selBBRef.current = bb;
+            setSelectedIdxs(idxs);
+            setSelBB(bb);
+        };
+
+        /** Seçim değiştikten sonra sınırlayıcı kutuyu tazeler. */
+        const refreshSelectionBB = () => {
+            const bb = unionBB(
+                selectedIdxsRef.current
+                    .map((i) => strokesRef.current[i])
+                    .filter(Boolean)
+                    .map(getBB)
+            );
+            selBBRef.current = bb;
+            setSelBB(bb);
         };
 
         React.useEffect(() => {
@@ -327,6 +214,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         React.useEffect(() => {
             onHistoryChangeRef.current = onHistoryChange;
         }, [onHistoryChange]);
+
+        React.useEffect(() => {
+            onViewChangeRef.current = onViewChange;
+        }, [onViewChange]);
 
         const notifyHistory = React.useCallback(() => {
             onHistoryChangeRef.current?.(
@@ -366,22 +257,73 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const { w, h } = getCanvasSize();
             if (w <= 0 || h <= 0) return;
 
+            applyIdentity(bCtx);
             bCtx.clearRect(0, 0, w, h);
+            applyView(bCtx);
             strokesRef.current.forEach((s) => drawStroke(bCtx, s));
 
+            applyIdentity(mainCtx);
             mainCtx.clearRect(0, 0, w, h);
             mainCtx.drawImage(buffer, 0, 0, w, h);
 
-            if (selectedIdxRef.current !== null && strokesRef.current[selectedIdxRef.current]) {
-                const bb = getBB(strokesRef.current[selectedIdxRef.current]);
+            // Seçim çerçevesi ekran uzayında çizilir ki kalınlığı sabit kalsın.
+            const bb = selBBRef.current;
+            if (bb && selectedIdxsRef.current.length > 0) {
+                const v = viewRef.current;
+                const a = toScreenPoint({ x: bb.x1, y: bb.y1 }, v);
+                const b = toScreenPoint({ x: bb.x2, y: bb.y2 }, v);
                 mainCtx.save();
                 mainCtx.strokeStyle = '#4f46e5';
                 mainCtx.lineWidth = 1.5;
                 mainCtx.setLineDash([5, 3]);
-                mainCtx.strokeRect(bb.x1, bb.y1, bb.x2 - bb.x1, bb.y2 - bb.y1);
+                mainCtx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+                // Çoklu seçimde her parçanın kendi çerçevesi soluk gösterilir.
+                if (selectedIdxsRef.current.length > 1) {
+                    mainCtx.strokeStyle = 'rgba(79,70,229,0.35)';
+                    mainCtx.lineWidth = 1;
+                    selectedIdxsRef.current.forEach((i) => {
+                        const s = strokesRef.current[i];
+                        if (!s) return;
+                        const sb = getBB(s);
+                        const p1 = toScreenPoint({ x: sb.x1, y: sb.y1 }, v);
+                        const p2 = toScreenPoint({ x: sb.x2, y: sb.y2 }, v);
+                        mainCtx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
+                    });
+                }
                 mainCtx.restore();
             }
         }, []);
+
+        /** Görünümü değiştirir ve yeniden çizer. */
+        const applyViewChange = React.useCallback(
+            (next: Viewport) => {
+                const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, next.scale));
+                const v = { scale, tx: next.tx, ty: next.ty };
+                viewRef.current = v;
+                setViewState(v);
+                onViewChangeRef.current?.(v, getCanvasSize());
+                redraw();
+            },
+            [redraw]
+        );
+
+        /** Ekrandaki bir noktayı sabit tutarak yakınlaştırır. */
+        const zoomAt = React.useCallback(
+            (factor: number, screenX: number, screenY: number) => {
+                const v = viewRef.current;
+                const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.scale * factor));
+                const k = scale / v.scale;
+                applyViewChange({
+                    scale,
+                    tx: screenX - (screenX - v.tx) * k,
+                    ty: screenY - (screenY - v.ty) * k,
+                });
+            },
+            [applyViewChange]
+        );
+
+        // Fotoğraf yüklenince sayfayı tazele.
+        React.useEffect(() => onImageReady(() => redraw()), [redraw]);
 
         const notifyPageChange = React.useCallback(() => {
             onPageChange?.(currentPageRef.current, pagesRef.current.length);
@@ -438,13 +380,17 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 },
                 insertMath: (math: MathObject, color?: string) => {
                     const item = findMathItem(math.kind);
-                    const { w, h } = getCanvasSize();
-                    const boxW = Math.min(item?.size.w ?? 320, Math.max(120, w - 60));
-                    const boxH = Math.min(item?.size.h ?? 280, Math.max(100, h - 60));
-                    // Sayfanın ortasına, üst üste eklenirse hafif kaydırarak yerleştir.
-                    const offset = (strokesRef.current.filter((st) => st.tool === 'math').length % 5) * 18;
-                    const x = Math.max(12, (w - boxW) / 2 + offset);
-                    const y = Math.max(12, (h - boxH) / 2 + offset);
+                    const vis = visibleWorldRect();
+                    const scale = viewRef.current.scale;
+                    // Ekranda hep benzer büyüklükte görünsün diye dünya boyutu
+                    // yakınlaştırmaya göre ölçeklenir.
+                    const boxW = Math.min((item?.size.w ?? 320) / scale, vis.w * 0.85);
+                    const boxH = Math.min((item?.size.h ?? 280) / scale, vis.h * 0.85);
+                    const offset =
+                        (strokesRef.current.filter((st) => st.tool === 'math').length % 5) *
+                        (18 / scale);
+                    const x = vis.x + (vis.w - boxW) / 2 + offset;
+                    const y = vis.y + (vis.h - boxH) / 2 + offset;
                     pushHistory();
                     const stroke: Stroke = {
                         tool: 'math',
@@ -457,54 +403,83 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         math: { ...item?.defaults, ...math },
                     };
                     strokesRef.current.push(stroke);
-                    const idx = strokesRef.current.length - 1;
-                    selectedIdxRef.current = idx;
                     commitStrokes();
-                    setSelectedIdx(idx);
-                    setSelBB(getBB(stroke));
+                    setSelection([strokesRef.current.length - 1]);
                     redraw();
                 },
+                insertImage: (src: string, width: number, height: number) => {
+                    const vis = visibleWorldRect();
+                    const maxW = vis.w * 0.6;
+                    const maxH = vis.h * 0.6;
+                    const ratio = Math.min(maxW / width, maxH / height, 1 / viewRef.current.scale);
+                    const w = width * ratio;
+                    const h = height * ratio;
+                    const x = vis.x + (vis.w - w) / 2;
+                    const y = vis.y + (vis.h - h) / 2;
+                    pushHistory();
+                    const stroke: Stroke = {
+                        tool: 'image',
+                        color: '#000000',
+                        src,
+                        points: [
+                            { x, y },
+                            { x: x + w, y: y + h },
+                        ],
+                    };
+                    strokesRef.current.push(stroke);
+                    commitStrokes();
+                    setSelection([strokesRef.current.length - 1]);
+                    redraw();
+                },
+                zoomBy: (factor: number) => {
+                    const { w, h } = getCanvasSize();
+                    zoomAt(factor, w / 2, h / 2);
+                },
+                resetView: () => applyViewChange({ ...IDENTITY_VIEW }),
+                getView: () => ({ ...viewRef.current }),
                 deleteSelected: () => {
-                    if (selectedIdxRef.current !== null) {
-                        pushHistory();
-                        strokesRef.current = strokesRef.current.filter(
-                            (_, i) => i !== selectedIdxRef.current
-                        );
-                        commitStrokes();
-                        deselect();
-                        redraw();
-                    }
+                    const idxs = new Set(selectedIdxsRef.current);
+                    if (idxs.size === 0) return;
+                    pushHistory();
+                    strokesRef.current = strokesRef.current.filter((_, i) => !idxs.has(i));
+                    commitStrokes();
+                    deselect();
+                    redraw();
                 },
                 setSelectedColor: (color: string) => {
-                    const idx = selectedIdxRef.current;
-                    if (idx !== null && strokesRef.current[idx]) {
-                        pushHistory();
-                        strokesRef.current = strokesRef.current.map((st, i) =>
-                            i === idx ? { ...st, color } : st
-                        );
-                        commitStrokes();
-                        setSelBB({ ...getBB(strokesRef.current[idx]) });
-                        redraw();
-                    }
+                    const idxs = new Set(selectedIdxsRef.current);
+                    if (idxs.size === 0) return;
+                    pushHistory();
+                    strokesRef.current = strokesRef.current.map((st, i) =>
+                        idxs.has(i) ? { ...st, color } : st
+                    );
+                    commitStrokes();
+                    refreshSelectionBB();
+                    redraw();
                 },
                 duplicateSelected: () => {
-                    if (
-                        selectedIdxRef.current !== null &&
-                        strokesRef.current[selectedIdxRef.current]
-                    ) {
-                        const copy: Stroke = JSON.parse(
-                            JSON.stringify(strokesRef.current[selectedIdxRef.current])
-                        );
-                        copy.points = copy.points.map((p) => ({ ...p, x: p.x + 20, y: p.y + 20 }));
-                        pushHistory();
-                        strokesRef.current.push(copy);
-                        const newIdx = strokesRef.current.length - 1;
-                        selectedIdxRef.current = newIdx;
-                        commitStrokes();
-                        setSelectedIdx(newIdx);
-                        setSelBB(getBB(copy));
-                        redraw();
-                    }
+                    const idxs = selectedIdxsRef.current;
+                    if (idxs.length === 0) return;
+                    const offset = 20 / viewRef.current.scale;
+                    const copies = idxs
+                        .map((i) => strokesRef.current[i])
+                        .filter(Boolean)
+                        .map((s) => {
+                            const copy: Stroke = JSON.parse(JSON.stringify(s));
+                            copy.points = copy.points.map((p) => ({
+                                ...p,
+                                x: p.x + offset,
+                                y: p.y + offset,
+                            }));
+                            return copy;
+                        });
+                    if (copies.length === 0) return;
+                    pushHistory();
+                    const first = strokesRef.current.length;
+                    strokesRef.current.push(...copies);
+                    commitStrokes();
+                    setSelection(copies.map((_, i) => first + i));
+                    redraw();
                 },
                 nextPage: () => {
                     if (currentPageRef.current < pagesRef.current.length - 1)
@@ -513,10 +488,49 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 prevPage: () => {
                     if (currentPageRef.current > 0) switchPage(currentPageRef.current - 1);
                 },
+                goToPage: (index: number) => {
+                    if (index >= 0 && index < pagesRef.current.length && index !== currentPageRef.current)
+                        switchPage(index);
+                },
                 addPage: () => {
                     pagesRef.current[currentPageRef.current] = [...strokesRef.current];
                     pagesRef.current.push([]);
                     switchPage(pagesRef.current.length - 1);
+                },
+                duplicatePage: () => {
+                    pagesRef.current[currentPageRef.current] = [...strokesRef.current];
+                    const copy: Stroke[] = JSON.parse(
+                        JSON.stringify(pagesRef.current[currentPageRef.current])
+                    );
+                    pagesRef.current.splice(currentPageRef.current + 1, 0, copy);
+                    switchPage(currentPageRef.current + 1);
+                },
+                movePage: (from: number, to: number) => {
+                    const pages = pagesRef.current;
+                    if (
+                        from === to ||
+                        from < 0 ||
+                        to < 0 ||
+                        from >= pages.length ||
+                        to >= pages.length
+                    )
+                        return;
+                    pages[currentPageRef.current] = [...strokesRef.current];
+                    const [moved] = pages.splice(from, 1);
+                    pages.splice(to, 0, moved);
+                    // Taşınan sayfa açıksa onunla birlikte git.
+                    let next = currentPageRef.current;
+                    if (currentPageRef.current === from) next = to;
+                    else if (from < currentPageRef.current && to >= currentPageRef.current) next -= 1;
+                    else if (from > currentPageRef.current && to <= currentPageRef.current) next += 1;
+                    currentPageRef.current = next;
+                    strokesRef.current = [...(pages[next] || [])];
+                    setStrokes([...strokesRef.current]);
+                    deselect();
+                    resetHistory();
+                    commitStrokes();
+                    window.setTimeout(redraw, 0);
+                    notifyPageChange();
                 },
                 deletePage: () => {
                     if (pagesRef.current.length <= 1) {
@@ -527,10 +541,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         return;
                     }
                     pagesRef.current.splice(currentPageRef.current, 1);
-                    const newIdx = Math.min(
-                        currentPageRef.current,
-                        pagesRef.current.length - 1
-                    );
+                    const newIdx = Math.min(currentPageRef.current, pagesRef.current.length - 1);
                     currentPageRef.current = newIdx;
                     strokesRef.current = [...pagesRef.current[newIdx]];
                     commitStrokes();
@@ -562,7 +573,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 },
                 screenshot: (wbMode: boolean, color: string) => {
                     const canvas = canvasRef.current;
-                    if (!canvas) return;
+                    const buffer = bufferCanvasRef.current;
+                    if (!canvas || !buffer) return;
                     const exp = document.createElement('canvas');
                     exp.width = canvas.width;
                     exp.height = canvas.height;
@@ -570,31 +582,39 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     if (!ctx) return;
                     const dpr = window.devicePixelRatio || 1;
                     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                    const w = canvas.width / dpr;
+                    const h = canvas.height / dpr;
                     if (wbMode) {
                         ctx.fillStyle = color || '#ffffff';
-                        ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+                        ctx.fillRect(0, 0, w, h);
                     }
-                    ctx.drawImage(
-                        canvas,
-                        0,
-                        0,
-                        canvas.width / dpr,
-                        canvas.height / dpr
-                    );
+                    // Seçim çerçevesi görüntüye girmesin diye tampon kullanılır.
+                    ctx.drawImage(buffer, 0, 0, w, h);
                     const link = document.createElement('a');
                     link.download = `cizim-sayfa${currentPageRef.current + 1}.png`;
                     link.href = exp.toDataURL('image/png');
                     link.click();
                 },
             }),
-            [commitStrokes, notifyHistory, notifyPageChange, pushHistory, redraw, resetHistory, switchPage]
+            [
+                applyViewChange,
+                commitStrokes,
+                notifyHistory,
+                notifyPageChange,
+                pushHistory,
+                redraw,
+                resetHistory,
+                switchPage,
+                visibleWorldRect,
+                zoomAt,
+            ]
         );
 
         const resize = React.useCallback(() => {
             if (isDrawingRef.current) return;
             const canvas = canvasRef.current;
             const buffer = bufferCanvasRef.current;
-            const laser = laserCanvasRef.current;
+            const overlay = overlayCanvasRef.current;
             if (!canvas || !buffer) return;
 
             const dpr = window.devicePixelRatio || 1;
@@ -611,7 +631,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
 
-            [canvas, buffer, laser].forEach((c) => {
+            [canvas, buffer, overlay].forEach((c) => {
                 if (!c) return;
                 c.width = w * dpr;
                 c.height = h * dpr;
@@ -620,24 +640,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             });
 
             ctxRef.current = canvas.getContext('2d');
-            if (ctxRef.current) {
-                ctxRef.current.setTransform(1, 0, 0, 1, 0, 0);
-                ctxRef.current.scale(dpr, dpr);
-            }
-
             bufferCtxRef.current = buffer.getContext('2d');
-            if (bufferCtxRef.current) {
-                bufferCtxRef.current.setTransform(1, 0, 0, 1, 0, 0);
-                bufferCtxRef.current.scale(dpr, dpr);
-            }
-
-            if (laser) {
-                laserCtxRef.current = laser.getContext('2d');
-                if (laserCtxRef.current) {
-                    laserCtxRef.current.setTransform(1, 0, 0, 1, 0, 0);
-                    laserCtxRef.current.scale(dpr, dpr);
-                }
-            }
+            if (overlay) overlayCtxRef.current = overlay.getContext('2d');
+            [ctxRef.current, bufferCtxRef.current, overlayCtxRef.current].forEach((c) => {
+                if (c) applyIdentity(c);
+            });
+            onViewChangeRef.current?.(viewRef.current, { w, h });
             redraw();
         }, [redraw]);
 
@@ -670,6 +678,35 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             };
         }, [resize]);
 
+        // Tekerlek: Ctrl/⌘ ile yakınlaştırma, düz kaydırma ile gezinme.
+        React.useEffect(() => {
+            const canvas = canvasRef.current;
+            if (!canvas || !viewportEnabled || !enabled) return;
+            const onWheel = (e: WheelEvent) => {
+                e.preventDefault();
+                const rect = canvas.getBoundingClientRect();
+                const sx = e.clientX - rect.left;
+                const sy = e.clientY - rect.top;
+                if (e.ctrlKey || e.metaKey) {
+                    zoomAt(Math.exp(-e.deltaY / 320), sx, sy);
+                } else {
+                    const v = viewRef.current;
+                    applyViewChange({ ...v, tx: v.tx - e.deltaX, ty: v.ty - e.deltaY });
+                }
+            };
+            canvas.addEventListener('wheel', onWheel, { passive: false });
+            return () => canvas.removeEventListener('wheel', onWheel);
+        }, [applyViewChange, enabled, viewportEnabled, zoomAt]);
+
+        /** Devam eden çizimi iptal eder (çift parmak dokunuşunda). */
+        const cancelCurrentStroke = () => {
+            if (!isDrawingRef.current && !currentStrokeRef.current) return;
+            isDrawingRef.current = false;
+            currentStrokeRef.current = null;
+            lassoRef.current = null;
+            redraw();
+        };
+
         /** Verilen noktaya değen çizgilerin tamamını kaldırır. */
         const eraseStrokesAt = (x: number, y: number) => {
             const radius = Math.max(6, config.width * 3);
@@ -684,15 +721,89 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             redraw();
         };
 
+        /** Kement önizlemesini üst katmana çizer. */
+        const drawLassoPreview = () => {
+            const oCtx = overlayCtxRef.current;
+            const poly = lassoRef.current;
+            const { w, h } = getCanvasSize();
+            if (!oCtx) return;
+            applyIdentity(oCtx);
+            oCtx.clearRect(0, 0, w, h);
+            if (!poly || poly.length < 2) return;
+            const v = viewRef.current;
+            oCtx.save();
+            oCtx.strokeStyle = '#4f46e5';
+            oCtx.fillStyle = 'rgba(79,70,229,0.10)';
+            oCtx.lineWidth = 1.5;
+            oCtx.setLineDash([6, 4]);
+            oCtx.beginPath();
+            poly.forEach((p, i) => {
+                const s = toScreenPoint(p, v);
+                if (i === 0) oCtx.moveTo(s.x, s.y);
+                else oCtx.lineTo(s.x, s.y);
+            });
+            oCtx.closePath();
+            oCtx.fill();
+            oCtx.stroke();
+            oCtx.restore();
+        };
+
+        const clearOverlay = () => {
+            const oCtx = overlayCtxRef.current;
+            if (!oCtx) return;
+            const { w, h } = getCanvasSize();
+            applyIdentity(oCtx);
+            oCtx.clearRect(0, 0, w, h);
+        };
+
         const startDrawing = async (e: React.PointerEvent) => {
-            if (!enabled || ['pan', 'sun'].includes(config.tool)) return;
-            const rect = canvasRef.current?.getBoundingClientRect();
-            if (!rect) return;
-            canvasRectRef.current = rect;
-            const scaleX = rect.width ? (canvasRef.current?.offsetWidth || 1) / rect.width : 1;
-            const scaleY = rect.height ? (canvasRef.current?.offsetHeight || 1) / rect.height : 1;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
+            if (!enabled) return;
+            pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+            // Çift parmak: yakınlaştırma/kaydırma kipine geç.
+            if (viewportEnabled && pointersRef.current.size === 2) {
+                cancelCurrentStroke();
+                clearOverlay();
+                const [a, b] = [...pointersRef.current.values()];
+                const canvas = canvasRef.current;
+                const rect = canvas?.getBoundingClientRect();
+                pinchRef.current = {
+                    dist: Math.hypot(b.x - a.x, b.y - a.y) || 1,
+                    scale: viewRef.current.scale,
+                    centerX: (a.x + b.x) / 2 - (rect?.left ?? 0),
+                    centerY: (a.y + b.y) / 2 - (rect?.top ?? 0),
+                    tx: viewRef.current.tx,
+                    ty: viewRef.current.ty,
+                };
+                return;
+            }
+            if (pointersRef.current.size > 1) return;
+
+            if (config.tool === 'sun') return;
+
+            // El aracı: defterde çalışma alanını kaydırır, etkinlik ekranlarında
+            // tıklamaları alttaki sayfaya geçirir (tuval zaten pointer-events:none).
+            if (config.tool === 'pan') {
+                if (!viewportEnabled) return;
+                panRef.current = {
+                    x: e.clientX,
+                    y: e.clientY,
+                    tx: viewRef.current.tx,
+                    ty: viewRef.current.ty,
+                };
+                return;
+            }
+
+            const { x, y } = toWorld(e.clientX, e.clientY);
+
+            // Kement: serbest bir çerçeve çizip içine düşenleri seçer.
+            if (config.tool === 'lasso') {
+                deselect();
+                lassoRef.current = [{ x, y }];
+                isDrawingRef.current = true;
+                redraw();
+                return;
+            }
 
             // Çizgi silgisi: dokunulan çizginin tamamını kaldırır.
             if (config.tool === 'eraser' && config.eraserMode === 'stroke') {
@@ -703,39 +814,55 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
 
             if (config.tool === 'select') {
-                if (selectedIdxRef.current !== null && selBB) {
-                    for (const h of getHandlePositions(selBB)) {
-                        if (Math.hypot(x - h.x, y - h.y) < 10) {
-                            const s = strokesRef.current[selectedIdxRef.current];
+                const bb = selBBRef.current;
+                if (selectedIdxsRef.current.length > 0 && bb) {
+                    const v = viewRef.current;
+                    // Tutamaçlar ekran uzayında sabit büyüklükte olduğu için
+                    // yakınlık testi de ekran uzayında yapılır.
+                    const screen = toScreenPoint({ x, y }, v);
+                    for (const h of getHandlePositions(bb)) {
+                        const hs = toScreenPoint(h, v);
+                        if (Math.hypot(screen.x - hs.x, screen.y - hs.y) < 12) {
                             gestureDirtyRef.current = false;
                             dragStateRef.current = {
                                 type: 'resize',
                                 handle: h.id,
                                 startX: x,
                                 startY: y,
-                                origPoints: JSON.parse(JSON.stringify(s.points)),
-                                origBB: { ...selBB },
+                                orig: selectedIdxsRef.current.map((i) =>
+                                    JSON.parse(JSON.stringify(strokesRef.current[i].points))
+                                ),
+                                origBB: { ...bb },
                             };
                             return;
                         }
                     }
-                    if (x >= selBB.x1 && x <= selBB.x2 && y >= selBB.y1 && y <= selBB.y2) {
-                        const s = strokesRef.current[selectedIdxRef.current];
+                    if (x >= bb.x1 && x <= bb.x2 && y >= bb.y1 && y <= bb.y2) {
                         gestureDirtyRef.current = false;
                         dragStateRef.current = {
                             type: 'move',
                             startX: x,
                             startY: y,
-                            origPoints: JSON.parse(JSON.stringify(s.points)),
+                            orig: selectedIdxsRef.current.map((i) =>
+                                JSON.parse(JSON.stringify(strokesRef.current[i].points))
+                            ),
                         };
                         return;
                     }
                 }
                 for (let i = strokesRef.current.length - 1; i >= 0; i--) {
                     if (hitTest(strokesRef.current[i], x, y)) {
-                        selectedIdxRef.current = i;
-                        setSelectedIdx(i);
-                        setSelBB(getBB(strokesRef.current[i]));
+                        // Shift ile tıklamak seçime ekler/çıkarır.
+                        if (e.shiftKey) {
+                            const current = selectedIdxsRef.current;
+                            setSelection(
+                                current.includes(i)
+                                    ? current.filter((n) => n !== i)
+                                    : [...current, i]
+                            );
+                        } else {
+                            setSelection([i]);
+                        }
                         redraw();
                         return;
                     }
@@ -745,15 +872,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
 
-            if (selectedIdxRef.current !== null) {
+            if (selectedIdxsRef.current.length > 0) {
                 deselect();
                 redraw();
             }
 
             if (config.tool === 'text') {
-                const val = onRequestText
-                    ? await onRequestText()
-                    : window.prompt('Metin girin:');
+                const val = onRequestText ? await onRequestText() : window.prompt('Metin girin:');
                 if (val && val.trim()) {
                     const s: Stroke = {
                         tool: 'text',
@@ -781,6 +906,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 redraw();
                 return;
             }
+
             isDrawingRef.current = true;
             const first: Point = { x, y };
             if (config.tool === 'pencil') {
@@ -803,35 +929,70 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         };
 
         const draw = (e: React.PointerEvent) => {
-            const rect = canvasRectRef.current || canvasRef.current?.getBoundingClientRect();
-            if (!rect) return;
-            const scaleX = rect.width ? (canvasRef.current?.offsetWidth || 1) / rect.width : 1;
-            const scaleY = rect.height ? (canvasRef.current?.offsetHeight || 1) / rect.height : 1;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
+            if (pointersRef.current.has(e.pointerId)) {
+                pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            }
 
-            if (
-                config.tool === 'select' &&
-                dragStateRef.current &&
-                selectedIdxRef.current !== null
-            ) {
+            // Çift parmak yakınlaştırma
+            const pinch = pinchRef.current;
+            if (pinch && pointersRef.current.size >= 2) {
+                const [a, b] = [...pointersRef.current.values()];
+                const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+                const scale = Math.min(
+                    MAX_SCALE,
+                    Math.max(MIN_SCALE, (pinch.scale * dist) / pinch.dist)
+                );
+                const k = scale / pinch.scale;
+                applyViewChange({
+                    scale,
+                    tx: pinch.centerX - (pinch.centerX - pinch.tx) * k,
+                    ty: pinch.centerY - (pinch.centerY - pinch.ty) * k,
+                });
+                return;
+            }
+
+            // El aracıyla kaydırma
+            const pan = panRef.current;
+            if (pan) {
+                applyViewChange({
+                    scale: viewRef.current.scale,
+                    tx: pan.tx + (e.clientX - pan.x),
+                    ty: pan.ty + (e.clientY - pan.y),
+                });
+                return;
+            }
+
+            const { x, y } = toWorld(e.clientX, e.clientY);
+
+            if (config.tool === 'lasso' && isDrawingRef.current && lassoRef.current) {
+                const last = lassoRef.current[lassoRef.current.length - 1];
+                if (Math.hypot(x - last.x, y - last.y) * viewRef.current.scale >= 3) {
+                    lassoRef.current.push({ x, y });
+                    drawLassoPreview();
+                }
+                return;
+            }
+
+            if (config.tool === 'select' && dragStateRef.current && selectedIdxsRef.current.length) {
                 const drag = dragStateRef.current;
                 const dx = x - drag.startX;
                 const dy = y - drag.startY;
-                const idx = selectedIdxRef.current;
-                const s = strokesRef.current[idx];
                 if (!gestureDirtyRef.current) {
                     pushHistory();
                     gestureDirtyRef.current = true;
                 }
-                const points =
-                    drag.type === 'move'
-                        ? drag.origPoints.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy }))
-                        : resizePoints(drag.origPoints, drag.origBB, drag.handle, dx, dy);
                 // Kopyala-yaz: geçmişteki anlık görüntüler bozulmasın.
-                const updated: Stroke = { ...s, points };
-                strokesRef.current[idx] = updated;
-                setSelBB(getBB(updated));
+                selectedIdxsRef.current.forEach((idx, n) => {
+                    const s = strokesRef.current[idx];
+                    if (!s) return;
+                    const orig = drag.orig[n];
+                    const points =
+                        drag.type === 'move'
+                            ? orig.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy }))
+                            : resizePoints(orig, drag.origBB, drag.handle, dx, dy);
+                    strokesRef.current[idx] = { ...s, points };
+                });
+                refreshSelectionBB();
                 redraw();
                 return;
             }
@@ -841,37 +1002,37 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
 
-            const cssW = canvasRef.current?.offsetWidth || rect.width;
-            const cssH = canvasRef.current?.offsetHeight || rect.height;
-
             if (config.tool === 'sun') {
-                const lCtx = laserCtxRef.current;
-                if (lCtx) {
-                    lCtx.clearRect(0, 0, cssW, cssH);
-                    const cx = x;
-                    const cy = y;
+                const oCtx = overlayCtxRef.current;
+                if (oCtx) {
+                    const { w, h } = getCanvasSize();
+                    const v = viewRef.current;
+                    const s = toScreenPoint({ x, y }, v);
+                    applyIdentity(oCtx);
+                    oCtx.clearRect(0, 0, w, h);
                     const r = 12;
-                    const g = lCtx.createRadialGradient(cx, cy, 0, cx, cy, r * 3);
+                    const g = oCtx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r * 3);
                     g.addColorStop(0, 'rgba(255,50,50,1)');
                     g.addColorStop(0.3, 'rgba(255,80,80,0.4)');
                     g.addColorStop(1, 'rgba(255,0,0,0)');
-                    lCtx.fillStyle = g;
-                    lCtx.beginPath();
-                    lCtx.arc(cx, cy, r * 3, 0, Math.PI * 2);
-                    lCtx.fill();
-                    lCtx.fillStyle = '#fff';
-                    lCtx.beginPath();
-                    lCtx.arc(cx, cy, 2, 0, Math.PI * 2);
-                    lCtx.fill();
+                    oCtx.fillStyle = g;
+                    oCtx.beginPath();
+                    oCtx.arc(s.x, s.y, r * 3, 0, Math.PI * 2);
+                    oCtx.fill();
+                    oCtx.fillStyle = '#fff';
+                    oCtx.beginPath();
+                    oCtx.arc(s.x, s.y, 2, 0, Math.PI * 2);
+                    oCtx.fill();
                 }
                 return;
             }
+
             if (!isDrawingRef.current || !currentStrokeRef.current) return;
             const stroke = currentStrokeRef.current;
             const last = stroke.points[stroke.points.length - 1];
             if (!last) return;
             const step = Math.hypot(x - last.x, y - last.y);
-            if (step < 0.5) return;
+            if (step * viewRef.current.scale < 0.5) return;
 
             const oldBB = getBB(stroke);
             if (SHAPE_TOOLS.includes(stroke.tool)) {
@@ -885,7 +1046,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     point.p = samplePressure(
                         e.pressure,
                         e.pointerType,
-                        step,
+                        step * viewRef.current.scale,
                         last.p,
                         stroke.penType
                     );
@@ -893,43 +1054,82 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 stroke.points.push(point);
             }
             const newBB = getBB(stroke);
-            
-            const minX = Math.min(oldBB.x1, newBB.x1);
-            const minY = Math.min(oldBB.y1, newBB.y1);
-            const maxX = Math.max(oldBB.x2, newBB.x2);
-            const maxY = Math.max(oldBB.y2, newBB.y2);
-            const width = maxX - minX;
-            const height = maxY - minY;
 
+            // Yalnızca değişen bölgeyi tamponla tazeleyip üstüne çiz.
             const mainCtx = ctxRef.current;
-            if (mainCtx && bufferCanvasRef.current) {
+            const buffer = bufferCanvasRef.current;
+            if (mainCtx && buffer) {
+                const v = viewRef.current;
+                const minX = Math.min(oldBB.x1, newBB.x1) * v.scale + v.tx;
+                const minY = Math.min(oldBB.y1, newBB.y1) * v.scale + v.ty;
+                const maxX = Math.max(oldBB.x2, newBB.x2) * v.scale + v.tx;
+                const maxY = Math.max(oldBB.y2, newBB.y2) * v.scale + v.ty;
+                const width = maxX - minX;
+                const height = maxY - minY;
                 const dpr = window.devicePixelRatio || 1;
+
                 let sx = Math.floor(minX * dpr);
                 let sy = Math.floor(minY * dpr);
                 let sw = Math.ceil(width * dpr);
                 let sh = Math.ceil(height * dpr);
+                const imgW = buffer.width;
+                const imgH = buffer.height;
+                if (sx < 0) {
+                    sw += sx;
+                    sx = 0;
+                }
+                if (sy < 0) {
+                    sh += sy;
+                    sy = 0;
+                }
+                if (sx + sw > imgW) sw = imgW - sx;
+                if (sy + sh > imgH) sh = imgH - sy;
 
-                const imgW = bufferCanvasRef.current.width;
-                const imgH = bufferCanvasRef.current.height;
-                
-                if (sx < 0) { sw += sx; sx = 0; }
-                if (sy < 0) { sh += sy; sy = 0; }
-                if (sx + sw > imgW) { sw = imgW - sx; }
-                if (sy + sh > imgH) { sh = imgH - sy; }
-
+                applyIdentity(mainCtx);
                 mainCtx.clearRect(minX, minY, width, height);
                 if (sw > 0 && sh > 0) {
                     mainCtx.drawImage(
-                        bufferCanvasRef.current,
-                        sx, sy, sw, sh,
-                        sx / dpr, sy / dpr, sw / dpr, sh / dpr
+                        buffer,
+                        sx,
+                        sy,
+                        sw,
+                        sh,
+                        sx / dpr,
+                        sy / dpr,
+                        sw / dpr,
+                        sh / dpr
                     );
                 }
+                applyView(mainCtx);
                 drawStroke(mainCtx, stroke);
+                applyIdentity(mainCtx);
             }
         };
 
-        const stopDrawing = () => {
+        const stopDrawing = (e?: React.PointerEvent) => {
+            if (e) pointersRef.current.delete(e.pointerId);
+            if (pointersRef.current.size < 2) pinchRef.current = null;
+            if (panRef.current) {
+                panRef.current = null;
+                return;
+            }
+
+            if (config.tool === 'lasso') {
+                const poly = lassoRef.current;
+                lassoRef.current = null;
+                isDrawingRef.current = false;
+                clearOverlay();
+                if (poly && poly.length >= 3) {
+                    const picked: number[] = [];
+                    strokesRef.current.forEach((s, i) => {
+                        if (strokeInPolygon(s, poly)) picked.push(i);
+                    });
+                    if (picked.length) setSelection(picked);
+                }
+                redraw();
+                return;
+            }
+
             if (config.tool === 'select') {
                 if (dragStateRef.current) {
                     dragStateRef.current = null;
@@ -969,28 +1169,49 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     // Ana katmanda serbest çizimin izi duruyor; baştan çiz.
                     redraw();
                 } else if (bufferCtxRef.current) {
+                    applyView(bufferCtxRef.current);
                     drawStroke(bufferCtxRef.current, stroke);
+                    applyIdentity(bufferCtxRef.current);
                 }
             }
             isDrawingRef.current = false;
             gestureDirtyRef.current = false;
             currentStrokeRef.current = null;
-            if (laserCtxRef.current) {
-                const cssW = canvasRef.current?.offsetWidth || 0;
-                const cssH = canvasRef.current?.offsetHeight || 0;
-                laserCtxRef.current.clearRect(0, 0, cssW, cssH);
-            }
+            if (config.tool === 'sun') clearOverlay();
         };
 
         const handleCursorStyle = (): string => {
             if (!enabled) return 'default';
-            if (config.tool === 'pan') return 'grab';
+            if (config.tool === 'pan') return panRef.current ? 'grabbing' : 'grab';
             if (config.tool === 'select') return 'default';
+            if (config.tool === 'lasso') return 'crosshair';
             return 'crosshair';
         };
 
-        const selStroke =
-            selectedIdx !== null ? strokesRef.current[selectedIdx] : null;
+        const selectedStrokes = selectedIdxs
+            .map((i) => strokesRef.current[i])
+            .filter(Boolean);
+        const selColor =
+            selectedStrokes.length && selectedStrokes.every((s) => s.color === selectedStrokes[0].color)
+                ? selectedStrokes[0].color
+                : null;
+        const selScreenBB = selBB
+            ? {
+                  x1: selBB.x1 * view.scale + view.tx,
+                  y1: selBB.y1 * view.scale + view.ty,
+                  x2: selBB.x2 * view.scale + view.tx,
+                  y2: selBB.y2 * view.scale + view.ty,
+              }
+            : null;
+
+        /** Seçili çizimleri toplu günceller (renk, çoğalt, sil). */
+        const mutateSelection = (fn: (idxs: number[]) => void) => {
+            if (selectedIdxsRef.current.length === 0) return;
+            pushHistory();
+            fn(selectedIdxsRef.current);
+            commitStrokes();
+            redraw();
+        };
 
         return (
             <>
@@ -1000,12 +1221,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     onPointerDown={startDrawing}
                     onPointerMove={draw}
                     onPointerUp={stopDrawing}
+                    onPointerCancel={stopDrawing}
                     onPointerLeave={stopDrawing}
                     aria-label="Çizim alanı"
                     className={cn(
                         'absolute left-0 z-[4000] touch-none transition-opacity',
                         enabled
-                            ? config.tool === 'pan'
+                            ? config.tool === 'pan' && !viewportEnabled
                                 ? 'pointer-events-none opacity-100'
                                 : 'pointer-events-auto opacity-100'
                             : 'pointer-events-none opacity-0'
@@ -1017,18 +1239,18 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     }}
                 />
                 <canvas
-                    ref={laserCanvasRef}
+                    ref={overlayCanvasRef}
                     aria-hidden="true"
                     className="absolute left-0 z-[4001] pointer-events-none touch-none"
                     style={{ top: 0 }}
                 />
 
-                {enabled && selectedIdx !== null && selBB && selStroke && (
+                {enabled && selectedIdxs.length > 0 && selBB && selScreenBB && (
                     <div
                         className="absolute left-0 top-0 z-[4500] pointer-events-none"
                         style={{ width: '100%', height: '100%' }}
                     >
-                        {getHandlePositions(selBB).map((h) => (
+                        {getHandlePositions(selScreenBB).map((h) => (
                             <div
                                 key={h.id}
                                 className="absolute pointer-events-auto bg-white border-2 border-indigo-500 rounded-sm shadow-md hover:bg-indigo-100 transition-colors"
@@ -1043,41 +1265,45 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 onPointerDown={(e) => {
                                     e.stopPropagation();
                                     e.currentTarget.setPointerCapture(e.pointerId);
-                                    const s = strokesRef.current[selectedIdxRef.current!];
                                     gestureDirtyRef.current = false;
                                     dragStateRef.current = {
                                         type: 'resize',
                                         handle: h.id,
                                         startX: e.clientX,
                                         startY: e.clientY,
-                                        origPoints: JSON.parse(JSON.stringify(s.points)),
+                                        orig: selectedIdxsRef.current.map((i) =>
+                                            JSON.parse(JSON.stringify(strokesRef.current[i].points))
+                                        ),
                                         origBB: { ...selBB },
                                     };
                                 }}
                                 onPointerMove={(e) => {
-                                    if (!dragStateRef.current || selectedIdxRef.current === null)
-                                        return;
                                     const drag = dragStateRef.current;
-                                    if (drag.type !== 'resize') return;
-                                    const dx = e.clientX - drag.startX;
-                                    const dy = e.clientY - drag.startY;
-                                    const idx = selectedIdxRef.current;
+                                    if (!drag || drag.type !== 'resize') return;
                                     if (!gestureDirtyRef.current) {
                                         pushHistory();
                                         gestureDirtyRef.current = true;
                                     }
-                                    const updated: Stroke = {
-                                        ...strokesRef.current[idx],
-                                        points: resizePoints(
-                                            drag.origPoints,
-                                            drag.origBB,
-                                            drag.handle,
-                                            dx,
-                                            dy
-                                        ),
-                                    };
-                                    strokesRef.current[idx] = updated;
-                                    setSelBB(getBB(updated));
+                                    // Tutamaç ekran uzayında sürüklenir; dünya
+                                    // farkı için ölçeğe bölünür.
+                                    const scale = viewRef.current.scale;
+                                    const dx = (e.clientX - drag.startX) / scale;
+                                    const dy = (e.clientY - drag.startY) / scale;
+                                    selectedIdxsRef.current.forEach((idx, n) => {
+                                        const s = strokesRef.current[idx];
+                                        if (!s) return;
+                                        strokesRef.current[idx] = {
+                                            ...s,
+                                            points: resizePoints(
+                                                drag.orig[n],
+                                                drag.origBB,
+                                                drag.handle,
+                                                dx,
+                                                dy
+                                            ),
+                                        };
+                                    });
+                                    refreshSelectionBB();
                                     redraw();
                                 }}
                                 onPointerUp={(e) => {
@@ -1094,12 +1320,17 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                             aria-label="Seçim araçları"
                             className="absolute pointer-events-auto flex items-center gap-1 bg-[#1a1b26]/95 backdrop-blur-md px-2 py-1.5 rounded-xl border border-white/10 shadow-xl"
                             style={{
-                                left: selBB.x1,
-                                top: Math.max(0, selBB.y1 - 52),
+                                left: Math.max(4, selScreenBB.x1),
+                                top: Math.max(0, selScreenBB.y1 - 52),
                                 zIndex: 4700,
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
                         >
+                            {selectedIdxs.length > 1 && (
+                                <span className="text-[11px] font-bold text-slate-300 px-1 tabular-nums shrink-0">
+                                    {selectedIdxs.length} öğe
+                                </span>
+                            )}
                             {DRAWING_COLORS.map((color) => (
                                 <button
                                     key={color}
@@ -1107,24 +1338,18 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                     aria-label={`Renk ${color}`}
                                     className={cn(
                                         'w-5 h-5 rounded-full border-2 transition-all hover:scale-110 shrink-0',
-                                        selStroke.color === color
-                                            ? 'border-white scale-110'
-                                            : 'border-transparent'
+                                        selColor === color ? 'border-white scale-110' : 'border-transparent'
                                     )}
                                     style={{ backgroundColor: color }}
-                                    onClick={() => {
-                                        const idx = selectedIdxRef.current;
-                                        if (idx !== null && strokesRef.current[idx]) {
-                                            pushHistory();
-                                            strokesRef.current[idx] = {
-                                                ...strokesRef.current[idx],
-                                                color,
-                                            };
-                                            commitStrokes();
-                                            setSelBB({ ...getBB(strokesRef.current[idx]) });
-                                            redraw();
-                                        }
-                                    }}
+                                    onClick={() =>
+                                        mutateSelection((idxs) => {
+                                            const set = new Set(idxs);
+                                            strokesRef.current = strokesRef.current.map((st, i) =>
+                                                set.has(i) ? { ...st, color } : st
+                                            );
+                                            refreshSelectionBB();
+                                        })
+                                    }
                                 />
                             ))}
                             <div className="w-px h-4 bg-white/20 mx-1 shrink-0" aria-hidden="true" />
@@ -1133,51 +1358,43 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 title="Çoğalt"
                                 aria-label="Çoğalt"
                                 className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
-                                onClick={() => {
-                                    if (
-                                        selectedIdxRef.current !== null &&
-                                        strokesRef.current[selectedIdxRef.current]
-                                    ) {
-                                        const copy: Stroke = JSON.parse(
-                                            JSON.stringify(
-                                                strokesRef.current[selectedIdxRef.current]
-                                            )
-                                        );
-                                        copy.points = copy.points.map((p) => ({
-                                            ...p,
-                                            x: p.x + 20,
-                                            y: p.y + 20,
-                                        }));
-                                        pushHistory();
-                                        strokesRef.current.push(copy);
-                                        const ni = strokesRef.current.length - 1;
-                                        selectedIdxRef.current = ni;
-                                        commitStrokes();
-                                        setSelectedIdx(ni);
-                                        setSelBB(getBB(copy));
-                                        redraw();
-                                    }
-                                }}
+                                onClick={() =>
+                                    mutateSelection((idxs) => {
+                                        const offset = 20 / viewRef.current.scale;
+                                        const copies = idxs
+                                            .map((i) => strokesRef.current[i])
+                                            .filter(Boolean)
+                                            .map((s) => {
+                                                const copy: Stroke = JSON.parse(JSON.stringify(s));
+                                                copy.points = copy.points.map((p) => ({
+                                                    ...p,
+                                                    x: p.x + offset,
+                                                    y: p.y + offset,
+                                                }));
+                                                return copy;
+                                            });
+                                        const first = strokesRef.current.length;
+                                        strokesRef.current.push(...copies);
+                                        setSelection(copies.map((_, i) => first + i));
+                                    })
+                                }
                             >
                                 <Copy className="w-3.5 h-3.5" />
                             </button>
                             <button
                                 type="button"
-                                title="Seçili öğeyi sil"
-                                aria-label="Seçili öğeyi sil"
+                                title="Seçili öğeleri sil"
+                                aria-label="Seçili öğeleri sil"
                                 className="p-1 text-red-400 hover:text-red-300 rounded-lg hover:bg-red-400/10 transition-colors"
-                                onClick={() => {
-                                    const idx = selectedIdxRef.current;
-                                    if (idx !== null) {
-                                        pushHistory();
+                                onClick={() =>
+                                    mutateSelection((idxs) => {
+                                        const set = new Set(idxs);
                                         strokesRef.current = strokesRef.current.filter(
-                                            (_, i) => i !== idx
+                                            (_, i) => !set.has(i)
                                         );
-                                        commitStrokes();
                                         deselect();
-                                        redraw();
-                                    }
-                                }}
+                                    })
+                                }
                             >
                                 <Trash2 className="w-3.5 h-3.5" />
                             </button>
