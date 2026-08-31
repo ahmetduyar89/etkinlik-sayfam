@@ -8,12 +8,15 @@ import {
     ArrowLeft,
     Camera,
     Check,
+    ChevronDown,
     ChevronLeft,
     ChevronRight,
     Cloud,
+    LayoutTemplate,
     Loader2,
     Plus,
     Redo2,
+    Save,
     Trash2,
     Undo2,
 } from 'lucide-react';
@@ -31,6 +34,7 @@ import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
     DrawingCanvasHandle,
+    MathObject,
     Notebook,
     NotebookContent,
     NotebookPage,
@@ -49,6 +53,16 @@ interface NotebookEditorProps {
 type SaveState = 'idle' | 'saving' | 'saved';
 
 const emptyPage = (): NotebookPage => ({ strokes: [], boxes: [] });
+
+/** Şablonları menüde başlıklandırmak için gruplara ayırır. */
+const PAPER_GROUPS = PAPER_STYLES.reduce<
+    { label: string; items: typeof PAPER_STYLES[number][] }[]
+>((groups, style) => {
+    const existing = groups.find((g) => g.label === style.group);
+    if (existing) existing.items.push(style);
+    else groups.push({ label: style.group, items: [style] });
+    return groups;
+}, []);
 
 function parsePages(raw?: string): NotebookPage[] {
     if (!raw) return [emptyPage()];
@@ -88,8 +102,14 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         width: 2,
         fillEnabled: false,
         stampIcon: '⭐',
+        penType: 'fountain',
+        snapShapes: false,
+        snapAngle: false,
+        eraserMode: 'pixel',
     });
     const [isTextBoxMode, setIsTextBoxMode] = React.useState(false);
+    const [history, setHistory] = React.useState({ canUndo: false, canRedo: false });
+    const [showPaperMenu, setShowPaperMenu] = React.useState(false);
 
     const boxesRef = React.useRef<TextBoxData[][]>([[]]);
     boxesRef.current = boxesByPage;
@@ -177,6 +197,48 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         onClose();
     };
 
+    const handleUndo = React.useCallback(() => {
+        canvasRef.current?.undo();
+        scheduleSave();
+    }, [scheduleSave]);
+
+    const handleRedo = React.useCallback(() => {
+        canvasRef.current?.redo();
+        scheduleSave();
+    }, [scheduleSave]);
+
+    // Klavye kısayolları: Ctrl/Cmd+Z geri al, Ctrl+Shift+Z veya Ctrl+Y ileri al.
+    React.useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (!(e.ctrlKey || e.metaKey)) return;
+            const target = e.target as HTMLElement | null;
+            if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return;
+            if (target?.isContentEditable) return;
+            const key = e.key.toLowerCase();
+            if (key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                handleUndo();
+            } else if ((key === 'z' && e.shiftKey) || key === 'y') {
+                e.preventDefault();
+                handleRedo();
+            } else if (key === 's') {
+                e.preventDefault();
+                void save();
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [handleRedo, handleUndo, save]);
+
+    const handleInsertMath = React.useCallback(
+        (math: MathObject) => {
+            canvasRef.current?.insertMath(math, config.color === '#ffffff' ? '#1a1b26' : config.color);
+            setConfig((c) => ({ ...c, tool: 'select' }));
+            scheduleSave();
+        },
+        [config.color, scheduleSave]
+    );
+
     // ── Sayfa yönetimi ───────────────────────────────────────────────
     const currentBoxes = boxesByPage[pageInfo.current] ?? [];
 
@@ -222,6 +284,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         if (clean !== notebook.title) onMetaChange({ title: clean });
     };
 
+    const currentPaper = PAPER_STYLES.find((p) => p.id === paper);
+
     const changePaper = (next: PaperStyle) => {
         setPaper(next);
         onMetaChange({ paper: next });
@@ -260,20 +324,76 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     {notebook.kind === 'whiteboard' ? 'Beyaz Tahta' : 'Not Defteri'}
                 </span>
 
-                {/* Kağıt deseni */}
-                <div className="hidden lg:flex items-center gap-1 bg-white/10 rounded-xl p-1 ml-2">
-                    {PAPER_STYLES.map((p) => (
-                        <button
-                            key={p.id}
-                            onClick={() => changePaper(p.id)}
-                            className={cn(
-                                'px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors',
-                                paper === p.id ? 'bg-white text-primary' : 'text-white/80 hover:bg-white/15'
-                            )}
-                        >
-                            {p.label}
-                        </button>
-                    ))}
+                {/* Kağıt şablonu */}
+                <div className="relative hidden sm:block ml-1">
+                    <button
+                        onClick={() => setShowPaperMenu((v) => !v)}
+                        aria-haspopup="menu"
+                        aria-expanded={showPaperMenu}
+                        title="Sayfa şablonu"
+                        className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-xl px-2.5 py-1.5 text-[12.5px] font-semibold transition-colors"
+                    >
+                        <LayoutTemplate className="w-4 h-4" />
+                        <span className="hidden md:inline">{currentPaper?.label ?? 'Şablon'}</span>
+                        <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+                    </button>
+
+                    {showPaperMenu && (
+                        <>
+                            <div
+                                className="fixed inset-0 z-[9100]"
+                                onClick={() => setShowPaperMenu(false)}
+                                aria-hidden="true"
+                            />
+                            <div
+                                role="menu"
+                                aria-label="Sayfa şablonu"
+                                className="absolute left-0 top-[calc(100%+8px)] z-[9200] w-[268px] max-h-[70vh] overflow-y-auto bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2"
+                            >
+                                {PAPER_GROUPS.map((group) => (
+                                    <div key={group.label} className="mb-1.5 last:mb-0">
+                                        <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                                            {group.label}
+                                        </p>
+                                        {group.items.map((item) => (
+                                            <button
+                                                key={item.id}
+                                                role="menuitemradio"
+                                                aria-checked={paper === item.id}
+                                                onClick={() => {
+                                                    changePaper(item.id);
+                                                    setShowPaperMenu(false);
+                                                }}
+                                                className={cn(
+                                                    'w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl text-left transition-colors',
+                                                    paper === item.id
+                                                        ? 'bg-primary/10'
+                                                        : 'hover:bg-surface-container-high'
+                                                )}
+                                            >
+                                                <span
+                                                    className="w-9 h-9 rounded-lg border border-outline-variant shrink-0"
+                                                    style={paperBackground(item.id, '#ffffff')}
+                                                    aria-hidden="true"
+                                                />
+                                                <span className="min-w-0">
+                                                    <span className="block text-[12.5px] font-bold leading-tight">
+                                                        {item.label}
+                                                    </span>
+                                                    <span className="block text-[11px] text-on-surface-variant leading-tight truncate">
+                                                        {item.hint}
+                                                    </span>
+                                                </span>
+                                                {paper === item.id && (
+                                                    <Check className="w-4 h-4 text-primary ml-auto shrink-0" />
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {/* Zemin rengi */}
@@ -312,15 +432,22 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     </span>
 
                     <button
-                        onClick={() => {
-                            canvasRef.current?.undo();
-                            scheduleSave();
-                        }}
-                        title="Geri al"
+                        onClick={handleUndo}
+                        disabled={!history.canUndo}
+                        title="Geri al (Ctrl+Z)"
                         aria-label="Geri al"
-                        className="p-2 rounded-xl hover:bg-white/15 transition-colors"
+                        className="p-2 rounded-xl hover:bg-white/15 transition-colors disabled:opacity-35 disabled:hover:bg-transparent"
                     >
                         <Undo2 className="w-[18px] h-[18px]" />
+                    </button>
+                    <button
+                        onClick={handleRedo}
+                        disabled={!history.canRedo}
+                        title="İleri al (Ctrl+Shift+Z)"
+                        aria-label="İleri al"
+                        className="p-2 rounded-xl hover:bg-white/15 transition-colors disabled:opacity-35 disabled:hover:bg-transparent"
+                    >
+                        <Redo2 className="w-[18px] h-[18px]" />
                     </button>
                     <button
                         onClick={() => canvasRef.current?.screenshot(true, bgColor)}
@@ -334,7 +461,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         onClick={() => void save()}
                         className="inline-flex items-center gap-1.5 bg-white text-primary px-3 py-2 rounded-xl text-[13px] font-bold hover:brightness-95 transition"
                     >
-                        <Redo2 className="w-4 h-4 rotate-180 hidden sm:inline" /> Kaydet
+                        <Save className="w-4 h-4 hidden sm:inline" /> Kaydet
                     </button>
                 </div>
             </header>
@@ -400,6 +527,9 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             bgColor={bgColor}
                             initialPages={initialStrokes}
                             onDirty={scheduleSave}
+                            onHistoryChange={(canUndo, canRedo) =>
+                                setHistory({ canUndo, canRedo })
+                            }
                             onPageChange={(current, total) => setPageInfo({ current, total })}
                             onRequestText={() =>
                                 prompt({
@@ -429,10 +559,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             {/* Çizim araç çubuğu (sürüklenebilir) */}
             <DrawingToolbar
                 onCommand={(type) => {
-                    if (type === 'UNDO_DRAWING') {
-                        canvasRef.current?.undo();
-                        scheduleSave();
-                    }
+                    if (type === 'UNDO_DRAWING') handleUndo();
+                    if (type === 'REDO_DRAWING') handleRedo();
                     if (type === 'CLEAR_DRAWING') {
                         canvasRef.current?.clear();
                         scheduleSave();
@@ -445,6 +573,9 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 onScreenshot={() => canvasRef.current?.screenshot(true, bgColor)}
                 isTextBoxMode={isTextBoxMode}
                 onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
+                onInsertMath={handleInsertMath}
+                canUndo={history.canUndo}
+                canRedo={history.canRedo}
             />
         </div>
     );

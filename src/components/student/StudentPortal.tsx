@@ -31,6 +31,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
         stampIcon: '✅',
     });
     const [showWhiteboard, setShowWhiteboard] = useState(false);
+    const [drawHistory, setDrawHistory] = useState({ canUndo: false, canRedo: false });
     const [iframeHeight, setIframeHeight] = useState(1000);
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
@@ -145,6 +146,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
 
     const handleToolbarCommand = (type: string) => {
         if (type === 'UNDO_DRAWING') canvasRef.current?.undo();
+        else if (type === 'REDO_DRAWING') canvasRef.current?.redo();
         else if (type === 'CLEAR_DRAWING') canvasRef.current?.clear();
         else if (type === 'TOGGLE_WHITEBOARD') setShowWhiteboard((v) => !v);
     };
@@ -361,6 +363,9 @@ export function StudentPortal({ act }: StudentPortalProps) {
                         config={drawConfig}
                         enabled={isDrawingMode}
                         whiteboardMode={showWhiteboard}
+                        onHistoryChange={(canUndo, canRedo) =>
+                            setDrawHistory({ canUndo, canRedo })
+                        }
                     />
                 </div>
                 <AnimatePresence>
@@ -371,6 +376,8 @@ export function StudentPortal({ act }: StudentPortalProps) {
                             setConfig={setDrawConfig}
                             showWhiteboard={showWhiteboard}
                             setShowWhiteboard={setShowWhiteboard}
+                            canUndo={drawHistory.canUndo}
+                            canRedo={drawHistory.canRedo}
                         />
                     )}
                 </AnimatePresence>

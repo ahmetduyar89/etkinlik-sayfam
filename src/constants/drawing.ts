@@ -1,4 +1,4 @@
-import type { DrawingTool } from '../types';
+import type { DrawingTool, EraserMode } from '../types';
 import {
     MousePointer2,
     Pencil,
@@ -133,6 +133,66 @@ export const STAMP_CATEGORIES: ReadonlyArray<{
             { emoji: '∠', label: 'Açı' },
         ],
     },
+    {
+        label: 'İşlem',
+        items: [
+            { emoji: '×', label: 'Çarpı' },
+            { emoji: '÷', label: 'Bölü' },
+            { emoji: '±', label: 'Artı Eksi' },
+            { emoji: '%', label: 'Yüzde' },
+            { emoji: '≈', label: 'Yaklaşık' },
+            { emoji: '≡', label: 'Denk' },
+            { emoji: '·', label: 'Nokta Çarpım' },
+            { emoji: '⁻¹', label: 'Ters' },
+            { emoji: '²', label: 'Kare' },
+            { emoji: '³', label: 'Küp' },
+        ],
+    },
+    {
+        label: 'Küme & Mantık',
+        items: [
+            { emoji: '∈', label: 'Elemanıdır' },
+            { emoji: '∉', label: 'Elemanı Değil' },
+            { emoji: '⊂', label: 'Alt Küme' },
+            { emoji: '∪', label: 'Birleşim' },
+            { emoji: '∩', label: 'Kesişim' },
+            { emoji: '∅', label: 'Boş Küme' },
+            { emoji: '∀', label: 'Her' },
+            { emoji: '∃', label: 'Vardır' },
+            { emoji: '⇒', label: 'İse' },
+            { emoji: '⇔', label: 'Ancak ve Ancak' },
+        ],
+    },
+    {
+        label: 'Geometri',
+        items: [
+            { emoji: '∥', label: 'Paralel' },
+            { emoji: '⊥', label: 'Dik' },
+            { emoji: '≅', label: 'Eş' },
+            { emoji: '∼', label: 'Benzer' },
+            { emoji: '°', label: 'Derece' },
+            { emoji: '⌒', label: 'Yay' },
+            { emoji: '□', label: 'Kare' },
+            { emoji: '○', label: 'Çember' },
+            { emoji: '⟶', label: 'Işın' },
+            { emoji: '↔', label: 'Doğru' },
+        ],
+    },
+    {
+        label: 'Fizik & Birim',
+        items: [
+            { emoji: 'Δ', label: 'Delta' },
+            { emoji: 'θ', label: 'Teta' },
+            { emoji: 'λ', label: 'Lambda' },
+            { emoji: 'μ', label: 'Mü' },
+            { emoji: 'Ω', label: 'Ohm' },
+            { emoji: '→', label: 'Vektör' },
+            { emoji: '↑', label: 'Yukarı' },
+            { emoji: '↓', label: 'Aşağı' },
+            { emoji: '⇌', label: 'Denge' },
+            { emoji: '∝', label: 'Orantılı' },
+        ],
+    },
 ];
 
 export const TEXTBOX_COLORS = [
@@ -151,6 +211,11 @@ export const TEXTBOX_TEXT_COLORS: Record<string, string> = {
 
 export const getTextBoxTextColor = (bg: string): string =>
     TEXTBOX_TEXT_COLORS[bg] || TEXTBOX_TEXT_COLORS.default;
+
+export const ERASER_MODES: ReadonlyArray<{ id: EraserMode; label: string; hint: string }> = [
+    { id: 'pixel', label: 'Piksel', hint: 'Dokunduğu yeri siler' },
+    { id: 'stroke', label: 'Çizgi', hint: 'Dokunduğu çizginin tamamını siler' },
+];
 
 export const HANDLE_CURSORS: Record<string, string> = {
     nw: 'nw-resize',
