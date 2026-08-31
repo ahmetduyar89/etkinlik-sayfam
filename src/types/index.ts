@@ -18,6 +18,8 @@ export interface Activity {
     storage_url?: string;
     created_at?: string;
     unit?: string;
+    /** Etkinlik "Defterlerim" içinde hangi klasöre eklendi (yoksa hiçbiri). */
+    folder_id?: string | null;
 }
 
 export interface Unit {

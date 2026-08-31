@@ -5,12 +5,15 @@
 import React from 'react';
 import {
     ChevronRight,
+    Eye,
     Folder,
     FolderInput,
     FolderPlus,
     Home,
     LayoutGrid,
+    Link2,
     List,
+    MonitorPlay,
     MoreVertical,
     NotebookPen,
     PencilLine,
@@ -26,12 +29,16 @@ import { useToast } from '../common/ToastProvider';
 import { useConfirm } from '../common/ConfirmDialog';
 import { usePrompt } from '../common/PromptDialog';
 import { NotebookEditor } from './NotebookEditor';
+import { ActivityPicker } from './ActivityPicker';
 import { firestoreErrorMessage } from './errors';
-import type { DriveFolder, Notebook, NotebookKind } from '../../types';
+import { ActivityPreviewModal } from '../activities/ActivityPreviewModal';
+import { formatGradeLevel } from '../../constants/education';
+import type { Activity, DriveFolder, Notebook, NotebookKind } from '../../types';
 
 type MoveTarget =
     | { kind: 'folder'; id: string; name: string }
-    | { kind: 'notebook'; id: string; name: string };
+    | { kind: 'notebook'; id: string; name: string }
+    | { kind: 'activity'; id: string; name: string };
 
 const FOLDER_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#0ea5e9'];
 
@@ -49,6 +56,7 @@ function formatDate(value?: string): string {
 export function NotebooksView() {
     const foldersHandler = useFirestore<DriveFolder>('folders');
     const notebooksHandler = useFirestore<Notebook>('notebooks');
+    const activitiesHandler = useFirestore<Activity>('activities');
     const toast = useToast();
     const confirm = useConfirm();
     const prompt = usePrompt();
@@ -65,6 +73,9 @@ export function NotebooksView() {
     const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
     const [moveTarget, setMoveTarget] = React.useState<MoveTarget | null>(null);
     const [openNotebookId, setOpenNotebookId] = React.useState<string | null>(null);
+    const [activities, setActivities] = React.useState<Activity[]>([]);
+    const [previewActivityId, setPreviewActivityId] = React.useState<string | null>(null);
+    const [isPickerOpen, setIsPickerOpen] = React.useState(false);
 
     React.useEffect(() => {
         const unsub = foldersHandler.sync(
@@ -86,6 +97,12 @@ export function NotebooksView() {
                 setIsLoading(false);
             }
         );
+        return () => unsub();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    React.useEffect(() => {
+        const unsub = activitiesHandler.sync((data) => setActivities(data || []));
         return () => unsub();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -139,12 +156,27 @@ export function NotebooksView() {
         );
     }, [notebooks, currentFolderId, needle]);
 
+    /**
+     * Etkinlikler yalnızca eklendikleri klasörün içinde görünür; ana klasörde
+     * listelenmezler (hepsi zaten "İçerikler" sekmesinde duruyor).
+     */
+    const visibleActivities = React.useMemo(() => {
+        const filed = activities.filter((a) => !!a.folder_id);
+        const list = needle
+            ? filed.filter((a) => a.title.toLocaleLowerCase('tr').includes(needle))
+            : currentFolderId
+            ? filed.filter((a) => a.folder_id === currentFolderId)
+            : [];
+        return [...list].sort((a, b) => a.title.localeCompare(b.title, 'tr'));
+    }, [activities, currentFolderId, needle]);
+
     const countsFor = React.useCallback(
         (folderId: string) => ({
             folders: folders.filter((f) => f.parent_id === folderId).length,
             notebooks: notebooks.filter((n) => n.parent_id === folderId).length,
+            activities: activities.filter((a) => a.folder_id === folderId).length,
         }),
-        [folders, notebooks]
+        [folders, notebooks, activities]
     );
 
     // ── Oluşturma ────────────────────────────────────────────────────
@@ -237,18 +269,24 @@ export function NotebooksView() {
             const notebookIds = notebooks
                 .filter((n) => n.parent_id && folderIds.includes(n.parent_id))
                 .map((n) => n.id);
-            return { folderIds, notebookIds };
+            const activityIds = activities
+                .filter((a) => a.folder_id && folderIds.includes(a.folder_id))
+                .map((a) => a.id);
+            return { folderIds, notebookIds, activityIds };
         },
-        [folders, notebooks]
+        [folders, notebooks, activities]
     );
 
     const deleteFolder = async (f: DriveFolder) => {
-        const { folderIds, notebookIds } = collectDescendants(f.id);
+        const { folderIds, notebookIds, activityIds } = collectDescendants(f.id);
         const ok = await confirm({
             title: 'Klasörü sil?',
             message:
-                notebookIds.length > 0 || folderIds.length > 1
-                    ? `"${f.name}" ve içindeki ${folderIds.length - 1} klasör, ${notebookIds.length} defter kalıcı olarak silinecek.`
+                notebookIds.length > 0 || folderIds.length > 1 || activityIds.length > 0
+                    ? `"${f.name}" ve içindeki ${folderIds.length - 1} klasör, ${notebookIds.length} defter kalıcı olarak silinecek.` +
+                      (activityIds.length
+                          ? ` İçindeki ${activityIds.length} etkinlik silinmez, yalnızca klasörden çıkarılır.`
+                          : '')
                     : `"${f.name}" kalıcı olarak silinecek.`,
             confirmLabel: 'Sil',
             cancelLabel: 'Vazgeç',
@@ -261,6 +299,10 @@ export function NotebooksView() {
                     await notebooksHandler.remove(id);
                     await deleteDocById('notebook_content', id).catch(() => undefined);
                 })
+            );
+            // Etkinlikler İçerikler sekmesinde kalmalı; sadece klasör bağı kopar.
+            await Promise.all(
+                activityIds.map((id) => activitiesHandler.update(id, { folder_id: null }))
             );
             await Promise.all(folderIds.map((id) => foldersHandler.remove(id)));
             if (folderIds.includes(currentFolderId || '')) setCurrentFolderId(f.parent_id);
@@ -288,6 +330,40 @@ export function NotebooksView() {
         }
     };
 
+    const addActivitiesToFolder = async (ids: string[]) => {
+        if (!currentFolderId) return;
+        try {
+            await Promise.all(
+                ids.map((id) => activitiesHandler.update(id, { folder_id: currentFolderId }))
+            );
+            setIsPickerOpen(false);
+            toast.success(
+                ids.length > 1 ? `${ids.length} etkinlik klasöre eklendi.` : 'Etkinlik klasöre eklendi.'
+            );
+        } catch (e) {
+            toast.error(firestoreErrorMessage(e, 'Etkinlik eklenemedi.'));
+        }
+    };
+
+    const removeActivityFromFolder = async (a: Activity) => {
+        try {
+            await activitiesHandler.update(a.id, { folder_id: null });
+            toast.success('Etkinlik klasörden çıkarıldı. İçerikler sekmesinde duruyor.');
+        } catch (e) {
+            toast.error(firestoreErrorMessage(e, 'Etkinlik çıkarılamadı.'));
+        }
+    };
+
+    const handleCopyActivityLink = async (a: Activity) => {
+        const link = `${window.location.origin}${window.location.pathname}?view=student&id=${a.id}`;
+        try {
+            await navigator.clipboard.writeText(link);
+            toast.success('Öğrenci giriş linki kopyalandı.');
+        } catch {
+            toast.error('Link kopyalanamadı.');
+        }
+    };
+
     /** Taşıma hedefi olarak seçilemeyecek klasörler (kendisi ve alt klasörleri). */
     const blockedForMove = React.useMemo(() => {
         if (moveTarget?.kind !== 'folder') return new Set<string>();
@@ -295,9 +371,11 @@ export function NotebooksView() {
     }, [moveTarget, collectDescendants]);
 
     const moveOptions = React.useMemo(() => {
-        const out: Array<{ id: string | null; label: string; depth: number }> = [
-            { id: null, label: 'Defterlerim (ana klasör)', depth: 0 },
-        ];
+        const out: Array<{ id: string | null; label: string; depth: number }> = [];
+        // Etkinlikler ana klasörde listelenmez; onlar için "çıkar" eylemi vardır.
+        if (moveTarget?.kind !== 'activity') {
+            out.push({ id: null, label: 'Defterlerim (ana klasör)', depth: 0 });
+        }
         const walk = (parent: string | null, depth: number) => {
             folders
                 .filter((f) => (f.parent_id ?? null) === parent)
@@ -309,25 +387,33 @@ export function NotebooksView() {
         };
         walk(null, 1);
         return out;
-    }, [folders]);
+    }, [folders, moveTarget]);
 
     const applyMove = async (destination: string | null) => {
         if (!moveTarget) return;
         try {
             if (moveTarget.kind === 'folder') {
                 await foldersHandler.update(moveTarget.id, { parent_id: destination });
-            } else {
+            } else if (moveTarget.kind === 'notebook') {
                 await notebooksHandler.update(moveTarget.id, { parent_id: destination });
+            } else {
+                await activitiesHandler.update(moveTarget.id, { folder_id: destination });
             }
             toast.success('Taşındı.');
-        } catch {
-            toast.error('Taşıma başarısız.');
+        } catch (e) {
+            toast.error(firestoreErrorMessage(e, 'Taşıma başarısız.'));
         } finally {
             setMoveTarget(null);
         }
     };
 
     const openNotebook = notebooks.find((n) => n.id === openNotebookId) || null;
+    const previewActivity = activities.find((a) => a.id === previewActivityId) || null;
+    const currentFolder = currentFolderId ? folderById.get(currentFolderId) : undefined;
+    const activityIdsHere = React.useMemo(
+        () => new Set(activities.filter((a) => a.folder_id === currentFolderId).map((a) => a.id)),
+        [activities, currentFolderId]
+    );
 
     // ── Parçalar ─────────────────────────────────────────────────────
     const RowMenu = ({ id, children }: { id: string; children: React.ReactNode }) => {
@@ -516,9 +602,26 @@ export function NotebooksView() {
                             >
                                 <FolderPlus className="w-[18px] h-[18px] text-on-surface-variant" /> Yeni Klasör
                             </button>
+                            <button
+                                onClick={() => {
+                                    setIsNewMenuOpen(false);
+                                    setIsPickerOpen(true);
+                                }}
+                                disabled={!currentFolderId}
+                                title={
+                                    currentFolderId
+                                        ? undefined
+                                        : 'Önce bir klasöre girin'
+                                }
+                                className="mt-1.5 w-full flex items-center gap-2.5 px-3.5 py-3 rounded-2xl bg-surface-container-high hover:bg-surface-container-highest disabled:opacity-40 disabled:hover:bg-surface-container-high text-[13.5px] font-semibold text-on-surface transition-colors"
+                            >
+                                <MonitorPlay className="w-[18px] h-[18px] text-on-surface-variant" />{' '}
+                                Etkinlik Ekle
+                            </button>
                             <p className="text-[11.5px] text-on-surface-variant mt-2 px-1 leading-relaxed">
                                 Klasör oluşturup derslerini içine ekleyebilirsin. Yeni defter,
-                                bulunduğun klasörde açılır.
+                                bulunduğun klasörde açılır. “Etkinlik Ekle” ile İçerikler
+                                sekmesindeki etkinlikleri bu klasöre bağlarsın.
                             </p>
                         </div>
                     )}
@@ -536,6 +639,7 @@ export function NotebooksView() {
                 </h1>
                 <span className="text-[13px] text-on-surface-variant">
                     {visibleFolders.length} klasör · {visibleNotebooks.length} defter
+                    {visibleActivities.length > 0 && ` · ${visibleActivities.length} etkinlik`}
                 </span>
             </div>
 
@@ -552,7 +656,9 @@ export function NotebooksView() {
                         Yükleniyor…
                     </p>
                 </div>
-            ) : visibleFolders.length === 0 && visibleNotebooks.length === 0 ? (
+            ) : visibleFolders.length === 0 &&
+              visibleNotebooks.length === 0 &&
+              visibleActivities.length === 0 ? (
                 <div className="py-20 bg-white rounded-[22px] border border-outline-variant text-center px-6">
                     <h3 className="text-base font-bold font-headline-md text-on-surface">
                         {needle ? 'Sonuç bulunamadı' : 'Bu klasör boş'}
@@ -584,7 +690,9 @@ export function NotebooksView() {
                                 <div className="min-w-0 flex-1">
                                     <p className="text-[14px] font-semibold text-on-surface truncate">{f.name}</p>
                                     <p className="text-[12px] text-on-surface-variant">
-                                        {c.folders} klasör · {c.notebooks} defter · {formatDate(f.created_at)}
+                                        {c.folders} klasör · {c.notebooks} defter
+                                        {c.activities > 0 && ` · ${c.activities} etkinlik`} ·{' '}
+                                        {formatDate(f.created_at)}
                                     </p>
                                 </div>
                                 <RowMenu id={f.id}>
@@ -629,6 +737,33 @@ export function NotebooksView() {
                             </RowMenu>
                         </div>
                     ))}
+
+                    {visibleActivities.map((a) => (
+                        <div
+                            key={a.id}
+                            onClick={() => setPreviewActivityId(a.id)}
+                            className="flex items-center gap-3.5 px-4 py-3 border-b border-outline-variant last:border-b-0 first:rounded-t-[18px] last:rounded-b-[18px] hover:bg-surface-container-low cursor-pointer transition-colors"
+                        >
+                            <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 border bg-[#fff7ed] border-[#fed7aa] text-orange-500">
+                                <MonitorPlay className="w-[18px] h-[18px]" />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[14px] font-semibold text-on-surface truncate">{a.title}</p>
+                                <p className="text-[12px] text-on-surface-variant truncate">
+                                    Etkinlik
+                                    {a.subject ? ` · ${a.subject}` : ''}
+                                    {a.grade_level ? ` · ${formatGradeLevel(a.grade_level)}` : ''}
+                                    {a.category ? ` · ${a.category}` : ''}
+                                </p>
+                            </div>
+                            <RowMenu id={a.id}>
+                                <MenuAction icon={<Eye className="w-4 h-4" />} label="Aç / önizle" onClick={() => setPreviewActivityId(a.id)} />
+                                <MenuAction icon={<Link2 className="w-4 h-4" />} label="Öğrenci linkini kopyala" onClick={() => handleCopyActivityLink(a)} />
+                                <MenuAction icon={<FolderInput className="w-4 h-4" />} label="Başka klasöre taşı" onClick={() => setMoveTarget({ kind: 'activity', id: a.id, name: a.title })} />
+                                <MenuAction icon={<Trash2 className="w-4 h-4" />} label="Klasörden çıkar" danger onClick={() => removeActivityFromFolder(a)} />
+                            </RowMenu>
+                        </div>
+                    ))}
                 </div>
             ) : (
                 <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
@@ -658,6 +793,7 @@ export function NotebooksView() {
                                 <p className="mt-2.5 text-[14px] font-semibold text-on-surface truncate">{f.name}</p>
                                 <p className="text-[12px] text-on-surface-variant">
                                     {c.folders} klasör · {c.notebooks} defter
+                                    {c.activities > 0 && ` · ${c.activities} etkinlik`}
                                 </p>
                             </div>
                         );
@@ -705,6 +841,38 @@ export function NotebooksView() {
                             </div>
                         </div>
                     ))}
+
+                    {visibleActivities.map((a) => (
+                        <div
+                            key={a.id}
+                            onClick={() => setPreviewActivityId(a.id)}
+                            className="bg-white border border-outline-variant rounded-[18px] cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.08)] transition-all"
+                        >
+                            <div
+                                className="h-[104px] flex items-center justify-center rounded-t-[17px] overflow-hidden bg-[#fff7ed] bg-cover bg-center"
+                                style={
+                                    a.image_url ? { backgroundImage: `url(${a.image_url})` } : undefined
+                                }
+                            >
+                                {!a.image_url && <MonitorPlay className="w-8 h-8 text-orange-500" />}
+                            </div>
+                            <div className="flex items-start gap-1 p-3">
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[13.5px] font-semibold text-on-surface truncate">{a.title}</p>
+                                    <p className="text-[11.5px] text-on-surface-variant truncate">
+                                        Etkinlik{a.subject ? ` · ${a.subject}` : ''}
+                                        {a.grade_level ? ` · ${formatGradeLevel(a.grade_level)}` : ''}
+                                    </p>
+                                </div>
+                                <RowMenu id={a.id}>
+                                    <MenuAction icon={<Eye className="w-4 h-4" />} label="Aç / önizle" onClick={() => setPreviewActivityId(a.id)} />
+                                    <MenuAction icon={<Link2 className="w-4 h-4" />} label="Öğrenci linkini kopyala" onClick={() => handleCopyActivityLink(a)} />
+                                    <MenuAction icon={<FolderInput className="w-4 h-4" />} label="Başka klasöre taşı" onClick={() => setMoveTarget({ kind: 'activity', id: a.id, name: a.title })} />
+                                    <MenuAction icon={<Trash2 className="w-4 h-4" />} label="Klasörden çıkar" danger onClick={() => removeActivityFromFolder(a)} />
+                                </RowMenu>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
 
@@ -741,6 +909,24 @@ export function NotebooksView() {
                     })}
                 </div>
             </Modal>
+
+            {/* Etkinlik seçici */}
+            <ActivityPicker
+                isOpen={isPickerOpen && !!currentFolderId}
+                onClose={() => setIsPickerOpen(false)}
+                activities={activities}
+                folderName={currentFolder?.name || 'Klasör'}
+                existingIds={activityIdsHere}
+                onAdd={addActivitiesToFolder}
+            />
+
+            {/* Etkinlik önizleme */}
+            {previewActivity && (
+                <ActivityPreviewModal
+                    activity={previewActivity}
+                    onClose={() => setPreviewActivityId(null)}
+                />
+            )}
 
             {/* Editör */}
             {openNotebook && (
