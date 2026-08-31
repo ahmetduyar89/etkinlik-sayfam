@@ -330,22 +330,51 @@ export function NotebooksView() {
     const openNotebook = notebooks.find((n) => n.id === openNotebookId) || null;
 
     // ── Parçalar ─────────────────────────────────────────────────────
-    const RowMenu = ({ id, children }: { id: string; children: React.ReactNode }) => (
-        <div className="relative" onClick={(e) => e.stopPropagation()}>
-            <button
-                onClick={() => setOpenMenuId(openMenuId === id ? null : id)}
-                aria-label="Seçenekler"
-                className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
+    const RowMenu = ({ id, children }: { id: string; children: React.ReactNode }) => {
+        const btnRef = React.useRef<HTMLButtonElement>(null);
+        const isOpen = openMenuId === id;
+        // Sayfanın altına yakın satırlarda menü yukarı doğru açılır.
+        const [dropUp, setDropUp] = React.useState(false);
+
+        const toggle = () => {
+            if (isOpen) {
+                setOpenMenuId(null);
+                return;
+            }
+            const rect = btnRef.current?.getBoundingClientRect();
+            setDropUp(!!rect && rect.bottom + 168 > window.innerHeight);
+            setOpenMenuId(id);
+        };
+
+        return (
+            <div
+                className={cn('relative', isOpen && 'z-40')}
+                onClick={(e) => e.stopPropagation()}
             >
-                <MoreVertical className="w-4 h-4" />
-            </button>
-            {openMenuId === id && (
-                <div className="absolute right-0 top-full mt-1 z-30 min-w-[184px] bg-white border border-outline-variant rounded-xl shadow-lg py-1.5">
-                    {children}
-                </div>
-            )}
-        </div>
-    );
+                <button
+                    ref={btnRef}
+                    onClick={toggle}
+                    aria-label="Seçenekler"
+                    aria-haspopup="menu"
+                    aria-expanded={isOpen}
+                    className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                >
+                    <MoreVertical className="w-4 h-4" />
+                </button>
+                {isOpen && (
+                    <div
+                        role="menu"
+                        className={cn(
+                            'absolute right-0 z-40 min-w-[184px] bg-white border border-outline-variant rounded-xl shadow-lg py-1.5',
+                            dropUp ? 'bottom-full mb-1' : 'top-full mt-1'
+                        )}
+                    >
+                        {children}
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     const MenuAction = ({
         icon,
@@ -535,7 +564,7 @@ export function NotebooksView() {
                     </p>
                 </div>
             ) : viewMode === 'list' ? (
-                <div className="bg-white border border-outline-variant rounded-[18px] overflow-hidden">
+                <div className="bg-white border border-outline-variant rounded-[18px]">
                     {visibleFolders.map((f) => {
                         const c = countsFor(f.id);
                         return (
@@ -545,7 +574,7 @@ export function NotebooksView() {
                                     setSearch('');
                                     setCurrentFolderId(f.id);
                                 }}
-                                className="flex items-center gap-3.5 px-4 py-3 border-b border-outline-variant last:border-b-0 hover:bg-surface-container-low cursor-pointer transition-colors"
+                                className="flex items-center gap-3.5 px-4 py-3 border-b border-outline-variant last:border-b-0 first:rounded-t-[18px] last:rounded-b-[18px] hover:bg-surface-container-low cursor-pointer transition-colors"
                             >
                                 <Folder
                                     className="w-9 h-9 flex-shrink-0"
@@ -571,7 +600,7 @@ export function NotebooksView() {
                         <div
                             key={n.id}
                             onClick={() => setOpenNotebookId(n.id)}
-                            className="flex items-center gap-3.5 px-4 py-3 border-b border-outline-variant last:border-b-0 hover:bg-surface-container-low cursor-pointer transition-colors"
+                            className="flex items-center gap-3.5 px-4 py-3 border-b border-outline-variant last:border-b-0 first:rounded-t-[18px] last:rounded-b-[18px] hover:bg-surface-container-low cursor-pointer transition-colors"
                         >
                             <span
                                 className={cn(
@@ -638,11 +667,11 @@ export function NotebooksView() {
                         <div
                             key={n.id}
                             onClick={() => setOpenNotebookId(n.id)}
-                            className="bg-white border border-outline-variant rounded-[18px] overflow-hidden cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.08)] transition-all"
+                            className="bg-white border border-outline-variant rounded-[18px] cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.08)] transition-all"
                         >
                             <div
                                 className={cn(
-                                    'h-[104px] flex items-center justify-center',
+                                    'h-[104px] flex items-center justify-center rounded-t-[17px] overflow-hidden',
                                     n.kind === 'whiteboard' ? 'bg-[#ecfdf5]' : 'bg-[#eef2ff]'
                                 )}
                                 style={
