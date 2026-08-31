@@ -21,6 +21,10 @@ interface DrawingCanvasProps {
     bgColor?: string;
     onPageChange?: (current: number, total: number) => void;
     onRequestText?: () => Promise<string | null>;
+    /** Açılışta yüklenecek sayfalar (defter içeriği). */
+    initialPages?: Stroke[][];
+    /** Çizim verisi her değiştiğinde tetiklenir (otomatik kayıt için). */
+    onDirty?: () => void;
 }
 
 const getBB = (s: Stroke): BoundingBox => {
@@ -195,7 +199,16 @@ const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke) => {
 
 export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(
     function DrawingCanvas(
-        { config, enabled, whiteboardMode, bgColor, onPageChange, onRequestText },
+        {
+            config,
+            enabled,
+            whiteboardMode,
+            bgColor,
+            onPageChange,
+            onRequestText,
+            initialPages,
+            onDirty,
+        },
         ref
     ) {
         const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -209,13 +222,16 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const selectedIdxRef = React.useRef<number | null>(null);
         const dragStateRef = React.useRef<DragState | null>(null);
 
-        const pagesRef = React.useRef<Stroke[][]>([[]]);
+        const pagesRef = React.useRef<Stroke[][]>(
+            initialPages && initialPages.length ? initialPages.map((p) => [...p]) : [[]]
+        );
         const currentPageRef = React.useRef(0);
+        const onDirtyRef = React.useRef(onDirty);
 
         const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null);
         const bufferCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
         const laserCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
-        const strokesRef = React.useRef<Stroke[]>([]);
+        const strokesRef = React.useRef<Stroke[]>([...pagesRef.current[0]]);
         const isDrawingRef = React.useRef(false);
         const resizeFrameRef = React.useRef<number | null>(null);
 
@@ -231,6 +247,16 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             setSelectedIdx(null);
             setSelBB(null);
         };
+
+        React.useEffect(() => {
+            onDirtyRef.current = onDirty;
+        }, [onDirty]);
+
+        /** Yeniden çizimi tetikler ve dışarıya "içerik değişti" haberi verir. */
+        const commitStrokes = React.useCallback(() => {
+            setStrokes([...strokesRef.current]);
+            onDirtyRef.current?.();
+        }, []);
 
         const redraw = React.useCallback(() => {
             const bCtx = bufferCtxRef.current;
@@ -283,19 +309,19 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 undo: () => {
                     deselect();
                     strokesRef.current.pop();
-                    setStrokes([...strokesRef.current]);
+                    commitStrokes();
                     redraw();
                 },
                 clear: () => {
                     strokesRef.current = [];
-                    setStrokes([]);
+                    commitStrokes();
                     deselect();
                     redraw();
                 },
                 deleteSelected: () => {
                     if (selectedIdxRef.current !== null) {
                         strokesRef.current.splice(selectedIdxRef.current, 1);
-                        setStrokes([...strokesRef.current]);
+                        commitStrokes();
                         deselect();
                         redraw();
                     }
@@ -306,7 +332,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         strokesRef.current[selectedIdxRef.current]
                     ) {
                         strokesRef.current[selectedIdxRef.current].color = color;
-                        setStrokes([...strokesRef.current]);
+                        commitStrokes();
                         setSelBB({
                             ...getBB(strokesRef.current[selectedIdxRef.current]),
                         });
@@ -325,7 +351,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         strokesRef.current.push(copy);
                         const newIdx = strokesRef.current.length - 1;
                         selectedIdxRef.current = newIdx;
-                        setStrokes([...strokesRef.current]);
+                        commitStrokes();
                         setSelectedIdx(newIdx);
                         setSelBB(getBB(copy));
                         redraw();
@@ -346,7 +372,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 deletePage: () => {
                     if (pagesRef.current.length <= 1) {
                         strokesRef.current = [];
-                        setStrokes([]);
+                        commitStrokes();
                         redraw();
                         return;
                     }
@@ -357,13 +383,31 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     );
                     currentPageRef.current = newIdx;
                     strokesRef.current = [...pagesRef.current[newIdx]];
-                    setStrokes([...strokesRef.current]);
+                    commitStrokes();
                     deselect();
                     window.setTimeout(redraw, 0);
                     notifyPageChange();
                 },
                 getCurrentPage: () => currentPageRef.current,
                 getPageCount: () => pagesRef.current.length,
+                getPages: () => {
+                    pagesRef.current[currentPageRef.current] = [...strokesRef.current];
+                    return pagesRef.current.map((page) =>
+                        page.map((stroke) => ({
+                            ...stroke,
+                            points: stroke.points.map((pt) => ({ ...pt })),
+                        }))
+                    );
+                },
+                loadPages: (pages: Stroke[][]) => {
+                    pagesRef.current = pages.length ? pages.map((p) => [...p]) : [[]];
+                    currentPageRef.current = 0;
+                    strokesRef.current = [...pagesRef.current[0]];
+                    setStrokes([...strokesRef.current]);
+                    deselect();
+                    window.setTimeout(redraw, 0);
+                    notifyPageChange();
+                },
                 screenshot: (wbMode: boolean, color: string) => {
                     const canvas = canvasRef.current;
                     if (!canvas) return;
@@ -391,7 +435,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     link.click();
                 },
             }),
-            [notifyPageChange, redraw, switchPage]
+            [commitStrokes, notifyPageChange, redraw, switchPage]
         );
 
         const resize = React.useCallback(() => {
@@ -444,6 +488,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
             redraw();
         }, [redraw]);
+
+        // Açılışta mevcut sayfa bilgisini bir kez dışarıya bildir.
+        React.useEffect(() => {
+            notifyPageChange();
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, []);
 
         React.useEffect(() => {
             const target = canvasRef.current?.parentElement;
@@ -536,7 +586,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         points: [{ x, y }],
                     };
                     strokesRef.current.push(s);
-                    setStrokes([...strokesRef.current]);
+                    commitStrokes();
                     redraw();
                 }
                 return;
@@ -549,7 +599,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     points: [{ x, y }],
                 };
                 strokesRef.current.push(s);
-                setStrokes([...strokesRef.current]);
+                commitStrokes();
                 redraw();
                 return;
             }
@@ -672,13 +722,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (config.tool === 'select') {
                 if (dragStateRef.current) {
                     dragStateRef.current = null;
-                    setStrokes([...strokesRef.current]);
+                    commitStrokes();
                 }
                 return;
             }
             if (isDrawingRef.current && currentStrokeRef.current) {
                 strokesRef.current.push(currentStrokeRef.current);
-                setStrokes([...strokesRef.current]);
+                commitStrokes();
                 if (bufferCtxRef.current) drawStroke(bufferCtxRef.current, currentStrokeRef.current);
             }
             isDrawingRef.current = false;
@@ -782,7 +832,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 onPointerUp={(e) => {
                                     e.currentTarget.releasePointerCapture(e.pointerId);
                                     dragStateRef.current = null;
-                                    setStrokes([...strokesRef.current]);
+                                    commitStrokes();
                                 }}
                             />
                         ))}
@@ -813,7 +863,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                     onClick={() => {
                                         if (selectedIdxRef.current !== null) {
                                             strokesRef.current[selectedIdxRef.current].color = color;
-                                            setStrokes([...strokesRef.current]);
+                                            commitStrokes();
                                             setSelBB({
                                                 ...getBB(
                                                     strokesRef.current[selectedIdxRef.current]
@@ -847,7 +897,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                         strokesRef.current.push(copy);
                                         const ni = strokesRef.current.length - 1;
                                         selectedIdxRef.current = ni;
-                                        setStrokes([...strokesRef.current]);
+                                        commitStrokes();
                                         setSelectedIdx(ni);
                                         setSelBB(getBB(copy));
                                         redraw();
@@ -864,7 +914,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 onClick={() => {
                                     if (selectedIdxRef.current !== null) {
                                         strokesRef.current.splice(selectedIdxRef.current, 1);
-                                        setStrokes([...strokesRef.current]);
+                                        commitStrokes();
                                         deselect();
                                         redraw();
                                     }

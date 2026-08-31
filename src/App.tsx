@@ -18,7 +18,7 @@ import { LayoutGrid, List, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
 import { useFirestore } from './lib/firebase';
 import { cn } from './utils/cn';
 import { useDebounce } from './hooks/useDebounce';
-import { Navbar } from './components/common/Navbar';
+import { Navbar, type MainView } from './components/common/Navbar';
 import { Modal } from './components/common/Modal';
 import { useToast } from './components/common/ToastProvider';
 import { useConfirm } from './components/common/ConfirmDialog';
@@ -27,6 +27,7 @@ import { ResultsModal } from './components/activities/ResultsModal';
 import { ActivityForm, type ActivityFormValues } from './components/activities/ActivityForm';
 import { ActivityPreviewModal } from './components/activities/ActivityPreviewModal';
 import { StudentPortal } from './components/student/StudentPortal';
+import { NotebooksView } from './components/notebooks/NotebooksView';
 import { GRADE_LEVELS, SUBJECTS, formatGradeLevel } from './constants/education';
 import type { Activity, Unit } from './types';
 
@@ -139,6 +140,7 @@ export default function App() {
     const isStudentView = params.get('view') === 'student' && !!params.get('id');
     const studentId = params.get('id');
 
+    const [mainView, setMainView] = useState<MainView>('content');
     const [activities, setActivities] = useState<Activity[]>([]);
     const [search, setSearch] = useState('');
     const debouncedSearch = useDebounce(search, 200);
@@ -318,8 +320,19 @@ export default function App() {
 
     return (
         <div className="min-h-screen bg-background text-on-background font-sans">
-            <Navbar search={search} onSearchChange={setSearch} onAdd={openCreate} />
+            <Navbar
+                search={search}
+                onSearchChange={setSearch}
+                onAdd={openCreate}
+                view={mainView}
+                onViewChange={setMainView}
+            />
 
+            {mainView === 'notebooks' ? (
+                <div className="flex max-w-[1280px] mx-auto">
+                    <NotebooksView />
+                </div>
+            ) : (
             <div className="flex max-w-[1280px] mx-auto">
                 {/* Sol menü */}
                 <aside className="w-[232px] flex-shrink-0 border-r border-outline-variant bg-white p-3 hidden lg:flex flex-col gap-1 min-h-[calc(100vh-62px)]">
@@ -448,6 +461,7 @@ export default function App() {
                     )}
                 </main>
             </div>
+            )}
 
             {/* Footer */}
             <footer className="bg-white border-t border-outline-variant py-7 px-6 text-center text-[13px] text-on-surface-variant">
