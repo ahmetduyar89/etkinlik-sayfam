@@ -7,6 +7,8 @@ import {
     updateDoc,
     deleteDoc,
     doc,
+    getDoc,
+    setDoc,
     query,
     orderBy,
     Timestamp,
@@ -30,7 +32,7 @@ export const db = initializeFirestore(app, {
 export const storage = getStorage(app);
 
 export interface FirestoreHandler<T extends { id: string }> {
-    sync: (onUpdate: (data: T[]) => void) => () => void;
+    sync: (onUpdate: (data: T[]) => void, onError?: (e: Error) => void) => () => void;
     add: (data: Omit<T, 'id' | 'created_at'>) => Promise<DocumentReference>;
     update: (id: string, data: Partial<Omit<T, 'id'>>) => Promise<void>;
     remove: (id: string) => Promise<void>;
@@ -40,17 +42,21 @@ export function useFirestore<T extends { id: string }>(
     collectionName: string
 ): FirestoreHandler<T> {
     return {
-        sync: (onUpdate) => {
+        sync: (onUpdate, onError) => {
             const q = query(
                 collection(db, collectionName),
                 orderBy('created_at', 'desc')
             );
-            return onSnapshot(q, (snapshot) => {
-                const data = snapshot.docs.map(
-                    (d) => ({ id: d.id, ...d.data() } as unknown as T)
-                );
-                onUpdate(data);
-            });
+            return onSnapshot(
+                q,
+                (snapshot) => {
+                    const data = snapshot.docs.map(
+                        (d) => ({ id: d.id, ...d.data() } as unknown as T)
+                    );
+                    onUpdate(data);
+                },
+                (error) => onError?.(error)
+            );
         },
         add: async (data) =>
             addDoc(collection(db, collectionName), {
@@ -66,4 +72,31 @@ export function useFirestore<T extends { id: string }>(
             await deleteDoc(docRef);
         },
     };
+}
+
+/** Tek bir dokümanı id ile okur; yoksa null döner. */
+export async function fetchDocById<T>(
+    collectionName: string,
+    id: string
+): Promise<T | null> {
+    const snap = await getDoc(doc(db, collectionName, id));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() } as unknown as T;
+}
+
+/** Dokümanı id ile oluşturur veya birleştirerek günceller. */
+export async function saveDocById(
+    collectionName: string,
+    id: string,
+    data: Record<string, unknown>
+): Promise<void> {
+    await setDoc(doc(db, collectionName, id), data, { merge: true });
+}
+
+/** Dokümanı id ile siler. */
+export async function deleteDocById(
+    collectionName: string,
+    id: string
+): Promise<void> {
+    await deleteDoc(doc(db, collectionName, id));
 }

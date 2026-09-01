@@ -7,3 +7,27 @@
   # Since these keys are intended to be public in the JS bundle for client-side use,
   # we disable the smart detection to allow the build to proceed.
   SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+
+# Service worker ve uygulama kabuğu asla önbellekte donmamalı; aksi halde
+# yayınlanan yeni sürüm kurulu uygulamaya geç yansır.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    Content-Type = "application/manifest+json"
+
+# İçerik özetli (hash'li) dosyalar kalıcı olarak önbelleklenebilir.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

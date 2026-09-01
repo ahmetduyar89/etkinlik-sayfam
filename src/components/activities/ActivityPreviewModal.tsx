@@ -11,6 +11,7 @@ import {
     ZoomOut,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { FullscreenToggle } from '../common/FullscreenToggle';
 import { getFormattedHtml } from '../../utils/format-html';
 import { HTML2CANVAS_CDN } from '../../constants/drawing';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
@@ -126,6 +127,7 @@ export function ActivityPreviewModal({
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const stageRef = React.useRef<HTMLDivElement>(null);
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
+    const [drawHistory, setDrawHistory] = React.useState({ canUndo: false, canRedo: false });
     const prompt = usePrompt();
     const toast = useToast();
 
@@ -443,6 +445,8 @@ export function ActivityPreviewModal({
                             </span>
                         </button>
 
+                        <FullscreenToggle variant="dark" />
+
                         <button
                             type="button"
                             onClick={onClose}
@@ -511,6 +515,9 @@ export function ActivityPreviewModal({
                                 onPageChange={(cur, tot) =>
                                     setPageInfo({ current: cur, total: tot })
                                 }
+                                onHistoryChange={(canUndo, canRedo) =>
+                                    setDrawHistory({ canUndo, canRedo })
+                                }
                                 onRequestText={() =>
                                     prompt({
                                         title: 'Metin ekle',
@@ -565,6 +572,7 @@ export function ActivityPreviewModal({
                             <DrawingToolbar
                                 onCommand={(type) => {
                                     if (type === 'UNDO_DRAWING') canvasRef.current?.undo();
+                                    if (type === 'REDO_DRAWING') canvasRef.current?.redo();
                                     if (type === 'CLEAR_DRAWING') canvasRef.current?.clear();
                                     if (type === 'TOGGLE_WHITEBOARD')
                                         setShowWhiteboard((v) => !v);
@@ -578,8 +586,21 @@ export function ActivityPreviewModal({
                                 onScreenshot={handleScreenshot}
                                 isTextBoxMode={isTextBoxMode}
                                 onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
+<<<<<<< HEAD
                                 onOpenLibrary={() => setShowLibraryModal((v) => !v)}
                                 isLibraryOpen={showLibraryModal}
+=======
+                                onInsertMath={(math) =>
+                                    canvasRef.current?.insertMath(
+                                        math,
+                                        previewDrawConfig.color === '#ffffff'
+                                            ? '#1a1b26'
+                                            : previewDrawConfig.color
+                                    )
+                                }
+                                canUndo={drawHistory.canUndo}
+                                canRedo={drawHistory.canRedo}
+>>>>>>> 97d1fe083575a99fffe36616e37adfb1a6f99634
                             />
                         )}
                     </AnimatePresence>

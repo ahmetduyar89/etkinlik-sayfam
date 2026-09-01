@@ -1,17 +1,35 @@
 import React from 'react';
 import { cn } from '../../utils/cn';
 import { Copy, Trash2 } from 'lucide-react';
+import { DRAWING_COLORS, HANDLE_CURSORS } from '../../constants/drawing';
+import { samplePressure } from './penEngine';
+import { recognizeShape, snapAngle } from './shapeRecognizer';
+import { findLibraryItem, getSimSpec, isAnimated, objectRect } from './libraryObjects';
+import { onImageReady } from './imageStore';
+import { drawPaper } from '../notebooks/paper';
 import {
-    DRAWING_COLORS,
-    HANDLE_CURSORS,
-} from '../../constants/drawing';
+    SHAPE_TOOLS,
+    drawStroke,
+    erasePixels,
+    getBB,
+    getHandlePositions,
+    hitTest,
+    isSelectable,
+    resizePoints,
+    strokeInPolygon,
+    strokeNearPoint,
+    unionBB,
+} from './strokeRenderer';
 import type {
     BoundingBox,
     DrawConfig,
     DrawingCanvasHandle,
     DragState,
+    MathObject,
+    PaperStyle,
     Point,
     Stroke,
+    Viewport,
 } from '../../types';
 
 interface DrawingCanvasProps {
@@ -21,203 +39,112 @@ interface DrawingCanvasProps {
     bgColor?: string;
     onPageChange?: (current: number, total: number) => void;
     onRequestText?: () => Promise<string | null>;
+    /** Açılışta yüklenecek sayfalar (defter içeriği). */
+    initialPages?: Stroke[][];
+    /** Çizim verisi her değiştiğinde tetiklenir (otomatik kayıt için). */
+    onDirty?: () => void;
+    /** Geri al / ileri al düğmelerinin durumunu dışarı bildirir. */
+    onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
+    /**
+     * "El" aracının anlamı:
+     *  - `passthrough` (varsayılan): tuval tıklamaları geçirir, altındaki
+     *    etkinlik sayfası kaydırılabilir. Mevcut etkinlik ekranları böyle çalışır.
+     *  - `viewport`: el aracı çalışma alanını kaydırır, tekerlek ve çift parmak
+     *    yakınlaştırır. Defter/beyaz tahta bu kipi kullanır.
+     */
+    panMode?: 'passthrough' | 'viewport';
+    /**
+     * Yakınlaştırma/kaydırma ya da tuval boyutu değiştiğinde tetiklenir.
+     * `size`, kağıt deseninin çizimle aynı hizada durması için gerekir.
+     */
+    onViewChange?: (view: Viewport, size: { w: number; h: number }) => void;
 }
 
-const getBB = (s: Stroke): BoundingBox => {
-    let x1 = Math.min(...s.points.map((p) => p.x));
-    let y1 = Math.min(...s.points.map((p) => p.y));
-    let x2 = Math.max(...s.points.map((p) => p.x));
-    let y2 = Math.max(...s.points.map((p) => p.y));
+/** Geri al yığınında tutulan en fazla adım sayısı. */
+const HISTORY_LIMIT = 80;
+const MIN_SCALE = 0.25;
+const MAX_SCALE = 5;
 
-    if (s.tool === 'circle' && s.points.length >= 2) {
-        const p1 = s.points[0];
-        const p2 = s.points[s.points.length - 1];
-        const r = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
-        x1 = Math.min(x1, p1.x - r);
-        y1 = Math.min(y1, p1.y - r);
-        x2 = Math.max(x2, p1.x + r);
-        y2 = Math.max(y2, p1.y + r);
-    }
-
-    const pad = Math.max((s.width || 2) / 2 + 6, 24);
-    return {
-        x1: x1 - pad,
-        y1: y1 - pad,
-        x2: x2 + pad,
-        y2: y2 + pad,
-    };
-};
-
-const hitTest = (s: Stroke, x: number, y: number): boolean => {
-    const bb = getBB(s);
-    return x >= bb.x1 && x <= bb.x2 && y >= bb.y1 && y <= bb.y2;
-};
-
-const getHandlePositions = (bb: BoundingBox) => {
-    const { x1, y1, x2, y2 } = bb;
-    const mx = (x1 + x2) / 2;
-    const my = (y1 + y2) / 2;
-    return [
-        { id: 'nw', x: x1, y: y1 },
-        { id: 'n', x: mx, y: y1 },
-        { id: 'ne', x: x2, y: y1 },
-        { id: 'w', x: x1, y: my },
-        { id: 'e', x: x2, y: my },
-        { id: 'sw', x: x1, y: y2 },
-        { id: 's', x: mx, y: y2 },
-        { id: 'se', x: x2, y: y2 },
-    ];
-};
-
-const resizePoints = (
-    origPoints: Point[],
-    origBB: BoundingBox,
-    handle: string,
-    dx: number,
-    dy: number
-): Point[] => {
-    const { x1, y1, x2, y2 } = origBB;
-    const w = x2 - x1 || 1;
-    const h = y2 - y1 || 1;
-    const nb = { x1, y1, x2, y2 };
-    if (handle.includes('e')) nb.x2 = x2 + dx;
-    if (handle.includes('w')) nb.x1 = x1 + dx;
-    if (handle.includes('s')) nb.y2 = y2 + dy;
-    if (handle.includes('n')) nb.y1 = y1 + dy;
-    const sx = (nb.x2 - nb.x1) / w;
-    const sy = (nb.y2 - nb.y1) / h;
-    return origPoints.map((p) => ({
-        x: nb.x1 + (p.x - x1) * sx,
-        y: nb.y1 + (p.y - y1) * sy,
-    }));
-};
-
-const drawShape = (
-    tCtx: CanvasRenderingContext2D,
-    tool: string,
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    fill?: boolean
-) => {
-    tCtx.beginPath();
-    if (tool === 'rect') tCtx.rect(x1, y1, x2 - x1, y2 - y1);
-    else if (tool === 'circle')
-        tCtx.arc(
-            x1,
-            y1,
-            Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)),
-            0,
-            Math.PI * 2
-        );
-    else if (tool === 'triangle') {
-        tCtx.moveTo((x1 + x2) / 2, y1);
-        tCtx.lineTo(x2, y2);
-        tCtx.lineTo(x1, y2);
-        tCtx.closePath();
-    } else if (tool === 'line' || tool === 'dashed') {
-        tCtx.moveTo(x1, y1);
-        tCtx.lineTo(x2, y2);
-    } else if (tool === 'arrow' || tool === 'double_arrow') {
-        const h = 15;
-        const a = Math.atan2(y2 - y1, x2 - x1);
-        tCtx.moveTo(x1, y1);
-        tCtx.lineTo(x2, y2);
-        tCtx.stroke();
-        tCtx.beginPath();
-        tCtx.moveTo(x2, y2);
-        tCtx.lineTo(x2 - h * Math.cos(a - Math.PI / 6), y2 - h * Math.sin(a - Math.PI / 6));
-        tCtx.moveTo(x2, y2);
-        tCtx.lineTo(x2 - h * Math.cos(a + Math.PI / 6), y2 - h * Math.sin(a + Math.PI / 6));
-        if (tool === 'double_arrow') {
-            tCtx.moveTo(x1, y1);
-            tCtx.lineTo(x1 + h * Math.cos(a - Math.PI / 6), y1 + h * Math.sin(a - Math.PI / 6));
-            tCtx.moveTo(x1, y1);
-            tCtx.lineTo(x1 + h * Math.cos(a + Math.PI / 6), y1 + h * Math.sin(a + Math.PI / 6));
-        }
-    }
-    if (fill && !['line', 'dashed', 'arrow', 'double_arrow'].includes(tool)) {
-        tCtx.save();
-        tCtx.globalAlpha = 0.2;
-        tCtx.fill();
-        tCtx.restore();
-    }
-    tCtx.stroke();
-};
-
-const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke) => {
-    if (!s || s.points.length < 1) return;
-    tCtx.save();
-    tCtx.strokeStyle = s.color;
-    tCtx.fillStyle = s.color;
-    tCtx.lineWidth = s.width || 2;
-    tCtx.lineCap = 'round';
-    tCtx.lineJoin = 'round';
-    if (s.tool === 'eraser') tCtx.globalCompositeOperation = 'destination-out';
-    if (s.tool === 'highlighter') tCtx.globalAlpha = 0.4;
-    if (s.tool === 'dashed') tCtx.setLineDash([12, 6]);
-
-    if (['pencil', 'highlighter', 'eraser'].includes(s.tool)) {
-        if (s.points.length < 2) {
-            tCtx.beginPath();
-            tCtx.arc(s.points[0].x, s.points[0].y, (s.width || 2) / 2, 0, Math.PI * 2);
-            tCtx.fill();
-        } else {
-            tCtx.beginPath();
-            tCtx.moveTo(s.points[0].x, s.points[0].y);
-            for (let i = 1; i < s.points.length - 1; i++) {
-                const mid = {
-                    x: (s.points[i].x + s.points[i + 1].x) / 2,
-                    y: (s.points[i].y + s.points[i + 1].y) / 2,
-                };
-                tCtx.quadraticCurveTo(s.points[i].x, s.points[i].y, mid.x, mid.y);
-            }
-            const last = s.points[s.points.length - 1];
-            if (last) tCtx.lineTo(last.x, last.y);
-            tCtx.stroke();
-        }
-    } else if (s.tool === 'text') {
-        tCtx.font = 'bold 20px Arial';
-        tCtx.fillText(s.text || '', s.points[0].x, s.points[0].y);
-    } else if (s.tool === 'stamp') {
-        tCtx.font = '44px serif';
-        tCtx.textAlign = 'center';
-        tCtx.textBaseline = 'middle';
-        tCtx.fillText(s.stampIcon || '', s.points[0].x, s.points[0].y);
-    } else {
-        const p1 = s.points[0];
-        const p2 = s.points[s.points.length - 1];
-        drawShape(tCtx, s.tool, p1.x, p1.y, p2.x, p2.y, s.fillEnabled);
-    }
-    tCtx.restore();
-};
+const IDENTITY_VIEW: Viewport = { scale: 1, tx: 0, ty: 0 };
 
 export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(
     function DrawingCanvas(
-        { config, enabled, whiteboardMode, bgColor, onPageChange, onRequestText },
+        {
+            config,
+            enabled,
+            whiteboardMode,
+            bgColor,
+            onPageChange,
+            onRequestText,
+            initialPages,
+            onDirty,
+            onHistoryChange,
+            panMode = 'passthrough',
+            onViewChange,
+        },
         ref
     ) {
         const canvasRef = React.useRef<HTMLCanvasElement>(null);
         const bufferCanvasRef = React.useRef<HTMLCanvasElement>(null);
-        const laserCanvasRef = React.useRef<HTMLCanvasElement>(null);
-        const [, setStrokes] = React.useState<Stroke[]>([]);
+        const overlayCanvasRef = React.useRef<HTMLCanvasElement>(null);
+        const [strokes, setStrokes] = React.useState<Stroke[]>([]);
         const currentStrokeRef = React.useRef<Stroke | null>(null);
-        const [selectedIdx, setSelectedIdx] = React.useState<number | null>(null);
-        const [selBB, setSelBB] = React.useState<BoundingBox | null>(null);
-        const canvasRectRef = React.useRef<DOMRect | null>(null);
-        const selectedIdxRef = React.useRef<number | null>(null);
-        const dragStateRef = React.useRef<DragState | null>(null);
 
-        const pagesRef = React.useRef<Stroke[][]>([[]]);
+        const [selectedIdxs, setSelectedIdxs] = React.useState<number[]>([]);
+        const [selBB, setSelBB] = React.useState<BoundingBox | null>(null);
+        const selectedIdxsRef = React.useRef<number[]>([]);
+        const selBBRef = React.useRef<BoundingBox | null>(null);
+        const dragStateRef = React.useRef<DragState | null>(null);
+        const lassoRef = React.useRef<Point[] | null>(null);
+
+        const viewportEnabled = panMode === 'viewport';
+        const viewRef = React.useRef<Viewport>({ ...IDENTITY_VIEW });
+        const [view, setViewState] = React.useState<Viewport>({ ...IDENTITY_VIEW });
+        const onViewChangeRef = React.useRef(onViewChange);
+        /** Aktif işaretçiler — çift parmak yakınlaştırmayı tanımak için. */
+        const pointersRef = React.useRef(new Map<number, Point>());
+        const pinchRef = React.useRef<{
+            dist: number;
+            scale: number;
+            centerX: number;
+            centerY: number;
+            tx: number;
+            ty: number;
+        } | null>(null);
+        const panRef = React.useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
+
+        const pagesRef = React.useRef<Stroke[][]>(
+            initialPages && initialPages.length ? initialPages.map((p) => [...p]) : [[]]
+        );
         const currentPageRef = React.useRef(0);
+        const onDirtyRef = React.useRef(onDirty);
+
+        const historyRef = React.useRef<{ past: Stroke[][]; future: Stroke[][] }>({
+            past: [],
+            future: [],
+        });
+        const onHistoryChangeRef = React.useRef(onHistoryChange);
 
         const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null);
         const bufferCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
-        const laserCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
-        const strokesRef = React.useRef<Stroke[]>([]);
+        const overlayCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
+        const strokesRef = React.useRef<Stroke[]>([...pagesRef.current[0]]);
         const isDrawingRef = React.useRef(false);
+        /** Kalem baskısını gerçek hızdan üretmek için son nokta zamanı. */
+        const lastPointTimeRef = React.useRef(0);
         const resizeFrameRef = React.useRef<number | null>(null);
+        /** Sürükleme sırasında geçmişe yalnızca bir kez kayıt düşmek için. */
+        const gestureDirtyRef = React.useRef(false);
+        /** Sürüklemede kare sıkıştırma ve statik katman önbelleği. */
+        const dragFrameRef = React.useRef<number | null>(null);
+        const pendingDragRef = React.useRef<(() => void) | null>(null);
+        const dragCachedRef = React.useRef(false);
+        /** Simülasyon kontrolü sürüklenirken geçmişe tek kayıt düşmek için. */
+        const simGestureRef = React.useRef(false);
+        /** Canlı simülasyonların animasyon zamanı (saniye) ve döngü kimliği. */
+        const simTimeRef = React.useRef(0);
+        const simFrameRef = React.useRef<number | null>(null);
+        const simStartRef = React.useRef(0);
 
         const getCanvasSize = () => {
             const c = canvasRef.current;
@@ -226,39 +153,278 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             return { w: c.width / dpr, h: c.height / dpr };
         };
 
+        // ── Görünüm dönüşümleri ──────────────────────────────────────
+        const applyIdentity = (c: CanvasRenderingContext2D) => {
+            const dpr = window.devicePixelRatio || 1;
+            c.setTransform(dpr, 0, 0, dpr, 0, 0);
+        };
+
+        const applyView = (c: CanvasRenderingContext2D) => {
+            const dpr = window.devicePixelRatio || 1;
+            const v = viewRef.current;
+            c.setTransform(dpr * v.scale, 0, 0, dpr * v.scale, dpr * v.tx, dpr * v.ty);
+        };
+
+        /** İşaretçi olayını çalışma alanı (dünya) koordinatına çevirir. */
+        const toWorld = (clientX: number, clientY: number): Point => {
+            const canvas = canvasRef.current;
+            const rect = canvas?.getBoundingClientRect();
+            if (!canvas || !rect) return { x: 0, y: 0 };
+            // Üst katmanlarda CSS ölçeği varsa telafi et.
+            const cssX = rect.width ? canvas.offsetWidth / rect.width : 1;
+            const cssY = rect.height ? canvas.offsetHeight / rect.height : 1;
+            const sx = (clientX - rect.left) * cssX;
+            const sy = (clientY - rect.top) * cssY;
+            const v = viewRef.current;
+            return { x: (sx - v.tx) / v.scale, y: (sy - v.ty) / v.scale };
+        };
+
+        const toScreenPoint = (p: Point, v: Viewport): Point => ({
+            x: p.x * v.scale + v.tx,
+            y: p.y * v.scale + v.ty,
+        });
+
+        /** Şu anda görünen dünya dikdörtgeni. */
+        const visibleWorldRect = React.useCallback(() => {
+            const canvas = canvasRef.current;
+            const dpr = window.devicePixelRatio || 1;
+            const w = canvas ? canvas.width / dpr : 0;
+            const h = canvas ? canvas.height / dpr : 0;
+            const v = viewRef.current;
+            return { x: -v.tx / v.scale, y: -v.ty / v.scale, w: w / v.scale, h: h / v.scale };
+        }, []);
+
         const deselect = () => {
-            selectedIdxRef.current = null;
-            setSelectedIdx(null);
+            selectedIdxsRef.current = [];
+            selBBRef.current = null;
+            setSelectedIdxs([]);
             setSelBB(null);
         };
 
-        const redraw = React.useCallback(() => {
-            const bCtx = bufferCtxRef.current;
-            const mainCtx = ctxRef.current;
-            const buffer = bufferCanvasRef.current;
-            const mainCanvas = canvasRef.current;
-            if (!bCtx || !mainCtx || !buffer || !mainCanvas) return;
-            if (buffer.width === 0 || buffer.height === 0) return;
+        const setSelection = (idxs: number[]) => {
+            selectedIdxsRef.current = idxs;
+            const bb = unionBB(
+                idxs.map((i) => strokesRef.current[i]).filter(Boolean).map(getBB)
+            );
+            selBBRef.current = bb;
+            setSelectedIdxs(idxs);
+            setSelBB(bb);
+        };
 
+        /** Seçim değiştikten sonra sınırlayıcı kutuyu tazeler. */
+        const refreshSelectionBB = () => {
+            const bb = unionBB(
+                selectedIdxsRef.current
+                    .map((i) => strokesRef.current[i])
+                    .filter(Boolean)
+                    .map(getBB)
+            );
+            selBBRef.current = bb;
+            setSelBB(bb);
+        };
+
+        React.useEffect(() => {
+            onDirtyRef.current = onDirty;
+        }, [onDirty]);
+
+        React.useEffect(() => {
+            onHistoryChangeRef.current = onHistoryChange;
+        }, [onHistoryChange]);
+
+        React.useEffect(() => {
+            onViewChangeRef.current = onViewChange;
+        }, [onViewChange]);
+
+        const notifyHistory = React.useCallback(() => {
+            onHistoryChangeRef.current?.(
+                historyRef.current.past.length > 0,
+                historyRef.current.future.length > 0
+            );
+        }, []);
+
+        /** Değişiklikten HEMEN ÖNCE çağrılır: mevcut durumu geçmişe iter. */
+        const pushHistory = React.useCallback(() => {
+            const h = historyRef.current;
+            h.past.push([...strokesRef.current]);
+            if (h.past.length > HISTORY_LIMIT) h.past.shift();
+            h.future = [];
+            notifyHistory();
+        }, [notifyHistory]);
+
+        const resetHistory = React.useCallback(() => {
+            historyRef.current = { past: [], future: [] };
+            notifyHistory();
+        }, [notifyHistory]);
+
+        /** Yeniden çizimi tetikler ve dışarıya "içerik değişti" haberi verir. */
+        const commitStrokes = React.useCallback(() => {
+            setStrokes([...strokesRef.current]);
+            onDirtyRef.current?.();
+        }, []);
+
+        /**
+         * Statik katmanı (tampon) çizer. `exclude` verilirse o indeksler
+         * atlanır — sürükleme sırasında yalnızca hareket eden çizimler
+         * her karede yeniden çizilsin diye kullanılır.
+         */
+        const paintBuffer = React.useCallback((exclude?: Set<number>) => {
+            const bCtx = bufferCtxRef.current;
+            const buffer = bufferCanvasRef.current;
+            if (!bCtx || !buffer || buffer.width === 0 || buffer.height === 0) return;
             const { w, h } = getCanvasSize();
             if (w <= 0 || h <= 0) return;
 
+            applyIdentity(bCtx);
             bCtx.clearRect(0, 0, w, h);
-            strokesRef.current.forEach((s) => drawStroke(bCtx, s));
+            applyView(bCtx);
+            strokesRef.current.forEach((s, i) => {
+                if (exclude?.has(i)) return;
+                drawStroke(bCtx, s, simTimeRef.current);
+            });
+        }, []);
 
+        /**
+         * Ana katmanı tampondan tazeler. `live` verilirse (sürükleme sırasında
+         * hareket eden çizimler) tamponun üstüne çizilir.
+         */
+        const paintMain = React.useCallback((live?: Stroke[]) => {
+            const mainCtx = ctxRef.current;
+            const buffer = bufferCanvasRef.current;
+            if (!mainCtx || !buffer || buffer.width === 0 || buffer.height === 0) return;
+            const { w, h } = getCanvasSize();
+            if (w <= 0 || h <= 0) return;
+
+            applyIdentity(mainCtx);
             mainCtx.clearRect(0, 0, w, h);
             mainCtx.drawImage(buffer, 0, 0, w, h);
 
-            if (selectedIdxRef.current !== null && strokesRef.current[selectedIdxRef.current]) {
-                const bb = getBB(strokesRef.current[selectedIdxRef.current]);
+            if (live && live.length) {
+                applyView(mainCtx);
+                live.forEach((s) => drawStroke(mainCtx, s, simTimeRef.current));
+                applyIdentity(mainCtx);
+            }
+
+            // Seçim çerçevesi ekran uzayında çizilir ki kalınlığı sabit kalsın.
+            const bb = selBBRef.current;
+            if (bb && selectedIdxsRef.current.length > 0) {
+                const v = viewRef.current;
+                const a = toScreenPoint({ x: bb.x1, y: bb.y1 }, v);
+                const b = toScreenPoint({ x: bb.x2, y: bb.y2 }, v);
                 mainCtx.save();
                 mainCtx.strokeStyle = '#4f46e5';
                 mainCtx.lineWidth = 1.5;
                 mainCtx.setLineDash([5, 3]);
-                mainCtx.strokeRect(bb.x1, bb.y1, bb.x2 - bb.x1, bb.y2 - bb.y1);
+                mainCtx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+                // Çoklu seçimde her parçanın kendi çerçevesi soluk gösterilir.
+                if (selectedIdxsRef.current.length > 1) {
+                    mainCtx.strokeStyle = 'rgba(79,70,229,0.35)';
+                    mainCtx.lineWidth = 1;
+                    selectedIdxsRef.current.forEach((i) => {
+                        const s = strokesRef.current[i];
+                        if (!s) return;
+                        const sb = getBB(s);
+                        const p1 = toScreenPoint({ x: sb.x1, y: sb.y1 }, v);
+                        const p2 = toScreenPoint({ x: sb.x2, y: sb.y2 }, v);
+                        mainCtx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
+                    });
+                }
                 mainCtx.restore();
             }
         }, []);
+
+        /** Sayfadaki animasyonlu (canlı) simülasyonların indeksleri. */
+        const animatedIndexes = React.useCallback(() => {
+            const out: number[] = [];
+            strokesRef.current.forEach((st, i) => {
+                if (isAnimated(st)) out.push(i);
+            });
+            return out;
+        }, []);
+
+        const redraw = React.useCallback(() => {
+            // Canlı simülasyonlar tampona girmez: her karede üstte yeniden
+            // çizilecekleri için statik katmanın dışında tutulurlar.
+            const animated = animatedIndexes();
+            if (animated.length === 0) {
+                paintBuffer();
+                paintMain();
+                return;
+            }
+            paintBuffer(new Set(animated));
+            paintMain(animated.map((i) => strokesRef.current[i]));
+        }, [animatedIndexes, paintBuffer, paintMain]);
+
+        /** Sayfada canlı (animasyonlu) simülasyon var mı. */
+        const hasAnimated = React.useMemo(
+            () => strokes.some(isAnimated),
+            [strokes]
+        );
+
+        /**
+         * Canlı simülasyon varken her karede yalnızca onları yeniden çizer.
+         * Döngü, sayfadaki içerik değiştikçe yeniden kurulur; animasyonlu
+         * nesne yoksa hiç çalışmaz.
+         */
+        React.useEffect(() => {
+            if (!hasAnimated) return;
+            let cancelled = false;
+            if (simStartRef.current === 0) simStartRef.current = performance.now();
+            const tick = () => {
+                if (cancelled) return;
+                simTimeRef.current = (performance.now() - simStartRef.current) / 1000;
+                const animated = animatedIndexes();
+                // Sürükleme sırasında tampon seçime göre ayarlı; karışmasın.
+                if (animated.length > 0 && !dragCachedRef.current) {
+                    const live = animated.map((i) => strokesRef.current[i]);
+                    // Devam eden çizim de her karede yeniden basılmalı; aksi
+                    // halde animasyon ana katmanı temizlerken kalem izi kaybolur.
+                    if (isDrawingRef.current && currentStrokeRef.current) {
+                        live.push(currentStrokeRef.current);
+                    }
+                    paintMain(live);
+                }
+                simFrameRef.current = window.requestAnimationFrame(tick);
+            };
+            simFrameRef.current = window.requestAnimationFrame(tick);
+            return () => {
+                cancelled = true;
+                if (simFrameRef.current !== null) {
+                    window.cancelAnimationFrame(simFrameRef.current);
+                    simFrameRef.current = null;
+                }
+            };
+        }, [animatedIndexes, hasAnimated, paintMain]);
+
+        /** Görünümü değiştirir ve yeniden çizer. */
+        const applyViewChange = React.useCallback(
+            (next: Viewport) => {
+                const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, next.scale));
+                const v = { scale, tx: next.tx, ty: next.ty };
+                viewRef.current = v;
+                setViewState(v);
+                onViewChangeRef.current?.(v, getCanvasSize());
+                redraw();
+            },
+            [redraw]
+        );
+
+        /** Ekrandaki bir noktayı sabit tutarak yakınlaştırır. */
+        const zoomAt = React.useCallback(
+            (factor: number, screenX: number, screenY: number) => {
+                const v = viewRef.current;
+                const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.scale * factor));
+                const k = scale / v.scale;
+                applyViewChange({
+                    scale,
+                    tx: screenX - (screenX - v.tx) * k,
+                    ty: screenY - (screenY - v.ty) * k,
+                });
+            },
+            [applyViewChange]
+        );
+
+        // Fotoğraf yüklenince sayfayı tazele.
+        React.useEffect(() => onImageReady(() => redraw()), [redraw]);
 
         const notifyPageChange = React.useCallback(() => {
             onPageChange?.(currentPageRef.current, pagesRef.current.length);
@@ -271,65 +437,150 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 strokesRef.current = [...(pagesRef.current[idx] || [])];
                 setStrokes([...strokesRef.current]);
                 deselect();
+                resetHistory();
                 window.setTimeout(redraw, 0);
                 notifyPageChange();
             },
-            [notifyPageChange, redraw]
+            [notifyPageChange, redraw, resetHistory]
         );
 
         React.useImperativeHandle(
             ref,
             () => ({
                 undo: () => {
+                    const h = historyRef.current;
+                    const previous = h.past.pop();
+                    if (!previous) return;
+                    h.future.push([...strokesRef.current]);
+                    strokesRef.current = previous;
                     deselect();
-                    strokesRef.current.pop();
-                    setStrokes([...strokesRef.current]);
+                    commitStrokes();
+                    notifyHistory();
                     redraw();
                 },
+                redo: () => {
+                    const h = historyRef.current;
+                    const next = h.future.pop();
+                    if (!next) return;
+                    h.past.push([...strokesRef.current]);
+                    strokesRef.current = next;
+                    deselect();
+                    commitStrokes();
+                    notifyHistory();
+                    redraw();
+                },
+                canUndo: () => historyRef.current.past.length > 0,
+                canRedo: () => historyRef.current.future.length > 0,
                 clear: () => {
+                    if (strokesRef.current.length === 0) return;
+                    pushHistory();
                     strokesRef.current = [];
-                    setStrokes([]);
+                    commitStrokes();
                     deselect();
                     redraw();
                 },
+                insertMath: (math: MathObject, color?: string) => {
+                    const item = findLibraryItem(math.kind);
+                    const vis = visibleWorldRect();
+                    const scale = viewRef.current.scale;
+                    // Ekranda hep benzer büyüklükte görünsün diye dünya boyutu
+                    // yakınlaştırmaya göre ölçeklenir.
+                    const boxW = Math.min((item?.size.w ?? 320) / scale, vis.w * 0.85);
+                    const boxH = Math.min((item?.size.h ?? 280) / scale, vis.h * 0.85);
+                    const offset =
+                        (strokesRef.current.filter((st) => st.tool === 'math').length % 5) *
+                        (18 / scale);
+                    const x = vis.x + (vis.w - boxW) / 2 + offset;
+                    const y = vis.y + (vis.h - boxH) / 2 + offset;
+                    pushHistory();
+                    const stroke: Stroke = {
+                        tool: 'math',
+                        color: color || '#1a1b26',
+                        width: 2,
+                        points: [
+                            { x, y },
+                            { x: x + boxW, y: y + boxH },
+                        ],
+                        math: { ...item?.defaults, ...math },
+                    };
+                    strokesRef.current.push(stroke);
+                    commitStrokes();
+                    setSelection([strokesRef.current.length - 1]);
+                    redraw();
+                },
+                insertImage: (src: string, width: number, height: number) => {
+                    const vis = visibleWorldRect();
+                    const maxW = vis.w * 0.6;
+                    const maxH = vis.h * 0.6;
+                    const ratio = Math.min(maxW / width, maxH / height, 1 / viewRef.current.scale);
+                    const w = width * ratio;
+                    const h = height * ratio;
+                    const x = vis.x + (vis.w - w) / 2;
+                    const y = vis.y + (vis.h - h) / 2;
+                    pushHistory();
+                    const stroke: Stroke = {
+                        tool: 'image',
+                        color: '#000000',
+                        src,
+                        points: [
+                            { x, y },
+                            { x: x + w, y: y + h },
+                        ],
+                    };
+                    strokesRef.current.push(stroke);
+                    commitStrokes();
+                    setSelection([strokesRef.current.length - 1]);
+                    redraw();
+                },
+                zoomBy: (factor: number) => {
+                    const { w, h } = getCanvasSize();
+                    zoomAt(factor, w / 2, h / 2);
+                },
+                resetView: () => applyViewChange({ ...IDENTITY_VIEW }),
+                getView: () => ({ ...viewRef.current }),
                 deleteSelected: () => {
-                    if (selectedIdxRef.current !== null) {
-                        strokesRef.current.splice(selectedIdxRef.current, 1);
-                        setStrokes([...strokesRef.current]);
-                        deselect();
-                        redraw();
-                    }
+                    const idxs = new Set(selectedIdxsRef.current);
+                    if (idxs.size === 0) return;
+                    pushHistory();
+                    strokesRef.current = strokesRef.current.filter((_, i) => !idxs.has(i));
+                    commitStrokes();
+                    deselect();
+                    redraw();
                 },
                 setSelectedColor: (color: string) => {
-                    if (
-                        selectedIdxRef.current !== null &&
-                        strokesRef.current[selectedIdxRef.current]
-                    ) {
-                        strokesRef.current[selectedIdxRef.current].color = color;
-                        setStrokes([...strokesRef.current]);
-                        setSelBB({
-                            ...getBB(strokesRef.current[selectedIdxRef.current]),
-                        });
-                        redraw();
-                    }
+                    const idxs = new Set(selectedIdxsRef.current);
+                    if (idxs.size === 0) return;
+                    pushHistory();
+                    strokesRef.current = strokesRef.current.map((st, i) =>
+                        idxs.has(i) ? { ...st, color } : st
+                    );
+                    commitStrokes();
+                    refreshSelectionBB();
+                    redraw();
                 },
                 duplicateSelected: () => {
-                    if (
-                        selectedIdxRef.current !== null &&
-                        strokesRef.current[selectedIdxRef.current]
-                    ) {
-                        const copy: Stroke = JSON.parse(
-                            JSON.stringify(strokesRef.current[selectedIdxRef.current])
-                        );
-                        copy.points = copy.points.map((p) => ({ x: p.x + 20, y: p.y + 20 }));
-                        strokesRef.current.push(copy);
-                        const newIdx = strokesRef.current.length - 1;
-                        selectedIdxRef.current = newIdx;
-                        setStrokes([...strokesRef.current]);
-                        setSelectedIdx(newIdx);
-                        setSelBB(getBB(copy));
-                        redraw();
-                    }
+                    const idxs = selectedIdxsRef.current;
+                    if (idxs.length === 0) return;
+                    const offset = 20 / viewRef.current.scale;
+                    const copies = idxs
+                        .map((i) => strokesRef.current[i])
+                        .filter(Boolean)
+                        .map((s) => {
+                            const copy: Stroke = JSON.parse(JSON.stringify(s));
+                            copy.points = copy.points.map((p) => ({
+                                ...p,
+                                x: p.x + offset,
+                                y: p.y + offset,
+                            }));
+                            return copy;
+                        });
+                    if (copies.length === 0) return;
+                    pushHistory();
+                    const first = strokesRef.current.length;
+                    strokesRef.current.push(...copies);
+                    commitStrokes();
+                    setSelection(copies.map((_, i) => first + i));
+                    redraw();
                 },
                 nextPage: () => {
                     if (currentPageRef.current < pagesRef.current.length - 1)
@@ -338,35 +589,93 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 prevPage: () => {
                     if (currentPageRef.current > 0) switchPage(currentPageRef.current - 1);
                 },
+                goToPage: (index: number) => {
+                    if (index >= 0 && index < pagesRef.current.length && index !== currentPageRef.current)
+                        switchPage(index);
+                },
                 addPage: () => {
                     pagesRef.current[currentPageRef.current] = [...strokesRef.current];
                     pagesRef.current.push([]);
                     switchPage(pagesRef.current.length - 1);
                 },
+                duplicatePage: () => {
+                    pagesRef.current[currentPageRef.current] = [...strokesRef.current];
+                    const copy: Stroke[] = JSON.parse(
+                        JSON.stringify(pagesRef.current[currentPageRef.current])
+                    );
+                    pagesRef.current.splice(currentPageRef.current + 1, 0, copy);
+                    switchPage(currentPageRef.current + 1);
+                },
+                movePage: (from: number, to: number) => {
+                    const pages = pagesRef.current;
+                    if (
+                        from === to ||
+                        from < 0 ||
+                        to < 0 ||
+                        from >= pages.length ||
+                        to >= pages.length
+                    )
+                        return;
+                    pages[currentPageRef.current] = [...strokesRef.current];
+                    const [moved] = pages.splice(from, 1);
+                    pages.splice(to, 0, moved);
+                    // Taşınan sayfa açıksa onunla birlikte git.
+                    let next = currentPageRef.current;
+                    if (currentPageRef.current === from) next = to;
+                    else if (from < currentPageRef.current && to >= currentPageRef.current) next -= 1;
+                    else if (from > currentPageRef.current && to <= currentPageRef.current) next += 1;
+                    currentPageRef.current = next;
+                    strokesRef.current = [...(pages[next] || [])];
+                    setStrokes([...strokesRef.current]);
+                    deselect();
+                    resetHistory();
+                    commitStrokes();
+                    window.setTimeout(redraw, 0);
+                    notifyPageChange();
+                },
                 deletePage: () => {
                     if (pagesRef.current.length <= 1) {
+                        pushHistory();
                         strokesRef.current = [];
-                        setStrokes([]);
+                        commitStrokes();
                         redraw();
                         return;
                     }
                     pagesRef.current.splice(currentPageRef.current, 1);
-                    const newIdx = Math.min(
-                        currentPageRef.current,
-                        pagesRef.current.length - 1
-                    );
+                    const newIdx = Math.min(currentPageRef.current, pagesRef.current.length - 1);
                     currentPageRef.current = newIdx;
                     strokesRef.current = [...pagesRef.current[newIdx]];
-                    setStrokes([...strokesRef.current]);
+                    commitStrokes();
                     deselect();
+                    resetHistory();
                     window.setTimeout(redraw, 0);
                     notifyPageChange();
                 },
                 getCurrentPage: () => currentPageRef.current,
                 getPageCount: () => pagesRef.current.length,
-                screenshot: (wbMode: boolean, color: string) => {
+                getPages: () => {
+                    pagesRef.current[currentPageRef.current] = [...strokesRef.current];
+                    return pagesRef.current.map((page) =>
+                        page.map((stroke) => ({
+                            ...stroke,
+                            points: stroke.points.map((pt) => ({ ...pt })),
+                        }))
+                    );
+                },
+                loadPages: (pages: Stroke[][]) => {
+                    pagesRef.current = pages.length ? pages.map((p) => [...p]) : [[]];
+                    currentPageRef.current = 0;
+                    strokesRef.current = [...pagesRef.current[0]];
+                    setStrokes([...strokesRef.current]);
+                    deselect();
+                    resetHistory();
+                    window.setTimeout(redraw, 0);
+                    notifyPageChange();
+                },
+                screenshot: (wbMode: boolean, color: string, paper?: PaperStyle) => {
                     const canvas = canvasRef.current;
-                    if (!canvas) return;
+                    const buffer = bufferCanvasRef.current;
+                    if (!canvas || !buffer) return;
                     const exp = document.createElement('canvas');
                     exp.width = canvas.width;
                     exp.height = canvas.height;
@@ -374,31 +683,44 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     if (!ctx) return;
                     const dpr = window.devicePixelRatio || 1;
                     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                    const w = canvas.width / dpr;
+                    const h = canvas.height / dpr;
                     if (wbMode) {
                         ctx.fillStyle = color || '#ffffff';
-                        ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+                        ctx.fillRect(0, 0, w, h);
                     }
-                    ctx.drawImage(
-                        canvas,
-                        0,
-                        0,
-                        canvas.width / dpr,
-                        canvas.height / dpr
-                    );
+                    // Kağıt deseni ekranda CSS arka planıdır; çıktıda da
+                    // görünsün diye aynı desen tuvale çizilir.
+                    if (paper && paper !== 'blank') {
+                        drawPaper(ctx, paper, wbMode ? color || '#ffffff' : 'transparent', w, h, viewRef.current);
+                    }
+                    // Seçim çerçevesi görüntüye girmesin diye tampon kullanılır.
+                    ctx.drawImage(buffer, 0, 0, w, h);
                     const link = document.createElement('a');
                     link.download = `cizim-sayfa${currentPageRef.current + 1}.png`;
                     link.href = exp.toDataURL('image/png');
                     link.click();
                 },
             }),
-            [notifyPageChange, redraw, switchPage]
+            [
+                applyViewChange,
+                commitStrokes,
+                notifyHistory,
+                notifyPageChange,
+                pushHistory,
+                redraw,
+                resetHistory,
+                switchPage,
+                visibleWorldRect,
+                zoomAt,
+            ]
         );
 
         const resize = React.useCallback(() => {
             if (isDrawingRef.current) return;
             const canvas = canvasRef.current;
             const buffer = bufferCanvasRef.current;
-            const laser = laserCanvasRef.current;
+            const overlay = overlayCanvasRef.current;
             if (!canvas || !buffer) return;
 
             const dpr = window.devicePixelRatio || 1;
@@ -415,7 +737,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
 
-            [canvas, buffer, laser].forEach((c) => {
+            [canvas, buffer, overlay].forEach((c) => {
                 if (!c) return;
                 c.width = w * dpr;
                 c.height = h * dpr;
@@ -424,26 +746,20 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             });
 
             ctxRef.current = canvas.getContext('2d');
-            if (ctxRef.current) {
-                ctxRef.current.setTransform(1, 0, 0, 1, 0, 0);
-                ctxRef.current.scale(dpr, dpr);
-            }
-
             bufferCtxRef.current = buffer.getContext('2d');
-            if (bufferCtxRef.current) {
-                bufferCtxRef.current.setTransform(1, 0, 0, 1, 0, 0);
-                bufferCtxRef.current.scale(dpr, dpr);
-            }
-
-            if (laser) {
-                laserCtxRef.current = laser.getContext('2d');
-                if (laserCtxRef.current) {
-                    laserCtxRef.current.setTransform(1, 0, 0, 1, 0, 0);
-                    laserCtxRef.current.scale(dpr, dpr);
-                }
-            }
+            if (overlay) overlayCtxRef.current = overlay.getContext('2d');
+            [ctxRef.current, bufferCtxRef.current, overlayCtxRef.current].forEach((c) => {
+                if (c) applyIdentity(c);
+            });
+            onViewChangeRef.current?.(viewRef.current, { w, h });
             redraw();
         }, [redraw]);
+
+        // Açılışta mevcut sayfa bilgisini bir kez dışarıya bildir.
+        React.useEffect(() => {
+            notifyPageChange();
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, []);
 
         React.useEffect(() => {
             const target = canvasRef.current?.parentElement;
@@ -468,48 +784,284 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             };
         }, [resize]);
 
+        // Tekerlek: Ctrl/⌘ ile yakınlaştırma, düz kaydırma ile gezinme.
+        React.useEffect(() => {
+            const canvas = canvasRef.current;
+            if (!canvas || !viewportEnabled || !enabled) return;
+            const onWheel = (e: WheelEvent) => {
+                e.preventDefault();
+                const rect = canvas.getBoundingClientRect();
+                const sx = e.clientX - rect.left;
+                const sy = e.clientY - rect.top;
+                if (e.ctrlKey || e.metaKey) {
+                    zoomAt(Math.exp(-e.deltaY / 320), sx, sy);
+                } else {
+                    const v = viewRef.current;
+                    applyViewChange({ ...v, tx: v.tx - e.deltaX, ty: v.ty - e.deltaY });
+                }
+            };
+            canvas.addEventListener('wheel', onWheel, { passive: false });
+            return () => canvas.removeEventListener('wheel', onWheel);
+        }, [applyViewChange, enabled, viewportEnabled, zoomAt]);
+
+        /** Devam eden çizimi iptal eder (çift parmak dokunuşunda). */
+        const cancelCurrentStroke = () => {
+            if (!isDrawingRef.current && !currentStrokeRef.current) return;
+            isDrawingRef.current = false;
+            currentStrokeRef.current = null;
+            lassoRef.current = null;
+            redraw();
+        };
+
+        /** Silgi ucunun yarıçapı (dünya birimi). */
+        const eraserRadius = () => Math.max(6, config.width * 5);
+
+        /**
+         * Sürükleme başlarken seçili olmayan her şeyi tampona sabitler.
+         * Böylece her karede yalnızca hareket eden çizimler yeniden çizilir;
+         * yüzlerce çizimli bir sayfada boyutlandırma takılmaz.
+         */
+        const beginDragCache = () => {
+            paintBuffer(new Set(selectedIdxsRef.current));
+            dragCachedRef.current = true;
+        };
+
+        /** Sürükleme sırasında yalnızca seçili çizimleri tazeler. */
+        const paintDrag = () => {
+            paintMain(
+                selectedIdxsRef.current.map((i) => strokesRef.current[i]).filter(Boolean)
+            );
+        };
+
+        const endDragCache = () => {
+            if (dragFrameRef.current !== null) {
+                window.cancelAnimationFrame(dragFrameRef.current);
+                dragFrameRef.current = null;
+            }
+            pendingDragRef.current = null;
+            if (!dragCachedRef.current) return;
+            dragCachedRef.current = false;
+            redraw();
+        };
+
+        /**
+         * İşaretçi olaylarını ekran karesine sıkıştırır. Fare/kalem saniyede
+         * 120'ye kadar olay üretebilir; her birinde yeniden çizmek yerine
+         * karede bir kez, en son konumla çizilir.
+         */
+        const scheduleDrag = (apply: () => void) => {
+            pendingDragRef.current = apply;
+            if (dragFrameRef.current !== null) return;
+            dragFrameRef.current = window.requestAnimationFrame(() => {
+                dragFrameRef.current = null;
+                const job = pendingDragRef.current;
+                pendingDragRef.current = null;
+                job?.();
+            });
+        };
+
+        /** Geçmişe bu hareket için bir kez kayıt düşer. */
+        const markGesture = () => {
+            if (gestureDirtyRef.current) return;
+            pushHistory();
+            gestureDirtyRef.current = true;
+        };
+
+        /** Çizgi silgisi: dokunulan çizimin tamamını kaldırır. */
+        const eraseStrokesAt = (x: number, y: number) => {
+            const radius = Math.max(6, config.width * 3);
+            const survivors = strokesRef.current.filter(
+                (st) => !isSelectable(st) || !strokeNearPoint(st, x, y, radius)
+            );
+            if (survivors.length === strokesRef.current.length) return;
+            markGesture();
+            strokesRef.current = survivors;
+            commitStrokes();
+            redraw();
+        };
+
+        /**
+         * Piksel silgisi: serbest çizimleri gerçekten keser.
+         * Eskiden üste `destination-out` bir katman konuyordu; o katman normal
+         * bir çizim olduğu için seçilip kenara çekilebiliyor ve altındaki
+         * "silinmiş" içerik geri geliyordu.
+         */
+        const erasePixelsAt = (x: number, y: number) => {
+            const next = erasePixels(strokesRef.current, x, y, eraserRadius());
+            if (!next) return;
+            markGesture();
+            strokesRef.current = next;
+            commitStrokes();
+            redraw();
+        };
+
+        /** Silgi ucunu üst katmanda daire olarak gösterir. */
+        const drawEraserCursor = (x: number, y: number) => {
+            const oCtx = overlayCtxRef.current;
+            if (!oCtx) return;
+            const { w, h } = getCanvasSize();
+            applyIdentity(oCtx);
+            oCtx.clearRect(0, 0, w, h);
+            const v = viewRef.current;
+            const c = toScreenPoint({ x, y }, v);
+            oCtx.save();
+            oCtx.beginPath();
+            oCtx.arc(c.x, c.y, eraserRadius() * v.scale, 0, Math.PI * 2);
+            oCtx.fillStyle = 'rgba(148,163,184,0.20)';
+            oCtx.strokeStyle = 'rgba(71,85,105,0.75)';
+            oCtx.lineWidth = 1.5;
+            oCtx.fill();
+            oCtx.stroke();
+            oCtx.restore();
+        };
+
+        /** Kement önizlemesini üst katmana çizer. */
+        const drawLassoPreview = () => {
+            const oCtx = overlayCtxRef.current;
+            const poly = lassoRef.current;
+            const { w, h } = getCanvasSize();
+            if (!oCtx) return;
+            applyIdentity(oCtx);
+            oCtx.clearRect(0, 0, w, h);
+            if (!poly || poly.length < 2) return;
+            const v = viewRef.current;
+            oCtx.save();
+            oCtx.strokeStyle = '#4f46e5';
+            oCtx.fillStyle = 'rgba(79,70,229,0.10)';
+            oCtx.lineWidth = 1.5;
+            oCtx.setLineDash([6, 4]);
+            oCtx.beginPath();
+            poly.forEach((p, i) => {
+                const s = toScreenPoint(p, v);
+                if (i === 0) oCtx.moveTo(s.x, s.y);
+                else oCtx.lineTo(s.x, s.y);
+            });
+            oCtx.closePath();
+            oCtx.fill();
+            oCtx.stroke();
+            oCtx.restore();
+        };
+
+        const clearOverlay = () => {
+            const oCtx = overlayCtxRef.current;
+            if (!oCtx) return;
+            const { w, h } = getCanvasSize();
+            applyIdentity(oCtx);
+            oCtx.clearRect(0, 0, w, h);
+        };
+
         const startDrawing = async (e: React.PointerEvent) => {
-            if (!enabled || ['pan', 'sun'].includes(config.tool)) return;
-            const rect = canvasRef.current?.getBoundingClientRect();
-            if (!rect) return;
-            canvasRectRef.current = rect;
-            const scaleX = rect.width ? (canvasRef.current?.offsetWidth || 1) / rect.width : 1;
-            const scaleY = rect.height ? (canvasRef.current?.offsetHeight || 1) / rect.height : 1;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
+            if (!enabled) return;
+            pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+            // Çift parmak: yakınlaştırma/kaydırma kipine geç.
+            if (viewportEnabled && pointersRef.current.size === 2) {
+                cancelCurrentStroke();
+                clearOverlay();
+                const [a, b] = [...pointersRef.current.values()];
+                const canvas = canvasRef.current;
+                const rect = canvas?.getBoundingClientRect();
+                pinchRef.current = {
+                    dist: Math.hypot(b.x - a.x, b.y - a.y) || 1,
+                    scale: viewRef.current.scale,
+                    centerX: (a.x + b.x) / 2 - (rect?.left ?? 0),
+                    centerY: (a.y + b.y) / 2 - (rect?.top ?? 0),
+                    tx: viewRef.current.tx,
+                    ty: viewRef.current.ty,
+                };
+                return;
+            }
+            if (pointersRef.current.size > 1) return;
+
+            if (config.tool === 'sun') return;
+
+            // El aracı: defterde çalışma alanını kaydırır, etkinlik ekranlarında
+            // tıklamaları alttaki sayfaya geçirir (tuval zaten pointer-events:none).
+            if (config.tool === 'pan') {
+                if (!viewportEnabled) return;
+                panRef.current = {
+                    x: e.clientX,
+                    y: e.clientY,
+                    tx: viewRef.current.tx,
+                    ty: viewRef.current.ty,
+                };
+                return;
+            }
+
+            const { x, y } = toWorld(e.clientX, e.clientY);
+
+            // Kement: serbest bir çerçeve çizip içine düşenleri seçer.
+            if (config.tool === 'lasso') {
+                deselect();
+                lassoRef.current = [{ x, y }];
+                isDrawingRef.current = true;
+                redraw();
+                return;
+            }
+
+            // Silgi hiçbir kipte çizim nesnesi üretmez; doğrudan içeriği düzenler.
+            if (config.tool === 'eraser') {
+                isDrawingRef.current = true;
+                gestureDirtyRef.current = false;
+                if (config.eraserMode === 'stroke') eraseStrokesAt(x, y);
+                else erasePixelsAt(x, y);
+                drawEraserCursor(x, y);
+                return;
+            }
 
             if (config.tool === 'select') {
-                if (selectedIdxRef.current !== null && selBB) {
-                    for (const h of getHandlePositions(selBB)) {
-                        if (Math.hypot(x - h.x, y - h.y) < 10) {
-                            const s = strokesRef.current[selectedIdxRef.current];
+                const bb = selBBRef.current;
+                if (selectedIdxsRef.current.length > 0 && bb) {
+                    const v = viewRef.current;
+                    // Tutamaçlar ekran uzayında sabit büyüklükte olduğu için
+                    // yakınlık testi de ekran uzayında yapılır.
+                    const screen = toScreenPoint({ x, y }, v);
+                    for (const h of getHandlePositions(bb)) {
+                        const hs = toScreenPoint(h, v);
+                        if (Math.hypot(screen.x - hs.x, screen.y - hs.y) < 12) {
+                            gestureDirtyRef.current = false;
                             dragStateRef.current = {
                                 type: 'resize',
                                 handle: h.id,
                                 startX: x,
                                 startY: y,
-                                origPoints: JSON.parse(JSON.stringify(s.points)),
-                                origBB: { ...selBB },
+                                orig: selectedIdxsRef.current.map((i) =>
+                                    JSON.parse(JSON.stringify(strokesRef.current[i].points))
+                                ),
+                                origBB: { ...bb },
                             };
+                            beginDragCache();
                             return;
                         }
                     }
-                    if (x >= selBB.x1 && x <= selBB.x2 && y >= selBB.y1 && y <= selBB.y2) {
-                        const s = strokesRef.current[selectedIdxRef.current];
+                    if (x >= bb.x1 && x <= bb.x2 && y >= bb.y1 && y <= bb.y2) {
+                        gestureDirtyRef.current = false;
                         dragStateRef.current = {
                             type: 'move',
                             startX: x,
                             startY: y,
-                            origPoints: JSON.parse(JSON.stringify(s.points)),
+                            orig: selectedIdxsRef.current.map((i) =>
+                                JSON.parse(JSON.stringify(strokesRef.current[i].points))
+                            ),
                         };
+                        beginDragCache();
                         return;
                     }
                 }
                 for (let i = strokesRef.current.length - 1; i >= 0; i--) {
+                    if (!isSelectable(strokesRef.current[i])) continue;
                     if (hitTest(strokesRef.current[i], x, y)) {
-                        selectedIdxRef.current = i;
-                        setSelectedIdx(i);
-                        setSelBB(getBB(strokesRef.current[i]));
+                        // Shift ile tıklamak seçime ekler/çıkarır.
+                        if (e.shiftKey) {
+                            const current = selectedIdxsRef.current;
+                            setSelection(
+                                current.includes(i)
+                                    ? current.filter((n) => n !== i)
+                                    : [...current, i]
+                            );
+                        } else {
+                            setSelection([i]);
+                        }
                         redraw();
                         return;
                     }
@@ -519,15 +1071,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
 
-            if (selectedIdxRef.current !== null) {
+            if (selectedIdxsRef.current.length > 0) {
                 deselect();
                 redraw();
             }
 
             if (config.tool === 'text') {
-                const val = onRequestText
-                    ? await onRequestText()
-                    : window.prompt('Metin girin:');
+                const val = onRequestText ? await onRequestText() : window.prompt('Metin girin:');
                 if (val && val.trim()) {
                     const s: Stroke = {
                         tool: 'text',
@@ -535,8 +1085,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         color: config.color,
                         points: [{ x, y }],
                     };
+                    pushHistory();
                     strokesRef.current.push(s);
-                    setStrokes([...strokesRef.current]);
+                    commitStrokes();
                     redraw();
                 }
                 return;
@@ -545,160 +1096,361 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 const s: Stroke = {
                     tool: 'stamp',
                     stampIcon: config.stampIcon,
-                    color: '#000',
+                    // Emoji damgalar kendi renklerini korur; metin sembolleri
+                    // (π, ×, ∈…) seçili kalem rengini alır. Sabit siyah kalırsa
+                    // koyu zeminli sayfalarda görünmezler.
+                    color: config.color,
                     points: [{ x, y }],
                 };
+                pushHistory();
                 strokesRef.current.push(s);
-                setStrokes([...strokesRef.current]);
+                commitStrokes();
                 redraw();
                 return;
             }
+
             isDrawingRef.current = true;
+            const first: Point = { x, y };
+            lastPointTimeRef.current = performance.now();
+            if (config.tool === 'pencil') {
+                // İlk noktada hız bilgisi yok; orta hızla başla.
+                first.p = samplePressure(e.pressure, e.pointerType, 0.5, undefined, config.penType);
+            }
             currentStrokeRef.current = {
                 tool: config.tool,
                 color: config.color,
-                width:
-                    config.tool === 'highlighter'
-                        ? config.width * 5
-                        : config.tool === 'eraser'
-                        ? config.width * 10
-                        : config.width,
+                width: config.tool === 'highlighter' ? config.width * 5 : config.width,
                 fillEnabled: config.fillEnabled,
-                points: [{ x, y }],
+                penType: config.tool === 'pencil' ? config.penType ?? 'ballpoint' : undefined,
+                points: [first],
             };
         };
 
         const draw = (e: React.PointerEvent) => {
-            const rect = canvasRectRef.current || canvasRef.current?.getBoundingClientRect();
-            if (!rect) return;
-            const scaleX = rect.width ? (canvasRef.current?.offsetWidth || 1) / rect.width : 1;
-            const scaleY = rect.height ? (canvasRef.current?.offsetHeight || 1) / rect.height : 1;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
+            if (pointersRef.current.has(e.pointerId)) {
+                pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            }
 
-            if (
-                config.tool === 'select' &&
-                dragStateRef.current &&
-                selectedIdxRef.current !== null
-            ) {
+            // Çift parmak yakınlaştırma
+            const pinch = pinchRef.current;
+            if (pinch && pointersRef.current.size >= 2) {
+                const [a, b] = [...pointersRef.current.values()];
+                const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+                const scale = Math.min(
+                    MAX_SCALE,
+                    Math.max(MIN_SCALE, (pinch.scale * dist) / pinch.dist)
+                );
+                const k = scale / pinch.scale;
+                applyViewChange({
+                    scale,
+                    tx: pinch.centerX - (pinch.centerX - pinch.tx) * k,
+                    ty: pinch.centerY - (pinch.centerY - pinch.ty) * k,
+                });
+                return;
+            }
+
+            // El aracıyla kaydırma
+            const pan = panRef.current;
+            if (pan) {
+                applyViewChange({
+                    scale: viewRef.current.scale,
+                    tx: pan.tx + (e.clientX - pan.x),
+                    ty: pan.ty + (e.clientY - pan.y),
+                });
+                return;
+            }
+
+            const { x, y } = toWorld(e.clientX, e.clientY);
+
+            if (config.tool === 'lasso' && isDrawingRef.current && lassoRef.current) {
+                const last = lassoRef.current[lassoRef.current.length - 1];
+                if (Math.hypot(x - last.x, y - last.y) * viewRef.current.scale >= 3) {
+                    lassoRef.current.push({ x, y });
+                    drawLassoPreview();
+                }
+                return;
+            }
+
+            if (config.tool === 'select' && dragStateRef.current && selectedIdxsRef.current.length) {
                 const drag = dragStateRef.current;
                 const dx = x - drag.startX;
                 const dy = y - drag.startY;
-                const s = strokesRef.current[selectedIdxRef.current];
-                if (drag.type === 'move') {
-                    s.points = drag.origPoints.map((p) => ({
-                        x: p.x + dx,
-                        y: p.y + dy,
-                    }));
-                } else if (drag.type === 'resize') {
-                    s.points = resizePoints(drag.origPoints, drag.origBB, drag.handle, dx, dy);
-                }
-                const newBB = getBB(s);
-                setSelBB(newBB);
-                redraw();
+                scheduleDrag(() => {
+                    markGesture();
+                    // Kopyala-yaz: geçmişteki anlık görüntüler bozulmasın.
+                    selectedIdxsRef.current.forEach((idx, n) => {
+                        const s = strokesRef.current[idx];
+                        if (!s) return;
+                        const orig = drag.orig[n];
+                        const points =
+                            drag.type === 'move'
+                                ? orig.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy }))
+                                : resizePoints(orig, drag.origBB, drag.handle, dx, dy);
+                        strokesRef.current[idx] = { ...s, points };
+                    });
+                    refreshSelectionBB();
+                    paintDrag();
+                });
                 return;
             }
 
-            const cssW = canvasRef.current?.offsetWidth || rect.width;
-            const cssH = canvasRef.current?.offsetHeight || rect.height;
+            if (config.tool === 'eraser') {
+                if (isDrawingRef.current) {
+                    if (config.eraserMode === 'stroke') eraseStrokesAt(x, y);
+                    else erasePixelsAt(x, y);
+                }
+                drawEraserCursor(x, y);
+                return;
+            }
 
             if (config.tool === 'sun') {
-                const lCtx = laserCtxRef.current;
-                if (lCtx) {
-                    lCtx.clearRect(0, 0, cssW, cssH);
-                    const cx = x;
-                    const cy = y;
+                const oCtx = overlayCtxRef.current;
+                if (oCtx) {
+                    const { w, h } = getCanvasSize();
+                    const v = viewRef.current;
+                    const s = toScreenPoint({ x, y }, v);
+                    applyIdentity(oCtx);
+                    oCtx.clearRect(0, 0, w, h);
                     const r = 12;
-                    const g = lCtx.createRadialGradient(cx, cy, 0, cx, cy, r * 3);
+                    const g = oCtx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r * 3);
                     g.addColorStop(0, 'rgba(255,50,50,1)');
                     g.addColorStop(0.3, 'rgba(255,80,80,0.4)');
                     g.addColorStop(1, 'rgba(255,0,0,0)');
-                    lCtx.fillStyle = g;
-                    lCtx.beginPath();
-                    lCtx.arc(cx, cy, r * 3, 0, Math.PI * 2);
-                    lCtx.fill();
-                    lCtx.fillStyle = '#fff';
-                    lCtx.beginPath();
-                    lCtx.arc(cx, cy, 2, 0, Math.PI * 2);
-                    lCtx.fill();
+                    oCtx.fillStyle = g;
+                    oCtx.beginPath();
+                    oCtx.arc(s.x, s.y, r * 3, 0, Math.PI * 2);
+                    oCtx.fill();
+                    oCtx.fillStyle = '#fff';
+                    oCtx.beginPath();
+                    oCtx.arc(s.x, s.y, 2, 0, Math.PI * 2);
+                    oCtx.fill();
                 }
                 return;
             }
+
             if (!isDrawingRef.current || !currentStrokeRef.current) return;
             const stroke = currentStrokeRef.current;
             const last = stroke.points[stroke.points.length - 1];
-            if (!last || Math.hypot(x - last.x, y - last.y) < 0.5) return;
-            
-            const oldBB = getBB(stroke);
-            stroke.points.push({ x, y });
-            const newBB = getBB(stroke);
-            
-            const minX = Math.min(oldBB.x1, newBB.x1);
-            const minY = Math.min(oldBB.y1, newBB.y1);
-            const maxX = Math.max(oldBB.x2, newBB.x2);
-            const maxY = Math.max(oldBB.y2, newBB.y2);
-            const width = maxX - minX;
-            const height = maxY - minY;
+            if (!last) return;
+            const step = Math.hypot(x - last.x, y - last.y);
+            if (step * viewRef.current.scale < 0.5) return;
 
+            const oldBB = getBB(stroke);
+            if (SHAPE_TOOLS.includes(stroke.tool)) {
+                // Şekiller yalnızca başlangıç ve bitiş noktasıyla tanımlanır.
+                const start = stroke.points[0];
+                const end = config.snapAngle ? snapAngle(start, { x, y }) : { x, y };
+                stroke.points = [start, end];
+            } else {
+                const point: Point = { x, y };
+                if (stroke.tool === 'pencil') {
+                    // Hız = ekranda alınan yol / geçen süre. Sadece mesafeye
+                    // bakmak işaretçi olay sıklığını hız sanmak olurdu.
+                    const now = performance.now();
+                    const elapsed = Math.max(1, now - lastPointTimeRef.current);
+                    lastPointTimeRef.current = now;
+                    point.p = samplePressure(
+                        e.pressure,
+                        e.pointerType,
+                        (step * viewRef.current.scale) / elapsed,
+                        last.p,
+                        stroke.penType
+                    );
+                }
+                stroke.points.push(point);
+            }
+            const newBB = getBB(stroke);
+
+            // Yalnızca değişen bölgeyi tamponla tazeleyip üstüne çiz.
             const mainCtx = ctxRef.current;
-            if (mainCtx && bufferCanvasRef.current) {
+            const buffer = bufferCanvasRef.current;
+            if (mainCtx && buffer) {
+                const v = viewRef.current;
+                const minX = Math.min(oldBB.x1, newBB.x1) * v.scale + v.tx;
+                const minY = Math.min(oldBB.y1, newBB.y1) * v.scale + v.ty;
+                const maxX = Math.max(oldBB.x2, newBB.x2) * v.scale + v.tx;
+                const maxY = Math.max(oldBB.y2, newBB.y2) * v.scale + v.ty;
+                const width = maxX - minX;
+                const height = maxY - minY;
                 const dpr = window.devicePixelRatio || 1;
+
                 let sx = Math.floor(minX * dpr);
                 let sy = Math.floor(minY * dpr);
                 let sw = Math.ceil(width * dpr);
                 let sh = Math.ceil(height * dpr);
+                const imgW = buffer.width;
+                const imgH = buffer.height;
+                if (sx < 0) {
+                    sw += sx;
+                    sx = 0;
+                }
+                if (sy < 0) {
+                    sh += sy;
+                    sy = 0;
+                }
+                if (sx + sw > imgW) sw = imgW - sx;
+                if (sy + sh > imgH) sh = imgH - sy;
 
-                const imgW = bufferCanvasRef.current.width;
-                const imgH = bufferCanvasRef.current.height;
-                
-                if (sx < 0) { sw += sx; sx = 0; }
-                if (sy < 0) { sh += sy; sy = 0; }
-                if (sx + sw > imgW) { sw = imgW - sx; }
-                if (sy + sh > imgH) { sh = imgH - sy; }
-
+                applyIdentity(mainCtx);
                 mainCtx.clearRect(minX, minY, width, height);
                 if (sw > 0 && sh > 0) {
                     mainCtx.drawImage(
-                        bufferCanvasRef.current,
-                        sx, sy, sw, sh,
-                        sx / dpr, sy / dpr, sw / dpr, sh / dpr
+                        buffer,
+                        sx,
+                        sy,
+                        sw,
+                        sh,
+                        sx / dpr,
+                        sy / dpr,
+                        sw / dpr,
+                        sh / dpr
                     );
                 }
+                applyView(mainCtx);
                 drawStroke(mainCtx, stroke);
+                applyIdentity(mainCtx);
             }
         };
 
-        const stopDrawing = () => {
+        const stopDrawing = (e?: React.PointerEvent) => {
+            if (e) pointersRef.current.delete(e.pointerId);
+            if (pointersRef.current.size < 2) pinchRef.current = null;
+            if (panRef.current) {
+                panRef.current = null;
+                return;
+            }
+
+            if (config.tool === 'lasso') {
+                const poly = lassoRef.current;
+                lassoRef.current = null;
+                isDrawingRef.current = false;
+                clearOverlay();
+                if (poly && poly.length >= 3) {
+                    const picked: number[] = [];
+                    strokesRef.current.forEach((s, i) => {
+                        if (isSelectable(s) && strokeInPolygon(s, poly)) picked.push(i);
+                    });
+                    if (picked.length) setSelection(picked);
+                }
+                redraw();
+                return;
+            }
+
             if (config.tool === 'select') {
                 if (dragStateRef.current) {
                     dragStateRef.current = null;
-                    setStrokes([...strokesRef.current]);
+                    gestureDirtyRef.current = false;
+                    endDragCache();
+                    commitStrokes();
                 }
                 return;
             }
+            if (config.tool === 'eraser') {
+                isDrawingRef.current = false;
+                gestureDirtyRef.current = false;
+                clearOverlay();
+                return;
+            }
             if (isDrawingRef.current && currentStrokeRef.current) {
-                strokesRef.current.push(currentStrokeRef.current);
-                setStrokes([...strokesRef.current]);
-                if (bufferCtxRef.current) drawStroke(bufferCtxRef.current, currentStrokeRef.current);
+                let stroke = currentStrokeRef.current;
+                let snapped = false;
+
+                // Şekil düzeltme: serbest çizilen kapalı/düz şekilleri tanı.
+                if (config.snapShapes && stroke.tool === 'pencil') {
+                    const recognized = recognizeShape(stroke.points);
+                    if (recognized) {
+                        stroke = {
+                            ...stroke,
+                            tool: recognized.tool,
+                            points: recognized.points,
+                            penType: undefined,
+                            fillEnabled: config.fillEnabled,
+                        };
+                        snapped = true;
+                    }
+                }
+
+                pushHistory();
+                strokesRef.current.push(stroke);
+                commitStrokes();
+                if (snapped) {
+                    // Ana katmanda serbest çizimin izi duruyor; baştan çiz.
+                    redraw();
+                } else if (bufferCtxRef.current) {
+                    applyView(bufferCtxRef.current);
+                    drawStroke(bufferCtxRef.current, stroke);
+                    applyIdentity(bufferCtxRef.current);
+                }
             }
             isDrawingRef.current = false;
+            gestureDirtyRef.current = false;
             currentStrokeRef.current = null;
-            if (laserCtxRef.current) {
-                const cssW = canvasRef.current?.offsetWidth || 0;
-                const cssH = canvasRef.current?.offsetHeight || 0;
-                laserCtxRef.current.clearRect(0, 0, cssW, cssH);
-            }
+            if (config.tool === 'sun') clearOverlay();
         };
 
         const handleCursorStyle = (): string => {
             if (!enabled) return 'default';
-            if (config.tool === 'pan') return 'grab';
+            if (config.tool === 'pan') return panRef.current ? 'grabbing' : 'grab';
             if (config.tool === 'select') return 'default';
+            if (config.tool === 'eraser') return 'none';
             return 'crosshair';
         };
 
-        const selStroke =
-            selectedIdx !== null ? strokesRef.current[selectedIdx] : null;
+        const selectedStrokes = selectedIdxs
+            .map((i) => strokesRef.current[i])
+            .filter(Boolean);
+        const selColor =
+            selectedStrokes.length && selectedStrokes.every((s) => s.color === selectedStrokes[0].color)
+                ? selectedStrokes[0].color
+                : null;
+        const selSim = selectedIdxs.length === 1 ? strokesRef.current[selectedIdxs[0]] : null;
+        const selSimMath = selSim?.tool === 'math' ? selSim.math : undefined;
+        const simSpec = selSimMath ? getSimSpec(selSimMath.kind) : undefined;
+        const simRect = selSim ? objectRect(selSim) : null;
+        const simControls =
+            simSpec?.controls && simRect && selSimMath ? simSpec.controls(simRect, selSimMath) : [];
+
+        const selScreenBB = selBB
+            ? {
+                  x1: selBB.x1 * view.scale + view.tx,
+                  y1: selBB.y1 * view.scale + view.ty,
+                  x2: selBB.x2 * view.scale + view.tx,
+                  y2: selBB.y2 * view.scale + view.ty,
+              }
+            : null;
+
+        /**
+         * Seçili simülasyonun ayarını değiştirir. Sürükleme boyunca geçmişe
+         * yalnızca bir kez kayıt düşülür.
+         */
+        const patchSim = (patch: Record<string, number>, startGesture: boolean) => {
+            const idx = selectedIdxsRef.current[0];
+            const st = strokesRef.current[idx];
+            if (!st?.math) return;
+            if (startGesture) {
+                if (!simGestureRef.current) {
+                    pushHistory();
+                    simGestureRef.current = true;
+                }
+            } else {
+                pushHistory();
+            }
+            strokesRef.current[idx] = {
+                ...st,
+                math: { ...st.math, sim: { ...st.math.sim, ...patch } },
+            };
+            commitStrokes();
+            redraw();
+        };
+
+        /** Seçili çizimleri toplu günceller (renk, çoğalt, sil). */
+        const mutateSelection = (fn: (idxs: number[]) => void) => {
+            if (selectedIdxsRef.current.length === 0) return;
+            pushHistory();
+            fn(selectedIdxsRef.current);
+            commitStrokes();
+            redraw();
+        };
 
         return (
             <>
@@ -708,12 +1460,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     onPointerDown={startDrawing}
                     onPointerMove={draw}
                     onPointerUp={stopDrawing}
+                    onPointerCancel={stopDrawing}
                     onPointerLeave={stopDrawing}
                     aria-label="Çizim alanı"
                     className={cn(
                         'absolute left-0 z-[4000] touch-none transition-opacity',
                         enabled
-                            ? config.tool === 'pan'
+                            ? config.tool === 'pan' && !viewportEnabled
                                 ? 'pointer-events-none opacity-100'
                                 : 'pointer-events-auto opacity-100'
                             : 'pointer-events-none opacity-0'
@@ -725,18 +1478,18 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     }}
                 />
                 <canvas
-                    ref={laserCanvasRef}
+                    ref={overlayCanvasRef}
                     aria-hidden="true"
                     className="absolute left-0 z-[4001] pointer-events-none touch-none"
                     style={{ top: 0 }}
                 />
 
-                {enabled && selectedIdx !== null && selBB && selStroke && (
+                {enabled && selectedIdxs.length > 0 && selBB && selScreenBB && (
                     <div
                         className="absolute left-0 top-0 z-[4500] pointer-events-none"
                         style={{ width: '100%', height: '100%' }}
                     >
-                        {getHandlePositions(selBB).map((h) => (
+                        {getHandlePositions(selScreenBB).map((h) => (
                             <div
                                 key={h.id}
                                 className="absolute pointer-events-auto bg-white border-2 border-indigo-500 rounded-sm shadow-md hover:bg-indigo-100 transition-colors"
@@ -751,53 +1504,182 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 onPointerDown={(e) => {
                                     e.stopPropagation();
                                     e.currentTarget.setPointerCapture(e.pointerId);
-                                    const s = strokesRef.current[selectedIdxRef.current!];
+                                    gestureDirtyRef.current = false;
                                     dragStateRef.current = {
                                         type: 'resize',
                                         handle: h.id,
                                         startX: e.clientX,
                                         startY: e.clientY,
-                                        origPoints: JSON.parse(JSON.stringify(s.points)),
+                                        orig: selectedIdxsRef.current.map((i) =>
+                                            JSON.parse(JSON.stringify(strokesRef.current[i].points))
+                                        ),
                                         origBB: { ...selBB },
                                     };
+                                    beginDragCache();
                                 }}
                                 onPointerMove={(e) => {
-                                    if (!dragStateRef.current || selectedIdxRef.current === null)
-                                        return;
                                     const drag = dragStateRef.current;
-                                    if (drag.type !== 'resize') return;
-                                    const dx = e.clientX - drag.startX;
-                                    const dy = e.clientY - drag.startY;
-                                    const s = strokesRef.current[selectedIdxRef.current];
-                                    s.points = resizePoints(
-                                        drag.origPoints,
-                                        drag.origBB,
-                                        drag.handle,
-                                        dx,
-                                        dy
-                                    );
-                                    setSelBB(getBB(s));
-                                    redraw();
+                                    if (!drag || drag.type !== 'resize') return;
+                                    // Tutamaç ekran uzayında sürüklenir; dünya
+                                    // farkı için ölçeğe bölünür.
+                                    const scale = viewRef.current.scale;
+                                    const dx = (e.clientX - drag.startX) / scale;
+                                    const dy = (e.clientY - drag.startY) / scale;
+                                    scheduleDrag(() => {
+                                        markGesture();
+                                        selectedIdxsRef.current.forEach((idx, n) => {
+                                            const s = strokesRef.current[idx];
+                                            if (!s) return;
+                                            strokesRef.current[idx] = {
+                                                ...s,
+                                                points: resizePoints(
+                                                    drag.orig[n],
+                                                    drag.origBB,
+                                                    drag.handle,
+                                                    dx,
+                                                    dy
+                                                ),
+                                            };
+                                        });
+                                        refreshSelectionBB();
+                                        paintDrag();
+                                    });
                                 }}
                                 onPointerUp={(e) => {
                                     e.currentTarget.releasePointerCapture(e.pointerId);
                                     dragStateRef.current = null;
-                                    setStrokes([...strokesRef.current]);
+                                    gestureDirtyRef.current = false;
+                                    endDragCache();
+                                    commitStrokes();
                                 }}
                             />
                         ))}
+
+                        {/* Canlı simülasyonun üzerindeki etkileşim noktaları */}
+                        {simControls.map((ctrl) => {
+                            const pos = toScreenPoint({ x: ctrl.x, y: ctrl.y }, view);
+                            return (
+                                <button
+                                    key={ctrl.id}
+                                    type="button"
+                                    title={ctrl.label}
+                                    aria-label={ctrl.label ?? ctrl.id}
+                                    className={cn(
+                                        'absolute pointer-events-auto rounded-full border-2 shadow-md transition-colors',
+                                        ctrl.type === 'toggle'
+                                            ? ctrl.on
+                                                ? 'bg-amber-400 border-amber-600'
+                                                : 'bg-white border-amber-500'
+                                            : 'bg-amber-400 border-amber-600 cursor-grab active:cursor-grabbing'
+                                    )}
+                                    style={{
+                                        left: pos.x - 9,
+                                        top: pos.y - 9,
+                                        width: 18,
+                                        height: 18,
+                                        zIndex: 4650,
+                                        touchAction: 'none',
+                                    }}
+                                    onPointerDown={(e) => {
+                                        e.stopPropagation();
+                                        if (ctrl.type === 'toggle') return;
+                                        e.currentTarget.setPointerCapture(e.pointerId);
+                                        simGestureRef.current = false;
+                                    }}
+                                    onPointerMove={(e) => {
+                                        if (ctrl.type !== 'drag') return;
+                                        if (!e.currentTarget.hasPointerCapture?.(e.pointerId)) return;
+                                        if (!simSpec?.onControl || !simRect || !selSimMath) return;
+                                        const world = toWorld(e.clientX, e.clientY);
+                                        patchSim(
+                                            simSpec.onControl(simRect, selSimMath, ctrl.id, world),
+                                            true
+                                        );
+                                    }}
+                                    onPointerUp={(e) => {
+                                        if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+                                            e.currentTarget.releasePointerCapture(e.pointerId);
+                                        }
+                                        simGestureRef.current = false;
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (ctrl.type !== 'toggle') return;
+                                        if (!simSpec?.onControl || !simRect || !selSimMath) return;
+                                        patchSim(
+                                            simSpec.onControl(simRect, selSimMath, ctrl.id, {
+                                                x: ctrl.x,
+                                                y: ctrl.y,
+                                            }),
+                                            false
+                                        );
+                                    }}
+                                />
+                            );
+                        })}
+
+                        {/* Simülasyon ayarları */}
+                        {simSpec?.params && selSimMath && (
+                            <div
+                                className="absolute pointer-events-auto flex flex-col gap-1.5 bg-[#1a1b26]/95 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10 shadow-xl"
+                                style={{
+                                    left: Math.max(4, selScreenBB.x1),
+                                    top: selScreenBB.y2 + 8,
+                                    minWidth: 208,
+                                    zIndex: 4700,
+                                }}
+                                onPointerDown={(e) => e.stopPropagation()}
+                            >
+                                {simSpec.params.map((prm) => {
+                                    const value = selSimMath.sim?.[prm.key] ?? prm.min;
+                                    return (
+                                        <label key={prm.key} className="flex items-center gap-2">
+                                            <span className="text-[10.5px] font-semibold text-slate-300 w-[104px] shrink-0 leading-tight">
+                                                {prm.label}
+                                            </span>
+                                            <input
+                                                type="range"
+                                                min={prm.min}
+                                                max={prm.max}
+                                                step={prm.step ?? 1}
+                                                value={value}
+                                                onChange={(e) =>
+                                                    patchSim(
+                                                        { [prm.key]: Number(e.target.value) },
+                                                        true
+                                                    )
+                                                }
+                                                onPointerUp={() => {
+                                                    simGestureRef.current = false;
+                                                }}
+                                                className="flex-1 accent-amber-400 h-1"
+                                            />
+                                            <span className="text-[10.5px] font-bold text-white tabular-nums w-[42px] text-right shrink-0">
+                                                {value}
+                                                {prm.unit ? ` ${prm.unit}` : ''}
+                                            </span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        )}
 
                         <div
                             role="toolbar"
                             aria-label="Seçim araçları"
                             className="absolute pointer-events-auto flex items-center gap-1 bg-[#1a1b26]/95 backdrop-blur-md px-2 py-1.5 rounded-xl border border-white/10 shadow-xl"
                             style={{
-                                left: selBB.x1,
-                                top: Math.max(0, selBB.y1 - 52),
+                                left: Math.max(4, selScreenBB.x1),
+                                top: Math.max(0, selScreenBB.y1 - 52),
                                 zIndex: 4700,
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
                         >
+                            {selectedIdxs.length > 1 && (
+                                <span className="text-[11px] font-bold text-slate-300 px-1 tabular-nums shrink-0">
+                                    {selectedIdxs.length} öğe
+                                </span>
+                            )}
                             {DRAWING_COLORS.map((color) => (
                                 <button
                                     key={color}
@@ -805,23 +1687,18 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                     aria-label={`Renk ${color}`}
                                     className={cn(
                                         'w-5 h-5 rounded-full border-2 transition-all hover:scale-110 shrink-0',
-                                        selStroke.color === color
-                                            ? 'border-white scale-110'
-                                            : 'border-transparent'
+                                        selColor === color ? 'border-white scale-110' : 'border-transparent'
                                     )}
                                     style={{ backgroundColor: color }}
-                                    onClick={() => {
-                                        if (selectedIdxRef.current !== null) {
-                                            strokesRef.current[selectedIdxRef.current].color = color;
-                                            setStrokes([...strokesRef.current]);
-                                            setSelBB({
-                                                ...getBB(
-                                                    strokesRef.current[selectedIdxRef.current]
-                                                ),
-                                            });
-                                            redraw();
-                                        }
-                                    }}
+                                    onClick={() =>
+                                        mutateSelection((idxs) => {
+                                            const set = new Set(idxs);
+                                            strokesRef.current = strokesRef.current.map((st, i) =>
+                                                set.has(i) ? { ...st, color } : st
+                                            );
+                                            refreshSelectionBB();
+                                        })
+                                    }
                                 />
                             ))}
                             <div className="w-px h-4 bg-white/20 mx-1 shrink-0" aria-hidden="true" />
@@ -830,45 +1707,43 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 title="Çoğalt"
                                 aria-label="Çoğalt"
                                 className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
-                                onClick={() => {
-                                    if (
-                                        selectedIdxRef.current !== null &&
-                                        strokesRef.current[selectedIdxRef.current]
-                                    ) {
-                                        const copy: Stroke = JSON.parse(
-                                            JSON.stringify(
-                                                strokesRef.current[selectedIdxRef.current]
-                                            )
-                                        );
-                                        copy.points = copy.points.map((p) => ({
-                                            x: p.x + 20,
-                                            y: p.y + 20,
-                                        }));
-                                        strokesRef.current.push(copy);
-                                        const ni = strokesRef.current.length - 1;
-                                        selectedIdxRef.current = ni;
-                                        setStrokes([...strokesRef.current]);
-                                        setSelectedIdx(ni);
-                                        setSelBB(getBB(copy));
-                                        redraw();
-                                    }
-                                }}
+                                onClick={() =>
+                                    mutateSelection((idxs) => {
+                                        const offset = 20 / viewRef.current.scale;
+                                        const copies = idxs
+                                            .map((i) => strokesRef.current[i])
+                                            .filter(Boolean)
+                                            .map((s) => {
+                                                const copy: Stroke = JSON.parse(JSON.stringify(s));
+                                                copy.points = copy.points.map((p) => ({
+                                                    ...p,
+                                                    x: p.x + offset,
+                                                    y: p.y + offset,
+                                                }));
+                                                return copy;
+                                            });
+                                        const first = strokesRef.current.length;
+                                        strokesRef.current.push(...copies);
+                                        setSelection(copies.map((_, i) => first + i));
+                                    })
+                                }
                             >
                                 <Copy className="w-3.5 h-3.5" />
                             </button>
                             <button
                                 type="button"
-                                title="Seçili öğeyi sil"
-                                aria-label="Seçili öğeyi sil"
+                                title="Seçili öğeleri sil"
+                                aria-label="Seçili öğeleri sil"
                                 className="p-1 text-red-400 hover:text-red-300 rounded-lg hover:bg-red-400/10 transition-colors"
-                                onClick={() => {
-                                    if (selectedIdxRef.current !== null) {
-                                        strokesRef.current.splice(selectedIdxRef.current, 1);
-                                        setStrokes([...strokesRef.current]);
+                                onClick={() =>
+                                    mutateSelection((idxs) => {
+                                        const set = new Set(idxs);
+                                        strokesRef.current = strokesRef.current.filter(
+                                            (_, i) => !set.has(i)
+                                        );
                                         deselect();
-                                        redraw();
-                                    }
-                                }}
+                                    })
+                                }
                             >
                                 <Trash2 className="w-3.5 h-3.5" />
                             </button>

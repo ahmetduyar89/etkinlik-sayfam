@@ -1,0 +1,190 @@
+// src/components/notebooks/NotebookViewer.tsx
+// Öğrencinin gördüğü SALT-OKUNUR defter. `?view=notebook&id=...` bağlantısıyla
+// açılır; öğretmenin QR kodunu okutan öğrenci burayı görür.
+//
+// Çizim aynı DrawingCanvas ile yapılır (enabled=false) — böylece kalem izleri,
+// nesne kütüphanesi ve canlı simülasyonlar öğrencide de birebir aynı görünür,
+// simülasyonlar çalışmaya devam eder. Hiçbir değişiklik kaydedilmez.
+import React from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { DrawingCanvas } from '../drawing/DrawingCanvas';
+import { TextBoxLayer } from '../tools/TextBoxLayer';
+import { FullscreenToggle } from '../common/FullscreenToggle';
+import { fetchDocById } from '../../lib/firebase';
+import { paperBackground } from './paper';
+import { firestoreErrorMessage } from './errors';
+import type {
+    DrawConfig,
+    DrawingCanvasHandle,
+    Notebook,
+    NotebookContent,
+    NotebookPage,
+    Stroke,
+    TextBoxData,
+    Viewport,
+} from '../../types';
+
+/**
+ * Görüntüleyici tuvali "el" aracıyla açılır: sayfa kaydırılıp yakınlaştırılır
+ * ama yazılamaz. `enabled={false}` KULLANILMAZ — o kip tuvali saydamlaştırır
+ * (etkinlik akışında çizim katmanını gizlemek için) ve öğrenci boş sayfa görür.
+ */
+const VIEW_CONFIG: DrawConfig = {
+    tool: 'pan',
+    color: '#000000',
+    width: 2,
+} as DrawConfig;
+
+function parsePages(raw?: string): NotebookPage[] {
+    if (!raw) return [{ strokes: [], boxes: [] }];
+    try {
+        const parsed = JSON.parse(raw) as NotebookPage[];
+        if (!Array.isArray(parsed) || parsed.length === 0) return [{ strokes: [], boxes: [] }];
+        return parsed.map((p) => ({
+            strokes: Array.isArray(p?.strokes) ? p.strokes : [],
+            boxes: Array.isArray(p?.boxes) ? p.boxes : [],
+        }));
+    } catch {
+        return [{ strokes: [], boxes: [] }];
+    }
+}
+
+interface NotebookViewerProps {
+    notebookId: string;
+}
+
+export function NotebookViewer({ notebookId }: NotebookViewerProps) {
+    const canvasRef = React.useRef<DrawingCanvasHandle>(null);
+    const stageRef = React.useRef<HTMLDivElement>(null);
+
+    const [notebook, setNotebook] = React.useState<Notebook | null>(null);
+    const [pages, setPages] = React.useState<Stroke[][] | null>(null);
+    const [boxesByPage, setBoxesByPage] = React.useState<TextBoxData[][]>([[]]);
+    const [pageInfo, setPageInfo] = React.useState({ current: 0, total: 1 });
+    const [view, setView] = React.useState<Viewport>({ scale: 1, tx: 0, ty: 0 });
+    const [canvasSize, setCanvasSize] = React.useState({ w: 0, h: 0 });
+    const [error, setError] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const meta = await fetchDocById<Notebook>('notebooks', notebookId);
+                if (cancelled) return;
+                if (!meta) {
+                    setError('Bu defter bulunamadı. Bağlantı güncel olmayabilir.');
+                    return;
+                }
+                setNotebook(meta);
+                const content = await fetchDocById<NotebookContent>('notebook_content', notebookId);
+                if (cancelled) return;
+                const parsed = parsePages(content?.pages_json);
+                setPages(parsed.map((p) => p.strokes));
+                setBoxesByPage(parsed.map((p) => p.boxes ?? []));
+            } catch (e) {
+                if (!cancelled) setError(firestoreErrorMessage(e, 'Defter yüklenemedi.'));
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [notebookId]);
+
+    // Öğrenci sayfalar arasında ok tuşlarıyla da gezebilsin.
+    React.useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowRight' || e.key === 'PageDown') canvasRef.current?.nextPage();
+            if (e.key === 'ArrowLeft' || e.key === 'PageUp') canvasRef.current?.prevPage();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
+
+    if (error) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+                <p className="text-[15px] font-bold text-on-surface">Defter açılamadı</p>
+                <p className="text-[13.5px] text-on-surface-variant max-w-[420px]">{error}</p>
+            </div>
+        );
+    }
+
+    if (!notebook || pages === null) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-on-surface-variant font-bold uppercase tracking-widest text-xs">
+                    Defter açılıyor…
+                </p>
+            </div>
+        );
+    }
+
+    const bgColor = notebook.bg_color || '#ffffff';
+    const paper = notebook.paper || 'grid';
+    const canGoPrev = pageInfo.current > 0;
+    const canGoNext = pageInfo.current < pageInfo.total - 1;
+
+    return (
+        <div ref={stageRef} className="h-screen flex flex-col bg-background">
+            <header className="flex items-center gap-3 px-4 h-14 bg-white border-b border-outline-variant flex-shrink-0">
+                <h1 className="flex-1 min-w-0 truncate text-[15px] font-extrabold text-on-surface">
+                    {notebook.title}
+                </h1>
+                <span className="text-[12.5px] font-bold text-on-surface-variant tabular-nums">
+                    {pageInfo.current + 1} / {pageInfo.total}
+                </span>
+                <FullscreenToggle target={stageRef} />
+            </header>
+
+            <div className="flex-1 min-h-0 relative overflow-hidden">
+                <div
+                    className="absolute inset-0"
+                    style={paperBackground(paper, bgColor, view, canvasSize)}
+                />
+                <DrawingCanvas
+                    ref={canvasRef}
+                    config={VIEW_CONFIG}
+                    enabled
+                    whiteboardMode={false}
+                    bgColor={bgColor}
+                    initialPages={pages}
+                    panMode="viewport"
+                    onPageChange={(current, total) => setPageInfo({ current, total })}
+                    onViewChange={(v, size) => {
+                        setView(v);
+                        setCanvasSize(size);
+                    }}
+                />
+                <TextBoxLayer
+                    boxes={boxesByPage[pageInfo.current] ?? []}
+                    enabled={false}
+                    view={view}
+                    onAdd={() => {}}
+                    onUpdate={() => {}}
+                    onDelete={() => {}}
+                />
+
+                {/* Sayfa okları — dokunmatik cihazda da rahat basılır. */}
+                <button
+                    type="button"
+                    onClick={() => canvasRef.current?.prevPage()}
+                    disabled={!canGoPrev}
+                    aria-label="Önceki sayfa"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 z-[3000] w-11 h-11 rounded-full bg-white/90 border border-outline-variant shadow-lg flex items-center justify-center text-on-surface-variant disabled:opacity-0 transition-opacity"
+                >
+                    <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                    type="button"
+                    onClick={() => canvasRef.current?.nextPage()}
+                    disabled={!canGoNext}
+                    aria-label="Sonraki sayfa"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 z-[3000] w-11 h-11 rounded-full bg-white/90 border border-outline-variant shadow-lg flex items-center justify-center text-on-surface-variant disabled:opacity-0 transition-opacity"
+                >
+                    <ChevronRight className="w-5 h-5" />
+                </button>
+            </div>
+        </div>
+    );
+}

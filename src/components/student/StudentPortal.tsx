@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Clock, Pencil, User, Zap } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { FullscreenToggle } from '../common/FullscreenToggle';
 import { getFormattedHtml } from '../../utils/format-html';
 import { useFirestore } from '../../lib/firebase';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
@@ -36,6 +37,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
         stampIcon: '✅',
     });
     const [showWhiteboard, setShowWhiteboard] = useState(false);
+<<<<<<< HEAD
     const [showCompass, setShowCompass] = useState(false);
     const [showNumberLine, setShowNumberLine] = useState(false);
     const [showCalculator, setShowCalculator] = useState(false);
@@ -56,6 +58,9 @@ export function StudentPortal({ act }: StudentPortalProps) {
         }
     };
 
+=======
+    const [drawHistory, setDrawHistory] = useState({ canUndo: false, canRedo: false });
+>>>>>>> 97d1fe083575a99fffe36616e37adfb1a6f99634
     const [iframeHeight, setIframeHeight] = useState(1000);
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
@@ -170,6 +175,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
 
     const handleToolbarCommand = (type: string) => {
         if (type === 'UNDO_DRAWING') canvasRef.current?.undo();
+        else if (type === 'REDO_DRAWING') canvasRef.current?.redo();
         else if (type === 'CLEAR_DRAWING') canvasRef.current?.clear();
         else if (type === 'TOGGLE_WHITEBOARD') setShowWhiteboard((v) => !v);
     };
@@ -337,6 +343,8 @@ export function StudentPortal({ act }: StudentPortalProps) {
                             {isDrawingMode ? 'Çizimi Kapat' : 'Kalem Modu'}
                         </span>
                     </button>
+                    <FullscreenToggle variant="dark" />
+
                     {act.is_test && (
                         <button
                             type="button"
@@ -384,6 +392,9 @@ export function StudentPortal({ act }: StudentPortalProps) {
                         config={drawConfig}
                         enabled={isDrawingMode}
                         whiteboardMode={showWhiteboard}
+                        onHistoryChange={(canUndo, canRedo) =>
+                            setDrawHistory({ canUndo, canRedo })
+                        }
                     />
                 </div>
                 <AnimatePresence>
@@ -394,8 +405,13 @@ export function StudentPortal({ act }: StudentPortalProps) {
                             setConfig={setDrawConfig}
                             showWhiteboard={showWhiteboard}
                             setShowWhiteboard={setShowWhiteboard}
+<<<<<<< HEAD
                             onOpenLibrary={() => setShowLibraryModal((v) => !v)}
                             isLibraryOpen={showLibraryModal}
+=======
+                            canUndo={drawHistory.canUndo}
+                            canRedo={drawHistory.canRedo}
+>>>>>>> 97d1fe083575a99fffe36616e37adfb1a6f99634
                         />
                     )}
                 </AnimatePresence>
