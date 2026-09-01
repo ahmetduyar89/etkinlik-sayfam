@@ -18,6 +18,12 @@ import { DrawingToolbar } from '../drawing/DrawingToolbar';
 import { TextBoxLayer } from '../tools/TextBoxLayer';
 import { RulerTool } from '../tools/RulerTool';
 import { ProtractorTool } from '../tools/ProtractorTool';
+import { CompassTool } from '../tools/CompassTool';
+import { NumberLineTool } from '../tools/NumberLineTool';
+import { MiniCalculatorTool } from '../tools/MiniCalculatorTool';
+import { PeriodicTableTool } from '../tools/PeriodicTableTool';
+import { DrawingLibraryModal } from '../drawing/DrawingLibraryModal';
+import type { LibraryItem } from '../../constants/drawing-library';
 import { SpotlightOverlay } from '../tools/SpotlightOverlay';
 import { OverlayTimer } from '../tools/OverlayTimer';
 import { PageNav } from '../tools/PageNav';
@@ -94,6 +100,27 @@ export function ActivityPreviewModal({
     const [pageInfo, setPageInfo] = React.useState({ current: 0, total: 1 });
     const [showRuler, setShowRuler] = React.useState(false);
     const [showProtractor, setShowProtractor] = React.useState(false);
+    const [showCompass, setShowCompass] = React.useState(false);
+    const [showNumberLine, setShowNumberLine] = React.useState(false);
+    const [showCalculator, setShowCalculator] = React.useState(false);
+    const [showPeriodicTable, setShowPeriodicTable] = React.useState(false);
+    const [showLibraryModal, setShowLibraryModal] = React.useState(false);
+
+    const handleSelectLibraryItem = (item: LibraryItem) => {
+        if (item.actionType === 'tool') {
+            if (item.toolId === 'compass') setShowCompass(true);
+            if (item.toolId === 'numberLine') setShowNumberLine(true);
+            if (item.toolId === 'calculator') setShowCalculator(true);
+            if (item.toolId === 'periodicTable') setShowPeriodicTable(true);
+            if (item.toolId === 'ruler') setShowRuler(true);
+            if (item.toolId === 'protractor') setShowProtractor(true);
+            setShowLibraryModal(false);
+            toast.success(`${item.title} aracı açıldı.`);
+        } else {
+            toast.info(`${item.title} kütüphaneden seçildi.`);
+            setShowLibraryModal(false);
+        }
+    };
 
     const mainRef = React.useRef<HTMLElement>(null);
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
@@ -551,6 +578,8 @@ export function ActivityPreviewModal({
                                 onScreenshot={handleScreenshot}
                                 isTextBoxMode={isTextBoxMode}
                                 onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
+                                onOpenLibrary={() => setShowLibraryModal((v) => !v)}
+                                isLibraryOpen={showLibraryModal}
                             />
                         )}
                     </AnimatePresence>
@@ -592,8 +621,27 @@ export function ActivityPreviewModal({
                 />
             )}
 
+            {showLibraryModal && (
+                <DrawingLibraryModal
+                    isOpen={showLibraryModal}
+                    onClose={() => setShowLibraryModal(false)}
+                    onSelectTool={handleSelectLibraryItem}
+                />
+            )}
+
             {showRuler && <RulerTool onClose={() => setShowRuler(false)} />}
             {showProtractor && <ProtractorTool onClose={() => setShowProtractor(false)} />}
+            {showCompass && (
+                <CompassTool
+                    onClose={() => setShowCompass(false)}
+                    onDrawCircle={(cx, cy, r) => {
+                        toast.success(`Yarıçapı ${r}px olan çember çizildi.`);
+                    }}
+                />
+            )}
+            {showNumberLine && <NumberLineTool onClose={() => setShowNumberLine(false)} />}
+            {showCalculator && <MiniCalculatorTool onClose={() => setShowCalculator(false)} />}
+            {showPeriodicTable && <PeriodicTableTool onClose={() => setShowPeriodicTable(false)} />}
         </div>
     );
 }

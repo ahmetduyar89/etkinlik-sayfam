@@ -36,6 +36,8 @@ interface DrawingToolbarProps {
     onScreenshot?: () => void;
     isTextBoxMode?: boolean;
     onTextBoxModeToggle?: () => void;
+    onOpenLibrary?: () => void;
+    isLibraryOpen?: boolean;
 }
 
 const shapeTools = makeShapeTools(SolidLineIcon, DashedLineIcon);
@@ -51,6 +53,8 @@ export function DrawingToolbar({
     onScreenshot,
     isTextBoxMode,
     onTextBoxModeToggle,
+    onOpenLibrary,
+    isLibraryOpen,
 }: DrawingToolbarProps) {
     const [showShapes, setShowShapes] = React.useState(false);
     const [showExtras, setShowExtras] = React.useState(false);
@@ -320,7 +324,25 @@ export function DrawingToolbar({
                     )}
                 </div>
 
-                <div className="flex items-center gap-1 px-2">
+                <div className="flex items-center gap-1.5 px-2">
+                    {onOpenLibrary && (
+                        <button
+                            type="button"
+                            onClick={onOpenLibrary}
+                            aria-label="Kütüphane"
+                            aria-pressed={isLibraryOpen}
+                            className={cn(
+                                'px-3 py-2 rounded-xl transition-all flex items-center gap-1 font-bold text-sm shadow-md',
+                                isLibraryOpen
+                                    ? 'bg-indigo-600 text-white shadow-indigo-600/50 ring-2 ring-indigo-400'
+                                    : 'bg-indigo-600/80 hover:bg-indigo-600 text-white hover:shadow-indigo-600/30'
+                            )}
+                            title="Kütüphane (Matematik & Fen Araçları)"
+                        >
+                            <span className="font-serif text-base leading-none">∑</span>
+                            <span className="text-[11px] leading-none">✨</span>
+                        </button>
+                    )}
                     {onTextBoxModeToggle && (
                         <button
                             type="button"
