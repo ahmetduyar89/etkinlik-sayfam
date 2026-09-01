@@ -4,7 +4,7 @@ import { Copy, Trash2 } from 'lucide-react';
 import { DRAWING_COLORS, HANDLE_CURSORS } from '../../constants/drawing';
 import { samplePressure } from './penEngine';
 import { recognizeShape, snapAngle } from './shapeRecognizer';
-import { findMathItem } from './mathObjects';
+import { findLibraryItem } from './libraryObjects';
 import { onImageReady } from './imageStore';
 import {
     SHAPE_TOOLS,
@@ -414,7 +414,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     redraw();
                 },
                 insertMath: (math: MathObject, color?: string) => {
-                    const item = findMathItem(math.kind);
+                    const item = findLibraryItem(math.kind);
                     const vis = visibleWorldRect();
                     const scale = viewRef.current.scale;
                     // Ekranda hep benzer büyüklükte görünsün diye dünya boyutu

@@ -1,120 +1,21 @@
 // src/components/drawing/mathObjects.ts
 // Yazma alanına tek dokunuşla eklenebilen hazır matematik/geometri nesneleri.
-//
-// Her nesne, `Stroke.points[0]` ve `points[1]` ile verilen dikdörtgenin içine
-// çizilir. Böylece mevcut seç/taşı/ölçekle/çoğalt/renklendir mantığı hiçbir
-// değişiklik olmadan bu nesneler için de çalışır.
+// Ortak çizim yardımcıları objectDrawing.ts'te; fen nesneleri scienceObjects.ts'te.
 
-import type { MathObject, MathObjectKind, Stroke } from '../../types';
+import type { MathObjectKind } from '../../types';
 import { compileExpression } from './expression';
-
-export interface Rect {
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-}
-
-export interface MathField {
-    key: 'n' | 'k' | 'm' | 'expr';
-    label: string;
-    type: 'number' | 'text';
-    min?: number;
-    max?: number;
-}
-
-export interface MathCatalogItem {
-    kind: MathObjectKind;
-    label: string;
-    hint: string;
-    /** Sayfaya eklenirken kullanılacak varsayılan boyut (CSS px). */
-    size: { w: number; h: number };
-    defaults?: Partial<MathObject>;
-    /** Eklemeden önce sorulacak parametreler. */
-    fields?: MathField[];
-}
-
-// ── Yardımcılar ──────────────────────────────────────────────────────
-
-/** #rgb / #rrggbb rengini verilen saydamlıkta rgba'ya çevirir. */
-export function withAlpha(color: string, a: number): string {
-    let hex = color.trim();
-    if (hex.startsWith('#')) hex = hex.slice(1);
-    if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
-    if (hex.length !== 6 || /[^0-9a-f]/i.test(hex)) return color;
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${a})`;
-}
-
-const clampInt = (v: number | undefined, lo: number, hi: number, fallback: number): number => {
-    const n = Math.round(Number.isFinite(v as number) ? (v as number) : fallback);
-    return Math.min(hi, Math.max(lo, n));
-};
-
-interface Ctx {
-    c: CanvasRenderingContext2D;
-    r: Rect;
-    o: MathObject;
-    color: string;
-    lw: number;
-    /** Kutuya göre ölçeklenen yazı boyutu. */
-    fs: number;
-}
-
-const line = (k: Ctx, x1: number, y1: number, x2: number, y2: number, width?: number) => {
-    k.c.beginPath();
-    k.c.lineWidth = width ?? k.lw;
-    k.c.moveTo(x1, y1);
-    k.c.lineTo(x2, y2);
-    k.c.stroke();
-};
-
-const arrowHead = (k: Ctx, x: number, y: number, angle: number, size = 8) => {
-    k.c.beginPath();
-    k.c.lineWidth = k.lw;
-    k.c.moveTo(x, y);
-    k.c.lineTo(x - size * Math.cos(angle - Math.PI / 6), y - size * Math.sin(angle - Math.PI / 6));
-    k.c.moveTo(x, y);
-    k.c.lineTo(x - size * Math.cos(angle + Math.PI / 6), y - size * Math.sin(angle + Math.PI / 6));
-    k.c.stroke();
-};
-
-const label = (
-    k: Ctx,
-    text: string,
-    x: number,
-    y: number,
-    align: CanvasTextAlign = 'center',
-    baseline: CanvasTextBaseline = 'middle',
-    scale = 1
-) => {
-    k.c.save();
-    k.c.font = `600 ${Math.round(k.fs * scale)}px ui-sans-serif, system-ui, Arial`;
-    k.c.textAlign = align;
-    k.c.textBaseline = baseline;
-    k.c.fillText(text, x, y);
-    k.c.restore();
-};
-
-const ellipse = (k: Ctx, cx: number, cy: number, rx: number, ry: number, dashed = false) => {
-    k.c.save();
-    k.c.lineWidth = k.lw;
-    if (dashed) k.c.setLineDash([6, 5]);
-    k.c.beginPath();
-    k.c.ellipse(cx, cy, Math.abs(rx), Math.abs(ry), 0, 0, Math.PI * 2);
-    k.c.stroke();
-    k.c.restore();
-};
-
-/** Etiketlerin taşmaması için çizim kutusunu içeri alır. */
-const inset = (r: Rect, px: number, py: number): Rect => ({
-    x: r.x + px,
-    y: r.y + py,
-    w: Math.max(10, r.w - px * 2),
-    h: Math.max(10, r.h - py * 2),
-});
+import {
+    arrowHead,
+    clampInt,
+    ellipse,
+    inset,
+    label,
+    line,
+    withAlpha,
+    type Ctx,
+    type ObjectCategory,
+    type Renderer,
+} from './objectDrawing';
 
 /** Ekseni ve ızgarayı çizen ortak yardımcı (koordinat düzlemi türevleri). */
 function drawGridAxes(
@@ -184,9 +85,10 @@ function drawGridAxes(
 
 // ── Çizim fonksiyonları ──────────────────────────────────────────────
 
-type Renderer = (k: Ctx) => void;
+// ── Çizim fonksiyonları ──────────────────────────────────────────────
 
-const RENDERERS: Record<MathObjectKind, Renderer> = {
+/** Matematik nesnelerinin çizicileri. */
+export const MATH_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
     axes: (k) =>
         void drawGridAxes(k, {
             unitsX: clampInt(k.o.n, 1, 20, 5),
@@ -892,49 +794,9 @@ const RENDERERS: Record<MathObjectKind, Renderer> = {
     },
 };
 
-/**
- * Bir matematik nesnesini canvas'a çizer.
- * `stroke.points` en az iki nokta içermeli (sol-üst, sağ-alt).
- */
-export function drawMathObject(ctx: CanvasRenderingContext2D, stroke: Stroke): void {
-    const obj = stroke.math;
-    if (!obj || stroke.points.length < 2) return;
-    const render = RENDERERS[obj.kind];
-    if (!render) return;
+// ── Katalog ──────────────────────────────────────────────────────────
 
-    const a = stroke.points[0];
-    const b = stroke.points[stroke.points.length - 1];
-    const rect: Rect = {
-        x: Math.min(a.x, b.x),
-        y: Math.min(a.y, b.y),
-        w: Math.abs(b.x - a.x),
-        h: Math.abs(b.y - a.y),
-    };
-    if (rect.w < 8 || rect.h < 8) return;
-
-    ctx.save();
-    ctx.strokeStyle = stroke.color;
-    ctx.fillStyle = stroke.color;
-    ctx.lineWidth = stroke.width || 2;
-    ctx.lineCap = 'butt';
-    ctx.lineJoin = 'miter';
-    render({
-        c: ctx,
-        r: rect,
-        o: obj,
-        color: stroke.color,
-        lw: Math.max(1, stroke.width || 2),
-        fs: Math.max(9, Math.min(20, Math.min(rect.w, rect.h) / 13)),
-    });
-    ctx.restore();
-}
-
-// ── Kütüphane kataloğu (arayüzde gösterilen liste) ───────────────────
-
-export const MATH_CATEGORIES: ReadonlyArray<{
-    label: string;
-    items: ReadonlyArray<MathCatalogItem>;
-}> = [
+export const MATH_CATEGORIES: ReadonlyArray<ObjectCategory> = [
     {
         label: 'Koordinat & Grafik',
         items: [
@@ -1135,5 +997,3 @@ export const MATH_CATEGORIES: ReadonlyArray<{
 ];
 
 /** Katalogdaki bir nesneyi türüne göre bulur. */
-export const findMathItem = (kind: MathObjectKind): MathCatalogItem | undefined =>
-    MATH_CATEGORIES.flatMap((c) => c.items).find((i) => i.kind === kind);

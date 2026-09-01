@@ -31,7 +31,7 @@ import {
     makeShapeTools,
 } from '../../constants/drawing';
 import { PEN_TYPES } from './penEngine';
-import { MathLibraryPanel } from './MathLibraryPanel';
+import { ObjectLibraryPanel } from './ObjectLibraryPanel';
 import { DashedLineIcon, SolidLineIcon } from './DrawingIcons';
 
 export type ToolbarCommand =
@@ -132,7 +132,7 @@ export function DrawingToolbar({
             style={{ touchAction: 'none' }}
         >
             {onInsertMath && (
-                <MathLibraryPanel
+                <ObjectLibraryPanel
                     open={showMath}
                     onClose={() => setShowMath(false)}
                     onInsert={onInsertMath}
@@ -555,7 +555,7 @@ export function DrawingToolbar({
                         <button
                             type="button"
                             onClick={() => openOnly(showMath ? null : 'math')}
-                            aria-label="Matematik nesne kütüphanesi"
+                            aria-label="Nesne kütüphanesi"
                             aria-expanded={showMath}
                             className={cn(
                                 'p-2.5 rounded-xl transition-all relative',
@@ -563,7 +563,7 @@ export function DrawingToolbar({
                                     ? 'bg-indigo-600 text-white'
                                     : 'text-slate-400 hover:text-indigo-300 hover:bg-indigo-400/10'
                             )}
-                            title="Matematik Kütüphanesi"
+                            title="Matematik & Fen Kütüphanesi"
                         >
                             <Sigma className="w-5 h-5" />
                             <Sparkles className="w-2.5 h-2.5 absolute top-1 right-1 text-indigo-300" />
