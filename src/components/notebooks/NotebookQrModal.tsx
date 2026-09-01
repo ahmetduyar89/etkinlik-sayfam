@@ -1,9 +1,10 @@
 // src/components/notebooks/NotebookQrModal.tsx — Defteri öğrenciye gönder
 // Tahtaya yansıtılıp öğrencilerin kendi cihazlarından okutması içindir.
 // Açılan bağlantı salt-okunurdur; öğrenci defteri değiştiremez.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Check, Copy } from 'lucide-react';
+import { copyText } from '../../utils/clipboard';
 import { Modal } from '../common/Modal';
 import type { Notebook } from '../../types';
 
@@ -16,14 +17,19 @@ export function NotebookQrModal({ notebook, onClose }: NotebookQrModalProps) {
     // NotebookViewer'ın beklediği biçim: ?view=notebook&id=...
     const link = `${window.location.origin}${window.location.pathname}?view=notebook&id=${notebook.id}`;
     const [copied, setCopied] = useState(false);
+    const [failed, setFailed] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const copy = async () => {
-        try {
-            await navigator.clipboard.writeText(link);
-            setCopied(true);
+        const ok = await copyText(link);
+        setCopied(ok);
+        setFailed(!ok);
+        if (ok) {
             window.setTimeout(() => setCopied(false), 2000);
-        } catch {
-            setCopied(false);
+        } else {
+            // Pano engellenmişse bağlantıyı seçip kullanıcıya bırak.
+            inputRef.current?.focus();
+            inputRef.current?.select();
         }
     };
 
@@ -40,7 +46,16 @@ export function NotebookQrModal({ notebook, onClose }: NotebookQrModalProps) {
                 </div>
 
                 <div className="w-full flex items-center gap-2.5 bg-surface-container-high rounded-2xl px-4 h-12">
-                    <span className="flex-1 min-w-0 truncate text-[13px] text-on-surface-variant">{link}</span>
+                    {/* Salt-okunur girdi: pano engellenirse elle seçilip kopyalanabilir. */}
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        readOnly
+                        value={link}
+                        aria-label="Öğrenci bağlantısı"
+                        onFocus={(e) => e.currentTarget.select()}
+                        className="flex-1 min-w-0 bg-transparent text-[13px] text-on-surface-variant focus:outline-none"
+                    />
                     <button
                         type="button"
                         onClick={copy}
@@ -50,6 +65,13 @@ export function NotebookQrModal({ notebook, onClose }: NotebookQrModalProps) {
                         {copied ? 'Kopyalandı' : 'Kopyala'}
                     </button>
                 </div>
+
+                {failed && (
+                    <p role="status" className="text-[12.5px] font-semibold text-amber-700 text-center -mt-2">
+                        Tarayıcı panoya erişemedi. Bağlantı seçili — kopyalamak için
+                        Ctrl+C (Mac'te ⌘+C) ya da telefonda basılı tutup “Kopyala”.
+                    </p>
+                )}
 
                 <p className="text-[12px] text-on-surface-variant text-center">
                     Öğrenci sayfayı açtığında defterin o anki hâlini görür; sonradan yaptığın

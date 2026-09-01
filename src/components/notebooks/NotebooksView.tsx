@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useFirestore, deleteDocById } from '../../lib/firebase';
 import { cn } from '../../utils/cn';
+import { copyText } from '../../utils/clipboard';
 import { Modal } from '../common/Modal';
 import { useToast } from '../common/ToastProvider';
 import { useConfirm } from '../common/ConfirmDialog';
@@ -393,11 +394,10 @@ export function NotebooksView() {
 
     const handleCopyActivityLink = async (a: Activity) => {
         const link = `${window.location.origin}${window.location.pathname}?view=student&id=${a.id}`;
-        try {
-            await navigator.clipboard.writeText(link);
+        if (await copyText(link)) {
             toast.success('Öğrenci giriş linki kopyalandı.');
-        } catch {
-            toast.error('Link kopyalanamadı.');
+        } else {
+            toast.error('Tarayıcı panoya erişemedi.');
         }
     };
 

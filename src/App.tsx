@@ -31,6 +31,7 @@ import { activityFolderIds } from './components/notebooks/activityFolders';
 import { LibraryTree } from './components/content/LibraryTree';
 import { LessonModeBar } from './components/content/LessonModeBar';
 import { NotebookViewer } from './components/notebooks/NotebookViewer';
+import { copyText } from './utils/clipboard';
 import { ContentFilterBar, type SortBy } from './components/content/ContentFilterBar';
 import { RecentActivities } from './components/content/RecentActivities';
 import { formatGradeLevel } from './constants/education';
@@ -383,13 +384,13 @@ export default function App() {
 
     const handleCopyLink = useCallback(async (act: Activity) => {
         const link = `${window.location.origin}${window.location.pathname}?view=student&id=${act.id}`;
-        try { await navigator.clipboard.writeText(link); toast.success('Öğrenci giriş linki kopyalandı.'); }
-        catch { toast.error('Link kopyalanamadı.'); }
+        if (await copyText(link)) toast.success('Öğrenci giriş linki kopyalandı.');
+        else toast.error('Tarayıcı panoya erişemedi. Bağlantıyı QR penceresinden elle kopyalayabilirsin.');
     }, [toast]);
 
     const handleCopyHtml = useCallback(async (act: Activity) => {
-        try { await navigator.clipboard.writeText(act.html_code || ''); toast.success('HTML kodu kopyalandı.'); }
-        catch { toast.error('Kopyalanamadı.'); }
+        if (await copyText(act.html_code || '')) toast.success('HTML kodu kopyalandı.');
+        else toast.error('Tarayıcı panoya erişemedi.');
     }, [toast]);
 
     const handleRequestDelete = useCallback(async (act: Activity) => {
