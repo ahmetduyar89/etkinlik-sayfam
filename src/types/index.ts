@@ -298,7 +298,11 @@ export interface DrawingCanvasHandle {
     getPages: () => Stroke[][];
     /** Kayıtlı sayfa verisini canvas'a yükler. */
     loadPages: (pages: Stroke[][]) => void;
-    screenshot: (wbMode: boolean, color: string) => void;
+    /**
+     * Sayfayı PNG olarak indirir. `paper` verilirse kağıt deseni de çizilir —
+     * desen ekranda CSS arka planı olduğundan aksi hâlde çıktıda görünmez.
+     */
+    screenshot: (wbMode: boolean, color: string, paper?: PaperStyle) => void;
 }
 
 export type ToastVariant = 'success' | 'error' | 'info';

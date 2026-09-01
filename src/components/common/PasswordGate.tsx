@@ -1,6 +1,7 @@
 // src/components/common/PasswordGate.tsx — Basit şifre ile giriş ekranı
 // Doğru şifre girilene kadar site açılmaz. Giriş tarayıcıda hatırlanır.
-// Öğrenci linkleri (?view=student&id=…) şifre istemez; öğrenciler doğrudan girer.
+// Öğrenci bağlantıları şifre istemez; öğrenciler doğrudan girer:
+// etkinlik (?view=student&id=…) ve salt-okunur defter (?view=notebook&id=…).
 //
 // NOT: Bu, tamamen tarayıcıda çalışan basit bir kilittir — meraklı bir kullanıcı
 // sayfa kaynağından şifreyi görebilir. Gerçek koruma için ileride sunucu tarafı

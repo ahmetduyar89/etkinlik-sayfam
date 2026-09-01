@@ -62,8 +62,36 @@ export function ObjectLibraryPanel({ open, onClose, onInsert }: ObjectLibraryPan
     const [pending, setPending] = React.useState<MathCatalogItem | null>(null);
     const [values, setValues] = React.useState<Record<string, string>>({});
 
+    const [query, setQuery] = React.useState('');
+
     const categories = LIBRARY_GROUPS[group]?.categories ?? LIBRARY_GROUPS[0].categories;
     const category = categories[tab] ?? categories[0];
+
+    /**
+     * Arama yazılınca gruplar/kategoriler devre dışı kalır ve tüm kütüphane
+     * (70'e yakın nesne) ad ve ipucu üzerinden taranır. Türkçe'de büyük/küçük
+     * harf dönüşümü 'I/ı' ve 'İ/i' yüzünden özel olduğundan `tr` yerelini
+     * kullanmak gerekir; aksi hâlde "ışık" araması "IŞIK"ı bulamıyordu.
+     */
+    const fold = (t: string) => t.toLocaleLowerCase('tr');
+    const results = React.useMemo(() => {
+        const q = fold(query.trim());
+        if (!q) return null;
+        const hits: Array<{ item: MathCatalogItem; where: string }> = [];
+        for (const g of LIBRARY_GROUPS) {
+            for (const cat of g.categories) {
+                for (const item of cat.items) {
+                    // Kategori ve ders adı da taranır: "optik" ya da "8. sınıf"
+                    // yazan biri o gruptaki her nesneyi bulabilsin.
+                    const hay = fold(
+                        `${item.label} ${item.hint ?? ''} ${cat.label} ${g.label}`
+                    );
+                    if (hay.includes(q)) hits.push({ item, where: `${g.label} · ${cat.label}` });
+                }
+            }
+        }
+        return hits;
+    }, [query]);
 
     const beginInsert = (item: MathCatalogItem) => {
         if (!item.fields?.length) {
@@ -159,8 +187,20 @@ export function ObjectLibraryPanel({ open, onClose, onInsert }: ObjectLibraryPan
                             </button>
                         </div>
 
+                        <input
+                            type="search"
+                            value={query}
+                            onChange={(e) => {
+                                setQuery(e.target.value);
+                                setPending(null);
+                            }}
+                            placeholder="Nesne ara — örn. kaldıraç, üçgen, devre"
+                            aria-label="Kütüphanede ara"
+                            className="w-full h-8 px-3 rounded-lg bg-white/[0.06] border border-white/10 text-[12.5px] text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500"
+                        />
+
                         {/* Alt kademe: seçili dersin kategorileri */}
-                        <div className="flex items-center gap-1 flex-wrap">
+                        <div className={cn('flex items-center gap-1 flex-wrap', results && 'hidden')}>
                             {categories.map((cat, i) => (
                                 <button
                                     key={cat.label}
@@ -183,8 +223,13 @@ export function ObjectLibraryPanel({ open, onClose, onInsert }: ObjectLibraryPan
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-3">
+                        {results && results.length === 0 && (
+                            <p className="text-[12.5px] text-slate-400 text-center py-6">
+                                “{query}” için sonuç yok.
+                            </p>
+                        )}
                         <div className="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-2">
-                            {category.items.map((item) => (
+                            {(results ? results.map((r) => r.item) : category.items).map((item) => (
                                 <button
                                     key={item.kind}
                                     type="button"
@@ -203,6 +248,11 @@ export function ObjectLibraryPanel({ open, onClose, onInsert }: ObjectLibraryPan
                                     <span className="text-[11.5px] font-semibold text-slate-200 leading-tight">
                                         {item.label}
                                     </span>
+                                    {results && (
+                                        <span className="text-[10px] text-slate-500 leading-tight">
+                                            {results.find((r) => r.item.kind === item.kind)?.where}
+                                        </span>
+                                    )}
                                 </button>
                             ))}
                         </div>
