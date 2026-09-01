@@ -620,7 +620,6 @@ export function DrawingToolbar({
                             </button>
                         </>
                     )}
->>>>>>> 97d1fe083575a99fffe36616e37adfb1a6f99634
                     {onTextBoxModeToggle && (
                         <button
                             type="button"
