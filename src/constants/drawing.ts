@@ -215,8 +215,12 @@ export const getTextBoxTextColor = (bg: string): string =>
     TEXTBOX_TEXT_COLORS[bg] || TEXTBOX_TEXT_COLORS.default;
 
 export const ERASER_MODES: ReadonlyArray<{ id: EraserMode; label: string; hint: string }> = [
-    { id: 'pixel', label: 'Piksel', hint: 'Dokunduğu yeri siler' },
-    { id: 'stroke', label: 'Çizgi', hint: 'Dokunduğu çizginin tamamını siler' },
+    { id: 'pixel', label: 'Piksel', hint: 'Kalem ve fosforlu izini dokunduğu yerden keser' },
+    {
+        id: 'stroke',
+        label: 'Çizgi',
+        hint: 'Dokunduğu çizimin tamamını siler (şekil, nesne, fotoğraf dahil)',
+    },
 ];
 
 export const HANDLE_CURSORS: Record<string, string> = {

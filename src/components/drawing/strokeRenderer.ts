@@ -295,3 +295,104 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke) => {
     tCtx.restore();
 };
 
+/** Piksel silgisiyle parça parça kesilebilen (vektör iz bırakan) araçlar. */
+const TRIMMABLE_TOOLS = ['pencil', 'highlighter'];
+
+/**
+ * Seçilebilir mi?
+ *
+ * Eski defterlerde silgi, üzerine `destination-out` bir katman koyan normal
+ * bir çizim olarak saklanıyordu. Bu katmanlar hâlâ çizilir (yoksa eskiden
+ * silinmiş içerik geri gelirdi) ama asla seçilemez: aksi halde silgi izi
+ * kenara çekilip altındaki çizim ortaya çıkarılabiliyordu.
+ */
+export const isSelectable = (s: Stroke): boolean => s.tool !== 'eraser';
+
+const lerp = (a: number | undefined, b: number | undefined, t: number): number | undefined => {
+    if (a === undefined && b === undefined) return undefined;
+    const av = a ?? b ?? 0;
+    const bv = b ?? a ?? 0;
+    return av + (bv - av) * t;
+};
+
+/**
+ * Noktalar arasındaki boşlukları doldurur. Hızlı çizilen bir çizgide noktalar
+ * seyrek olur; silgi iki nokta arasından geçtiğinde kesme yapılabilmesi için
+ * ara noktalar gerekir.
+ */
+function densify(points: Point[], maxGap: number): Point[] {
+    if (points.length < 2) return points;
+    const out: Point[] = [points[0]];
+    for (let i = 1; i < points.length; i++) {
+        const a = points[i - 1];
+        const b = points[i];
+        const distance = Math.hypot(b.x - a.x, b.y - a.y);
+        const extra = Math.floor(distance / maxGap);
+        for (let k = 1; k <= extra; k++) {
+            const t = k / (extra + 1);
+            out.push({
+                x: a.x + (b.x - a.x) * t,
+                y: a.y + (b.y - a.y) * t,
+                p: lerp(a.p, b.p, t),
+            });
+        }
+        out.push(b);
+    }
+    return out;
+}
+
+/**
+ * Piksel silgisi: verilen daireye giren serbest çizim parçalarını keser.
+ * Kalan parçalar ayrı çizimler olarak döner; hiçbir şey değişmediyse `null`.
+ *
+ * Şekil, metin, damga, matematik nesnesi ve fotoğraflar parça parça
+ * silinemediği için bu silgiden etkilenmez — onları kaldırmak için
+ * çizgi silgisi ya da seçip silme kullanılır.
+ */
+export function erasePixels(
+    strokes: Stroke[],
+    x: number,
+    y: number,
+    radius: number
+): Stroke[] | null {
+    let changed = false;
+    const result: Stroke[] = [];
+
+    for (const stroke of strokes) {
+        if (!TRIMMABLE_TOOLS.includes(stroke.tool)) {
+            result.push(stroke);
+            continue;
+        }
+        // Ucuz eleme: silgi dairesi çizimin kutusuna değmiyorsa dokunma.
+        const bb = getBB(stroke);
+        if (x < bb.x1 - radius || x > bb.x2 + radius || y < bb.y1 - radius || y > bb.y2 + radius) {
+            result.push(stroke);
+            continue;
+        }
+
+        const reach = radius + (stroke.width || 2) / 2;
+        const points = densify(stroke.points, Math.max(2, radius / 2));
+
+        const runs: Point[][] = [];
+        let run: Point[] = [];
+        for (const point of points) {
+            if (Math.hypot(point.x - x, point.y - y) <= reach) {
+                if (run.length >= 2) runs.push(run);
+                run = [];
+            } else {
+                run.push(point);
+            }
+        }
+        if (run.length >= 2) runs.push(run);
+
+        // Hiç nokta silinmediyse çizimi olduğu gibi bırak (densify'ı da atma).
+        if (runs.length === 1 && runs[0].length === points.length) {
+            result.push(stroke);
+            continue;
+        }
+        changed = true;
+        for (const segment of runs) result.push({ ...stroke, points: segment });
+    }
+
+    return changed ? result : null;
+}

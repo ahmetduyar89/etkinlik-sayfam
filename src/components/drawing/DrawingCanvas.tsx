@@ -9,9 +9,11 @@ import { onImageReady } from './imageStore';
 import {
     SHAPE_TOOLS,
     drawStroke,
+    erasePixels,
     getBB,
     getHandlePositions,
     hitTest,
+    isSelectable,
     resizePoints,
     strokeInPolygon,
     strokeNearPoint,
@@ -707,18 +709,62 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             redraw();
         };
 
-        /** Verilen noktaya değen çizgilerin tamamını kaldırır. */
+        /** Silgi ucunun yarıçapı (dünya birimi). */
+        const eraserRadius = () => Math.max(6, config.width * 5);
+
+        /** Geçmişe bu hareket için bir kez kayıt düşer. */
+        const markGesture = () => {
+            if (gestureDirtyRef.current) return;
+            pushHistory();
+            gestureDirtyRef.current = true;
+        };
+
+        /** Çizgi silgisi: dokunulan çizimin tamamını kaldırır. */
         const eraseStrokesAt = (x: number, y: number) => {
             const radius = Math.max(6, config.width * 3);
-            const survivors = strokesRef.current.filter((st) => !strokeNearPoint(st, x, y, radius));
+            const survivors = strokesRef.current.filter(
+                (st) => !isSelectable(st) || !strokeNearPoint(st, x, y, radius)
+            );
             if (survivors.length === strokesRef.current.length) return;
-            if (!gestureDirtyRef.current) {
-                pushHistory();
-                gestureDirtyRef.current = true;
-            }
+            markGesture();
             strokesRef.current = survivors;
             commitStrokes();
             redraw();
+        };
+
+        /**
+         * Piksel silgisi: serbest çizimleri gerçekten keser.
+         * Eskiden üste `destination-out` bir katman konuyordu; o katman normal
+         * bir çizim olduğu için seçilip kenara çekilebiliyor ve altındaki
+         * "silinmiş" içerik geri geliyordu.
+         */
+        const erasePixelsAt = (x: number, y: number) => {
+            const next = erasePixels(strokesRef.current, x, y, eraserRadius());
+            if (!next) return;
+            markGesture();
+            strokesRef.current = next;
+            commitStrokes();
+            redraw();
+        };
+
+        /** Silgi ucunu üst katmanda daire olarak gösterir. */
+        const drawEraserCursor = (x: number, y: number) => {
+            const oCtx = overlayCtxRef.current;
+            if (!oCtx) return;
+            const { w, h } = getCanvasSize();
+            applyIdentity(oCtx);
+            oCtx.clearRect(0, 0, w, h);
+            const v = viewRef.current;
+            const c = toScreenPoint({ x, y }, v);
+            oCtx.save();
+            oCtx.beginPath();
+            oCtx.arc(c.x, c.y, eraserRadius() * v.scale, 0, Math.PI * 2);
+            oCtx.fillStyle = 'rgba(148,163,184,0.20)';
+            oCtx.strokeStyle = 'rgba(71,85,105,0.75)';
+            oCtx.lineWidth = 1.5;
+            oCtx.fill();
+            oCtx.stroke();
+            oCtx.restore();
         };
 
         /** Kement önizlemesini üst katmana çizer. */
@@ -805,11 +851,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
 
-            // Çizgi silgisi: dokunulan çizginin tamamını kaldırır.
-            if (config.tool === 'eraser' && config.eraserMode === 'stroke') {
+            // Silgi hiçbir kipte çizim nesnesi üretmez; doğrudan içeriği düzenler.
+            if (config.tool === 'eraser') {
                 isDrawingRef.current = true;
                 gestureDirtyRef.current = false;
-                eraseStrokesAt(x, y);
+                if (config.eraserMode === 'stroke') eraseStrokesAt(x, y);
+                else erasePixelsAt(x, y);
+                drawEraserCursor(x, y);
                 return;
             }
 
@@ -851,6 +899,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     }
                 }
                 for (let i = strokesRef.current.length - 1; i >= 0; i--) {
+                    if (!isSelectable(strokesRef.current[i])) continue;
                     if (hitTest(strokesRef.current[i], x, y)) {
                         // Shift ile tıklamak seçime ekler/çıkarır.
                         if (e.shiftKey) {
@@ -919,12 +968,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             currentStrokeRef.current = {
                 tool: config.tool,
                 color: config.color,
-                width:
-                    config.tool === 'highlighter'
-                        ? config.width * 5
-                        : config.tool === 'eraser'
-                        ? config.width * 10
-                        : config.width,
+                width: config.tool === 'highlighter' ? config.width * 5 : config.width,
                 fillEnabled: config.fillEnabled,
                 penType: config.tool === 'pencil' ? config.penType ?? 'ballpoint' : undefined,
                 points: [first],
@@ -1000,8 +1044,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
 
-            if (config.tool === 'eraser' && config.eraserMode === 'stroke') {
-                if (isDrawingRef.current) eraseStrokesAt(x, y);
+            if (config.tool === 'eraser') {
+                if (isDrawingRef.current) {
+                    if (config.eraserMode === 'stroke') eraseStrokesAt(x, y);
+                    else erasePixelsAt(x, y);
+                }
+                drawEraserCursor(x, y);
                 return;
             }
 
@@ -1125,7 +1173,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 if (poly && poly.length >= 3) {
                     const picked: number[] = [];
                     strokesRef.current.forEach((s, i) => {
-                        if (strokeInPolygon(s, poly)) picked.push(i);
+                        if (isSelectable(s) && strokeInPolygon(s, poly)) picked.push(i);
                     });
                     if (picked.length) setSelection(picked);
                 }
@@ -1141,9 +1189,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 }
                 return;
             }
-            if (config.tool === 'eraser' && config.eraserMode === 'stroke') {
+            if (config.tool === 'eraser') {
                 isDrawingRef.current = false;
                 gestureDirtyRef.current = false;
+                clearOverlay();
                 return;
             }
             if (isDrawingRef.current && currentStrokeRef.current) {
@@ -1187,7 +1236,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (!enabled) return 'default';
             if (config.tool === 'pan') return panRef.current ? 'grabbing' : 'grab';
             if (config.tool === 'select') return 'default';
-            if (config.tool === 'lasso') return 'crosshair';
+            if (config.tool === 'eraser') return 'none';
             return 'crosshair';
         };
 
