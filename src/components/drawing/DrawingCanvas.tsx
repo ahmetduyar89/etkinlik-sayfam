@@ -128,6 +128,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const overlayCtxRef = React.useRef<CanvasRenderingContext2D | null>(null);
         const strokesRef = React.useRef<Stroke[]>([...pagesRef.current[0]]);
         const isDrawingRef = React.useRef(false);
+        /** Kalem baskısını gerçek hızdan üretmek için son nokta zamanı. */
+        const lastPointTimeRef = React.useRef(0);
         const resizeFrameRef = React.useRef<number | null>(null);
         /** Sürükleme sırasında geçmişe yalnızca bir kez kayıt düşmek için. */
         const gestureDirtyRef = React.useRef(false);
@@ -1038,9 +1040,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
             isDrawingRef.current = true;
             const first: Point = { x, y };
+            lastPointTimeRef.current = performance.now();
             if (config.tool === 'pencil') {
-                // İlk noktada hız bilgisi yok; orta seviye bir baskıyla başla.
-                first.p = samplePressure(e.pressure, e.pointerType, 12, undefined, config.penType);
+                // İlk noktada hız bilgisi yok; orta hızla başla.
+                first.p = samplePressure(e.pressure, e.pointerType, 0.5, undefined, config.penType);
             }
             currentStrokeRef.current = {
                 tool: config.tool,
@@ -1170,10 +1173,15 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             } else {
                 const point: Point = { x, y };
                 if (stroke.tool === 'pencil') {
+                    // Hız = ekranda alınan yol / geçen süre. Sadece mesafeye
+                    // bakmak işaretçi olay sıklığını hız sanmak olurdu.
+                    const now = performance.now();
+                    const elapsed = Math.max(1, now - lastPointTimeRef.current);
+                    lastPointTimeRef.current = now;
                     point.p = samplePressure(
                         e.pressure,
                         e.pointerType,
-                        step * viewRef.current.scale,
+                        (step * viewRef.current.scale) / elapsed,
                         last.p,
                         stroke.penType
                     );

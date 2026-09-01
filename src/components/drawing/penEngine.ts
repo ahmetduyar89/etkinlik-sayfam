@@ -35,28 +35,28 @@ export const PEN_PROFILES: Record<PenType, PenProfile> = {
     fountain: {
         id: 'fountain',
         label: 'Dolma Kalem',
-        min: 0.45,
-        max: 1.45,
+        min: 0.35,
+        max: 1.75,
         alpha: 1,
-        smoothing: 0.72,
+        smoothing: 0.55,
         hint: 'Hız ve baskıya göre incelir/kalınlaşır',
     },
     brush: {
         id: 'brush',
         label: 'Fırça',
-        min: 0.25,
-        max: 2.3,
-        alpha: 0.95,
-        smoothing: 0.6,
+        min: 0.2,
+        max: 3,
+        alpha: 0.92,
+        smoothing: 0.45,
         hint: 'Geniş kontrast, kaligrafi hissi',
     },
     marker: {
         id: 'marker',
         label: 'Keçeli',
-        min: 1.15,
-        max: 1.35,
-        alpha: 0.9,
-        smoothing: 0.4,
+        min: 1.55,
+        max: 1.75,
+        alpha: 0.72,
+        smoothing: 0.3,
         hint: 'Kalın ve yarı saydam',
     },
 };
@@ -77,17 +77,30 @@ export const FREEHAND_TOOLS = ['pencil', 'highlighter', 'eraser'] as const;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /**
+ * Elle çizerken "yavaş" ve "hızlı" sayılan uç değerler (ekran pikseli / ms).
+ * Normal el yazısı yaklaşık 0.15–1.2 px/ms aralığında gezer.
+ */
+const SLOW_SPEED = 0.15;
+const FAST_SPEED = 1.2;
+
+/**
  * Yeni bir nokta için baskı değeri üretir.
  *
- * @param pressure  PointerEvent.pressure (stylus yoksa 0 veya 0.5 gelir)
+ * Hız, iki nokta arasındaki mesafenin GEÇEN SÜREYE bölünmesiyle bulunur.
+ * Sadece mesafeye bakmak yanlış olur: işaretçi olaylarının sıklığı cihaza
+ * göre değişir (60 Hz'de aralıklar iki katı büyük olur), bu yüzden aynı el
+ * hareketi farklı cihazlarda farklı kalınlık üretirdi — ve gerçek hız
+ * aralığı o kadar daralırdı ki bütün kalem uçları aynı görünürdü.
+ *
+ * @param pressure    PointerEvent.pressure (stylus yoksa 0 veya 0.5 gelir)
  * @param pointerType PointerEvent.pointerType
- * @param distance  Bir önceki noktaya uzaklık (px) — hız göstergesi
- * @param previous  Bir önceki noktanın baskısı (yumuşatma için)
+ * @param speed       Ekran pikseli / milisaniye
+ * @param previous    Bir önceki noktanın baskısı (yumuşatma için)
  */
 export function samplePressure(
     pressure: number,
     pointerType: string,
-    distance: number,
+    speed: number,
     previous: number | undefined,
     pen: PenType | undefined
 ): number {
@@ -97,7 +110,7 @@ export function samplePressure(
         pointerType === 'pen' && pressure > 0 && Math.abs(pressure - 0.5) > 0.001;
     const raw = hasStylusPressure
         ? clamp(pressure, 0.02, 1)
-        : clamp(1 - distance / 34, 0.12, 1);
+        : 1 - clamp((speed - SLOW_SPEED) / (FAST_SPEED - SLOW_SPEED), 0, 1);
     const prev = previous ?? raw;
     const s = profile.smoothing;
     return clamp(prev * s + raw * (1 - s), 0.02, 1);
@@ -115,62 +128,83 @@ export const hasPressure = (points: Point[]): boolean =>
     points.some((pt) => typeof pt.p === 'number');
 
 /**
- * Değişken kalınlıklı serbest çizgi. Her segment kendi kalınlığıyla ayrı
- * çizilir; uçlar yuvarlak olduğu için birleşim yerleri görünmez.
+ * Değişken kalınlıklı serbest çizgi.
+ *
+ * Çizgi, tek bir kapalı şerit olarak DOLDURULUR: her noktanın iki yanına
+ * kalınlığın yarısı kadar açılıp sol kenar ileri, sağ kenar geri dolaşılır.
+ * Parça parça `stroke()` çağırmak daha basit olurdu ama komşu parçaların
+ * kalınlıkları farklı olduğunda yuvarlak uçlar birbirinin üstüne taşar ve
+ * çizgi boncuklu görünür.
  */
 export function drawVariableStroke(
     ctx: CanvasRenderingContext2D,
     stroke: Stroke,
     base: number
 ): void {
-    const pts = stroke.points;
     const widthAt = (pt: Point) => pressureToWidth(base, pt.p, stroke.penType);
 
-    if (pts.length === 1) {
+    // Üst üste binen noktalar yön hesabını bozar; ayıkla.
+    const pts: Point[] = [];
+    for (const q of stroke.points) {
+        const last = pts[pts.length - 1];
+        if (!last || Math.hypot(q.x - last.x, q.y - last.y) > 0.01) pts.push(q);
+    }
+
+    const dot = (pt: Point) => {
         ctx.beginPath();
-        ctx.arc(pts[0].x, pts[0].y, widthAt(pts[0]) / 2, 0, Math.PI * 2);
+        ctx.arc(pt.x, pt.y, Math.max(0.3, widthAt(pt) / 2), 0, Math.PI * 2);
         ctx.fill();
+    };
+
+    if (pts.length === 0) return;
+    if (pts.length === 1) {
+        dot(pts[0]);
         return;
     }
 
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    const n = pts.length;
+    // Her noktada, komşularının yönüne dik birim vektör.
+    const left: Point[] = [];
+    const right: Point[] = [];
+    for (let i = 0; i < n; i++) {
+        const a = pts[Math.max(0, i - 1)];
+        const b = pts[Math.min(n - 1, i + 1)];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const half = widthAt(pts[i]) / 2;
+        const nx = (-dy / len) * half;
+        const ny = (dx / len) * half;
+        left.push({ x: pts[i].x + nx, y: pts[i].y + ny });
+        right.push({ x: pts[i].x - nx, y: pts[i].y - ny });
+    }
 
     const mid = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
-    if (pts.length === 2) {
-        ctx.beginPath();
-        ctx.lineWidth = (widthAt(pts[0]) + widthAt(pts[1])) / 2;
-        ctx.moveTo(pts[0].x, pts[0].y);
-        ctx.lineTo(pts[1].x, pts[1].y);
-        ctx.stroke();
-        return;
-    }
+    /**
+     * Uçtaki yarım daire. Ayrı bir daire olarak doldurulsaydı yarı saydam
+     * uçlarda (keçeli, fırça) şeritle üst üste binip koyu benek bırakırdı;
+     * bu yüzden aynı yolun parçası olarak çizilir.
+     */
+    const cap = (center: Point, from: Point) => {
+        const angle = Math.atan2(from.y - center.y, from.x - center.x);
+        ctx.arc(center.x, center.y, widthAt(center) / 2, angle, angle - Math.PI, true);
+    };
 
-    // İlk parça: başlangıç noktasından ilk orta noktaya.
-    let from = mid(pts[0], pts[1]);
     ctx.beginPath();
-    ctx.lineWidth = (widthAt(pts[0]) + widthAt(pts[1])) / 2;
-    ctx.moveTo(pts[0].x, pts[0].y);
-    ctx.lineTo(from.x, from.y);
-    ctx.stroke();
-
-    // Orta parçalar: her nokta kontrol noktası, komşu orta noktalar uç.
-    for (let i = 1; i < pts.length - 1; i++) {
-        const to = mid(pts[i], pts[i + 1]);
-        ctx.beginPath();
-        ctx.lineWidth = widthAt(pts[i]);
-        ctx.moveTo(from.x, from.y);
-        ctx.quadraticCurveTo(pts[i].x, pts[i].y, to.x, to.y);
-        ctx.stroke();
-        from = to;
+    ctx.moveTo(left[0].x, left[0].y);
+    for (let i = 1; i < n - 1; i++) {
+        const to = mid(left[i], left[i + 1]);
+        ctx.quadraticCurveTo(left[i].x, left[i].y, to.x, to.y);
     }
-
-    // Son parça: son orta noktadan bitiş noktasına.
-    const last = pts[pts.length - 1];
-    ctx.beginPath();
-    ctx.lineWidth = widthAt(last);
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(last.x, last.y);
-    ctx.stroke();
+    ctx.lineTo(left[n - 1].x, left[n - 1].y);
+    cap(pts[n - 1], left[n - 1]);
+    for (let i = n - 2; i > 0; i--) {
+        const to = mid(right[i], right[i - 1]);
+        ctx.quadraticCurveTo(right[i].x, right[i].y, to.x, to.y);
+    }
+    ctx.lineTo(right[0].x, right[0].y);
+    cap(pts[0], right[0]);
+    ctx.closePath();
+    ctx.fill();
 }
