@@ -211,11 +211,11 @@ export const strokeNearPoint = (s: Stroke, x: number, y: number, radius: number)
 };
 
 /** Tek bir çizimi verilen bağlama çizer. Küçük resimlerde de kullanılır. */
-export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke) => {
+export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0) => {
     if (!s || s.points.length < 1) return;
 
     if (s.tool === 'math') {
-        drawLibraryObject(tCtx, s);
+        drawLibraryObject(tCtx, s, time);
         return;
     }
 

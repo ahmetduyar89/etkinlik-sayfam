@@ -178,7 +178,11 @@ export type MathObjectKind =
     | 'states_of_matter'
     | 'animal_cell'
     | 'plant_cell'
-    | 'sun_earth_moon';
+    | 'sun_earth_moon'
+    // ── Canlı simülasyonlar ─────────────────────────────────────────
+    | 'optics_bench'
+    | 'circuit_sim'
+    | 'matter_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile
@@ -199,6 +203,12 @@ export interface MathObject {
     text?: string;
     /** Etiketler (sayı, derece, isim) çizilsin mi. */
     labels?: boolean;
+    /**
+     * Canlı simülasyonların kullanıcı tarafından ayarlanan değerleri
+     * (odak uzaklığı, sıcaklık, anahtar durumu…). Yalnızca kalıcı ayarlar
+     * burada tutulur; animasyonun anlık evresi saklanmaz, zamandan üretilir.
+     */
+    sim?: Record<string, number>;
 }
 
 export interface DrawConfig {
