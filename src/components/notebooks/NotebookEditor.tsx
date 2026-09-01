@@ -33,6 +33,9 @@ import { BG_COLORS } from '../../constants/drawing';
 import { PAPER_STYLES, paperBackground } from './paper';
 import { PageThumbnails } from './PageThumbnails';
 import { CONTENT_LIMIT_BYTES, importImageFile } from '../drawing/imageStore';
+import { Curtain, Spotlight } from './LessonTools';
+import { LessonModeToolbar, type LessonOverlay } from './LessonModeToolbar';
+import { NotebookQrModal } from './NotebookQrModal';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
@@ -112,6 +115,13 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         eraserMode: 'pixel',
     });
     const [isTextBoxMode, setIsTextBoxMode] = React.useState(false);
+
+    // ── Ders modu ─────────────────────────────────────────────────────
+    // Yalnızca görünümü etkiler; defter içeriğine dokunmaz, kaydedilmez.
+    const [overlay, setOverlay] = React.useState<LessonOverlay>('none');
+    const [presenting, setPresenting] = React.useState(false);
+    const [showQr, setShowQr] = React.useState(false);
+    const stageRef = React.useRef<HTMLDivElement>(null);
     const [history, setHistory] = React.useState({ canUndo: false, canRedo: false });
     const [showPaperMenu, setShowPaperMenu] = React.useState(false);
     const [showPages, setShowPages] = React.useState(false);
@@ -408,7 +418,12 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     return (
         <div className="fixed inset-0 z-[9000] flex flex-col bg-surface-container-low">
             {/* Üst şerit */}
-            <header className="flex items-center gap-3 px-3 sm:px-5 py-2.5 bg-primary text-white shadow-[0_2px_10px_rgba(15,23,42,0.18)] flex-shrink-0">
+            <header
+                className={cn(
+                    'flex items-center gap-3 px-3 sm:px-5 py-2.5 bg-primary text-white shadow-[0_2px_10px_rgba(15,23,42,0.18)] flex-shrink-0',
+                    presenting && 'hidden'
+                )}
+            >
                 <button
                     onClick={handleClose}
                     title="Defterlerime dön"
@@ -576,7 +591,12 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             </header>
 
             {/* Sayfa şeridi */}
-            <div className="flex items-center justify-center gap-2 py-1.5 bg-white border-b border-outline-variant flex-shrink-0">
+            <div
+                className={cn(
+                    'flex items-center justify-center gap-2 py-1.5 bg-white border-b border-outline-variant flex-shrink-0',
+                    presenting && 'hidden'
+                )}
+            >
                 <button
                     onClick={() => setShowPages((v) => !v)}
                     aria-pressed={showPages}
@@ -628,12 +648,21 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         <Trash2 className="w-3.5 h-3.5" /> Sil
                     </button>
                 )}
+                <div className="w-px h-4 bg-outline-variant mx-1" />
+                <LessonModeToolbar
+                    overlay={overlay}
+                    onOverlayChange={setOverlay}
+                    presenting={presenting}
+                    onPresentingChange={setPresenting}
+                    onShare={() => setShowQr(true)}
+                    fullscreenTarget={stageRef}
+                />
             </div>
 
             {/* Çalışma alanı */}
-            <div className="flex-1 min-h-0 flex">
+            <div ref={stageRef} className="flex-1 min-h-0 flex bg-background">
                 <PageThumbnails
-                    open={showPages}
+                    open={showPages && !presenting}
                     onClose={() => setShowPages(false)}
                     pages={thumbPages}
                     boxesByPage={boxesByPage}
@@ -701,10 +730,48 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         />
                     </>
                 )}
+
+                {/* Ders modu örtüleri — tuvalin üstünde durur, içeriğe dokunmaz. */}
+                {overlay === 'spotlight' && <Spotlight onExit={() => setOverlay('none')} />}
+                {overlay === 'curtain' && <Curtain onExit={() => setOverlay('none')} />}
+
+                {/* Sunum modunda araç çubukları gizli; çıkış için tek düğme. */}
+                {presenting && (
+                    <button
+                        type="button"
+                        onClick={() => setPresenting(false)}
+                        className="absolute top-3 right-3 z-[4400] px-3 py-1.5 rounded-full bg-slate-900/80 text-white text-[12px] font-bold hover:bg-slate-900"
+                    >
+                        Sunumdan çık
+                    </button>
+                )}
+                {presenting && (
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => canvasRef.current?.prevPage()}
+                            disabled={pageInfo.current === 0}
+                            aria-label="Önceki sayfa"
+                            className="absolute left-3 top-1/2 -translate-y-1/2 z-[4400] w-12 h-12 rounded-full bg-white/90 border border-outline-variant shadow-lg flex items-center justify-center text-on-surface-variant disabled:opacity-0"
+                        >
+                            <ChevronLeft className="w-6 h-6" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => canvasRef.current?.nextPage()}
+                            disabled={pageInfo.current >= pageInfo.total - 1}
+                            aria-label="Sonraki sayfa"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 z-[4400] w-12 h-12 rounded-full bg-white/90 border border-outline-variant shadow-lg flex items-center justify-center text-on-surface-variant disabled:opacity-0"
+                        >
+                            <ChevronRight className="w-6 h-6" />
+                        </button>
+                    </>
+                )}
                 </div>
             </div>
 
-            {/* Çizim araç çubuğu (sürüklenebilir) */}
+            {/* Çizim araç çubuğu (sürüklenebilir) — sunum modunda gizlenir. */}
+            {!presenting && (
             <DrawingToolbar
                 onCommand={(type) => {
                     if (type === 'UNDO_DRAWING') handleUndo();
@@ -731,6 +798,9 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 onZoomOut={() => canvasRef.current?.zoomBy(0.8)}
                 onZoomReset={() => canvasRef.current?.resetView()}
             />
+            )}
+
+            {showQr && <NotebookQrModal notebook={notebook} onClose={() => setShowQr(false)} />}
         </div>
     );
 }

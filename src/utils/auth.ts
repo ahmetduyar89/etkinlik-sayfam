@@ -38,8 +38,13 @@ export function lockApp(): void {
     window.location.reload();
 }
 
-/** Öğrenci linkleri (?view=student&id=…) şifre istemez. */
+/**
+ * Öğrenciye gönderilen bağlantılar şifre istemez; öğrenciler doğrudan girer.
+ * İki tür vardır: etkinlik (?view=student&id=…) ve salt-okunur defter
+ * (?view=notebook&id=…).
+ */
 export function isStudentLink(): boolean {
     const params = new URLSearchParams(window.location.search);
-    return params.get('view') === 'student' && !!params.get('id');
+    const view = params.get('view');
+    return (view === 'student' || view === 'notebook') && !!params.get('id');
 }

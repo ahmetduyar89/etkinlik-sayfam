@@ -30,6 +30,7 @@ import { ActivityFolderDialog } from './components/notebooks/ActivityFolderDialo
 import { activityFolderIds } from './components/notebooks/activityFolders';
 import { LibraryTree } from './components/content/LibraryTree';
 import { LessonModeBar } from './components/content/LessonModeBar';
+import { NotebookViewer } from './components/notebooks/NotebookViewer';
 import { ContentFilterBar, type SortBy } from './components/content/ContentFilterBar';
 import { RecentActivities } from './components/content/RecentActivities';
 import { formatGradeLevel } from './constants/education';
@@ -158,6 +159,8 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const isStudentView = params.get('view') === 'student' && !!params.get('id');
     const studentId = params.get('id');
+    // Öğrenciye gönderilen defter bağlantısı: salt-okunur görüntüleyici.
+    const sharedNotebookId = params.get('view') === 'notebook' ? params.get('id') : null;
 
     const [mainView, setMainView] = useState<MainView>('content');
     const [activities, setActivities] = useState<Activity[]>([]);
@@ -485,6 +488,9 @@ export default function App() {
         : selectedCategory ? selectedCategory
         : selectedTag ? `#${selectedTag}`
         : 'Tüm İçerikler';
+
+    // ── Paylaşılan defter (öğrenci) ───────────────────────────────────
+    if (sharedNotebookId) return <NotebookViewer notebookId={sharedNotebookId} />;
 
     // ── Öğrenci görünümü ──────────────────────────────────────────────
     if (isStudentView) {
