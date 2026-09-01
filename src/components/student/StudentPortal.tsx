@@ -36,6 +36,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
         fillEnabled: false,
         stampIcon: '✅',
     });
+    const [showWhiteboard, setShowWhiteboard] = useState(false);
     const [showCompass, setShowCompass] = useState(false);
     const [showNumberLine, setShowNumberLine] = useState(false);
     const [showCalculator, setShowCalculator] = useState(false);
