@@ -31,6 +31,13 @@ export const LIBRARY_GROUPS: ReadonlyArray<ObjectGroup> = [
 /** Bir nesnenin canlı simülasyon tanımı (yoksa undefined). */
 export const getSimSpec = (kind: MathObjectKind): SimSpec | undefined => SIM_SPECS[kind];
 
+/** Bu çizim şu anda her karede yeniden çizilmeli mi? */
+export function isAnimated(stroke: Stroke): boolean {
+    if (stroke.tool !== 'math' || !stroke.math) return false;
+    const flag = getSimSpec(stroke.math.kind)?.animated;
+    return typeof flag === 'function' ? flag(stroke.math) : !!flag;
+}
+
 /** Çizim, nesnenin kutusunu bu şekilde türetir; kontroller de aynısını kullanır. */
 export function objectRect(stroke: Stroke): Rect | null {
     if (stroke.points.length < 2) return null;

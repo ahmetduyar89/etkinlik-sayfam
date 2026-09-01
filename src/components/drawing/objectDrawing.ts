@@ -77,8 +77,11 @@ export interface SimParam {
 }
 
 export interface SimSpec {
-    /** Her karede yeniden çizilmeli mi (animasyonlu nesneler). */
-    animated?: boolean;
+    /**
+     * Her karede yeniden çizilmeli mi. Fonksiyon verilirse nesnenin o anki
+     * ayarına bakılır — duraklatılmış bir simülasyon boşuna kare harcamaz.
+     */
+    animated?: boolean | ((o: MathObject) => boolean);
     /** Nesnenin üzerindeki etkileşim noktaları. */
     controls?: (r: Rect, o: MathObject) => SimControl[];
     /** Bir kontrol sürüklendiğinde/dokunulduğunda uygulanacak değişiklik. */
@@ -167,6 +170,15 @@ export const arrow = (
 ) => {
     line(k, x1, y1, x2, y2, width);
     arrowHead(k, x2, y2, Math.atan2(y2 - y1, x2 - x1), size);
+};
+
+/** Etiketin `label` ile aynı fontta kaplayacağı genişlik (px). */
+export const textWidth = (k: Ctx, text: string, scale = 1): number => {
+    k.c.save();
+    k.c.font = `600 ${Math.round(k.fs * scale)}px ui-sans-serif, system-ui, Arial`;
+    const w = k.c.measureText(text).width;
+    k.c.restore();
+    return w;
 };
 
 export const label = (
