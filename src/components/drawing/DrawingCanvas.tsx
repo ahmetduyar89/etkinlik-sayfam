@@ -4,7 +4,7 @@ import { Copy, Trash2 } from 'lucide-react';
 import { DRAWING_COLORS, HANDLE_CURSORS } from '../../constants/drawing';
 import { samplePressure } from './penEngine';
 import { recognizeShape, snapAngle } from './shapeRecognizer';
-import { findLibraryItem, getSimSpec, objectRect } from './libraryObjects';
+import { findLibraryItem, getSimSpec, isAnimated, objectRect } from './libraryObjects';
 import { onImageReady } from './imageStore';
 import {
     SHAPE_TOOLS,
@@ -334,7 +334,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const animatedIndexes = React.useCallback(() => {
             const out: number[] = [];
             strokesRef.current.forEach((st, i) => {
-                if (st.tool === 'math' && st.math && getSimSpec(st.math.kind)?.animated) out.push(i);
+                if (isAnimated(st)) out.push(i);
             });
             return out;
         }, []);
@@ -354,10 +354,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
         /** Sayfada canlı (animasyonlu) simülasyon var mı. */
         const hasAnimated = React.useMemo(
-            () =>
-                strokes.some(
-                    (st) => st.tool === 'math' && st.math && getSimSpec(st.math.kind)?.animated
-                ),
+            () => strokes.some(isAnimated),
             [strokes]
         );
 

@@ -182,7 +182,13 @@ export type MathObjectKind =
     // ── Canlı simülasyonlar ─────────────────────────────────────────
     | 'optics_bench'
     | 'circuit_sim'
-    | 'matter_sim';
+    | 'matter_sim'
+    // ── 8. sınıf üniteleri ──────────────────────────────────────────
+    | 'seasons_sim'
+    | 'punnett_sim'
+    | 'liquid_pressure_sim'
+    | 'solid_pressure_sim'
+    | 'lever_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile
