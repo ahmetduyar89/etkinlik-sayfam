@@ -897,7 +897,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 const s: Stroke = {
                     tool: 'stamp',
                     stampIcon: config.stampIcon,
-                    color: '#000',
+                    // Emoji damgalar kendi renklerini korur; metin sembolleri
+                    // (π, ×, ∈…) seçili kalem rengini alır. Sabit siyah kalırsa
+                    // koyu zeminli sayfalarda görünmezler.
+                    color: config.color,
                     points: [{ x, y }],
                 };
                 pushHistory();

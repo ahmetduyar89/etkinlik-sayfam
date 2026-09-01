@@ -281,10 +281,10 @@ export function DrawingToolbar({
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="pointer-events-auto flex flex-col gap-2 bg-[#1a1b26]/95 backdrop-blur-md p-3 rounded-2xl border border-white/10 shadow-2xl"
+                        className="pointer-events-auto flex flex-col gap-2 max-h-[62vh] overflow-y-auto bg-[#1a1b26]/95 backdrop-blur-md p-3 rounded-2xl border border-white/10 shadow-2xl"
                     >
                         <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-slate-500 font-medium w-12 shrink-0">
+                            <span className="text-[10px] text-slate-400 font-semibold w-[78px] shrink-0 leading-tight">
                                 Şekil
                             </span>
                             <div className="flex items-center gap-0.5">
@@ -331,7 +331,7 @@ export function DrawingToolbar({
 
                         {STAMP_CATEGORIES.map((cat) => (
                             <div key={cat.label} className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-500 font-medium w-12 shrink-0">
+                                <span className="text-[10px] text-slate-400 font-semibold w-[78px] shrink-0 leading-tight">
                                     {cat.label}
                                 </span>
                                 <div className="flex items-center gap-0.5 flex-wrap">
@@ -350,7 +350,10 @@ export function DrawingToolbar({
                                             title={stamp.label}
                                             aria-label={`${cat.label}: ${stamp.label}`}
                                             className={cn(
-                                                'w-9 h-9 rounded-xl text-xl transition-all hover:bg-white/10 flex items-center justify-center',
+                                                // Emoji kendi rengini taşır; π, ×, ∈ gibi metin
+                                                // semboller ise yazı rengini kullanır — açıkça
+                                                // verilmezse koyu panelde görünmez olurlar.
+                                                'w-9 h-9 rounded-xl text-xl leading-none text-slate-100 transition-all hover:bg-white/10 hover:text-white flex items-center justify-center',
                                                 config.tool === 'stamp' &&
                                                     config.stampIcon === stamp.emoji
                                                     ? 'bg-[#2d3045] ring-2 ring-indigo-500'
