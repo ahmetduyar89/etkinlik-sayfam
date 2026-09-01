@@ -14,3 +14,18 @@ interface ImportMetaEnv {
 interface ImportMeta {
     readonly env: ImportMetaEnv
 }
+
+declare module 'qrcode.react' {
+    import React from 'react';
+    export interface QRCodeProps {
+        value: string;
+        size?: number;
+        level?: string;
+        bgColor?: string;
+        fgColor?: string;
+        className?: string;
+        includeMargin?: boolean;
+    }
+    export const QRCodeSVG: React.FC<QRCodeProps>;
+    export const QRCodeCanvas: React.FC<QRCodeProps>;
+}
