@@ -559,7 +559,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         <Redo2 className="w-[18px] h-[18px]" />
                     </button>
                     <button
-                        onClick={() => canvasRef.current?.screenshot(true, bgColor)}
+                        onClick={() => canvasRef.current?.screenshot(true, bgColor, paper)}
                         title="Sayfayı görsel olarak indir"
                         aria-label="Sayfayı görsel olarak indir"
                         className="p-2 rounded-xl hover:bg-white/15 transition-colors"
@@ -718,7 +718,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 setConfig={setConfig}
                 bgColor={bgColor}
                 onBgColorChange={changeBg}
-                onScreenshot={() => canvasRef.current?.screenshot(true, bgColor)}
+                onScreenshot={() => canvasRef.current?.screenshot(true, bgColor, paper)}
                 isTextBoxMode={isTextBoxMode}
                 onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
                 onInsertMath={handleInsertMath}

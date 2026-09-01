@@ -262,3 +262,230 @@ export function paperBackground(
             return base;
     }
 }
+
+/**
+ * Kağıt desenini Canvas 2D üzerine çizer — `paperBackground` ile aynı görüntü.
+ *
+ * Desen sayfada CSS arka planı olarak durduğu için PNG dışa aktarımında
+ * kayboluyordu; ekran görüntüsü yalnızca çizim tuvalini alıyordu. Bu işlev
+ * aynı deseni tuvale çizerek çıktının ekranla aynı görünmesini sağlar.
+ *
+ * `ctx` çağrılmadan önce dpr ölçeğine ayarlanmış olmalıdır; `w` ve `h` CSS
+ * pikselidir. Katman sırası CSS ile aynıdır: CSS'te ÖNCE yazılan katman ÜSTTE
+ * kalır, bu yüzden burada ters sırada çizilir.
+ */
+export function drawPaper(
+    ctx: CanvasRenderingContext2D,
+    paper: PaperStyle,
+    bgColor: string,
+    w: number,
+    h: number,
+    view: Viewport = IDENTITY
+): void {
+    ctx.save();
+    ctx.fillStyle = bgColor || '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+
+    const k = view.scale;
+    /** Yatay bant dizisi: CSS `linear-gradient(c Npx, transparent Npx)` eşi. */
+    const rows = (step: number, color: string, thick: number, phase = view.ty) => {
+        if (step <= 0.5) return;
+        ctx.fillStyle = color;
+        for (let y = wrap(phase, step) - step; y < h; y += step) {
+            if (y + thick >= 0) ctx.fillRect(0, y, w, thick);
+        }
+    };
+    /** Dikey bant dizisi. */
+    const cols = (step: number, color: string, thick: number, phase = view.tx) => {
+        if (step <= 0.5) return;
+        ctx.fillStyle = color;
+        for (let x = wrap(phase, step) - step; x < w; x += step) {
+            if (x + thick >= 0) ctx.fillRect(x, 0, thick, h);
+        }
+    };
+    /** Deseni döşeyip her karo için `body` çizer. */
+    const tiles = (
+        tw: number,
+        th: number,
+        body: (ox: number, oy: number) => void,
+        phaseX = view.tx,
+        phaseY = view.ty,
+        onlyOneColumn = false
+    ) => {
+        if (tw <= 0.5 || th <= 0.5) return;
+        const x0 = wrap(phaseX, tw) - tw;
+        for (let y = wrap(phaseY, th) - th; y < h; y += th) {
+            if (onlyOneColumn) {
+                body(phaseX, y);
+                continue;
+            }
+            for (let x = x0; x < w; x += tw) body(x, y);
+        }
+    };
+    const stroke = (color: string, lw: number, build: () => void) => {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lw;
+        ctx.beginPath();
+        build();
+        ctx.stroke();
+        ctx.restore();
+    };
+
+    switch (paper) {
+        case 'grid':
+            cols(26 * k, LINE, 1);
+            rows(26 * k, LINE, 1);
+            break;
+
+        case 'lined':
+            rows(30 * k, LINE, 1);
+            break;
+
+        case 'wide_lined':
+            rows(48 * k, LINE, 1.5);
+            break;
+
+        case 'dotted': {
+            const step = 24 * k;
+            const r = Math.max(1, 1.2 * k);
+            if (step > 0.5) {
+                ctx.fillStyle = STRONG;
+                for (let y = wrap(view.ty + step / 2, step) - step; y < h; y += step) {
+                    for (let x = wrap(view.tx + step / 2, step) - step; x < w; x += step) {
+                        ctx.beginPath();
+                        ctx.arc(x, y, r, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+            break;
+        }
+
+        case 'graph_mm':
+            // Kabadan inceye: CSS'te ince katman üstte olduğu için en son çizilir.
+            cols(80 * k, 'rgba(15,23,42,0.2)', 1);
+            rows(80 * k, 'rgba(15,23,42,0.2)', 1);
+            cols(40 * k, 'rgba(15,23,42,0.11)', 1);
+            rows(40 * k, 'rgba(15,23,42,0.11)', 1);
+            cols(8 * k, 'rgba(15,23,42,0.055)', 1);
+            rows(8 * k, 'rgba(15,23,42,0.055)', 1);
+            break;
+
+        case 'coordinate': {
+            // Eksenler sayfanın dünya orta noktasına oturur; ızgara eksenlere
+            // hizalanır. CSS'te eksenler en üst katman, bu yüzden en son çizilir.
+            const axisX = (w / 2) * k + view.tx;
+            const axisY = (h / 2) * k + view.ty;
+            const minor = 28 * k;
+            const major = 140 * k;
+            cols(minor, LINE, 1, axisX);
+            rows(minor, LINE, 1, axisY);
+            cols(major, GRID_MID, 1, axisX);
+            rows(major, GRID_MID, 1, axisY);
+            ctx.fillStyle = AXIS;
+            ctx.fillRect(axisX - 1, 0, 2, h);
+            ctx.fillRect(0, axisY - 1, w, 2);
+            break;
+        }
+
+        case 'isometric':
+            tiles(60 * k, 104 * k, (ox, oy) => {
+                const s = (n: number) => n * k;
+                stroke('rgba(15,23,42,0.13)', 1, () => {
+                    ctx.moveTo(ox, oy + s(26));
+                    ctx.lineTo(ox + s(30), oy + s(43));
+                    ctx.lineTo(ox + s(60), oy + s(26));
+                    ctx.moveTo(ox, oy + s(78));
+                    ctx.lineTo(ox + s(30), oy + s(95));
+                    ctx.lineTo(ox + s(60), oy + s(78));
+                    ctx.moveTo(ox, oy + s(78));
+                    ctx.lineTo(ox + s(30), oy + s(61));
+                    ctx.lineTo(ox + s(60), oy + s(78));
+                    ctx.moveTo(ox, oy + s(26));
+                    ctx.lineTo(ox + s(30), oy + s(9));
+                    ctx.lineTo(ox + s(60), oy + s(26));
+                    ctx.moveTo(ox, oy + s(26));
+                    ctx.lineTo(ox, oy + s(78));
+                    ctx.moveTo(ox + s(30), oy + s(43));
+                    ctx.lineTo(ox + s(30), oy + s(95));
+                    ctx.moveTo(ox + s(60), oy + s(26));
+                    ctx.lineTo(ox + s(60), oy + s(78));
+                    ctx.moveTo(ox + s(30), oy - s(9));
+                    ctx.lineTo(ox + s(30), oy + s(9));
+                });
+            });
+            break;
+
+        case 'handwriting':
+            tiles(40 * k, 72 * k, (ox, oy) => {
+                const line = (y: number, color: string, lw: number, dash: number[] = []) => {
+                    ctx.save();
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = lw;
+                    ctx.setLineDash(dash.map((d) => d * k));
+                    ctx.beginPath();
+                    ctx.moveTo(ox, oy + y * k);
+                    ctx.lineTo(ox + 40 * k, oy + y * k);
+                    ctx.stroke();
+                    ctx.restore();
+                };
+                line(6, 'rgba(15,23,42,0.10)', 1);
+                line(24, 'rgba(37,99,235,0.30)', 1, [5, 5]);
+                line(42, 'rgba(37,99,235,0.30)', 1, [5, 5]);
+                line(60, 'rgba(15,23,42,0.20)', 1.4);
+            });
+            break;
+
+        case 'music':
+            tiles(40 * k, 96 * k, (ox, oy) => {
+                stroke('rgba(15,23,42,0.28)', 1, () => {
+                    for (const y of [16, 26, 36, 46, 56]) {
+                        ctx.moveTo(ox, oy + y * k);
+                        ctx.lineTo(ox + 40 * k, oy + y * k);
+                    }
+                });
+            });
+            break;
+
+        case 'todo': {
+            rows(40 * k, LINE, 1, view.ty + 6 * k);
+            tiles(
+                40 * k,
+                40 * k,
+                (ox, oy) => {
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(15,23,42,0.32)';
+                    ctx.lineWidth = 1.4;
+                    const x = ox + 8 * k;
+                    const y = oy + 11 * k;
+                    const s = 17 * k;
+                    const r = Math.min(4 * k, s / 2);
+                    ctx.beginPath();
+                    ctx.roundRect?.(x, y, s, s, r);
+                    if (!ctx.roundRect) ctx.rect(x, y, s, s);
+                    ctx.stroke();
+                    ctx.restore();
+                },
+                view.tx + 14 * k,
+                view.ty + 6 * k,
+                true
+            );
+            break;
+        }
+
+        case 'cornell': {
+            rows(32 * k, LINE, 1);
+            const rule = 'rgba(220,38,38,0.45)';
+            ctx.fillStyle = rule;
+            ctx.fillRect(w * 0.26 - 1, 0, 2, h * 0.82);
+            ctx.fillRect(0, h * 0.82 - 1, w, 2);
+            break;
+        }
+
+        case 'blank':
+        default:
+            break;
+    }
+    ctx.restore();
+}

@@ -6,6 +6,7 @@ import { samplePressure } from './penEngine';
 import { recognizeShape, snapAngle } from './shapeRecognizer';
 import { findLibraryItem, getSimSpec, isAnimated, objectRect } from './libraryObjects';
 import { onImageReady } from './imageStore';
+import { drawPaper } from '../notebooks/paper';
 import {
     SHAPE_TOOLS,
     drawStroke,
@@ -25,6 +26,7 @@ import type {
     DrawingCanvasHandle,
     DragState,
     MathObject,
+    PaperStyle,
     Point,
     Stroke,
     Viewport,
@@ -670,7 +672,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     window.setTimeout(redraw, 0);
                     notifyPageChange();
                 },
-                screenshot: (wbMode: boolean, color: string) => {
+                screenshot: (wbMode: boolean, color: string, paper?: PaperStyle) => {
                     const canvas = canvasRef.current;
                     const buffer = bufferCanvasRef.current;
                     if (!canvas || !buffer) return;
@@ -686,6 +688,11 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     if (wbMode) {
                         ctx.fillStyle = color || '#ffffff';
                         ctx.fillRect(0, 0, w, h);
+                    }
+                    // Kağıt deseni ekranda CSS arka planıdır; çıktıda da
+                    // görünsün diye aynı desen tuvale çizilir.
+                    if (paper && paper !== 'blank') {
+                        drawPaper(ctx, paper, wbMode ? color || '#ffffff' : 'transparent', w, h, viewRef.current);
                     }
                     // Seçim çerçevesi görüntüye girmesin diye tampon kullanılır.
                     ctx.drawImage(buffer, 0, 0, w, h);
