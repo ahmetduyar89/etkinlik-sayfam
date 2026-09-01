@@ -188,7 +188,13 @@ export type MathObjectKind =
     | 'punnett_sim'
     | 'liquid_pressure_sim'
     | 'solid_pressure_sim'
-    | 'lever_sim';
+    | 'lever_sim'
+    | 'pulley_sim'
+    | 'incline_sim'
+    | 'division_sim'
+    | 'ph_sim'
+    | 'pyramid_sim'
+    | 'electro_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile

@@ -115,6 +115,10 @@ export function withAlpha(color: string, a: number): string {
     return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
+/** Değeri [lo, hi] aralığına sıkıştırır. */
+export const clamp = (v: number, lo: number, hi: number): number =>
+    Math.min(hi, Math.max(lo, v));
+
 export const clampInt = (
     v: number | undefined,
     lo: number,
