@@ -131,6 +131,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const resizeFrameRef = React.useRef<number | null>(null);
         /** Sürükleme sırasında geçmişe yalnızca bir kez kayıt düşmek için. */
         const gestureDirtyRef = React.useRef(false);
+        /** Sürüklemede kare sıkıştırma ve statik katman önbelleği. */
+        const dragFrameRef = React.useRef<number | null>(null);
+        const pendingDragRef = React.useRef<(() => void) | null>(null);
+        const dragCachedRef = React.useRef(false);
 
         const getCanvasSize = () => {
             const c = canvasRef.current;
@@ -248,25 +252,47 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             onDirtyRef.current?.();
         }, []);
 
-        const redraw = React.useCallback(() => {
+        /**
+         * Statik katmanı (tampon) çizer. `exclude` verilirse o indeksler
+         * atlanır — sürükleme sırasında yalnızca hareket eden çizimler
+         * her karede yeniden çizilsin diye kullanılır.
+         */
+        const paintBuffer = React.useCallback((exclude?: Set<number>) => {
             const bCtx = bufferCtxRef.current;
-            const mainCtx = ctxRef.current;
             const buffer = bufferCanvasRef.current;
-            const mainCanvas = canvasRef.current;
-            if (!bCtx || !mainCtx || !buffer || !mainCanvas) return;
-            if (buffer.width === 0 || buffer.height === 0) return;
-
+            if (!bCtx || !buffer || buffer.width === 0 || buffer.height === 0) return;
             const { w, h } = getCanvasSize();
             if (w <= 0 || h <= 0) return;
 
             applyIdentity(bCtx);
             bCtx.clearRect(0, 0, w, h);
             applyView(bCtx);
-            strokesRef.current.forEach((s) => drawStroke(bCtx, s));
+            strokesRef.current.forEach((s, i) => {
+                if (exclude?.has(i)) return;
+                drawStroke(bCtx, s);
+            });
+        }, []);
+
+        /**
+         * Ana katmanı tampondan tazeler. `live` verilirse (sürükleme sırasında
+         * hareket eden çizimler) tamponun üstüne çizilir.
+         */
+        const paintMain = React.useCallback((live?: Stroke[]) => {
+            const mainCtx = ctxRef.current;
+            const buffer = bufferCanvasRef.current;
+            if (!mainCtx || !buffer || buffer.width === 0 || buffer.height === 0) return;
+            const { w, h } = getCanvasSize();
+            if (w <= 0 || h <= 0) return;
 
             applyIdentity(mainCtx);
             mainCtx.clearRect(0, 0, w, h);
             mainCtx.drawImage(buffer, 0, 0, w, h);
+
+            if (live && live.length) {
+                applyView(mainCtx);
+                live.forEach((s) => drawStroke(mainCtx, s));
+                applyIdentity(mainCtx);
+            }
 
             // Seçim çerçevesi ekran uzayında çizilir ki kalınlığı sabit kalsın.
             const bb = selBBRef.current;
@@ -295,6 +321,11 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 mainCtx.restore();
             }
         }, []);
+
+        const redraw = React.useCallback(() => {
+            paintBuffer();
+            paintMain();
+        }, [paintBuffer, paintMain]);
 
         /** Görünümü değiştirir ve yeniden çizer. */
         const applyViewChange = React.useCallback(
@@ -712,6 +743,50 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         /** Silgi ucunun yarıçapı (dünya birimi). */
         const eraserRadius = () => Math.max(6, config.width * 5);
 
+        /**
+         * Sürükleme başlarken seçili olmayan her şeyi tampona sabitler.
+         * Böylece her karede yalnızca hareket eden çizimler yeniden çizilir;
+         * yüzlerce çizimli bir sayfada boyutlandırma takılmaz.
+         */
+        const beginDragCache = () => {
+            paintBuffer(new Set(selectedIdxsRef.current));
+            dragCachedRef.current = true;
+        };
+
+        /** Sürükleme sırasında yalnızca seçili çizimleri tazeler. */
+        const paintDrag = () => {
+            paintMain(
+                selectedIdxsRef.current.map((i) => strokesRef.current[i]).filter(Boolean)
+            );
+        };
+
+        const endDragCache = () => {
+            if (dragFrameRef.current !== null) {
+                window.cancelAnimationFrame(dragFrameRef.current);
+                dragFrameRef.current = null;
+            }
+            pendingDragRef.current = null;
+            if (!dragCachedRef.current) return;
+            dragCachedRef.current = false;
+            redraw();
+        };
+
+        /**
+         * İşaretçi olaylarını ekran karesine sıkıştırır. Fare/kalem saniyede
+         * 120'ye kadar olay üretebilir; her birinde yeniden çizmek yerine
+         * karede bir kez, en son konumla çizilir.
+         */
+        const scheduleDrag = (apply: () => void) => {
+            pendingDragRef.current = apply;
+            if (dragFrameRef.current !== null) return;
+            dragFrameRef.current = window.requestAnimationFrame(() => {
+                dragFrameRef.current = null;
+                const job = pendingDragRef.current;
+                pendingDragRef.current = null;
+                job?.();
+            });
+        };
+
         /** Geçmişe bu hareket için bir kez kayıt düşer. */
         const markGesture = () => {
             if (gestureDirtyRef.current) return;
@@ -882,6 +957,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 ),
                                 origBB: { ...bb },
                             };
+                            beginDragCache();
                             return;
                         }
                     }
@@ -895,6 +971,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 JSON.parse(JSON.stringify(strokesRef.current[i].points))
                             ),
                         };
+                        beginDragCache();
                         return;
                     }
                 }
@@ -1024,23 +1101,22 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 const drag = dragStateRef.current;
                 const dx = x - drag.startX;
                 const dy = y - drag.startY;
-                if (!gestureDirtyRef.current) {
-                    pushHistory();
-                    gestureDirtyRef.current = true;
-                }
-                // Kopyala-yaz: geçmişteki anlık görüntüler bozulmasın.
-                selectedIdxsRef.current.forEach((idx, n) => {
-                    const s = strokesRef.current[idx];
-                    if (!s) return;
-                    const orig = drag.orig[n];
-                    const points =
-                        drag.type === 'move'
-                            ? orig.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy }))
-                            : resizePoints(orig, drag.origBB, drag.handle, dx, dy);
-                    strokesRef.current[idx] = { ...s, points };
+                scheduleDrag(() => {
+                    markGesture();
+                    // Kopyala-yaz: geçmişteki anlık görüntüler bozulmasın.
+                    selectedIdxsRef.current.forEach((idx, n) => {
+                        const s = strokesRef.current[idx];
+                        if (!s) return;
+                        const orig = drag.orig[n];
+                        const points =
+                            drag.type === 'move'
+                                ? orig.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy }))
+                                : resizePoints(orig, drag.origBB, drag.handle, dx, dy);
+                        strokesRef.current[idx] = { ...s, points };
+                    });
+                    refreshSelectionBB();
+                    paintDrag();
                 });
-                refreshSelectionBB();
-                redraw();
                 return;
             }
 
@@ -1185,6 +1261,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 if (dragStateRef.current) {
                     dragStateRef.current = null;
                     gestureDirtyRef.current = false;
+                    endDragCache();
                     commitStrokes();
                 }
                 return;
@@ -1328,40 +1405,41 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                         ),
                                         origBB: { ...selBB },
                                     };
+                                    beginDragCache();
                                 }}
                                 onPointerMove={(e) => {
                                     const drag = dragStateRef.current;
                                     if (!drag || drag.type !== 'resize') return;
-                                    if (!gestureDirtyRef.current) {
-                                        pushHistory();
-                                        gestureDirtyRef.current = true;
-                                    }
                                     // Tutamaç ekran uzayında sürüklenir; dünya
                                     // farkı için ölçeğe bölünür.
                                     const scale = viewRef.current.scale;
                                     const dx = (e.clientX - drag.startX) / scale;
                                     const dy = (e.clientY - drag.startY) / scale;
-                                    selectedIdxsRef.current.forEach((idx, n) => {
-                                        const s = strokesRef.current[idx];
-                                        if (!s) return;
-                                        strokesRef.current[idx] = {
-                                            ...s,
-                                            points: resizePoints(
-                                                drag.orig[n],
-                                                drag.origBB,
-                                                drag.handle,
-                                                dx,
-                                                dy
-                                            ),
-                                        };
+                                    scheduleDrag(() => {
+                                        markGesture();
+                                        selectedIdxsRef.current.forEach((idx, n) => {
+                                            const s = strokesRef.current[idx];
+                                            if (!s) return;
+                                            strokesRef.current[idx] = {
+                                                ...s,
+                                                points: resizePoints(
+                                                    drag.orig[n],
+                                                    drag.origBB,
+                                                    drag.handle,
+                                                    dx,
+                                                    dy
+                                                ),
+                                            };
+                                        });
+                                        refreshSelectionBB();
+                                        paintDrag();
                                     });
-                                    refreshSelectionBB();
-                                    redraw();
                                 }}
                                 onPointerUp={(e) => {
                                     e.currentTarget.releasePointerCapture(e.pointerId);
                                     dragStateRef.current = null;
                                     gestureDirtyRef.current = false;
+                                    endDragCache();
                                     commitStrokes();
                                 }}
                             />
