@@ -51,10 +51,8 @@ interface DrawingToolbarProps {
     onScreenshot?: () => void;
     isTextBoxMode?: boolean;
     onTextBoxModeToggle?: () => void;
-<<<<<<< HEAD
     onOpenLibrary?: () => void;
     isLibraryOpen?: boolean;
-=======
     /** Matematik kütüphanesinden seçilen nesneyi sayfaya ekler. */
     onInsertMath?: (math: MathObject) => void;
     canUndo?: boolean;
@@ -68,7 +66,6 @@ interface DrawingToolbarProps {
     onZoomIn?: () => void;
     onZoomOut?: () => void;
     onZoomReset?: () => void;
->>>>>>> 97d1fe083575a99fffe36616e37adfb1a6f99634
 }
 
 const shapeTools = makeShapeTools(SolidLineIcon, DashedLineIcon);
@@ -84,10 +81,8 @@ export function DrawingToolbar({
     onScreenshot,
     isTextBoxMode,
     onTextBoxModeToggle,
-<<<<<<< HEAD
     onOpenLibrary,
     isLibraryOpen,
-=======
     onInsertMath,
     canUndo,
     canRedo,
@@ -97,7 +92,6 @@ export function DrawingToolbar({
     onZoomIn,
     onZoomOut,
     onZoomReset,
->>>>>>> 97d1fe083575a99fffe36616e37adfb1a6f99634
 }: DrawingToolbarProps) {
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const [showShapes, setShowShapes] = React.useState(false);
@@ -560,7 +554,6 @@ export function DrawingToolbar({
                     )}
                 </div>
 
-<<<<<<< HEAD
                 <div className="flex items-center gap-1.5 px-2">
                     {onOpenLibrary && (
                         <button
@@ -580,9 +573,7 @@ export function DrawingToolbar({
                             <span className="text-[11px] leading-none">✨</span>
                         </button>
                     )}
-=======
-                <div className="flex items-center gap-1 px-2">
-                    {onInsertMath && (
+                    {onInsertMath && !onOpenLibrary && (
                         <button
                             type="button"
                             onClick={() => openOnly(showMath ? null : 'math')}
@@ -610,7 +601,6 @@ export function DrawingToolbar({
                                 className="hidden"
                                 onChange={(e) => {
                                     if (e.target.files?.length) onInsertImages(e.target.files);
-                                    // Aynı dosya tekrar seçilebilsin diye sıfırla.
                                     e.target.value = '';
                                 }}
                             />

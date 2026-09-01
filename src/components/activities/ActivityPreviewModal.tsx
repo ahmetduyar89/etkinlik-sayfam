@@ -586,10 +586,8 @@ export function ActivityPreviewModal({
                                 onScreenshot={handleScreenshot}
                                 isTextBoxMode={isTextBoxMode}
                                 onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
-<<<<<<< HEAD
                                 onOpenLibrary={() => setShowLibraryModal((v) => !v)}
                                 isLibraryOpen={showLibraryModal}
-=======
                                 onInsertMath={(math) =>
                                     canvasRef.current?.insertMath(
                                         math,
@@ -600,7 +598,6 @@ export function ActivityPreviewModal({
                                 }
                                 canUndo={drawHistory.canUndo}
                                 canRedo={drawHistory.canRedo}
->>>>>>> 97d1fe083575a99fffe36616e37adfb1a6f99634
                             />
                         )}
                     </AnimatePresence>

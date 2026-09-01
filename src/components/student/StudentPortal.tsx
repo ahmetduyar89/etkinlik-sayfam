@@ -36,13 +36,12 @@ export function StudentPortal({ act }: StudentPortalProps) {
         fillEnabled: false,
         stampIcon: '✅',
     });
-    const [showWhiteboard, setShowWhiteboard] = useState(false);
-<<<<<<< HEAD
     const [showCompass, setShowCompass] = useState(false);
     const [showNumberLine, setShowNumberLine] = useState(false);
     const [showCalculator, setShowCalculator] = useState(false);
     const [showPeriodicTable, setShowPeriodicTable] = useState(false);
     const [showLibraryModal, setShowLibraryModal] = useState(false);
+    const [drawHistory, setDrawHistory] = useState({ canUndo: false, canRedo: false });
 
     const handleSelectLibraryItem = (item: LibraryItem) => {
         if (item.actionType === 'tool') {
@@ -57,10 +56,6 @@ export function StudentPortal({ act }: StudentPortalProps) {
             setShowLibraryModal(false);
         }
     };
-
-=======
-    const [drawHistory, setDrawHistory] = useState({ canUndo: false, canRedo: false });
->>>>>>> 97d1fe083575a99fffe36616e37adfb1a6f99634
     const [iframeHeight, setIframeHeight] = useState(1000);
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
@@ -405,13 +400,10 @@ export function StudentPortal({ act }: StudentPortalProps) {
                             setConfig={setDrawConfig}
                             showWhiteboard={showWhiteboard}
                             setShowWhiteboard={setShowWhiteboard}
-<<<<<<< HEAD
                             onOpenLibrary={() => setShowLibraryModal((v) => !v)}
                             isLibraryOpen={showLibraryModal}
-=======
                             canUndo={drawHistory.canUndo}
                             canRedo={drawHistory.canRedo}
->>>>>>> 97d1fe083575a99fffe36616e37adfb1a6f99634
                         />
                     )}
                 </AnimatePresence>
