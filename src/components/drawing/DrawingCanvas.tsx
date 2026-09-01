@@ -4,7 +4,7 @@ import { Copy, Trash2 } from 'lucide-react';
 import { DRAWING_COLORS, HANDLE_CURSORS } from '../../constants/drawing';
 import { samplePressure } from './penEngine';
 import { recognizeShape, snapAngle } from './shapeRecognizer';
-import { findLibraryItem } from './libraryObjects';
+import { findLibraryItem, getSimSpec, objectRect } from './libraryObjects';
 import { onImageReady } from './imageStore';
 import {
     SHAPE_TOOLS,
@@ -85,7 +85,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const canvasRef = React.useRef<HTMLCanvasElement>(null);
         const bufferCanvasRef = React.useRef<HTMLCanvasElement>(null);
         const overlayCanvasRef = React.useRef<HTMLCanvasElement>(null);
-        const [, setStrokes] = React.useState<Stroke[]>([]);
+        const [strokes, setStrokes] = React.useState<Stroke[]>([]);
         const currentStrokeRef = React.useRef<Stroke | null>(null);
 
         const [selectedIdxs, setSelectedIdxs] = React.useState<number[]>([]);
@@ -137,6 +137,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const dragFrameRef = React.useRef<number | null>(null);
         const pendingDragRef = React.useRef<(() => void) | null>(null);
         const dragCachedRef = React.useRef(false);
+        /** Simülasyon kontrolü sürüklenirken geçmişe tek kayıt düşmek için. */
+        const simGestureRef = React.useRef(false);
+        /** Canlı simülasyonların animasyon zamanı (saniye) ve döngü kimliği. */
+        const simTimeRef = React.useRef(0);
+        const simFrameRef = React.useRef<number | null>(null);
+        const simStartRef = React.useRef(0);
 
         const getCanvasSize = () => {
             const c = canvasRef.current;
@@ -271,7 +277,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             applyView(bCtx);
             strokesRef.current.forEach((s, i) => {
                 if (exclude?.has(i)) return;
-                drawStroke(bCtx, s);
+                drawStroke(bCtx, s, simTimeRef.current);
             });
         }, []);
 
@@ -292,7 +298,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
             if (live && live.length) {
                 applyView(mainCtx);
-                live.forEach((s) => drawStroke(mainCtx, s));
+                live.forEach((s) => drawStroke(mainCtx, s, simTimeRef.current));
                 applyIdentity(mainCtx);
             }
 
@@ -324,10 +330,71 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
         }, []);
 
+        /** Sayfadaki animasyonlu (canlı) simülasyonların indeksleri. */
+        const animatedIndexes = React.useCallback(() => {
+            const out: number[] = [];
+            strokesRef.current.forEach((st, i) => {
+                if (st.tool === 'math' && st.math && getSimSpec(st.math.kind)?.animated) out.push(i);
+            });
+            return out;
+        }, []);
+
         const redraw = React.useCallback(() => {
-            paintBuffer();
-            paintMain();
-        }, [paintBuffer, paintMain]);
+            // Canlı simülasyonlar tampona girmez: her karede üstte yeniden
+            // çizilecekleri için statik katmanın dışında tutulurlar.
+            const animated = animatedIndexes();
+            if (animated.length === 0) {
+                paintBuffer();
+                paintMain();
+                return;
+            }
+            paintBuffer(new Set(animated));
+            paintMain(animated.map((i) => strokesRef.current[i]));
+        }, [animatedIndexes, paintBuffer, paintMain]);
+
+        /** Sayfada canlı (animasyonlu) simülasyon var mı. */
+        const hasAnimated = React.useMemo(
+            () =>
+                strokes.some(
+                    (st) => st.tool === 'math' && st.math && getSimSpec(st.math.kind)?.animated
+                ),
+            [strokes]
+        );
+
+        /**
+         * Canlı simülasyon varken her karede yalnızca onları yeniden çizer.
+         * Döngü, sayfadaki içerik değiştikçe yeniden kurulur; animasyonlu
+         * nesne yoksa hiç çalışmaz.
+         */
+        React.useEffect(() => {
+            if (!hasAnimated) return;
+            let cancelled = false;
+            if (simStartRef.current === 0) simStartRef.current = performance.now();
+            const tick = () => {
+                if (cancelled) return;
+                simTimeRef.current = (performance.now() - simStartRef.current) / 1000;
+                const animated = animatedIndexes();
+                // Sürükleme sırasında tampon seçime göre ayarlı; karışmasın.
+                if (animated.length > 0 && !dragCachedRef.current) {
+                    const live = animated.map((i) => strokesRef.current[i]);
+                    // Devam eden çizim de her karede yeniden basılmalı; aksi
+                    // halde animasyon ana katmanı temizlerken kalem izi kaybolur.
+                    if (isDrawingRef.current && currentStrokeRef.current) {
+                        live.push(currentStrokeRef.current);
+                    }
+                    paintMain(live);
+                }
+                simFrameRef.current = window.requestAnimationFrame(tick);
+            };
+            simFrameRef.current = window.requestAnimationFrame(tick);
+            return () => {
+                cancelled = true;
+                if (simFrameRef.current !== null) {
+                    window.cancelAnimationFrame(simFrameRef.current);
+                    simFrameRef.current = null;
+                }
+            };
+        }, [animatedIndexes, hasAnimated, paintMain]);
 
         /** Görünümü değiştirir ve yeniden çizer. */
         const applyViewChange = React.useCallback(
@@ -1332,6 +1399,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             selectedStrokes.length && selectedStrokes.every((s) => s.color === selectedStrokes[0].color)
                 ? selectedStrokes[0].color
                 : null;
+        const selSim = selectedIdxs.length === 1 ? strokesRef.current[selectedIdxs[0]] : null;
+        const selSimMath = selSim?.tool === 'math' ? selSim.math : undefined;
+        const simSpec = selSimMath ? getSimSpec(selSimMath.kind) : undefined;
+        const simRect = selSim ? objectRect(selSim) : null;
+        const simControls =
+            simSpec?.controls && simRect && selSimMath ? simSpec.controls(simRect, selSimMath) : [];
+
         const selScreenBB = selBB
             ? {
                   x1: selBB.x1 * view.scale + view.tx,
@@ -1340,6 +1414,30 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                   y2: selBB.y2 * view.scale + view.ty,
               }
             : null;
+
+        /**
+         * Seçili simülasyonun ayarını değiştirir. Sürükleme boyunca geçmişe
+         * yalnızca bir kez kayıt düşülür.
+         */
+        const patchSim = (patch: Record<string, number>, startGesture: boolean) => {
+            const idx = selectedIdxsRef.current[0];
+            const st = strokesRef.current[idx];
+            if (!st?.math) return;
+            if (startGesture) {
+                if (!simGestureRef.current) {
+                    pushHistory();
+                    simGestureRef.current = true;
+                }
+            } else {
+                pushHistory();
+            }
+            strokesRef.current[idx] = {
+                ...st,
+                math: { ...st.math, sim: { ...st.math.sim, ...patch } },
+            };
+            commitStrokes();
+            redraw();
+        };
 
         /** Seçili çizimleri toplu günceller (renk, çoğalt, sil). */
         const mutateSelection = (fn: (idxs: number[]) => void) => {
@@ -1452,6 +1550,115 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 }}
                             />
                         ))}
+
+                        {/* Canlı simülasyonun üzerindeki etkileşim noktaları */}
+                        {simControls.map((ctrl) => {
+                            const pos = toScreenPoint({ x: ctrl.x, y: ctrl.y }, view);
+                            return (
+                                <button
+                                    key={ctrl.id}
+                                    type="button"
+                                    title={ctrl.label}
+                                    aria-label={ctrl.label ?? ctrl.id}
+                                    className={cn(
+                                        'absolute pointer-events-auto rounded-full border-2 shadow-md transition-colors',
+                                        ctrl.type === 'toggle'
+                                            ? ctrl.on
+                                                ? 'bg-amber-400 border-amber-600'
+                                                : 'bg-white border-amber-500'
+                                            : 'bg-amber-400 border-amber-600 cursor-grab active:cursor-grabbing'
+                                    )}
+                                    style={{
+                                        left: pos.x - 9,
+                                        top: pos.y - 9,
+                                        width: 18,
+                                        height: 18,
+                                        zIndex: 4650,
+                                        touchAction: 'none',
+                                    }}
+                                    onPointerDown={(e) => {
+                                        e.stopPropagation();
+                                        if (ctrl.type === 'toggle') return;
+                                        e.currentTarget.setPointerCapture(e.pointerId);
+                                        simGestureRef.current = false;
+                                    }}
+                                    onPointerMove={(e) => {
+                                        if (ctrl.type !== 'drag') return;
+                                        if (!e.currentTarget.hasPointerCapture?.(e.pointerId)) return;
+                                        if (!simSpec?.onControl || !simRect || !selSimMath) return;
+                                        const world = toWorld(e.clientX, e.clientY);
+                                        patchSim(
+                                            simSpec.onControl(simRect, selSimMath, ctrl.id, world),
+                                            true
+                                        );
+                                    }}
+                                    onPointerUp={(e) => {
+                                        if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+                                            e.currentTarget.releasePointerCapture(e.pointerId);
+                                        }
+                                        simGestureRef.current = false;
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (ctrl.type !== 'toggle') return;
+                                        if (!simSpec?.onControl || !simRect || !selSimMath) return;
+                                        patchSim(
+                                            simSpec.onControl(simRect, selSimMath, ctrl.id, {
+                                                x: ctrl.x,
+                                                y: ctrl.y,
+                                            }),
+                                            false
+                                        );
+                                    }}
+                                />
+                            );
+                        })}
+
+                        {/* Simülasyon ayarları */}
+                        {simSpec?.params && selSimMath && (
+                            <div
+                                className="absolute pointer-events-auto flex flex-col gap-1.5 bg-[#1a1b26]/95 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10 shadow-xl"
+                                style={{
+                                    left: Math.max(4, selScreenBB.x1),
+                                    top: selScreenBB.y2 + 8,
+                                    minWidth: 208,
+                                    zIndex: 4700,
+                                }}
+                                onPointerDown={(e) => e.stopPropagation()}
+                            >
+                                {simSpec.params.map((prm) => {
+                                    const value = selSimMath.sim?.[prm.key] ?? prm.min;
+                                    return (
+                                        <label key={prm.key} className="flex items-center gap-2">
+                                            <span className="text-[10.5px] font-semibold text-slate-300 w-[104px] shrink-0 leading-tight">
+                                                {prm.label}
+                                            </span>
+                                            <input
+                                                type="range"
+                                                min={prm.min}
+                                                max={prm.max}
+                                                step={prm.step ?? 1}
+                                                value={value}
+                                                onChange={(e) =>
+                                                    patchSim(
+                                                        { [prm.key]: Number(e.target.value) },
+                                                        true
+                                                    )
+                                                }
+                                                onPointerUp={() => {
+                                                    simGestureRef.current = false;
+                                                }}
+                                                className="flex-1 accent-amber-400 h-1"
+                                            />
+                                            <span className="text-[10.5px] font-bold text-white tabular-nums w-[42px] text-right shrink-0">
+                                                {value}
+                                                {prm.unit ? ` ${prm.unit}` : ''}
+                                            </span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        )}
 
                         <div
                             role="toolbar"

@@ -47,7 +47,56 @@ export interface Ctx {
     lw: number;
     /** Kutuya göre ölçeklenen yazı boyutu. */
     fs: number;
+    /** Animasyon için saniye cinsinden zaman. Durağan nesneler kullanmaz. */
+    t: number;
 }
+
+/**
+ * Simülasyon nesnesinin üzerindeki etkileşim noktası.
+ * `drag` olanlar sürüklenir, `toggle` olanlar dokununca 0/1 arası değişir.
+ */
+export interface SimControl {
+    id: string;
+    x: number;
+    y: number;
+    type: 'drag' | 'toggle';
+    label?: string;
+    /** Toggle kontrollerde şu anki durum (dolu/boş gösterimi için). */
+    on?: boolean;
+}
+
+/** Seçili simülasyon için gösterilen kaydırıcı tanımı. */
+export interface SimParam {
+    key: string;
+    label: string;
+    min: number;
+    max: number;
+    step?: number;
+    /** Değerin yanında gösterilecek birim. */
+    unit?: string;
+}
+
+export interface SimSpec {
+    /** Her karede yeniden çizilmeli mi (animasyonlu nesneler). */
+    animated?: boolean;
+    /** Nesnenin üzerindeki etkileşim noktaları. */
+    controls?: (r: Rect, o: MathObject) => SimControl[];
+    /** Bir kontrol sürüklendiğinde/dokunulduğunda uygulanacak değişiklik. */
+    onControl?: (
+        r: Rect,
+        o: MathObject,
+        id: string,
+        point: { x: number; y: number }
+    ) => Record<string, number>;
+    /** Seçiliyken gösterilecek kaydırıcılar. */
+    params?: SimParam[];
+}
+
+/** Simülasyon değerini varsayılanıyla birlikte okur. */
+export const simValue = (o: MathObject, key: string, fallback: number): number => {
+    const v = o.sim?.[key];
+    return Number.isFinite(v as number) ? (v as number) : fallback;
+};
 
 export type Renderer = (k: Ctx) => void;
 
