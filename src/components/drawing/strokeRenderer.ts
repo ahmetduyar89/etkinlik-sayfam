@@ -5,7 +5,7 @@
 // çizim mantığını kullanır.
 
 import { drawVariableStroke, getPenProfile } from './penEngine';
-import { drawMathObject } from './mathObjects';
+import { drawLibraryObject } from './libraryObjects';
 import { getImage } from './imageStore';
 import type { BoundingBox, Point, Stroke } from '../../types';
 
@@ -215,7 +215,7 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke) => {
     if (!s || s.points.length < 1) return;
 
     if (s.tool === 'math') {
-        drawMathObject(tCtx, s);
+        drawLibraryObject(tCtx, s);
         return;
     }
 

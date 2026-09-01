@@ -1,5 +1,5 @@
-// src/components/drawing/MathLibraryPanel.tsx
-// Yazma alanına hazır matematik/geometri nesnesi ekleme paneli.
+// src/components/drawing/ObjectLibraryPanel.tsx
+// Yazma alanına hazır matematik ve fen nesnesi ekleme paneli.
 // Her öğe küçük bir canvas önizlemesiyle listelenir; parametresi olan
 // nesnelerde (kesir, açı, fonksiyon…) önce değerler sorulur.
 
@@ -8,14 +8,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Check, X } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import {
-    MATH_CATEGORIES,
-    drawMathObject,
+    LIBRARY_GROUPS,
+    drawLibraryObject,
     type MathCatalogItem,
-} from './mathObjects';
+} from './libraryObjects';
 import { validateExpression } from './expression';
 import type { MathObject, Stroke } from '../../types';
 
-interface MathLibraryPanelProps {
+interface ObjectLibraryPanelProps {
     open: boolean;
     onClose: () => void;
     onInsert: (math: MathObject) => void;
@@ -50,18 +50,20 @@ function MathPreview({ item, color }: { item: MathCatalogItem; color: string }) 
             // Etiketler bu boyutta okunmadığı için önizlemede kapatılır.
             math: { ...item.defaults, kind: item.kind, labels: false },
         };
-        drawMathObject(ctx, preview);
+        drawLibraryObject(ctx, preview);
     }, [item, color]);
 
     return <canvas ref={ref} aria-hidden="true" className="pointer-events-none" />;
 }
 
-export function MathLibraryPanel({ open, onClose, onInsert }: MathLibraryPanelProps) {
+export function ObjectLibraryPanel({ open, onClose, onInsert }: ObjectLibraryPanelProps) {
+    const [group, setGroup] = React.useState(0);
     const [tab, setTab] = React.useState(0);
     const [pending, setPending] = React.useState<MathCatalogItem | null>(null);
     const [values, setValues] = React.useState<Record<string, string>>({});
 
-    const category = MATH_CATEGORIES[tab] ?? MATH_CATEGORIES[0];
+    const categories = LIBRARY_GROUPS[group]?.categories ?? LIBRARY_GROUPS[0].categories;
+    const category = categories[tab] ?? categories[0];
 
     const beginInsert = (item: MathCatalogItem) => {
         if (!item.fields?.length) {
@@ -90,7 +92,9 @@ export function MathLibraryPanel({ open, onClose, onInsert }: MathLibraryPanelPr
         for (const field of pending.fields ?? []) {
             const raw = values[field.key]?.trim() ?? '';
             if (field.type === 'text') {
-                if (raw) math.expr = raw;
+                // Metin alanı her nesnede `expr` değil: element sembolü gibi
+                // değerler `text` alanına yazılır.
+                if (raw && (field.key === 'expr' || field.key === 'text')) math[field.key] = raw;
             } else {
                 const num = Number(raw.replace(',', '.'));
                 if (Number.isFinite(num)) {
@@ -112,16 +116,52 @@ export function MathLibraryPanel({ open, onClose, onInsert }: MathLibraryPanelPr
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 14, scale: 0.97 }}
                     role="dialog"
-                    aria-label="Matematik nesne kütüphanesi"
+                    aria-label="Nesne kütüphanesi"
                     className="pointer-events-auto w-[min(92vw,620px)] max-h-[62vh] flex flex-col bg-[#1a1b26]/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden"
                     onPointerDown={(e) => e.stopPropagation()}
                 >
-                    <div className="flex items-center gap-2 px-3 pt-3 pb-2 border-b border-white/10">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1">
-                            Kütüphane
-                        </span>
-                        <div className="flex-1 flex items-center gap-1 overflow-x-auto">
-                            {MATH_CATEGORIES.map((cat, i) => (
+                    <div className="flex flex-col gap-1.5 px-3 pt-2.5 pb-2 border-b border-white/10">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                Kütüphane
+                            </span>
+                            {/* Üst kademe: ders. Dokuz kategoriyi tek satıra
+                                sıkıştırmak, sığmayanları gizli bırakıyordu. */}
+                            <div className="flex items-center gap-1">
+                                {LIBRARY_GROUPS.map((g, i) => (
+                                    <button
+                                        key={g.label}
+                                        type="button"
+                                        onClick={() => {
+                                            setGroup(i);
+                                            setTab(0);
+                                            setPending(null);
+                                        }}
+                                        aria-pressed={i === group}
+                                        className={cn(
+                                            'px-3 py-1 rounded-full text-[12px] font-bold transition-colors',
+                                            i === group
+                                                ? 'bg-indigo-600 text-white'
+                                                : 'text-slate-400 hover:text-white hover:bg-white/10'
+                                        )}
+                                    >
+                                        {g.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                aria-label="Kütüphaneyi kapat"
+                                className="ml-auto p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Alt kademe: seçili dersin kategorileri */}
+                        <div className="flex items-center gap-1 flex-wrap">
+                            {categories.map((cat, i) => (
                                 <button
                                     key={cat.label}
                                     type="button"
@@ -130,7 +170,7 @@ export function MathLibraryPanel({ open, onClose, onInsert }: MathLibraryPanelPr
                                         setPending(null);
                                     }}
                                     className={cn(
-                                        'px-2.5 py-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap transition-colors',
+                                        'px-2.5 py-1 rounded-lg text-[12px] font-semibold whitespace-nowrap transition-colors',
                                         i === tab
                                             ? 'bg-white text-[#1a1b26]'
                                             : 'text-slate-400 hover:text-white hover:bg-white/10'
@@ -140,14 +180,6 @@ export function MathLibraryPanel({ open, onClose, onInsert }: MathLibraryPanelPr
                                 </button>
                             ))}
                         </div>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            aria-label="Kütüphaneyi kapat"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-3">

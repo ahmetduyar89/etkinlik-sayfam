@@ -144,7 +144,41 @@ export type MathObjectKind =
     | 'times_table'
     | 'venn'
     | 'clock'
-    | 'balance';
+    | 'balance'
+    // ── Fen: laboratuvar ────────────────────────────────────────────
+    | 'beaker'
+    | 'flask'
+    | 'graduated_cylinder'
+    | 'test_tube'
+    | 'heating_setup'
+    | 'thermometer'
+    // ── Fen: elektrik ve devre ──────────────────────────────────────
+    | 'battery'
+    | 'bulb'
+    | 'resistor'
+    | 'switch'
+    | 'meter'
+    | 'circuit_series'
+    | 'circuit_parallel'
+    // ── Fen: optik ──────────────────────────────────────────────────
+    | 'convex_lens'
+    | 'concave_lens'
+    | 'plane_mirror'
+    | 'concave_mirror'
+    | 'prism'
+    // ── Fen: kuvvet ve hareket ──────────────────────────────────────
+    | 'force_arrows'
+    | 'inclined_plane'
+    | 'pulley'
+    | 'lever'
+    | 'spring_scale'
+    // ── Fen: madde ve canlılar ──────────────────────────────────────
+    | 'bohr_atom'
+    | 'element_card'
+    | 'states_of_matter'
+    | 'animal_cell'
+    | 'plant_cell'
+    | 'sun_earth_moon';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile
@@ -161,6 +195,8 @@ export interface MathObject {
     m?: number;
     /** Fonksiyon grafiği için ifade, ör. "x^2 - 3". */
     expr?: string;
+    /** Nesnenin üzerine yazılacak serbest metin (element sembolü, etiket…). */
+    text?: string;
     /** Etiketler (sayı, derece, isim) çizilsin mi. */
     labels?: boolean;
 }
