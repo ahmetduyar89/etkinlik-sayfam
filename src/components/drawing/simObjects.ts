@@ -942,12 +942,30 @@ const liquidRender: Renderer = (k) => {
             return;
         }
         const depth = (hy - g.surface) * unit; // cm
-        const pressure = depth * density * G; // ~Pa ölçeğinde göreli değer
+        // Etikette h tam sayı gösterildiği için basınç DA yuvarlanmış h'den
+        // hesaplanır; aksi halde "h=11 · P=112" gibi formülü tutmayan
+        // (11·1·10 = 110) bir çift yazılıyordu.
+        const shownDepth = Math.round(depth);
+        const pressure = shownDepth * density * G; // ~Pa ölçeğinde göreli değer
         const speed = Math.sqrt(Math.max(0, 2 * G * depth));
         // Menzil: yatay hız × düşme süresi
         const fallH = (ground - hy) * unit;
         const range = speed * Math.sqrt((2 * Math.max(fallH, 0.1)) / G);
         const rangePx = (range / unit) * 0.9;
+
+        // Çıkış hızı oku: uzunluğu v = √(2gh) ile orantılı. Menzil düşme
+        // yüksekliğine de bağlı olduğundan (en uzağa ORTA delik gider),
+        // "derinlik arttıkça hız artar" mesajını taşıyan şey bu oktur.
+        const vMax = Math.sqrt(2 * G * 40);
+        arrow(
+            k,
+            g.tankX + g.tankW,
+            hy,
+            g.tankX + g.tankW + (speed / vMax) * g.tankW * 0.55,
+            hy,
+            6,
+            Math.max(1.6, k.lw)
+        );
 
         // Fışkıran su: eğik atış eğrisi
         k.c.save();
@@ -976,7 +994,7 @@ const liquidRender: Renderer = (k) => {
             // Etiket kutunun sağ kenarını aşarsa sağa yaslanıp içeride kalır.
             // Genişlik tahmin edilmez, gerçek metin ölçülür — yoksa uzun
             // değerlerde (P=140 gibi) son karakter kırpılıyordu.
-            const text = `h=${depth.toFixed(0)} · P=${Math.round(pressure)}`;
+            const text = `h=${shownDepth} · P=${Math.round(pressure)}`;
             const wanted = x0 + rangePx + 6;
             const maxX = r.x + r.w - 4;
             const inside = wanted + textWidth(k, text, 0.68) < maxX;
@@ -996,7 +1014,15 @@ const liquidRender: Renderer = (k) => {
 
     if (k.o.labels !== false) {
         label(k, `P = h · d · g   (d = ${density.toFixed(1)} g/cm³)`, r.x, r.y, 'left', 'top', 0.8);
-        label(k, 'Derindeki delik daha uzağa fışkırır', r.x + r.w / 2, r.y + r.h, 'center', 'bottom', 0.8);
+        label(
+            k,
+            'Derinlik arttıkça basınç ve çıkış hızı artar',
+            r.x + r.w / 2,
+            r.y + r.h,
+            'center',
+            'bottom',
+            0.8
+        );
     }
     k.c.restore();
 };
@@ -1038,23 +1064,50 @@ const BLOCK_FACES: Array<{ w: number; d: number; label: string }> = [
     { w: BLOCK.a, d: BLOCK.b, label: '2 × 3' },
 ];
 
-const solidRender: Renderer = (k) => {
-    const r = k.r;
-    const faceIdx = clampInt(simValue(k.o, 'face', 0), 0, 2, 0);
-    const force = clamp(simValue(k.o, 'f', 60), 10, 200);
+/** Kutu, zemin ve batma geometrisi. Hem çizim hem tutamak buradan okur. */
+function solidGeom(r: Rect, o: MathObject) {
+    const faceIdx = clampInt(simValue(o, 'face', 0), 0, 2, 0);
+    const force = clamp(simValue(o, 'f', 60), 10, 200);
     const face = BLOCK_FACES[faceIdx];
     const area = face.w * face.d;
     const pressure = force / area;
 
-    const unit = Math.min(r.w * 0.1, r.h * 0.12);
     const ground = r.y + r.h * 0.68;
     const cx = r.x + r.w * 0.42;
-    const boxW = face.w * unit;
     // Yüksekliği hacim sabit kalacak biçimde türet.
-    const height = (BLOCK.a * BLOCK.b * BLOCK.c) / area;
+    const volume = BLOCK.a * BLOCK.b * BLOCK.c;
+    const height = volume / area;
+    // Ölçek EN UZUN duruma göre seçilir: en dar yüz seçilince blok uzuyor ve
+    // ağırlık oku başlık satırlarını kesiyordu. Ölçek yüze göre değişmediği
+    // için hacmin sabit kaldığı da görünür kalır.
+    const tallest = volume / Math.min(...BLOCK_FACES.map((f) => f.w * f.d));
+    const headerBottom = r.y + r.h * 0.2;
+    const room = ground - headerBottom - r.h * 0.14 - 6; // ok + pay
+    const unit = Math.max(6, Math.min(r.w * 0.1, r.h * 0.12, room / (tallest + 0.5)));
+    const boxW = face.w * unit;
     const boxH = height * unit;
-    // Batma: basınçla orantılı, kutunun altına doğru.
-    const sink = Math.min(r.h * 0.16, (pressure / 20) * unit * 0.9);
+    // Batma: basınçla orantılı. Ölçüyü kutu birimine değil kutunun kendi
+    // yüksekliğine bağlarız; yoksa ölçek küçülünce fark göze çarpmıyordu.
+    const sink = clamp(pressure / 25, 0, 1) * r.h * 0.13;
+    return {
+        face,
+        area,
+        force,
+        pressure,
+        unit,
+        ground,
+        cx,
+        boxW,
+        boxH,
+        sink,
+        top: ground + sink - boxH,
+        dep: unit * 0.5,
+    };
+}
+
+const solidRender: Renderer = (k) => {
+    const r = k.r;
+    const { face, area, force, pressure, ground, cx, boxW, sink, top, dep } = solidGeom(r, k.o);
 
     k.c.lineWidth = k.lw;
     // Zemin ve batma çukuru
@@ -1068,14 +1121,14 @@ const solidRender: Renderer = (k) => {
         line(k, x, ground, x - r.w * 0.022, ground + r.h * 0.05, 1);
     }
 
-    // Blok
-    const top = ground + sink - boxH;
-    k.c.strokeRect(cx - boxW / 2, top, boxW, boxH);
-    const dep = unit * 0.5;
+    // Blok. Derinlik (2.5B) kenarları zemine girince kesilir; aksi halde
+    // arka dikey kenar boşlukta asılı bir çizgi gibi duruyordu.
+    k.c.strokeRect(cx - boxW / 2, top, boxW, ground + sink - top);
     line(k, cx - boxW / 2, top, cx - boxW / 2 + dep, top - dep);
     line(k, cx + boxW / 2, top, cx + boxW / 2 + dep, top - dep);
     line(k, cx - boxW / 2 + dep, top - dep, cx + boxW / 2 + dep, top - dep);
-    line(k, cx + boxW / 2 + dep, top - dep, cx + boxW / 2 + dep, ground + sink - dep);
+    line(k, cx + boxW / 2 + dep, top - dep, cx + boxW / 2 + dep, ground - dep);
+    line(k, cx + boxW / 2, ground, cx + boxW / 2 + dep, ground - dep);
 
     // Ağırlık oku
     arrow(k, cx, top - dep - r.h * 0.14, cx, top - 4, 9, Math.max(2, k.lw * 1.2));
@@ -1083,7 +1136,7 @@ const solidRender: Renderer = (k) => {
     if (k.o.labels === false) return;
     // İnce yüz seçilince blok uzar ve ok başlık satırlarının hizasına çıkar;
     // etiket formülün üstüne binmesin diye aşağıya sıkıştırılır.
-    const forceLabelY = Math.max(r.y + k.fs * 2.5, top - dep - r.h * 0.08);
+    const forceLabelY = Math.max(r.y + k.fs * 2.6, top - dep - r.h * 0.08);
     label(k, `F = ${Math.round(force)} N`, cx + k.fs * 0.5, forceLabelY, 'left', 'middle', 0.85);
     label(k, `Temas yüzeyi: ${face.label} = ${area} br²`, r.x, r.y, 'left', 'top', 0.8);
     label(
@@ -1099,20 +1152,27 @@ const solidRender: Renderer = (k) => {
 };
 
 const solidSpec: SimSpec = {
-    controls: (r, o) => [
-        {
-            id: 'face',
-            x: r.x + r.w * 0.42,
-            y: r.y + r.h * 0.86,
-            type: 'toggle',
-            label: 'Yüzü değiştir',
-            on: simValue(o, 'face', 0) > 0,
-        },
-    ],
+    controls: (r, o) => {
+        // Tutamak bloğun üzerinde, zeminin hemen üstünde durur: boşlukta
+        // asılı kalınca neyi değiştirdiği anlaşılmıyordu. Ölçek yüze göre
+        // değişmediği için bu nokta sabittir — art arda tıklayınca tutamak
+        // kaçmaz, yüzler sırayla dolaşılır.
+        const g = solidGeom(r, o);
+        return [
+            {
+                id: 'face',
+                x: g.cx,
+                y: g.ground - g.unit * 0.6,
+                type: 'toggle',
+                label: 'Yere basan yüzü değiştir',
+                on: simValue(o, 'face', 0) > 0,
+            },
+        ];
+    },
     onControl: (r, o, id): Record<string, number> =>
         id === 'face' ? { face: (clampInt(simValue(o, 'face', 0), 0, 2, 0) + 1) % 3 } : {},
     params: [
-        { key: 'face', label: 'Temas yüzeyi', min: 0, max: 2, step: 1 },
+        { key: 'face', label: 'Hangi yüz yerde', min: 0, max: 2, step: 1 },
         { key: 'f', label: 'Ağırlık', min: 10, max: 200, step: 5, unit: 'N' },
     ],
 };
