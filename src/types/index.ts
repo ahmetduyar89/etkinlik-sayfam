@@ -235,7 +235,13 @@ export type MathObjectKind =
     | 'sound_wave_sim'
     | 'gas_pressure_sim'
     | 'ion_bond_sim'
-    | 'circulation_sim';
+    | 'circulation_sim'
+    | 'measure_read_sim'
+    | 'ratio_sim'
+    | 'spring_sim'
+    | 'electromagnet_sim'
+    | 'mass_conservation_sim'
+    | 'food_web_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile

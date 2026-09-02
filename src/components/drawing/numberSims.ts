@@ -7,6 +7,7 @@ import {
     clamp,
     clampInt,
     fitText,
+    fmtNum,
     isIconSize,
     label,
     line,
@@ -587,16 +588,183 @@ export const scaleZoomSpec: SimSpec = {
     ],
 };
 
+// ── Oran ve orantı (Doğru ve ters orantı) ────────────────────────────
+//
+// Kilit fikir: doğru orantıda y / x sabittir, grafik orijinden geçen bir
+// DOĞRUDUR. Ters orantıda x · y sabittir, grafik hiperboldür: biri iki
+// katına çıkarsa diğeri yarıya iner.
+
+const RATIO_MAX_X = 12;
+
+const ratioState = (o: MathObject) => {
+    const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0);
+    const k = clamp(simValue(o, 'k', mode === 0 ? 6 : 48), 2, 72);
+    const x = clamp(simValue(o, 'x', 3), 1, RATIO_MAX_X);
+    return { mode, k, x, y: mode === 0 ? k * x : k / x };
+};
+
+function ratioGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    return {
+        fs,
+        icon,
+        chart: {
+            x: r.x + r.w * (icon ? 0.1 : 0.42),
+            y: r.y + (icon ? r.h * 0.12 : fs * 3),
+            w: r.w * (icon ? 0.8 : 0.5),
+            h: r.h - (icon ? r.h * 0.24 : fs * 5.4),
+        },
+        tableX: r.x + fs * 1.5,
+    };
+}
+
+export const ratioRender: Renderer = (k) => {
+    const r = k.r;
+    const s = ratioState(k.o);
+    const g = ratioGeom(r);
+    const ch = g.chart;
+    // Ölçek: doğru orantıda en büyük y, ters orantıda x = 1'deki y.
+    const maxY = s.mode === 0 ? s.k * RATIO_MAX_X : s.k;
+    const px = (x: number) => ch.x + (ch.w * x) / RATIO_MAX_X;
+    const py = (y: number) => ch.y + ch.h - (ch.h * Math.min(y, maxY)) / maxY;
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    // Eksenler ve eğri
+    line(k, ch.x, ch.y, ch.x, ch.y + ch.h);
+    line(k, ch.x, ch.y + ch.h, ch.x + ch.w, ch.y + ch.h);
+    const curve: Array<[number, number]> = [];
+    for (let i = 0; i <= 60; i++) {
+        const x = 0.6 + ((RATIO_MAX_X - 0.6) * i) / 60;
+        const y = s.mode === 0 ? s.k * x : s.k / x;
+        if (y <= maxY) curve.push([px(x), py(y)]);
+    }
+    k.c.lineWidth = Math.max(1.8, k.lw);
+    path(k, curve, false);
+
+    // Şu anki nokta ve kılavuzları
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.45);
+    k.c.setLineDash([4, 3]);
+    line(k, ch.x, py(s.y), px(s.x), py(s.y), 1);
+    line(k, px(s.x), py(s.y), px(s.x), ch.y + ch.h, 1);
+    k.c.restore();
+    k.c.beginPath();
+    k.c.arc(px(s.x), py(s.y), Math.max(3, g.fs * 0.26), 0, Math.PI * 2);
+    k.c.fill();
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Değer tablosu: seçili satır vurgulanır
+    const rows = [1, 2, 4, 6, 12].map((x) => ({ x, y: s.mode === 0 ? s.k * x : s.k / x }));
+    label(k, 'x', g.tableX, r.y + g.fs * 3, 'center', 'middle', 0.72);
+    label(k, 'y', g.tableX + g.fs * 3, r.y + g.fs * 3, 'center', 'middle', 0.72);
+    line(k, g.tableX - g.fs, r.y + g.fs * 3.7, g.tableX + g.fs * 4.2, r.y + g.fs * 3.7, 1);
+    rows.forEach((row, i) => {
+        const y = r.y + g.fs * (4.8 + i * 1.6);
+        const current = Math.abs(row.x - s.x) < 0.01;
+        if (current) {
+            k.c.save();
+            k.c.globalAlpha = 0.12;
+            k.c.fillRect(g.tableX - g.fs, y - g.fs * 0.7, g.fs * 5.2, g.fs * 1.4);
+            k.c.restore();
+        }
+        label(k, String(row.x), g.tableX, y, 'center', 'middle', 0.72);
+        label(k, fmtNum(row.y, 1), g.tableX + g.fs * 3, y, 'center', 'middle', 0.72);
+    });
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                s.mode === 0
+                    ? `Doğru orantı · y / x = ${fmtNum(s.k, 1)} sabit`
+                    : `Ters orantı · x · y = ${fmtNum(s.k, 0)} sabit`,
+                s.mode === 0 ? 'Doğru orantı' : 'Ters orantı',
+            ],
+            r.w - g.fs * 4,
+            0.85,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.85,
+    );
+    label(
+        k,
+        s.mode === 0
+            ? `x = ${fmtNum(s.x, 0)} iken y = ${fmtNum(s.y, 1)} · x iki katına çıkarsa y de iki katına çıkar`
+            : `x = ${fmtNum(s.x, 0)} iken y = ${fmtNum(s.y, 1)} · x iki katına çıkarsa y yarıya iner`,
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.72,
+    );
+    k.c.restore();
+};
+
+export const ratioSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = ratioState(o);
+        const g = ratioGeom(r);
+        const ch = g.chart;
+        const maxY = s.mode === 0 ? s.k * RATIO_MAX_X : s.k;
+        return [
+            {
+                id: 'point',
+                x: ch.x + (ch.w * s.x) / RATIO_MAX_X,
+                y: ch.y + ch.h - (ch.h * Math.min(s.y, maxY)) / maxY,
+                type: 'drag',
+                label: 'x değerini değiştir',
+            },
+            {
+                id: 'mode',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.mode === 0 ? 'Ters orantıya geç' : 'Doğru orantıya geç',
+                on: s.mode === 1,
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const s = ratioState(o);
+        // Kip değişince sabit de anlamlı bir değere kurulur.
+        if (id === 'mode') return s.mode === 0 ? { mode: 1, k: 48 } : { mode: 0, k: 6 };
+        const g = ratioGeom(r);
+        const x = ((p.x - g.chart.x) / g.chart.w) * RATIO_MAX_X;
+        return { x: clamp(Math.round(x), 1, RATIO_MAX_X) };
+    },
+    params: [
+        { key: 'mode', label: 'Orantı (0 doğru / 1 ters)', min: 0, max: 1, step: 1 },
+        { key: 'k', label: 'Sabit (k)', min: 2, max: 72, step: 2 },
+        { key: 'x', label: 'x değeri', min: 1, max: RATIO_MAX_X, step: 1 },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const NUMBER_SIM_RENDERERS: Record<string, Renderer> = {
     fraction_add_sim: fractionAddRender,
     scale_zoom_sim: scaleZoomRender,
+    ratio_sim: ratioRender,
 };
 
 export const NUMBER_SIM_SPECS: Record<string, SimSpec> = {
     fraction_add_sim: fractionAddSpec,
     scale_zoom_sim: scaleZoomSpec,
+    ratio_sim: ratioSpec,
 };
 
 export const NUMBER_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -613,5 +781,12 @@ export const NUMBER_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Atomdan galaksiye: her basamak onun bir kuvveti',
         size: { w: 520, h: 340 },
         defaults: { labels: true, sim: { i: 6 } },
+    },
+    {
+        kind: 'ratio_sim',
+        label: 'Oran ve Orantı',
+        hint: 'Doğru ve ters orantıyı tablo ve grafikte birlikte gör',
+        size: { w: 540, h: 340 },
+        defaults: { labels: true, sim: { mode: 0, k: 6, x: 3 } },
     },
 ];

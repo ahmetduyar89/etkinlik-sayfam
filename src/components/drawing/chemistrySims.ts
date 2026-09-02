@@ -892,6 +892,169 @@ export const ionBondSpec: SimSpec = {
     ],
 };
 
+// ── Kütlenin korunumu (Kimyasal Tepkimeler) ──────────────────────────
+//
+// Kilit fikir: tepkimede atomlar kaybolmaz, yalnız yeniden düzenlenir.
+// KAPALI kapta terazi hiç şaşmaz; AÇIK kapta çıkan gaz kaptan ayrıldığı
+// için tartılan kütle azalır — kaybolan kütle değil, kaçan gazdır.
+
+/** Tepkimede açığa çıkan gazın kütlesi (g). */
+const ESCAPING_GAS = 2;
+const START_MASS = 120;
+
+const massState = (o: MathObject) => {
+    const closed = simValue(o, 'closed', 1) > 0.5;
+    const after = simValue(o, 'after', 0) > 0.5;
+    const mass = after && !closed ? START_MASS - ESCAPING_GAS : START_MASS;
+    return { closed, after, mass };
+};
+
+export const massConservationRender: Renderer = (k) => {
+    const r = k.r;
+    const s = massState(k.o);
+    const icon = isIconSize(r);
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const cx = r.x + r.w * 0.42;
+    const flask = {
+        x: cx - r.w * 0.11,
+        y: r.y + r.h * (icon ? 0.16 : 0.24),
+        w: r.w * 0.22,
+        h: r.h * (icon ? 0.42 : 0.36),
+    };
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = Math.max(1.5, k.lw);
+
+    // Erlenmeyer: boyun ve gövde
+    path(k, [
+        [cx - flask.w * 0.16, flask.y],
+        [cx - flask.w * 0.16, flask.y + flask.h * 0.3],
+        [flask.x, flask.y + flask.h],
+        [flask.x + flask.w, flask.y + flask.h],
+        [cx + flask.w * 0.16, flask.y + flask.h * 0.3],
+        [cx + flask.w * 0.16, flask.y],
+    ]);
+    // Sıvı
+    k.c.save();
+    k.c.globalAlpha = 0.14;
+    k.c.beginPath();
+    k.c.moveTo(flask.x + flask.w * 0.08, flask.y + flask.h * 0.72);
+    k.c.lineTo(flask.x + flask.w * 0.92, flask.y + flask.h * 0.72);
+    k.c.lineTo(flask.x + flask.w, flask.y + flask.h);
+    k.c.lineTo(flask.x, flask.y + flask.h);
+    k.c.closePath();
+    k.c.fill();
+    k.c.restore();
+
+    // Tıpa ya da açık ağız
+    if (s.closed) {
+        k.c.save();
+        k.c.globalAlpha = 0.3;
+        k.c.fillRect(cx - flask.w * 0.2, flask.y - fs * 0.5, flask.w * 0.4, fs * 0.6);
+        k.c.restore();
+        k.c.strokeRect(cx - flask.w * 0.2, flask.y - fs * 0.5, flask.w * 0.4, fs * 0.6);
+    }
+
+    // Tepkime sonrası kabarcıklar; açık kapta gaz yukarı kaçar
+    if (s.after) {
+        for (let i = 0; i < 7; i++) {
+            const bx = flask.x + flask.w * (0.2 + ((i * 37) % 60) / 100);
+            const by = flask.y + flask.h * (0.72 - i * 0.07);
+            k.c.beginPath();
+            k.c.arc(bx, by, Math.max(1.4, fs * 0.13), 0, Math.PI * 2);
+            k.c.stroke();
+        }
+        if (!s.closed) {
+            k.c.save();
+            k.c.strokeStyle = withAlpha(k.color, 0.6);
+            for (let i = 0; i < 3; i++) {
+                const bx = cx + (i - 1) * fs * 0.7;
+                arrow(k, bx, flask.y - fs * 0.4, bx, flask.y - fs * 2, fs * 0.35, 1.2);
+            }
+            k.c.restore();
+        }
+    }
+
+    // Terazi: gövde ve gösterge
+    const scaleY = flask.y + flask.h;
+    k.c.strokeRect(cx - r.w * 0.19, scaleY, r.w * 0.38, r.h * 0.1);
+    line(k, cx - r.w * 0.15, scaleY + r.h * 0.1, cx - r.w * 0.15, scaleY + r.h * 0.14);
+    line(k, cx + r.w * 0.15, scaleY + r.h * 0.1, cx + r.w * 0.15, scaleY + r.h * 0.14);
+
+    if (icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    label(k, `${fmtNum(s.mass, 0)} g`, cx, scaleY + r.h * 0.05, 'center', 'middle', 1.05);
+    label(k, s.closed ? 'kapalı kap' : 'açık kap', cx, flask.y - fs * 2.4, 'center', 'bottom', 0.7);
+    if (s.after && !s.closed) {
+        label(k, 'kaçan gaz', cx + fs * 1.6, flask.y - fs * 1.6, 'left', 'middle', 0.62);
+    }
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                `${s.closed ? 'Kapalı' : 'Açık'} kapta tepkime · ${s.after ? 'tepkimeden sonra' : 'tepkimeden önce'}`,
+                s.closed ? 'Kapalı kap' : 'Açık kap',
+            ],
+            r.w - fs * 5,
+            0.82,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.82,
+    );
+    const note = s.closed
+        ? `Kütle değişmez: ${START_MASS} g → ${START_MASS} g · atomlar kapta kalır`
+        : s.after
+          ? `Tartım azaldı: ${START_MASS} g → ${START_MASS - ESCAPING_GAS} g · ${ESCAPING_GAS} g gaz kaptan çıktı`
+          : `Başlangıç kütlesi ${START_MASS} g · kabın ağzı açık`;
+    label(k, fitText(k, [note], r.w - 8, 0.75), r.x + r.w / 2, r.y + r.h, 'center', 'bottom', 0.75);
+    k.c.restore();
+};
+
+export const massConservationSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = massState(o);
+        return [
+            {
+                id: 'after',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.after ? 'Tepkimeden önceye dön' : 'Tepkimeyi başlat',
+                on: s.after,
+            },
+            {
+                id: 'closed',
+                x: r.x + r.w - 40,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.closed ? 'Kabın ağzını aç' : 'Kabı kapat',
+                on: s.closed,
+            },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        const s = massState(o);
+        if (id === 'after') return { after: s.after ? 0 : 1 };
+        if (id === 'closed') return { closed: s.closed ? 0 : 1 };
+        return {};
+    },
+    params: [
+        { key: 'closed', label: 'Kapalı kap (0/1)', min: 0, max: 1, step: 1 },
+        { key: 'after', label: 'Tepkime sonrası (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const CHEMISTRY_SIM_RENDERERS: Record<string, Renderer> = {
@@ -899,6 +1062,7 @@ export const CHEMISTRY_SIM_RENDERERS: Record<string, Renderer> = {
     balance_eq_sim: balanceRender,
     solubility_sim: solubilityRender,
     ion_bond_sim: ionBondRender,
+    mass_conservation_sim: massConservationRender,
 };
 
 export const CHEMISTRY_SIM_SPECS: Record<string, SimSpec> = {
@@ -906,6 +1070,7 @@ export const CHEMISTRY_SIM_SPECS: Record<string, SimSpec> = {
     balance_eq_sim: balanceSpec,
     solubility_sim: solubilitySpec,
     ion_bond_sim: ionBondSpec,
+    mass_conservation_sim: massConservationSpec,
 };
 
 export const CHEMISTRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -936,5 +1101,12 @@ export const CHEMISTRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Elektron alışverişi ve ortaklaşma: iyonik ve kovalent bağ',
         size: { w: 520, h: 340 },
         defaults: { labels: true, sim: { mode: 0, step: 0 } },
+    },
+    {
+        kind: 'mass_conservation_sim',
+        label: 'Kütlenin Korunumu',
+        hint: 'Kapalı ve açık kapta tepkime: terazi neden farklı gösterir',
+        size: { w: 480, h: 360 },
+        defaults: { labels: true, sim: { closed: 1, after: 0 } },
     },
 ];

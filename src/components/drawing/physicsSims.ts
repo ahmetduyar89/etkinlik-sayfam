@@ -12,8 +12,10 @@ import {
     label,
     line,
     path,
+    roundRect,
     simValue,
     withAlpha,
+    type Ctx,
     type MathCatalogItem,
     type Rect,
     type Renderer,
@@ -1279,6 +1281,341 @@ export const gasSpec: SimSpec = {
     params: [{ key: 'v', label: 'Hacim', min: 20, max: 100, step: 5, unit: 'birim' }],
 };
 
+// ── Yay ve Hooke yasası (Kuvvet ve Hareket) ──────────────────────────
+//
+// Kilit fikir: yaya asılan kuvvet arttıkça uzama orantılı artar. Kuvvet-
+// uzama grafiği orijinden geçen bir doğrudur ve eğimi yay sabitidir;
+// sert yay (büyük k) aynı kuvvette daha az uzar.
+
+const springState = (o: MathObject) => {
+    const mass = clamp(simValue(o, 'mass', 200), 0, 500);
+    const k = clamp(simValue(o, 'k', 20), 10, 50);
+    const force = (mass / 1000) * 10;
+    return { mass, k, force, stretch: (force / k) * 100 };
+};
+
+function springGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    return {
+        fs,
+        icon,
+        topY: r.y + (icon ? r.h * 0.1 : fs * 3),
+        springX: r.x + r.w * (icon ? 0.5 : 0.22),
+        maxLen: r.h - (icon ? r.h * 0.3 : fs * 6.4),
+        chart: {
+            x: r.x + r.w * 0.5,
+            y: r.y + fs * 3.2,
+            w: r.w * 0.42,
+            h: r.h - fs * 5.6,
+        },
+    };
+}
+
+/** Yay çizimi: verilen uzunlukta zikzak. */
+function springCoil(k: Ctx, cx: number, top: number, len: number, coils: number, w: number) {
+    k.c.beginPath();
+    k.c.moveTo(cx, top);
+    for (let i = 0; i <= coils * 2; i++) {
+        const t = (i + 0.5) / (coils * 2 + 1);
+        k.c.lineTo(cx + (i % 2 === 0 ? w : -w), top + len * t);
+    }
+    k.c.lineTo(cx, top + len);
+    k.c.stroke();
+}
+
+export const springRender: Renderer = (k) => {
+    const r = k.r;
+    const s = springState(k.o);
+    const g = springGeom(r);
+    // Doğal boy ve uzama piksele çevrilir; en fazla kutuya sığdığı kadar.
+    const natural = g.maxLen * 0.34;
+    const stretchPx = Math.min(g.maxLen * 0.5, s.stretch * (g.maxLen * 0.5) / 50);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = Math.max(1.5, k.lw);
+
+    // Tavan
+    line(k, g.springX - g.fs * 1.6, g.topY, g.springX + g.fs * 1.6, g.topY);
+    for (let i = -3; i <= 3; i++) {
+        line(k, g.springX + i * g.fs * 0.5, g.topY, g.springX + i * g.fs * 0.5 - g.fs * 0.3, g.topY - g.fs * 0.4, 1);
+    }
+
+    springCoil(k, g.springX, g.topY, natural + stretchPx, 8, g.fs * 0.7);
+
+    // Asılı kütle
+    const boxTop = g.topY + natural + stretchPx;
+    const boxW = g.fs * 2.4;
+    const boxH = g.fs * 1.8;
+    k.c.strokeRect(g.springX - boxW / 2, boxTop, boxW, boxH);
+    k.c.save();
+    k.c.globalAlpha = 0.14;
+    k.c.fillRect(g.springX - boxW / 2, boxTop, boxW, boxH);
+    k.c.restore();
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    label(k, `${fmtNum(s.mass, 0)} g`, g.springX, boxTop + boxH / 2, 'center', 'middle', 0.68);
+
+    // Uzama ölçüsü
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.55);
+    k.c.setLineDash([4, 3]);
+    line(k, g.springX + g.fs * 1.8, g.topY + natural, g.springX + g.fs * 3.4, g.topY + natural, 1);
+    line(k, g.springX + g.fs * 1.8, boxTop, g.springX + g.fs * 3.4, boxTop, 1);
+    k.c.restore();
+    arrow(k, g.springX + g.fs * 2.8, g.topY + natural, g.springX + g.fs * 2.8, boxTop, g.fs * 0.4, 1.2);
+    label(k, `${fmtNum(s.stretch, 1)} cm`, g.springX + g.fs * 3.1, (g.topY + natural + boxTop) / 2, 'left', 'middle', 0.66);
+
+    // Kuvvet–uzama grafiği
+    const ch = g.chart;
+    const maxX = 50;
+    const maxF = 5;
+    const cpx = (x: number) => ch.x + (ch.w * x) / maxX;
+    const cpy = (f: number) => ch.y + ch.h - (ch.h * f) / maxF;
+    line(k, ch.x, ch.y, ch.x, ch.y + ch.h);
+    line(k, ch.x, ch.y + ch.h, ch.x + ch.w, ch.y + ch.h);
+    const endX = Math.min(maxX, (maxF / s.k) * 100);
+    line(k, cpx(0), cpy(0), cpx(endX), cpy((endX / 100) * s.k), Math.max(1.6, k.lw));
+    k.c.beginPath();
+    k.c.arc(cpx(Math.min(s.stretch, maxX)), cpy(Math.min(s.force, maxF)), Math.max(3, g.fs * 0.24), 0, Math.PI * 2);
+    k.c.fill();
+    label(k, 'kuvvet (N)', ch.x - g.fs * 0.3, ch.y, 'right', 'middle', 0.58);
+    label(k, 'uzama (cm)', ch.x + ch.w, ch.y + ch.h + g.fs * 0.3, 'right', 'top', 0.58);
+
+    label(
+        k,
+        fitText(
+            k,
+            ['Kütleyi sürükle: uzama kuvvetle orantılı artar', 'Yay ve Hooke yasası'],
+            r.w - g.fs * 4,
+            0.82,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.82,
+    );
+    label(
+        k,
+        `F = ${fmtNum(s.force, 1)} N · uzama ${fmtNum(s.stretch, 1)} cm · yay sabiti ${fmtNum(s.k, 0)} N/m`,
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.78,
+    );
+    k.c.restore();
+};
+
+export const springSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = springState(o);
+        const g = springGeom(r);
+        const natural = g.maxLen * 0.34;
+        const stretchPx = Math.min(g.maxLen * 0.5, (s.stretch * (g.maxLen * 0.5)) / 50);
+        return [
+            {
+                id: 'mass',
+                x: g.springX,
+                y: g.topY + natural + stretchPx + g.fs * 0.9,
+                type: 'drag',
+                label: 'Kütleyi aşağı-yukarı sürükle',
+            },
+        ];
+    },
+    onControl: (r, o, _id, p): Record<string, number> => {
+        const s = springState(o);
+        const g = springGeom(r);
+        const natural = g.topY + g.maxLen * 0.34;
+        // Tutamak kutunun biraz altında durur; aynı kaydırma burada da
+        // düşülmezse sürüklemeye başlar başlamaz değer sıçrar.
+        const stretchPx = clamp(p.y - g.fs * 0.9 - natural, 0, g.maxLen * 0.5);
+        const stretchCm = (stretchPx / (g.maxLen * 0.5)) * 50;
+        const mass = ((stretchCm / 100) * s.k * 1000) / 10;
+        return { mass: clamp(Math.round(mass / 50) * 50, 0, 500) };
+    },
+    params: [
+        { key: 'mass', label: 'Asılan kütle', min: 0, max: 500, step: 50, unit: 'g' },
+        { key: 'k', label: 'Yay sabiti', min: 10, max: 50, step: 5, unit: 'N/m' },
+    ],
+};
+
+// ── Elektromıknatıs (Elektrik Enerjisinin Dönüşümü) ──────────────────
+//
+// Kilit fikir: elektromıknatısın çekim gücü sarım sayısına ve akıma
+// bağlıdır; demir çekirdek gücü belirgin biçimde artırır. Akım kesilince
+// mıknatıslık kaybolur.
+
+const magnetState = (o: MathObject) => {
+    const turns = clamp(simValue(o, 'turns', 20), 5, 40);
+    const cells = clamp(simValue(o, 'cells', 1), 1, 3);
+    const core = simValue(o, 'core', 1) > 0.5;
+    const on = simValue(o, 'on', 1) > 0.5;
+    const strength = on ? (turns / 40) * (cells / 3) * (core ? 1 : 0.4) : 0;
+    return { turns, cells, core, on, strength, clips: Math.round(strength * 12) };
+};
+
+function magnetGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    return {
+        fs,
+        icon,
+        nail: {
+            x: r.x + r.w * (icon ? 0.2 : 0.3),
+            y: r.y + r.h * (icon ? 0.34 : 0.36),
+            w: r.w * (icon ? 0.6 : 0.42),
+            h: Math.min(r.h * 0.12, fs * 2),
+        },
+    };
+}
+
+export const electromagnetRender: Renderer = (k) => {
+    const r = k.r;
+    const s = magnetState(k.o);
+    const g = magnetGeom(r);
+    const n = g.nail;
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = Math.max(1.5, k.lw);
+
+    // Çivi (demir çekirdek) — çekirdeksiz durumda yalnız hava
+    if (s.core) {
+        k.c.strokeRect(n.x, n.y, n.w, n.h);
+        k.c.save();
+        k.c.globalAlpha = 0.12;
+        k.c.fillRect(n.x, n.y, n.w, n.h);
+        k.c.restore();
+    } else {
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.3);
+        k.c.setLineDash([5, 4]);
+        k.c.strokeRect(n.x, n.y, n.w, n.h);
+        k.c.restore();
+    }
+
+    // Sarımlar: görsel halka sayısı sarım sayısıyla artar
+    const loops = Math.max(3, Math.round(s.turns / 4));
+    for (let i = 0; i < loops; i++) {
+        const x = n.x + (n.w * (i + 0.5)) / loops;
+        k.c.beginPath();
+        k.c.ellipse(x, n.y + n.h / 2, n.w / loops / 2.6, n.h * 0.85, 0, 0, Math.PI * 2);
+        k.c.stroke();
+    }
+
+    // Piller ve kablolar
+    // Alt tel, asılı ataç zincirinin altından geçmeli.
+    const by = n.y + n.h + r.h * 0.3;
+    const bx = r.x + r.w * 0.3;
+    for (let i = 0; i < s.cells; i++) {
+        const cx = bx + i * g.fs * 1.6;
+        line(k, cx, by - g.fs * 0.7, cx, by + g.fs * 0.7, Math.max(1.6, k.lw));
+        line(k, cx + g.fs * 0.5, by - g.fs * 0.4, cx + g.fs * 0.5, by + g.fs * 0.4);
+    }
+    line(k, n.x, n.y + n.h / 2, n.x - g.fs, n.y + n.h / 2);
+    line(k, n.x - g.fs, n.y + n.h / 2, n.x - g.fs, by);
+    line(k, n.x - g.fs, by, bx, by);
+    line(k, bx + (s.cells - 1) * g.fs * 1.6 + g.fs * 0.5, by, n.x + n.w + g.fs, by);
+    line(k, n.x + n.w + g.fs, by, n.x + n.w + g.fs, n.y + n.h / 2);
+    line(k, n.x + n.w + g.fs, n.y + n.h / 2, n.x + n.w, n.y + n.h / 2);
+
+    // Ataçlar: uçta zincir hâlinde asılı
+    for (let i = 0; i < s.clips; i++) {
+        const cx = n.x + n.w - g.fs * 0.4 - (i % 3) * g.fs * 0.9;
+        const cy = n.y + n.h + g.fs * (0.6 + Math.floor(i / 3) * 0.9);
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.85);
+        roundRect(k, cx - g.fs * 0.3, cy - g.fs * 0.18, g.fs * 0.6, g.fs * 0.36, g.fs * 0.18);
+        k.c.stroke();
+        k.c.restore();
+    }
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    label(k, s.core ? 'demir çekirdek' : 'çekirdeksiz', n.x + n.w / 2, n.y - g.fs * 1.5, 'center', 'bottom', 0.62);
+    label(k, `${fmtNum(s.cells, 0)} pil`, bx + (s.cells - 1) * g.fs * 0.8, by + g.fs * 1.3, 'center', 'top', 0.62);
+    label(k, `${s.clips} ataç`, n.x + n.w + g.fs * 1.4, n.y + n.h + g.fs * 1.4, 'left', 'middle', 0.7);
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                `Sarım ${fmtNum(s.turns, 0)} · ${fmtNum(s.cells, 0)} pil · ${s.core ? 'demir çekirdekli' : 'çekirdeksiz'}`,
+                `Sarım ${fmtNum(s.turns, 0)} · ${fmtNum(s.cells, 0)} pil`,
+            ],
+            r.w - g.fs * 5,
+            0.82,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.82,
+    );
+    label(
+        k,
+        s.on
+            ? `Çekim gücü %${fmtNum(s.strength * 100, 0)} · sarım ve akım arttıkça güç artar`
+            : 'Akım kesildi: mıknatıslık kayboldu, ataçlar düşer',
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.75,
+    );
+    k.c.restore();
+};
+
+export const electromagnetSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = magnetState(o);
+        return [
+            {
+                id: 'on',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.on ? 'Akımı kes' : 'Akımı ver',
+                on: s.on,
+            },
+            {
+                id: 'core',
+                x: r.x + r.w - 40,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.core ? 'Demir çekirdeği çıkar' : 'Demir çekirdek tak',
+                on: s.core,
+            },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        const s = magnetState(o);
+        if (id === 'on') return { on: s.on ? 0 : 1 };
+        if (id === 'core') return { core: s.core ? 0 : 1 };
+        return {};
+    },
+    params: [
+        { key: 'turns', label: 'Sarım sayısı', min: 5, max: 40, step: 5 },
+        { key: 'cells', label: 'Pil sayısı', min: 1, max: 3, step: 1 },
+        { key: 'core', label: 'Demir çekirdek (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const PHYSICS_SIM_RENDERERS: Record<string, Renderer> = {
@@ -1289,6 +1626,8 @@ export const PHYSICS_SIM_RENDERERS: Record<string, Renderer> = {
     ohm_sim: ohmRender,
     sound_wave_sim: soundRender,
     gas_pressure_sim: gasRender,
+    spring_sim: springRender,
+    electromagnet_sim: electromagnetRender,
 };
 
 export const PHYSICS_SIM_SPECS: Record<string, SimSpec> = {
@@ -1299,6 +1638,8 @@ export const PHYSICS_SIM_SPECS: Record<string, SimSpec> = {
     ohm_sim: ohmSpec,
     sound_wave_sim: soundSpec,
     gas_pressure_sim: gasSpec,
+    spring_sim: springSpec,
+    electromagnet_sim: electromagnetSpec,
 };
 
 export const PHYSICS_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -1350,5 +1691,19 @@ export const PHYSICS_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Pistonu it; hacim küçülünce basınç artsın (P · V sabit)',
         size: { w: 540, h: 320 },
         defaults: { labels: true, sim: { v: 60 } },
+    },
+    {
+        kind: 'spring_sim',
+        label: 'Yay ve Hooke Yasası',
+        hint: 'Kütleyi as; uzama ile kuvvetin orantısını grafikte gör',
+        size: { w: 540, h: 360 },
+        defaults: { labels: true, sim: { mass: 200, k: 20 } },
+    },
+    {
+        kind: 'electromagnet_sim',
+        label: 'Elektromıknatıs',
+        hint: 'Sarım, pil ve demir çekirdek: kaç ataç çekiliyor',
+        size: { w: 520, h: 340 },
+        defaults: { labels: true, sim: { turns: 20, cells: 1, core: 1, on: 1 } },
     },
 ];
