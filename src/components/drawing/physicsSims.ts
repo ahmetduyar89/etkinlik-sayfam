@@ -832,6 +832,178 @@ export const energySpec: SimSpec = {
     ],
 };
 
+// ── Ohm yasası (Elektrik Akımı) ──────────────────────────────────────
+//
+// Kilit fikir: aynı direnç için gerilim ile akım DOĞRU orantılıdır;
+// gerilim-akım grafiği orijinden geçen bir doğrudur ve o doğrunun EĞİMİ
+// direncin kendisidir.
+
+const OHM_MAX_V = 12;
+const OHM_MAX_I = 6;
+
+const ohmState = (o: MathObject) => {
+    const res = clamp(simValue(o, 'r', 3), 1, 12);
+    const volt = clamp(simValue(o, 'v', 6), 0, OHM_MAX_V);
+    return { res, volt, current: volt / res };
+};
+
+function ohmGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    return {
+        fs,
+        icon,
+        circuit: {
+            x: r.x + r.w * (icon ? 0.12 : 0.06),
+            y: r.y + (icon ? r.h * 0.16 : fs * 3),
+            w: r.w * (icon ? 0.76 : 0.34),
+            h: r.h - (icon ? r.h * 0.32 : fs * 5),
+        },
+        chart: {
+            x: r.x + r.w * 0.52,
+            y: r.y + fs * 3,
+            w: r.w * 0.4,
+            h: r.h - fs * 5.4,
+        },
+    };
+}
+
+export const ohmRender: Renderer = (k) => {
+    const r = k.r;
+    const s = ohmState(k.o);
+    const g = ohmGeom(r);
+    const c = g.circuit;
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    // Devre: üstte direnç, solda pil, sağda ampermetre
+    line(k, c.x, c.y, c.x + c.w * 0.3, c.y);
+    line(k, c.x + c.w * 0.7, c.y, c.x + c.w, c.y);
+    line(k, c.x, c.y, c.x, c.y + c.h);
+    line(k, c.x + c.w, c.y, c.x + c.w, c.y + c.h * 0.34);
+    line(k, c.x + c.w, c.y + c.h * 0.66, c.x + c.w, c.y + c.h);
+    line(k, c.x, c.y + c.h, c.x + c.w * 0.34, c.y + c.h);
+    line(k, c.x + c.w * 0.66, c.y + c.h, c.x + c.w, c.y + c.h);
+
+    // Direnç (dikdörtgen sembol)
+    k.c.strokeRect(c.x + c.w * 0.3, c.y - c.h * 0.06, c.w * 0.4, c.h * 0.12);
+    // Pil
+    const bx = c.x + c.w * 0.5;
+    line(k, bx - c.w * 0.05, c.y + c.h - c.h * 0.09, bx - c.w * 0.05, c.y + c.h + c.h * 0.09);
+    line(k, bx + c.w * 0.05, c.y + c.h - c.h * 0.05, bx + c.w * 0.05, c.y + c.h + c.h * 0.05);
+    // Ampermetre
+    const ax = c.x + c.w;
+    const ay = c.y + c.h * 0.5;
+    const arad = Math.min(c.w * 0.13, c.h * 0.13);
+    k.c.beginPath();
+    k.c.arc(ax, ay, arad, 0, Math.PI * 2);
+    k.c.stroke();
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+    label(k, 'A', ax, ay, 'center', 'middle', 0.75);
+    label(k, `${fmtNum(s.res, 0)} Ω`, c.x + c.w * 0.5, c.y - c.h * 0.1, 'center', 'bottom', 0.72);
+    // Pil ve ampermetre okumaları devrenin İÇİNE yazılır; dışarıda alt
+    // satırdaki özetle ve tellerle çakışıyordu.
+    label(k, `${fmtNum(s.volt, 1)} V`, bx + c.w * 0.1, c.y + c.h, 'left', 'middle', 0.72);
+    label(k, `${fmtNum(s.current, 2)} A`, ax - arad - g.fs * 0.35, ay, 'right', 'middle', 0.7);
+
+    // Gerilim–akım grafiği: eğim direnci verir
+    const ch = g.chart;
+    const px = (i: number) => ch.x + (ch.w * i) / OHM_MAX_I;
+    const py = (v: number) => ch.y + ch.h - (ch.h * v) / OHM_MAX_V;
+    line(k, ch.x, ch.y, ch.x, ch.y + ch.h);
+    line(k, ch.x, ch.y + ch.h, ch.x + ch.w, ch.y + ch.h);
+    // Doğrunun kutu içinde kalan ucu
+    const iEnd = Math.min(OHM_MAX_I, OHM_MAX_V / s.res);
+    line(k, px(0), py(0), px(iEnd), py(iEnd * s.res), Math.max(1.6, k.lw));
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.45);
+    k.c.setLineDash([4, 3]);
+    line(k, px(s.current), py(s.volt), px(s.current), py(0), 1);
+    line(k, ch.x, py(s.volt), px(s.current), py(s.volt), 1);
+    k.c.restore();
+    k.c.beginPath();
+    k.c.arc(px(s.current), py(s.volt), Math.max(3, g.fs * 0.26), 0, Math.PI * 2);
+    k.c.fill();
+    label(k, 'V', ch.x - g.fs * 0.3, ch.y, 'right', 'middle', 0.62);
+    label(k, `${OHM_MAX_I} A`, ch.x + ch.w, ch.y + ch.h + g.fs * 0.3, 'right', 'top', 0.6);
+    label(k, '0', ch.x - g.fs * 0.3, ch.y + ch.h, 'right', 'middle', 0.6);
+    label(k, `${OHM_MAX_V}`, ch.x - g.fs * 0.3, ch.y + g.fs * 0.6, 'right', 'middle', 0.6);
+
+    label(
+        k,
+        fitText(
+            k,
+            ['Gerilim–akım grafiğinin eğimi direnci verir', 'Ohm yasası'],
+            r.w - g.fs * 4,
+            0.82,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.82,
+    );
+    label(
+        k,
+        `V = ${fmtNum(s.volt, 1)} V · I = ${fmtNum(s.current, 2)} A · R = V / I = ${fmtNum(s.res, 0)} Ω`,
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.82,
+    );
+    k.c.restore();
+};
+
+export const ohmSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = ohmState(o);
+        const g = ohmGeom(r);
+        const ch = g.chart;
+        return [
+            {
+                id: 'point',
+                x: ch.x + (ch.w * s.current) / OHM_MAX_I,
+                y: ch.y + ch.h - (ch.h * s.volt) / OHM_MAX_V,
+                type: 'drag',
+                label: 'Gerilimi değiştir',
+            },
+            {
+                id: 'res',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: `Direnci değiştir (şimdi: ${fmtNum(s.res, 0)} Ω)`,
+                on: s.res > 1,
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const s = ohmState(o);
+        // Direnç okunması kolay değerler arasında döner.
+        if (id === 'res') {
+            const steps = [1, 2, 3, 4, 6, 12];
+            const i = steps.indexOf(Math.round(s.res));
+            return { r: steps[(i + 1) % steps.length] };
+        }
+        const g = ohmGeom(r);
+        const volt = clamp(((g.chart.y + g.chart.h - p.y) / g.chart.h) * OHM_MAX_V, 0, OHM_MAX_V);
+        return { v: Math.round(volt * 2) / 2 };
+    },
+    params: [
+        { key: 'v', label: 'Gerilim', min: 0, max: OHM_MAX_V, step: 0.5, unit: 'V' },
+        { key: 'r', label: 'Direnç', min: 1, max: 12, step: 1, unit: 'Ω' },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const PHYSICS_SIM_RENDERERS: Record<string, Renderer> = {
@@ -839,6 +1011,7 @@ export const PHYSICS_SIM_RENDERERS: Record<string, Renderer> = {
     motion_graph_sim: motionRender,
     net_force_sim: netForceRender,
     energy_sim: energyRender,
+    ohm_sim: ohmRender,
 };
 
 export const PHYSICS_SIM_SPECS: Record<string, SimSpec> = {
@@ -846,6 +1019,7 @@ export const PHYSICS_SIM_SPECS: Record<string, SimSpec> = {
     motion_graph_sim: motionSpec,
     net_force_sim: netForceSpec,
     energy_sim: energySpec,
+    ohm_sim: ohmSpec,
 };
 
 export const PHYSICS_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -876,5 +1050,12 @@ export const PHYSICS_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Sarkacı bırak; kinetik ve potansiyel enerji çubuklarını izle',
         size: { w: 520, h: 340 },
         defaults: { labels: true, sim: { amp: 40, play: 0, damp: 0 } },
+    },
+    {
+        kind: 'ohm_sim',
+        label: 'Ohm Yasası',
+        hint: 'Gerilimi değiştir; akım ve grafiğin eğimi ilişkisini gör',
+        size: { w: 540, h: 340 },
+        defaults: { labels: true, sim: { v: 6, r: 3 } },
     },
 ];

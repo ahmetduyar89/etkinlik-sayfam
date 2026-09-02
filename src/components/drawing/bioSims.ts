@@ -384,16 +384,202 @@ export const dnaSpec: SimSpec = {
     params: [{ key: 'show', label: 'Cevaplar (0/1)', min: 0, max: 1, step: 1 }],
 };
 
+// ── Doğal seçilim (Adaptasyon ve Evrim) ──────────────────────────────
+//
+// Kilit fikir: çevreye daha uygun olan birey daha çok yaşar ve daha çok
+// yavru bırakır. Zemin koyulaştıkça koyu bireyler avcıdan gizlenir ve
+// nesiller boyunca oranları artar; bireyler değişmez, POPÜLASYON değişir.
+
+const SELECTION_POP = 40;
+const SELECTION_MAX_GEN = 12;
+
+function selectionState(o: MathObject) {
+    const bg = clamp(simValue(o, 'bg', 20), 0, 100);
+    const gen = clampInt(simValue(o, 'gen', 0), 0, SELECTION_MAX_GEN, 0);
+    // Zemin ne kadar koyuysa koyu bireylerin ulaşacağı oran o kadar yüksek.
+    const target = 0.05 + 0.9 * (bg / 100);
+    // Başlangıçta yarı yarıya; her nesilde hedefe biraz daha yaklaşır.
+    const dark = 0.5 + (target - 0.5) * (1 - Math.exp(-0.45 * gen));
+    const darkCount = Math.round(dark * SELECTION_POP);
+    return {
+        bg,
+        gen,
+        dark,
+        darkCount,
+        lightCount: SELECTION_POP - darkCount,
+        favored: bg >= 50 ? 'koyu' : 'açık',
+    };
+}
+
+export const selectionRender: Renderer = (k) => {
+    const r = k.r;
+    const s = selectionState(k.o);
+    const icon = isIconSize(r);
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    // Alt bölge sırasıyla oran çubuğu, düğme başlıkları, düğmeler ve özet
+    // satırına ayrılır; yükseklikler yazı boyuna göre hesaplanır.
+    const ctrlY = r.y + r.h - fs * 2.3;
+    const capY = ctrlY - fs * 0.9;
+    const barH = fs * 0.9;
+    const barY = capY - fs * 1.5 - barH;
+    const field = {
+        x: r.x + (icon ? r.w * 0.06 : fs),
+        y: r.y + (icon ? r.h * 0.06 : fs * 2.6),
+        w: r.w - (icon ? r.w * 0.12 : fs * 2),
+        h: (icon ? r.h * 0.88 : barY - fs * 0.5 - (r.y + fs * 2.6)),
+    };
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    // Zemin
+    k.c.strokeRect(field.x, field.y, field.w, field.h);
+    k.c.save();
+    k.c.globalAlpha = 0.05 + (s.bg / 100) * 0.3;
+    k.c.fillRect(field.x, field.y, field.w, field.h);
+    k.c.restore();
+
+    // Bireyler: koyu olanlar dolu, açık olanlar boş daire
+    const cols = 8;
+    const rows = Math.ceil(SELECTION_POP / cols);
+    const cw = field.w / (cols + 1);
+    const chh = field.h / (rows + 1);
+    const dotR = Math.min(cw, chh) * 0.3;
+    for (let i = 0; i < SELECTION_POP; i++) {
+        const cx = field.x + cw * (0.9 + (i % cols));
+        const cy = field.y + chh * (0.9 + Math.floor(i / cols));
+        k.c.beginPath();
+        k.c.arc(cx, cy, dotR, 0, Math.PI * 2);
+        if (i < s.darkCount) {
+            k.c.save();
+            k.c.globalAlpha = 0.85;
+            k.c.fill();
+            k.c.restore();
+        } else {
+            k.c.save();
+            k.c.globalAlpha = 0.9;
+            k.c.fillStyle = '#ffffff';
+            k.c.fill();
+            k.c.restore();
+            k.c.stroke();
+        }
+    }
+
+    if (icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Oran çubuğu
+    k.c.strokeRect(field.x, barY, field.w, barH);
+    k.c.save();
+    k.c.globalAlpha = 0.75;
+    k.c.fillRect(field.x, barY, field.w * s.dark, barH);
+    k.c.restore();
+    label(k, `koyu %${fmtNum(s.dark * 100, 0)}`, field.x + 4, barY + barH / 2, 'left', 'middle', 0.62);
+    label(
+        k,
+        `açık %${fmtNum((1 - s.dark) * 100, 0)}`,
+        field.x + field.w - 4,
+        barY + barH / 2,
+        'right',
+        'middle',
+        0.62,
+    );
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                `${s.gen}. nesil · zemin ${s.bg < 35 ? 'açık' : s.bg > 65 ? 'koyu' : 'orta'} · avantajlı olan ${s.favored} bireyler`,
+                `${s.gen}. nesil · avantajlı: ${s.favored}`,
+            ],
+            r.w - fs * 5,
+            0.8,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8,
+    );
+    label(
+        k,
+        fitText(
+            k,
+            [
+                `${s.darkCount} koyu · ${s.lightCount} açık birey — bireyler değişmez, popülasyonun oranı değişir`,
+                `${s.darkCount} koyu · ${s.lightCount} açık birey — popülasyonun oranı değişir`,
+                `${s.darkCount} koyu · ${s.lightCount} açık birey`,
+            ],
+            r.w - 8,
+            0.7,
+        ),
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.7,
+    );
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.75);
+    label(k, 'sonraki nesil', r.x + r.w * 0.3, capY, 'center', 'bottom', 0.66);
+    label(k, 'başa dön', r.x + r.w * 0.62, capY, 'center', 'bottom', 0.66);
+    k.c.restore();
+    k.c.restore();
+};
+
+export const selectionSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = selectionState(o);
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        return [
+            {
+                id: 'next',
+                x: r.x + r.w * 0.3,
+                y: r.y + r.h - fs * 2.3,
+                type: 'toggle',
+                label: 'Bir nesil ilerlet',
+                on: s.gen > 0,
+            },
+            {
+                id: 'reset',
+                x: r.x + r.w * 0.62,
+                y: r.y + r.h - fs * 2.3,
+                type: 'toggle',
+                label: 'İlk nesle dön',
+                on: s.gen === 0,
+            },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        const s = selectionState(o);
+        if (id === 'next') return { gen: Math.min(SELECTION_MAX_GEN, s.gen + 1) };
+        if (id === 'reset') return { gen: 0 };
+        return {};
+    },
+    params: [
+        { key: 'bg', label: 'Zeminin koyuluğu', min: 0, max: 100, step: 5 },
+        { key: 'gen', label: 'Nesil', min: 0, max: SELECTION_MAX_GEN, step: 1 },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const BIO_SIM_RENDERERS: Record<string, Renderer> = {
     photosynthesis_sim: photosynthesisRender,
     dna_pair_sim: dnaRender,
+    selection_sim: selectionRender,
 };
 
 export const BIO_SIM_SPECS: Record<string, SimSpec> = {
     photosynthesis_sim: photosynthesisSpec,
     dna_pair_sim: dnaSpec,
+    selection_sim: selectionSpec,
 };
 
 export const BIO_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -410,5 +596,12 @@ export const BIO_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Karşı zinciri kur (A–T, G–C) ve kontrol et',
         size: { w: 440, h: 360 },
         defaults: { labels: true, sim: { show: 0 } },
+    },
+    {
+        kind: 'selection_sim',
+        label: 'Doğal Seçilim',
+        hint: 'Zemini koyulaştır; nesiller boyunca popülasyon oranı değişsin',
+        size: { w: 520, h: 360 },
+        defaults: { labels: true, sim: { bg: 20, gen: 0 } },
     },
 ];

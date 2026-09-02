@@ -223,7 +223,13 @@ export type MathObjectKind =
     | 'net_force_sim'
     | 'energy_sim'
     | 'solubility_sim'
-    | 'sorting_sim';
+    | 'sorting_sim'
+    | 'sequence_sim'
+    | 'match_sim'
+    | 'angles_sim'
+    | 'ohm_sim'
+    | 'eclipse_sim'
+    | 'selection_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile

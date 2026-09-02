@@ -950,6 +950,187 @@ export const densitySpec: SimSpec = {
     ],
 };
 
+// ── Tutulmalar (Güneş Sistemi ve Tutulmalar) ─────────────────────────
+//
+// Kilit fikir: tutulma bir GÖLGE olayıdır. Ay, Güneş ile Dünya arasına
+// girip gölgesini Dünya'ya düşürürse Güneş tutulması; Dünya'nın gölgesine
+// girerse Ay tutulması olur. Ay'ın yörüngesi eğik olduğu için üçü her ay
+// aynı hizaya gelmez.
+
+/** Hizalanma bu açı farkından küçükse tutulma olur (derece). */
+const ECLIPSE_WINDOW = 9;
+
+const eclipseState = (o: MathObject) => {
+    const pos = ((simValue(o, 'pos', 0) % 360) + 360) % 360;
+    const tilted = simValue(o, 'tilt', 0) > 0.5;
+    const nearNew = Math.min(pos, 360 - pos) < ECLIPSE_WINDOW;
+    const nearFull = Math.abs(pos - 180) < ECLIPSE_WINDOW;
+    return {
+        pos,
+        tilted,
+        // Eğik yörüngede Ay gölge konisinin dışından geçer.
+        solar: nearNew && !tilted,
+        lunar: nearFull && !tilted,
+        aligned: nearNew || nearFull,
+    };
+};
+
+function eclipseGeom(r: Rect, o: MathObject) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = eclipseState(o);
+    const ex = r.x + r.w * 0.62;
+    const ey = r.y + r.h * (icon ? 0.5 : 0.52);
+    const orbit = Math.min(r.w * 0.22, r.h * 0.3);
+    const rad = (s.pos * Math.PI) / 180;
+    return {
+        fs,
+        icon,
+        ex,
+        ey,
+        orbit,
+        earthR: Math.min(r.w, r.h) * 0.085,
+        moonR: Math.min(r.w, r.h) * 0.032,
+        sun: { x: r.x + r.w * 0.04, y: ey, r: Math.min(r.w, r.h) * 0.13 },
+        moon: {
+            x: ex - orbit * Math.cos(rad),
+            // Eğiklik açıkken Ay yörünge düzleminin dışına çıkar.
+            y: ey - orbit * 0.34 * Math.sin(rad) - (s.tilted ? orbit * 0.3 : 0),
+        },
+    };
+}
+
+/** Bir kürenin arkasına uzanan gölge konisi (daralan üçgen). */
+function shadowCone(k: Ctx, cx: number, cy: number, radius: number, length: number, alpha: number) {
+    k.c.save();
+    k.c.globalAlpha = alpha;
+    k.c.beginPath();
+    k.c.moveTo(cx, cy - radius);
+    k.c.lineTo(cx + length, cy - radius * 0.12);
+    k.c.lineTo(cx + length, cy + radius * 0.12);
+    k.c.lineTo(cx, cy + radius);
+    k.c.closePath();
+    k.c.fill();
+    k.c.restore();
+}
+
+export const eclipseRender: Renderer = (k) => {
+    const r = k.r;
+    const s = eclipseState(k.o);
+    const g = eclipseGeom(r, k.o);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    // Güneş ve ışınları
+    k.c.beginPath();
+    k.c.arc(g.sun.x, g.sun.y, g.sun.r, -Math.PI / 2, Math.PI / 2);
+    k.c.stroke();
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.4);
+    for (let i = -2; i <= 2; i++) {
+        const y = g.ey + i * g.orbit * 0.42;
+        line(k, g.sun.x + g.sun.r * 0.6, y, g.ex - g.earthR * 1.6, y, 1);
+    }
+    k.c.restore();
+
+    // Yörünge
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.3);
+    k.c.setLineDash([6, 4]);
+    k.c.beginPath();
+    k.c.lineWidth = 1;
+    k.c.ellipse(g.ex, g.ey - (s.tilted ? g.orbit * 0.3 : 0), g.orbit, g.orbit * 0.34, 0, 0, Math.PI * 2);
+    k.c.stroke();
+    k.c.restore();
+
+    // Dünya ve gölgesi
+    shadowCone(k, g.ex + g.earthR * 0.2, g.ey, g.earthR, g.orbit * 1.5, 0.16);
+    k.c.beginPath();
+    k.c.arc(g.ex, g.ey, g.earthR, 0, Math.PI * 2);
+    k.c.stroke();
+    k.c.save();
+    k.c.globalAlpha = 0.18;
+    k.c.beginPath();
+    k.c.moveTo(g.ex, g.ey);
+    k.c.arc(g.ex, g.ey, g.earthR, -Math.PI / 2, Math.PI / 2);
+    k.c.closePath();
+    k.c.fill();
+    k.c.restore();
+
+    // Ay ve gölgesi
+    shadowCone(k, g.moon.x + g.moonR * 0.2, g.moon.y, g.moonR, g.orbit * 1.1, 0.2);
+    k.c.beginPath();
+    k.c.arc(g.moon.x, g.moon.y, g.moonR, 0, Math.PI * 2);
+    k.c.stroke();
+    k.c.save();
+    k.c.globalAlpha = 0.2;
+    k.c.beginPath();
+    k.c.moveTo(g.moon.x, g.moon.y);
+    k.c.arc(g.moon.x, g.moon.y, g.moonR, -Math.PI / 2, Math.PI / 2);
+    k.c.closePath();
+    k.c.fill();
+    k.c.restore();
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    label(k, 'Güneş', g.sun.x + g.sun.r * 0.2, g.sun.y + g.sun.r + g.fs * 0.4, 'center', 'top', 0.66);
+    label(k, 'Dünya', g.ex, g.ey + g.earthR + g.fs * 0.4, 'center', 'top', 0.66);
+    label(k, 'Ay', g.moon.x, g.moon.y - g.moonR - g.fs * 0.35, 'center', 'bottom', 0.66);
+
+    const title = s.solar
+        ? 'Güneş tutulması — Ay, Güneş’i perdeler'
+        : s.lunar
+          ? 'Ay tutulması — Ay, Dünya’nın gölgesinde'
+          : 'Tutulma yok';
+    label(k, fitText(k, [title, s.solar ? 'Güneş tutulması' : s.lunar ? 'Ay tutulması' : 'Tutulma yok'], r.w - g.fs * 5, 0.85), r.x + 4, r.y + 1, 'left', 'top', 0.85);
+
+    const note = s.tilted
+        ? 'Yörünge eğik: Ay gölgenin dışından geçer, her ay tutulma olmaz'
+        : s.aligned
+          ? 'Üçü aynı hizada: gölge tam düşüyor'
+          : 'Gölgeler uzayda kalıyor — hizalanma yok';
+    label(k, fitText(k, [note, s.tilted ? 'Yörünge eğik' : 'Hizalanma'], r.w - 8, 0.75), r.x + r.w / 2, r.y + r.h, 'center', 'bottom', 0.75);
+    k.c.restore();
+};
+
+export const eclipseSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = eclipseState(o);
+        const g = eclipseGeom(r, o);
+        return [
+            { id: 'moon', x: g.moon.x, y: g.moon.y, type: 'drag', label: 'Ay’ı yörüngede sürükle' },
+            {
+                id: 'tilt',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.tilted ? 'Yörüngeyi düzleştir' : 'Yörüngeyi eğ (5°)',
+                on: s.tilted,
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const s = eclipseState(o);
+        if (id === 'tilt') return { tilt: s.tilted ? 0 : 1 };
+        const g = eclipseGeom(r, o);
+        // Açı, elips yörünge daireye indirgenerek bulunur.
+        const dx = (g.ex - p.x) / g.orbit;
+        const dy = (g.ey - p.y) / (g.orbit * 0.34);
+        return { pos: ((Math.atan2(dy, dx) * 180) / Math.PI + 360) % 360 };
+    },
+    params: [
+        { key: 'pos', label: 'Ay’ın konumu', min: 0, max: 359, step: 1, unit: '°' },
+        { key: 'tilt', label: 'Yörünge eğik (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const SCIENCE_SIM_RENDERERS: Record<string, Renderer> = {
@@ -957,6 +1138,7 @@ export const SCIENCE_SIM_RENDERERS: Record<string, Renderer> = {
     label_drag_sim: labelDragRender,
     heating_curve_sim: heatingRender,
     density_sim: densityRender,
+    eclipse_sim: eclipseRender,
 };
 
 export const SCIENCE_SIM_SPECS: Record<string, SimSpec> = {
@@ -964,6 +1146,7 @@ export const SCIENCE_SIM_SPECS: Record<string, SimSpec> = {
     label_drag_sim: labelDragSpec,
     heating_curve_sim: heatingSpec,
     density_sim: densitySpec,
+    eclipse_sim: eclipseSpec,
 };
 
 /** Kütüphane panelindeki "Etkileşimli Fen" kategorisinin içeriği. */
@@ -995,5 +1178,12 @@ export const SCIENCE_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Cismi sürükle; yüzme, askıda kalma ve batma koşulunu gör',
         size: { w: 520, h: 340 },
         defaults: { labels: true, sim: { d: 0.6, dl: 1, v: 30 } },
+    },
+    {
+        kind: 'eclipse_sim',
+        label: 'Tutulmalar',
+        hint: 'Ay’ı sürükle; Güneş ve Ay tutulmasının neden her ay olmadığını gör',
+        size: { w: 540, h: 320 },
+        defaults: { labels: true, sim: { pos: 0, tilt: 0 } },
     },
 ];

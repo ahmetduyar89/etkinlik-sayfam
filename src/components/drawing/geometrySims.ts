@@ -7,6 +7,7 @@
 
 import type { MathObject } from '../../types';
 import {
+    arrow,
     clamp,
     clampInt,
     fitText,
@@ -573,16 +574,207 @@ export const netFoldSpec: SimSpec = {
     ],
 };
 
+// ── Açı ilişkileri (Paralel doğrular ve kesen) ───────────────────────
+//
+// Kilit fikir: iki paralel doğruyu bir kesen kestiğinde oluşan sekiz
+// açının hepsi ya birbirine EŞİT ya da BÜTÜNLERDİR. Keseni döndürdükçe
+// değerler değişir ama ilişki bozulmaz.
+
+const ANGLE_PAIRS = [
+    { name: 'Yöndeş açılar', rule: 'eşittir' },
+    { name: 'Ters açılar', rule: 'eşittir' },
+    { name: 'İç ters açılar', rule: 'eşittir' },
+    { name: 'İç yan açılar', rule: 'bütünlerdir' },
+];
+
+const anglesState = (o: MathObject) => ({
+    theta: clamp(simValue(o, 'theta', 55), 20, 80),
+    pair: clampInt(simValue(o, 'pair', 0), 0, ANGLE_PAIRS.length - 1, 0),
+});
+
+function anglesGeom(r: Rect, theta: number) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const y1 = r.y + r.h * (icon ? 0.3 : 0.38);
+    const y2 = r.y + r.h * (icon ? 0.72 : 0.74);
+    const cx = r.x + r.w * 0.5;
+    const cy = (y1 + y2) / 2;
+    const rad = (theta * Math.PI) / 180;
+    // Kesen, iki doğrunun ortasındaki noktadan geçer; kesişimler oradan
+    // yukarı ve aşağı doğru yürünerek bulunur.
+    const t1 = (cy - y1) / Math.sin(rad);
+    const a = { x: cx + t1 * Math.cos(rad), y: y1 };
+    const b = { x: cx - t1 * Math.cos(rad), y: y2 };
+    return {
+        fs,
+        icon,
+        y1,
+        y2,
+        a,
+        b,
+        rad,
+        arcR: Math.min(r.w, r.h) * 0.11,
+        /** Kesenin uçları (kutu dışına taşacak kadar uzun). */
+        tip: { x: cx + r.h * 0.9 * Math.cos(rad), y: cy - r.h * 0.9 * Math.sin(rad) },
+        tail: { x: cx - r.h * 0.9 * Math.cos(rad), y: cy + r.h * 0.9 * Math.sin(rad) },
+    };
+}
+
+/** Bir kesişimdeki dört açının yay sınırları (radyan). */
+function anglePositions(rad: number) {
+    return {
+        ustSag: [-rad, 0],
+        altSag: [0, Math.PI - rad],
+        altSol: [Math.PI - rad, Math.PI],
+        ustSol: [Math.PI, Math.PI * 2 - rad],
+    } as const;
+}
+
+export const anglesRender: Renderer = (k) => {
+    const r = k.r;
+    const s = anglesState(k.o);
+    const g = anglesGeom(r, s.theta);
+    const pos = anglePositions(g.rad);
+    const acute = s.theta;
+    const obtuse = 180 - s.theta;
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = Math.max(1.5, k.lw);
+
+    // Paralel doğrular ve kesen
+    line(k, r.x + 4, g.y1, r.x + r.w - 4, g.y1);
+    line(k, r.x + 4, g.y2, r.x + r.w - 4, g.y2);
+    line(k, g.tail.x, g.tail.y, g.tip.x, g.tip.y);
+    // Paralellik işaretleri
+    for (const y of [g.y1, g.y2]) {
+        const mx = r.x + r.w * 0.12;
+        arrow(k, mx - g.fs * 0.5, y, mx + g.fs * 0.5, y, g.fs * 0.4, 1.2);
+    }
+
+    // Seçili açı çifti: hangi iki açı olduğu vurgulanır
+    const highlights: Array<{ p: { x: number; y: number }; span: readonly [number, number]; value: number }> =
+        s.pair === 0
+            ? [
+                  { p: g.a, span: pos.ustSag, value: acute },
+                  { p: g.b, span: pos.ustSag, value: acute },
+              ]
+            : s.pair === 1
+              ? [
+                    { p: g.a, span: pos.ustSag, value: acute },
+                    { p: g.a, span: pos.altSol, value: acute },
+                ]
+              : s.pair === 2
+                ? [
+                      { p: g.a, span: pos.altSol, value: acute },
+                      { p: g.b, span: pos.ustSag, value: acute },
+                  ]
+                : [
+                      { p: g.a, span: pos.altSag, value: obtuse },
+                      { p: g.b, span: pos.ustSag, value: acute },
+                  ];
+
+    for (const h of highlights) {
+        k.c.save();
+        k.c.globalAlpha = 0.16;
+        k.c.beginPath();
+        k.c.moveTo(h.p.x, h.p.y);
+        k.c.arc(h.p.x, h.p.y, g.arcR, h.span[0], h.span[1]);
+        k.c.closePath();
+        k.c.fill();
+        k.c.restore();
+        k.c.beginPath();
+        k.c.lineWidth = Math.max(1.6, k.lw);
+        k.c.arc(h.p.x, h.p.y, g.arcR, h.span[0], h.span[1]);
+        k.c.stroke();
+        if (g.icon) continue;
+        const mid = (h.span[0] + h.span[1]) / 2;
+        label(
+            k,
+            `${fmtNum(h.value, 0)}°`,
+            h.p.x + g.arcR * 1.45 * Math.cos(mid),
+            h.p.y + g.arcR * 1.45 * Math.sin(mid),
+            'center',
+            'middle',
+            0.75,
+        );
+    }
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    const pair = ANGLE_PAIRS[s.pair];
+    label(
+        k,
+        fitText(k, [`${pair.name} — keseni sürükle`, pair.name], r.w - g.fs * 4, 0.85),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.85,
+    );
+    const detail =
+        s.pair === 3
+            ? `${pair.name} ${pair.rule}: ${fmtNum(obtuse, 0)}° + ${fmtNum(acute, 0)}° = 180°`
+            : `${pair.name} ${pair.rule}: ${fmtNum(acute, 0)}° = ${fmtNum(acute, 0)}°`;
+    label(k, detail, r.x + r.w / 2, r.y + r.h, 'center', 'bottom', 0.85);
+    k.c.restore();
+};
+
+export const anglesSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = anglesState(o);
+        const g = anglesGeom(r, s.theta);
+        return [
+            {
+                id: 'line',
+                // Tutamak kesenin üst kesişiminin biraz ötesinde durur.
+                x: g.a.x + g.arcR * 1.6 * Math.cos(-g.rad),
+                y: g.a.y + g.arcR * 1.6 * Math.sin(-g.rad),
+                type: 'drag',
+                label: 'Keseni döndür',
+            },
+            {
+                id: 'pair',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: `Açı çiftini değiştir (şimdi: ${ANGLE_PAIRS[s.pair].name})`,
+                on: s.pair > 0,
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const s = anglesState(o);
+        if (id === 'pair') return { pair: (s.pair + 1) % ANGLE_PAIRS.length };
+        const g = anglesGeom(r, s.theta);
+        const cx = r.x + r.w * 0.5;
+        const cy = (g.y1 + g.y2) / 2;
+        const deg = (Math.atan2(cy - p.y, p.x - cx) * 180) / Math.PI;
+        return { theta: clamp(Math.abs(deg), 20, 80) };
+    },
+    params: [
+        { key: 'theta', label: 'Kesenin açısı', min: 20, max: 80, step: 1, unit: '°' },
+        { key: 'pair', label: 'Açı çifti (0-3)', min: 0, max: ANGLE_PAIRS.length - 1, step: 1 },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const GEOMETRY_SIM_RENDERERS: Record<string, Renderer> = {
     transform_sim: transformRender,
     net_fold_sim: netFoldRender,
+    angles_sim: anglesRender,
 };
 
 export const GEOMETRY_SIM_SPECS: Record<string, SimSpec> = {
     transform_sim: transformSpec,
     net_fold_sim: netFoldSpec,
+    angles_sim: anglesSpec,
 };
 
 export const GEOMETRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -599,5 +791,12 @@ export const GEOMETRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Açınımı katla; küp, prizma ve piramit oluşsun',
         size: { w: 460, h: 360 },
         defaults: { labels: true, sim: { shape: 0, fold: 0, play: 0 } },
+    },
+    {
+        kind: 'angles_sim',
+        label: 'Açı İlişkileri',
+        hint: 'Paralel doğrular ve kesen: yöndeş, ters, iç ters ve iç yan açılar',
+        size: { w: 500, h: 340 },
+        defaults: { labels: true, sim: { theta: 55, pair: 0 } },
     },
 ];
