@@ -296,6 +296,524 @@ export const seasonsSpec: SimSpec = {
     ],
 };
 
+// ── Işığın Geliş Açısı ve Birim Alan (Mevsimlerin Oluşumu) ──────────
+
+function lightAngleGeom(r: Rect, o: MathObject) {
+    const cx = r.x + r.w * 0.42;
+    const groundY = r.y + r.h * 0.76;
+    const angleDeg = clamp(simValue(o, 'angle', 60), 20, 90);
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const dist = Math.min(r.w, r.h) * 0.52;
+
+    const srcX = cx - dist * Math.cos(angleRad);
+    const srcY = groundY - dist * Math.sin(angleRad);
+    const beamW = 40;
+    const spotW = beamW / Math.sin(angleRad);
+    const intensity = Math.sin(angleRad); // 0..1
+    const temp = Math.round(10 + intensity * 28); // 10°C .. 38°C
+
+    return {
+        cx,
+        groundY,
+        angleDeg,
+        angleRad,
+        srcX,
+        srcY,
+        beamW,
+        spotW,
+        intensity,
+        temp,
+    };
+}
+
+export const lightAngleRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = lightAngleGeom(r, k.o);
+
+    // Zemin çizgisi
+    line(k, r.x + 10, g.groundY, r.x + r.w - 10, g.groundY, Math.max(2, k.lw * 1.4));
+
+    // Aydınlanan zemin alanı (parlak sarı/turuncu şerit)
+    k.c.save();
+    const spotLeft = g.cx - g.spotW / 2;
+    const spotRight = g.cx + g.spotW / 2;
+    k.c.fillStyle = withAlpha('#f59e0b', 0.45);
+    k.c.fillRect(spotLeft, g.groundY - 4, g.spotW, 8);
+    k.c.strokeStyle = '#d97706';
+    k.c.lineWidth = 2;
+    k.c.strokeRect(spotLeft, g.groundY - 4, g.spotW, 8);
+    k.c.restore();
+
+    // Işık konisi (fenerden zemine)
+    k.c.save();
+    const perpX = Math.sin(g.angleRad) * (g.beamW / 2);
+    const perpY = -Math.cos(g.angleRad) * (g.beamW / 2);
+    const grad = k.c.createLinearGradient(g.srcX, g.srcY, g.cx, g.groundY);
+    grad.addColorStop(0, withAlpha('#fef08a', 0.85));
+    grad.addColorStop(1, withAlpha('#f59e0b', 0.25));
+    k.c.fillStyle = grad;
+    k.c.beginPath();
+    k.c.moveTo(g.srcX - perpX, g.srcY - perpY);
+    k.c.lineTo(g.srcX + perpX, g.srcY + perpY);
+    k.c.lineTo(spotRight, g.groundY);
+    k.c.lineTo(spotLeft, g.groundY);
+    k.c.closePath();
+    k.c.fill();
+    k.c.restore();
+
+    // Fener / Güneş başlığı
+    k.c.save();
+    k.c.fillStyle = '#eab308';
+    k.c.beginPath();
+    k.c.arc(g.srcX, g.srcY, 14, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.strokeStyle = '#ca8a04';
+    k.c.lineWidth = 2;
+    k.c.stroke();
+    k.c.restore();
+
+    // Geliş açısı yayı
+    k.c.save();
+    k.c.beginPath();
+    k.c.strokeStyle = '#ef4444';
+    k.c.lineWidth = 1.6;
+    k.c.arc(g.cx, g.groundY, 36, Math.PI, Math.PI + g.angleRad);
+    k.c.stroke();
+    label(k, `${Math.round(g.angleDeg)}°`, g.cx - 44, g.groundY - 14, 'right', 'bottom', 0.72);
+    k.c.restore();
+
+    // Aydınlanan alan etiket oku
+    label(
+        k,
+        `Aydınlanan Alan: ${Math.round(g.spotW * 1.5)} br²`,
+        g.cx,
+        g.groundY + 16,
+        'center',
+        'top',
+        0.75
+    );
+
+    // Sağ tarafta Termometre ve Enerji göstergesi
+    const thermoX = r.x + r.w - 38;
+    const thermoY = r.y + r.h * 0.25;
+    const thermoH = r.h * 0.42;
+    k.c.save();
+    // Termometre tüpü
+    k.c.strokeStyle = withAlpha(k.color, 0.5);
+    k.c.lineWidth = 2;
+    k.c.strokeRect(thermoX - 5, thermoY, 10, thermoH);
+    // Hazne
+    k.c.beginPath();
+    k.c.arc(thermoX, thermoY + thermoH + 6, 9, 0, Math.PI * 2);
+    k.c.fillStyle = '#ef4444';
+    k.c.fill();
+    k.c.stroke();
+    // Cıva sütunu
+    const fillH = (thermoH * (g.temp - 5)) / 40;
+    k.c.fillRect(thermoX - 3, thermoY + thermoH - fillH, 6, fillH);
+    k.c.restore();
+
+    label(k, `${g.temp} °C`, thermoX, thermoY - 12, 'center', 'bottom', 0.82);
+    label(k, `Enerji: %${Math.round(g.intensity * 100)}`, thermoX, thermoY + thermoH + 20, 'center', 'top', 0.68);
+
+    // Açıklama yazısı
+    const seasonState =
+        g.angleDeg >= 70
+            ? 'DİK AÇI → Dar Alan → Yüksek Enerji Yoğunluğu → Sıcaklık Fazla (YAZ)'
+            : g.angleDeg <= 40
+              ? 'EĞİK AÇI → Geniş Alan → Düşük Enerji Yoğunluğu → Sıcaklık Az (KIŞ)'
+              : 'ORTA AÇI → Ilıman Sıcaklık (İLKBAHAR / SONBAHAR)';
+    label(k, seasonState, r.x + r.w / 2, r.y + 10, 'center', 'top', 0.78);
+
+    k.c.restore();
+};
+
+export const lightAngleSpec: SimSpec = {
+    controls: (r, o) => {
+        const g = lightAngleGeom(r, o);
+        return [
+            {
+                id: 'src',
+                x: g.srcX,
+                y: g.srcY,
+                type: 'drag',
+                label: 'Güneş / Fener açısını ayarla',
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (id === 'src') {
+            const cx = r.x + r.w * 0.42;
+            const groundY = r.y + r.h * 0.76;
+            const dx = cx - p.x;
+            const dy = groundY - p.y;
+            if (dy <= 0) return { angle: 20 };
+            const deg = Math.round((Math.atan2(dy, dx) * 180) / Math.PI);
+            return { angle: clamp(deg, 20, 90) };
+        }
+        return {};
+    },
+    params: [
+        { key: 'angle', label: 'Geliş açısı', min: 20, max: 90, step: 1, unit: '°' },
+    ],
+};
+
+// ── Rüzgar ve Basınç Alanları (İklim ve Hava Hareketleri) ────────────
+
+function windPressureGeom(r: Rect, o: MathObject) {
+    const tempA = clampInt(simValue(o, 'tempA', 14), 5, 40, 14);
+    const tempB = clampInt(simValue(o, 'tempB', 32), 5, 40, 32);
+    const deltaT = Math.abs(tempA - tempB);
+    const pA = tempA <= tempB ? 'YAB' : 'AAB';
+    const pB = tempB < tempA ? 'YAB' : 'AAB';
+    const windSpeed = deltaT * 2.6; // km/h
+    const fromAtoB = tempA < tempB;
+    const balanced = deltaT < 2;
+
+    const midX = r.x + r.w / 2;
+    const groundY = r.y + r.h * 0.78;
+
+    return {
+        tempA,
+        tempB,
+        deltaT,
+        pA,
+        pB,
+        windSpeed,
+        fromAtoB,
+        balanced,
+        midX,
+        groundY,
+    };
+}
+
+export const windPressureRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = windPressureGeom(r, k.o);
+    const midX = g.midX;
+    const groundY = g.groundY;
+
+    // Bölge arka planları (Soğuk mavi, Sıcak turuncu)
+    k.c.save();
+    // Bölge A
+    k.c.fillStyle = withAlpha(g.tempA < 22 ? '#0284c7' : '#ea580c', 0.12);
+    k.c.fillRect(r.x, r.y, r.w / 2, groundY - r.y);
+    // Bölge B
+    k.c.fillStyle = withAlpha(g.tempB < 22 ? '#0284c7' : '#ea580c', 0.12);
+    k.c.fillRect(midX, r.y, r.w / 2, groundY - r.y);
+    k.c.restore();
+
+    // Sınır kesikli çizgi
+    k.c.save();
+    k.c.setLineDash([4, 4]);
+    k.c.strokeStyle = withAlpha(k.color, 0.3);
+    line(k, midX, r.y + 24, midX, groundY, 1);
+    k.c.restore();
+
+    // Zemin
+    line(k, r.x, groundY, r.x + r.w, groundY, Math.max(2, k.lw * 1.4));
+
+    // Bölge A ve B dikey hava hareketleri (Oklar)
+    const drawAirMotion = (cx: number, isRising: boolean) => {
+        k.c.save();
+        k.c.strokeStyle = withAlpha(isRising ? '#ef4444' : '#0284c7', 0.75);
+        k.c.lineWidth = 2.2;
+        const arrowY = groundY - r.h * 0.35;
+        if (isRising) {
+            // Yükselici hava
+            arrow(k, cx - 20, groundY - 15, cx - 20, arrowY, 7);
+            arrow(k, cx + 20, groundY - 15, cx + 20, arrowY, 7);
+        } else {
+            // Alçalıcı hava
+            arrow(k, cx - 20, arrowY, cx - 20, groundY - 15, 7);
+            arrow(k, cx + 20, arrowY, cx + 20, groundY - 15, 7);
+        }
+        k.c.restore();
+    };
+
+    const centerA = r.x + r.w * 0.25;
+    const centerB = r.x + r.w * 0.75;
+    drawAirMotion(centerA, g.tempA > g.tempB);
+    drawAirMotion(centerB, g.tempB > g.tempA);
+
+    // Bulut (Alçak Basınç alanında)
+    const drawCloud = (cx: number, cy: number) => {
+        k.c.save();
+        k.c.fillStyle = withAlpha('#94a3b8', 0.5);
+        k.c.beginPath();
+        k.c.arc(cx - 16, cy, 14, 0, Math.PI * 2);
+        k.c.arc(cx + 16, cy, 14, 0, Math.PI * 2);
+        k.c.arc(cx, cy - 10, 18, 0, Math.PI * 2);
+        k.c.fill();
+        // Yağmur damlaları
+        k.c.strokeStyle = withAlpha('#0284c7', 0.7);
+        line(k, cx - 12, cy + 18, cx - 16, cy + 26);
+        line(k, cx + 4, cy + 18, cx, cy + 26);
+        line(k, cx + 18, cy + 18, cx + 14, cy + 26);
+        k.c.restore();
+    };
+
+    if (g.tempA > g.tempB && !g.balanced) drawCloud(centerA, r.y + r.h * 0.2);
+    if (g.tempB > g.tempA && !g.balanced) drawCloud(centerB, r.y + r.h * 0.2);
+
+    // Güneş simgesi (Yüksek Basınç alanında açık hava)
+    const drawSun = (cx: number, cy: number) => {
+        k.c.save();
+        k.c.fillStyle = '#f59e0b';
+        k.c.beginPath();
+        k.c.arc(cx, cy, 13, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+    };
+    if (g.tempA < g.tempB && !g.balanced) drawSun(centerA, r.y + r.h * 0.2);
+    if (g.tempB < g.tempA && !g.balanced) drawSun(centerB, r.y + r.h * 0.2);
+
+    // Yatay Rüzgar Akımı (Zemin üzerinde YAB -> AAB yönünde)
+    if (!g.balanced) {
+        k.c.save();
+        k.c.strokeStyle = '#0284c7';
+        k.c.lineWidth = Math.min(4.5, 1.8 + g.windSpeed * 0.05);
+        const windY = groundY - 24;
+        const startX = g.fromAtoB ? r.x + r.w * 0.22 : r.x + r.w * 0.78;
+        const endX = g.fromAtoB ? r.x + r.w * 0.78 : r.x + r.w * 0.22;
+        arrow(k, startX, windY, endX, windY, 10);
+
+        // Akan rüzgar parçacıkları
+        const phase = (k.t * (30 + g.windSpeed * 2.5)) % 60;
+        const dir = g.fromAtoB ? 1 : -1;
+        k.c.fillStyle = '#38bdf8';
+        for (let i = 0; i < 6; i++) {
+            const px = startX + dir * ((phase + i * 45) % Math.abs(endX - startX));
+            k.c.beginPath();
+            k.c.arc(px, windY, 2.5, 0, Math.PI * 2);
+            k.c.fill();
+        }
+        k.c.restore();
+    }
+
+    // Başlıklar ve Etiketler
+    label(k, `A BÖLGESİ (${g.tempA} °C)`, centerA, r.y + 12, 'center', 'top', 0.85);
+    label(k, `B BÖLGESİ (${g.tempB} °C)`, centerB, r.y + 12, 'center', 'top', 0.85);
+
+    label(
+        k,
+        g.pA === 'YAB' ? 'YÜKSEK BASINÇ (YAB) · Alçalıcı Hava' : 'ALÇAK BASINÇ (AAB) · Yükselici Hava',
+        centerA,
+        groundY + 12,
+        'center',
+        'top',
+        0.75
+    );
+    label(
+        k,
+        g.pB === 'YAB' ? 'YÜKSEK BASINÇ (YAB) · Alçalıcı Hava' : 'ALÇAK BASINÇ (AAB) · Yükselici Hava',
+        centerB,
+        groundY + 12,
+        'center',
+        'top',
+        0.75
+    );
+
+    // Durum açıklaması
+    const verdict = g.balanced
+        ? 'Sıcaklıklar eşit → Basınç farkı yok → RÜZGAR ESMEZ'
+        : `Rüzgar Yönü: ${g.fromAtoB ? 'A (Soğuk/YAB) → B (Sıcak/AAB)' : 'B (Soğuk/YAB) → A (Sıcak/AAB)'} · Hız: ${Math.round(g.windSpeed)} km/h`;
+    label(k, verdict, r.x + r.w / 2, r.y + r.h - 8, 'center', 'bottom', 0.82);
+
+    k.c.restore();
+};
+
+export const windPressureSpec: SimSpec = {
+    animated: true,
+    controls: (r, o) => {
+        return [
+            {
+                id: 'swap',
+                x: r.x + r.w / 2,
+                y: r.y + 20,
+                type: 'toggle',
+                label: 'Sıcaklıkları ters çevir',
+            },
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        if (id === 'swap') {
+            const ta = simValue(o, 'tempA', 14);
+            const tb = simValue(o, 'tempB', 32);
+            return { tempA: tb, tempB: ta };
+        }
+        return {};
+    },
+    params: [
+        { key: 'tempA', label: 'A Bölgesi Sıcaklığı', min: 5, max: 40, step: 1, unit: '°C' },
+        { key: 'tempB', label: 'B Bölgesi Sıcaklığı', min: 5, max: 40, step: 1, unit: '°C' },
+    ],
+};
+
+// ── Güneş Yüksekliği ve Gölge Boyu ──────────────────────────────────
+
+function shadowGeom(r: Rect, o: MathObject) {
+    const cx = r.x + r.w * 0.38;
+    const groundY = r.y + r.h * 0.78;
+    const poleH = Math.min(r.h * 0.32, 90);
+    const angleDeg = clamp(simValue(o, 'angle', 45), 15, 90);
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const sunDist = Math.min(r.w, r.h) * 0.55;
+
+    const sunX = cx - sunDist * Math.cos(angleRad);
+    const sunY = groundY - sunDist * Math.sin(angleRad);
+
+    const shadowLen = angleDeg >= 89 ? 0 : poleH / Math.tan(angleRad);
+    const shadowCm = angleDeg >= 89 ? 0 : Math.round((100 / Math.tan(angleRad)));
+
+    return {
+        cx,
+        groundY,
+        poleH,
+        angleDeg,
+        angleRad,
+        sunX,
+        sunY,
+        shadowLen,
+        shadowCm,
+    };
+}
+
+export const shadowRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = shadowGeom(r, k.o);
+
+    // Zemin çizgisi
+    line(k, r.x, g.groundY, r.x + r.w, g.groundY, Math.max(2, k.lw * 1.4));
+
+    // Gölge (çubuğun dibinden sağa uzanan koyu şerit)
+    if (g.shadowLen > 0) {
+        k.c.save();
+        k.c.fillStyle = withAlpha('#1e293b', 0.65);
+        k.c.fillRect(g.cx, g.groundY - 2, g.shadowLen, 5);
+        k.c.restore();
+
+        // Cetvel ve ölçü etiketi
+        label(
+            k,
+            `Gölge Boyu: ${g.shadowCm} cm`,
+            g.cx + g.shadowLen / 2,
+            g.groundY + 16,
+            'center',
+            'top',
+            0.75
+        );
+    } else {
+        label(k, 'Gölge Boyu: 0 cm (Gölge Oluşmaz)', g.cx, g.groundY + 16, 'center', 'top', 0.75);
+    }
+
+    // Güneşten çubuğun tepesine uzanan ışın hattı
+    k.c.save();
+    k.c.setLineDash([4, 4]);
+    k.c.strokeStyle = withAlpha('#eab308', 0.6);
+    const poleTopY = g.groundY - g.poleH;
+    line(k, g.sunX, g.sunY, g.cx + g.shadowLen, g.groundY, 1.5);
+    k.c.restore();
+
+    // Referans Çubuk
+    k.c.save();
+    k.c.fillStyle = '#ef4444';
+    k.c.fillRect(g.cx - 3, poleTopY, 6, g.poleH);
+    k.c.strokeStyle = '#991b1b';
+    k.c.lineWidth = 1.5;
+    k.c.strokeRect(g.cx - 3, poleTopY, 6, g.poleH);
+    label(k, 'Çubuk (1 m)', g.cx - 8, g.groundY - g.poleH / 2, 'right', 'middle', 0.7);
+    k.c.restore();
+
+    // Güneş
+    k.c.save();
+    k.c.fillStyle = '#facc15';
+    k.c.beginPath();
+    k.c.arc(g.sunX, g.sunY, 16, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.strokeStyle = '#ca8a04';
+    k.c.lineWidth = 2;
+    k.c.stroke();
+    // Güneş ışınları
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+        line(
+            k,
+            g.sunX + Math.cos(a) * 19,
+            g.sunY + Math.sin(a) * 19,
+            g.sunX + Math.cos(a) * 26,
+            g.sunY + Math.sin(a) * 26,
+            1.6
+        );
+    }
+    k.c.restore();
+
+    // Yükseklik açısı yayı
+    k.c.save();
+    k.c.beginPath();
+    k.c.strokeStyle = '#f59e0b';
+    k.c.lineWidth = 1.5;
+    k.c.arc(g.cx, g.groundY, 32, Math.PI, Math.PI + g.angleRad);
+    k.c.stroke();
+    label(k, `${Math.round(g.angleDeg)}°`, g.cx - 38, g.groundY - 14, 'right', 'bottom', 0.72);
+    k.c.restore();
+
+    // Üst açıklama
+    const note =
+        g.angleDeg >= 80
+            ? 'ÖĞLE VAKTİ / YAZ MEVSİMİ → Güneş tepeye yakın (dik) → Gölge boyu en KISA'
+            : g.angleDeg <= 35
+              ? 'SABAH-AKŞAM / KIŞ MEVSİMİ → Güneş ufka yakın (eğik) → Gölge boyu en UZUN'
+              : 'Güneş yükseldikçe geliş açısı artar, gölge boyu kısalır';
+    label(k, note, r.x + r.w / 2, r.y + 10, 'center', 'top', 0.8);
+
+    k.c.restore();
+};
+
+export const shadowSpec: SimSpec = {
+    controls: (r, o) => {
+        const g = shadowGeom(r, o);
+        return [
+            {
+                id: 'sun',
+                x: g.sunX,
+                y: g.sunY,
+                type: 'drag',
+                label: 'Güneş yüksekliğini ayarla',
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (id === 'sun') {
+            const cx = r.x + r.w * 0.38;
+            const groundY = r.y + r.h * 0.78;
+            const dx = cx - p.x;
+            const dy = groundY - p.y;
+            if (dy <= 0) return { angle: 15 };
+            const deg = Math.round((Math.atan2(dy, dx) * 180) / Math.PI);
+            return { angle: clamp(deg, 15, 90) };
+        }
+        return {};
+    },
+    params: [
+        { key: 'angle', label: 'Güneş açısı', min: 15, max: 90, step: 1, unit: '°' },
+    ],
+};
+
 // ── Punnett karesi (DNA ve Genetik Kod) ──────────────────────────────
 
 /** 0 = baskın (A), 1 = çekinik (a). Cinsiyet kipinde 0 = X, 1 = Y. */
@@ -2298,6 +2816,9 @@ const electroSpec: SimSpec = {
 
 export const GRADE8_RENDERERS: Record<string, Renderer> = {
     seasons_sim: seasonsRender,
+    light_angle_sim: lightAngleRender,
+    wind_pressure_sim: windPressureRender,
+    shadow_sim: shadowRender,
     punnett_sim: punnettRender,
     liquid_pressure_sim: liquidRender,
     solid_pressure_sim: solidRender,
@@ -2312,6 +2833,9 @@ export const GRADE8_RENDERERS: Record<string, Renderer> = {
 
 export const GRADE8_SPECS: Record<string, SimSpec> = {
     seasons_sim: seasonsSpec,
+    light_angle_sim: lightAngleSpec,
+    wind_pressure_sim: windPressureSpec,
+    shadow_sim: shadowSpec,
     punnett_sim: punnettSpec,
     liquid_pressure_sim: liquidSpec,
     solid_pressure_sim: solidSpec,
@@ -2332,6 +2856,27 @@ export const GRADE8_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Dünya\u2019yı yörüngede sürükle; eksen eğikliği ve mevsim',
         size: { w: 480, h: 320 },
         defaults: { labels: true, sim: { pos: 0, play: 1 } },
+    },
+    {
+        kind: 'light_angle_sim',
+        label: 'Işığın Geliş Açısı & Birim Alan',
+        hint: 'Geliş açısını ayarla; dik ve eğik açının sıcaklığa ve alana etkisi',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { angle: 60 } },
+    },
+    {
+        kind: 'wind_pressure_sim',
+        label: 'Rüzgar ve Basınç Alanları',
+        hint: 'Sıcaklık farkı, YAB ve AAB; rüzgarın yönü ve hızı',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { tempA: 14, tempB: 32 } },
+    },
+    {
+        kind: 'shadow_sim',
+        label: 'Gölge Boyu & Güneş Açısı',
+        hint: 'Güneş yüksekliğini ayarla; öğle ve kış gölge boyu değişimi',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { angle: 45 } },
     },
     {
         kind: 'punnett_sim',

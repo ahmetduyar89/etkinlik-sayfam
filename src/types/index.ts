@@ -191,6 +191,9 @@ export type MathObjectKind =
     | 'matter_sim'
     // ── 8. sınıf üniteleri ──────────────────────────────────────────
     | 'seasons_sim'
+    | 'light_angle_sim'
+    | 'wind_pressure_sim'
+    | 'shadow_sim'
     | 'punnett_sim'
     | 'liquid_pressure_sim'
     | 'solid_pressure_sim'
