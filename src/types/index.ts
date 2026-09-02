@@ -204,11 +204,20 @@ export type MathObjectKind =
     | 'equation_sim'
     | 'area_perimeter_sim'
     | 'probability_sim'
+    | 'transform_sim'
+    | 'data_stats_sim'
+    | 'net_fold_sim'
     // ── Etkileşimli fen ─────────────────────────────────────────────
     | 'moon_phase_sim'
     | 'label_drag_sim'
     | 'heating_curve_sim'
-    | 'density_sim';
+    | 'density_sim'
+    | 'refraction_sim'
+    | 'motion_graph_sim'
+    | 'electron_config_sim'
+    | 'balance_eq_sim'
+    | 'photosynthesis_sim'
+    | 'dna_pair_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile

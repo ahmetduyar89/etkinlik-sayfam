@@ -549,6 +549,10 @@ const matterSpec: SimSpec = {
 };
 
 import { GRADE8_ITEMS, GRADE8_RENDERERS, GRADE8_SPECS } from './grade8Sims';
+import { BIO_SIM_ITEMS, BIO_SIM_RENDERERS, BIO_SIM_SPECS } from './bioSims';
+import { CHEMISTRY_SIM_ITEMS, CHEMISTRY_SIM_RENDERERS, CHEMISTRY_SIM_SPECS } from './chemistrySims';
+import { GEOMETRY_SIM_ITEMS, GEOMETRY_SIM_RENDERERS, GEOMETRY_SIM_SPECS } from './geometrySims';
+import { PHYSICS_SIM_ITEMS, PHYSICS_SIM_RENDERERS, PHYSICS_SIM_SPECS } from './physicsSims';
 import { MATH_SIM_ITEMS, MATH_SIM_RENDERERS, MATH_SIM_SPECS } from './mathSims';
 import { SCIENCE_SIM_ITEMS, SCIENCE_SIM_RENDERERS, SCIENCE_SIM_SPECS } from './scienceSims';
 
@@ -560,6 +564,10 @@ export const SIM_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
     matter_sim: matterRender,
     ...(GRADE8_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(MATH_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
+    ...(GEOMETRY_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
+    ...(PHYSICS_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
+    ...(CHEMISTRY_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
+    ...(BIO_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(SCIENCE_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
 };
 
@@ -569,6 +577,10 @@ export const SIM_SPECS: Partial<Record<MathObjectKind, SimSpec>> = {
     matter_sim: matterSpec,
     ...(GRADE8_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(MATH_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
+    ...(GEOMETRY_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
+    ...(PHYSICS_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
+    ...(CHEMISTRY_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
+    ...(BIO_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(SCIENCE_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
 };
 
@@ -600,6 +612,14 @@ export const SIM_CATEGORIES: ReadonlyArray<ObjectCategory> = [
         ],
     },
     { label: '8. Sınıf', items: GRADE8_ITEMS },
-    { label: 'Canlı Matematik', items: MATH_SIM_ITEMS },
-    { label: 'Etkileşimli Fen', items: SCIENCE_SIM_ITEMS },
+    { label: 'Canlı Matematik', items: [...MATH_SIM_ITEMS, ...GEOMETRY_SIM_ITEMS] },
+    {
+        label: 'Etkileşimli Fen',
+        items: [
+            ...SCIENCE_SIM_ITEMS,
+            ...PHYSICS_SIM_ITEMS,
+            ...CHEMISTRY_SIM_ITEMS,
+            ...BIO_SIM_ITEMS,
+        ],
+    },
 ];
