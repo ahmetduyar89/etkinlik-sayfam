@@ -954,6 +954,591 @@ export const punnettSpec: SimSpec = {
     ],
 };
 
+// ── DNA Eşlenmesi ve Hata Onarımı ────────────────────────────────────
+
+const DNA_PAIRS = [
+    { a: 'A', b: 'T' },
+    { a: 'G', b: 'C' },
+    { a: 'T', b: 'A' },
+    { a: 'C', b: 'G' },
+    { a: 'A', b: 'T' },
+];
+
+function dnaReplicationGeom(r: Rect, o: MathObject) {
+    const stage = clampInt(simValue(o, 'stage', 0), 0, 3, 0);
+    const errMode = clampInt(simValue(o, 'err', 0), 0, 3, 0);
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h * 0.52;
+    const split = stage === 0 ? 0 : stage === 1 ? 42 : stage === 2 ? 75 : 95;
+
+    return {
+        stage,
+        errMode,
+        cx,
+        cy,
+        split,
+    };
+}
+
+export const dnaReplicationRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = dnaReplicationGeom(r, k.o);
+    const { stage, errMode, cx, cy, split } = g;
+
+    // Renk tablosu
+    const baseColors: Record<string, string> = {
+        A: '#16a34a', // Yeşil
+        T: '#dc2626', // Kırmızı
+        G: '#2563eb', // Mavi
+        C: '#ca8a04', // Sarı
+    };
+
+    const rungCount = DNA_PAIRS.length;
+    const rungH = Math.min(28, (r.h * 0.55) / rungCount);
+    const startY = cy - (rungCount * rungH) / 2;
+
+    // Aşamalara göre çizim
+    for (let i = 0; i < rungCount; i++) {
+        const y = startY + i * rungH;
+        let baseA = DNA_PAIRS[i].a;
+        let baseB = DNA_PAIRS[i].b;
+
+        // Hata onarım senaryoları (3. basamakta uygula)
+        let isErrorRung = i === 2 && errMode > 0;
+        let showRepairStatus = false;
+
+        if (isErrorRung) {
+            if (errMode === 1) {
+                // Tek zincirde baz eksik
+                baseB = stage >= 2 ? '?' : baseB;
+            } else if (errMode === 2) {
+                // Yanlış eşleşme (A-C)
+                baseB = stage >= 2 ? 'C' : baseB;
+            } else if (errMode === 3) {
+                // Karşılıklı çift eksik
+                baseA = stage >= 2 ? '?' : baseA;
+                baseB = stage >= 2 ? '?' : baseB;
+            }
+            showRepairStatus = stage >= 2;
+        }
+
+        // Sol Zincir
+        const leftX = cx - split - 24;
+        k.c.save();
+        k.c.fillStyle = baseA === '?' ? withAlpha('#ef4444', 0.25) : withAlpha(baseColors[baseA] || '#64748b', 0.85);
+        k.c.fillRect(leftX - 16, y - rungH * 0.38, 32, rungH * 0.76);
+        k.c.strokeStyle = baseA === '?' ? '#ef4444' : '#334155';
+        k.c.strokeRect(leftX - 16, y - rungH * 0.38, 32, rungH * 0.76);
+        label(k, baseA, leftX, y, 'center', 'middle', 0.82);
+        k.c.restore();
+
+        // Sağ Zincir
+        const rightX = cx + split + 24;
+        k.c.save();
+        k.c.fillStyle = baseB === '?' ? withAlpha('#ef4444', 0.25) : withAlpha(baseColors[baseB] || '#64748b', 0.85);
+        k.c.fillRect(rightX - 16, y - rungH * 0.38, 32, rungH * 0.76);
+        k.c.strokeStyle = baseB === '?' ? '#ef4444' : '#334155';
+        k.c.strokeRect(rightX - 16, y - rungH * 0.38, 32, rungH * 0.76);
+        label(k, baseB, rightX, y, 'center', 'middle', 0.82);
+        k.c.restore();
+
+        // Bağlantı çizgileri (Hidrojen bağı / Replikasyon durumu)
+        if (stage === 0) {
+            // Bağlı
+            k.c.save();
+            k.c.setLineDash([3, 3]);
+            k.c.strokeStyle = withAlpha(k.color, 0.45);
+            line(k, leftX + 16, y, rightX - 16, y, 1.5);
+            k.c.restore();
+        } else if (stage >= 2) {
+            // Yeni nükleotidler karşılarına geldi
+            // Solun karşısına yeni gelen
+            const newLeftPairX = leftX + 38;
+            const pairOfA = DNA_PAIRS[i].b;
+            k.c.save();
+            k.c.fillStyle = withAlpha(baseColors[pairOfA], 0.75);
+            k.c.fillRect(newLeftPairX - 14, y - rungH * 0.35, 28, rungH * 0.7);
+            k.c.strokeRect(newLeftPairX - 14, y - rungH * 0.35, 28, rungH * 0.7);
+            label(k, pairOfA, newLeftPairX, y, 'center', 'middle', 0.78);
+            line(k, leftX + 16, y, newLeftPairX - 14, y, 1);
+            k.c.restore();
+
+            // Sağın karşısına yeni gelen
+            const newRightPairX = rightX - 38;
+            const pairOfB = baseB === '?' ? '?' : DNA_PAIRS[i].a;
+            k.c.save();
+            k.c.fillStyle = pairOfB === '?' ? withAlpha('#ef4444', 0.25) : withAlpha(baseColors[pairOfB] || '#64748b', 0.75);
+            k.c.fillRect(newRightPairX - 14, y - rungH * 0.35, 28, rungH * 0.7);
+            k.c.strokeRect(newRightPairX - 14, y - rungH * 0.35, 28, rungH * 0.7);
+            label(k, pairOfB, newRightPairX, y, 'center', 'middle', 0.78);
+            line(k, newRightPairX + 14, y, rightX - 16, y, 1);
+            k.c.restore();
+        }
+
+        // Hata durum uyarısı oku
+        if (showRepairStatus) {
+            k.c.save();
+            const statusText =
+                errMode === 1
+                    ? 'Tek zincirde baz eksik → ONARILABİLİR ✅'
+                    : errMode === 2
+                      ? 'Yanlış eşleşme (A-C) → ONARILABİLİR ✅'
+                      : 'Karşılıklı çift eksik → ONARILAMAZ (MUTASYON!) ❌';
+            const statusColor = errMode === 3 ? '#dc2626' : '#16a34a';
+            label(k, statusText, cx, y + rungH * 0.45, 'center', 'top', 0.68, statusColor);
+            k.c.restore();
+        }
+    }
+
+    // Aşama Başlığı ve Açıklama
+    const stageTitles = [
+        '1. AŞAMA: Orijinal DNA Çift Sarmalı (A=T, G≡C)',
+        '2. AŞAMA: DNA Fermuar Gibi Açılıyor (Hidrojen bağları kopar)',
+        '3. AŞAMA: Serbest Nükleotidler Çekirdeğe Girip Eşleşiyor',
+        '4. AŞAMA: Birebir Aynı 2 Yeni DNA Molekülü Oluştu (Yarı Korunumlu)',
+    ];
+    label(k, stageTitles[stage], cx, r.y + 10, 'center', 'top', 0.82);
+
+    // Alt durum çubuğu
+    const errTitles = [
+        'Mod: Hatasız Normal Eşlenme',
+        'Senaryo: Tek Zincirde Eksik Baz',
+        'Senaryo: Yanlış Baz Eşleşmesi',
+        'Senaryo: Karşılıklı Çift Eksiklik (Mutasyon)',
+    ];
+    label(k, errTitles[errMode], cx, r.y + r.h - 10, 'center', 'bottom', 0.75);
+
+    k.c.restore();
+};
+
+export const dnaReplicationSpec: SimSpec = {
+    controls: (r, o) => {
+        const stage = clampInt(simValue(o, 'stage', 0), 0, 3, 0);
+        return [
+            {
+                id: 'next',
+                x: r.x + r.w - 18,
+                y: r.y + r.h - 18,
+                type: 'toggle',
+                label: 'Sonraki aşama ▶',
+                on: stage > 0,
+            },
+            {
+                id: 'prev',
+                x: r.x + r.w - 44,
+                y: r.y + r.h - 18,
+                type: 'toggle',
+                label: '◀ Önceki aşama',
+                on: stage > 0,
+            },
+            {
+                id: 'err',
+                x: r.x + 20,
+                y: r.y + r.h - 18,
+                type: 'toggle',
+                label: 'Hata senaryosunu değiştir',
+            },
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        const stage = clampInt(simValue(o, 'stage', 0), 0, 3, 0);
+        const err = clampInt(simValue(o, 'err', 0), 0, 3, 0);
+        if (id === 'next') return { stage: (stage + 1) % 4 };
+        if (id === 'prev') return { stage: (stage - 1 + 4) % 4 };
+        if (id === 'err') return { err: (err + 1) % 4 };
+        return {};
+    },
+    params: [
+        { key: 'stage', label: 'Eşlenme Aşaması (0-3)', min: 0, max: 3, step: 1 },
+        { key: 'err', label: 'Hata Modu (0-3)', min: 0, max: 3, step: 1 },
+    ],
+};
+
+// ── Mutasyon ve Modifikasyon Laboratuvarı ─────────────────────────────
+
+function modificationGeom(r: Rect, o: MathObject) {
+    const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0); // 0: Tavşan, 1: Çuha Çiçeği
+    const ice = simValue(o, 'ice', 0) > 0.5;
+    const temp = clampInt(simValue(o, 'temp', 18), 15, 35, 18);
+    const bred = simValue(o, 'bred', 0) > 0.5; // Yavru / tohum testi yapıldı mı
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h * 0.5;
+
+    return {
+        mode,
+        ice,
+        temp,
+        bred,
+        cx,
+        cy,
+    };
+}
+
+export const modificationRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = modificationGeom(r, k.o);
+    const { mode, ice, temp, bred, cx, cy } = g;
+
+    if (mode === 0) {
+        // ── HİMALAYA TAVŞANI DENEYİ ──
+        label(k, 'DENEY 1: Himalaya Tavşanı (Modifikasyon)', cx, r.y + 10, 'center', 'top', 0.85);
+
+        const rabbitX = cx - 40;
+        const rabbitY = cy - 10;
+
+        // Tavşan gövdesi (oval)
+        k.c.save();
+        k.c.fillStyle = '#f8fafc';
+        k.c.strokeStyle = '#64748b';
+        k.c.lineWidth = 2;
+        k.c.beginPath();
+        k.c.ellipse(rabbitX, rabbitY + 15, 65, 42, 0, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+
+        // Tavşan kafası
+        k.c.beginPath();
+        k.c.arc(rabbitX + 55, rabbitY - 5, 26, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+
+        // Kulaklar (Himalaya tavşanın uçları doğaldan siyahtır)
+        k.c.fillStyle = '#1e293b';
+        k.c.beginPath();
+        k.c.ellipse(rabbitX + 60, rabbitY - 38, 8, 22, 0.2, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+
+        // Burun ucu siyah
+        k.c.beginPath();
+        k.c.arc(rabbitX + 78, rabbitY - 5, 5, 0, Math.PI * 2);
+        k.c.fill();
+
+        // Göz
+        k.c.fillStyle = '#ef4444';
+        k.c.beginPath();
+        k.c.arc(rabbitX + 66, rabbitY - 12, 3, 0, Math.PI * 2);
+        k.c.fill();
+
+        // Sırt Bölgesi (Tıraş edilen ve buz konulan alan)
+        const patchColor = ice ? '#0f172a' : '#f8fafc'; // Buz varsa siyah kıl çıkar!
+        k.c.fillStyle = patchColor;
+        k.c.beginPath();
+        k.c.ellipse(rabbitX - 10, rabbitY - 12, 28, 16, 0, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.strokeStyle = '#94a3b8';
+        k.c.setLineDash([3, 3]);
+        k.c.stroke();
+        k.c.restore();
+
+        // Buz Torbası
+        if (ice) {
+            k.c.save();
+            k.c.fillStyle = withAlpha('#38bdf8', 0.8);
+            k.c.strokeStyle = '#0284c7';
+            k.c.lineWidth = 1.8;
+            k.c.fillRect(rabbitX - 25, rabbitY - 44, 34, 24);
+            k.c.strokeRect(rabbitX - 25, rabbitY - 44, 34, 24);
+            label(k, 'BUZ', rabbitX - 8, rabbitY - 32, 'center', 'middle', 0.65, '#ffffff');
+            k.c.restore();
+        }
+
+        // Açıklama Kutusu
+        const furText = ice
+            ? 'Buz konuldu → Çıkan tüyler: SİYAH (Soğukta melanin geni aktifleşti)'
+            : 'Normal sıcaklıkta çıkan tüyler: BEYAZ';
+        label(k, furText, cx, cy + 65, 'center', 'top', 0.78);
+
+        const verdict = bred
+            ? 'Yavru Testi: Yavrular daima BEYAZ doğar → Kalıtsal DEĞİLDİR (MODİFİKASYON) ✅'
+            : 'Genin yapısı DEĞİL, çevre etkisiyle İŞLEYİŞİ değişti.';
+        label(k, verdict, cx, r.y + r.h - 12, 'center', 'bottom', 0.8, bred ? '#16a34a' : '#0284c7');
+    } else {
+        // ── ÇUHA ÇİÇEĞİ DENEYİ ──
+        label(k, 'DENEY 2: Çuha Çiçeği (Sıcaklık Modifikasyonu)', cx, r.y + 10, 'center', 'top', 0.85);
+
+        const isRed = temp <= 22;
+        const flowerColor = isRed ? '#dc2626' : '#f8fafc'; // Kırmızı / Beyaz
+
+        // Saksı
+        const potX = cx;
+        const potY = cy + 25;
+        k.c.save();
+        k.c.fillStyle = '#b45309';
+        k.c.beginPath();
+        k.c.moveTo(potX - 30, potY);
+        k.c.lineTo(potX + 30, potY);
+        k.c.lineTo(potX + 22, potY + 45);
+        k.c.lineTo(potX - 22, potY + 45);
+        k.c.closePath();
+        k.c.fill();
+        k.c.stroke();
+
+        // Sap ve yapraklar
+        k.c.strokeStyle = '#15803d';
+        k.c.lineWidth = 4;
+        line(k, potX, potY, potX, potY - 50);
+
+        // Çiçek Taç Yaprakları
+        k.c.fillStyle = flowerColor;
+        k.c.strokeStyle = '#475569';
+        k.c.lineWidth = 1.6;
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 2.5) {
+            const petX = potX + Math.cos(a) * 22;
+            const petY = potY - 50 + Math.sin(a) * 22;
+            k.c.beginPath();
+            k.c.arc(petX, petY, 14, 0, Math.PI * 2);
+            k.c.fill();
+            k.c.stroke();
+        }
+        // Çiçek göbeği
+        k.c.fillStyle = '#eab308';
+        k.c.beginPath();
+        k.c.arc(potX, potY - 50, 10, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+        k.c.restore();
+
+        // Sıcaklık ve Renk etiketi
+        label(k, `Sıcaklık: ${temp} °C → Çiçek Rengi: ${isRed ? 'KIRMIZI' : 'BEYAZ'}`, cx, cy + 85, 'center', 'top', 0.82);
+        label(
+            k,
+            '15-25°C: Kırmızı Çiçek   |   30-35°C: Beyaz Çiçek (Genin işleyişi değişir)',
+            cx,
+            r.y + r.h - 12,
+            'center',
+            'bottom',
+            0.75
+        );
+    }
+
+    k.c.restore();
+};
+
+export const modificationSpec: SimSpec = {
+    controls: (r, o) => {
+        const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0);
+        const ice = simValue(o, 'ice', 0) > 0.5;
+        const bred = simValue(o, 'bred', 0) > 0.5;
+        return [
+            {
+                id: 'toggleMode',
+                x: r.x + 24,
+                y: r.y + 20,
+                type: 'toggle',
+                label: mode === 0 ? 'Çuha Çiçeğine Geç' : 'Himalaya Tavşanına Geç',
+            },
+            ...(mode === 0
+                ? [
+                      {
+                          id: 'toggleIce',
+                          x: r.x + r.w - 24,
+                          y: r.y + 20,
+                          type: 'toggle' as const,
+                          label: ice ? 'Buz Torbasını Kaldır' : 'Sırta Buz Torbası Koy',
+                          on: ice,
+                      },
+                      {
+                          id: 'breed',
+                          x: r.x + r.w / 2,
+                          y: r.y + r.h - 32,
+                          type: 'toggle' as const,
+                          label: bred ? 'Yavru Testini Sıfırla' : 'Yavruyu Doğurt (Kalıtsal mı?)',
+                          on: bred,
+                      },
+                  ]
+                : []),
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        if (id === 'toggleMode') return { mode: simValue(o, 'mode', 0) > 0.5 ? 0 : 1 };
+        if (id === 'toggleIce') return { ice: simValue(o, 'ice', 0) > 0.5 ? 0 : 1 };
+        if (id === 'breed') return { bred: simValue(o, 'bred', 0) > 0.5 ? 0 : 1 };
+        return {};
+    },
+    params: [
+        { key: 'mode', label: 'Deney (0 Tavşan / 1 Çuha)', min: 0, max: 1, step: 1 },
+        { key: 'temp', label: 'Çiçek Sıcaklığı', min: 15, max: 35, step: 1, unit: '°C' },
+    ],
+};
+
+// ── Nükleotid Yapısı ve KeDiGeNi Hiyerarşisi ──────────────────────────
+
+function nucleotideGeom(r: Rect, o: MathObject) {
+    const baseIdx = clampInt(simValue(o, 'base', 0), 0, 3, 0);
+    const bases = ['A', 'T', 'G', 'C'];
+    const baseNames = ['Adenin', 'Timin', 'Guanin', 'Sitozin'];
+    const baseColors = ['#16a34a', '#dc2626', '#2563eb', '#ca8a04'];
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h * 0.58;
+
+    return {
+        baseIdx,
+        baseSym: bases[baseIdx],
+        baseName: baseNames[baseIdx],
+        baseColor: baseColors[baseIdx],
+        cx,
+        cy,
+    };
+}
+
+export const nucleotideRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = nucleotideGeom(r, k.o);
+    const cx = g.cx;
+    const cy = g.cy;
+
+    // ── Üst Kısım: KeDiGeNi Hiyerarşisi (Kromozom > DNA > Gen > Nükleotid) ──
+    const hieY = r.y + 22;
+    const boxW = Math.min(68, r.w * 0.18);
+    const boxH = 26;
+    const gap = 16;
+    const startX = cx - (4 * boxW + 3 * gap) / 2;
+
+    const items = [
+        { code: 'K', label: 'Kromozom' },
+        { code: 'D', label: 'DNA' },
+        { code: 'G', label: 'Gen' },
+        { code: 'N', label: 'Nükleotid' },
+    ];
+
+    items.forEach((it, i) => {
+        const bx = startX + i * (boxW + gap);
+        k.c.save();
+        k.c.fillStyle = i === 3 ? withAlpha('#6366f1', 0.25) : withAlpha('#0284c7', 0.15);
+        k.c.strokeStyle = i === 3 ? '#6366f1' : '#0284c7';
+        k.c.lineWidth = 1.5;
+        k.c.strokeRect(bx, hieY, boxW, boxH);
+        k.c.fillRect(bx, hieY, boxW, boxH);
+        label(k, `${it.code} · ${it.label}`, bx + boxW / 2, hieY + boxH / 2, 'center', 'middle', 0.68);
+        k.c.restore();
+
+        if (i < 3) {
+            label(k, '>', bx + boxW + gap / 2, hieY + boxH / 2, 'center', 'middle', 0.85);
+        }
+    });
+
+    label(k, 'Karmaşıktan Basite Sıralama (KeDiGeNi)', cx, r.y + 4, 'center', 'top', 0.72);
+
+    // ── Alt Kısım: 1 Nükleotidin 3 Temel Parçası ──
+    const nucY = cy + 5;
+
+    // 1. Fosfat (Daire P)
+    const phosX = cx - 95;
+    k.c.save();
+    k.c.fillStyle = '#f59e0b';
+    k.c.strokeStyle = '#b45309';
+    k.c.lineWidth = 2;
+    k.c.beginPath();
+    k.c.arc(phosX, nucY, 22, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+    label(k, 'P', phosX, nucY - 2, 'center', 'middle', 0.9, '#ffffff');
+    label(k, 'Fosfat', phosX, nucY + 30, 'center', 'top', 0.7);
+    k.c.restore();
+
+    // Fosfat ile Şeker Arası Bağ
+    line(k, phosX + 22, nucY, cx - 40, nucY, 2.5);
+
+    // 2. Deoksiriboz Şekeri (5-gen D)
+    const sugarX = cx - 10;
+    k.c.save();
+    k.c.fillStyle = '#38bdf8';
+    k.c.strokeStyle = '#0284c7';
+    k.c.lineWidth = 2;
+    k.c.beginPath();
+    for (let a = 0; a < 5; a++) {
+        const ang = (a * 2 * Math.PI) / 5 - Math.PI / 2;
+        const px = sugarX + Math.cos(ang) * 26;
+        const py = nucY + Math.sin(ang) * 26;
+        if (a === 0) k.c.moveTo(px, py);
+        else k.c.lineTo(px, py);
+    }
+    k.c.closePath();
+    k.c.fill();
+    k.c.stroke();
+    label(k, 'D', sugarX, nucY - 2, 'center', 'middle', 0.9, '#ffffff');
+    label(k, 'Deoksiriboz', sugarX, nucY + 30, 'center', 'top', 0.7);
+    k.c.restore();
+
+    // Şeker ile Baz Arası Bağ
+    line(k, sugarX + 26, nucY, cx + 50, nucY, 2.5);
+
+    // 3. Organik Baz (Dikdörtgen A/T/G/C)
+    const baseX = cx + 85;
+    k.c.save();
+    k.c.fillStyle = g.baseColor;
+    k.c.strokeStyle = '#334155';
+    k.c.lineWidth = 2;
+    k.c.fillRect(baseX - 30, nucY - 22, 60, 44);
+    k.c.strokeRect(baseX - 30, nucY - 22, 60, 44);
+    label(k, g.baseSym, baseX, nucY - 3, 'center', 'middle', 1.0, '#ffffff');
+    label(k, g.baseName, baseX, nucY + 30, 'center', 'top', 0.75);
+    k.c.restore();
+
+    // Alt Kural & İsimlendirme
+    label(
+        k,
+        `Bu nükleotid: "${g.baseName} Nükleotidi" (İçerdiği baza göre isimlendirilir)`,
+        cx,
+        r.y + r.h - 26,
+        'center',
+        'bottom',
+        0.82
+    );
+    label(
+        k,
+        'Kural: Toplam Nükleotid = Toplam Şeker = Toplam Fosfat = Toplam Baz (A+T+G+C)',
+        cx,
+        r.y + r.h - 8,
+        'center',
+        'bottom',
+        0.72
+    );
+
+    k.c.restore();
+};
+
+export const nucleotideSpec: SimSpec = {
+    controls: (r, o) => {
+        const cx = r.x + r.w / 2;
+        return [
+            {
+                id: 'nextBase',
+                x: cx + 85,
+                y: r.y + r.h * 0.58,
+                type: 'toggle',
+                label: 'Organik bazı değiştir (A, T, G, C)',
+            },
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        if (id === 'nextBase') {
+            const b = clampInt(simValue(o, 'base', 0), 0, 3, 0);
+            return { base: (b + 1) % 4 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'base', label: 'Baz (0:A / 1:T / 2:G / 3:C)', min: 0, max: 3, step: 1 },
+    ],
+};
+
 // ── Sıvı basıncı (Basınç) ────────────────────────────────────────────
 //
 // P = h · d · g  →  basınç yalnızca derinliğe ve sıvının yoğunluğuna bağlı.
@@ -2819,6 +3404,9 @@ export const GRADE8_RENDERERS: Record<string, Renderer> = {
     light_angle_sim: lightAngleRender,
     wind_pressure_sim: windPressureRender,
     shadow_sim: shadowRender,
+    dna_replication_sim: dnaReplicationRender,
+    modification_sim: modificationRender,
+    nucleotide_sim: nucleotideRender,
     punnett_sim: punnettRender,
     liquid_pressure_sim: liquidRender,
     solid_pressure_sim: solidRender,
@@ -2836,6 +3424,9 @@ export const GRADE8_SPECS: Record<string, SimSpec> = {
     light_angle_sim: lightAngleSpec,
     wind_pressure_sim: windPressureSpec,
     shadow_sim: shadowSpec,
+    dna_replication_sim: dnaReplicationSpec,
+    modification_sim: modificationSpec,
+    nucleotide_sim: nucleotideSpec,
     punnett_sim: punnettSpec,
     liquid_pressure_sim: liquidSpec,
     solid_pressure_sim: solidSpec,
@@ -2879,6 +3470,20 @@ export const GRADE8_ITEMS: ReadonlyArray<MathCatalogItem> = [
         defaults: { labels: true, sim: { angle: 45 } },
     },
     {
+        kind: 'nucleotide_sim',
+        label: 'Nükleotid & KeDiGeNi',
+        hint: 'Kromozom > DNA > Gen > Nükleotid ve P-D-Baz yapısı',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { base: 0 } },
+    },
+    {
+        kind: 'dna_replication_sim',
+        label: 'DNA Eşlenmesi & Hata Onarımı',
+        hint: 'Fermuar açılma, serbest nükleotidler ve mutasyon senaryoları',
+        size: { w: 480, h: 340 },
+        defaults: { labels: true, sim: { stage: 0, err: 0 } },
+    },
+    {
         kind: 'punnett_sim',
         label: 'Punnett Karesi',
         hint: 'Ebeveyn alellerini seç, oranları gör',
@@ -2889,6 +3494,13 @@ export const GRADE8_ITEMS: ReadonlyArray<MathCatalogItem> = [
             sim: { p1a: 0, p1b: 1, p2a: 0, p2b: 1, mode: 0 },
         },
         fields: [{ key: 'text', label: 'Karakter harfi', type: 'text' }],
+    },
+    {
+        kind: 'modification_sim',
+        label: 'Modifikasyon Laboratuvarı',
+        hint: 'Himalaya tavşanı buz deneyi ve çuha çiçeği sıcaklık deneyi',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { mode: 0, ice: 0, temp: 18 } },
     },
     {
         kind: 'liquid_pressure_sim',
