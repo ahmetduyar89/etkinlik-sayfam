@@ -23,8 +23,6 @@ import { CompassTool } from '../tools/CompassTool';
 import { NumberLineTool } from '../tools/NumberLineTool';
 import { MiniCalculatorTool } from '../tools/MiniCalculatorTool';
 import { PeriodicTableTool } from '../tools/PeriodicTableTool';
-import { DrawingLibraryModal } from '../drawing/DrawingLibraryModal';
-import type { LibraryItem } from '../../constants/drawing-library';
 import { SpotlightOverlay } from '../tools/SpotlightOverlay';
 import { OverlayTimer } from '../tools/OverlayTimer';
 import { PageNav } from '../tools/PageNav';
@@ -105,24 +103,6 @@ export function ActivityPreviewModal({
     const [showNumberLine, setShowNumberLine] = React.useState(false);
     const [showCalculator, setShowCalculator] = React.useState(false);
     const [showPeriodicTable, setShowPeriodicTable] = React.useState(false);
-    const [showLibraryModal, setShowLibraryModal] = React.useState(false);
-
-    const handleSelectLibraryItem = (item: LibraryItem) => {
-        if (item.actionType === 'tool') {
-            if (item.toolId === 'compass') setShowCompass(true);
-            if (item.toolId === 'numberLine') setShowNumberLine(true);
-            if (item.toolId === 'calculator') setShowCalculator(true);
-            if (item.toolId === 'periodicTable') setShowPeriodicTable(true);
-            if (item.toolId === 'ruler') setShowRuler(true);
-            if (item.toolId === 'protractor') setShowProtractor(true);
-            setShowLibraryModal(false);
-            toast.success(`${item.title} aracı açıldı.`);
-        } else {
-            toast.info(`${item.title} kütüphaneden seçildi.`);
-            setShowLibraryModal(false);
-        }
-    };
-
     const mainRef = React.useRef<HTMLElement>(null);
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const stageRef = React.useRef<HTMLDivElement>(null);
@@ -586,8 +566,6 @@ export function ActivityPreviewModal({
                                 onScreenshot={handleScreenshot}
                                 isTextBoxMode={isTextBoxMode}
                                 onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
-                                onOpenLibrary={() => setShowLibraryModal((v) => !v)}
-                                isLibraryOpen={showLibraryModal}
                                 onInsertMath={(math) =>
                                     canvasRef.current?.insertMath(
                                         math,
@@ -642,14 +620,6 @@ export function ActivityPreviewModal({
                         setShowTimer(false);
                         setTimerRunning(false);
                     }}
-                />
-            )}
-
-            {showLibraryModal && (
-                <DrawingLibraryModal
-                    isOpen={showLibraryModal}
-                    onClose={() => setShowLibraryModal(false)}
-                    onSelectTool={handleSelectLibraryItem}
                 />
             )}
 

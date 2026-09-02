@@ -11,6 +11,7 @@ import {
     clampInt,
     fitText,
     fmtNum,
+    isIconSize,
     label,
     line,
     path,
@@ -554,16 +555,289 @@ export const areaSpec: SimSpec = {
     ],
 };
 
+// ── Olasılık deneyi (Veri ve Olasılık) ───────────────────────────────
+//
+// Kilit fikir: tek tek atışlar rastgeledir, ama atış sayısı arttıkça
+// deneysel olasılık teorik olasılığa yaklaşır. Bu yüzden çubukların yanında
+// beklenen değer çizgisi durur; öğrenci yaklaşmayı gözle görür.
+
+/** 0: madeni para (2 sonuç), 1: zar (6 sonuç). */
+const PROB_FACE_LABELS = [
+    ['Yazı', 'Tura'],
+    ['1', '2', '3', '4', '5', '6'],
+];
+
+interface ProbState {
+    mode: number;
+    faces: number;
+    counts: number[];
+    total: number;
+    /** Son atışın sonucu; hiç atılmadıysa -1. */
+    last: number;
+}
+
+function probState(o: MathObject): ProbState {
+    const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0);
+    const faces = PROB_FACE_LABELS[mode].length;
+    const counts = Array.from({ length: faces }, (_, i) =>
+        Math.max(0, Math.round(simValue(o, `c${i}`, 0)))
+    );
+    return {
+        mode,
+        faces,
+        counts,
+        total: counts.reduce((a, b) => a + b, 0),
+        last: clampInt(simValue(o, 'last', -1), -1, faces - 1, -1),
+    };
+}
+
+function probGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const ctrlY = r.y + r.h * 0.96;
+    // Eksenin altında yüz adı ve yüzde satırı var; düğme başlıklarıyla
+    // çakışmasın diye taban çizgisi yazı boyuna göre yukarı çekilir.
+    const baseY = Math.min(r.y + r.h * 0.72, ctrlY - fs * 3.9);
+    return {
+        fs,
+        objX: r.x + r.w * 0.13,
+        objY: r.y + r.h * 0.42,
+        objR: Math.min(r.w * 0.09, r.h * 0.14),
+        chartX: r.x + r.w * 0.3,
+        chartW: r.w * 0.66,
+        baseY,
+        topY: r.y + r.h * 0.2,
+        ctrlY,
+    };
+}
+
+/** Zarın bir yüzündeki nokta düzeni (0 tabanlı yüz numarası). */
+const DIE_PIPS: ReadonlyArray<ReadonlyArray<[number, number]>> = [
+    [[0, 0]],
+    [
+        [-0.5, -0.5],
+        [0.5, 0.5],
+    ],
+    [
+        [-0.5, -0.5],
+        [0, 0],
+        [0.5, 0.5],
+    ],
+    [
+        [-0.5, -0.5],
+        [0.5, -0.5],
+        [-0.5, 0.5],
+        [0.5, 0.5],
+    ],
+    [
+        [-0.5, -0.5],
+        [0.5, -0.5],
+        [0, 0],
+        [-0.5, 0.5],
+        [0.5, 0.5],
+    ],
+    [
+        [-0.5, -0.5],
+        [0.5, -0.5],
+        [-0.5, 0],
+        [0.5, 0],
+        [-0.5, 0.5],
+        [0.5, 0.5],
+    ],
+];
+
+export const probabilityRender: Renderer = (k) => {
+    const r = k.r;
+    const g = probGeom(r);
+    const s = probState(k.o);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    // Simge ölçeğinde grafik okunmaz; yalnızca atılan nesne çizilir.
+    const icon = isIconSize(r);
+    const objX = icon ? r.x + r.w / 2 : g.objX;
+    const objY = icon ? r.y + r.h / 2 : g.objY;
+    const objR = icon ? Math.min(r.w, r.h) * 0.3 : g.objR;
+
+    // Atılan nesne: para ya da zar, son sonucu gösterir
+    if (s.mode === 0) {
+        k.c.beginPath();
+        k.c.arc(objX, objY, objR, 0, Math.PI * 2);
+        k.c.stroke();
+        k.c.beginPath();
+        k.c.arc(objX, objY, objR * 0.82, 0, Math.PI * 2);
+        k.c.stroke();
+        if (objR > k.fs * 0.8) {
+            label(k, s.last < 0 ? '?' : s.last === 0 ? 'Y' : 'T', objX, objY, 'center', 'middle', 1.3);
+        }
+    } else {
+        const side = objR * 1.7;
+        roundRect(k, objX - side / 2, objY - side / 2, side, side, side * 0.18);
+        k.c.stroke();
+        if (s.last < 0) {
+            if (objR > k.fs * 0.8) label(k, '?', objX, objY, 'center', 'middle', 1.3);
+        } else {
+            for (const [dx, dy] of DIE_PIPS[s.last]) {
+                k.c.beginPath();
+                k.c.arc(objX + dx * side * 0.3, objY + dy * side * 0.3, side * 0.07, 0, Math.PI * 2);
+                k.c.fill();
+            }
+        }
+    }
+
+    if (icon) {
+        k.c.restore();
+        return;
+    }
+
+    // Çubuk grafik: her sonuç için bir çubuk, beklenen değer çizgisi
+    const expected = s.total / s.faces;
+    const maxCount = Math.max(1, ...s.counts, expected * 1.4);
+    const slot = g.chartW / s.faces;
+    const barW = slot * 0.56;
+    const chartH = g.baseY - g.topY;
+    line(k, g.chartX, g.baseY, g.chartX + g.chartW, g.baseY);
+
+    s.counts.forEach((count, i) => {
+        const cx = g.chartX + slot * (i + 0.5);
+        const h = (count / maxCount) * chartH;
+        k.c.save();
+        k.c.lineWidth = k.lw;
+        k.c.strokeRect(cx - barW / 2, g.baseY - h, barW, h);
+        k.c.save();
+        k.c.globalAlpha = 0.16;
+        k.c.fillRect(cx - barW / 2, g.baseY - h, barW, h);
+        k.c.restore();
+        k.c.restore();
+        if (k.o.labels === false) return;
+        label(k, PROB_FACE_LABELS[s.mode][i], cx, g.baseY + k.fs * 0.3, 'center', 'top', 0.72);
+        // Yüzde altta, sayı çubuğun içinde: altı yüzlü zarda ikisi yan yana
+        // sığmıyor ve etiketler birbirine giriyordu.
+        const pct = s.total ? Math.round((count / s.total) * 100) : 0;
+        label(k, `%${pct}`, cx, g.baseY + k.fs * 1.25, 'center', 'top', 0.66);
+        if (h > k.fs * 1.4) label(k, String(count), cx, g.baseY - h + k.fs * 0.25, 'center', 'top', 0.7);
+        else if (count > 0) label(k, String(count), cx, g.baseY - h - k.fs * 0.2, 'center', 'bottom', 0.7);
+    });
+
+    // Teorik beklenti: her sonuç için toplam / yüz sayısı
+    if (s.total > 0) {
+        const y = g.baseY - (expected / maxCount) * chartH;
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.6);
+        k.c.setLineDash([6, 4]);
+        line(k, g.chartX, y, g.chartX + g.chartW, y, 1.4);
+        k.c.restore();
+    }
+
+    if (k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    const theoretical = 1 / s.faces;
+    label(
+        k,
+        fitText(
+            k,
+            [
+                `${s.mode === 0 ? 'Madeni para' : 'Zar'} · ${s.total} atış · teorik ${fmtNum(theoretical, 3)} · beklenen ${fmtNum(expected, 1)} (kesikli çizgi)`,
+                `${s.total} atış · teorik ${fmtNum(theoretical, 3)} · beklenen ${fmtNum(expected, 1)}`,
+                `${s.total} atış · beklenen ${fmtNum(expected, 1)}`,
+            ],
+            r.w - 6,
+            0.85,
+        ),
+        r.x + r.w / 2,
+        r.y + 1,
+        'center',
+        'top',
+        0.85,
+    );
+
+    const caps: Array<[number, string]> = [
+        [r.x + r.w * 0.16, '1 at'],
+        [r.x + r.w * 0.38, '10 at'],
+        [r.x + r.w * 0.6, 'sıfırla'],
+        [r.x + r.w * 0.84, s.mode === 0 ? 'zara geç' : 'paraya geç'],
+    ];
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.75);
+    for (const [x, text] of caps) label(k, text, x, g.ctrlY - k.fs * 0.95, 'center', 'bottom', 0.68);
+    k.c.restore();
+    k.c.restore();
+};
+
+/** `n` atış yapar ve sayaç yamasını döndürür. */
+function probRoll(s: ProbState, n: number): Record<string, number> {
+    const counts = [...s.counts];
+    let last = s.last;
+    for (let i = 0; i < n; i++) {
+        last = Math.floor(Math.random() * s.faces);
+        counts[last]++;
+    }
+    const patch: Record<string, number> = { last };
+    counts.forEach((c, i) => (patch[`c${i}`] = c));
+    return patch;
+}
+
+export const probabilitySpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const g = probGeom(r);
+        const s = probState(o);
+        return [
+            { id: 'roll1', x: r.x + r.w * 0.16, y: g.ctrlY, type: 'toggle', label: 'Bir kez at', on: false },
+            { id: 'roll10', x: r.x + r.w * 0.38, y: g.ctrlY, type: 'toggle', label: '10 kez at', on: false },
+            {
+                id: 'reset',
+                x: r.x + r.w * 0.6,
+                y: g.ctrlY,
+                type: 'toggle',
+                label: 'Sayaçları sıfırla',
+                on: s.total === 0,
+            },
+            {
+                id: 'mode',
+                x: r.x + r.w * 0.84,
+                y: g.ctrlY,
+                type: 'toggle',
+                label: s.mode === 0 ? 'Zar at' : 'Madeni para at',
+                on: s.mode === 1,
+            },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        const s = probState(o);
+        // Sayaçlar altı yüz için sıfırlanır: zardan paraya dönerken artık
+        // kullanılmayan c2..c5 geride kalmasın.
+        const clear = (): Record<string, number> => {
+            const patch: Record<string, number> = { last: -1 };
+            for (let i = 0; i < 6; i++) patch[`c${i}`] = 0;
+            return patch;
+        };
+        if (id === 'roll1') return probRoll(s, 1);
+        if (id === 'roll10') return probRoll(s, 10);
+        if (id === 'reset') return clear();
+        if (id === 'mode') return { ...clear(), mode: s.mode === 0 ? 1 : 0 };
+        return {};
+    },
+    params: [{ key: 'mode', label: 'Deney (0 para / 1 zar)', min: 0, max: 1, step: 1 }],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const MATH_SIM_RENDERERS: Record<string, Renderer> = {
     equation_sim: equationRender,
     area_perimeter_sim: areaRender,
+    probability_sim: probabilityRender,
 };
 
 export const MATH_SIM_SPECS: Record<string, SimSpec> = {
     equation_sim: equationSpec,
     area_perimeter_sim: areaSpec,
+    probability_sim: probabilitySpec,
 };
 
 /** Kütüphane panelindeki "Canlı Matematik" kategorisinin içeriği. */
@@ -581,5 +855,12 @@ export const MATH_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Köşeyi sürükle; birim karelerle alan ve çevre canlı değişsin',
         size: { w: 480, h: 340 },
         defaults: { labels: true, sim: { mode: 0, w: 6, h: 4, skew: 2 } },
+    },
+    {
+        kind: 'probability_sim',
+        label: 'Olasılık Deneyi',
+        hint: 'Para ya da zar at; deneysel olasılık teoriğe yaklaşsın',
+        size: { w: 500, h: 340 },
+        defaults: { labels: true, sim: { mode: 0, last: -1 } },
     },
 ];

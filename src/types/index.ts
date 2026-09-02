@@ -203,9 +203,12 @@ export type MathObjectKind =
     // ── Canlı matematik ─────────────────────────────────────────────
     | 'equation_sim'
     | 'area_perimeter_sim'
+    | 'probability_sim'
     // ── Etkileşimli fen ─────────────────────────────────────────────
     | 'moon_phase_sim'
-    | 'label_drag_sim';
+    | 'label_drag_sim'
+    | 'heating_curve_sim'
+    | 'density_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile

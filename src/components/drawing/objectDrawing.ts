@@ -263,6 +263,12 @@ export const roundRect = (
 };
 
 /**
+ * Nesne, panel önizlemesi gibi simge ölçeğinde mi çiziliyor?
+ * Bu boyutta eksen, etiket ve okuma sütunu okunmaz; çizimler sadeleşir.
+ */
+export const isIconSize = (r: Rect): boolean => Math.min(r.w, r.h) < 90;
+
+/**
  * Verilen genişliğe sığan ilk metni seçer (adaylar uzundan kısaya).
  * Nesne küçültüldüğünde yazı boyu tabanlı olduğundan uzun başlıklar kutudan
  * taşıyordu; kısaltma bu yüzden çizim anında yapılır.
