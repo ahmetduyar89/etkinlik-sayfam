@@ -1089,8 +1089,8 @@ export const dnaReplicationRender: Renderer = (k) => {
                     : errMode === 2
                       ? 'Yanlış eşleşme (A-C) → ONARILABİLİR ✅'
                       : 'Karşılıklı çift eksik → ONARILAMAZ (MUTASYON!) ❌';
-            const statusColor = errMode === 3 ? '#dc2626' : '#16a34a';
-            label(k, statusText, cx, y + rungH * 0.45, 'center', 'top', 0.68, statusColor);
+            k.c.fillStyle = errMode === 3 ? '#dc2626' : '#16a34a';
+            label(k, statusText, cx, y + rungH * 0.45, 'center', 'top', 0.68);
             k.c.restore();
         }
     }
@@ -1249,7 +1249,8 @@ export const modificationRender: Renderer = (k) => {
             k.c.lineWidth = 1.8;
             k.c.fillRect(rabbitX - 25, rabbitY - 44, 34, 24);
             k.c.strokeRect(rabbitX - 25, rabbitY - 44, 34, 24);
-            label(k, 'BUZ', rabbitX - 8, rabbitY - 32, 'center', 'middle', 0.65, '#ffffff');
+            k.c.fillStyle = '#ffffff';
+            label(k, 'BUZ', rabbitX - 8, rabbitY - 32, 'center', 'middle', 0.65);
             k.c.restore();
         }
 
@@ -1262,7 +1263,10 @@ export const modificationRender: Renderer = (k) => {
         const verdict = bred
             ? 'Yavru Testi: Yavrular daima BEYAZ doğar → Kalıtsal DEĞİLDİR (MODİFİKASYON) ✅'
             : 'Genin yapısı DEĞİL, çevre etkisiyle İŞLEYİŞİ değişti.';
-        label(k, verdict, cx, r.y + r.h - 12, 'center', 'bottom', 0.8, bred ? '#16a34a' : '#0284c7');
+        k.c.save();
+        k.c.fillStyle = bred ? '#16a34a' : '#0284c7';
+        label(k, verdict, cx, r.y + r.h - 12, 'center', 'bottom', 0.8);
+        k.c.restore();
     } else {
         // ── ÇUHA ÇİÇEĞİ DENEYİ ──
         label(k, 'DENEY 2: Çuha Çiçeği (Sıcaklık Modifikasyonu)', cx, r.y + 10, 'center', 'top', 0.85);
@@ -1448,7 +1452,9 @@ export const nucleotideRender: Renderer = (k) => {
     k.c.arc(phosX, nucY, 22, 0, Math.PI * 2);
     k.c.fill();
     k.c.stroke();
-    label(k, 'P', phosX, nucY - 2, 'center', 'middle', 0.9, '#ffffff');
+    k.c.fillStyle = '#ffffff';
+    label(k, 'P', phosX, nucY - 2, 'center', 'middle', 0.9);
+    k.c.fillStyle = k.color;
     label(k, 'Fosfat', phosX, nucY + 30, 'center', 'top', 0.7);
     k.c.restore();
 
@@ -1472,7 +1478,9 @@ export const nucleotideRender: Renderer = (k) => {
     k.c.closePath();
     k.c.fill();
     k.c.stroke();
-    label(k, 'D', sugarX, nucY - 2, 'center', 'middle', 0.9, '#ffffff');
+    k.c.fillStyle = '#ffffff';
+    label(k, 'D', sugarX, nucY - 2, 'center', 'middle', 0.9);
+    k.c.fillStyle = k.color;
     label(k, 'Deoksiriboz', sugarX, nucY + 30, 'center', 'top', 0.7);
     k.c.restore();
 
@@ -1487,7 +1495,9 @@ export const nucleotideRender: Renderer = (k) => {
     k.c.lineWidth = 2;
     k.c.fillRect(baseX - 30, nucY - 22, 60, 44);
     k.c.strokeRect(baseX - 30, nucY - 22, 60, 44);
-    label(k, g.baseSym, baseX, nucY - 3, 'center', 'middle', 1.0, '#ffffff');
+    k.c.fillStyle = '#ffffff';
+    label(k, g.baseSym, baseX, nucY - 3, 'center', 'middle', 1.0);
+    k.c.fillStyle = k.color;
     label(k, g.baseName, baseX, nucY + 30, 'center', 'top', 0.75);
     k.c.restore();
 
