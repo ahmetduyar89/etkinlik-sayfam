@@ -555,6 +555,7 @@ import { GEOMETRY_SIM_ITEMS, GEOMETRY_SIM_RENDERERS, GEOMETRY_SIM_SPECS } from '
 import { NUMBER_SIM_ITEMS, NUMBER_SIM_RENDERERS, NUMBER_SIM_SPECS } from './numberSims';
 import { PHYSICS_SIM_ITEMS, PHYSICS_SIM_RENDERERS, PHYSICS_SIM_SPECS } from './physicsSims';
 import { SORTING_SIM_ITEMS, SORTING_SIM_RENDERERS, SORTING_SIM_SPECS } from './sortingSim';
+import { TASK_SIM_ITEMS, TASK_SIM_RENDERERS, TASK_SIM_SPECS } from './taskSims';
 import { MATH_SIM_ITEMS, MATH_SIM_RENDERERS, MATH_SIM_SPECS } from './mathSims';
 import { SCIENCE_SIM_ITEMS, SCIENCE_SIM_RENDERERS, SCIENCE_SIM_SPECS } from './scienceSims';
 
@@ -572,6 +573,7 @@ export const SIM_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
     ...(CHEMISTRY_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(BIO_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(SORTING_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
+    ...(TASK_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(SCIENCE_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
 };
 
@@ -587,6 +589,7 @@ export const SIM_SPECS: Partial<Record<MathObjectKind, SimSpec>> = {
     ...(CHEMISTRY_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(BIO_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(SORTING_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
+    ...(TASK_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(SCIENCE_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
 };
 
@@ -630,6 +633,7 @@ export const SIM_CATEGORIES: ReadonlyArray<ObjectCategory> = [
             ...CHEMISTRY_SIM_ITEMS,
             ...BIO_SIM_ITEMS,
             ...SORTING_SIM_ITEMS,
+            ...TASK_SIM_ITEMS,
         ],
     },
 ];
