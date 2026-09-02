@@ -384,12 +384,6 @@ export function StudentPortal({ act }: StudentPortalProps) {
                             setConfig={setDrawConfig}
                             showWhiteboard={showWhiteboard}
                             setShowWhiteboard={setShowWhiteboard}
-                            onInsertMath={(math) =>
-                                canvasRef.current?.insertMath(
-                                    math,
-                                    drawConfig.color === '#ffffff' ? '#1a1b26' : drawConfig.color
-                                )
-                            }
                             canUndo={drawHistory.canUndo}
                             canRedo={drawHistory.canRedo}
                             onSelectTool={(toolId) => {

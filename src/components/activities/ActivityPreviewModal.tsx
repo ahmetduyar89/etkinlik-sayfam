@@ -566,14 +566,6 @@ export function ActivityPreviewModal({
                                 onScreenshot={handleScreenshot}
                                 isTextBoxMode={isTextBoxMode}
                                 onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
-                                onInsertMath={(math) =>
-                                    canvasRef.current?.insertMath(
-                                        math,
-                                        previewDrawConfig.color === '#ffffff'
-                                            ? '#1a1b26'
-                                            : previewDrawConfig.color
-                                    )
-                                }
                                 canUndo={drawHistory.canUndo}
                                 canRedo={drawHistory.canRedo}
                                 onSelectTool={(toolId) => {
