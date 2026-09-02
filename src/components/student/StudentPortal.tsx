@@ -11,8 +11,6 @@ import { CompassTool } from '../tools/CompassTool';
 import { NumberLineTool } from '../tools/NumberLineTool';
 import { MiniCalculatorTool } from '../tools/MiniCalculatorTool';
 import { PeriodicTableTool } from '../tools/PeriodicTableTool';
-import { DrawingLibraryModal } from '../drawing/DrawingLibraryModal';
-import type { LibraryItem } from '../../constants/drawing-library';
 import { useToast } from '../common/ToastProvider';
 import type { Activity, DrawConfig, DrawingCanvasHandle, Submission } from '../../types';
 
@@ -41,22 +39,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
     const [showNumberLine, setShowNumberLine] = useState(false);
     const [showCalculator, setShowCalculator] = useState(false);
     const [showPeriodicTable, setShowPeriodicTable] = useState(false);
-    const [showLibraryModal, setShowLibraryModal] = useState(false);
     const [drawHistory, setDrawHistory] = useState({ canUndo: false, canRedo: false });
-
-    const handleSelectLibraryItem = (item: LibraryItem) => {
-        if (item.actionType === 'tool') {
-            if (item.toolId === 'compass') setShowCompass(true);
-            if (item.toolId === 'numberLine') setShowNumberLine(true);
-            if (item.toolId === 'calculator') setShowCalculator(true);
-            if (item.toolId === 'periodicTable') setShowPeriodicTable(true);
-            setShowLibraryModal(false);
-            toast.success(`${item.title} aracı açıldı.`);
-        } else {
-            toast.info(`${item.title} kütüphaneden seçildi.`);
-            setShowLibraryModal(false);
-        }
-    };
     const [iframeHeight, setIframeHeight] = useState(1000);
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
@@ -401,8 +384,12 @@ export function StudentPortal({ act }: StudentPortalProps) {
                             setConfig={setDrawConfig}
                             showWhiteboard={showWhiteboard}
                             setShowWhiteboard={setShowWhiteboard}
-                            onOpenLibrary={() => setShowLibraryModal((v) => !v)}
-                            isLibraryOpen={showLibraryModal}
+                            onInsertMath={(math) =>
+                                canvasRef.current?.insertMath(
+                                    math,
+                                    drawConfig.color === '#ffffff' ? '#1a1b26' : drawConfig.color
+                                )
+                            }
                             canUndo={drawHistory.canUndo}
                             canRedo={drawHistory.canRedo}
                             onSelectTool={(toolId) => {
@@ -414,14 +401,6 @@ export function StudentPortal({ act }: StudentPortalProps) {
                         />
                     )}
                 </AnimatePresence>
-
-                {showLibraryModal && (
-                    <DrawingLibraryModal
-                        isOpen={showLibraryModal}
-                        onClose={() => setShowLibraryModal(false)}
-                        onSelectTool={handleSelectLibraryItem}
-                    />
-                )}
 
                 {showCompass && (
                     <CompassTool

@@ -6,6 +6,7 @@
 // değerler saklanır (MathObject.sim); animasyon evresi zamandan türetilir.
 
 import type { MathObject } from '../../types';
+import { LABEL_SETS, MAX_SLOTS, rel } from './labelSets';
 import {
     arrow,
     clamp,
@@ -13,7 +14,6 @@ import {
     fitText,
     label,
     line,
-    path,
     roundRect,
     simValue,
     withAlpha,
@@ -272,198 +272,11 @@ export const moonSpec: SimSpec = {
 
 // ── Şema etiketleme (sürükle-bırak) ──────────────────────────────────
 //
-// Tek bir nesne, üç şemayı da taşır: rozetler havuzdan çekilip şemadaki
+// Şemalar ve yuvaları labelSets.ts'te durur; burada yalnızca yerleşim,
+// çizim ve sürükleme mantığı vardır. Rozetler havuzdan çekilip şemadaki
 // çıkıntılara bırakılır, "Kontrol et" düğmesi doğruları işaretler.
 // Yerleşim renderer ile kontrol noktaları arasında ortak olmalı; bu yüzden
 // tüm konumlar tek bir yerleşim fonksiyonundan gelir.
-
-interface LabelSlot {
-    /** Şemadaki hedef nokta (çizim kutusuna göre 0..1). */
-    px: number;
-    py: number;
-    /** Rozetin oturacağı yer (şema alanına göre 0..1). */
-    lx: number;
-    ly: number;
-    text: string;
-}
-
-interface LabelSet {
-    title: string;
-    draw: (k: Ctx, b: Rect) => void;
-    slots: ReadonlyArray<LabelSlot>;
-}
-
-/** Çizim kutusuna göre 0..1 koordinatı ekran noktasına çevirir. */
-const rel = (b: Rect, x: number, y: number) => ({ x: b.x + b.w * x, y: b.y + b.h * y });
-
-function drawAnimalCell(k: Ctx, b: Rect) {
-    const cx = b.x + b.w / 2;
-    const cy = b.y + b.h / 2;
-    k.c.lineWidth = k.lw;
-    // Hücre zarı
-    k.c.beginPath();
-    k.c.ellipse(cx, cy, b.w * 0.44, b.h * 0.4, 0, 0, Math.PI * 2);
-    k.c.stroke();
-    k.c.save();
-    k.c.globalAlpha = 0.07;
-    k.c.fill();
-    k.c.restore();
-    // Çekirdek ve çekirdekçik
-    const nR = Math.min(b.w, b.h) * 0.15;
-    k.c.beginPath();
-    k.c.arc(cx - b.w * 0.04, cy, nR, 0, Math.PI * 2);
-    k.c.stroke();
-    k.c.beginPath();
-    k.c.arc(cx - b.w * 0.04, cy, nR * 0.35, 0, Math.PI * 2);
-    k.c.fill();
-    // Mitokondri
-    const mx = cx + b.w * 0.2;
-    const my = cy - b.h * 0.2;
-    k.c.save();
-    k.c.translate(mx, my);
-    k.c.rotate(-0.5);
-    k.c.beginPath();
-    k.c.ellipse(0, 0, b.w * 0.12, b.h * 0.06, 0, 0, Math.PI * 2);
-    k.c.stroke();
-    k.c.beginPath();
-    for (let i = -2; i <= 2; i++) {
-        k.c.moveTo(i * b.w * 0.04, -b.h * 0.05);
-        k.c.lineTo(i * b.w * 0.04 + b.w * 0.02, b.h * 0.05);
-    }
-    k.c.stroke();
-    k.c.restore();
-    // Ribozomlar
-    for (const [rx, ry] of [
-        [0.28, 0.62],
-        [0.34, 0.7],
-        [0.24, 0.72],
-        [0.66, 0.66],
-    ]) {
-        const p = rel(b, rx, ry);
-        k.c.beginPath();
-        k.c.arc(p.x, p.y, Math.min(b.w, b.h) * 0.018, 0, Math.PI * 2);
-        k.c.fill();
-    }
-}
-
-function drawPlantCell(k: Ctx, b: Rect) {
-    k.c.lineWidth = k.lw;
-    // Hücre çeperi ve içindeki hücre zarı
-    roundRect(k, b.x + b.w * 0.05, b.y + b.h * 0.1, b.w * 0.9, b.h * 0.8, Math.min(b.w, b.h) * 0.08);
-    k.c.stroke();
-    roundRect(k, b.x + b.w * 0.09, b.y + b.h * 0.15, b.w * 0.82, b.h * 0.7, Math.min(b.w, b.h) * 0.07);
-    k.c.stroke();
-    k.c.save();
-    k.c.globalAlpha = 0.06;
-    k.c.fill();
-    k.c.restore();
-    // Koful
-    k.c.beginPath();
-    k.c.ellipse(b.x + b.w * 0.42, b.y + b.h * 0.52, b.w * 0.2, b.h * 0.24, 0, 0, Math.PI * 2);
-    k.c.stroke();
-    // Çekirdek
-    k.c.beginPath();
-    k.c.arc(b.x + b.w * 0.72, b.y + b.h * 0.35, Math.min(b.w, b.h) * 0.11, 0, Math.PI * 2);
-    k.c.stroke();
-    // Kloroplastlar
-    for (const [rx, ry] of [
-        [0.22, 0.3],
-        [0.7, 0.68],
-        [0.28, 0.74],
-    ]) {
-        const p = rel(b, rx, ry);
-        k.c.save();
-        k.c.translate(p.x, p.y);
-        k.c.rotate(0.6);
-        k.c.beginPath();
-        k.c.ellipse(0, 0, b.w * 0.07, b.h * 0.04, 0, 0, Math.PI * 2);
-        k.c.stroke();
-        k.c.save();
-        k.c.globalAlpha = 0.25;
-        k.c.fill();
-        k.c.restore();
-        k.c.restore();
-    }
-}
-
-function drawCircuit(k: Ctx, b: Rect) {
-    const x1 = b.x + b.w * 0.14;
-    const x2 = b.x + b.w * 0.86;
-    const y1 = b.y + b.h * 0.22;
-    const y2 = b.y + b.h * 0.78;
-    k.c.lineWidth = k.lw;
-    // Tel: ampul üstte, pil altta, anahtar sağda olacak şekilde kesikli çerçeve
-    line(k, x1, y1, b.x + b.w * 0.42, y1);
-    line(k, b.x + b.w * 0.58, y1, x2, y1);
-    line(k, x1, y1, x1, y2);
-    line(k, x1, y2, b.x + b.w * 0.4, y2);
-    line(k, b.x + b.w * 0.6, y2, x2, y2);
-    line(k, x2, y1, x2, b.y + b.h * 0.42);
-    line(k, x2, b.y + b.h * 0.62, x2, y2);
-    // Ampul
-    const bx = b.x + b.w * 0.5;
-    const br = Math.min(b.w, b.h) * 0.09;
-    k.c.beginPath();
-    k.c.arc(bx, y1, br, 0, Math.PI * 2);
-    k.c.stroke();
-    line(k, bx - br * 0.7, y1 - br * 0.7, bx + br * 0.7, y1 + br * 0.7);
-    line(k, bx - br * 0.7, y1 + br * 0.7, bx + br * 0.7, y1 - br * 0.7);
-    // Pil (uzun-kısa çizgi çifti)
-    const px = b.x + b.w * 0.5;
-    const gap = b.w * 0.03;
-    line(k, px - gap, y2 - b.h * 0.09, px - gap, y2 + b.h * 0.09);
-    line(k, px + gap, y2 - b.h * 0.045, px + gap, y2 + b.h * 0.045);
-    // Anahtar (açık)
-    const sy = b.y + b.h * 0.52;
-    k.c.beginPath();
-    k.c.arc(x2, b.y + b.h * 0.42, Math.min(b.w, b.h) * 0.012, 0, Math.PI * 2);
-    k.c.fill();
-    k.c.beginPath();
-    k.c.arc(x2, b.y + b.h * 0.62, Math.min(b.w, b.h) * 0.012, 0, Math.PI * 2);
-    k.c.fill();
-    path(k, [
-        [x2, b.y + b.h * 0.42],
-        [x2 + b.w * 0.08, sy + b.h * 0.06],
-    ]);
-}
-
-const LABEL_SETS: ReadonlyArray<LabelSet> = [
-    {
-        title: 'Hayvan Hücresi',
-        draw: drawAnimalCell,
-        slots: [
-            { px: 0.7, py: 0.3, lx: 0.88, ly: 0.14, text: 'Mitokondri' },
-            { px: 0.94, py: 0.5, lx: 0.88, ly: 0.5, text: 'Hücre zarı' },
-            { px: 0.3, py: 0.35, lx: 0.12, ly: 0.14, text: 'Sitoplazma' },
-            { px: 0.46, py: 0.5, lx: 0.12, ly: 0.5, text: 'Çekirdek' },
-            { px: 0.3, py: 0.7, lx: 0.12, ly: 0.85, text: 'Ribozom' },
-        ],
-    },
-    {
-        title: 'Bitki Hücresi',
-        draw: drawPlantCell,
-        slots: [
-            { px: 0.05, py: 0.35, lx: 0.12, ly: 0.14, text: 'Hücre çeperi' },
-            { px: 0.42, py: 0.52, lx: 0.12, ly: 0.5, text: 'Koful' },
-            { px: 0.09, py: 0.72, lx: 0.12, ly: 0.85, text: 'Hücre zarı' },
-            { px: 0.72, py: 0.35, lx: 0.88, ly: 0.14, text: 'Çekirdek' },
-            { px: 0.7, py: 0.68, lx: 0.88, ly: 0.6, text: 'Kloroplast' },
-        ],
-    },
-    {
-        title: 'Basit Elektrik Devresi',
-        draw: drawCircuit,
-        slots: [
-            { px: 0.5, py: 0.22, lx: 0.12, ly: 0.14, text: 'Ampul' },
-            { px: 0.14, py: 0.5, lx: 0.12, ly: 0.5, text: 'İletken tel' },
-            { px: 0.5, py: 0.78, lx: 0.12, ly: 0.85, text: 'Pil' },
-            { px: 0.9, py: 0.52, lx: 0.88, ly: 0.45, text: 'Anahtar' },
-        ],
-    },
-];
-
-/** En çok yuvası olan şema; sıfırlama her şemayı kapsamalı. */
-const MAX_SLOTS = Math.max(...LABEL_SETS.map((set) => set.slots.length));
 
 /** Rozet ölçüsü ölçüm yapmadan kestirilir: kontroller Ctx görmez. */
 const chipSize = (text: string, fs: number) => ({
@@ -738,7 +551,13 @@ export const labelDragSpec: SimSpec = {
         return patch;
     },
     params: [
-        { key: 'mode', label: 'Şema (0-1-2)', min: 0, max: LABEL_SETS.length - 1, step: 1 },
+        {
+            key: 'mode',
+            label: `Şema (0-${LABEL_SETS.length - 1})`,
+            min: 0,
+            max: LABEL_SETS.length - 1,
+            step: 1,
+        },
         { key: 'show', label: 'Cevaplar (0/1)', min: 0, max: 1, step: 1 },
     ],
 };
@@ -767,7 +586,7 @@ export const SCIENCE_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
     {
         kind: 'label_drag_sim',
         label: 'Şema Etiketleme',
-        hint: 'Etiketleri sürükleyip bırak, kontrol et (hücre ve devre şemaları)',
+        hint: `Etiketleri sürükleyip bırak, kontrol et (${LABEL_SETS.length} şema)`,
         size: { w: 540, h: 360 },
         defaults: { labels: true, sim: { mode: 0, show: 0 } },
     },
