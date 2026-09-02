@@ -826,18 +826,231 @@ export const probabilitySpec: SimSpec = {
     params: [{ key: 'mode', label: 'Deney (0 para / 1 zar)', min: 0, max: 1, step: 1 }],
 };
 
+// ── Merkezî eğilim ve yayılım (Veri işleme) ──────────────────────────
+//
+// Kilit fikir: aynı veri kümesini üç ölçü farklı özetler. Sütunları
+// sürükleyip dağılımı değiştirince ortalama kayar, ortanca sıradaki
+// değere göre zıplar, tepe değer en yüksek sütuna geçer.
+
+/** Veri değerleri 1..6; her sütun o değerden kaç tane olduğunu tutar. */
+const DATA_BINS = 6;
+const DATA_MAX = 8;
+
+interface DataState {
+    counts: number[];
+    total: number;
+    mean: number;
+    median: number;
+    mode: number[];
+    range: number;
+}
+
+function dataState(o: MathObject): DataState {
+    const counts = Array.from({ length: DATA_BINS }, (_, i) =>
+        clampInt(simValue(o, `c${i}`, 0), 0, DATA_MAX, 0)
+    );
+    const total = counts.reduce((a, b) => a + b, 0);
+    const sum = counts.reduce((acc, c, i) => acc + c * (i + 1), 0);
+    // Ortanca sıralı listenin ortasıdır; çift sayıda veride iki ortanın
+    // ortalaması alınır.
+    const sorted: number[] = [];
+    counts.forEach((c, i) => {
+        for (let j = 0; j < c; j++) sorted.push(i + 1);
+    });
+    const mid = Math.floor(sorted.length / 2);
+    const median = sorted.length
+        ? sorted.length % 2
+            ? sorted[mid]
+            : (sorted[mid - 1] + sorted[mid]) / 2
+        : 0;
+    const top = Math.max(...counts);
+    return {
+        counts,
+        total,
+        mean: total ? sum / total : 0,
+        median,
+        mode: top > 0 ? counts.map((c, i) => (c === top ? i + 1 : 0)).filter(Boolean) : [],
+        range: sorted.length ? sorted[sorted.length - 1] - sorted[0] : 0,
+    };
+}
+
+function dataGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    // Simge ölçeğinde yazı çizilmediğinden kenar payları oransal olur.
+    const icon = isIconSize(r);
+    const baseY = icon ? r.y + r.h * 0.9 : r.y + r.h - fs * 4.4;
+    const chartX = r.x + (icon ? r.w * 0.08 : fs * 1.6);
+    const chartW = r.w - (icon ? r.w * 0.16 : fs * 3.2);
+    return {
+        fs,
+        baseY,
+        topY: r.y + (icon ? r.h * 0.12 : fs * 2.2),
+        chartX,
+        chartW,
+        slot: chartW / DATA_BINS,
+        ctrlY: r.y + r.h - 12,
+    };
+}
+
+export const dataStatsRender: Renderer = (k) => {
+    const r = k.r;
+    const g = dataGeom(r);
+    const s = dataState(k.o);
+    const icon = isIconSize(r);
+    const chartH = g.baseY - g.topY;
+    const barW = g.slot * 0.62;
+    const unit = chartH / DATA_MAX;
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    line(k, g.chartX, g.baseY, g.chartX + g.chartW, g.baseY);
+
+    s.counts.forEach((count, i) => {
+        const cx = g.chartX + g.slot * (i + 0.5);
+        const h = count * unit;
+        const isMode = s.mode.includes(i + 1);
+        k.c.save();
+        k.c.lineWidth = isMode ? Math.max(2.2, k.lw * 1.6) : k.lw;
+        k.c.strokeRect(cx - barW / 2, g.baseY - h, barW, h);
+        k.c.save();
+        k.c.globalAlpha = isMode ? 0.24 : 0.12;
+        k.c.fillRect(cx - barW / 2, g.baseY - h, barW, h);
+        k.c.restore();
+        k.c.restore();
+        if (icon || k.o.labels === false) return;
+        label(k, String(i + 1), cx, g.baseY + g.fs * 0.3, 'center', 'top', 0.72);
+        if (count > 0) label(k, String(count), cx, g.baseY - h - g.fs * 0.25, 'center', 'bottom', 0.68);
+    });
+
+    if (icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Ortalama: verinin denge noktası, eksenin altına üçgenle işaretlenir
+    if (s.total > 0) {
+        const mx = g.chartX + g.slot * (s.mean - 0.5);
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.7);
+        k.c.setLineDash([5, 4]);
+        line(k, mx, g.topY, mx, g.baseY, 1.4);
+        k.c.restore();
+        path(
+            k,
+            [
+                [mx, g.baseY + 2],
+                [mx - g.fs * 0.4, g.baseY + g.fs * 0.75],
+                [mx + g.fs * 0.4, g.baseY + g.fs * 0.75],
+            ],
+            true,
+        );
+    }
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                'Sütunları sürükle: dağılım değişince üç ölçü de değişir',
+                'Sütunları sürükle',
+            ],
+            r.w - g.fs * 4,
+            0.8,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8,
+    );
+    const stats = s.total
+        ? `N = ${s.total} · Ortalama ${fmtNum(s.mean, 2)} · Ortanca ${fmtNum(s.median, 1)} · Tepe değer ${s.mode.join(', ')} · Açıklık ${s.range}`
+        : 'Veri yok — sütunları yukarı sürükleyerek veri ekle';
+    label(
+        k,
+        fitText(
+            k,
+            [
+                stats,
+                s.total
+                    ? `N ${s.total} · Ort ${fmtNum(s.mean, 2)} · Ortanca ${fmtNum(s.median, 1)} · Tepe ${s.mode.join(', ')} · Açıklık ${s.range}`
+                    : stats,
+                s.total
+                    ? `Ort ${fmtNum(s.mean, 2)} · Ortanca ${fmtNum(s.median, 1)} · Tepe ${s.mode.join(', ')}`
+                    : stats,
+            ],
+            r.w - 8,
+            0.78,
+        ),
+        r.x + r.w / 2,
+        g.baseY + g.fs * 1.9,
+        'center',
+        'middle',
+        0.78,
+    );
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.75);
+    label(k, 'sıfırla', r.x + r.w - 34, g.ctrlY, 'right', 'middle', 0.68);
+    k.c.restore();
+    k.c.restore();
+};
+
+export const dataStatsSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const g = dataGeom(r);
+        const s = dataState(o);
+        const unit = (g.baseY - g.topY) / DATA_MAX;
+        const out: SimControl[] = s.counts.map((count, i) => ({
+            id: `bar${i}`,
+            x: g.chartX + g.slot * (i + 0.5),
+            y: g.baseY - count * unit,
+            type: 'drag' as const,
+            label: `${i + 1} değerinin sıklığı (${count})`,
+        }));
+        out.push({
+            id: 'reset',
+            x: r.x + r.w - 16,
+            y: g.ctrlY,
+            type: 'toggle',
+            label: 'Veriyi temizle',
+            on: s.total === 0,
+        });
+        return out;
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (id === 'reset') {
+            const patch: Record<string, number> = {};
+            for (let i = 0; i < DATA_BINS; i++) patch[`c${i}`] = 0;
+            return patch;
+        }
+        if (!id.startsWith('bar')) return {};
+        const g = dataGeom(r);
+        const unit = (g.baseY - g.topY) / DATA_MAX;
+        const i = Number(id.slice(3));
+        if (!Number.isInteger(i) || i < 0 || i >= DATA_BINS) return {};
+        return { [`c${i}`]: clamp(Math.round((g.baseY - p.y) / unit), 0, DATA_MAX) };
+    },
+    params: [],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const MATH_SIM_RENDERERS: Record<string, Renderer> = {
     equation_sim: equationRender,
     area_perimeter_sim: areaRender,
     probability_sim: probabilityRender,
+    data_stats_sim: dataStatsRender,
 };
 
 export const MATH_SIM_SPECS: Record<string, SimSpec> = {
     equation_sim: equationSpec,
     area_perimeter_sim: areaSpec,
     probability_sim: probabilitySpec,
+    data_stats_sim: dataStatsSpec,
 };
 
 /** Kütüphane panelindeki "Canlı Matematik" kategorisinin içeriği. */
@@ -862,5 +1075,12 @@ export const MATH_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Para ya da zar at; deneysel olasılık teoriğe yaklaşsın',
         size: { w: 500, h: 340 },
         defaults: { labels: true, sim: { mode: 0, last: -1 } },
+    },
+    {
+        kind: 'data_stats_sim',
+        label: 'Merkezî Eğilim',
+        hint: 'Sütunları sürükle; ortalama, ortanca ve tepe değer değişsin',
+        size: { w: 500, h: 340 },
+        defaults: { labels: true, sim: { c0: 1, c1: 3, c2: 5, c3: 2, c4: 4, c5: 1 } },
     },
 ];
