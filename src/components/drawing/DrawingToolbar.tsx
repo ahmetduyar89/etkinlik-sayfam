@@ -66,6 +66,7 @@ interface DrawingToolbarProps {
     onZoomIn?: () => void;
     onZoomOut?: () => void;
     onZoomReset?: () => void;
+    onSelectTool?: (toolId: string) => void;
 }
 
 const shapeTools = makeShapeTools(SolidLineIcon, DashedLineIcon);
@@ -92,6 +93,7 @@ export function DrawingToolbar({
     onZoomIn,
     onZoomOut,
     onZoomReset,
+    onSelectTool,
 }: DrawingToolbarProps) {
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const [showShapes, setShowShapes] = React.useState(false);
@@ -140,6 +142,7 @@ export function DrawingToolbar({
                     open={showMath}
                     onClose={() => setShowMath(false)}
                     onInsert={onInsertMath}
+                    onSelectTool={onSelectTool}
                 />
             )}
 

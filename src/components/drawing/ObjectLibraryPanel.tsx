@@ -19,6 +19,7 @@ interface ObjectLibraryPanelProps {
     open: boolean;
     onClose: () => void;
     onInsert: (math: MathObject) => void;
+    onSelectTool?: (toolId: string) => void;
 }
 
 /** Katalog öğesini küçük bir canvas'a çizen önizleme. */
@@ -56,7 +57,7 @@ function MathPreview({ item, color }: { item: MathCatalogItem; color: string }) 
     return <canvas ref={ref} aria-hidden="true" className="pointer-events-none" />;
 }
 
-export function ObjectLibraryPanel({ open, onClose, onInsert }: ObjectLibraryPanelProps) {
+export function ObjectLibraryPanel({ open, onClose, onInsert, onSelectTool }: ObjectLibraryPanelProps) {
     const [group, setGroup] = React.useState(0);
     const [tab, setTab] = React.useState(0);
     const [pending, setPending] = React.useState<MathCatalogItem | null>(null);
@@ -94,6 +95,16 @@ export function ObjectLibraryPanel({ open, onClose, onInsert }: ObjectLibraryPan
     }, [query]);
 
     const beginInsert = (item: MathCatalogItem) => {
+        if (item.kind.startsWith('tool_')) {
+            if (onSelectTool) {
+                if (item.kind === 'tool_compass') onSelectTool('compass');
+                else if (item.kind === 'tool_number_line') onSelectTool('numberLine');
+                else if (item.kind === 'tool_calculator') onSelectTool('calculator');
+                else if (item.kind === 'tool_periodic_table') onSelectTool('periodicTable');
+            }
+            onClose();
+            return;
+        }
         if (!item.fields?.length) {
             onInsert({ ...item.defaults, kind: item.kind });
             onClose();
@@ -242,8 +253,13 @@ export function ObjectLibraryPanel({ open, onClose, onInsert }: ObjectLibraryPan
                                             : 'border-white/10 bg-white/[0.03] hover:bg-white/10 hover:border-white/25'
                                     )}
                                 >
-                                    <span className="bg-white rounded-lg p-1 flex items-center justify-center">
+                                    <span className="bg-white rounded-lg p-1 flex items-center justify-center relative overflow-hidden">
                                         <MathPreview item={item} color="#1a1b26" />
+                                        {item.kind.startsWith('tool_') && (
+                                            <span className="absolute top-1 right-1 bg-indigo-600 text-white text-[8px] font-bold px-1 rounded shadow">
+                                                Araç
+                                            </span>
+                                        )}
                                     </span>
                                     <span className="text-[11.5px] font-semibold text-slate-200 leading-tight">
                                         {item.label}

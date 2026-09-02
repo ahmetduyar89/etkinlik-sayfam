@@ -969,6 +969,23 @@ export const SCIENCE_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
     animal_cell,
     plant_cell,
     sun_earth_moon,
+    tool_periodic_table: (k) => {
+        const { r } = k;
+        k.c.save();
+        k.c.strokeStyle = k.color;
+        k.c.lineWidth = 1.5;
+        k.c.strokeRect(r.x + 4, r.y + 4, r.w - 8, r.h - 8);
+        const cols = 4;
+        const rows = 3;
+        const cw = (r.w - 12) / cols;
+        const ch = (r.h - 12) / rows;
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                k.c.strokeRect(r.x + 6 + col * cw, r.y + 6 + row * ch, cw - 2, ch - 2);
+            }
+        }
+        k.c.restore();
+    },
 };
 
 export const SCIENCE_CATEGORIES: ReadonlyArray<ObjectCategory> = [
@@ -1138,6 +1155,13 @@ export const SCIENCE_CATEGORIES: ReadonlyArray<ObjectCategory> = [
             { kind: 'animal_cell', label: 'Hayvan Hücresi', hint: 'Temel organeller etiketli', size: { w: 400, h: 260 }, defaults: { labels: true } },
             { kind: 'plant_cell', label: 'Bitki Hücresi', hint: 'Çeper, koful, kloroplast', size: { w: 400, h: 260 }, defaults: { labels: true } },
             { kind: 'sun_earth_moon', label: 'Güneş-Dünya-Ay', hint: 'Yörüngeli konum şeması', size: { w: 400, h: 240 }, defaults: { labels: true } },
+            {
+                kind: 'tool_periodic_table',
+                label: 'Periyodik Tablo',
+                hint: 'Element arama, proton/kütle ve katman dağılımı referans kartı',
+                size: { w: 320, h: 220 },
+                defaults: {},
+            },
         ],
     },
 ];

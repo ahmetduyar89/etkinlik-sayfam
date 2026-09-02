@@ -36,6 +36,10 @@ import { CONTENT_LIMIT_BYTES, importImageFile } from '../drawing/imageStore';
 import { Curtain, Spotlight } from './LessonTools';
 import { LessonModeToolbar, type LessonOverlay } from './LessonModeToolbar';
 import { NotebookQrModal } from './NotebookQrModal';
+import { CompassTool } from '../tools/CompassTool';
+import { NumberLineTool } from '../tools/NumberLineTool';
+import { MiniCalculatorTool } from '../tools/MiniCalculatorTool';
+import { PeriodicTableTool } from '../tools/PeriodicTableTool';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
@@ -130,6 +134,17 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const [isInsertingImage, setIsInsertingImage] = React.useState(false);
     /** Küçük resim panelinde gösterilen sayfa verisi (gecikmeli tazelenir). */
     const [thumbPages, setThumbPages] = React.useState<Stroke[][]>([]);
+    const [showCompass, setShowCompass] = React.useState(false);
+    const [showNumberLine, setShowNumberLine] = React.useState(false);
+    const [showCalculator, setShowCalculator] = React.useState(false);
+    const [showPeriodicTable, setShowPeriodicTable] = React.useState(false);
+
+    const handleSelectTool = (toolId: string) => {
+        if (toolId === 'compass') setShowCompass(true);
+        else if (toolId === 'numberLine' || toolId === 'number_line') setShowNumberLine(true);
+        else if (toolId === 'calculator') setShowCalculator(true);
+        else if (toolId === 'periodicTable' || toolId === 'periodic_table') setShowPeriodicTable(true);
+    };
 
     const boxesRef = React.useRef<TextBoxData[][]>([[]]);
     boxesRef.current = boxesByPage;
@@ -797,10 +812,23 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 onZoomIn={() => canvasRef.current?.zoomBy(1.25)}
                 onZoomOut={() => canvasRef.current?.zoomBy(0.8)}
                 onZoomReset={() => canvasRef.current?.resetView()}
+                onSelectTool={handleSelectTool}
             />
             )}
 
             {showQr && <NotebookQrModal notebook={notebook} onClose={() => setShowQr(false)} />}
+
+            {showCompass && (
+                <CompassTool
+                    onClose={() => setShowCompass(false)}
+                    onDrawCircle={(_cx, _cy, r) => {
+                        toast.success(`Yarıçapı ${r}px olan çember çizildi.`);
+                    }}
+                />
+            )}
+            {showNumberLine && <NumberLineTool onClose={() => setShowNumberLine(false)} />}
+            {showCalculator && <MiniCalculatorTool onClose={() => setShowCalculator(false)} />}
+            {showPeriodicTable && <PeriodicTableTool onClose={() => setShowPeriodicTable(false)} />}
         </div>
     );
 }

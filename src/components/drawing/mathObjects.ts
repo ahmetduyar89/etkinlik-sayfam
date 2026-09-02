@@ -89,6 +89,57 @@ function drawGridAxes(
 
 /** Matematik nesnelerinin çizicileri. */
 export const MATH_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
+    tool_compass: (k) => {
+        const { r } = k;
+        const cx = r.x + r.w * 0.5;
+        const topY = r.y + r.h * 0.15;
+        const hingeR = Math.min(r.w, r.h) * 0.08;
+        const leftX = r.x + r.w * 0.25;
+        const rightX = r.x + r.w * 0.75;
+        const botY = r.y + r.h * 0.85;
+        line(k, cx, topY, leftX, botY, 2.5);
+        line(k, cx, topY, rightX, botY, 2.5);
+        ellipse(k, cx, topY, hingeR, hingeR);
+        k.c.beginPath();
+        k.c.arc(cx, botY, (rightX - leftX) * 0.5, 0, Math.PI);
+        k.c.strokeStyle = k.color;
+        k.c.lineWidth = 1.5;
+        k.c.stroke();
+    },
+
+    tool_number_line: (k) => {
+        const { r } = k;
+        const cy = r.y + r.h * 0.5;
+        const left = r.x + 8;
+        const right = r.x + r.w - 8;
+        line(k, left, cy, right, cy, 2);
+        arrowHead(k, right, cy, 0, 6);
+        arrowHead(k, left, cy, Math.PI, 6);
+        const steps = 6;
+        for (let i = 0; i <= steps; i++) {
+            const tx = left + (i * (right - left)) / steps;
+            line(k, tx, cy - 5, tx, cy + 5, 1.5);
+        }
+    },
+
+    tool_calculator: (k) => {
+        const { r } = k;
+        k.c.save();
+        k.c.strokeStyle = k.color;
+        k.c.lineWidth = 1.8;
+        k.c.strokeRect(r.x + 6, r.y + 4, r.w - 12, r.h - 8);
+        k.c.strokeRect(r.x + 10, r.y + 8, r.w - 20, (r.h - 8) * 0.22);
+        const btnTop = r.y + 12 + (r.h - 8) * 0.22;
+        const btnH = (r.y + r.h - 8 - btnTop) / 3;
+        const btnW = (r.w - 20) / 3;
+        for (let row = 0; row < 3; row++) {
+            for (let col = 0; col < 3; col++) {
+                k.c.strokeRect(r.x + 10 + col * btnW + 2, btnTop + row * btnH + 2, btnW - 4, btnH - 4);
+            }
+        }
+        k.c.restore();
+    },
+
     axes: (k) =>
         void drawGridAxes(k, {
             unitsX: clampInt(k.o.n, 1, 20, 5),
@@ -855,11 +906,25 @@ export const MATH_CATEGORIES: ReadonlyArray<ObjectCategory> = [
                 defaults: { n: 5 },
                 fields: [{ key: 'n', label: 'Halka sayısı', type: 'number', min: 2, max: 10 }],
             },
+            {
+                kind: 'tool_number_line',
+                label: 'Sayı Doğrusu Aracı',
+                hint: 'Tam sayı, kesir ve ondalık modlu işaretlenebilir sayı doğrusu',
+                size: { w: 420, h: 100 },
+                defaults: {},
+            },
         ],
     },
     {
         label: 'Geometri',
         items: [
+            {
+                kind: 'tool_compass',
+                label: 'İnteraktif Pergel',
+                hint: 'Merkez nokta ve ayarlanabilir yarıçapla çember çizimi',
+                size: { w: 260, h: 260 },
+                defaults: {},
+            },
             {
                 kind: 'angle',
                 label: 'Açı',
@@ -991,6 +1056,13 @@ export const MATH_CATEGORIES: ReadonlyArray<ObjectCategory> = [
                 hint: 'Denklem kurma modeli',
                 size: { w: 340, h: 240 },
                 defaults: { labels: true },
+            },
+            {
+                kind: 'tool_calculator',
+                label: 'Basit Hesap Makinesi',
+                hint: 'Köşeye küçültülebilen 4 işlem ve kök/yüzde hesaplayıcı',
+                size: { w: 220, h: 300 },
+                defaults: {},
             },
         ],
     },

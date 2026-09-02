@@ -145,6 +145,11 @@ export type MathObjectKind =
     | 'venn'
     | 'clock'
     | 'balance'
+    // İnteraktif araçlar
+    | 'tool_compass'
+    | 'tool_number_line'
+    | 'tool_calculator'
+    | 'tool_periodic_table'
     // ── Fen: laboratuvar ────────────────────────────────────────────
     | 'beaker'
     | 'flask'

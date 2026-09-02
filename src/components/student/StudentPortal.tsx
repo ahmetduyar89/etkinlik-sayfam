@@ -405,6 +405,12 @@ export function StudentPortal({ act }: StudentPortalProps) {
                             isLibraryOpen={showLibraryModal}
                             canUndo={drawHistory.canUndo}
                             canRedo={drawHistory.canRedo}
+                            onSelectTool={(toolId) => {
+                                if (toolId === 'compass') setShowCompass(true);
+                                else if (toolId === 'numberLine' || toolId === 'number_line') setShowNumberLine(true);
+                                else if (toolId === 'calculator') setShowCalculator(true);
+                                else if (toolId === 'periodicTable' || toolId === 'periodic_table') setShowPeriodicTable(true);
+                            }}
                         />
                     )}
                 </AnimatePresence>
