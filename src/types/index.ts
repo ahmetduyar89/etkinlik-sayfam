@@ -208,6 +208,9 @@ export type MathObjectKind =
     | 'incline_sim'
     | 'division_sim'
     | 'ph_sim'
+    | 'reaction_change_sim'
+    | 'specific_heat_sim'
+    | 'acid_base_lab_sim'
     | 'pyramid_sim'
     | 'electro_sim'
     // ── Canlı matematik ─────────────────────────────────────────────
