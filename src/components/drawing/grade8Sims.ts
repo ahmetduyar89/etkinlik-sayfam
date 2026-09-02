@@ -1857,6 +1857,560 @@ export const solidSpec: SimSpec = {
     ],
 };
 
+// ── Pascal Prensibi ve Su Cenderesi (Sıvıların Basıncı İletmesi) ─────
+
+function pascalGeom(r: Rect, o: MathObject) {
+    const f1 = clamp(simValue(o, 'f1', 100), 40, 200);
+    const ratio = clampInt(simValue(o, 'ratio', 4), 2, 5, 4); // S2 / S1
+    const pushDown = clamp(simValue(o, 'push', 35), 0, 50); // cm
+    const h1 = pushDown;
+    const h2 = h1 / ratio; // cm (yoldan kayıp)
+    const f2 = f1 * ratio; // N (kuvvetten kazanç)
+    const p = f1; // Temsili basınç birimi (Pa)
+
+    const cx = r.x + r.w / 2;
+    const groundY = r.y + r.h * 0.82;
+    const leftW = Math.min(50, r.w * 0.16);
+    const rightW = leftW * 2.2;
+    const leftX = cx - r.w * 0.28;
+    const rightX = cx + r.w * 0.2;
+
+    return {
+        f1,
+        f2,
+        ratio,
+        h1,
+        h2,
+        p,
+        cx,
+        groundY,
+        leftW,
+        rightW,
+        leftX,
+        rightX,
+    };
+}
+
+export const pascalRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = pascalGeom(r, k.o);
+    const bottomTubeY = g.groundY;
+    const tubeH = 34;
+
+    // Hidrolik Sıvı (Açık Mavi / Yağ)
+    k.c.save();
+    k.c.fillStyle = withAlpha('#0284c7', 0.28);
+    // Sol boru sıvısı
+    const leftPistonY = g.groundY - 70 + g.h1 * 0.8;
+    k.c.fillRect(g.leftX - g.leftW / 2, leftPistonY, g.leftW, g.groundY - leftPistonY);
+    // Sağ boru sıvısı
+    const rightPistonY = g.groundY - 70 - g.h2 * 0.8;
+    k.c.fillRect(g.rightX - g.rightW / 2, rightPistonY, g.rightW, g.groundY - rightPistonY);
+    // Alt bağlantı borusu
+    k.c.fillRect(g.leftX - g.leftW / 2, bottomTubeY - tubeH, (g.rightX + g.rightW / 2) - (g.leftX - g.leftW / 2), tubeH);
+    k.c.restore();
+
+    // Boru Çeperleri (Metalik gri sınırlar)
+    k.c.save();
+    k.c.strokeStyle = '#334155';
+    k.c.lineWidth = 2.5;
+    // Sol boru dış duvar
+    line(k, g.leftX - g.leftW / 2, g.groundY - 100, g.leftX - g.leftW / 2, bottomTubeY);
+    // Sol boru iç duvar
+    line(k, g.leftX + g.leftW / 2, g.groundY - 100, g.leftX + g.leftW / 2, bottomTubeY - tubeH);
+    // Taban
+    line(k, g.leftX - g.leftW / 2, bottomTubeY, g.rightX + g.rightW / 2, bottomTubeY);
+    // Ara tavan
+    line(k, g.leftX + g.leftW / 2, bottomTubeY - tubeH, g.rightX - g.rightW / 2, bottomTubeY - tubeH);
+    // Sağ boru iç duvar
+    line(k, g.rightX - g.rightW / 2, bottomTubeY - tubeH, g.rightX - g.rightW / 2, g.groundY - 100);
+    // Sağ boru dış duvar
+    line(k, g.rightX + g.rightW / 2, bottomTubeY, g.rightX + g.rightW / 2, g.groundY - 100);
+    k.c.restore();
+
+    // Sol Küçük Piston (S1)
+    k.c.save();
+    k.c.fillStyle = '#64748b';
+    k.c.fillRect(g.leftX - g.leftW / 2 + 1, leftPistonY - 8, g.leftW - 2, 8);
+    k.c.strokeRect(g.leftX - g.leftW / 2 + 1, leftPistonY - 8, g.leftW - 2, 8);
+    // Piston kolu ve kuvvet oku F1
+    line(k, g.leftX, leftPistonY - 8, g.leftX, leftPistonY - 36, 3);
+    arrow(k, g.leftX, leftPistonY - 48, g.leftX, leftPistonY - 12, 8, 2.5);
+    k.c.restore();
+    label(k, `F₁ = ${Math.round(g.f1)} N`, g.leftX, leftPistonY - 54, 'center', 'bottom', 0.78);
+    label(k, `S₁ = 1 br²`, g.leftX, leftPistonY + 12, 'center', 'top', 0.68);
+
+    // Sağ Büyük Piston (S2)
+    k.c.save();
+    k.c.fillStyle = '#64748b';
+    k.c.fillRect(g.rightX - g.rightW / 2 + 1, rightPistonY - 10, g.rightW - 2, 10);
+    k.c.strokeRect(g.rightX - g.rightW / 2 + 1, rightPistonY - 10, g.rightW - 2, 10);
+
+    // Sağ Piston Üzerindeki Ağır Yük (Araba / Kütle)
+    const carX = g.rightX;
+    const carY = rightPistonY - 26;
+    k.c.fillStyle = '#ef4444';
+    k.c.fillRect(carX - 26, carY, 52, 16);
+    k.c.beginPath();
+    k.c.arc(carX - 14, carY + 16, 5, 0, Math.PI * 2);
+    k.c.arc(carX + 14, carY + 16, 5, 0, Math.PI * 2);
+    k.c.fillStyle = '#1e293b';
+    k.c.fill();
+    // Kaldırma kuvveti oku F2
+    arrow(k, g.rightX, rightPistonY + 16, g.rightX, rightPistonY - 32, 8, 2);
+    k.c.restore();
+
+    label(k, `F₂ = ${Math.round(g.f2)} N`, g.rightX, carY - 8, 'center', 'bottom', 0.85);
+    label(k, `S₂ = ${g.ratio} br²`, g.rightX, rightPistonY + 12, 'center', 'top', 0.72);
+
+    // Sıvı İçinde Basınç Okları (Pascal İletimi)
+    k.c.save();
+    k.c.setLineDash([2, 2]);
+    k.c.strokeStyle = withAlpha('#0284c7', 0.6);
+    const midX = (g.leftX + g.rightX) / 2;
+    arrow(k, g.leftX + 15, bottomTubeY - tubeH / 2, g.rightX - 15, bottomTubeY - tubeH / 2, 6);
+    k.c.restore();
+
+    // Üst Başlık & Formül
+    label(k, 'PASCAL PRENSİBİ: Sıvılar Basıncı Aynen İletir (P₁ = P₂)', r.x + r.w / 2, r.y + 10, 'center', 'top', 0.82);
+
+    // Alt Bilgi Şeridi
+    k.c.save();
+    k.c.fillStyle = '#16a34a';
+    label(
+        k,
+        `Kuvvet Kazancı: ${g.ratio} Kat  (F₂ = F₁ × S₂/S₁)  |  İşten Kazanç Yoktur! (F₁·h₁ = F₂·h₂)`,
+        r.x + r.w / 2,
+        r.y + r.h - 22,
+        'center',
+        'bottom',
+        0.75
+    );
+    k.c.fillStyle = '#64748b';
+    label(
+        k,
+        'Kullanım Alanları: Berber koltuğu, hidrolik fren, itfaiye merdiveni, vinç',
+        r.x + r.w / 2,
+        r.y + r.h - 6,
+        'center',
+        'bottom',
+        0.68
+    );
+    k.c.restore();
+
+    k.c.restore();
+};
+
+export const pascalSpec: SimSpec = {
+    controls: (r, o) => {
+        const g = pascalGeom(r, o);
+        const leftPistonY = g.groundY - 70 + g.h1 * 0.8;
+        return [
+            {
+                id: 'piston',
+                x: g.leftX,
+                y: leftPistonY - 24,
+                type: 'drag',
+                label: 'Küçük pistona bas',
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (id === 'piston') {
+            const g = pascalGeom(r, o);
+            const raw = (p.y - (g.groundY - 70)) / 0.8;
+            return { push: clamp(raw, 0, 50) };
+        }
+        return {};
+    },
+    params: [
+        { key: 'f1', label: 'Uygulanan Kuvvet (F₁)', min: 40, max: 200, step: 10, unit: 'N' },
+        { key: 'ratio', label: 'Piston Alan Oranı (S₂/S₁)', min: 2, max: 5, step: 1 },
+        { key: 'push', label: 'Piston İtme Mesafesi (h₁)', min: 0, max: 50, step: 5, unit: 'cm' },
+    ],
+};
+
+// ── Torricelli Deneyi ve Açık Hava Basıncı (P₀) ──────────────────────
+
+function torricelliGeom(r: Rect, o: MathObject) {
+    const alt = clamp(simValue(o, 'alt', 0), 0, 2400); // Rakım (metre)
+    const tilt = clamp(simValue(o, 'tilt', 0), 0, 40); // Boru açısı (derece)
+    const balloonMode = simValue(o, 'balloon', 1) > 0.5;
+
+    // Her 120 metrede açık hava basıncı yaklaşık 1 cm-Hg düşer
+    const hHg = Math.round(76 - alt / 150); // 76 .. 60 cm-Hg
+    const tiltRad = (tilt * Math.PI) / 180;
+    const colLen = hHg / Math.cos(tiltRad); // Boru boyunca cıva uzunluğu
+
+    const cx = r.x + r.w * 0.38;
+    const groundY = r.y + r.h * 0.8;
+    const dishW = Math.min(130, r.w * 0.35);
+    const dishH = 26;
+
+    return {
+        alt,
+        tilt,
+        tiltRad,
+        balloonMode,
+        hHg,
+        colLen,
+        cx,
+        groundY,
+        dishW,
+        dishH,
+    };
+}
+
+export const torricelliRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = torricelliGeom(r, k.o);
+    const { cx, groundY, dishW, dishH, hHg, tiltRad, alt } = g;
+
+    // Cıva Çanağı (Alttaki kap)
+    k.c.save();
+    k.c.fillStyle = '#94a3b8'; // Cıva metalik gri
+    k.c.fillRect(cx - dishW / 2, groundY - dishH, dishW, dishH);
+    k.c.strokeStyle = '#334155';
+    k.c.lineWidth = 2;
+    k.c.strokeRect(cx - dishW / 2, groundY - dishH, dishW, dishH);
+    label(k, 'Cıva (d = 13.6 g/cm³)', cx, groundY + 12, 'center', 'top', 0.7);
+    k.c.restore();
+
+    // Açık Hava Basıncı Okları (P₀) Çanağın üstüne bastırır
+    k.c.save();
+    k.c.strokeStyle = '#ef4444';
+    k.c.lineWidth = 2;
+    arrow(k, cx - dishW * 0.35, groundY - dishH - 25, cx - dishW * 0.35, groundY - dishH - 3, 7);
+    arrow(k, cx + dishW * 0.35, groundY - dishH - 25, cx + dishW * 0.35, groundY - dishH - 3, 7);
+    k.c.fillStyle = '#ef4444';
+    label(k, 'P₀', cx - dishW * 0.35, groundY - dishH - 30, 'center', 'bottom', 0.75);
+    label(k, 'P₀', cx + dishW * 0.35, groundY - dishH - 30, 'center', 'bottom', 0.75);
+    k.c.restore();
+
+    // Cam Boru ve Cıva Sütunu
+    const tubeW = 14;
+    const maxTubeH = 150;
+    const pixelH = (hHg / 76) * 115; // Ekrandaki dikey yükseklik
+
+    k.c.save();
+    k.c.translate(cx, groundY - dishH);
+    k.c.rotate(tiltRad);
+
+    // Boş cam boru
+    k.c.strokeStyle = withAlpha(k.color, 0.5);
+    k.c.lineWidth = 1.5;
+    k.c.strokeRect(-tubeW / 2, -maxTubeH, tubeW, maxTubeH);
+
+    // Boru içindeki cıva
+    const tubeColLen = (pixelH / Math.cos(tiltRad));
+    k.c.fillStyle = '#64748b';
+    k.c.fillRect(-tubeW / 2 + 1, -tubeColLen, tubeW - 2, tubeColLen);
+
+    // Üst kısımdaki boşluk (Torricelli Vakumu)
+    k.c.fillStyle = '#e2e8f0';
+    label(k, 'Boşluk', 0, -maxTubeH + 14, 'center', 'middle', 0.6);
+    k.c.restore();
+
+    // Dikey Yükseklik Çizgisi (h = 76 cm)
+    k.c.save();
+    k.c.setLineDash([3, 3]);
+    k.c.strokeStyle = '#0284c7';
+    const topHgY = (groundY - dishH) - pixelH;
+    line(k, cx + 25, groundY - dishH, cx + 55, groundY - dishH, 1.2);
+    line(k, cx + 25, topHgY, cx + 55, topHgY, 1.2);
+    line(k, cx + 45, groundY - dishH, cx + 45, topHgY, 1.5);
+    k.c.fillStyle = '#0284c7';
+    label(k, `h = ${hHg} cm`, cx + 60, (groundY - dishH + topHgY) / 2, 'left', 'middle', 0.82);
+    k.c.restore();
+
+    // Sağ Taraf: Dağ Grafiği ve Esnek Balon Testi
+    const rightSideX = r.x + r.w * 0.78;
+    const mountainBaseY = groundY;
+
+    // Dağ silüeti
+    k.c.save();
+    k.c.fillStyle = withAlpha('#64748b', 0.2);
+    k.c.beginPath();
+    k.c.moveTo(rightSideX - 60, mountainBaseY);
+    k.c.lineTo(rightSideX, mountainBaseY - 110);
+    k.c.lineTo(rightSideX + 60, mountainBaseY);
+    k.c.closePath();
+    k.c.fill();
+    k.c.restore();
+
+    // Esnek Balon (Dağa çıktıkça dış basınç düştüğü için genleşir!)
+    const balloonRadius = 16 + (alt / 2400) * 16; // 16px .. 32px
+    const balloonY = mountainBaseY - (alt / 2400) * 100 - 15;
+    k.c.save();
+    k.c.fillStyle = withAlpha('#f43f5e', 0.85);
+    k.c.beginPath();
+    k.c.arc(rightSideX, balloonY, balloonRadius, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+    // Balon ipi
+    line(k, rightSideX, balloonY + balloonRadius, rightSideX, balloonY + balloonRadius + 14);
+    k.c.restore();
+
+    label(k, `Rakım: ${Math.round(alt)} m`, rightSideX, mountainBaseY + 12, 'center', 'top', 0.75);
+    label(k, alt === 0 ? 'Deniz Seviyesi (P₀ = 76 cm-Hg)' : `Dağ Zirvesi (P₀ = ${hHg} cm-Hg)`, rightSideX, balloonY - balloonRadius - 6, 'center', 'bottom', 0.72);
+
+    // Üst Başlık & Açıklama
+    label(k, 'TORRİCELLİ DENEYİ & AÇIK HAVA BASINCI', r.x + r.w / 2, r.y + 10, 'center', 'top', 0.85);
+
+    // Kritik LGS Uyarısı
+    const tip =
+        g.tilt > 0
+            ? 'Borunun eğik olması cıva yüksekliğini (h) DEĞİŞTİRMEZ! Dikey seviye sabittir.'
+            : 'Yukarı çıkıldıkça açık hava basıncı (P₀) düşer → Cıva seviyesi azalır, balon şişer!';
+    k.c.save();
+    k.c.fillStyle = g.tilt > 0 ? '#b45309' : '#0284c7';
+    label(k, tip, r.x + r.w / 2, r.y + r.h - 12, 'center', 'bottom', 0.78);
+    k.c.restore();
+
+    k.c.restore();
+};
+
+export const torricelliSpec: SimSpec = {
+    controls: (r, o) => {
+        const g = torricelliGeom(r, o);
+        return [
+            {
+                id: 'tiltTube',
+                x: g.cx + 20,
+                y: r.y + 36,
+                type: 'toggle',
+                label: g.tilt > 0 ? 'Boruyu Düzelt' : 'Boruyu Yana Eğ',
+                on: g.tilt > 0,
+            },
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        if (id === 'tiltTube') {
+            const current = simValue(o, 'tilt', 0);
+            return { tilt: current > 0 ? 0 : 25 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'alt', label: 'Rakım / Yükseklik', min: 0, max: 2400, step: 100, unit: 'm' },
+        { key: 'tilt', label: 'Boru Eğimi', min: 0, max: 40, step: 5, unit: '°' },
+    ],
+};
+
+// ── Sıvı Basıncı Paradoksu ve Bileşik Kaplar ─────────────────────────
+
+function liquidParadoxGeom(r: Rect, o: MathObject) {
+    const depth = clamp(simValue(o, 'h', 60), 20, 90); // cm
+    const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0); // 0: Paradoks, 1: Bileşik kap
+    const groundY = r.y + r.h * 0.78;
+    const cx = r.x + r.w / 2;
+
+    return {
+        depth,
+        mode,
+        groundY,
+        cx,
+    };
+}
+
+export const liquidParadoxRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = liquidParadoxGeom(r, k.o);
+    const { depth, mode, groundY, cx } = g;
+    const pixelH = (depth / 90) * (r.h * 0.42);
+
+    if (mode === 0) {
+        // ── 3 FARKLI ŞEKİLLİ KAP (SIVI BASINCI PARADOKSU) ──
+        label(k, 'SIVI BASINCI PARADOKSU: Basınç Kabın Şekline Bağlı Değildir!', cx, r.y + 10, 'center', 'top', 0.82);
+
+        const capW = 50;
+        const spacing = r.w * 0.28;
+        const xA = cx - spacing;
+        const xB = cx;
+        const xC = cx + spacing;
+
+        const drawVessel = (x: number, type: 'wide' | 'straight' | 'narrow', name: string, weightText: string) => {
+            const baseW = 44;
+            const topW = type === 'wide' ? 22 : type === 'narrow' ? 68 : 44;
+            const topY = groundY - r.h * 0.46;
+
+            // Sıvı Alanı
+            k.c.save();
+            k.c.fillStyle = withAlpha('#0284c7', 0.35);
+            k.c.beginPath();
+            const liquidTopW = baseW + (topW - baseW) * (pixelH / (r.h * 0.46));
+            k.c.moveTo(x - baseW / 2, groundY);
+            k.c.lineTo(x + baseW / 2, groundY);
+            k.c.lineTo(x + liquidTopW / 2, groundY - pixelH);
+            k.c.lineTo(x - liquidTopW / 2, groundY - pixelH);
+            k.c.closePath();
+            k.c.fill();
+
+            // Kap Çeperi
+            k.c.strokeStyle = '#334155';
+            k.c.lineWidth = 2;
+            k.c.beginPath();
+            k.c.moveTo(x - topW / 2, topY);
+            k.c.lineTo(x - baseW / 2, groundY);
+            k.c.lineTo(x + baseW / 2, groundY);
+            k.c.lineTo(x + topW / 2, topY);
+            k.c.stroke();
+            k.c.restore();
+
+            // Kap İsim ve Ağırlık Bilgisi
+            label(k, name, x, groundY + 12, 'center', 'top', 0.75);
+            label(k, weightText, x, groundY + 28, 'center', 'top', 0.68);
+
+            // Taban Basınç Göstergesi
+            k.c.save();
+            k.c.fillStyle = '#16a34a';
+            label(k, `P = ${Math.round(depth)} Pa`, x, groundY - 8, 'center', 'bottom', 0.72);
+            k.c.restore();
+        };
+
+        // Kap A (Geniş taban, dar ağız), Kap B (Düz), Kap C (Dar taban, geniş ağız)
+        drawVessel(xA, 'wide', '1. Kap (Daralan)', 'Sıvı: G₁ (Az)');
+        drawVessel(xB, 'straight', '2. Kap (Düz)', 'Sıvı: G₂ (Orta)');
+        drawVessel(xC, 'narrow', '3. Kap (Genişleyen)', 'Sıvı: G₃ (Çok)');
+
+        // Sıvı Seviyesi Kesikli Çizgisi (Tüm kaplarda eşit h)
+        k.c.save();
+        k.c.setLineDash([4, 4]);
+        k.c.strokeStyle = '#ef4444';
+        const liquidLevelY = groundY - pixelH;
+        line(k, xA - 40, liquidLevelY, xC + 40, liquidLevelY, 1.5);
+        k.c.fillStyle = '#ef4444';
+        label(k, `h = ${Math.round(depth)} cm (Eşit Yükseklik)`, cx, liquidLevelY - 8, 'center', 'bottom', 0.75);
+        k.c.restore();
+
+        // Alt Açıklama
+        k.c.save();
+        k.c.fillStyle = '#16a34a';
+        label(
+            k,
+            'Sıvı Ağırlıkları Farklı (G₃ > G₂ > G₁)  |  Taban Sıvı Basınçları EŞİTTİR: P₁ = P₂ = P₃ = h · d',
+            cx,
+            r.y + r.h - 10,
+            'center',
+            'bottom',
+            0.78
+        );
+        k.c.restore();
+    } else {
+        // ── BİLEŞİK KAPLAR (U BORUSU & FARKLI KOLLAR) ──
+        label(k, 'BİLEŞİK KAPLAR: Kollardaki Sıvı Seviyesi Daima Aynı Yatay Hizada Dengelenir', cx, r.y + 10, 'center', 'top', 0.82);
+
+        const col1X = cx - r.w * 0.26;
+        const col2X = cx;
+        const col3X = cx + r.w * 0.26;
+        const tubeH = 26;
+
+        // Sıvı Dolgusu (Alttan birbirine bağlı)
+        k.c.save();
+        k.c.fillStyle = withAlpha('#0284c7', 0.35);
+        const liquidTopY = groundY - pixelH;
+        // Kol 1 (Dar)
+        k.c.fillRect(col1X - 12, liquidTopY, 24, groundY - liquidTopY);
+        // Kol 2 (Geniş)
+        k.c.fillRect(col2X - 25, liquidTopY, 50, groundY - liquidTopY);
+        // Kol 3 (Eğik/Kıvrımlı temsili)
+        k.c.fillRect(col3X - 18, liquidTopY, 36, groundY - liquidTopY);
+        // Alt bağlantı borusu
+        k.c.fillRect(col1X - 12, groundY - tubeH, (col3X + 18) - (col1X - 12), tubeH);
+        k.c.restore();
+
+        // Çeperler
+        k.c.save();
+        k.c.strokeStyle = '#334155';
+        k.c.lineWidth = 2;
+        // Kol 1
+        line(k, col1X - 12, groundY - r.h * 0.45, col1X - 12, groundY);
+        line(k, col1X + 12, groundY - r.h * 0.45, col1X + 12, groundY - tubeH);
+        // Alt zemin
+        line(k, col1X - 12, groundY, col3X + 18, groundY);
+        // Kol 2
+        line(k, col1X + 12, groundY - tubeH, col2X - 25, groundY - tubeH);
+        line(k, col2X - 25, groundY - r.h * 0.45, col2X - 25, groundY - tubeH);
+        line(k, col2X + 25, groundY - r.h * 0.45, col2X + 25, groundY - tubeH);
+        // Kol 3
+        line(k, col2X + 25, groundY - tubeH, col3X - 18, groundY - tubeH);
+        line(k, col3X - 18, groundY - r.h * 0.45, col3X - 18, groundY - tubeH);
+        line(k, col3X + 18, groundY - r.h * 0.45, col3X + 18, groundY);
+        k.c.restore();
+
+        // Ortak Su Terazisi Çizgisi
+        k.c.save();
+        k.c.setLineDash([4, 4]);
+        k.c.strokeStyle = '#ef4444';
+        line(k, col1X - 25, liquidTopY, col3X + 30, liquidTopY, 1.5);
+        k.c.fillStyle = '#ef4444';
+        label(k, `Ortak Sıvı Denge Seviyesi (h = ${Math.round(depth)} cm)`, cx, liquidTopY - 10, 'center', 'bottom', 0.75);
+        k.c.restore();
+
+        label(k, 'Dar Kol', col1X, groundY + 12, 'center', 'top', 0.7);
+        label(k, 'Geniş Kol', col2X, groundY + 12, 'center', 'top', 0.7);
+        label(k, 'Orta Kol', col3X, groundY + 12, 'center', 'top', 0.7);
+
+        // Açıklama
+        k.c.save();
+        k.c.fillStyle = '#0284c7';
+        label(
+            k,
+            'Kolların genişliği veya şekli ne olursa olsun, açık uçlu bileşik kaplarda sıvı seviyesi eşittir.',
+            cx,
+            r.y + r.h - 10,
+            'center',
+            'bottom',
+            0.75
+        );
+        k.c.restore();
+    }
+
+    k.c.restore();
+};
+
+export const liquidParadoxSpec: SimSpec = {
+    controls: (r, o) => {
+        const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0);
+        return [
+            {
+                id: 'toggleMode',
+                x: r.x + r.w - 24,
+                y: r.y + 20,
+                type: 'toggle',
+                label: mode === 0 ? 'Bileşik Kaplara Geç' : 'Paradoks Kaplara Geç',
+                on: mode > 0,
+            },
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        if (id === 'toggleMode') {
+            const m = clampInt(simValue(o, 'mode', 0), 0, 1, 0);
+            return { mode: m > 0 ? 0 : 1 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'mode', label: 'Kip (0 Paradoks / 1 Bileşik Kaplar)', min: 0, max: 1, step: 1 },
+        { key: 'h', label: 'Sıvı Derinliği (h)', min: 20, max: 90, step: 5, unit: 'cm' },
+    ],
+};
+
 // ── Kaldıraç dengesi (Basit Makineler) ───────────────────────────────
 //
 // Denge şartı: F1 · d1 = F2 · d2
@@ -3420,6 +3974,9 @@ export const GRADE8_RENDERERS: Record<string, Renderer> = {
     punnett_sim: punnettRender,
     liquid_pressure_sim: liquidRender,
     solid_pressure_sim: solidRender,
+    pascal_sim: pascalRender,
+    torricelli_sim: torricelliRender,
+    liquid_paradox_sim: liquidParadoxRender,
     lever_sim: leverRender,
     pulley_sim: pulleyRender,
     incline_sim: inclineRender,
@@ -3440,6 +3997,9 @@ export const GRADE8_SPECS: Record<string, SimSpec> = {
     punnett_sim: punnettSpec,
     liquid_pressure_sim: liquidSpec,
     solid_pressure_sim: solidSpec,
+    pascal_sim: pascalSpec,
+    torricelli_sim: torricelliSpec,
+    liquid_paradox_sim: liquidParadoxSpec,
     lever_sim: leverSpec,
     pulley_sim: pulleySpec,
     incline_sim: inclineSpec,
@@ -3525,6 +4085,27 @@ export const GRADE8_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Yüzü değiştir, batma derinliği değişsin',
         size: { w: 420, h: 300 },
         defaults: { labels: true, sim: { face: 0, f: 60 } },
+    },
+    {
+        kind: 'pascal_sim',
+        label: 'Pascal Prensibi & Su Cenderesi',
+        hint: 'Küçük pistona bas, ağır yükü kaldır; sıvı basıncı aynen iletir',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { f1: 100, ratio: 4, push: 35 } },
+    },
+    {
+        kind: 'torricelli_sim',
+        label: 'Torricelli & Açık Hava Basıncı',
+        hint: 'Rakım ve boru eğimi; dağa çıkıldıkça P₀ düşer ve balon şişer',
+        size: { w: 480, h: 340 },
+        defaults: { labels: true, sim: { alt: 0, tilt: 0, balloon: 1 } },
+    },
+    {
+        kind: 'liquid_paradox_sim',
+        label: 'Sıvı Basıncı Paradoksu',
+        hint: 'Geniş, düz, daralan kaplar ve bileşik kaplar su dengesi',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { mode: 0, h: 60 } },
     },
     {
         kind: 'lever_sim',
