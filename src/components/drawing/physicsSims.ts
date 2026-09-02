@@ -1004,6 +1004,281 @@ export const ohmSpec: SimSpec = {
     ],
 };
 
+// ── Ses dalgası (Ses ve Özellikleri) ─────────────────────────────────
+//
+// Kilit fikir: sesin İNCELİĞİNİ frekans, ŞİDDETİNİ genlik belirler.
+// Dalga çizimi enine görünse de ses aslında boyuna bir dalgadır; bu
+// yüzden altta sıkışma-seyrelme modeli de çizilir.
+
+const soundState = (o: MathObject) => ({
+    freq: clamp(simValue(o, 'freq', 3), 1, 8),
+    amp: clamp(simValue(o, 'amp', 60), 10, 100),
+    playing: simValue(o, 'play', 0) > 0.5,
+});
+
+export const soundRender: Renderer = (k) => {
+    const r = k.r;
+    const s = soundState(k.o);
+    const icon = isIconSize(r);
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const x0 = r.x + (icon ? r.w * 0.06 : fs * 4);
+    const x1 = r.x + r.w - (icon ? r.w * 0.06 : fs);
+    const waveY = r.y + (icon ? r.h * 0.32 : fs * 4.6);
+    const waveH = (icon ? r.h * 0.22 : fs * 3.4) * (s.amp / 100);
+    const phase = s.playing ? k.t * 2.2 : 0;
+    const waves = s.freq;
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    // Ses kaynağı: hoparlör
+    if (!icon) {
+        const sx = r.x + fs * 1.2;
+        path(k, [
+            [sx, waveY - fs * 0.8],
+            [sx, waveY + fs * 0.8],
+            [sx + fs * 1.2, waveY + fs * 1.6],
+            [sx + fs * 1.2, waveY - fs * 1.6],
+        ], true);
+    }
+
+    // Enine dalga çizimi
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.3);
+    line(k, x0, waveY, x1, waveY, 1);
+    k.c.restore();
+    const pts: Array<[number, number]> = [];
+    for (let i = 0; i <= 120; i++) {
+        const t = i / 120;
+        pts.push([x0 + (x1 - x0) * t, waveY - Math.sin(t * waves * Math.PI * 2 - phase) * waveH]);
+    }
+    k.c.lineWidth = Math.max(1.8, k.lw);
+    path(k, pts, false);
+
+    // Boyuna model: sıkışma ve seyrelmeler
+    const partY = r.y + (icon ? r.h * 0.78 : r.h - fs * 3.4);
+    const count = 90;
+    for (let i = 0; i < count; i++) {
+        const t = i / count;
+        const shift = Math.sin(t * waves * Math.PI * 2 - phase) * ((x1 - x0) / count) * 2.4;
+        k.c.beginPath();
+        k.c.arc(x0 + (x1 - x0) * t + shift, partY, Math.max(1.2, fs * 0.1), 0, Math.PI * 2);
+        k.c.fill();
+    }
+
+    if (icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Dalga boyu ve genlik ölçüleri
+    const lambda = (x1 - x0) / waves;
+    const lx = x0 + lambda * 0.25;
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.6);
+    arrow(k, lx, waveY - waveH - fs * 0.9, lx + lambda, waveY - waveH - fs * 0.9, fs * 0.4, 1.2);
+    arrow(k, lx + lambda, waveY - waveH - fs * 0.9, lx, waveY - waveH - fs * 0.9, fs * 0.4, 1.2);
+    k.c.restore();
+    label(k, 'dalga boyu', lx + lambda / 2, waveY - waveH - fs * 1.2, 'center', 'bottom', 0.6);
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.6);
+    arrow(k, x0 + lambda * 0.25, waveY, x0 + lambda * 0.25, waveY - waveH, fs * 0.4, 1.2);
+    k.c.restore();
+    label(k, 'genlik', x0 + lambda * 0.25 + fs * 0.3, waveY - waveH / 2, 'left', 'middle', 0.6);
+    label(k, 'sıkışma – seyrelme', (x0 + x1) / 2, partY + fs * 0.9, 'center', 'top', 0.62);
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                `Frekans ${fmtNum(s.freq, 0)} birim → ${s.freq >= 5 ? 'ince (tiz)' : s.freq <= 2 ? 'kalın (pes)' : 'orta'} ses`,
+                `Frekans ${fmtNum(s.freq, 0)}`,
+            ],
+            r.w - fs * 4,
+            0.82,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.82,
+    );
+    label(
+        k,
+        fitText(
+            k,
+            [
+                `Genlik ${fmtNum(s.amp, 0)} → ${s.amp >= 70 ? 'şiddetli' : s.amp <= 30 ? 'zayıf' : 'orta şiddette'} ses · frekans inceliği, genlik şiddeti belirler`,
+                `Genlik ${fmtNum(s.amp, 0)} → ${s.amp >= 70 ? 'şiddetli' : s.amp <= 30 ? 'zayıf' : 'orta şiddette'} ses`,
+            ],
+            r.w - 8,
+            0.7,
+        ),
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.7,
+    );
+    k.c.restore();
+};
+
+export const soundSpec: SimSpec = {
+    animated: (o) => simValue(o, 'play', 0) > 0.5,
+    controls: (r, o): SimControl[] => [
+        {
+            id: 'play',
+            x: r.x + r.w - 14,
+            y: r.y + 14,
+            type: 'toggle',
+            label: soundState(o).playing ? 'Dalgayı durdur' : 'Dalgayı hareket ettir',
+            on: soundState(o).playing,
+        },
+    ],
+    onControl: (_r, o, id): Record<string, number> =>
+        id === 'play' ? { play: soundState(o).playing ? 0 : 1 } : {},
+    params: [
+        { key: 'freq', label: 'Frekans', min: 1, max: 8, step: 1 },
+        { key: 'amp', label: 'Genlik', min: 10, max: 100, step: 5 },
+        { key: 'play', label: 'Oynat (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
+// ── Gaz basıncı (Basınç) ─────────────────────────────────────────────
+//
+// Kilit fikir: kapalı kapta gaz taneciklerinin sayısı değişmez. Hacim
+// küçülünce tanecikler duvara daha sık çarpar, basınç artar: P · V sabit.
+
+/** Sabit sıcaklıkta P · V çarpımı (birim). */
+const GAS_CONST = 600;
+
+const gasState = (o: MathObject) => {
+    const v = clamp(simValue(o, 'v', 60), 20, 100);
+    return { v, p: GAS_CONST / v };
+};
+
+function gasGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const tube = {
+        x: r.x + (icon ? r.w * 0.06 : fs),
+        y: r.y + (icon ? r.h * 0.24 : fs * 3.6),
+        w: r.w * (icon ? 0.88 : 0.62),
+        h: r.h - (icon ? r.h * 0.48 : fs * 6.4),
+    };
+    return { fs, icon, tube };
+}
+
+export const gasRender: Renderer = (k) => {
+    const r = k.r;
+    const s = gasState(k.o);
+    const g = gasGeom(r);
+    const t = g.tube;
+    const gasW = t.w * (s.v / 100);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = Math.max(1.6, k.lw);
+
+    // Silindir: sağ ucu açık, pistonla kapanır
+    line(k, t.x, t.y, t.x + t.w, t.y);
+    line(k, t.x, t.y + t.h, t.x + t.w, t.y + t.h);
+    line(k, t.x, t.y, t.x, t.y + t.h);
+
+    // Gaz tanecikleri: sayı sabit, hacim küçülünce sıklaşır
+    const count = 26;
+    const scatter = (n: number) => Math.abs(Math.sin(n * 127.1) * 43758.5453) % 1;
+    for (let i = 0; i < count; i++) {
+        const px = t.x + gasW * (0.04 + scatter(i + 1) * 0.92);
+        const py = t.y + t.h * (0.08 + scatter(i + 51) * 0.84);
+        k.c.beginPath();
+        k.c.arc(px, py, Math.max(1.6, g.fs * 0.16), 0, Math.PI * 2);
+        k.c.fill();
+    }
+
+    // Piston
+    const px = t.x + gasW;
+    k.c.save();
+    k.c.globalAlpha = 0.18;
+    k.c.fillRect(px, t.y, g.fs * 0.7, t.h);
+    k.c.restore();
+    k.c.strokeRect(px, t.y, g.fs * 0.7, t.h);
+    // Piston kolu silindirin ucunda biter; göstergenin üstüne binmesin.
+    line(k, px + g.fs * 0.7, t.y + t.h / 2, t.x + t.w, t.y + t.h / 2);
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Basınç göstergesi
+    const gx = t.x + t.w + r.w * 0.1;
+    const gy = t.y + t.h * 0.5;
+    const grad = Math.min(r.w * 0.11, t.h * 0.42);
+    k.c.beginPath();
+    k.c.arc(gx, gy, grad, Math.PI, Math.PI * 2);
+    k.c.stroke();
+    line(k, gx - grad, gy, gx + grad, gy, 1);
+    // İbre: basınç 6–30 aralığında
+    const frac = clamp((s.p - 6) / 24, 0, 1);
+    const ang = Math.PI + frac * Math.PI;
+    line(k, gx, gy, gx + grad * 0.85 * Math.cos(ang), gy + grad * 0.85 * Math.sin(ang), Math.max(1.6, k.lw));
+    label(k, `${fmtNum(s.p, 1)}`, gx, gy + g.fs * 0.8, 'center', 'top', 0.8);
+    label(k, 'basınç', gx, gy + g.fs * 2, 'center', 'top', 0.62);
+
+    label(
+        k,
+        fitText(
+            k,
+            ['Pistonu it: hacim küçülünce çarpışma sıklaşır', 'Pistonu sürükle'],
+            r.w - g.fs * 4,
+            0.82,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.82,
+    );
+    label(
+        k,
+        `Hacim ${fmtNum(s.v, 0)} birim · basınç ${fmtNum(s.p, 1)} birim · P · V = ${fmtNum(s.p * s.v, 0)} (sabit)`,
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.78,
+    );
+    k.c.restore();
+};
+
+export const gasSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = gasState(o);
+        const g = gasGeom(r);
+        return [
+            {
+                id: 'piston',
+                x: g.tube.x + g.tube.w * (s.v / 100) + g.fs * 0.35,
+                y: g.tube.y + g.tube.h / 2,
+                type: 'drag',
+                label: 'Pistonu sürükle',
+            },
+        ];
+    },
+    onControl: (r, o, _id, p): Record<string, number> => {
+        const g = gasGeom(r);
+        return { v: clamp(((p.x - g.tube.x) / g.tube.w) * 100, 20, 100) };
+    },
+    params: [{ key: 'v', label: 'Hacim', min: 20, max: 100, step: 5, unit: 'birim' }],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const PHYSICS_SIM_RENDERERS: Record<string, Renderer> = {
@@ -1012,6 +1287,8 @@ export const PHYSICS_SIM_RENDERERS: Record<string, Renderer> = {
     net_force_sim: netForceRender,
     energy_sim: energyRender,
     ohm_sim: ohmRender,
+    sound_wave_sim: soundRender,
+    gas_pressure_sim: gasRender,
 };
 
 export const PHYSICS_SIM_SPECS: Record<string, SimSpec> = {
@@ -1020,6 +1297,8 @@ export const PHYSICS_SIM_SPECS: Record<string, SimSpec> = {
     net_force_sim: netForceSpec,
     energy_sim: energySpec,
     ohm_sim: ohmSpec,
+    sound_wave_sim: soundSpec,
+    gas_pressure_sim: gasSpec,
 };
 
 export const PHYSICS_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -1057,5 +1336,19 @@ export const PHYSICS_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Gerilimi değiştir; akım ve grafiğin eğimi ilişkisini gör',
         size: { w: 540, h: 340 },
         defaults: { labels: true, sim: { v: 6, r: 3 } },
+    },
+    {
+        kind: 'sound_wave_sim',
+        label: 'Ses Dalgası',
+        hint: 'Frekans ve genliği değiştir; incelik ile şiddeti ayır',
+        size: { w: 540, h: 320 },
+        defaults: { labels: true, sim: { freq: 3, amp: 60, play: 0 } },
+    },
+    {
+        kind: 'gas_pressure_sim',
+        label: 'Gaz Basıncı',
+        hint: 'Pistonu it; hacim küçülünce basınç artsın (P · V sabit)',
+        size: { w: 540, h: 320 },
+        defaults: { labels: true, sim: { v: 60 } },
     },
 ];

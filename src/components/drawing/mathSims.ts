@@ -1037,6 +1037,183 @@ export const dataStatsSpec: SimSpec = {
     params: [],
 };
 
+// ── Eğim ve doğrusal fonksiyon (Doğrusal denklemler) ─────────────────
+//
+// Kilit fikir: eğim, "x bir birim artınca y ne kadar değişir" sorusunun
+// cevabıdır. Sabit terim ise doğrunun y eksenini kestiği yerdir; ikisini
+// ayrı ayrı değiştirince doğrunun neyi değiştiği görünür.
+
+const SLOPE_COLS = 6;
+const SLOPE_ROWS = 5;
+
+const slopeState = (o: MathObject) => ({
+    m: clamp(simValue(o, 'm', 1), -3, 3),
+    n: clamp(simValue(o, 'n', 1), -SLOPE_ROWS, SLOPE_ROWS),
+});
+
+function slopeGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const plotW = icon ? r.w : r.w * 0.68;
+    const u = Math.min(
+        (plotW - (icon ? 4 : fs)) / (SLOPE_COLS * 2 + 1),
+        (r.h - (icon ? 4 : fs * 3.4)) / (SLOPE_ROWS * 2 + 1)
+    );
+    const cx = r.x + (icon ? r.w / 2 : fs * 0.5 + plotW / 2);
+    const cy = r.y + (icon ? r.h / 2 : fs * 2.2 + u * SLOPE_ROWS);
+    return {
+        fs,
+        icon,
+        u,
+        cx,
+        cy,
+        p: (x: number, y: number) => ({ x: cx + x * u, y: cy - y * u }),
+    };
+}
+
+/** "y = 2x − 3" biçiminde denklem metni. */
+function slopeEquation(m: number, n: number): string {
+    const mt = m === 0 ? '' : m === 1 ? 'x' : m === -1 ? '−x' : `${fmtNum(m, 1)}x`;
+    if (m === 0) return `y = ${fmtNum(n, 1)}`;
+    if (n === 0) return `y = ${mt}`;
+    return `y = ${mt} ${n > 0 ? '+' : '−'} ${fmtNum(Math.abs(n), 1)}`;
+}
+
+export const slopeRender: Renderer = (k) => {
+    const r = k.r;
+    const s = slopeState(k.o);
+    const g = slopeGeom(r);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    // Izgara ve eksenler
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.18);
+    for (let i = -SLOPE_COLS; i <= SLOPE_COLS; i++) {
+        line(k, g.p(i, -SLOPE_ROWS).x, g.p(i, -SLOPE_ROWS).y, g.p(i, SLOPE_ROWS).x, g.p(i, SLOPE_ROWS).y, 1);
+    }
+    for (let j = -SLOPE_ROWS; j <= SLOPE_ROWS; j++) {
+        line(k, g.p(-SLOPE_COLS, j).x, g.p(-SLOPE_COLS, j).y, g.p(SLOPE_COLS, j).x, g.p(SLOPE_COLS, j).y, 1);
+    }
+    k.c.restore();
+    k.c.lineWidth = k.lw;
+    line(k, g.p(-SLOPE_COLS, 0).x, g.cy, g.p(SLOPE_COLS, 0).x, g.cy);
+    line(k, g.cx, g.p(0, SLOPE_ROWS).y, g.cx, g.p(0, -SLOPE_ROWS).y);
+
+    // Doğru: kutunun kenarlarına kadar uzatılır
+    const yAt = (x: number) => s.m * x + s.n;
+    const xs = [-SLOPE_COLS, SLOPE_COLS];
+    const pts = xs.map((x) => {
+        let y = yAt(x);
+        let xx = x;
+        // Izgaranın dışına taşarsa kenarda kesilir.
+        if (Math.abs(y) > SLOPE_ROWS && s.m !== 0) {
+            y = Math.sign(y) * SLOPE_ROWS;
+            xx = (y - s.n) / s.m;
+        }
+        return g.p(xx, y);
+    });
+    k.c.lineWidth = Math.max(2, k.lw * 1.4);
+    line(k, pts[0].x, pts[0].y, pts[1].x, pts[1].y);
+
+    // Eğim üçgeni: x bir birim, y m birim
+    const stepX = s.m === 0 ? 1 : 1;
+    const a = g.p(0, s.n);
+    const b = g.p(stepX, s.n);
+    const c = g.p(stepX, s.n + s.m * stepX);
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.6);
+    k.c.setLineDash([4, 3]);
+    line(k, a.x, a.y, b.x, b.y, 1.4);
+    line(k, b.x, b.y, c.x, c.y, 1.4);
+    k.c.restore();
+    // Kesim noktası
+    k.c.beginPath();
+    k.c.arc(a.x, a.y, Math.max(3, g.u * 0.18), 0, Math.PI * 2);
+    k.c.fill();
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Eksen değerleri: kesim noktası ve eğim ızgaradan okunabilsin.
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.65);
+    for (const x of [-4, -2, 2, 4]) {
+        label(k, String(x), g.p(x, 0).x, g.cy + g.fs * 0.3, 'center', 'top', 0.55);
+    }
+    for (const y of [-4, -2, 2, 4]) {
+        label(k, String(y), g.cx - g.fs * 0.3, g.p(0, y).y, 'right', 'middle', 0.55);
+    }
+    k.c.restore();
+
+    label(k, '1', (a.x + b.x) / 2, b.y + g.fs * 0.4, 'center', 'top', 0.65);
+    if (s.m !== 0) {
+        label(k, fmtNum(s.m, 1), c.x + g.fs * 0.35, (b.y + c.y) / 2, 'left', 'middle', 0.65);
+    }
+
+    // Değer tablosu
+    const tx = r.x + r.w * 0.74;
+    label(k, 'x', tx, r.y + g.fs * 2.6, 'center', 'middle', 0.7);
+    label(k, 'y', tx + g.fs * 2.4, r.y + g.fs * 2.6, 'center', 'middle', 0.7);
+    line(k, tx - g.fs, r.y + g.fs * 3.2, tx + g.fs * 3.4, r.y + g.fs * 3.2, 1);
+    [-2, -1, 0, 1, 2].forEach((x, i) => {
+        const y = r.y + g.fs * (4.2 + i * 1.5);
+        label(k, String(x), tx, y, 'center', 'middle', 0.7);
+        label(k, fmtNum(yAt(x), 1), tx + g.fs * 2.4, y, 'center', 'middle', 0.7);
+    });
+
+    label(k, slopeEquation(s.m, s.n), r.x + 4, r.y + 1, 'left', 'top', 0.95);
+    label(
+        k,
+        fitText(
+            k,
+            [
+                `Eğim ${fmtNum(s.m, 1)}: x bir birim artınca y ${fmtNum(s.m, 1)} birim ${s.m >= 0 ? 'artar' : 'azalır'} · y eksenini ${fmtNum(s.n, 1)} noktasında keser`,
+                `Eğim ${fmtNum(s.m, 1)} · y eksenini ${fmtNum(s.n, 1)} noktasında keser`,
+            ],
+            r.w - 8,
+            0.72,
+        ),
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.72,
+    );
+    k.c.restore();
+};
+
+export const slopeSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = slopeState(o);
+        const g = slopeGeom(r);
+        const cut = g.p(0, s.n);
+        const far = g.p(2, s.m * 2 + s.n);
+        return [
+            { id: 'cut', x: cut.x, y: cut.y, type: 'drag', label: 'Doğruyu yukarı-aşağı kaydır (sabit terim)' },
+            { id: 'slope', x: far.x, y: far.y, type: 'drag', label: 'Doğruyu eğ (eğim)' },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const s = slopeState(o);
+        const g = slopeGeom(r);
+        const gy = (g.cy - p.y) / g.u;
+        if (id === 'cut') return { n: clamp(Math.round(gy * 2) / 2, -SLOPE_ROWS, SLOPE_ROWS) };
+        // Eğim, x = 2 noktasındaki yüksekliğe göre bulunur.
+        const gx = Math.max(0.5, (p.x - g.cx) / g.u);
+        return { m: clamp(Math.round(((gy - s.n) / gx) * 2) / 2, -3, 3) };
+    },
+    params: [
+        { key: 'm', label: 'Eğim (m)', min: -3, max: 3, step: 0.5 },
+        { key: 'n', label: 'Sabit terim (n)', min: -SLOPE_ROWS, max: SLOPE_ROWS, step: 0.5 },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const MATH_SIM_RENDERERS: Record<string, Renderer> = {
@@ -1044,6 +1221,7 @@ export const MATH_SIM_RENDERERS: Record<string, Renderer> = {
     area_perimeter_sim: areaRender,
     probability_sim: probabilityRender,
     data_stats_sim: dataStatsRender,
+    slope_sim: slopeRender,
 };
 
 export const MATH_SIM_SPECS: Record<string, SimSpec> = {
@@ -1051,6 +1229,7 @@ export const MATH_SIM_SPECS: Record<string, SimSpec> = {
     area_perimeter_sim: areaSpec,
     probability_sim: probabilitySpec,
     data_stats_sim: dataStatsSpec,
+    slope_sim: slopeSpec,
 };
 
 /** Kütüphane panelindeki "Canlı Matematik" kategorisinin içeriği. */
@@ -1082,5 +1261,12 @@ export const MATH_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Sütunları sürükle; ortalama, ortanca ve tepe değer değişsin',
         size: { w: 500, h: 340 },
         defaults: { labels: true, sim: { c0: 1, c1: 3, c2: 5, c3: 2, c4: 4, c5: 1 } },
+    },
+    {
+        kind: 'slope_sim',
+        label: 'Eğim ve Doğrusal Fonksiyon',
+        hint: 'Doğruyu eğ ve kaydır; eğim ile sabit terimin işini ayır',
+        size: { w: 540, h: 340 },
+        defaults: { labels: true, sim: { m: 1, n: 1 } },
     },
 ];

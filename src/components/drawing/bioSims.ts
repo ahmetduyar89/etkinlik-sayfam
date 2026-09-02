@@ -10,6 +10,7 @@ import {
     isIconSize,
     label,
     line,
+    path,
     roundRect,
     simValue,
     withAlpha,
@@ -568,18 +569,215 @@ export const selectionSpec: SimSpec = {
     ],
 };
 
+// ── Kan dolaşımı (Sistemler) ─────────────────────────────────────────
+//
+// Kilit fikir: kan iki turda dolaşır. KÜÇÜK dolaşım kalp–akciğer–kalp
+// (kan burada oksijen alır), BÜYÜK dolaşım kalp–vücut–kalp (oksijen
+// burada dokulara bırakılır). İkisi de kalpte başlar, kalpte biter.
+
+/** Dolaşım yolları: her biri kapalı bir çokgen (oransal koordinat). */
+const PULMONARY: ReadonlyArray<[number, number]> = [
+    [0.5, 0.42],
+    [0.34, 0.36],
+    [0.34, 0.16],
+    [0.42, 0.08],
+    [0.58, 0.08],
+    [0.66, 0.16],
+    [0.66, 0.36],
+    [0.5, 0.42],
+];
+const SYSTEMIC: ReadonlyArray<[number, number]> = [
+    [0.5, 0.58],
+    [0.66, 0.64],
+    [0.66, 0.86],
+    [0.58, 0.94],
+    [0.42, 0.94],
+    [0.34, 0.86],
+    [0.34, 0.64],
+    [0.5, 0.58],
+];
+
+const circulationState = (o: MathObject) => ({
+    playing: simValue(o, 'play', 0) > 0.5,
+    // 0: ikisi de, 1: yalnız küçük dolaşım, 2: yalnız büyük dolaşım
+    focus: clampInt(simValue(o, 'focus', 0), 0, 2, 0),
+});
+
+/** Kapalı yol üzerinde 0–1 arası konumun noktası. */
+function pathPoint(pts: ReadonlyArray<[number, number]>, t: number, r: Rect) {
+    const segs = pts.length - 1;
+    const total = t * segs;
+    const i = Math.min(segs - 1, Math.floor(total));
+    const f = total - i;
+    const [x1, y1] = pts[i];
+    const [x2, y2] = pts[i + 1];
+    return { x: r.x + r.w * (x1 + (x2 - x1) * f), y: r.y + r.h * (y1 + (y2 - y1) * f) };
+}
+
+export const circulationRender: Renderer = (k) => {
+    const r = k.r;
+    const s = circulationState(k.o);
+    const icon = isIconSize(r);
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = Math.max(1.5, k.lw);
+
+    const drawLoop = (pts: ReadonlyArray<[number, number]>, active: boolean) => {
+        k.c.save();
+        if (!active) k.c.strokeStyle = withAlpha(k.color, 0.25);
+        path(k, pts.map(([x, y]) => [r.x + r.w * x, r.y + r.h * y] as [number, number]), false);
+        k.c.restore();
+    };
+    const smallActive = s.focus !== 2;
+    const bigActive = s.focus !== 1;
+    drawLoop(PULMONARY, smallActive);
+    drawLoop(SYSTEMIC, bigActive);
+
+    // Akciğerler ve vücut: ikisi de dolaşım halkasının İÇİNDE durur
+    const lungY = r.y + r.h * 0.2;
+    for (const dx of [0.43, 0.57]) {
+        k.c.save();
+        if (!smallActive) k.c.strokeStyle = withAlpha(k.color, 0.3);
+        k.c.beginPath();
+        k.c.ellipse(r.x + r.w * dx, lungY, r.w * 0.055, r.h * 0.075, 0, 0, Math.PI * 2);
+        k.c.stroke();
+        k.c.restore();
+    }
+    k.c.save();
+    if (!bigActive) k.c.strokeStyle = withAlpha(k.color, 0.3);
+    roundRect(k, r.x + r.w * 0.38, r.y + r.h * 0.72, r.w * 0.24, r.h * 0.14, 8);
+    k.c.stroke();
+    k.c.restore();
+
+    // Kalp: iki karıncık iki kulakçık
+    const hx = r.x + r.w * 0.5;
+    const hy = r.y + r.h * 0.5;
+    const hw = r.w * 0.16;
+    const hh = r.h * 0.18;
+    roundRect(k, hx - hw / 2, hy - hh / 2, hw, hh, hw * 0.28);
+    k.c.stroke();
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.5);
+    line(k, hx, hy - hh / 2, hx, hy + hh / 2, 1);
+    line(k, hx - hw / 2, hy, hx + hw / 2, hy, 1);
+    k.c.restore();
+
+    // Kan hücreleri: oksijence zengin olanlar dolu, kirli kan boş çizilir
+    const phase = s.playing ? k.t * 0.35 : 0;
+    const dots = 6;
+    for (let i = 0; i < dots; i++) {
+        const t = ((i / dots + phase) % 1 + 1) % 1;
+        if (smallActive) {
+            const p = pathPoint(PULMONARY, t, r);
+            k.c.beginPath();
+            k.c.arc(p.x, p.y, Math.max(2.2, fs * 0.2), 0, Math.PI * 2);
+            // Akciğerden döndükten sonra temiz kan
+            if (t > 0.5) k.c.fill();
+            else k.c.stroke();
+        }
+        if (bigActive) {
+            const p = pathPoint(SYSTEMIC, t, r);
+            k.c.beginPath();
+            k.c.arc(p.x, p.y, Math.max(2.2, fs * 0.2), 0, Math.PI * 2);
+            // Vücuda gitmeden önce temiz, döndükten sonra kirli kan
+            if (t < 0.5) k.c.fill();
+            else k.c.stroke();
+        }
+    }
+
+    if (icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Akciğer yazısı halkanın üst kenarına biniyordu; ciğerlerin altına alındı.
+    label(k, 'Akciğer', r.x + r.w * 0.5, lungY + r.h * 0.1, 'center', 'top', 0.62);
+    label(k, 'Kalp', hx + hw * 0.75, hy, 'left', 'middle', 0.64);
+    label(k, 'Vücut', r.x + r.w * 0.5, r.y + r.h * 0.79, 'center', 'middle', 0.68);
+    // Halka adları halkanın solunda, çizgilerin dışında durur.
+    if (smallActive) label(k, 'küçük dolaşım', r.x + r.w * 0.32, r.y + r.h * 0.26, 'right', 'middle', 0.62);
+    if (bigActive) label(k, 'büyük dolaşım', r.x + r.w * 0.32, r.y + r.h * 0.76, 'right', 'middle', 0.62);
+
+    const title =
+        s.focus === 1
+            ? 'Küçük dolaşım: kalp → akciğer → kalp'
+            : s.focus === 2
+              ? 'Büyük dolaşım: kalp → vücut → kalp'
+              : 'Kan iki turda dolaşır: küçük ve büyük dolaşım';
+    label(k, fitText(k, [title, 'Kan dolaşımı'], r.w - fs * 5, 0.8), r.x + 4, r.y + 1, 'left', 'top', 0.8);
+    label(
+        k,
+        fitText(
+            k,
+            [
+                'Dolu daire: oksijence zengin kan · boş daire: oksijence fakir kan',
+                'Dolu daire: temiz kan · boş daire: kirli kan',
+            ],
+            r.w - 8,
+            0.68,
+        ),
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.68,
+    );
+    k.c.restore();
+};
+
+export const circulationSpec: SimSpec = {
+    animated: (o) => simValue(o, 'play', 0) > 0.5,
+    controls: (r, o): SimControl[] => {
+        const s = circulationState(o);
+        return [
+            {
+                id: 'play',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.playing ? 'Akışı durdur' : 'Kanı dolaştır',
+                on: s.playing,
+            },
+            {
+                id: 'focus',
+                x: r.x + r.w - 40,
+                y: r.y + 14,
+                type: 'toggle',
+                label: ['Yalnız küçük dolaşım', 'Yalnız büyük dolaşım', 'İkisini birden göster'][s.focus],
+                on: s.focus > 0,
+            },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        const s = circulationState(o);
+        if (id === 'play') return { play: s.playing ? 0 : 1 };
+        if (id === 'focus') return { focus: (s.focus + 1) % 3 };
+        return {};
+    },
+    params: [
+        { key: 'focus', label: 'Görünüm (0-2)', min: 0, max: 2, step: 1 },
+        { key: 'play', label: 'Akış (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const BIO_SIM_RENDERERS: Record<string, Renderer> = {
     photosynthesis_sim: photosynthesisRender,
     dna_pair_sim: dnaRender,
     selection_sim: selectionRender,
+    circulation_sim: circulationRender,
 };
 
 export const BIO_SIM_SPECS: Record<string, SimSpec> = {
     photosynthesis_sim: photosynthesisSpec,
     dna_pair_sim: dnaSpec,
     selection_sim: selectionSpec,
+    circulation_sim: circulationSpec,
 };
 
 export const BIO_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -603,5 +801,12 @@ export const BIO_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Zemini koyulaştır; nesiller boyunca popülasyon oranı değişsin',
         size: { w: 520, h: 360 },
         defaults: { labels: true, sim: { bg: 20, gen: 0 } },
+    },
+    {
+        kind: 'circulation_sim',
+        label: 'Kan Dolaşımı',
+        hint: 'Kanı dolaştır; küçük ve büyük dolaşımı ayrı ayrı izle',
+        size: { w: 460, h: 400 },
+        defaults: { labels: true, sim: { focus: 0, play: 0 } },
     },
 ];
