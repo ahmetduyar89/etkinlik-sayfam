@@ -12,8 +12,11 @@ import {
     clamp,
     clampInt,
     fitText,
+    fmtNum,
+    isIconSize,
     label,
     line,
+    path,
     roundRect,
     simValue,
     withAlpha,
@@ -562,16 +565,405 @@ export const labelDragSpec: SimSpec = {
     ],
 };
 
+// ── Isınma eğrisi (Madde ve Isı) ─────────────────────────────────────
+//
+// Kilit fikir: hâl değişimi sırasında verilen ısı sıcaklığı artırmaz,
+// hâli değiştirir. Bu yüzden grafikte erime ve kaynama düz platolardır;
+// platoların uzunluğu gizli ısının büyüklüğünü kabaca yansıtır.
+
+interface HeatSegment {
+    dur: number;
+    from: number;
+    to: number;
+    phase: string;
+    note: string;
+}
+
+const HEAT_SEGMENTS: ReadonlyArray<HeatSegment> = [
+    { dur: 12, from: -20, to: 0, phase: 'Katı — buz ısınıyor', note: 'ısı sıcaklığı artırır' },
+    { dur: 22, from: 0, to: 0, phase: 'Erime', note: 'sıcaklık sabit, hâl değişir' },
+    { dur: 26, from: 0, to: 100, phase: 'Sıvı — su ısınıyor', note: 'ısı sıcaklığı artırır' },
+    { dur: 30, from: 100, to: 100, phase: 'Kaynama', note: 'sıcaklık sabit, hâl değişir' },
+    { dur: 10, from: 100, to: 120, phase: 'Gaz — su buharı ısınıyor', note: 'ısı sıcaklığı artırır' },
+];
+
+const HEAT_TOTAL = HEAT_SEGMENTS.reduce((sum, seg) => sum + seg.dur, 0);
+const HEAT_MIN = -30;
+const HEAT_MAX = 130;
+
+const heatTime = (o: MathObject, t: number): number => {
+    const pos = clamp(simValue(o, 'time', 30), 0, HEAT_TOTAL);
+    // Oynatırken döngüye girer: eğri bitince baştan ısıtmaya başlar.
+    return simValue(o, 'play', 0) > 0.5 ? (pos + t * 9) % HEAT_TOTAL : pos;
+};
+
+/** Verilen ana ait sıcaklık ve içinde bulunulan aşama. */
+function heatAt(time: number): { temp: number; seg: HeatSegment } {
+    let left = clamp(time, 0, HEAT_TOTAL);
+    for (const seg of HEAT_SEGMENTS) {
+        if (left <= seg.dur) {
+            return { temp: seg.from + ((seg.to - seg.from) * left) / seg.dur, seg };
+        }
+        left -= seg.dur;
+    }
+    const last = HEAT_SEGMENTS[HEAT_SEGMENTS.length - 1];
+    return { temp: last.to, seg: last };
+}
+
+function heatGeom(r: Rect, o: MathObject, t: number) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    // Simge ölçeğinde eksen yazıları çizilmediği için kenar payı da gerekmez.
+    const icon = isIconSize(r);
+    const x0 = r.x + (icon ? r.w * 0.08 : fs * 2.8);
+    const x1 = r.x + r.w - (icon ? r.w * 0.08 : fs * 0.8);
+    const y0 = r.y + (icon ? r.h * 0.12 : fs * 2.6);
+    const y1 = r.y + r.h - (icon ? r.h * 0.12 : fs * 2.8);
+    const time = heatTime(o, t);
+    const px = (tm: number) => x0 + ((x1 - x0) * tm) / HEAT_TOTAL;
+    const py = (temp: number) => y1 - ((y1 - y0) * (temp - HEAT_MIN)) / (HEAT_MAX - HEAT_MIN);
+    return { fs, x0, x1, y0, y1, time, px, py, ...heatAt(time) };
+}
+
+export const heatingRender: Renderer = (k) => {
+    const r = k.r;
+    const g = heatGeom(r, k.o, k.t);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+    const icon = isIconSize(r);
+
+    if (!icon) {
+        // Eksenler
+        line(k, g.x0, g.y0 - g.fs * 0.4, g.x0, g.y1);
+        line(k, g.x0, g.y1, g.x1, g.y1);
+
+        // 0 °C ve 100 °C kılavuzları: platoların nerede olduğu okunsun
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.3);
+        k.c.setLineDash([5, 4]);
+        for (const temp of [0, 100]) line(k, g.x0, g.py(temp), g.x1, g.py(temp), 1);
+        k.c.restore();
+    }
+
+    // Eğrinin tamamı soluk, geçilen kısmı koyu
+    const points: Array<[number, number]> = [];
+    let acc = 0;
+    points.push([g.px(0), g.py(HEAT_SEGMENTS[0].from)]);
+    for (const seg of HEAT_SEGMENTS) {
+        acc += seg.dur;
+        points.push([g.px(acc), g.py(seg.to)]);
+    }
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.3);
+    path(k, points, false);
+    k.c.restore();
+
+    const walked: Array<[number, number]> = [[g.px(0), g.py(HEAT_SEGMENTS[0].from)]];
+    let used = 0;
+    for (const seg of HEAT_SEGMENTS) {
+        if (g.time <= used) break;
+        const part = Math.min(seg.dur, g.time - used);
+        used += part;
+        walked.push([g.px(used), g.py(seg.from + ((seg.to - seg.from) * part) / seg.dur)]);
+    }
+    k.c.lineWidth = Math.max(1.8, k.lw);
+    path(k, walked, false);
+
+    // Şu anki nokta ve eksenlere kılavuz
+    const mx = g.px(g.time);
+    const my = g.py(g.temp);
+    if (icon) {
+        k.c.restore();
+        return;
+    }
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.45);
+    k.c.setLineDash([4, 3]);
+    line(k, g.x0, my, mx, my, 1);
+    line(k, mx, my, mx, g.y1, 1);
+    k.c.restore();
+    k.c.beginPath();
+    k.c.arc(mx, my, Math.max(3, g.fs * 0.28), 0, Math.PI * 2);
+    k.c.fill();
+
+    if (k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Eksen değerleri
+    for (const temp of [-20, 0, 50, 100, 120]) {
+        label(k, String(temp), g.x0 - g.fs * 0.35, g.py(temp), 'right', 'middle', 0.62);
+    }
+    label(k, '°C', g.x0 - g.fs * 0.35, g.y0 - g.fs * 0.6, 'right', 'middle', 0.62);
+    label(k, 'verilen ısı (süre) →', g.x1, g.y1 + g.fs * 0.4, 'right', 'top', 0.62);
+
+    label(
+        k,
+        fitText(
+            k,
+            [`${g.seg.phase} · ${g.seg.note}`, g.seg.phase],
+            r.w - g.fs * 5.5,
+            0.85,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.85,
+    );
+    label(k, `${fmtNum(g.temp, 0)} °C`, mx, my - g.fs * 0.6, 'center', 'bottom', 0.8);
+    k.c.restore();
+};
+
+export const heatingSpec: SimSpec = {
+    animated: (o) => simValue(o, 'play', 0) > 0.5,
+    controls: (r, o): SimControl[] => {
+        const playing = simValue(o, 'play', 0) > 0.5;
+        const play: SimControl = {
+            id: 'play',
+            x: r.x + r.w - 14,
+            y: r.y + 14,
+            type: 'toggle',
+            label: playing ? 'Isıtmayı duraklat' : 'Isıtmayı başlat',
+            on: playing,
+        };
+        if (playing) return [play];
+        const g = heatGeom(r, o, 0);
+        return [
+            { id: 'point', x: g.px(g.time), y: g.py(g.temp), type: 'drag', label: 'Eğri üzerinde ilerle' },
+            play,
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (id === 'play') return { play: simValue(o, 'play', 0) > 0.5 ? 0 : 1 };
+        const g = heatGeom(r, o, 0);
+        return { time: clamp(((p.x - g.x0) / (g.x1 - g.x0)) * HEAT_TOTAL, 0, HEAT_TOTAL) };
+    },
+    params: [
+        { key: 'time', label: 'Verilen ısı', min: 0, max: HEAT_TOTAL, step: 1 },
+        { key: 'play', label: 'Isıt (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
+// ── Yoğunluk ve kaldırma kuvveti (Kuvvet ve Enerji) ──────────────────
+//
+// Kilit fikir: cisim, ağırlığı kadar sıvı taşırana dek batar. Bu yüzden
+// yüzen bir cismin batan kesri, yoğunlukların oranına eşittir (d/dₛ).
+// Cismi sürüklemek doğrudan bu oranı — yani cismin yoğunluğunu — değiştirir.
+
+/** Yerçekimi ivmesi; 8. sınıf hesaplarında 10 N/kg alınır. */
+const G_FORCE = 10;
+
+const DENSITY_LIQUIDS: ReadonlyArray<{ name: string; d: number }> = [
+    { name: 'Zeytinyağı', d: 0.9 },
+    { name: 'Su', d: 1 },
+    { name: 'Tuzlu su', d: 1.2 },
+];
+
+interface DensityState {
+    /** Cismin yoğunluğu (g/cm³). */
+    d: number;
+    /** Sıvının yoğunluğu (g/cm³). */
+    dl: number;
+    /** Hacim (cm³). */
+    v: number;
+}
+
+const densityState = (o: MathObject): DensityState => ({
+    d: clamp(simValue(o, 'd', 0.6), 0.1, 2.5),
+    dl: clamp(simValue(o, 'dl', 1), 0.6, 1.4),
+    v: clamp(simValue(o, 'v', 30), 10, 60),
+});
+
+function densityGeom(r: Rect, s: DensityState) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    // Simge ölçeğinde başlık ve okuma sütunu çizilmediğinden kap kutuyu doldurur.
+    const icon = isIconSize(r);
+    const tank = icon
+        ? { x: r.x + r.w * 0.16, y: r.y + r.h * 0.1, w: r.w * 0.68, h: r.h * 0.8 }
+        : {
+              x: r.x + r.w * 0.06,
+              y: r.y + fs * 2.4,
+              w: r.w * 0.52,
+              h: r.h - fs * 2.4 - fs * 2.2,
+          };
+    const surfaceY = tank.y + tank.h * 0.22;
+    const floorY = tank.y + tank.h;
+    // Küpün kenarı hacimle büyür; 30 cm³ referans alınır.
+    const side = Math.min(tank.w * 0.42, tank.h * 0.3) * Math.cbrt(s.v / 30);
+    // Yüzerken batan kesir yoğunlukların oranıdır; ağır cisim dibe oturur.
+    const sunk = s.d >= s.dl ? 1 : s.d / s.dl;
+    const top = s.d > s.dl ? floorY - side : surfaceY - side * (1 - sunk);
+    return { fs, tank, surfaceY, floorY, side, sunk, cubeTop: Math.min(top, floorY - side), cubeX: tank.x + tank.w / 2 - side / 2 };
+}
+
+export const densityRender: Renderer = (k) => {
+    const r = k.r;
+    const s = densityState(k.o);
+    const g = densityGeom(r, s);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    // Kap: üstü açık
+    path(k, [
+        [g.tank.x, g.tank.y],
+        [g.tank.x, g.floorY],
+        [g.tank.x + g.tank.w, g.floorY],
+        [g.tank.x + g.tank.w, g.tank.y],
+    ]);
+
+    // Sıvı ve dalgalı yüzeyi
+    k.c.save();
+    k.c.globalAlpha = 0.14;
+    k.c.fillRect(g.tank.x, g.surfaceY, g.tank.w, g.floorY - g.surfaceY);
+    k.c.restore();
+    k.c.beginPath();
+    k.c.lineWidth = Math.max(1.2, k.lw * 0.8);
+    for (let i = 0; i <= 20; i++) {
+        const x = g.tank.x + (g.tank.w * i) / 20;
+        const y = g.surfaceY + Math.sin((i / 20) * Math.PI * 4) * g.fs * 0.14;
+        if (i === 0) k.c.moveTo(x, y);
+        else k.c.lineTo(x, y);
+    }
+    k.c.stroke();
+
+    // Cisim
+    k.c.lineWidth = Math.max(1.6, k.lw);
+    k.c.strokeRect(g.cubeX, g.cubeTop, g.side, g.side);
+    k.c.save();
+    k.c.globalAlpha = 0.2;
+    k.c.fillRect(g.cubeX, g.cubeTop, g.side, g.side);
+    k.c.restore();
+
+    if (isIconSize(r)) {
+        k.c.restore();
+        return;
+    }
+
+    // Kuvvetler: ağırlık aşağı, kaldırma kuvveti yukarı
+    const weight = (s.d * s.v * G_FORCE) / 1000;
+    const subVolume = s.v * (s.d > s.dl ? 1 : g.sunk);
+    const buoyancy = (s.dl * subVolume * G_FORCE) / 1000;
+    // Oklar cismin kenarlarından çıkar ve kutunun dışına taşmaz: dibe oturan
+    // cisimde aşağı ok kabın altına sarkıyordu.
+    const cx = g.cubeX + g.side / 2;
+    const cubeBottom = g.cubeTop + g.side;
+    const bottomRoom = r.y + r.h - cubeBottom - g.fs * 1.4;
+    const topRoom = g.cubeTop - r.y - g.fs * 2.2;
+    const maxLen = Math.max(g.fs, Math.min(g.tank.h * 0.26, bottomRoom, topRoom));
+    const scale = maxLen / Math.max(weight, buoyancy, 0.01);
+    const lenG = weight * scale;
+    const lenF = buoyancy * scale;
+    arrow(k, cx, cubeBottom, cx, cubeBottom + lenG, g.fs * 0.42, Math.max(1.4, k.lw));
+    arrow(k, cx, g.cubeTop, cx, g.cubeTop - lenF, g.fs * 0.42, Math.max(1.4, k.lw));
+
+    if (k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    const verdict = s.d < s.dl - 0.001 ? 'Yüzer' : s.d > s.dl + 0.001 ? 'Batar' : 'Askıda kalır';
+    label(k, 'G', cx + g.fs * 0.45, cubeBottom + lenG * 0.6, 'left', 'middle', 0.75);
+    label(k, 'F', cx + g.fs * 0.45, g.cubeTop - lenF * 0.6, 'left', 'middle', 0.75);
+
+    // Okuma sütunu: kapın sağında
+    const tx = g.tank.x + g.tank.w + r.w * 0.05;
+    const lines = [
+        `Cisim: ${fmtNum(s.d, 2)} g/cm³`,
+        `Sıvı: ${fmtNum(s.dl, 2)} g/cm³`,
+        `Hacim: ${fmtNum(s.v, 0)} cm³`,
+        `G = ${fmtNum(weight, 2)} N`,
+        `F = ${fmtNum(buoyancy, 2)} N`,
+        s.d < s.dl ? `Batan kesir: %${fmtNum(g.sunk * 100, 0)}` : 'Tamamı batar',
+    ];
+    lines.forEach((text, i) => {
+        label(k, text, tx, g.tank.y + g.fs * (0.6 + i * 1.35), 'left', 'middle', 0.72);
+    });
+    label(k, verdict, tx, g.tank.y + g.fs * (0.6 + lines.length * 1.35 + 0.4), 'left', 'middle', 0.95);
+
+    label(
+        k,
+        fitText(
+            k,
+            ['Batan kesir = cisim yoğunluğu / sıvı yoğunluğu', 'Cismi sürükle'],
+            r.w - g.fs * 3,
+            0.8,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8,
+    );
+    k.c.restore();
+};
+
+export const densitySpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = densityState(o);
+        const g = densityGeom(r, s);
+        const liquid = DENSITY_LIQUIDS.findIndex((l) => Math.abs(l.d - s.dl) < 0.05);
+        return [
+            {
+                id: 'cube',
+                x: g.cubeX + g.side / 2,
+                y: g.cubeTop + g.side / 2,
+                type: 'drag',
+                label: 'Cismi sürükle (yoğunluğunu değiştirir)',
+            },
+            {
+                id: 'liquid',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: `Sıvıyı değiştir (şimdi: ${liquid >= 0 ? DENSITY_LIQUIDS[liquid].name : 'özel'})`,
+                on: liquid > 0,
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const s = densityState(o);
+        if (id === 'liquid') {
+            const i = DENSITY_LIQUIDS.findIndex((l) => Math.abs(l.d - s.dl) < 0.05);
+            return { dl: DENSITY_LIQUIDS[(i + 1) % DENSITY_LIQUIDS.length].d };
+        }
+        const g = densityGeom(r, s);
+        // Batan kesir, küpün ALT yüzünün yüzeyin ne kadar altında kaldığıdır;
+        // kesir de doğrudan yoğunlukların oranını verir.
+        const sunk = clamp((p.y + g.side / 2 - g.surfaceY) / g.side, 0, 1);
+        // Tamamen batırılınca sıvıdan yoğun kabul edilir; aksi halde oran.
+        const d = sunk >= 1 ? Math.max(s.dl + 0.1, s.d) : Math.max(0.1, s.dl * sunk);
+        return { d: Math.round(d * 20) / 20 };
+    },
+    params: [
+        { key: 'd', label: 'Cisim yoğunluğu', min: 0.1, max: 2.5, step: 0.05, unit: 'g/cm³' },
+        { key: 'dl', label: 'Sıvı yoğunluğu', min: 0.6, max: 1.4, step: 0.05, unit: 'g/cm³' },
+        { key: 'v', label: 'Hacim', min: 10, max: 60, step: 5, unit: 'cm³' },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const SCIENCE_SIM_RENDERERS: Record<string, Renderer> = {
     moon_phase_sim: moonRender,
     label_drag_sim: labelDragRender,
+    heating_curve_sim: heatingRender,
+    density_sim: densityRender,
 };
 
 export const SCIENCE_SIM_SPECS: Record<string, SimSpec> = {
     moon_phase_sim: moonSpec,
     label_drag_sim: labelDragSpec,
+    heating_curve_sim: heatingSpec,
+    density_sim: densitySpec,
 };
 
 /** Kütüphane panelindeki "Etkileşimli Fen" kategorisinin içeriği. */
@@ -589,5 +981,19 @@ export const SCIENCE_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: `Etiketleri sürükleyip bırak, kontrol et (${LABEL_SETS.length} şema)`,
         size: { w: 540, h: 360 },
         defaults: { labels: true, sim: { mode: 0, show: 0 } },
+    },
+    {
+        kind: 'heating_curve_sim',
+        label: 'Isınma Eğrisi',
+        hint: 'Buzu ısıt; erime ve kaynamada sıcaklık neden sabit kalır',
+        size: { w: 520, h: 340 },
+        defaults: { labels: true, sim: { time: 30, play: 0 } },
+    },
+    {
+        kind: 'density_sim',
+        label: 'Yoğunluk ve Kaldırma Kuvveti',
+        hint: 'Cismi sürükle; yüzme, askıda kalma ve batma koşulunu gör',
+        size: { w: 520, h: 340 },
+        defaults: { labels: true, sim: { d: 0.6, dl: 1, v: 30 } },
     },
 ];
