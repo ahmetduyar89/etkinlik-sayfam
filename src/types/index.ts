@@ -186,6 +186,7 @@ export type MathObjectKind =
     | 'sun_earth_moon'
     // ── Canlı simülasyonlar ─────────────────────────────────────────
     | 'optics_bench'
+    | 'refraction_sim'
     | 'circuit_sim'
     | 'matter_sim'
     // ── 8. sınıf üniteleri ──────────────────────────────────────────

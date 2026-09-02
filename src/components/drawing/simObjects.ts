@@ -208,6 +208,223 @@ const opticsSpec: SimSpec = {
     ],
 };
 
+// ── Işık Kırılması & Tam Yansıma ──────────────────────────────────────
+
+interface RefractionGeom {
+    cx: number;
+    cy: number;
+    rRay: number;
+    theta1Deg: number;
+    theta1Rad: number;
+    n1: number;
+    n2: number;
+    isTir: boolean;
+    thetaCritDeg: number;
+    theta2Rad: number;
+    theta2Deg: number;
+    laserX: number;
+    laserY: number;
+    reflX: number;
+    reflY: number;
+    refrX: number;
+    refrY: number;
+}
+
+function refractionGeom(r: Rect, o: MathObject): RefractionGeom {
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h / 2;
+    const rRay = Math.min(r.w * 0.42, r.h * 0.42);
+    const theta1Deg = clamp(simValue(o, 'theta1', 45), 0, 85);
+    const theta1Rad = (theta1Deg * Math.PI) / 180;
+    const n1 = clamp(simValue(o, 'n1', 1.5), 1.0, 2.5);
+    const n2 = clamp(simValue(o, 'n2', 1.0), 1.0, 2.5);
+
+    const laserX = cx - rRay * Math.sin(theta1Rad);
+    const laserY = cy - rRay * Math.cos(theta1Rad);
+    const reflX = cx + rRay * Math.sin(theta1Rad);
+    const reflY = cy - rRay * Math.cos(theta1Rad);
+
+    const sinTh2 = (n1 / n2) * Math.sin(theta1Rad);
+    const isTir = sinTh2 > 1.0;
+    const thetaCritDeg = n1 > n2 ? Math.asin(n2 / n1) * (180 / Math.PI) : 90;
+
+    let theta2Rad = 0;
+    let theta2Deg = 0;
+    let refrX = cx;
+    let refrY = cy + rRay;
+
+    if (!isTir) {
+        theta2Rad = Math.asin(sinTh2);
+        theta2Deg = (theta2Rad * 180) / Math.PI;
+        refrX = cx + rRay * Math.sin(theta2Rad);
+        refrY = cy + rRay * Math.cos(theta2Rad);
+    }
+
+    return {
+        cx,
+        cy,
+        rRay,
+        theta1Deg,
+        theta1Rad,
+        n1,
+        n2,
+        isTir,
+        thetaCritDeg,
+        theta2Rad,
+        theta2Deg,
+        laserX,
+        laserY,
+        reflX,
+        reflY,
+        refrX,
+        refrY,
+    };
+}
+
+const refractionRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = refractionGeom(r, k.o);
+    const { cx, cy } = g;
+
+    // 2. Ortam arka planı
+    k.c.save();
+    k.c.fillStyle = withAlpha('#0284c7', Math.min(0.24, (g.n2 - 0.9) * 0.16));
+    k.c.fillRect(r.x, cy, r.w, r.y + r.h - cy);
+    k.c.restore();
+
+    // Sınır yüzeyi
+    line(k, r.x, cy, r.x + r.w, cy, Math.max(1.5, k.lw));
+
+    // Normal çizgisi
+    k.c.save();
+    k.c.setLineDash([5, 4]);
+    k.c.strokeStyle = withAlpha(k.color, 0.45);
+    line(k, cx, r.y + 10, cx, r.y + r.h - 10, 1);
+    k.c.restore();
+
+    label(k, 'Normal (N)', cx + 6, r.y + 16, 'left', 'top', 0.65);
+    label(k, `1. Ortam (n₁ = ${g.n1.toFixed(2)})`, r.x + 12, cy - 14, 'left', 'bottom', 0.72);
+    label(k, `2. Ortam (n₂ = ${g.n2.toFixed(2)})`, r.x + 12, cy + 14, 'left', 'top', 0.72);
+
+    // Gelen ışın
+    k.c.save();
+    k.c.strokeStyle = '#ef4444';
+    k.c.lineWidth = Math.max(2.5, k.lw * 1.4);
+    line(k, g.laserX, g.laserY, cx, cy, k.c.lineWidth);
+
+    // Lazer başlığı
+    k.c.fillStyle = '#dc2626';
+    k.c.beginPath();
+    k.c.arc(g.laserX, g.laserY, 7, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.restore();
+
+    // Geliş açısı yayı
+    k.c.save();
+    k.c.beginPath();
+    k.c.strokeStyle = withAlpha('#ef4444', 0.8);
+    k.c.lineWidth = 1.5;
+    k.c.arc(cx, cy, 32, -Math.PI / 2 - g.theta1Rad, -Math.PI / 2);
+    k.c.stroke();
+    label(k, `θ₁ = ${Math.round(g.theta1Deg)}°`, cx - 22, cy - 36, 'right', 'bottom', 0.72);
+    k.c.restore();
+
+    // Yansıyan ışın
+    k.c.save();
+    const reflAlpha = g.isTir ? 1.0 : 0.35;
+    k.c.strokeStyle = withAlpha('#ef4444', reflAlpha);
+    k.c.lineWidth = g.isTir ? Math.max(2.5, k.lw * 1.4) : 1.5;
+    line(k, cx, cy, g.reflX, g.reflY, k.c.lineWidth);
+    k.c.restore();
+
+    if (g.isTir) {
+        k.c.save();
+        k.c.fillStyle = '#f59e0b';
+        label(
+            k,
+            `⚡ TAM YANSIMA (θ₁ = ${Math.round(g.theta1Deg)}° > θ_c = ${Math.round(g.thetaCritDeg)}°)`,
+            cx,
+            cy + 26,
+            'center',
+            'top',
+            0.82
+        );
+        label(k, 'Işın 2. ortama geçemez, %100 geri yansır', cx, cy + 46, 'center', 'top', 0.68);
+        k.c.restore();
+    } else {
+        k.c.save();
+        k.c.strokeStyle = '#ef4444';
+        k.c.lineWidth = Math.max(2.2, k.lw * 1.2);
+        line(k, cx, cy, g.refrX, g.refrY, k.c.lineWidth);
+
+        k.c.beginPath();
+        k.c.strokeStyle = withAlpha('#0284c7', 0.85);
+        k.c.lineWidth = 1.5;
+        k.c.arc(cx, cy, 34, Math.PI / 2 - g.theta2Rad, Math.PI / 2);
+        k.c.stroke();
+        label(k, `θ₂ = ${Math.round(g.theta2Deg)}°`, cx + 22, cy + 36, 'left', 'top', 0.72);
+        k.c.restore();
+
+        if (g.n1 > g.n2) {
+            label(k, `Sınır Açısı: θ_c = ${Math.round(g.thetaCritDeg)}°`, cx, r.y + r.h - 12, 'center', 'bottom', 0.7);
+        }
+    }
+
+    // Lazer foton akışı animasyonu
+    const dotPhase = (k.t * 65) % 24;
+    k.c.save();
+    k.c.fillStyle = '#fef08a';
+    for (let d = dotPhase; d < g.rRay; d += 24) {
+        const t = d / g.rRay;
+        const px = g.laserX + (cx - g.laserX) * t;
+        const py = g.laserY + (cy - g.laserY) * t;
+        k.c.beginPath();
+        k.c.arc(px, py, 2, 0, Math.PI * 2);
+        k.c.fill();
+    }
+    k.c.restore();
+
+    k.c.restore();
+};
+
+const refractionSpec: SimSpec = {
+    animated: true,
+    controls: (r, o) => {
+        const g = refractionGeom(r, o);
+        return [
+            {
+                id: 'laser',
+                x: g.laserX,
+                y: g.laserY,
+                type: 'drag',
+                label: 'Lazer açısını sürükle',
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (id === 'laser') {
+            const cx = r.x + r.w / 2;
+            const cy = r.y + r.h / 2;
+            const dx = cx - p.x;
+            const dy = cy - p.y;
+            if (dy <= 0) return { theta1: 85 };
+            const deg = Math.round((Math.atan2(dx, dy) * 180) / Math.PI);
+            return { theta1: clamp(deg, 0, 85) };
+        }
+        return {};
+    },
+    params: [
+        { key: 'theta1', label: 'Geliş açısı (θ₁)', min: 0, max: 85, step: 1, unit: '°' },
+        { key: 'n1', label: '1. Ortam (n₁)', min: 1.0, max: 2.4, step: 0.1 },
+        { key: 'n2', label: '2. Ortam (n₂)', min: 1.0, max: 2.4, step: 0.1 },
+    ],
+};
+
 // ── Canlı devre ──────────────────────────────────────────────────────
 
 interface CircuitGeom {
@@ -217,12 +434,13 @@ interface CircuitGeom {
     closed: boolean;
     cells: number;
     broken: number[];
-    /** Her ampulün merkezi. */
     bulbs: Array<{ x: number; y: number }>;
     switchAt: { x: number; y: number };
     s: number;
-    /** Ampul başına parlaklık (0..1). */
     brightness: number[];
+    res: number;
+    volts: number;
+    current: number;
 }
 
 function circuitGeom(rect: Rect, o: MathObject): CircuitGeom {
@@ -231,9 +449,11 @@ function circuitGeom(rect: Rect, o: MathObject): CircuitGeom {
     const parallel = simValue(o, 'parallel', 0) > 0.5;
     const count = clampInt(simValue(o, 'n', 2), 1, 3, 2);
     const closed = simValue(o, 'sw', 1) > 0.5;
-    const cells = clampInt(simValue(o, 'v', 1), 1, 3, 1);
+    const cells = clampInt(simValue(o, 'v', 2), 1, 4, 2);
     const broken = [0, 1, 2].map((i) => (simValue(o, `b${i}`, 0) > 0.5 ? 1 : 0));
     const s = Math.min(r.w / (count + 2), r.h) * 0.3;
+    const res = clampInt(simValue(o, 'res', 10), 1, 50, 10);
+    const volts = cells * 3;
 
     const bulbs: Array<{ x: number; y: number }> = [];
     for (let i = 0; i < count; i++) {
@@ -242,15 +462,17 @@ function circuitGeom(rect: Rect, o: MathObject): CircuitGeom {
     }
     const switchAt = { x: r.x + r.w * 0.72, y: r.y + r.h };
 
-    // Akım: seri devrede tek kol, paralelde her kol bağımsız.
+    const rTotal = parallel ? res + 6 / count : res + count * 6;
+    const current = closed ? volts / rTotal : 0;
+
     const brightness = bulbs.map((_, i) => {
         if (!closed) return 0;
-        if (parallel) return broken[i] ? 0 : Math.min(1, cells / 1);
+        if (parallel) return broken[i] ? 0 : Math.min(1, (current * 4) / 1);
         const anyBroken = broken.slice(0, count).some(Boolean);
         if (anyBroken) return 0;
-        return Math.min(1, cells / count);
+        return Math.min(1, (current * 4) / count);
     });
-    return { r, parallel, count, closed, cells, broken, bulbs, switchAt, s, brightness };
+    return { r, parallel, count, closed, cells, broken, bulbs, switchAt, s, brightness, res, volts, current };
 }
 
 /** Işıyan ampul. `glow` 0 ise sadece sembol çizilir. */
@@ -272,7 +494,6 @@ function drawBulb(k: Ctx, x: number, y: number, s: number, glow: number, broken:
     k.c.stroke();
     const d = s * 0.42;
     if (broken) {
-        // Patlak ampul: filamanın ortasında belirgin bir kopukluk bırakılır.
         line(k, x - d, y - d, x - d * 0.42, y - d * 0.42);
         line(k, x + d * 0.42, y + d * 0.42, x + d, y + d);
         line(k, x - d, y + d, x - d * 0.42, y + d * 0.42);
@@ -336,7 +557,7 @@ const circuitRender: Renderer = (k) => {
     };
 
     const batY = g.parallel ? midY : bottom;
-    const batX = g.parallel ? left : left + r.w * 0.3;
+    const batX = g.parallel ? left : left + r.w * 0.45;
 
     // Pil (sarımlı gösterim: hücre sayısı kadar uzun/kısa çizgi çifti)
     const drawBattery = (cx: number, cy: number, vertical: boolean) => {
@@ -353,10 +574,23 @@ const circuitRender: Renderer = (k) => {
     };
     const batHalf = (g.cells * s * 0.5) / 2 + s * 0.25;
 
+    // Ampermetre (alt telde, sol tarafta)
+    const ammeterX = left + r.w * 0.18;
+
+    // Direnç (sağ dikey telde)
+    const resY = (top + bottom) / 2;
+    const resH = s * 1.3;
+    const resW = s * 0.6;
+
     if (g.parallel) {
         line(k, left, top, right, top);
         line(k, left, bottom, right, bottom);
-        line(k, right, top, right, bottom);
+        // Sağ telde direnç
+        line(k, right, top, right, resY - resH / 2);
+        line(k, right, resY + resH / 2, right, bottom);
+        k.c.strokeRect(right - resW / 2, resY - resH / 2, resW, resH);
+        label(k, `${g.res} Ω`, right + resW / 2 + 4, resY, 'left', 'middle', 0.65);
+
         line(k, left, top, left, midY - batHalf);
         line(k, left, midY + batHalf, left, bottom);
         drawBattery(left, midY, true);
@@ -370,15 +604,22 @@ const circuitRender: Renderer = (k) => {
                     [b.x, top],
                     [b.x, bottom],
                 ],
-                k.t * 40,
+                k.t * (30 + g.current * 40),
                 g.brightness[i] > 0
             );
         });
-        // Anahtar alt telde
-        hWire(left, right, bottom, [[g.switchAt.x - s * 1.2, g.switchAt.x + s * 1.2]]);
+        hWire(left, right, bottom, [
+            [g.switchAt.x - s * 1.2, g.switchAt.x + s * 1.2],
+            [ammeterX - s * 0.7, ammeterX + s * 0.7],
+        ]);
     } else {
         line(k, left, top, left, bottom);
-        line(k, right, top, right, bottom);
+        // Sağ dikey telde direnç kutusu
+        line(k, right, top, right, resY - resH / 2);
+        line(k, right, resY + resH / 2, right, bottom);
+        k.c.strokeRect(right - resW / 2, resY - resH / 2, resW, resH);
+        label(k, `${g.res} Ω`, right + resW / 2 + 4, resY, 'left', 'middle', 0.65);
+
         hWire(
             left,
             right,
@@ -393,6 +634,7 @@ const circuitRender: Renderer = (k) => {
         hWire(left, right, batY, [
             [batX - batHalf, batX + batHalf],
             [g.switchAt.x - s * 1.2, g.switchAt.x + s * 1.2],
+            [ammeterX - s * 0.7, ammeterX + s * 0.7],
         ]);
         drawBattery(batX, batY, false);
         currentDots(
@@ -403,10 +645,19 @@ const circuitRender: Renderer = (k) => {
                 [right, top],
                 [right, bottom],
             ],
-            k.t * 40,
+            k.t * (30 + g.current * 40),
             g.brightness[0] > 0
         );
     }
+
+    // Ampermetre çizimi
+    k.c.save();
+    k.c.beginPath();
+    k.c.arc(ammeterX, bottom, s * 0.5, 0, Math.PI * 2);
+    k.c.stroke();
+    label(k, 'A', ammeterX, bottom, 'center', 'middle', 0.75);
+    label(k, `${g.current.toFixed(2)} A`, ammeterX, bottom - s * 0.7, 'center', 'bottom', 0.7);
+    k.c.restore();
 
     // Anahtar
     const sw = g.switchAt;
@@ -426,14 +677,8 @@ const circuitRender: Renderer = (k) => {
 
     if (k.o.labels === false) return;
     const state = !g.closed
-        ? 'anahtar açık — devre tamamlanmadı'
-        : g.brightness.every((b) => b === 0)
-        ? g.parallel
-            ? 'kollar patlak'
-            : 'seri devrede bir ampul patlayınca hepsi söner'
-        : `${g.parallel ? 'paralel' : 'seri'} bağlı · parlaklık ${Math.round(
-              Math.max(...g.brightness) * 100
-          )}%`;
+        ? 'Anahtar AÇIK — Devreden akım geçmiyor (I = 0.00 A)'
+        : `V = ${g.volts} V · R = ${g.res} Ω · Akım: ${g.current.toFixed(2)} A (Ohm Kanunu: I = V/R)`;
     label(k, state, k.r.x + k.r.w / 2, k.r.y + k.r.h, 'center', 'bottom', 0.8);
 };
 
@@ -447,7 +692,7 @@ const circuitSpec: SimSpec = {
                 x: g.switchAt.x,
                 y: g.switchAt.y,
                 type: 'toggle',
-                label: 'Anahtar',
+                label: 'Anahtar (Aç/Kapat)',
                 on: g.closed,
             },
             ...g.bulbs.map((b, i) => ({
@@ -455,7 +700,7 @@ const circuitSpec: SimSpec = {
                 x: b.x,
                 y: b.y - g.s * 1.1,
                 type: 'toggle' as const,
-                label: 'Ampulü patlat',
+                label: 'Ampulü patlat / onar',
                 on: !g.broken[i],
             })),
         ];
@@ -466,9 +711,10 @@ const circuitSpec: SimSpec = {
         return {};
     },
     params: [
+        { key: 'v', label: 'Pil sayısı (V)', min: 1, max: 4, step: 1, unit: 'pil' },
+        { key: 'res', label: 'Direnç (R)', min: 1, max: 50, step: 1, unit: 'Ω' },
         { key: 'parallel', label: 'Bağlantı (0 seri / 1 paralel)', min: 0, max: 1, step: 1 },
         { key: 'n', label: 'Ampul sayısı', min: 1, max: 3, step: 1 },
-        { key: 'v', label: 'Pil sayısı', min: 1, max: 3, step: 1 },
     ],
 };
 
@@ -564,6 +810,7 @@ import { SCIENCE_SIM_ITEMS, SCIENCE_SIM_RENDERERS, SCIENCE_SIM_SPECS } from './s
 
 export const SIM_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
     optics_bench: opticsRender,
+    refraction_sim: refractionRender,
     circuit_sim: circuitRender,
     matter_sim: matterRender,
     ...(GRADE8_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
@@ -581,6 +828,7 @@ export const SIM_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
 
 export const SIM_SPECS: Partial<Record<MathObjectKind, SimSpec>> = {
     optics_bench: opticsSpec,
+    refraction_sim: refractionSpec,
     circuit_sim: circuitSpec,
     matter_sim: matterSpec,
     ...(GRADE8_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
@@ -601,18 +849,49 @@ export const SIM_CATEGORIES: ReadonlyArray<ObjectCategory> = [
         label: 'Canlı Simülasyonlar',
         items: [
             {
+                kind: 'circuit_sim',
+                label: 'Canlı Devre (Mini PhET)',
+                hint: 'Pil, lamba, anahtar ve direnç; Ohm kanununu canlı izle',
+                size: { w: 440, h: 300 },
+                defaults: { labels: true, sim: { parallel: 0, n: 2, v: 2, sw: 1, res: 10 } },
+            },
+            {
+                kind: 'refraction_sim',
+                label: 'Işık Kırılması & Tam Yansıma',
+                hint: 'Lazer açısını sürükle; Snell yasası, sınır açısı ve tam yansıma',
+                size: { w: 460, h: 320 },
+                defaults: { labels: true, sim: { theta1: 45, n1: 1.5, n2: 1.0 } },
+            },
+            {
+                kind: 'lever_sim',
+                label: 'Kaldıraç Dengesi',
+                hint: 'Destek, yük ve kuvveti kaydır; F₁·d₁ = F₂·d₂ tork eşitliği',
+                size: { w: 480, h: 300 },
+                defaults: {
+                    labels: true,
+                    sim: { fulcrum: 50, loadPos: 15, effortPos: 85, load: 40, effort: 40 },
+                },
+            },
+            {
+                kind: 'ph_sim',
+                label: 'Asit – Baz ve pH',
+                hint: 'Turnusol kağıdını daldır, nötrleşmeyi ve renk değişimini gör',
+                size: { w: 500, h: 300 },
+                defaults: { labels: true, sim: { acid: 40, base: 40, k: 3 } },
+            },
+            {
+                kind: 'division_sim',
+                label: 'Mitoz ve Mayoz',
+                hint: 'Evreleri adım adım ilerlet, kromozom hareketlerini izle',
+                size: { w: 500, h: 300 },
+                defaults: { labels: true, sim: { mode: 0, stage: 0 } },
+            },
+            {
                 kind: 'optics_bench',
                 label: 'Optik Düzeneği',
                 hint: 'Cismi sürükle, görüntü canlı oluşsun',
                 size: { w: 460, h: 300 },
                 defaults: { labels: true, sim: { f: 4, a: 7, h: 2 } },
-            },
-            {
-                kind: 'circuit_sim',
-                label: 'Canlı Devre',
-                hint: 'Anahtarı aç-kapa, ampulü patlat, parlaklığı gör',
-                size: { w: 420, h: 280 },
-                defaults: { labels: true, sim: { parallel: 0, n: 2, v: 1, sw: 1 } },
             },
             {
                 kind: 'matter_sim',

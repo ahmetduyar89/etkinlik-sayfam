@@ -1661,7 +1661,15 @@ const divisionSpec: SimSpec = {
                 x: r.x + r.w - 16,
                 y: r.y + r.h - 16,
                 type: 'toggle',
-                label: 'Sonraki aşama',
+                label: 'Sonraki aşama ▶',
+                on: g.idx > 0,
+            },
+            {
+                id: 'prev',
+                x: r.x + r.w - 40,
+                y: r.y + r.h - 16,
+                type: 'toggle',
+                label: '◀ Önceki aşama',
                 on: g.idx > 0,
             },
             {
@@ -1679,6 +1687,7 @@ const divisionSpec: SimSpec = {
         // Kip değişince aşama sayısı değiştiğinden başa sarılır.
         if (id === 'mode') return { mode: g.meiosis ? 0 : 1, stage: 0 };
         if (id === 'next') return { stage: (g.idx + 1) % g.stages.length };
+        if (id === 'prev') return { stage: (g.idx - 1 + g.stages.length) % g.stages.length };
         return {};
     },
     params: [
