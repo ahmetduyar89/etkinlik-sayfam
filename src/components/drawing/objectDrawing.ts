@@ -239,3 +239,45 @@ export const path = (k: Ctx, points: ReadonlyArray<[number, number]>, close = fa
     if (close) k.c.closePath();
     k.c.stroke();
 };
+
+/**
+ * Yuvarlatılmış dikdörtgen YOLU kurar (çizmez). Çağıran `stroke()` ya da
+ * `fill()` ile bitirir; etiket rozetleri ve kutucuklar bunu kullanır.
+ */
+export const roundRect = (
+    k: Ctx,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    rad = 6
+) => {
+    const rr = Math.max(0, Math.min(rad, w / 2, h / 2));
+    k.c.beginPath();
+    k.c.moveTo(x + rr, y);
+    k.c.arcTo(x + w, y, x + w, y + h, rr);
+    k.c.arcTo(x + w, y + h, x, y + h, rr);
+    k.c.arcTo(x, y + h, x, y, rr);
+    k.c.arcTo(x, y, x + w, y, rr);
+    k.c.closePath();
+};
+
+/**
+ * Verilen genişliğe sığan ilk metni seçer (adaylar uzundan kısaya).
+ * Nesne küçültüldüğünde yazı boyu tabanlı olduğundan uzun başlıklar kutudan
+ * taşıyordu; kısaltma bu yüzden çizim anında yapılır.
+ */
+export const fitText = (k: Ctx, candidates: string[], maxWidth: number, scale = 1): string => {
+    for (const text of candidates) if (textWidth(k, text, scale) <= maxWidth) return text;
+    return candidates[candidates.length - 1];
+};
+
+/** Türkçe biçimli sayı: tam sayıysa düz, değilse virgüllü ve eksi işaretli. */
+export const fmtNum = (v: number, digits = 2): string => {
+    const p = 10 ** digits;
+    const rounded = Math.round(v * p) / p;
+    const text = Number.isInteger(rounded)
+        ? String(Math.abs(rounded))
+        : String(Math.abs(rounded)).replace('.', ',');
+    return (rounded < 0 ? '−' : '') + text;
+};
