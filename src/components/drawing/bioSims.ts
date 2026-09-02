@@ -3,6 +3,7 @@
 
 import type { MathObject } from '../../types';
 import {
+    arrow,
     clamp,
     clampInt,
     fitText,
@@ -764,6 +765,232 @@ export const circulationSpec: SimSpec = {
     ],
 };
 
+// ── Besin ağı (Canlılar ve Enerji İlişkileri) ────────────────────────
+//
+// Kilit fikir: besin ağındaki bir tür yok olursa etki yalnız komşusunda
+// kalmaz, ağ boyunca yayılır. Avı azalan tür azalır, avcısı azalan tür
+// çoğalır; etki uzaklaştıkça zayıflar.
+
+interface WebNode {
+    name: string;
+    x: number;
+    y: number;
+}
+
+/** Ağdaki türler ve "kim kimi yer" bağları (avdan avcıya). */
+const WEB_NODES: ReadonlyArray<WebNode> = [
+    { name: 'Ot', x: 0.5, y: 0.9 },
+    { name: 'Çekirge', x: 0.26, y: 0.66 },
+    { name: 'Fare', x: 0.72, y: 0.66 },
+    { name: 'Kurbağa', x: 0.26, y: 0.42 },
+    { name: 'Yılan', x: 0.6, y: 0.42 },
+    { name: 'Kartal', x: 0.5, y: 0.16 },
+];
+/** [av, avcı] çiftleri. */
+const WEB_EDGES: ReadonlyArray<[number, number]> = [
+    [0, 1],
+    [0, 2],
+    [1, 3],
+    [2, 4],
+    [3, 4],
+    [4, 5],
+    [2, 5],
+];
+
+function webState(o: MathObject) {
+    const removed = clampInt(simValue(o, 'removed', -1), -1, WEB_NODES.length - 1, -1);
+    // Popülasyonlar 1.0'dan başlar; etki iki basamak yayılır ve zayıflar.
+    const pop = WEB_NODES.map(() => 1);
+    if (removed >= 0) {
+        pop[removed] = 0;
+        // `effect` işareti yönü taşır: pozitif = tür azaldı, negatif = çoğaldı.
+        // Çoğalan bir tür avını AZALTIR; bu yüzden yayılırken işaret döner.
+        const apply = (node: number, effect: number, depth: number) => {
+            if (depth > 2) return;
+            for (const [prey, pred] of WEB_EDGES) {
+                // Avcısı azalan av çoğalır.
+                if (pred === node) {
+                    pop[prey] *= 1 + 0.5 * effect;
+                    if (depth < 2) apply(prey, -effect * 0.5, depth + 1);
+                }
+                // Avı azalan avcı azalır.
+                if (prey === node) {
+                    pop[pred] *= 1 - 0.5 * effect;
+                    if (depth < 2) apply(pred, effect * 0.5, depth + 1);
+                }
+            }
+        };
+        apply(removed, 1, 1);
+        pop[removed] = 0;
+    }
+    return { removed, pop };
+}
+
+export const foodWebRender: Renderer = (k) => {
+    const r = k.r;
+    const s = webState(k.o);
+    const icon = isIconSize(r);
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const box = {
+        x: r.x + fs,
+        y: r.y + (icon ? 0 : fs * 2),
+        w: r.w - fs * 2,
+        h: r.h - (icon ? 0 : fs * 3.6),
+    };
+    const pos = (i: number) => ({
+        x: box.x + box.w * WEB_NODES[i].x,
+        y: box.y + box.h * WEB_NODES[i].y,
+    });
+    const nodeR = Math.min(box.w * 0.075, box.h * 0.075);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    // Bağlar: avdan avcıya ok
+    for (const [prey, pred] of WEB_EDGES) {
+        const a = pos(prey);
+        const b = pos(pred);
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const gone = s.removed === prey || s.removed === pred;
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, gone ? 0.2 : 0.55);
+        arrow(
+            k,
+            a.x + (dx / len) * nodeR,
+            a.y + (dy / len) * nodeR,
+            b.x - (dx / len) * nodeR * 1.1,
+            b.y - (dy / len) * nodeR * 1.1,
+            fs * 0.4,
+            1.2,
+        );
+        k.c.restore();
+    }
+
+    // Düğümler: popülasyon çemberin dolgusuyla gösterilir
+    WEB_NODES.forEach((node, i) => {
+        const p = pos(i);
+        const removed = s.removed === i;
+        k.c.save();
+        k.c.lineWidth = Math.max(1.5, k.lw);
+        if (removed) k.c.setLineDash([4, 3]);
+        k.c.beginPath();
+        k.c.arc(p.x, p.y, nodeR, 0, Math.PI * 2);
+        k.c.stroke();
+        k.c.restore();
+        if (!removed) {
+            k.c.save();
+            k.c.globalAlpha = 0.1 + Math.min(0.35, s.pop[i] * 0.22);
+            k.c.beginPath();
+            k.c.arc(p.x, p.y, nodeR, 0, Math.PI * 2);
+            k.c.fill();
+            k.c.restore();
+        } else {
+            line(k, p.x - nodeR * 0.6, p.y - nodeR * 0.6, p.x + nodeR * 0.6, p.y + nodeR * 0.6, 1.4);
+            line(k, p.x - nodeR * 0.6, p.y + nodeR * 0.6, p.x + nodeR * 0.6, p.y - nodeR * 0.6, 1.4);
+        }
+        if (icon) return;
+        label(k, node.name, p.x, p.y + nodeR + fs * 0.3, 'center', 'top', 0.66);
+        if (!removed && s.removed >= 0) {
+            const change = s.pop[i] - 1;
+            if (Math.abs(change) > 0.02) {
+                label(
+                    k,
+                    `${change > 0 ? '↑' : '↓'} %${fmtNum(Math.abs(change) * 100, 0)}`,
+                    p.x + nodeR + fs * 0.3,
+                    p.y,
+                    'left',
+                    'middle',
+                    0.62,
+                );
+            }
+        }
+    });
+
+    if (icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                s.removed < 0
+                    ? 'Bir türü çıkar: etki ağ boyunca yayılsın'
+                    : `${WEB_NODES[s.removed].name} yok oldu · ok yönü avdan avcıya`,
+                s.removed < 0 ? 'Besin ağı' : `${WEB_NODES[s.removed].name} yok`,
+            ],
+            r.w - fs * 5,
+            0.82,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.82,
+    );
+    label(
+        k,
+        s.removed < 0
+            ? 'Oklar avdan avcıya gider; her tür dengeyi paylaşır'
+            : 'Avcısı azalan tür çoğalır, avı azalan tür azalır',
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.72,
+    );
+    k.c.restore();
+};
+
+export const foodWebSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = webState(o);
+        return [
+            {
+                id: 'next',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label:
+                    s.removed < 0
+                        ? 'Bir türü ağdan çıkar'
+                        : `Sıradaki türü çıkar (şimdi: ${WEB_NODES[s.removed].name})`,
+                on: s.removed >= 0,
+            },
+            {
+                id: 'reset',
+                x: r.x + r.w - 40,
+                y: r.y + 14,
+                type: 'toggle',
+                label: 'Ağı eski hâline getir',
+                on: s.removed < 0,
+            },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        const s = webState(o);
+        if (id === 'reset') return { removed: -1 };
+        if (id === 'next') return { removed: (s.removed + 1) % WEB_NODES.length };
+        return {};
+    },
+    params: [
+        {
+            key: 'removed',
+            label: 'Çıkarılan tür (-1 yok)',
+            min: -1,
+            max: WEB_NODES.length - 1,
+            step: 1,
+        },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const BIO_SIM_RENDERERS: Record<string, Renderer> = {
@@ -771,6 +998,7 @@ export const BIO_SIM_RENDERERS: Record<string, Renderer> = {
     dna_pair_sim: dnaRender,
     selection_sim: selectionRender,
     circulation_sim: circulationRender,
+    food_web_sim: foodWebRender,
 };
 
 export const BIO_SIM_SPECS: Record<string, SimSpec> = {
@@ -778,6 +1006,7 @@ export const BIO_SIM_SPECS: Record<string, SimSpec> = {
     dna_pair_sim: dnaSpec,
     selection_sim: selectionSpec,
     circulation_sim: circulationSpec,
+    food_web_sim: foodWebSpec,
 };
 
 export const BIO_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -808,5 +1037,12 @@ export const BIO_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Kanı dolaştır; küçük ve büyük dolaşımı ayrı ayrı izle',
         size: { w: 460, h: 400 },
         defaults: { labels: true, sim: { focus: 0, play: 0 } },
+    },
+    {
+        kind: 'food_web_sim',
+        label: 'Besin Ağı',
+        hint: 'Bir türü çıkar; etkinin ağ boyunca yayılmasını izle',
+        size: { w: 500, h: 380 },
+        defaults: { labels: true, sim: { removed: -1 } },
     },
 ];
