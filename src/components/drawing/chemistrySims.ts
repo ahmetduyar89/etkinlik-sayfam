@@ -3,6 +3,7 @@
 
 import type { MathObject } from '../../types';
 import {
+    arrow,
     clamp,
     clampInt,
     fitText,
@@ -13,6 +14,7 @@ import {
     path,
     simValue,
     withAlpha,
+    type Ctx,
     type MathCatalogItem,
     type Rect,
     type Renderer,
@@ -666,18 +668,244 @@ export const solubilitySpec: SimSpec = {
     ],
 };
 
+// ── İyon ve bağ oluşumu (Kimyasal Türler Arası Etkileşim) ────────────
+//
+// Kilit fikir: atomlar son katmanını sekize (hidrojende ikiye) tamamlamak
+// için elektron ALIR, VERİR ya da ORTAKLAŞIR. Vermek-almak iyonik bağı,
+// ortaklaşmak kovalent bağı doğurur.
+
+interface BondAtom {
+    symbol: string;
+    shells: number[];
+    /** Bağdan sonra oluşan yük (iyonik bağda). */
+    charge: number;
+}
+
+interface BondCase {
+    title: string;
+    /** 0 iyonik, 1 kovalent. */
+    kind: number;
+    left: BondAtom;
+    right: BondAtom;
+    product: string;
+    note: string;
+}
+
+const BOND_CASES: ReadonlyArray<BondCase> = [
+    {
+        title: 'Sodyum + Klor',
+        kind: 0,
+        left: { symbol: 'Na', shells: [2, 8, 1], charge: 1 },
+        right: { symbol: 'Cl', shells: [2, 8, 7], charge: -1 },
+        product: 'NaCl',
+        note: 'Sodyum bir elektron verir, klor alır: zıt yüklü iyonlar çekilir',
+    },
+    {
+        title: 'Magnezyum + Oksijen',
+        kind: 0,
+        left: { symbol: 'Mg', shells: [2, 8, 2], charge: 2 },
+        right: { symbol: 'O', shells: [2, 6], charge: -2 },
+        product: 'MgO',
+        note: 'Magnezyum iki elektron verir, oksijen ikisini de alır',
+    },
+    {
+        title: 'Hidrojen + Hidrojen',
+        kind: 1,
+        left: { symbol: 'H', shells: [1], charge: 0 },
+        right: { symbol: 'H', shells: [1], charge: 0 },
+        product: 'H₂',
+        note: 'İki hidrojen birer elektronunu ortaklaşa kullanır',
+    },
+];
+
+const bondState = (o: MathObject) => {
+    const mode = clampInt(simValue(o, 'mode', 0), 0, BOND_CASES.length - 1, 0);
+    // 0: nötr atomlar, 1: elektron aktarımı/ortaklaşma, 2: oluşan bileşik
+    const step = clampInt(simValue(o, 'step', 0), 0, 2, 0);
+    return { mode, step, data: BOND_CASES[mode] };
+};
+
+/** Katmanlı atom çizer ve son katmandaki elektron konumlarını döndürür. */
+function bondAtomDraw(
+    k: Ctx,
+    cx: number,
+    cy: number,
+    R: number,
+    atom: BondAtom,
+    shells: number[],
+    charge: number,
+    showCharge: boolean
+) {
+    const step = R / (shells.length + 0.4);
+    k.c.beginPath();
+    k.c.arc(cx, cy, step * 0.55, 0, Math.PI * 2);
+    k.c.stroke();
+    label(k, atom.symbol, cx, cy, 'center', 'middle', 0.72);
+    shells.forEach((count, i) => {
+        const rad = step * (i + 1);
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.45);
+        k.c.beginPath();
+        k.c.lineWidth = 1;
+        k.c.arc(cx, cy, rad, 0, Math.PI * 2);
+        k.c.stroke();
+        k.c.restore();
+        for (let j = 0; j < count; j++) {
+            const a = (j / Math.max(1, count)) * Math.PI * 2 - Math.PI / 2;
+            k.c.beginPath();
+            k.c.arc(cx + rad * Math.cos(a), cy + rad * Math.sin(a), Math.max(2, step * 0.13), 0, Math.PI * 2);
+            k.c.fill();
+        }
+    });
+    if (showCharge && charge !== 0) {
+        const sign = charge > 0 ? '+' : '−';
+        const text = Math.abs(charge) === 1 ? sign : `${Math.abs(charge)}${sign}`;
+        label(k, `[${atom.symbol}]${text}`, cx, cy + R + k.fs * 0.6, 'center', 'top', 0.75);
+    }
+}
+
+export const ionBondRender: Renderer = (k) => {
+    const r = k.r;
+    const s = bondState(k.o);
+    const d = s.data;
+    const icon = isIconSize(r);
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const cy = r.y + r.h * (icon ? 0.5 : 0.48);
+    const R = Math.min(r.w * 0.17, r.h * (icon ? 0.4 : 0.3));
+    const lx = r.x + r.w * 0.27;
+    const rx = r.x + r.w * 0.73;
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    // Aktarımdan sonra son katmanlar değişir
+    const transferred = s.step >= 2 && d.kind === 0;
+    const leftShells = transferred ? d.left.shells.slice(0, -1) : d.left.shells;
+    const rightShells = transferred
+        ? d.right.shells.map((c, i) => (i === d.right.shells.length - 1 ? c + Math.abs(d.left.charge) : c))
+        : d.right.shells;
+
+    bondAtomDraw(k, lx, cy, R, d.left, leftShells, d.left.charge, transferred);
+    bondAtomDraw(k, rx, cy, R, d.right, rightShells, d.right.charge, transferred);
+
+    // Aktarım oku ya da ortak elektron çifti
+    if (s.step >= 1) {
+        if (d.kind === 0) {
+            k.c.save();
+            k.c.strokeStyle = withAlpha(k.color, 0.8);
+            arrow(k, lx + R * 1.05, cy - R * 0.25, rx - R * 1.05, cy - R * 0.25, fs * 0.5, Math.max(1.5, k.lw));
+            k.c.restore();
+        } else {
+            for (const dy of [-fs * 0.35, fs * 0.35]) {
+                k.c.beginPath();
+                k.c.arc((lx + rx) / 2, cy + dy, Math.max(2.5, fs * 0.16), 0, Math.PI * 2);
+                k.c.fill();
+            }
+            k.c.save();
+            k.c.strokeStyle = withAlpha(k.color, 0.5);
+            k.c.beginPath();
+            k.c.ellipse((lx + rx) / 2, cy, fs * 0.9, fs * 1.1, 0, 0, Math.PI * 2);
+            k.c.stroke();
+            k.c.restore();
+        }
+    }
+
+    if (icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    if (s.step >= 1) {
+        label(
+            k,
+            d.kind === 0 ? 'elektron aktarımı' : 'ortak elektron çifti',
+            (lx + rx) / 2,
+            cy - R * (d.kind === 0 ? 0.6 : 1.1),
+            'center',
+            'bottom',
+            0.62,
+        );
+    }
+    if (s.step >= 2) {
+        // Bileşik adı iki atomun arasında durur; altta not satırıyla
+        // çakışıyordu.
+        label(k, d.product, (lx + rx) / 2, cy + R * 0.55, 'center', 'middle', 1.1);
+    }
+
+    const stepName = ['1. Nötr atomlar', '2. Elektron hareketi', '3. Oluşan bileşik'][s.step];
+    label(
+        k,
+        fitText(
+            k,
+            [
+                `${d.title} · ${stepName} · ${d.kind === 0 ? 'iyonik bağ' : 'kovalent bağ'}`,
+                `${d.title} · ${stepName}`,
+                d.title,
+            ],
+            r.w - fs * 5,
+            0.82,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.82,
+    );
+    label(k, fitText(k, [d.note], r.w - 8, 0.72), r.x + r.w / 2, r.y + r.h, 'center', 'bottom', 0.72);
+    k.c.restore();
+};
+
+export const ionBondSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = bondState(o);
+        return [
+            {
+                id: 'step',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: 'Sonraki adım',
+                on: s.step > 0,
+            },
+            {
+                id: 'mode',
+                x: r.x + r.w - 40,
+                y: r.y + 14,
+                type: 'toggle',
+                label: `Örneği değiştir (şimdi: ${s.data.title})`,
+                on: s.mode > 0,
+            },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        const s = bondState(o);
+        if (id === 'step') return { step: (s.step + 1) % 3 };
+        if (id === 'mode') return { mode: (s.mode + 1) % BOND_CASES.length, step: 0 };
+        return {};
+    },
+    params: [
+        { key: 'mode', label: `Örnek (0-${BOND_CASES.length - 1})`, min: 0, max: BOND_CASES.length - 1, step: 1 },
+        { key: 'step', label: 'Adım (0-2)', min: 0, max: 2, step: 1 },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const CHEMISTRY_SIM_RENDERERS: Record<string, Renderer> = {
     electron_config_sim: electronRender,
     balance_eq_sim: balanceRender,
     solubility_sim: solubilityRender,
+    ion_bond_sim: ionBondRender,
 };
 
 export const CHEMISTRY_SIM_SPECS: Record<string, SimSpec> = {
     electron_config_sim: electronSpec,
     balance_eq_sim: balanceSpec,
     solubility_sim: solubilitySpec,
+    ion_bond_sim: ionBondSpec,
 };
 
 export const CHEMISTRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -701,5 +929,12 @@ export const CHEMISTRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Sıcaklığı değiştir; doymuş çözeltiyi ve çökeltiyi gör',
         size: { w: 540, h: 340 },
         defaults: { labels: true, sim: { sub: 0, temp: 20, amount: 60 } },
+    },
+    {
+        kind: 'ion_bond_sim',
+        label: 'İyon ve Bağ Oluşumu',
+        hint: 'Elektron alışverişi ve ortaklaşma: iyonik ve kovalent bağ',
+        size: { w: 520, h: 340 },
+        defaults: { labels: true, sim: { mode: 0, step: 0 } },
     },
 ];

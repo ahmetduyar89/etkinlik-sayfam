@@ -763,18 +763,199 @@ export const anglesSpec: SimSpec = {
     ],
 };
 
+// ── Pisagor bağıntısı (Üçgende kenar bağıntıları) ────────────────────
+//
+// Kilit fikir: dik üçgende dik kenarların kareleri toplamı hipotenüsün
+// karesine eşittir. Kareler gerçekten çizilir ve birim kareleri sayılır;
+// eşitlik ezber değil, alan karşılaştırması olarak görünür.
+
+const pythState = (o: MathObject) => {
+    const a = clampInt(simValue(o, 'a', 3), 1, 8, 3);
+    const b = clampInt(simValue(o, 'b', 4), 1, 8, 4);
+    return { a, b, c: Math.hypot(a, b) };
+};
+
+function pythGeom(r: Rect, s: { a: number; b: number; c: number }) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    // Şeklin kapladığı alan: solda b karesi, altta a karesi, üstte hipotenüs
+    // karesi. Ölçek bu kutuya göre seçilir.
+    const spanX = s.b + s.a + s.c * 0.9;
+    const spanY = s.a + s.b + s.c * 0.9;
+    const u = Math.min(
+        (r.w - (icon ? 6 : fs * 2)) / spanX,
+        (r.h - (icon ? 6 : fs * 4)) / spanY
+    );
+    // Dik köşe: sol altta, dik kenarlar sağa ve yukarı gider.
+    const ox = r.x + (icon ? r.w * 0.5 - (s.a - s.b) * u * 0.5 : fs + s.b * u);
+    const oy = r.y + (icon ? r.h * 0.5 + (s.b - s.a) * u * 0.5 : fs * 2.4 + s.c * 0.9 * u + s.b * u);
+    return { fs, icon, u, ox, oy };
+}
+
+export const pythagorasRender: Renderer = (k) => {
+    const r = k.r;
+    const s = pythState(k.o);
+    const g = pythGeom(r, s);
+    const A = { x: g.ox, y: g.oy };
+    const B = { x: g.ox + s.a * g.u, y: g.oy };
+    const C = { x: g.ox, y: g.oy - s.b * g.u };
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = Math.max(1.6, k.lw);
+
+    /** Bir kenarın dışına, birim kareleriyle birlikte kare çizer. */
+    const squareOn = (
+        p1: { x: number; y: number },
+        p2: { x: number; y: number },
+        n: number,
+        away: { x: number; y: number }
+    ) => {
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        // Dik yön iki taraftan biri; üçgenden UZAK olan seçilir.
+        let nx = -dy;
+        let ny = dx;
+        const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+        if ((mid.x + nx - away.x) ** 2 + (mid.y + ny - away.y) ** 2 < (mid.x - away.x) ** 2 + (mid.y - away.y) ** 2) {
+            nx = -nx;
+            ny = -ny;
+        }
+        const p3 = { x: p2.x + nx, y: p2.y + ny };
+        const p4 = { x: p1.x + nx, y: p1.y + ny };
+        path(k, [
+            [p1.x, p1.y],
+            [p2.x, p2.y],
+            [p3.x, p3.y],
+            [p4.x, p4.y],
+        ], true);
+        k.c.save();
+        k.c.globalAlpha = 0.1;
+        k.c.beginPath();
+        k.c.moveTo(p1.x, p1.y);
+        k.c.lineTo(p2.x, p2.y);
+        k.c.lineTo(p3.x, p3.y);
+        k.c.lineTo(p4.x, p4.y);
+        k.c.closePath();
+        k.c.fill();
+        k.c.restore();
+        // Birim kareler
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.35);
+        for (let i = 1; i < n; i++) {
+            const t = i / n;
+            line(k, p1.x + dx * t, p1.y + dy * t, p4.x + dx * t, p4.y + dy * t, 1);
+            line(k, p1.x + nx * t, p1.y + ny * t, p2.x + nx * t, p2.y + ny * t, 1);
+        }
+        k.c.restore();
+        return { x: (p1.x + p3.x) / 2, y: (p1.y + p3.y) / 2 };
+    };
+
+    const centerA = squareOn(A, B, s.a, C);
+    const centerB = squareOn(C, A, s.b, B);
+    const centerC = squareOn(B, C, Math.round(s.c) === s.c ? s.c : 0, A);
+
+    // Üçgen ve dik açı işareti
+    k.c.lineWidth = Math.max(2, k.lw * 1.4);
+    path(k, [
+        [A.x, A.y],
+        [B.x, B.y],
+        [C.x, C.y],
+    ], true);
+    const m = Math.min(g.u * 0.35, 12);
+    path(k, [
+        [A.x + m, A.y],
+        [A.x + m, A.y - m],
+        [A.x, A.y - m],
+    ]);
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    label(k, `a² = ${s.a * s.a}`, centerA.x, centerA.y, 'center', 'middle', 0.8);
+    label(k, `b² = ${s.b * s.b}`, centerB.x, centerB.y, 'center', 'middle', 0.8);
+    label(k, `c² = ${s.a * s.a + s.b * s.b}`, centerC.x, centerC.y, 'center', 'middle', 0.8);
+    label(k, `a = ${s.a}`, (A.x + B.x) / 2, A.y - g.fs * 0.4, 'center', 'bottom', 0.68);
+    label(k, `b = ${s.b}`, A.x + g.fs * 0.4, (A.y + C.y) / 2, 'left', 'middle', 0.68);
+    label(k, `c = ${fmtNum(s.c, 2)}`, (B.x + C.x) / 2 + g.fs * 0.5, (B.y + C.y) / 2 - g.fs * 0.4, 'left', 'bottom', 0.68);
+
+    label(
+        k,
+        fitText(
+            k,
+            ['Dik kenarların kareleri toplamı = hipotenüsün karesi', 'Pisagor bağıntısı'],
+            r.w - g.fs * 2,
+            0.8,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8,
+    );
+    label(
+        k,
+        `${s.a}² + ${s.b}² = ${s.a * s.a} + ${s.b * s.b} = ${s.a * s.a + s.b * s.b} = c²`,
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.85,
+    );
+    k.c.restore();
+};
+
+export const pythagorasSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = pythState(o);
+        const g = pythGeom(r, s);
+        return [
+            {
+                id: 'a',
+                x: g.ox + s.a * g.u,
+                y: g.oy,
+                type: 'drag',
+                label: 'Yatay dik kenarı değiştir',
+            },
+            {
+                id: 'b',
+                x: g.ox,
+                y: g.oy - s.b * g.u,
+                type: 'drag',
+                label: 'Dikey dik kenarı değiştir',
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const s = pythState(o);
+        const g = pythGeom(r, s);
+        if (id === 'a') return { a: clamp(Math.round((p.x - g.ox) / g.u), 1, 8) };
+        return { b: clamp(Math.round((g.oy - p.y) / g.u), 1, 8) };
+    },
+    params: [
+        { key: 'a', label: 'Dik kenar a', min: 1, max: 8, step: 1, unit: 'br' },
+        { key: 'b', label: 'Dik kenar b', min: 1, max: 8, step: 1, unit: 'br' },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const GEOMETRY_SIM_RENDERERS: Record<string, Renderer> = {
     transform_sim: transformRender,
     net_fold_sim: netFoldRender,
     angles_sim: anglesRender,
+    pythagoras_sim: pythagorasRender,
 };
 
 export const GEOMETRY_SIM_SPECS: Record<string, SimSpec> = {
     transform_sim: transformSpec,
     net_fold_sim: netFoldSpec,
     angles_sim: anglesSpec,
+    pythagoras_sim: pythagorasSpec,
 };
 
 export const GEOMETRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -798,5 +979,12 @@ export const GEOMETRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Paralel doğrular ve kesen: yöndeş, ters, iç ters ve iç yan açılar',
         size: { w: 500, h: 340 },
         defaults: { labels: true, sim: { theta: 55, pair: 0 } },
+    },
+    {
+        kind: 'pythagoras_sim',
+        label: 'Pisagor Bağıntısı',
+        hint: 'Dik kenarları sürükle; kare alanlarının eşitliğini gör',
+        size: { w: 480, h: 400 },
+        defaults: { labels: true, sim: { a: 3, b: 4 } },
     },
 ];

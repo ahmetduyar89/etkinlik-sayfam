@@ -229,7 +229,13 @@ export type MathObjectKind =
     | 'angles_sim'
     | 'ohm_sim'
     | 'eclipse_sim'
-    | 'selection_sim';
+    | 'selection_sim'
+    | 'slope_sim'
+    | 'pythagoras_sim'
+    | 'sound_wave_sim'
+    | 'gas_pressure_sim'
+    | 'ion_bond_sim'
+    | 'circulation_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile
