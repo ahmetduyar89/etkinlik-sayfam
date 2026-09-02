@@ -549,6 +549,8 @@ const matterSpec: SimSpec = {
 };
 
 import { GRADE8_ITEMS, GRADE8_RENDERERS, GRADE8_SPECS } from './grade8Sims';
+import { MATH_SIM_ITEMS, MATH_SIM_RENDERERS, MATH_SIM_SPECS } from './mathSims';
+import { SCIENCE_SIM_ITEMS, SCIENCE_SIM_RENDERERS, SCIENCE_SIM_SPECS } from './scienceSims';
 
 // ── Kayıt ────────────────────────────────────────────────────────────
 
@@ -557,6 +559,8 @@ export const SIM_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
     circuit_sim: circuitRender,
     matter_sim: matterRender,
     ...(GRADE8_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
+    ...(MATH_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
+    ...(SCIENCE_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
 };
 
 export const SIM_SPECS: Partial<Record<MathObjectKind, SimSpec>> = {
@@ -564,6 +568,8 @@ export const SIM_SPECS: Partial<Record<MathObjectKind, SimSpec>> = {
     circuit_sim: circuitSpec,
     matter_sim: matterSpec,
     ...(GRADE8_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
+    ...(MATH_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
+    ...(SCIENCE_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
 };
 
 export const SIM_CATEGORIES: ReadonlyArray<ObjectCategory> = [
@@ -594,4 +600,6 @@ export const SIM_CATEGORIES: ReadonlyArray<ObjectCategory> = [
         ],
     },
     { label: '8. Sınıf', items: GRADE8_ITEMS },
+    { label: 'Canlı Matematik', items: MATH_SIM_ITEMS },
+    { label: 'Etkileşimli Fen', items: SCIENCE_SIM_ITEMS },
 ];

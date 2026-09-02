@@ -199,7 +199,13 @@ export type MathObjectKind =
     | 'division_sim'
     | 'ph_sim'
     | 'pyramid_sim'
-    | 'electro_sim';
+    | 'electro_sim'
+    // ── Canlı matematik ─────────────────────────────────────────────
+    | 'equation_sim'
+    | 'area_perimeter_sim'
+    // ── Etkileşimli fen ─────────────────────────────────────────────
+    | 'moon_phase_sim'
+    | 'label_drag_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile
