@@ -3,11 +3,14 @@
 
 import type { MathObject } from '../../types';
 import {
+    clamp,
     clampInt,
     fitText,
     isIconSize,
+    fmtNum,
     label,
     line,
+    path,
     simValue,
     withAlpha,
     type MathCatalogItem,
@@ -438,16 +441,243 @@ export const balanceSpec: SimSpec = {
     ],
 };
 
+// ── Çözünürlük (Maddenin Yapısı ve Özellikleri) ──────────────────────
+//
+// Kilit fikir: belli sıcaklıkta 100 mL suda ancak belli miktar madde
+// çözünür. Fazlası dipte çökelti olarak kalır; sıcaklık artınca katıların
+// çözünürlüğü genelde artar ama her maddede aynı hızda artmaz.
+
+interface Solute {
+    name: string;
+    /** Verilen sıcaklıkta 100 mL sudaki çözünürlük (g). */
+    curve: (t: number) => number;
+}
+
+const SOLUTES: ReadonlyArray<Solute> = [
+    // Potasyum nitrat sıcaklıkla hızla artar, tuz neredeyse sabittir.
+    { name: 'Potasyum nitrat', curve: (t) => 13 + 0.35 * t + 0.021 * t * t },
+    { name: 'Yemek tuzu', curve: (t) => 35.7 + 0.023 * t },
+];
+
+const SOLUBILITY_MAX = 260;
+
+function solubilityState(o: MathObject) {
+    const sub = clampInt(simValue(o, 'sub', 0), 0, SOLUTES.length - 1, 0);
+    const temp = clamp(simValue(o, 'temp', 20), 0, 100);
+    const amount = clamp(simValue(o, 'amount', 60), 0, 200);
+    const capacity = SOLUTES[sub].curve(temp);
+    const dissolved = Math.min(amount, capacity);
+    return {
+        sub,
+        solute: SOLUTES[sub],
+        temp,
+        amount,
+        capacity,
+        dissolved,
+        excess: Math.max(0, amount - capacity),
+        state:
+            amount > capacity + 0.01
+                ? 'Doymuş çözelti + çökelti'
+                : Math.abs(amount - capacity) < 2
+                  ? 'Doymuş çözelti'
+                  : 'Doymamış çözelti',
+    };
+}
+
+function solubilityGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const tank = {
+        x: r.x + r.w * (icon ? 0.24 : 0.06),
+        y: r.y + (icon ? r.h * 0.14 : fs * 2.8),
+        w: r.w * (icon ? 0.52 : 0.26),
+        h: r.h - (icon ? r.h * 0.28 : fs * 5),
+    };
+    const chart = {
+        x: r.x + r.w * 0.42,
+        y: r.y + fs * 3,
+        w: r.w * 0.5,
+        h: r.h - fs * 5.6,
+    };
+    return { fs, icon, tank, chart };
+}
+
+export const solubilityRender: Renderer = (k) => {
+    const r = k.r;
+    const s = solubilityState(k.o);
+    const g = solubilityGeom(r);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    // Beher ve su
+    const waterY = g.tank.y + g.tank.h * 0.2;
+    line(k, g.tank.x, g.tank.y, g.tank.x, g.tank.y + g.tank.h);
+    line(k, g.tank.x, g.tank.y + g.tank.h, g.tank.x + g.tank.w, g.tank.y + g.tank.h);
+    line(k, g.tank.x + g.tank.w, g.tank.y, g.tank.x + g.tank.w, g.tank.y + g.tank.h);
+    k.c.save();
+    k.c.globalAlpha = 0.1;
+    k.c.fillRect(g.tank.x, waterY, g.tank.w, g.tank.y + g.tank.h - waterY);
+    k.c.restore();
+    line(k, g.tank.x, waterY, g.tank.x + g.tank.w, waterY, 1.2);
+
+    // Çözünen tanecikler suda dağılır; çözünmeyen dipte birikir
+    const dots = Math.round((s.dissolved / SOLUBILITY_MAX) * 90);
+    const dotR = Math.max(1.2, g.tank.w * 0.018);
+    // Sabit ama düzensiz dağılım: çarpanla modül almak taneciklerimi
+    // çapraz şeritlere diziyordu, bu yüzden sinüs tabanlı saçılım kullanılır.
+    const scatter = (n: number) => Math.abs(Math.sin(n * 127.1) * 43758.5453) % 1;
+    for (let i = 0; i < dots; i++) {
+        const fx = scatter(i + 1);
+        const fy = scatter(i + 91);
+        k.c.beginPath();
+        k.c.arc(
+            g.tank.x + g.tank.w * (0.08 + fx * 0.84),
+            waterY + (g.tank.y + g.tank.h - waterY) * (0.06 + fy * 0.82),
+            dotR,
+            0,
+            Math.PI * 2,
+        );
+        k.c.fill();
+    }
+    if (s.excess > 0) {
+        const pileH = Math.min(g.tank.h * 0.3, (s.excess / 120) * g.tank.h * 0.3 + g.tank.h * 0.03);
+        k.c.save();
+        k.c.globalAlpha = 0.45;
+        k.c.beginPath();
+        k.c.moveTo(g.tank.x + g.tank.w * 0.12, g.tank.y + g.tank.h);
+        k.c.lineTo(g.tank.x + g.tank.w * 0.5, g.tank.y + g.tank.h - pileH);
+        k.c.lineTo(g.tank.x + g.tank.w * 0.88, g.tank.y + g.tank.h);
+        k.c.closePath();
+        k.c.fill();
+        k.c.restore();
+    }
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Çözünürlük grafiği
+    const px = (t: number) => g.chart.x + (g.chart.w * t) / 100;
+    const py = (v: number) => g.chart.y + g.chart.h - (g.chart.h * v) / SOLUBILITY_MAX;
+    line(k, g.chart.x, g.chart.y, g.chart.x, g.chart.y + g.chart.h);
+    line(k, g.chart.x, g.chart.y + g.chart.h, g.chart.x + g.chart.w, g.chart.y + g.chart.h);
+    SOLUTES.forEach((solute, i) => {
+        const pts: Array<[number, number]> = [];
+        for (let t = 0; t <= 100; t += 5) pts.push([px(t), py(solute.curve(t))]);
+        k.c.save();
+        if (i !== s.sub) k.c.strokeStyle = withAlpha(k.color, 0.3);
+        k.c.lineWidth = i === s.sub ? Math.max(1.8, k.lw) : 1;
+        path(k, pts, false);
+        k.c.restore();
+        label(
+            k,
+            solute.name,
+            px(100) - 2,
+            py(solute.curve(100)) - g.fs * 0.3,
+            'right',
+            'bottom',
+            0.58,
+        );
+    });
+    // Eklenen miktar ve şu anki nokta
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.5);
+    k.c.setLineDash([5, 4]);
+    line(k, g.chart.x, py(Math.min(s.amount, SOLUBILITY_MAX)), g.chart.x + g.chart.w, py(Math.min(s.amount, SOLUBILITY_MAX)), 1);
+    k.c.restore();
+    k.c.beginPath();
+    k.c.arc(px(s.temp), py(Math.min(s.capacity, SOLUBILITY_MAX)), Math.max(3, g.fs * 0.25), 0, Math.PI * 2);
+    k.c.fill();
+    label(k, '0', g.chart.x - g.fs * 0.3, g.chart.y + g.chart.h, 'right', 'middle', 0.58);
+    label(k, String(SOLUBILITY_MAX), g.chart.x - g.fs * 0.3, g.chart.y, 'right', 'middle', 0.58);
+    label(k, 'g / 100 mL', g.chart.x, g.chart.y - g.fs * 0.4, 'left', 'bottom', 0.58);
+    label(k, '0 °C', g.chart.x, g.chart.y + g.chart.h + g.fs * 0.3, 'left', 'top', 0.58);
+    label(k, '100 °C', g.chart.x + g.chart.w, g.chart.y + g.chart.h + g.fs * 0.3, 'right', 'top', 0.58);
+
+    label(
+        k,
+        fitText(
+            k,
+            [`${s.solute.name} · ${fmtNum(s.temp, 0)} °C · eklenen ${fmtNum(s.amount, 0)} g`, s.solute.name],
+            r.w - g.fs * 5,
+            0.8,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8,
+    );
+    label(
+        k,
+        fitText(
+            k,
+            [
+                `Çözünürlük ${fmtNum(s.capacity, 0)} g · çözünen ${fmtNum(s.dissolved, 0)} g · dipte ${fmtNum(s.excess, 0)} g · ${s.state}`,
+                `${fmtNum(s.dissolved, 0)} g çözündü · ${fmtNum(s.excess, 0)} g dipte · ${s.state}`,
+                s.state,
+            ],
+            r.w - 8,
+            0.72,
+        ),
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.72,
+    );
+    k.c.restore();
+};
+
+export const solubilitySpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = solubilityState(o);
+        const g = solubilityGeom(r);
+        const px = g.chart.x + (g.chart.w * s.temp) / 100;
+        const py =
+            g.chart.y + g.chart.h - (g.chart.h * Math.min(s.capacity, SOLUBILITY_MAX)) / SOLUBILITY_MAX;
+        return [
+            { id: 'temp', x: px, y: py, type: 'drag', label: 'Sıcaklığı değiştir' },
+            {
+                id: 'sub',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: `Maddeyi değiştir (şimdi: ${s.solute.name})`,
+                on: s.sub > 0,
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const s = solubilityState(o);
+        if (id === 'sub') return { sub: (s.sub + 1) % SOLUTES.length };
+        const g = solubilityGeom(r);
+        return { temp: clamp(((p.x - g.chart.x) / g.chart.w) * 100, 0, 100) };
+    },
+    params: [
+        { key: 'sub', label: 'Madde (0-1)', min: 0, max: SOLUTES.length - 1, step: 1 },
+        { key: 'temp', label: 'Sıcaklık', min: 0, max: 100, step: 1, unit: '°C' },
+        { key: 'amount', label: 'Eklenen madde', min: 0, max: 200, step: 5, unit: 'g' },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const CHEMISTRY_SIM_RENDERERS: Record<string, Renderer> = {
     electron_config_sim: electronRender,
     balance_eq_sim: balanceRender,
+    solubility_sim: solubilityRender,
 };
 
 export const CHEMISTRY_SIM_SPECS: Record<string, SimSpec> = {
     electron_config_sim: electronSpec,
     balance_eq_sim: balanceSpec,
+    solubility_sim: solubilitySpec,
 };
 
 export const CHEMISTRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -464,5 +694,12 @@ export const CHEMISTRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Katsayıları artır; atom sayıları iki tarafta eşitlensin',
         size: { w: 520, h: 340 },
         defaults: { labels: true, sim: { mode: 0, c0: 1, c1: 1, c2: 1, c3: 1 } },
+    },
+    {
+        kind: 'solubility_sim',
+        label: 'Çözünürlük',
+        hint: 'Sıcaklığı değiştir; doymuş çözeltiyi ve çökeltiyi gör',
+        size: { w: 540, h: 340 },
+        defaults: { labels: true, sim: { sub: 0, temp: 20, amount: 60 } },
     },
 ];

@@ -207,6 +207,8 @@ export type MathObjectKind =
     | 'transform_sim'
     | 'data_stats_sim'
     | 'net_fold_sim'
+    | 'fraction_add_sim'
+    | 'scale_zoom_sim'
     // ── Etkileşimli fen ─────────────────────────────────────────────
     | 'moon_phase_sim'
     | 'label_drag_sim'
@@ -217,7 +219,11 @@ export type MathObjectKind =
     | 'electron_config_sim'
     | 'balance_eq_sim'
     | 'photosynthesis_sim'
-    | 'dna_pair_sim';
+    | 'dna_pair_sim'
+    | 'net_force_sim'
+    | 'energy_sim'
+    | 'solubility_sim'
+    | 'sorting_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile
