@@ -17,6 +17,7 @@ import {
     roundRect,
     simValue,
     smooth,
+    textWidth,
     smoothPath,
     withAlpha,
     type Ctx,
@@ -1292,6 +1293,376 @@ export const breathingSpec: SimSpec = {
     params: [{ key: 'p', label: 'Soluk (0 ver – 1 al)', min: 0, max: 1, step: 0.05 }],
 };
 
+// ── Sindirim yolculuğu (Vücudumuzdaki Sistemler) ─────────────────────
+//
+// Kilit fikir: sindirim yalnız midede olmaz. Her durakta ya MEKANİK
+// (besini küçültme) ya KİMYASAL (enzimlerle yapı taşlarına ayırma) ya da
+// ikisi birden gerçekleşir; yemek borusu ile kalın bağırsakta sindirim
+// yoktur. Emilim ise büyük ölçüde ince bağırsakta olur.
+
+interface DigestStop {
+    organ: string;
+    mechanical: boolean;
+    chemical: boolean;
+    /** Salgı ve etkilediği besin. */
+    detail: string;
+    note: string;
+}
+
+const DIGEST_STOPS: ReadonlyArray<DigestStop> = [
+    {
+        organ: 'Ağız',
+        mechanical: true,
+        chemical: true,
+        detail: 'Tükürük amilazı · nişasta',
+        note: 'Dişler besini küçültür (mekanik), tükürükteki amilaz nişastayı kimyasal olarak parçalamaya başlar.',
+    },
+    {
+        organ: 'Yemek borusu',
+        mechanical: false,
+        chemical: false,
+        detail: 'Salgı yok · yalnız iletim',
+        note: 'Sindirim olmaz. Kasların dalga hareketi (peristaltik) besini mideye iletir.',
+    },
+    {
+        organ: 'Mide',
+        mechanical: true,
+        chemical: true,
+        detail: 'Mide öz suyu, pepsin · protein',
+        note: 'Mide kasları besini karıştırır (mekanik); mide öz suyundaki pepsin proteinleri parçalar (kimyasal).',
+    },
+    {
+        organ: 'İnce bağırsak',
+        mechanical: false,
+        chemical: true,
+        detail: 'Safra, pankreas ve bağırsak öz suyu',
+        note: 'Sindirim burada tamamlanır. Safra yağları küçük damlacıklara ayırır; villuslarla emilim yapılır.',
+    },
+    {
+        organ: 'Kalın bağırsak',
+        mechanical: false,
+        chemical: false,
+        detail: 'Su ve mineral emilimi',
+        note: 'Sindirim olmaz. Sindirilemeyen atıklardan su ve mineraller emilir, kalanı dışkı olarak atılır.',
+    },
+];
+
+const digestState = (o: MathObject, t: number) => {
+    const playing = simValue(o, 'play', 0) > 0.5;
+    const stop = playing
+        ? Math.floor((t * 0.4) % DIGEST_STOPS.length)
+        : clampInt(simValue(o, 'stop', 0), 0, DIGEST_STOPS.length - 1, 0);
+    return { stop, playing };
+};
+
+interface DigestGeom {
+    cx: number;
+    mouth: [number, number];
+    esoTop: [number, number];
+    esoBottom: [number, number];
+    stomach: [number, number];
+    smallInt: [number, number];
+    largeInt: [number, number];
+    bw: number;
+    bh: number;
+    bx: number;
+    by: number;
+}
+
+const digestGeom = (b: Rect): DigestGeom => {
+    const cx = b.x + b.w * 0.5;
+    return {
+        cx,
+        bx: b.x,
+        by: b.y,
+        bw: b.w,
+        bh: b.h,
+        mouth: [cx, b.y + b.h * 0.06],
+        esoTop: [cx, b.y + b.h * 0.13],
+        esoBottom: [cx, b.y + b.h * 0.34],
+        stomach: [cx + b.w * 0.15, b.y + b.h * 0.43],
+        smallInt: [cx, b.y + b.h * 0.72],
+        largeInt: [cx - b.w * 0.3, b.y + b.h * 0.66],
+    };
+};
+
+/** Etkin organ tam, ötekiler soluk çizilir. */
+function organ(k: Ctx, active: boolean, draw: () => void) {
+    k.c.save();
+    k.c.globalAlpha = active ? 1 : 0.26;
+    k.c.lineWidth = active ? Math.max(2.2, k.lw * 1.4) : Math.max(1.4, k.lw * 0.9);
+    draw();
+    k.c.restore();
+}
+
+export const digestionRender: Renderer = (k) => {
+    const r = k.r;
+    const s = digestState(k.o, k.t);
+    const icon = isIconSize(r);
+    const fs = clamp(Math.min(r.w, r.h) / 15, 9, 19);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineJoin = 'round';
+
+    const body: Rect = icon
+        ? { x: r.x + r.w * 0.14, y: r.y + r.h * 0.04, w: r.w * 0.72, h: r.h * 0.92 }
+        : { x: r.x + fs * 0.4, y: r.y + fs * 2.3, w: r.w * 0.44, h: r.h - fs * 3.4 };
+    const g = digestGeom(body);
+    const bw = body.w;
+    const bh = body.h;
+
+    // Gövde hattı
+    if (!icon) {
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.18);
+        const torso: Array<[number, number]> = [
+            [g.cx - bw * 0.42, body.y + bh * 0.12],
+            [g.cx - bw * 0.46, body.y + bh * 0.5],
+            [g.cx - bw * 0.38, body.y + bh * 0.94],
+            [g.cx + bw * 0.38, body.y + bh * 0.94],
+            [g.cx + bw * 0.46, body.y + bh * 0.5],
+            [g.cx + bw * 0.42, body.y + bh * 0.12],
+        ];
+        smooth(k, torso, false, 1.4);
+        k.c.restore();
+    }
+
+    // Karaciğer ve pankreas (yardımcı organlar, sindirim durağı değil)
+    if (!icon) {
+        k.c.save();
+        k.c.globalAlpha = s.stop === 3 ? 0.85 : 0.22;
+        const liver: Array<[number, number]> = [
+            [g.cx - bw * 0.36, body.y + bh * 0.34],
+            [g.cx - bw * 0.02, body.y + bh * 0.32],
+            [g.cx - bw * 0.06, body.y + bh * 0.45],
+            [g.cx - bw * 0.32, body.y + bh * 0.46],
+        ];
+        fillShape(k, () => smoothPath(k, liver), 0.16);
+        smooth(k, liver, true, Math.max(1.4, k.lw));
+        label(k, 'karaciğer', g.cx - bw * 0.34, body.y + bh * 0.39, 'left', 'middle', 0.5);
+        // Pankreas
+        const panc: Array<[number, number]> = [
+            [g.cx - bw * 0.04, body.y + bh * 0.555],
+            [g.cx + bw * 0.24, body.y + bh * 0.545],
+            [g.cx + bw * 0.22, body.y + bh * 0.59],
+            [g.cx - bw * 0.04, body.y + bh * 0.595],
+        ];
+        fillShape(k, () => smoothPath(k, panc), 0.16);
+        smooth(k, panc, true, Math.max(1.4, k.lw));
+        k.c.restore();
+    }
+
+    // Kalın bağırsak: ince bağırsağı çerçeveleyen kalın boru
+    organ(k, icon || s.stop === 4, () => {
+        const colon: Array<[number, number]> = [
+            [g.cx - bw * 0.3, body.y + bh * 0.89],
+            [g.cx - bw * 0.32, body.y + bh * 0.72],
+            [g.cx - bw * 0.3, body.y + bh * 0.65],
+            [g.cx, body.y + bh * 0.635],
+            [g.cx + bw * 0.3, body.y + bh * 0.65],
+            [g.cx + bw * 0.32, body.y + bh * 0.74],
+            [g.cx + bw * 0.28, body.y + bh * 0.89],
+            [g.cx + bw * 0.06, body.y + bh * 0.95],
+        ];
+        smooth(k, colon, false);
+    });
+
+    // İnce bağırsak: kıvrımlı ilmekler
+    organ(k, icon || s.stop === 3, () => {
+        const loops: Array<[number, number]> = [];
+        for (let i = 0; i <= 72; i++) {
+            const u = i / 72;
+            const x = g.cx + Math.sin(u * Math.PI * 2.5) * bw * 0.17;
+            const y = body.y + bh * (0.685 + u * 0.195);
+            loops.push([x, y]);
+        }
+        smooth(k, loops, false);
+    });
+
+    // Mide: J biçimli kese
+    organ(k, icon || s.stop === 2, () => {
+        const st: Array<[number, number]> = [
+            [g.cx + bw * 0.02, body.y + bh * 0.35],
+            [g.cx + bw * 0.24, body.y + bh * 0.36],
+            [g.cx + bw * 0.3, body.y + bh * 0.46],
+            [g.cx + bw * 0.18, body.y + bh * 0.55],
+            [g.cx + bw * 0.04, body.y + bh * 0.5],
+            [g.cx + bw * 0.08, body.y + bh * 0.42],
+        ];
+        fillShape(k, () => smoothPath(k, st), 0.12);
+        smooth(k, st, true);
+    });
+
+    // Yemek borusu
+    organ(k, icon || s.stop === 1, () => {
+        line(k, g.cx - bw * 0.03, g.esoTop[1], g.cx - bw * 0.03, body.y + bh * 0.37);
+        line(k, g.cx + bw * 0.03, g.esoTop[1], g.cx + bw * 0.03, body.y + bh * 0.36);
+    });
+
+    // Ağız
+    organ(k, icon || s.stop === 0, () => {
+        k.c.beginPath();
+        k.c.ellipse(g.cx, g.mouth[1], bw * 0.12, bh * 0.045, 0, 0, Math.PI * 2);
+        k.c.stroke();
+        if (!icon) {
+            for (let i = -2; i <= 2; i++) {
+                const tx = g.cx + i * bw * 0.035;
+                line(k, tx, g.mouth[1] - bh * 0.032, tx, g.mouth[1] - bh * 0.008, 1.2);
+            }
+        }
+    });
+
+    if (icon) {
+        k.c.restore();
+        return;
+    }
+
+    // Besin lokması: etkin durakta
+    const bolus: ReadonlyArray<[number, number]> = [
+        [g.cx, g.mouth[1]],
+        [g.cx, body.y + bh * 0.25],
+        [g.cx + bw * 0.17, body.y + bh * 0.45],
+        [g.cx, body.y + bh * 0.78],
+        [g.cx - bw * 0.31, body.y + bh * 0.78],
+    ];
+    const [bxp, byp] = bolus[s.stop];
+    k.c.save();
+    k.c.fillStyle = k.color;
+    k.c.beginPath();
+    k.c.arc(bxp, byp, fs * 0.3, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.restore();
+
+    if (k.o.labels !== false) {
+        const st = DIGEST_STOPS[s.stop];
+        const px = r.x + r.w * 0.5;
+        const pw = r.w - (px - r.x) - fs * 0.4;
+        const py = r.y + fs * 2.3;
+        const ph = fs * 10.4;
+        panel(k, px, py, pw, ph);
+        label(k, `${s.stop + 1}. ${st.organ}`, px + fs * 0.7, py + fs * 1.1, 'left', 'middle', 0.82);
+
+        // Sindirim türü rozetleri
+        const badges: ReadonlyArray<[string, boolean]> = [
+            ['Mekanik sindirim', st.mechanical],
+            ['Kimyasal sindirim', st.chemical],
+        ];
+        badges.forEach(([txt, on], i) => {
+            const y = py + fs * (2.5 + i * 1.5);
+            k.c.save();
+            k.c.strokeStyle = withAlpha(k.color, on ? 0.8 : 0.3);
+            roundRect(k, px + fs * 0.7, y - fs * 0.55, pw - fs * 1.4, fs * 1.15, 5);
+            k.c.lineWidth = 1;
+            k.c.stroke();
+            if (on) {
+                k.c.globalAlpha = 0.1;
+                k.c.fill();
+            }
+            k.c.restore();
+            label(k, `${on ? '✓' : '✕'}  ${txt}`, px + fs * 1.1, y, 'left', 'middle', 0.58);
+        });
+
+        label(k, 'Salgı', px + fs * 0.7, py + fs * 5.4, 'left', 'middle', 0.52);
+        label(k, fitText(k, [st.detail], pw - fs * 1.4, 0.58), px + fs * 0.7, py + fs * 6.2, 'left', 'middle', 0.58);
+
+        // Açıklama
+        let buf = '';
+        let row = 0;
+        for (const w of st.note.split(' ')) {
+            const next = buf ? `${buf} ${w}` : w;
+            if (textWidth(k, next, 0.55) > pw - fs * 1.4 && buf) {
+                label(k, buf, px + fs * 0.7, py + fs * 7.5 + row * fs * 0.8, 'left', 'top', 0.55);
+                buf = w;
+                row++;
+            } else buf = next;
+        }
+        if (buf) label(k, buf, px + fs * 0.7, py + fs * 7.5 + row * fs * 0.8, 'left', 'top', 0.55);
+
+        // Durak şeridi
+        const sy = py + ph + fs * 1.2;
+        DIGEST_STOPS.forEach((d, i) => {
+            const x = px + fs * 0.7 + i * fs * 1.5;
+            k.c.save();
+            k.c.strokeStyle = i === s.stop ? k.color : withAlpha(k.color, 0.4);
+            k.c.beginPath();
+            k.c.lineWidth = i === s.stop ? 2 : 1;
+            k.c.arc(x, sy, fs * 0.42, 0, Math.PI * 2);
+            if (i === s.stop) k.c.fill();
+            else k.c.stroke();
+            k.c.restore();
+            k.c.save();
+            if (i === s.stop) k.c.globalCompositeOperation = 'destination-out';
+            label(k, String(i + 1), x, sy, 'center', 'middle', 0.55);
+            k.c.restore();
+            if (i < DIGEST_STOPS.length - 1) {
+                k.c.save();
+                k.c.strokeStyle = withAlpha(k.color, 0.35);
+                line(k, x + fs * 0.5, sy, x + fs * 1.08, sy, 1.2);
+                k.c.restore();
+            }
+        });
+        label(k, DIGEST_STOPS[s.stop].organ, px + fs * 0.7, sy + fs * 0.9, 'left', 'top', 0.52);
+    }
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                'Sindirim yolculuğu: her durakta ne oluyor?',
+                'Sindirim yolculuğu',
+            ],
+            r.w - fs * 3,
+            0.8
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8
+    );
+    k.c.restore();
+};
+
+export const digestionSpec: SimSpec = {
+    animated: (o) => simValue(o, 'play', 0) > 0.5,
+    controls: (r, o): SimControl[] => {
+        const s = digestState(o, 0);
+        return [
+            {
+                id: 'next',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: 'Sonraki durak',
+                on: s.stop > 0,
+            },
+            {
+                id: 'play',
+                x: r.x + r.w - 40,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.playing ? 'Durdur' : 'Yolculuğu başlat',
+                on: s.playing,
+            },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        if (id === 'play') return { play: simValue(o, 'play', 0) > 0.5 ? 0 : 1 };
+        if (id === 'next') {
+            const stop = clampInt(simValue(o, 'stop', 0), 0, DIGEST_STOPS.length - 1, 0);
+            return { stop: (stop + 1) % DIGEST_STOPS.length, play: 0 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'stop', label: `Durak (0-${DIGEST_STOPS.length - 1})`, min: 0, max: DIGEST_STOPS.length - 1, step: 1 },
+    ],
+};
+
 export const BIO_SIM_RENDERERS: Record<string, Renderer> = {
     photosynthesis_sim: photosynthesisRender,
     dna_pair_sim: dnaRender,
@@ -1299,6 +1670,7 @@ export const BIO_SIM_RENDERERS: Record<string, Renderer> = {
     circulation_sim: circulationRender,
     food_web_sim: foodWebRender,
     breathing_sim: breathingRender,
+    digestion_sim: digestionRender,
 };
 
 export const BIO_SIM_SPECS: Record<string, SimSpec> = {
@@ -1308,6 +1680,7 @@ export const BIO_SIM_SPECS: Record<string, SimSpec> = {
     circulation_sim: circulationSpec,
     food_web_sim: foodWebSpec,
     breathing_sim: breathingSpec,
+    digestion_sim: digestionSpec,
 };
 
 export const BIO_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -1352,5 +1725,12 @@ export const BIO_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Diyaframı çek: hacim–basınç ilişkisini soluk alıp vermede gör',
         size: { w: 540, h: 380 },
         defaults: { labels: true, sim: { p: 0, play: 0 } },
+    },
+    {
+        kind: 'digestion_sim',
+        label: 'Sindirim Yolculuğu',
+        hint: 'Besini organ organ ilerlet: mekanik mi kimyasal mı, hangi salgı?',
+        size: { w: 620, h: 420 },
+        defaults: { labels: true, sim: { stop: 0, play: 0 } },
     },
 ];

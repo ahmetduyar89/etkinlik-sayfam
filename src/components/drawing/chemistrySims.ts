@@ -1422,6 +1422,275 @@ export const atomModelsSpec: SimSpec = {
 
 // ── Kayıt ────────────────────────────────────────────────────────────
 
+// ── Molekül kurucu (Maddenin Doğasına Yolculuk) ──────────────────────
+//
+// Kilit fikir: bir atom kaç bağ yapacağını kendi değerliği belirler.
+// Merkez atomun etrafındaki boşluk sayısı onun bağ sayısıdır; uçlara
+// ancak TEK bağ yapabilen atomlar (H, Cl) oturur. Bağ sayısı molekülün
+// şeklini de belirler.
+
+interface Element {
+    sym: string;
+    /** Yapabildiği bağ sayısı (değerlik). */
+    bonds: number;
+    /** Çizim yarıçapı çarpanı. */
+    size: number;
+}
+
+const MOL_ELEMENTS: ReadonlyArray<Element> = [
+    { sym: '', bonds: 0, size: 0.72 },
+    { sym: 'H', bonds: 1, size: 0.62 },
+    { sym: 'C', bonds: 4, size: 1 },
+    { sym: 'N', bonds: 3, size: 0.94 },
+    { sym: 'O', bonds: 2, size: 0.9 },
+    { sym: 'Cl', bonds: 1, size: 1.06 },
+];
+
+interface Molecule {
+    formula: string;
+    name: string;
+    shape: string;
+    /** Merkez atomun MOL_ELEMENTS içindeki sırası. */
+    center: number;
+    /** Uçlardaki doğru atom (MOL_ELEMENTS sırası). */
+    outer: number;
+    /** Bağ yönleri (derece, 0 = sağ, 90 = aşağı). */
+    angles: ReadonlyArray<number>;
+}
+
+const MOLECULES: ReadonlyArray<Molecule> = [
+    { formula: 'H₂O', name: 'Su', shape: 'Açısal', center: 4, outer: 1, angles: [142, 38] },
+    { formula: 'NH₃', name: 'Amonyak', shape: 'Üçgen piramit', center: 3, outer: 1, angles: [90, 210, 330] },
+    { formula: 'CH₄', name: 'Metan', shape: 'Düzgün dörtyüzlü', center: 2, outer: 1, angles: [45, 135, 225, 315] },
+    { formula: 'CCl₄', name: 'Karbon tetraklorür', shape: 'Düzgün dörtyüzlü', center: 2, outer: 5, angles: [45, 135, 225, 315] },
+];
+
+const MOL_MAX_SLOTS = Math.max(...MOLECULES.map((m) => m.angles.length));
+
+const moleculeState = (o: MathObject) => {
+    const mol = clampInt(simValue(o, 'mol', 0), 0, MOLECULES.length - 1, 0);
+    const m = MOLECULES[mol];
+    const slots = m.angles.map((_, i) => clampInt(simValue(o, `s${i}`, 0), 0, MOL_ELEMENTS.length - 1, 0));
+    const correct = slots.filter((v) => v === m.outer).length;
+    return { mol, m, slots, correct, show: simValue(o, 'show', 0) > 0.5 };
+};
+
+/** Atom yuvarlağı; boş yuva kesikli çizilir. */
+function atomCircle(k: Ctx, x: number, y: number, rad: number, sym: string, wrong: boolean) {
+    k.c.save();
+    if (!sym) {
+        k.c.setLineDash([4, 3]);
+        k.c.strokeStyle = withAlpha(k.color, 0.55);
+    } else if (wrong) {
+        k.c.setLineDash([5, 3]);
+    } else {
+        fillShape(k, () => k.c.arc(x, y, rad, 0, Math.PI * 2), 0.12);
+    }
+    k.c.beginPath();
+    k.c.lineWidth = Math.max(1.7, k.lw);
+    k.c.arc(x, y, rad, 0, Math.PI * 2);
+    k.c.stroke();
+    k.c.restore();
+    label(k, sym || '?', x, y, 'center', 'middle', sym.length > 1 ? 0.62 : 0.72);
+}
+
+export const moleculeBuildRender: Renderer = (k) => {
+    const r = k.r;
+    const s = moleculeState(k.o);
+    const icon = isIconSize(r);
+    const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineJoin = 'round';
+
+    const stage: Rect = icon
+        ? r
+        : { x: r.x + fs * 0.4, y: r.y + fs * 2.4, w: r.w * 0.55, h: r.h - fs * 3.4 };
+    const cx = stage.x + stage.w / 2;
+    const cy = stage.y + stage.h * 0.5;
+    const base = Math.min(stage.w, stage.h) * 0.13;
+    const bond = base * 2.45;
+    const c = MOL_ELEMENTS[s.m.center];
+    const cRad = base * c.size * 1.12;
+
+    // Bağlar: atom yuvarlaklarının kenarından kenarına
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.75);
+    s.m.angles.forEach((deg, i) => {
+        const a = (deg * Math.PI) / 180;
+        const oRad = base * MOL_ELEMENTS[icon ? s.m.outer : s.slots[i]].size;
+        line(
+            k,
+            cx + Math.cos(a) * cRad,
+            cy + Math.sin(a) * cRad,
+            cx + Math.cos(a) * (bond - oRad),
+            cy + Math.sin(a) * (bond - oRad),
+            Math.max(1.8, k.lw)
+        );
+    });
+    k.c.restore();
+
+    // Uç atomlar
+    s.m.angles.forEach((deg, i) => {
+        const a = (deg * Math.PI) / 180;
+        const x = cx + Math.cos(a) * bond;
+        const y = cy + Math.sin(a) * bond;
+        const el = MOL_ELEMENTS[icon ? s.m.outer : s.slots[i]];
+        atomCircle(k, x, y, base * el.size, el.sym, s.show && s.slots[i] !== 0 && s.slots[i] !== s.m.outer);
+    });
+
+    // Merkez atom
+    atomCircle(k, cx, cy, cRad, c.sym, false);
+
+    if (icon) {
+        k.c.restore();
+        return;
+    }
+
+    if (k.o.labels !== false) {
+        const px = r.x + r.w * 0.58;
+        const pw = r.w - (px - r.x) - fs * 0.4;
+        const py = r.y + fs * 2.4;
+        const ph = fs * 8.6;
+        panel(k, px, py, pw, ph);
+        label(k, `Hedef: ${s.m.formula}`, px + fs * 0.6, py + fs * 1.05, 'left', 'middle', 0.8);
+        label(k, s.m.name, px + fs * 0.6, py + fs * 2.1, 'left', 'middle', 0.56);
+        const rows: ReadonlyArray<[string, string]> = [
+            ['Merkez atom', `${c.sym} · ${c.bonds} bağ yapar`],
+            ['Bağ sayısı', `${s.m.angles.length}`],
+            ['Şekil', s.m.shape],
+        ];
+        rows.forEach(([a, b], i) => {
+            const y = py + fs * (3.4 + i * 1.4);
+            label(k, a, px + fs * 0.6, y, 'left', 'middle', 0.5);
+            label(k, fitText(k, [b], pw - fs * 1.1, 0.58), px + fs * 0.6, y + fs * 0.68, 'left', 'middle', 0.58);
+        });
+        const done = s.correct === s.m.angles.length;
+        label(
+            k,
+            s.show ? (done ? `Doğru — ${s.m.formula} kuruldu` : `${s.correct} / ${s.m.angles.length} doğru`) : 'Boşlukları doldur',
+            px + fs * 0.6,
+            py + fs * 7.9,
+            'left',
+            'middle',
+            0.62
+        );
+
+        // Değerlik şeridi
+        const vy = py + ph + fs * 0.8;
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.5);
+        roundRect(k, px + fs * 0.4, vy, pw - fs * 0.8, fs * 2.5, 5);
+        k.c.lineWidth = 1;
+        k.c.stroke();
+        k.c.restore();
+        label(k, 'Kaç bağ yapar?', px + fs * 0.8, vy + fs * 0.8, 'left', 'middle', 0.5);
+        label(
+            k,
+            fitText(k, ['H 1 · Cl 1 · O 2 · N 3 · C 4', 'H1 Cl1 O2 N3 C4'], pw - fs * 1.4, 0.58),
+            px + fs * 0.8,
+            vy + fs * 1.7,
+            'left',
+            'middle',
+            0.58
+        );
+    }
+
+    label(
+        k,
+        fitText(
+            k,
+            ['Molekül kurucu: bağ sayısı molekülün şeklini belirler', 'Molekül kurucu'],
+            r.w - fs * 4,
+            0.8
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8
+    );
+    k.c.restore();
+};
+
+const moleculeGeom = (r: Rect, m: Molecule) => {
+    const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+    const stage: Rect = { x: r.x + fs * 0.4, y: r.y + fs * 2.4, w: r.w * 0.55, h: r.h - fs * 3.4 };
+    const base = Math.min(stage.w, stage.h) * 0.13;
+    return {
+        fs,
+        base,
+        cx: stage.x + stage.w / 2,
+        cy: stage.y + stage.h * 0.5,
+        bond: base * 2.45,
+        angles: m.angles,
+    };
+};
+
+export const moleculeBuildSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = moleculeState(o);
+        const g = moleculeGeom(r, s.m);
+        const out: SimControl[] = s.m.angles.map((deg, i) => {
+            const a = (deg * Math.PI) / 180;
+            // Tutamak atomun dışında durur; üstünde olsaydı sembolü kapatırdı.
+            const d = g.bond + g.base * MOL_ELEMENTS[s.slots[i]].size + g.fs * 0.7;
+            return {
+                id: `slot${i}`,
+                x: g.cx + Math.cos(a) * d,
+                y: g.cy + Math.sin(a) * d,
+                type: 'toggle' as const,
+                label: `${i + 1}. boşluğa atom yerleştir`,
+                on: s.slots[i] !== 0,
+            };
+        });
+        out.push(
+            {
+                id: 'check',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.show ? 'Cevapları gizle' : 'Kontrol et',
+                on: s.show,
+            },
+            { id: 'reset', x: r.x + r.w - 40, y: r.y + 14, type: 'toggle', label: 'Boşlukları temizle', on: false },
+            {
+                id: 'mol',
+                x: r.x + r.w - 66,
+                y: r.y + 14,
+                type: 'toggle',
+                label: 'Başka molekül',
+                on: s.mol > 0,
+            },
+        );
+        return out;
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        const s = moleculeState(o);
+        const clear = (): Record<string, number> => {
+            const patch: Record<string, number> = {};
+            for (let i = 0; i < MOL_MAX_SLOTS; i++) patch[`s${i}`] = 0;
+            return patch;
+        };
+        if (id === 'check') return { show: s.show ? 0 : 1 };
+        if (id === 'reset') return { ...clear(), show: 0 };
+        if (id === 'mol') return { ...clear(), show: 0, mol: (s.mol + 1) % MOLECULES.length };
+        if (id.startsWith('slot')) {
+            const i = Number(id.slice(4));
+            if (!Number.isInteger(i) || i < 0 || i >= s.m.angles.length) return {};
+            return { [`s${i}`]: (s.slots[i] + 1) % MOL_ELEMENTS.length, show: 0 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'mol', label: `Molekül (0-${MOLECULES.length - 1})`, min: 0, max: MOLECULES.length - 1, step: 1 },
+        { key: 'show', label: 'Kontrol (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
 export const CHEMISTRY_SIM_RENDERERS: Record<string, Renderer> = {
     electron_config_sim: electronRender,
     balance_eq_sim: balanceRender,
@@ -1429,6 +1698,7 @@ export const CHEMISTRY_SIM_RENDERERS: Record<string, Renderer> = {
     ion_bond_sim: ionBondRender,
     mass_conservation_sim: massConservationRender,
     atom_models_sim: atomModelsRender,
+    molecule_build_sim: moleculeBuildRender,
 };
 
 export const CHEMISTRY_SIM_SPECS: Record<string, SimSpec> = {
@@ -1438,6 +1708,7 @@ export const CHEMISTRY_SIM_SPECS: Record<string, SimSpec> = {
     ion_bond_sim: ionBondSpec,
     mass_conservation_sim: massConservationSpec,
     atom_models_sim: atomModelsSpec,
+    molecule_build_sim: moleculeBuildSpec,
 };
 
 export const CHEMISTRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -1482,5 +1753,12 @@ export const CHEMISTRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Dalton’dan Bohr’a: her model neyi açıklar, neyi açıklayamaz',
         size: { w: 560, h: 360 },
         defaults: { labels: true, sim: { model: 0, exp: 0 } },
+    },
+    {
+        kind: 'molecule_build_sim',
+        label: 'Molekül Kurucu',
+        hint: 'Boşluklara atom yerleştir: H₂O, NH₃, CH₄, CCl₄ kur ve kontrol et',
+        size: { w: 600, h: 400 },
+        defaults: { labels: true, sim: { mol: 0, show: 0 } },
     },
 ];
