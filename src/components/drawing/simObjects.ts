@@ -797,6 +797,8 @@ const matterSpec: SimSpec = {
 import { GRADE8_ITEMS, GRADE8_RENDERERS, GRADE8_SPECS } from './grade8Sims';
 import { BIO_SIM_ITEMS, BIO_SIM_RENDERERS, BIO_SIM_SPECS } from './bioSims';
 import { CHEMISTRY_SIM_ITEMS, CHEMISTRY_SIM_RENDERERS, CHEMISTRY_SIM_SPECS } from './chemistrySims';
+import { ELECTRIC_SIM_ITEMS, ELECTRIC_SIM_RENDERERS, ELECTRIC_SIM_SPECS } from './electricSims';
+import { OPTICS_SIM_ITEMS, OPTICS_SIM_RENDERERS, OPTICS_SIM_SPECS } from './opticsSims';
 import { GEOMETRY_SIM_ITEMS, GEOMETRY_SIM_RENDERERS, GEOMETRY_SIM_SPECS } from './geometrySims';
 import { MEASURE_SIM_ITEMS, MEASURE_SIM_RENDERERS, MEASURE_SIM_SPECS } from './measureSim';
 import { NUMBER_SIM_ITEMS, NUMBER_SIM_RENDERERS, NUMBER_SIM_SPECS } from './numberSims';
@@ -823,6 +825,8 @@ export const SIM_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
     ...(SORTING_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(TASK_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(MEASURE_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
+    ...(ELECTRIC_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
+    ...(OPTICS_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(SCIENCE_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
 };
 
@@ -841,6 +845,8 @@ export const SIM_SPECS: Partial<Record<MathObjectKind, SimSpec>> = {
     ...(SORTING_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(TASK_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(MEASURE_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
+    ...(ELECTRIC_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
+    ...(OPTICS_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(SCIENCE_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
 };
 
@@ -1001,6 +1007,8 @@ export const SIM_CATEGORIES: ReadonlyArray<ObjectCategory> = [
             ...SORTING_SIM_ITEMS,
             ...TASK_SIM_ITEMS,
             ...MEASURE_SIM_ITEMS,
+            ...ELECTRIC_SIM_ITEMS,
+            ...OPTICS_SIM_ITEMS,
         ],
     },
 ];

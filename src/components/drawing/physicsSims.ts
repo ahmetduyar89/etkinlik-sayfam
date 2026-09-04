@@ -5,12 +5,14 @@ import type { MathObject } from '../../types';
 import {
     arrow,
     clamp,
+    fillShape,
     clampInt,
     fitText,
     fmtNum,
     isIconSize,
     label,
     line,
+    panel,
     path,
     roundRect,
     simValue,
@@ -1618,6 +1620,278 @@ export const electromagnetSpec: SimSpec = {
 
 // ── Kayıt ────────────────────────────────────────────────────────────
 
+// ── Fiziksel iş (Kuvvet ve Enerjiyi Keşfedelim) ──────────────────────
+//
+// Kilit fikir: fizikte iş, KUVVET YÖNÜNDEKİ yer değiştirmeyle yapılır.
+//   W = F · x · cos θ
+// Kuvvet yer değiştirmeye dikse (θ = 90°) ya da cisim hiç yer
+// değiştirmiyorsa (x = 0) iş sıfırdır — ne kadar zorlanırsak zorlanalım.
+
+interface WorkState {
+    /** Uygulanan kuvvet (N). */
+    f: number;
+    /** Yer değiştirme (m). */
+    x: number;
+    /** Kuvvetin yatayla açısı (derece). */
+    ang: number;
+    w: number;
+}
+
+const workState = (o: MathObject): WorkState => {
+    const f = clamp(simValue(o, 'f', 40), 0, 100);
+    const x = clamp(simValue(o, 'x', 3), 0, 6);
+    const ang = clamp(simValue(o, 'ang', 30), 0, 90);
+    return { f, x, ang, w: f * x * Math.cos((ang * Math.PI) / 180) };
+};
+
+/** Sandığı (tahta kasa) verilen merkeze çizer. */
+function drawCrate(k: Ctx, cx: number, groundY: number, side: number, ghost: boolean) {
+    const x0 = cx - side / 2;
+    const y0 = groundY - side;
+    k.c.save();
+    if (ghost) {
+        k.c.setLineDash([5, 4]);
+        k.c.strokeStyle = withAlpha(k.color, 0.4);
+        k.c.strokeRect(x0, y0, side, side);
+        k.c.restore();
+        return;
+    }
+    fillShape(k, () => k.c.rect(x0, y0, side, side), 0.12);
+    k.c.lineWidth = Math.max(1.8, k.lw);
+    k.c.strokeRect(x0, y0, side, side);
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.35);
+    k.c.lineWidth = 1.2;
+    k.c.beginPath();
+    k.c.moveTo(x0, y0);
+    k.c.lineTo(x0 + side, y0 + side);
+    k.c.moveTo(x0 + side, y0);
+    k.c.lineTo(x0, y0 + side);
+    k.c.stroke();
+    k.c.restore();
+    k.c.restore();
+}
+
+export const workRender: Renderer = (k) => {
+    const r = k.r;
+    const s = workState(k.o);
+    const icon = isIconSize(r);
+    const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineJoin = 'round';
+
+    const stage: Rect = icon
+        ? r
+        : { x: r.x + fs * 0.6, y: r.y + fs * 2.2, w: r.w * 0.62, h: r.h - fs * 3.2 };
+    const groundY = stage.y + stage.h * (icon ? 0.78 : 0.7);
+    const side = Math.min(stage.h * 0.24, stage.w * 0.16);
+    // 1 m = kaç piksel
+    const unit = (stage.w - side * 1.6) / 6.4;
+    const startX = stage.x + side * 0.9;
+    const crateX = startX + s.x * unit;
+
+    // Zemin
+    line(k, stage.x, groundY, stage.x + stage.w, groundY, Math.max(1.8, k.lw));
+    if (!icon) {
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.3);
+        for (let x = stage.x; x < stage.x + stage.w; x += fs * 0.8) {
+            line(k, x, groundY, x - fs * 0.4, groundY + fs * 0.45, 1);
+        }
+        k.c.restore();
+    }
+
+    if (!icon && s.x > 0.02) drawCrate(k, startX, groundY, side, true);
+    drawCrate(k, crateX, groundY, side, false);
+
+    // Kuvvet oku: sandığın üst köşesinden θ açısıyla
+    const a = (s.ang * Math.PI) / 180;
+    const ax = crateX + side / 2;
+    const ay = groundY - side * 0.75;
+    const len = fs * 1.7 + (s.f / 100) * Math.min(stage.w * 0.26, fs * 5.4);
+    const fx = ax + len * Math.cos(a);
+    const fy = ay - len * Math.sin(a);
+    k.c.save();
+    k.c.strokeStyle = k.color;
+    arrow(k, ax, ay, fx, fy, fs * 0.5, Math.max(2, k.lw * 1.3));
+    k.c.restore();
+    if (!icon) {
+        label(k, `F = ${fmtNum(s.f, 0)} N`, fx + fs * 0.2, fy - fs * 0.2, 'left', 'bottom', 0.6);
+        // Bileşenler
+        k.c.save();
+        k.c.setLineDash([4, 4]);
+        k.c.strokeStyle = withAlpha(k.color, 0.55);
+        line(k, ax, ay, ax + len * Math.cos(a), ay, 1.2);
+        line(k, ax + len * Math.cos(a), ay, fx, fy, 1.2);
+        k.c.restore();
+        if (s.ang < 86) {
+            label(k, 'F·cos θ', ax + len * Math.cos(a) * 0.5 + fs * 0.4, ay + fs * 0.28, 'center', 'top', 0.55);
+        }
+        // Açı yayı
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.6);
+        k.c.beginPath();
+        k.c.lineWidth = 1.2;
+        k.c.arc(ax, ay, fs * 0.95, -a, 0);
+        k.c.stroke();
+        k.c.restore();
+        if (s.ang >= 8) {
+            const bis = a / 2;
+            const rad = Math.min(fs * 1.5, len * 0.42);
+            label(k, 'θ', ax + rad * Math.cos(bis), ay - rad * Math.sin(bis), 'center', 'middle', 0.6);
+        }
+    }
+
+    // Yer değiştirme ölçüsü
+    if (!icon) {
+        const my = groundY + fs * 1.5;
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.7);
+        if (s.x > 0.02) {
+            arrow(k, startX, my, crateX, my, fs * 0.45, 1.4);
+            arrow(k, crateX, my, startX, my, fs * 0.45, 1.4);
+        }
+        line(k, startX, groundY + fs * 0.2, startX, my + fs * 0.4, 1);
+        line(k, crateX, groundY + fs * 0.2, crateX, my + fs * 0.4, 1);
+        k.c.restore();
+        label(k, `x = ${fmtNum(s.x, 1)} m`, (startX + crateX) / 2, my + fs * 0.55, 'center', 'top', 0.58);
+    }
+
+    if (icon) {
+        k.c.restore();
+        return;
+    }
+
+    if (k.o.labels !== false) {
+        const px = r.x + r.w * 0.63;
+        const pw = r.w - (px - r.x) - fs * 0.4;
+        const py = r.y + fs * 2.2;
+        const ph = fs * 8.2;
+        panel(k, px, py, pw, ph);
+        const cosv = Math.cos(a);
+        const rows: ReadonlyArray<[string, string]> = [
+            ['Kuvvet', `F = ${fmtNum(s.f, 0)} N`],
+            ['Yer değiştirme', `x = ${fmtNum(s.x, 1)} m`],
+            ['Açı', `θ = ${fmtNum(s.ang, 0)}°  ·  cos θ = ${fmtNum(cosv, 2)}`],
+        ];
+        rows.forEach(([t, v], i) => {
+            const y = py + fs * (1.1 + i * 1.5);
+            label(k, t, px + fs * 0.6, y, 'left', 'middle', 0.52);
+            label(k, v, px + fs * 0.6, y + fs * 0.72, 'left', 'middle', 0.6);
+        });
+        const wy = py + fs * 5.9;
+        label(k, 'W = F · x · cos θ', px + fs * 0.6, wy, 'left', 'middle', 0.6);
+        label(
+            k,
+            fitText(
+                k,
+                [
+                    `= ${fmtNum(s.f, 0)} · ${fmtNum(s.x, 1)} · ${fmtNum(cosv, 2)} = ${fmtNum(s.w, 1)} J`,
+                    `W = ${fmtNum(s.w, 1)} J`,
+                ],
+                pw - fs * 1.2,
+                0.66
+            ),
+            px + fs * 0.6,
+            wy + fs * 1.3,
+            'left',
+            'middle',
+            0.66
+        );
+
+        // Karar kutusu
+        const done = Math.abs(s.w) > 0.05;
+        const reason = done
+            ? 'Kuvvet yönünde yer değiştirme var'
+            : s.x <= 0.02
+              ? 'Cisim yer değiştirmedi (x = 0)'
+              : 'Kuvvet yer değiştirmeye dik (θ = 90°)';
+        const by = py + ph + fs * 0.5;
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.5);
+        roundRect(k, px + fs * 0.4, by, pw - fs * 0.8, fs * 2.5, 5);
+        k.c.lineWidth = 1;
+        k.c.stroke();
+        k.c.restore();
+        label(k, done ? 'İŞ YAPILDI' : 'İŞ YAPILMADI', px + fs * 0.8, by + fs * 0.8, 'left', 'middle', 0.64);
+        label(k, fitText(k, [reason, done ? 'Yer değiştirme var' : 'İş sıfır'], pw - fs * 1.4, 0.52), px + fs * 0.8, by + fs * 1.8, 'left', 'middle', 0.52);
+    }
+
+    label(
+        k,
+        fitText(
+            k,
+            ['Fiziksel iş: kuvvet yönündeki yer değiştirme sayılır', 'Fiziksel iş: W = F · x · cos θ', 'Fiziksel iş'],
+            r.w - fs * 3,
+            0.8
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8
+    );
+    k.c.restore();
+};
+
+const workGeom = (r: Rect) => {
+    const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+    const stage: Rect = { x: r.x + fs * 0.6, y: r.y + fs * 2.2, w: r.w * 0.62, h: r.h - fs * 3.2 };
+    const groundY = stage.y + stage.h * 0.7;
+    const side = Math.min(stage.h * 0.24, stage.w * 0.16);
+    const unit = (stage.w - side * 1.6) / 6.4;
+    return { fs, stage, groundY, side, unit, startX: stage.x + side * 0.9 };
+};
+
+export const workSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = workState(o);
+        const g = workGeom(r);
+        const crateX = g.startX + s.x * g.unit;
+        const a = (s.ang * Math.PI) / 180;
+        const len = g.fs * 1.7 + (s.f / 100) * Math.min(g.stage.w * 0.26, g.fs * 5.4);
+        return [
+            {
+                id: 'x',
+                x: crateX,
+                y: g.groundY + g.fs * 1.5,
+                type: 'drag',
+                label: 'Sandığı kaydır: yer değiştirme',
+            },
+            {
+                id: 'ang',
+                x: crateX + g.side / 2 + len * Math.cos(a),
+                y: g.groundY - g.side * 0.75 - len * Math.sin(a),
+                type: 'drag',
+                label: 'Kuvvetin açısını değiştir',
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (!p) return {};
+        const g = workGeom(r);
+        if (id === 'x') return { x: clamp((p.x - g.startX) / g.unit, 0, 6) };
+        if (id === 'ang') {
+            const s = workState(o);
+            const crateX = g.startX + s.x * g.unit;
+            const ax = crateX + g.side / 2;
+            const ay = g.groundY - g.side * 0.75;
+            const deg = (Math.atan2(ay - p.y, Math.max(1, p.x - ax)) * 180) / Math.PI;
+            return { ang: clamp(deg, 0, 90) };
+        }
+        return {};
+    },
+    params: [
+        { key: 'f', label: 'Kuvvet F (N)', min: 0, max: 100, step: 5 },
+        { key: 'x', label: 'Yer değiştirme x (m)', min: 0, max: 6, step: 0.5 },
+        { key: 'ang', label: 'Açı θ (°)', min: 0, max: 90, step: 5 },
+    ],
+};
+
 export const PHYSICS_SIM_RENDERERS: Record<string, Renderer> = {
     refraction_sim: refractionRender,
     motion_graph_sim: motionRender,
@@ -1628,6 +1902,7 @@ export const PHYSICS_SIM_RENDERERS: Record<string, Renderer> = {
     gas_pressure_sim: gasRender,
     spring_sim: springRender,
     electromagnet_sim: electromagnetRender,
+    work_sim: workRender,
 };
 
 export const PHYSICS_SIM_SPECS: Record<string, SimSpec> = {
@@ -1640,6 +1915,7 @@ export const PHYSICS_SIM_SPECS: Record<string, SimSpec> = {
     gas_pressure_sim: gasSpec,
     spring_sim: springSpec,
     electromagnet_sim: electromagnetSpec,
+    work_sim: workSpec,
 };
 
 export const PHYSICS_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -1705,5 +1981,12 @@ export const PHYSICS_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Sarım, pil ve demir çekirdek: kaç ataç çekiliyor',
         size: { w: 520, h: 340 },
         defaults: { labels: true, sim: { turns: 20, cells: 1, core: 1, on: 1 } },
+    },
+    {
+        kind: 'work_sim',
+        label: 'Fiziksel İş',
+        hint: 'F, x ve açıyı değiştir: iş yapıldı mı, yapılmadı mı?',
+        size: { w: 580, h: 360 },
+        defaults: { labels: true, sim: { f: 40, x: 3, ang: 30 } },
     },
 ];

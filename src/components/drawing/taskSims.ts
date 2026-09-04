@@ -14,6 +14,7 @@ import {
     line,
     roundRect,
     simValue,
+    textWidth,
     withAlpha,
     type Ctx,
     type MathCatalogItem,
@@ -71,6 +72,16 @@ const SEQUENCE_SETS: ReadonlyArray<SequenceSet> = [
         title: 'Gezegenler: Güneş’e yakından uzağa',
         items: ['Merkür', 'Venüs', 'Dünya', 'Mars', 'Jüpiter', 'Satürn'],
         scramble: [4, 0, 5, 2, 1, 3],
+    },
+    {
+        title: 'Evren: küçükten büyüğe',
+        items: ['Gezegen', 'Yıldız sistemi', 'Takımyıldız', 'Galaksi', 'Evren'],
+        scramble: [4, 1, 3, 0, 2],
+    },
+    {
+        title: 'Yıldızın yaşam evreleri',
+        items: ['Bulutsu', 'Yıldız', 'Kızıl dev', 'Süpernova', 'Kara delik'],
+        scramble: [2, 4, 0, 3, 1],
     },
     {
         title: 'Sayıları küçükten büyüğe sırala',
@@ -290,6 +301,26 @@ const MATCH_SETS: ReadonlyArray<MatchSet> = [
         ],
     },
     {
+        title: 'Mercek ve kullanım alanı',
+        pairs: [
+            ['Büyüteç', 'Yazıyı büyütür'],
+            ['Mikroskop', 'Hücreyi inceler'],
+            ['Teleskop', 'Uzak yıldızlar'],
+            ['Miyop gözlüğü', 'Kalın kenarlı'],
+            ['Hipermetrop gözlüğü', 'İnce kenarlı'],
+        ],
+    },
+    {
+        title: 'Uzay teknolojisi ve günlük hayat',
+        pairs: [
+            ['Uydu', 'Hava tahmini'],
+            ['GPS', 'Yol tarifi'],
+            ['Isı yalıtım köpüğü', 'Bina yalıtımı'],
+            ['Su arıtma sistemi', 'Temiz içme suyu'],
+            ['Hafıza köpüğü', 'Yatak ve yastık'],
+        ],
+    },
+    {
         title: 'Şekil ve alan bağıntısı',
         pairs: [
             ['Dikdörtgen', 'a · b'],
@@ -302,6 +333,13 @@ const MATCH_SETS: ReadonlyArray<MatchSet> = [
 
 const MATCH_MAX = Math.max(...MATCH_SETS.map((s) => s.pairs.length));
 
+/** Yazıyı verilen genişliğe sığdıran en büyük ölçeği bulur. */
+function autoScale(k: Ctx, text: string, maxW: number, start = 0.75, min = 0.44): number {
+    let sc = start;
+    while (sc > min && textWidth(k, text, sc) > maxW) sc -= 0.04;
+    return sc;
+}
+
 function matchLayout(r: Rect, o: MathObject) {
     const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
     const icon = isIconSize(r);
@@ -312,10 +350,16 @@ function matchLayout(r: Rect, o: MathObject) {
     const placed = set.pairs.map((_, i) => clampInt(simValue(o, `m${i}`, 0), 0, n, 0));
 
     const cardH = fs * 1.9;
-    const trayH = cardH + fs * 0.8;
+    // Beşten çok eşi olan setlerde havuz iki satıra yayılır; tek satırda
+    // kartlar okunamayacak kadar daralıyordu.
+    const trayRows = n > 4 ? 2 : 1;
+    const trayCols = Math.ceil(n / trayRows);
+    const trayH = cardH * trayRows + fs * 0.8;
     const top = r.y + (icon ? r.h * 0.08 : fs * 2.4);
     const bottom = r.y + r.h - (icon ? r.h * 0.08 : trayH + fs * 0.6);
     const rowH = (bottom - top) / n;
+    // Satır kartları sıkışmasın: yükseklik satır aralığına göre kısalır.
+    const rowCardH = Math.max(fs * 1.2, Math.min(cardH, rowH - fs * 0.35));
     const colW = (r.w - fs * 2) / 2 - fs * 0.5;
     const leftX = r.x + fs * 0.8;
     const rightX = leftX + colW + fs;
@@ -324,13 +368,18 @@ function matchLayout(r: Rect, o: MathObject) {
     const trayIdx = placed
         .map((_, i) => i)
         .filter((i) => !placed.includes(i + 1));
-    const trayW = Math.min(colW, (r.w - fs) / Math.max(1, trayIdx.length) - fs * 0.4);
-    const pos = set.pairs.map(() => ({ x: 0, y: 0, w: colW, h: cardH }));
+    const trayW = Math.min(colW, (r.w - fs) / trayCols - fs * 0.4);
+    const pos = set.pairs.map(() => ({ x: 0, y: 0, w: colW, h: rowCardH }));
+    const trayBottom = r.y + r.h - fs * 0.4;
     trayIdx.forEach((idx, n2) => {
-        const total = trayIdx.length * (trayW + fs * 0.4) - fs * 0.4;
+        const row = Math.floor(n2 / trayCols);
+        const col = n2 % trayCols;
+        const inRow = Math.min(trayCols, trayIdx.length - row * trayCols);
+        const total = inRow * (trayW + fs * 0.4) - fs * 0.4;
         pos[idx].w = trayW;
-        pos[idx].x = r.x + (r.w - total) / 2 + n2 * (trayW + fs * 0.4) + trayW / 2;
-        pos[idx].y = r.y + r.h - trayH / 2 - fs * 0.3;
+        pos[idx].h = cardH;
+        pos[idx].x = r.x + (r.w - total) / 2 + col * (trayW + fs * 0.4) + trayW / 2;
+        pos[idx].y = trayBottom - trayH + fs * 0.4 + cardH / 2 + row * cardH;
     });
     placed.forEach((cardNo, row) => {
         if (cardNo === 0) return;
@@ -350,7 +399,7 @@ function matchLayout(r: Rect, o: MathObject) {
         colW,
         leftX,
         rightX,
-        cardH,
+        cardH: rowCardH,
         trayH,
         correct,
         rowY: (i: number) => top + rowH * i + rowH / 2,
@@ -390,7 +439,7 @@ export const matchRender: Renderer = (k) => {
         const y = L.rowY(row);
         card(k, L.leftX, y - L.cardH / 2, L.colW, L.cardH, true);
         if (!L.icon) {
-            label(k, fitText(k, [left], L.colW - L.fs, 0.75), L.leftX + L.colW / 2, y, 'center', 'middle', 0.75);
+            label(k, left, L.leftX + L.colW / 2, y, 'center', 'middle', autoScale(k, left, L.colW - L.fs));
         }
         if (L.placed[row] === 0) {
             card(k, L.rightX, y - L.cardH / 2, L.colW, L.cardH, false, true);
@@ -409,7 +458,16 @@ export const matchRender: Renderer = (k) => {
         card(k, box.x - box.w / 2, box.y - box.h / 2, box.w, box.h, row >= 0, show && row >= 0 && !ok);
         if (L.icon) return;
         const mark = show && row >= 0 ? (ok ? ' ✓' : ' ✕') : '';
-        label(k, fitText(k, [right + mark, right], box.w - L.fs, 0.75), box.x, box.y, 'center', 'middle', 0.75);
+        // Tutamak kartın solunda; yazı sağa kayar ve kutuya sığana dek küçülür.
+        label(
+            k,
+            right + mark,
+            box.x + L.fs * 0.45,
+            box.y,
+            'center',
+            'middle',
+            autoScale(k, right + mark, box.w - L.fs * 1.9),
+        );
     });
 
     if (L.icon || k.o.labels === false) {
@@ -545,7 +603,7 @@ export const TASK_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         kind: 'match_sim',
         label: 'Kart Eşleştirme',
         hint: `İki sütunu eşleştir, kontrol et (${MATCH_SETS.length} konu)`,
-        size: { w: 520, h: 360 },
+        size: { w: 560, h: 420 },
         defaults: { labels: true, sim: { mode: 0, show: 0 } },
     },
 ];

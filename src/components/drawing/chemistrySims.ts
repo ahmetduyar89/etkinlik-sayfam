@@ -6,13 +6,17 @@ import {
     arrow,
     clamp,
     clampInt,
+    fillShape,
     fitText,
     isIconSize,
     fmtNum,
     label,
     line,
+    panel,
     path,
+    roundRect,
     simValue,
+    textWidth,
     withAlpha,
     type Ctx,
     type MathCatalogItem,
@@ -1055,6 +1059,367 @@ export const massConservationSpec: SimSpec = {
     ],
 };
 
+// ── Atom modelleri (Maddenin Tanecikli Yapısı) ───────────────────────
+//
+// Kilit fikir: her model, kendi döneminin deneylerini açıklamak için
+// kuruldu ve yeni bir deney onu yetersiz bıraktığında değişti. Modeller
+// "yanlış" değil, giderek daha kapsayıcıdır.
+
+interface AtomModel {
+    name: string;
+    year: string;
+    scientist: string;
+    explains: string;
+    fails: string;
+    draw: (k: Ctx, cx: number, cy: number, R: number) => void;
+}
+
+/** Dalton: içi dolu, bölünemez küre. */
+const drawDalton = (k: Ctx, cx: number, cy: number, R: number) => {
+    k.c.beginPath();
+    k.c.arc(cx, cy, R, 0, Math.PI * 2);
+    k.c.stroke();
+    k.c.save();
+    k.c.globalAlpha = 0.16;
+    k.c.fill();
+    k.c.restore();
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.3);
+    k.c.beginPath();
+    k.c.arc(cx - R * 0.3, cy - R * 0.3, R * 0.5, Math.PI * 0.9, Math.PI * 1.5);
+    k.c.stroke();
+    k.c.restore();
+};
+
+/** Thomson: pozitif hamur içine gömülü elektronlar. */
+const drawThomson = (k: Ctx, cx: number, cy: number, R: number) => {
+    k.c.beginPath();
+    k.c.arc(cx, cy, R, 0, Math.PI * 2);
+    k.c.stroke();
+    k.c.save();
+    k.c.globalAlpha = 0.1;
+    k.c.fill();
+    k.c.restore();
+    for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2 + 0.4;
+        const rr = R * (0.3 + ((i * 37) % 50) / 100);
+        const ex = cx + rr * Math.cos(a);
+        const ey = cy + rr * Math.sin(a);
+        k.c.beginPath();
+        k.c.arc(ex, ey, R * 0.09, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.save();
+        k.c.strokeStyle = withAlpha('#ffffff', 0.9);
+        line(k, ex - R * 0.045, ey, ex + R * 0.045, ey, 1.4);
+        k.c.restore();
+    }
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.55);
+    for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        label(k, '+', cx + R * 0.62 * Math.cos(a), cy + R * 0.62 * Math.sin(a), 'center', 'middle', 0.6);
+    }
+    k.c.restore();
+};
+
+/** Rutherford: merkezde küçük yoğun çekirdek, çevresinde boşluk. */
+const drawRutherford = (k: Ctx, cx: number, cy: number, R: number) => {
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.28);
+    k.c.setLineDash([4, 4]);
+    k.c.beginPath();
+    k.c.arc(cx, cy, R, 0, Math.PI * 2);
+    k.c.stroke();
+    k.c.restore();
+    k.c.beginPath();
+    k.c.arc(cx, cy, R * 0.16, 0, Math.PI * 2);
+    k.c.fill();
+    label(k, '+', cx, cy, 'center', 'middle', 0.8);
+    for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + 0.6;
+        const rr = R * (0.55 + (i % 2) * 0.28);
+        k.c.beginPath();
+        k.c.arc(cx + rr * Math.cos(a), cy + rr * Math.sin(a), R * 0.075, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.25);
+        k.c.beginPath();
+        k.c.ellipse(cx, cy, rr, rr * 0.85, a, 0, Math.PI * 2);
+        k.c.lineWidth = 1;
+        k.c.stroke();
+        k.c.restore();
+    }
+};
+
+/** Bohr: belirli enerji katmanları. */
+const drawBohr = (k: Ctx, cx: number, cy: number, R: number) => {
+    k.c.beginPath();
+    k.c.arc(cx, cy, R * 0.15, 0, Math.PI * 2);
+    k.c.fill();
+    const shells = [0.42, 0.72, 1];
+    shells.forEach((f, i) => {
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.45);
+        k.c.beginPath();
+        k.c.lineWidth = 1;
+        k.c.arc(cx, cy, R * f, 0, Math.PI * 2);
+        k.c.stroke();
+        k.c.restore();
+        const count = [2, 8, 4][i];
+        for (let j = 0; j < count; j++) {
+            const a = (j / count) * Math.PI * 2 - Math.PI / 2 + i * 0.3;
+            k.c.beginPath();
+            k.c.arc(cx + R * f * Math.cos(a), cy + R * f * Math.sin(a), R * 0.065, 0, Math.PI * 2);
+            k.c.fill();
+        }
+    });
+};
+
+const ATOM_MODELS: ReadonlyArray<AtomModel> = [
+    {
+        name: 'Dalton modeli',
+        year: '1803',
+        scientist: 'John Dalton',
+        explains: 'Maddenin taneciklerden oluşması, sabit oranlar',
+        fails: 'Elektriklenme ve atom içi parçacıklar',
+        draw: drawDalton,
+    },
+    {
+        name: 'Thomson modeli',
+        year: '1897',
+        scientist: 'J. J. Thomson',
+        explains: 'Elektronun varlığı, atomun nötrlüğü',
+        fails: 'Alfa taneciklerinin saçılması, çekirdek',
+        draw: drawThomson,
+    },
+    {
+        name: 'Rutherford modeli',
+        year: '1911',
+        scientist: 'Ernest Rutherford',
+        explains: 'Küçük, yoğun ve pozitif çekirdek; boş hacim',
+        fails: 'Elektronun neden çekirdeğe düşmediği',
+        draw: drawRutherford,
+    },
+    {
+        name: 'Bohr modeli',
+        year: '1913',
+        scientist: 'Niels Bohr',
+        explains: 'Elektronların belirli enerji katmanlarında bulunması',
+        fails: 'Çok elektronlu atomların ayrıntılı davranışı',
+        draw: drawBohr,
+    },
+];
+
+const atomState = (o: MathObject) => ({
+    model: clampInt(simValue(o, 'model', 0), 0, ATOM_MODELS.length - 1, 0),
+    experiment: simValue(o, 'exp', 0) > 0.5,
+});
+
+/** Rutherford'un altın levha deneyi: çoğu geçer, azı sapar, çok azı döner. */
+function goldFoilExperiment(k: Ctx, b: Rect, fs: number) {
+    const foilX = b.x + b.w * 0.54;
+    const cy = b.y + b.h * 0.54;
+    const R = Math.min(b.w * 0.38, b.h * 0.46);
+
+    // ZnS ekranı: sapmaları görünür kılan halka
+    k.c.save();
+    k.c.setLineDash([5, 5]);
+    k.c.strokeStyle = withAlpha(k.color, 0.32);
+    k.c.beginPath();
+    k.c.lineWidth = 1.2;
+    k.c.arc(foilX, cy, R, -Math.PI * 0.82, Math.PI * 0.82);
+    k.c.stroke();
+    k.c.restore();
+    label(k, 'ZnS ekranı', foilX, cy + R + fs * 0.2, 'center', 'top', 0.55);
+
+    // Kurşun blok içindeki alfa kaynağı
+    const bw = fs * 2.6;
+    const bh = fs * 2.2;
+    const bx = foilX - R - bw * 0.9;
+    roundRect(k, bx, cy - bh / 2, bw, bh, 3);
+    fillShape(k, () => roundRect(k, bx, cy - bh / 2, bw, bh, 3), 0.14);
+    k.c.stroke();
+    k.c.save();
+    k.c.fillStyle = k.color;
+    k.c.beginPath();
+    k.c.arc(bx + bw * 0.42, cy, fs * 0.3, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.restore();
+    line(k, bx + bw, cy - fs * 0.28, bx + bw, cy + fs * 0.28, 1);
+    label(k, 'α kaynağı', bx + bw / 2, cy - bh / 2 - fs * 0.15, 'center', 'bottom', 0.55);
+
+    // Altın levha
+    k.c.save();
+    k.c.globalAlpha = 0.22;
+    k.c.fillRect(foilX - 2.5, cy - R * 0.86, 5, R * 1.72);
+    k.c.restore();
+    line(k, foilX, cy - R * 0.86, foilX, cy + R * 0.86, Math.max(2, k.lw));
+    for (let i = -3; i <= 3; i++) {
+        const y = cy + (i / 3) * R * 0.72;
+        line(k, foilX - 4, y + 3, foilX + 4, y - 3, 0.9);
+    }
+    label(k, 'altın levha', foilX, cy - R - fs * 0.2, 'center', 'bottom', 0.6);
+
+    // Sapmadan geçen ışınlar
+    const sx = bx + bw;
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.5);
+    for (const f of [-0.34, -0.16, 0.16, 0.34]) {
+        const y = cy + R * f;
+        const ex = foilX + Math.sqrt(Math.max(0, R * R - (R * f) ** 2));
+        line(k, sx, cy + R * f * 0.18, foilX, y, 1.1);
+        arrow(k, foilX, y, ex, y, fs * 0.34, 1.1);
+    }
+    k.c.restore();
+
+    // Sapan ve geri dönen ışınlar
+    const deflect = (angleDeg: number, incomingF: number) => {
+        const a = (angleDeg * Math.PI) / 180;
+        line(k, sx, cy, foilX, cy + R * incomingF, 1.6);
+        arrow(k, foilX, cy + R * incomingF, foilX + R * Math.cos(a), cy + R * Math.sin(a), fs * 0.42, 1.6);
+    };
+    deflect(-42, -0.04);
+    deflect(28, 0.04);
+    deflect(-156, 0);
+
+    label(k, 'çoğu sapmadan geçer', foilX + R * 0.6, cy + R * 0.86, 'left', 'middle', 0.56);
+    label(k, 'azı sapar', foilX + R * 0.76, cy - R * 0.74, 'left', 'middle', 0.56);
+    label(k, 'çok azı geri döner', foilX - R * 0.86, cy - R * 0.62, 'right', 'middle', 0.56);
+}
+
+export const atomModelsRender: Renderer = (k) => {
+    const r = k.r;
+    const s = atomState(k.o);
+    const m = ATOM_MODELS[s.model];
+    const icon = isIconSize(r);
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const stage = {
+        x: r.x + fs * 0.5,
+        y: r.y + (icon ? 0 : fs * 2.4),
+        w: r.w * (icon ? 1 : 0.52),
+        h: r.h - (icon ? 0 : fs * 5.6),
+    };
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineJoin = 'round';
+
+    const showExp = s.experiment && s.model === 2 && !icon;
+    if (showExp) {
+        goldFoilExperiment(k, { ...stage, w: r.w - fs }, fs);
+    } else {
+        m.draw(
+            k,
+            stage.x + stage.w / 2,
+            stage.y + stage.h / 2,
+            Math.min(stage.w, stage.h) * (icon ? 0.42 : 0.36)
+        );
+    }
+
+    if (icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Zaman şeridi
+    const tlY = r.y + r.h - fs * 1.9;
+    const tlX0 = r.x + fs;
+    const tlX1 = r.x + r.w - fs;
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.4);
+    line(k, tlX0, tlY, tlX1, tlY, 1.4);
+    k.c.restore();
+    ATOM_MODELS.forEach((mm, i) => {
+        const x = tlX0 + ((tlX1 - tlX0) * i) / (ATOM_MODELS.length - 1);
+        k.c.beginPath();
+        k.c.arc(x, tlY, i === s.model ? fs * 0.32 : fs * 0.2, 0, Math.PI * 2);
+        if (i === s.model) k.c.fill();
+        else k.c.stroke();
+        label(k, mm.year, x, tlY + fs * 0.6, 'center', 'top', 0.58);
+    });
+
+    if (!showExp) {
+        // Okuma paneli
+        const px = r.x + r.w * 0.58;
+        const pw = r.w - (px - r.x) - fs * 0.5;
+        const py = stage.y;
+        const ph = fs * 9.4;
+        panel(k, px, py, pw, ph);
+        label(k, m.name, px + fs * 0.7, py + fs * 1.1, 'left', 'middle', 0.82);
+        label(k, `${m.scientist} · ${m.year}`, px + fs * 0.7, py + fs * 2.4, 'left', 'middle', 0.62);
+        label(k, 'Açıkladığı', px + fs * 0.7, py + fs * 3.8, 'left', 'middle', 0.56);
+        wrapLabel(k, m.explains, px + fs * 0.7, py + fs * 4.8, pw - fs * 1.4, 0.6);
+        label(k, 'Açıklayamadığı', px + fs * 0.7, py + fs * 6.9, 'left', 'middle', 0.56);
+        wrapLabel(k, m.fails, px + fs * 0.7, py + fs * 7.9, pw - fs * 1.4, 0.6);
+    }
+
+    label(
+        k,
+        showExp ? 'Altın levha deneyi: atomun büyük bölümü boşluktur' : 'Atom modelleri: her deney modeli yeniler',
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8,
+    );
+    k.c.restore();
+};
+
+/** Uzun metni panele iki satır hâlinde sığdırır. */
+function wrapLabel(k: Ctx, text: string, x: number, y: number, maxW: number, scale: number) {
+    const words = text.split(' ');
+    let line1 = '';
+    let i = 0;
+    while (i < words.length) {
+        const next = line1 ? `${line1} ${words[i]}` : words[i];
+        if (textWidth(k, next, scale) > maxW && line1) break;
+        line1 = next;
+        i++;
+    }
+    const line2 = words.slice(i).join(' ');
+    label(k, line1, x, y, 'left', 'middle', scale);
+    if (line2) label(k, fitText(k, [line2], maxW, scale), x, y + k.fs * scale * 1.35, 'left', 'middle', scale);
+}
+
+export const atomModelsSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = atomState(o);
+        const out: SimControl[] = [
+            {
+                id: 'next',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: 'Sonraki model',
+                on: s.model > 0,
+            },
+        ];
+        if (s.model === 2) {
+            out.push({
+                id: 'exp',
+                x: r.x + r.w - 40,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.experiment ? 'Modele dön' : 'Altın levha deneyini göster',
+                on: s.experiment,
+            });
+        }
+        return out;
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        const s = atomState(o);
+        if (id === 'next') return { model: (s.model + 1) % ATOM_MODELS.length, exp: 0 };
+        if (id === 'exp') return { exp: s.experiment ? 0 : 1 };
+        return {};
+    },
+    params: [
+        { key: 'model', label: `Model (0-${ATOM_MODELS.length - 1})`, min: 0, max: ATOM_MODELS.length - 1, step: 1 },
+        { key: 'exp', label: 'Deney görünümü (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const CHEMISTRY_SIM_RENDERERS: Record<string, Renderer> = {
@@ -1063,6 +1428,7 @@ export const CHEMISTRY_SIM_RENDERERS: Record<string, Renderer> = {
     solubility_sim: solubilityRender,
     ion_bond_sim: ionBondRender,
     mass_conservation_sim: massConservationRender,
+    atom_models_sim: atomModelsRender,
 };
 
 export const CHEMISTRY_SIM_SPECS: Record<string, SimSpec> = {
@@ -1071,6 +1437,7 @@ export const CHEMISTRY_SIM_SPECS: Record<string, SimSpec> = {
     solubility_sim: solubilitySpec,
     ion_bond_sim: ionBondSpec,
     mass_conservation_sim: massConservationSpec,
+    atom_models_sim: atomModelsSpec,
 };
 
 export const CHEMISTRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -1108,5 +1475,12 @@ export const CHEMISTRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Kapalı ve açık kapta tepkime: terazi neden farklı gösterir',
         size: { w: 480, h: 360 },
         defaults: { labels: true, sim: { closed: 1, after: 0 } },
+    },
+    {
+        kind: 'atom_models_sim',
+        label: 'Atom Modelleri',
+        hint: 'Dalton’dan Bohr’a: her model neyi açıklar, neyi açıklayamaz',
+        size: { w: 560, h: 360 },
+        defaults: { labels: true, sim: { model: 0, exp: 0 } },
     },
 ];

@@ -263,6 +263,81 @@ export const roundRect = (
 };
 
 /**
+ * Noktalardan yumuşak bir eğri çizer (Catmull-Rom → Bézier). Organ, mercek
+ * ve kap gibi doğal biçimler köşeli çokgenlerle inandırıcı görünmediğinden
+ * gerçekçi çizimlerde `path` yerine bu kullanılır.
+ */
+export function smooth(
+    k: Ctx,
+    pts: ReadonlyArray<[number, number]>,
+    close = false,
+    width?: number
+): void {
+    if (pts.length < 2) return;
+    const p = close ? [pts[pts.length - 1], ...pts, pts[0], pts[1]] : [pts[0], ...pts, pts[pts.length - 1]];
+    k.c.beginPath();
+    k.c.lineWidth = width ?? k.lw;
+    k.c.moveTo(p[1][0], p[1][1]);
+    for (let i = 1; i < p.length - 2; i++) {
+        const [x0, y0] = p[i - 1];
+        const [x1, y1] = p[i];
+        const [x2, y2] = p[i + 1];
+        const [x3, y3] = p[i + 2];
+        k.c.bezierCurveTo(
+            x1 + (x2 - x0) / 6,
+            y1 + (y2 - y0) / 6,
+            x2 - (x3 - x1) / 6,
+            y2 - (y3 - y1) / 6,
+            x2,
+            y2
+        );
+    }
+    if (close) k.c.closePath();
+    k.c.stroke();
+}
+
+/** `smooth` ile aynı eğriyi yol olarak kurar; dolgu için kullanılır. */
+export function smoothPath(k: Ctx, pts: ReadonlyArray<[number, number]>): void {
+    if (pts.length < 2) return;
+    const p = [pts[pts.length - 1], ...pts, pts[0], pts[1]];
+    k.c.beginPath();
+    k.c.moveTo(p[1][0], p[1][1]);
+    for (let i = 1; i < p.length - 2; i++) {
+        const [x0, y0] = p[i - 1];
+        const [x1, y1] = p[i];
+        const [x2, y2] = p[i + 1];
+        const [x3, y3] = p[i + 2];
+        k.c.bezierCurveTo(
+            x1 + (x2 - x0) / 6,
+            y1 + (y2 - y0) / 6,
+            x2 - (x3 - x1) / 6,
+            y2 - (y3 - y1) / 6,
+            x2,
+            y2
+        );
+    }
+    k.c.closePath();
+}
+
+/**
+ * Okuma paneli: değerlerin ve açıklamaların arkasına konan soluk kutu.
+ * Metni çizimin üstünden ayırır; tüm simülasyonlarda aynı görünür.
+ */
+export function panel(k: Ctx, x: number, y: number, w: number, h: number): void {
+    k.c.save();
+    k.c.globalAlpha = 0.05;
+    roundRect(k, x, y, w, h, Math.min(10, h * 0.28));
+    k.c.fill();
+    k.c.restore();
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.28);
+    roundRect(k, x, y, w, h, Math.min(10, h * 0.28));
+    k.c.lineWidth = 1;
+    k.c.stroke();
+    k.c.restore();
+}
+
+/**
  * Nesne, panel önizlemesi gibi simge ölçeğinde mi çiziliyor?
  * Bu boyutta eksen, etiket ve okuma sütunu okunmaz; çizimler sadeleşir.
  */
