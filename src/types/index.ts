@@ -246,7 +246,10 @@ export type MathObjectKind =
     | 'atom_models_sim'
     | 'breathing_sim'
     | 'eye_defect_sim'
-    | 'work_sim';
+    | 'work_sim'
+    | 'newton_cannon_sim'
+    | 'water_cycle_sim'
+    | 'coulomb_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile

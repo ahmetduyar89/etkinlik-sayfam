@@ -9,16 +9,21 @@ import type { MathObject } from '../../types';
 import { LABEL_SETS, MAX_SLOTS, rel } from './labelSets';
 import {
     arrow,
+    arrowHead,
     clamp,
+    fillShape,
     clampInt,
     fitText,
     fmtNum,
     isIconSize,
     label,
     line,
+    panel,
     path,
     roundRect,
     simValue,
+    smooth,
+    textWidth,
     withAlpha,
     type Ctx,
     type MathCatalogItem,
@@ -1133,12 +1138,685 @@ export const eclipseSpec: SimSpec = {
 
 // ── Kayıt ────────────────────────────────────────────────────────────
 
+// ── Newton'un top güllesi (Uzay Çağı) ────────────────────────────────
+//
+// Kilit fikir: yörünge, "sürekli düşme"dir. Yatay hız arttıkça gülle
+// daha uzağa düşer; belli bir hızda Dünya'nın eğriliği kadar hızlı
+// düştüğü için hiç yere değmez — yörüngeye oturur. Kurtulma hızında
+// (√2 × dairesel hız) bir daha geri dönmez.
+//
+// Yol, Dünya merkezine doğru 1/r² çekimle adım adım hesaplanır; şekil
+// (parabol / elips / çember / açık yörünge) bu hesaptan kendiliğinden
+// çıkar, elle çizilmez.
+
+interface CannonPath {
+    pts: Array<[number, number]>;
+    /** 'hit' yere düştü · 'orbit' kapalı yörünge · 'escape' kaçtı */
+    kind: 'hit' | 'orbit' | 'escape';
+    /** Dairesel hıza oranı. */
+    ratio: number;
+    /** Merkeze en uzak nokta (Dünya yarıçapı cinsinden). */
+    apo: number;
+}
+
+/**
+ * Güllenin yolunu birim sistemde üretir: Dünya yarıçapı 1, GM 1.
+ * Fırlatma yarıçapı r0'da dairesel hız √(1/r0) olur.
+ */
+function cannonPath(ratio: number, r0: number): CannonPath {
+    const vc = Math.sqrt(1 / r0);
+    const v0 = vc * ratio;
+    // Kaçış ölçütü analitiktir: v² ≥ 2GM/r  ⇔  oran ≥ √2
+    const escapes = ratio >= Math.SQRT2 - 1e-9;
+    // Kapalı yörüngede yarı-büyük eksen ve en uzak nokta
+    const a = escapes ? Infinity : 1 / (2 / r0 - v0 * v0);
+    const apoAnalytic = escapes ? Infinity : Math.max(r0, 2 * a - r0);
+
+    let x = 0;
+    let y = -r0;
+    let vx = v0;
+    let vy = 0;
+    const dt = 0.002;
+    const pts: Array<[number, number]> = [[x, y]];
+    let kind: CannonPath['kind'] = escapes ? 'escape' : 'orbit';
+    for (let i = 0; i < 20000; i++) {
+        const r = Math.hypot(x, y);
+        const acc = -1 / (r * r * r);
+        vx += acc * x * dt;
+        vy += acc * y * dt;
+        x += vx * dt;
+        y += vy * dt;
+        const rr = Math.hypot(x, y);
+        if (i % 4 === 0) pts.push([x, y]);
+        if (rr <= 1) {
+            pts.push([x, y]);
+            kind = 'hit';
+            break;
+        }
+        // Çizim alanının çok dışına çıkınca yolu kesmek yeter.
+        if (rr > 7) {
+            pts.push([x, y]);
+            break;
+        }
+        // Fırlatma noktasına döndüyse yörünge kapanmıştır.
+        if (i > 400 && Math.hypot(x, y + r0) < 0.03) break;
+    }
+    return { pts, kind, ratio, apo: apoAnalytic };
+}
+
+const cannonState = (o: MathObject) => ({
+    ratio: clamp(simValue(o, 'v', 0.7), 0.15, 1.6),
+    playing: simValue(o, 'play', 0) > 0.5,
+});
+
+/** Dünya: kıyı çizgileri belli belirsiz, tepesinde fırlatma dağı. */
+function drawEarth(k: Ctx, cx: number, cy: number, R: number, icon: boolean) {
+    fillShape(k, () => k.c.arc(cx, cy, R, 0, Math.PI * 2), 0.1);
+    k.c.beginPath();
+    k.c.lineWidth = Math.max(1.8, k.lw);
+    k.c.arc(cx, cy, R, 0, Math.PI * 2);
+    k.c.stroke();
+    if (!icon) {
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.3);
+        for (const [a0, a1, f] of [
+            [0.4, 1.5, 0.78],
+            [2.1, 2.9, 0.62],
+            [3.6, 4.6, 0.84],
+        ] as ReadonlyArray<[number, number, number]>) {
+            k.c.beginPath();
+            k.c.lineWidth = 1.2;
+            k.c.arc(cx, cy, R * f, a0, a1);
+            k.c.stroke();
+        }
+        k.c.restore();
+    }
+    // Fırlatma dağı ve top
+    const my = cy - R;
+    const mw = R * 0.16;
+    const mh = R * 0.18;
+    fillShape(
+        k,
+        () => {
+            k.c.moveTo(cx - mw, my + mh * 0.15);
+            k.c.lineTo(cx, my - mh);
+            k.c.lineTo(cx + mw, my + mh * 0.15);
+            k.c.closePath();
+        },
+        0.2
+    );
+    path(k, [
+        [cx - mw, my + mh * 0.15],
+        [cx, my - mh],
+        [cx + mw, my + mh * 0.15],
+    ]);
+    if (!icon) {
+        k.c.save();
+        k.c.lineCap = 'round';
+        line(k, cx - mw * 0.1, my - mh * 0.75, cx + mw * 1.5, my - mh * 0.95, Math.max(2.4, k.lw * 1.6));
+        k.c.restore();
+    }
+}
+
+export const newtonCannonRender: Renderer = (k) => {
+    const r = k.r;
+    const s = cannonState(k.o);
+    const icon = isIconSize(r);
+    const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineJoin = 'round';
+
+    const stage: Rect = icon
+        ? r
+        : { x: r.x + fs * 0.3, y: r.y + fs * 2.2, w: r.w * 0.62, h: r.h - fs * 3 };
+    const r0 = 1.18;
+    const P = cannonPath(s.ratio, r0);
+    // Görünüm: Dünya (yarıçap 1) ile yolun ortak sınır kutusu çerçeveye
+    // oturtulur; böylece hem çarpma hem de geniş elips dengeli görünür.
+    let x0 = -1.15;
+    let x1 = 1.15;
+    let y0 = -1.15;
+    let y1 = 1.15;
+    for (const [ux, uy] of P.pts) {
+        x0 = Math.min(x0, ux);
+        x1 = Math.max(x1, ux);
+        y0 = Math.min(y0, uy);
+        y1 = Math.max(y1, uy);
+    }
+    const R = Math.min(stage.w / Math.max(0.1, x1 - x0), stage.h / Math.max(0.1, y1 - y0)) * 0.94;
+    const cx = stage.x + stage.w / 2 - ((x0 + x1) / 2) * R;
+    const cy = stage.y + stage.h / 2 - ((y0 + y1) / 2) * R;
+
+    drawEarth(k, cx, cy, R, icon);
+
+    // Yol
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.85);
+    k.c.beginPath();
+    k.c.lineWidth = Math.max(1.4, k.lw * 0.9);
+    P.pts.forEach(([px, py], i) => {
+        const sx = cx + px * R;
+        const sy = cy + py * R;
+        if (i === 0) k.c.moveTo(sx, sy);
+        else k.c.lineTo(sx, sy);
+    });
+    k.c.stroke();
+    k.c.restore();
+
+    // Gülle
+    const t = s.playing ? (k.t * 0.5) % 1 : 1;
+    const idx = Math.min(P.pts.length - 1, Math.floor(t * (P.pts.length - 1)));
+    const [bx, by] = P.pts[idx];
+    k.c.save();
+    k.c.fillStyle = k.color;
+    k.c.beginPath();
+    k.c.arc(cx + bx * R, cy + by * R, Math.max(2.5, fs * 0.22), 0, Math.PI * 2);
+    k.c.fill();
+    k.c.restore();
+
+    if (icon) {
+        k.c.restore();
+        return;
+    }
+
+    if (P.kind === 'hit') {
+        const [hx, hy] = P.pts[P.pts.length - 1];
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.7);
+        const ang = Math.atan2(hy, hx);
+        for (let i = 0; i < 5; i++) {
+            const a = ang - 0.5 + i * 0.25;
+            line(
+                k,
+                cx + Math.cos(a) * R * 1.02,
+                cy + Math.sin(a) * R * 1.02,
+                cx + Math.cos(a) * R * 1.13,
+                cy + Math.sin(a) * R * 1.13,
+                1.2
+            );
+        }
+        k.c.restore();
+    }
+
+    if (k.o.labels !== false) {
+        const px = r.x + r.w * 0.64;
+        const pw = r.w - (px - r.x) - fs * 0.4;
+        const py = r.y + fs * 2.2;
+        const ph = fs * 7.6;
+        panel(k, px, py, pw, ph);
+        const verdict =
+            P.kind === 'hit'
+                ? 'Yere düşer'
+                : P.kind === 'escape'
+                  ? 'Kaçar — geri dönmez'
+                  : Math.abs(s.ratio - 1) < 0.04
+                    ? 'Dairesel yörünge'
+                    : 'Eliptik yörünge';
+        const rows: ReadonlyArray<[string, string]> = [
+            ['Yatay hız', `${fmtNum(s.ratio, 2)} × dairesel hız`],
+            ['Kurtulma hızı', `${fmtNum(Math.SQRT2, 2)} × dairesel hız`],
+            [
+                'En uzak nokta',
+                P.kind === 'escape'
+                    ? 'sınırsız'
+                    : P.kind === 'hit'
+                      ? 'yere çarpar'
+                      : `${fmtNum(P.apo, 2)} × Dünya yarıçapı`,
+            ],
+        ];
+        rows.forEach(([a, b], i) => {
+            const y = py + fs * (1.1 + i * 1.5);
+            label(k, a, px + fs * 0.6, y, 'left', 'middle', 0.52);
+            label(k, fitText(k, [b], pw - fs * 1.1, 0.6), px + fs * 0.6, y + fs * 0.72, 'left', 'middle', 0.6);
+        });
+        label(k, verdict, px + fs * 0.6, py + fs * 6.2, 'left', 'middle', 0.72);
+
+        // Hız çubuğu: dairesel ve kurtulma hızı işaretli
+        const barY = py + ph + fs * 1.1;
+        const barX = px + fs * 0.4;
+        const barW = pw - fs * 0.8;
+        const at = (v: number) => barX + ((v - 0.15) / (1.6 - 0.15)) * barW;
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.45);
+        line(k, barX, barY, barX + barW, barY, 1.4);
+        k.c.restore();
+        for (const [v, txt] of [
+            [1, 'dairesel'],
+            [Math.SQRT2, 'kurtulma'],
+        ] as ReadonlyArray<[number, string]>) {
+            k.c.save();
+            k.c.setLineDash([3, 3]);
+            k.c.strokeStyle = withAlpha(k.color, 0.5);
+            line(k, at(v), barY - fs * 0.4, at(v), barY + fs * 0.4, 1);
+            k.c.restore();
+            label(k, txt, at(v), barY + fs * 0.55, 'center', 'top', 0.48);
+        }
+        k.c.save();
+        k.c.fillStyle = k.color;
+        k.c.beginPath();
+        k.c.arc(at(s.ratio), barY, fs * 0.28, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+    }
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                'Newton’un top güllesi: yörünge, sürekli düşmektir',
+                'Newton’un top güllesi',
+            ],
+            r.w - fs * 3,
+            0.8
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8
+    );
+    k.c.restore();
+};
+
+const cannonBar = (r: Rect) => {
+    const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+    const px = r.x + r.w * 0.64;
+    const pw = r.w - (px - r.x) - fs * 0.4;
+    return {
+        fs,
+        x: px + fs * 0.4,
+        w: pw - fs * 0.8,
+        y: r.y + fs * 2.2 + fs * 7.6 + fs * 1.1,
+    };
+};
+
+export const newtonCannonSpec: SimSpec = {
+    animated: (o) => simValue(o, 'play', 0) > 0.5,
+    controls: (r, o): SimControl[] => {
+        const s = cannonState(o);
+        const b = cannonBar(r);
+        return [
+            {
+                id: 'play',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.playing ? 'Durdur' : 'Gülleyi fırlat',
+                on: s.playing,
+            },
+            {
+                id: 'v',
+                x: b.x + ((s.ratio - 0.15) / (1.6 - 0.15)) * b.w,
+                y: b.y,
+                type: 'drag',
+                label: 'Yatay hızı değiştir',
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (id === 'play') return { play: simValue(o, 'play', 0) > 0.5 ? 0 : 1 };
+        if (id === 'v' && p) {
+            const b = cannonBar(r);
+            return { v: clamp(0.15 + ((p.x - b.x) / b.w) * (1.6 - 0.15), 0.15, 1.6) };
+        }
+        return {};
+    },
+    params: [{ key: 'v', label: 'Yatay hız (dairesel hızın katı)', min: 0.15, max: 1.6, step: 0.05 }],
+};
+
+// ── Su döngüsü (Sürdürülebilir Yaşam ve Geri Dönüşüm) ────────────────
+//
+// Kilit fikir: yeryüzündeki su miktarı değişmez; su hâl değiştirerek
+// dolaşır. Buharlaşma → yoğuşma → yağış → toplanma; sonra baştan.
+// Her adımda hangi hâl değişiminin olduğu ayrıca yazılır.
+
+interface CycleStage {
+    name: string;
+    change: string;
+    text: string;
+}
+
+const WATER_STAGES: ReadonlyArray<CycleStage> = [
+    {
+        name: 'Buharlaşma',
+        change: 'sıvı → gaz',
+        text: 'Güneş’ten gelen ısı ile denizden, gölden ve topraktan su buharlaşır; bitkiler de terleme ile su buharı verir.',
+    },
+    {
+        name: 'Yoğuşma',
+        change: 'gaz → sıvı',
+        text: 'Yükselen su buharı soğur, küçük su damlacıklarına dönüşür ve bir araya gelerek bulutları oluşturur.',
+    },
+    {
+        name: 'Yağış',
+        change: 'sıvı / katı',
+        text: 'Damlacıklar birleşip ağırlaşınca yağmur, kar ya da dolu olarak yeryüzüne düşer.',
+    },
+    {
+        name: 'Toplanma',
+        change: 'akış ve sızma',
+        text: 'Yağan su akarsu ve göllerde toplanır, bir kısmı toprağa sızarak yer altı suyunu besler; sonra döngü yeniden başlar.',
+    },
+];
+
+const cycleState = (o: MathObject, t: number) => {
+    const playing = simValue(o, 'play', 0) > 0.5;
+    const step = playing
+        ? Math.floor((t * 0.5) % WATER_STAGES.length)
+        : clampInt(simValue(o, 'step', 0), 0, WATER_STAGES.length - 1, 0);
+    return { step, playing };
+};
+
+/** Etkin olmayan aşamalar soluk çizilir; anlatılan adım öne çıkar. */
+function stageAlpha(k: Ctx, active: boolean, draw: () => void) {
+    k.c.save();
+    k.c.globalAlpha = active ? 1 : 0.22;
+    draw();
+    k.c.restore();
+}
+
+export const waterCycleRender: Renderer = (k) => {
+    const r = k.r;
+    const icon = isIconSize(r);
+    const s = cycleState(k.o, k.t);
+    const fs = clamp(Math.min(r.w, r.h) / 15, 9, 19);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineJoin = 'round';
+
+    const scene: Rect = icon
+        ? r
+        : { x: r.x + fs * 0.3, y: r.y + fs * 2, w: r.w - fs * 0.6, h: r.h - fs * 7.6 };
+    const seaY = scene.y + scene.h * 0.62;
+    const bottom = scene.y + scene.h;
+    const seaX = scene.x + scene.w * 0.46;
+
+    if (icon) {
+        // Simge: bulut, yağış ve deniz yeter.
+        const cx = r.x + r.w * 0.5;
+        const cy = r.y + r.h * 0.3;
+        fillShape(k, () => k.c.ellipse(cx, cy, r.w * 0.24, r.h * 0.14, 0, 0, Math.PI * 2), 0.2);
+        k.c.beginPath();
+        k.c.ellipse(cx, cy, r.w * 0.24, r.h * 0.14, 0, 0, Math.PI * 2);
+        k.c.stroke();
+        for (let i = -1; i <= 1; i++) {
+            line(k, cx + i * r.w * 0.13, cy + r.h * 0.18, cx + i * r.w * 0.13 - r.w * 0.03, cy + r.h * 0.34, 1.4);
+        }
+        line(k, r.x + r.w * 0.12, r.y + r.h * 0.82, r.x + r.w * 0.88, r.y + r.h * 0.82, Math.max(1.6, k.lw));
+        k.c.restore();
+        return;
+    }
+
+    // Güneş (arka plan)
+    const sunX = scene.x + scene.w * 0.86;
+    const sunY = scene.y + scene.h * 0.16;
+    const sunR = fs * 1.05;
+    stageAlpha(k, s.step === 0, () => {
+        k.c.beginPath();
+        k.c.lineWidth = Math.max(1.6, k.lw);
+        k.c.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+        k.c.stroke();
+        for (let i = 0; i < 8; i++) {
+            const a = (i / 8) * Math.PI * 2;
+            line(
+                k,
+                sunX + Math.cos(a) * sunR * 1.3,
+                sunY + Math.sin(a) * sunR * 1.3,
+                sunX + Math.cos(a) * sunR * 1.7,
+                sunY + Math.sin(a) * sunR * 1.7,
+                1.4
+            );
+        }
+    });
+
+    // Bulut (dağların arkasında)
+    const clX = scene.x + scene.w * 0.26;
+    const clY = scene.y + scene.h * 0.2;
+    const clW = scene.w * 0.085;
+    stageAlpha(k, s.step === 1, () => {
+        const lobes: ReadonlyArray<[number, number, number]> = [
+            [-0.8, 0.16, 0.42],
+            [-0.28, -0.24, 0.58],
+            [0.26, -0.3, 0.6],
+            [0.76, 0.12, 0.44],
+        ];
+        fillShape(
+            k,
+            () => {
+                for (const [dx, dy, rr] of lobes) {
+                    k.c.moveTo(clX + dx * clW + rr * clW, clY + dy * clW);
+                    k.c.arc(clX + dx * clW, clY + dy * clW, rr * clW, 0, Math.PI * 2);
+                }
+                k.c.rect(clX - clW * 0.82, clY, clW * 1.64, clW * 0.4);
+            },
+            0.16
+        );
+        for (const [dx, dy, rr] of lobes) {
+            k.c.beginPath();
+            k.c.lineWidth = Math.max(1.6, k.lw);
+            k.c.arc(clX + dx * clW, clY + dy * clW, rr * clW, Math.PI * 0.97, Math.PI * 2.03);
+            k.c.stroke();
+        }
+        line(k, clX - clW * 0.8, clY + clW * 0.38, clX + clW * 0.76, clY + clW * 0.38, Math.max(1.6, k.lw));
+        label(k, 'yoğuşma', clX + clW * 1.15, clY - clW * 0.2, 'left', 'middle', 0.55);
+    });
+
+    // Deniz
+    const wave: Array<[number, number]> = [];
+    for (let i = 0; i <= 10; i++) {
+        const x = seaX + ((scene.x + scene.w - seaX) * i) / 10;
+        wave.push([x, seaY + Math.sin(i * 1.1) * fs * 0.16]);
+    }
+    fillShape(
+        k,
+        () => {
+            k.c.moveTo(wave[0][0], wave[0][1]);
+            for (const [x, y] of wave) k.c.lineTo(x, y);
+            k.c.lineTo(scene.x + scene.w, bottom);
+            k.c.lineTo(seaX, bottom);
+            k.c.closePath();
+        },
+        0.16
+    );
+    smooth(k, wave, false, Math.max(1.6, k.lw));
+
+    // Kara ve dağlar (ön planda)
+    const peakA = seaY - scene.h * 0.3;
+    const peakB = seaY - scene.h * 0.38;
+    const land: Array<[number, number]> = [
+        [scene.x, bottom],
+        [scene.x, seaY - scene.h * 0.04],
+        [scene.x + scene.w * 0.11, peakA],
+        [scene.x + scene.w * 0.18, seaY - scene.h * 0.18],
+        [scene.x + scene.w * 0.27, peakB],
+        [scene.x + scene.w * 0.37, seaY - scene.h * 0.08],
+        [seaX, seaY + fs * 0.1],
+        [seaX, bottom],
+    ];
+    k.c.save();
+    k.c.globalAlpha = 1;
+    fillShape(
+        k,
+        () => {
+            k.c.moveTo(land[0][0], land[0][1]);
+            for (const [x, y] of land) k.c.lineTo(x, y);
+            k.c.closePath();
+        },
+        0.09
+    );
+    // Kar örtüsü: zirvelerin ucu
+    fillShape(
+        k,
+        () => {
+            k.c.moveTo(scene.x + scene.w * 0.235, peakB + scene.h * 0.07);
+            k.c.lineTo(scene.x + scene.w * 0.27, peakB);
+            k.c.lineTo(scene.x + scene.w * 0.305, peakB + scene.h * 0.07);
+            k.c.closePath();
+        },
+        0.3
+    );
+    path(k, land.slice(1, land.length - 1));
+    k.c.restore();
+    line(k, scene.x, bottom, scene.x + scene.w, bottom, Math.max(1.4, k.lw * 0.8));
+
+    // Buharlaşma okları
+    stageAlpha(k, s.step === 0, () => {
+        for (let i = 0; i < 3; i++) {
+            const x = seaX + (scene.x + scene.w - seaX) * (0.2 + i * 0.26);
+            const y0 = seaY;
+            const y1 = scene.y + scene.h * 0.3;
+            k.c.beginPath();
+            k.c.lineWidth = 1.5;
+            k.c.moveTo(x, y0);
+            k.c.bezierCurveTo(x + fs * 0.6, y0 - fs, x - fs * 0.6, y1 + fs, x, y1);
+            k.c.stroke();
+            arrowHead(k, x, y1, -Math.PI / 2, fs * 0.45);
+        }
+        label(k, 'buharlaşma', seaX + fs * 0.3, seaY - fs * 0.5, 'left', 'bottom', 0.55);
+    });
+
+    // Yağış: buluttan dağların yamacına
+    stageAlpha(k, s.step === 2, () => {
+        for (let i = 0; i < 7; i++) {
+            const x = clX - clW * 0.72 + i * clW * 0.24;
+            const y = clY + clW * 0.55 + (i % 2) * fs * 0.4;
+            line(k, x, y, x - fs * 0.28, y + fs * 1.05, 1.5);
+        }
+        label(k, 'yağış', clX + clW * 1.15, clY + clW * 1.15, 'left', 'middle', 0.55);
+    });
+
+    // Toplanma: akarsu ve yer altı suyu
+    stageAlpha(k, s.step === 3, () => {
+        const river: Array<[number, number]> = [
+            [scene.x + scene.w * 0.27, peakB + scene.h * 0.06],
+            [scene.x + scene.w * 0.31, seaY - scene.h * 0.2],
+            [scene.x + scene.w * 0.36, seaY - scene.h * 0.09],
+            [scene.x + scene.w * 0.43, seaY - fs * 0.1],
+        ];
+        smooth(k, river, false, Math.max(2, k.lw * 1.2));
+        arrowHead(k, river[3][0], river[3][1], Math.PI * 0.22, fs * 0.5);
+        k.c.save();
+        k.c.setLineDash([4, 4]);
+        arrow(k, scene.x + scene.w * 0.14, bottom - fs * 1.2, scene.x + scene.w * 0.42, bottom - fs * 0.6, fs * 0.45, 1.3);
+        k.c.restore();
+        label(k, 'yer altı suyu', scene.x + scene.w * 0.14, bottom - fs * 1.5, 'left', 'bottom', 0.52);
+        label(k, 'akarsu', scene.x + scene.w * 0.4, seaY - scene.h * 0.06, 'left', 'middle', 0.52);
+    });
+
+    if (k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Adım şeridi ve açıklama
+    const stepY = scene.y + scene.h + fs * 1.5;
+    const chipW = (r.w - fs * 1.4) / WATER_STAGES.length;
+    WATER_STAGES.forEach((st, i) => {
+        const x = r.x + fs * 0.5 + i * chipW;
+        k.c.save();
+        k.c.lineWidth = i === s.step ? Math.max(2, k.lw * 1.3) : 1;
+        k.c.strokeStyle = i === s.step ? k.color : withAlpha(k.color, 0.4);
+        roundRect(k, x, stepY - fs * 0.85, chipW - fs * 0.4, fs * 1.7, 6);
+        k.c.stroke();
+        if (i === s.step) {
+            k.c.globalAlpha = 0.1;
+            k.c.fill();
+        }
+        k.c.restore();
+        label(
+            k,
+            `${i + 1}. ${st.name}`,
+            x + (chipW - fs * 0.4) / 2,
+            stepY - fs * 0.15,
+            'center',
+            'middle',
+            0.58
+        );
+        label(k, st.change, x + (chipW - fs * 0.4) / 2, stepY + fs * 0.55, 'center', 'middle', 0.48);
+    });
+
+    const st = WATER_STAGES[s.step];
+    const textY = stepY + fs * 1.7;
+    const words = st.text.split(' ');
+    let lineBuf = '';
+    let row = 0;
+    for (const w of words) {
+        const next = lineBuf ? `${lineBuf} ${w}` : w;
+        if (textWidth(k, next, 0.58) > r.w - fs * 1.2 && lineBuf) {
+            label(k, lineBuf, r.x + fs * 0.5, textY + row * fs * 0.85, 'left', 'top', 0.58);
+            lineBuf = w;
+            row++;
+        } else lineBuf = next;
+    }
+    if (lineBuf && row < 3) label(k, lineBuf, r.x + fs * 0.5, textY + row * fs * 0.85, 'left', 'top', 0.58);
+
+    label(
+        k,
+        fitText(
+            k,
+            ['Su döngüsü: su tükenmez, hâl değiştirerek dolaşır', 'Su döngüsü'],
+            r.w - fs * 3,
+            0.8
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8
+    );
+    k.c.restore();
+};
+
+export const waterCycleSpec: SimSpec = {
+    animated: (o) => simValue(o, 'play', 0) > 0.5,
+    controls: (r, o): SimControl[] => {
+        const s = cycleState(o, 0);
+        return [
+            {
+                id: 'next',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: 'Sonraki adım',
+                on: s.step > 0,
+            },
+            {
+                id: 'play',
+                x: r.x + r.w - 40,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.playing ? 'Durdur' : 'Döngüyü çalıştır',
+                on: s.playing,
+            },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        if (id === 'play') return { play: simValue(o, 'play', 0) > 0.5 ? 0 : 1 };
+        if (id === 'next') {
+            const step = clampInt(simValue(o, 'step', 0), 0, WATER_STAGES.length - 1, 0);
+            return { step: (step + 1) % WATER_STAGES.length, play: 0 };
+        }
+        return {};
+    },
+    params: [{ key: 'step', label: `Adım (0-${WATER_STAGES.length - 1})`, min: 0, max: WATER_STAGES.length - 1, step: 1 }],
+};
+
 export const SCIENCE_SIM_RENDERERS: Record<string, Renderer> = {
     moon_phase_sim: moonRender,
     label_drag_sim: labelDragRender,
     heating_curve_sim: heatingRender,
     density_sim: densityRender,
     eclipse_sim: eclipseRender,
+    newton_cannon_sim: newtonCannonRender,
+    water_cycle_sim: waterCycleRender,
 };
 
 export const SCIENCE_SIM_SPECS: Record<string, SimSpec> = {
@@ -1147,6 +1825,8 @@ export const SCIENCE_SIM_SPECS: Record<string, SimSpec> = {
     heating_curve_sim: heatingSpec,
     density_sim: densitySpec,
     eclipse_sim: eclipseSpec,
+    newton_cannon_sim: newtonCannonSpec,
+    water_cycle_sim: waterCycleSpec,
 };
 
 /** Kütüphane panelindeki "Etkileşimli Fen" kategorisinin içeriği. */
@@ -1185,5 +1865,19 @@ export const SCIENCE_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Ay’ı sürükle; Güneş ve Ay tutulmasının neden her ay olmadığını gör',
         size: { w: 540, h: 320 },
         defaults: { labels: true, sim: { pos: 0, tilt: 0 } },
+    },
+    {
+        kind: 'newton_cannon_sim',
+        label: 'Newton’un Top Güllesi',
+        hint: 'Yatay hızı artır: düşer, yörüngeye oturur, kaçar',
+        size: { w: 580, h: 400 },
+        defaults: { labels: true, sim: { v: 0.7, play: 0 } },
+    },
+    {
+        kind: 'water_cycle_sim',
+        label: 'Su Döngüsü',
+        hint: 'Buharlaşma → yoğuşma → yağış → toplanma; adım adım çalıştır',
+        size: { w: 600, h: 420 },
+        defaults: { labels: true, sim: { step: 0, play: 0 } },
     },
 ];
