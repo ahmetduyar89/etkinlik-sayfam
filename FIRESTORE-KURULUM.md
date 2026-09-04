@@ -7,6 +7,22 @@
 | `folders`          | Klasörler (iç içe olabilir)                         |
 | `notebooks`        | Defter/beyaz tahta bilgileri (ad, kağıt, sayfa sayısı) |
 | `notebook_content` | Sayfa çizimleri (JSON)                              |
+| `notebook_ops`     | Ortak çizimin canlı işlem akışı (geçici kayıtlar)   |
+
+Sayfa verisi büyükse `notebook_content` içinde parçalara bölünür:
+`{defterId}` ana dokümanı ilk parçayı, `{defterId}__c1`, `__c2` … dokümanları
+kalanını tutar. Hepsi aynı koleksiyonda olduğu için ek kural gerekmez.
+
+Defter içeriği cihazlar arasında canlı senkronlanır: her kayıt `notebooks`
+dokümanına bir sürüm numarası (`content_rev`) yazar, açık olan diğer ekranlar
+bu küçük dokümanı dinleyip içeriği tazeler.
+
+Aynı defterde aynı anda çizilebilir: her çizgi, silme veya taşıma
+`notebook_ops/{defterId}/ops` altına küçük bir işlem kaydı olarak yayınlanır ve
+diğer ekranlara anında uygulanır. Bu kayıtlar geçicidir (yayınlayan sekme kısa
+süre sonra siler, kalanlar defter açılışında temizlenir); kalıcı içerik yine
+`notebook_content`'tedir. **`notebook_ops` yeni bir koleksiyondur: ortak çizimin
+çalışması için aşağıdaki kuralları yeniden yayınlamanız gerekir.**
 
 Firestore güvenlik kuralları bu koleksiyonlara izin vermezse ekranda
 **"Firestore güvenlik kuralları bu bölüme izin vermiyor … (permission-denied)"**

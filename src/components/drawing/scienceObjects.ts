@@ -1079,11 +1079,25 @@ export const SCIENCE_CATEGORIES: ReadonlyArray<ObjectCategory> = [
                 defaults: { n: 2, labels: true },
                 fields: [{ key: 'n', label: 'Kol sayısı', type: 'number', min: 2, max: 3 }],
             },
+            {
+                kind: 'circuit_sim',
+                label: 'Canlı Devre (Mini PhET)',
+                hint: 'Pil, lamba, anahtar, direnç ve ampermetre ile canlı devre',
+                size: { w: 440, h: 300 },
+                defaults: { labels: true, sim: { parallel: 0, n: 2, v: 2, sw: 1, res: 10 } },
+            },
         ],
     },
     {
         label: 'Optik',
         items: [
+            {
+                kind: 'refraction_sim',
+                label: 'Işık Kırılması & Tam Yansıma',
+                hint: 'Lazer açısı, Snell yasası, sınır açısı ve tam yansıma',
+                size: { w: 460, h: 320 },
+                defaults: { labels: true, sim: { theta1: 45, n1: 1.5, n2: 1.0 } },
+            },
             { kind: 'convex_lens', label: 'İnce Kenarlı Mercek', hint: 'Işınları odakta toplar', size: { w: 360, h: 260 }, defaults: { labels: true } },
             { kind: 'concave_lens', label: 'Kalın Kenarlı Mercek', hint: 'Işınları dağıtır', size: { w: 360, h: 260 }, defaults: { labels: true } },
             { kind: 'plane_mirror', label: 'Düz Ayna', hint: 'Gelen ve yansıyan ışın, normal', size: { w: 320, h: 240 }, defaults: { labels: true } },
@@ -1094,6 +1108,16 @@ export const SCIENCE_CATEGORIES: ReadonlyArray<ObjectCategory> = [
     {
         label: 'Kuvvet & Hareket',
         items: [
+            {
+                kind: 'lever_sim',
+                label: 'Kaldıraç Dengesi',
+                hint: 'Destek, yük ve kuvveti kaydır; F₁·d₁ = F₂·d₂',
+                size: { w: 480, h: 300 },
+                defaults: {
+                    labels: true,
+                    sim: { fulcrum: 50, loadPos: 15, effortPos: 85, load: 40, effort: 40 },
+                },
+            },
             {
                 kind: 'force_arrows',
                 label: 'Kuvvet Okları',
@@ -1128,6 +1152,20 @@ export const SCIENCE_CATEGORIES: ReadonlyArray<ObjectCategory> = [
     {
         label: 'Madde & Canlılar',
         items: [
+            {
+                kind: 'ph_sim',
+                label: 'Asit – Baz ve pH',
+                hint: 'Turnusol kağıdı, 0-14 renk skalası ve nötrleşme',
+                size: { w: 500, h: 300 },
+                defaults: { labels: true, sim: { acid: 40, base: 40, k: 3 } },
+            },
+            {
+                kind: 'division_sim',
+                label: 'Mitoz ve Mayoz',
+                hint: 'Hücre bölünmesi evreleri ve kromozom hareketleri',
+                size: { w: 500, h: 300 },
+                defaults: { labels: true, sim: { mode: 0, stage: 0 } },
+            },
             {
                 kind: 'bohr_atom',
                 label: 'Atom Modeli',

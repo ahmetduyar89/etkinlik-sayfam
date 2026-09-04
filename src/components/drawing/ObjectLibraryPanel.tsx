@@ -260,6 +260,11 @@ export function ObjectLibraryPanel({ open, onClose, onInsert, onSelectTool }: Ob
                                                 Araç
                                             </span>
                                         )}
+                                        {item.kind.includes('_3d') && (
+                                            <span className="absolute top-1 right-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow tracking-wider animate-pulse">
+                                                3D
+                                            </span>
+                                        )}
                                     </span>
                                     <span className="text-[11.5px] font-semibold text-slate-200 leading-tight">
                                         {item.label}

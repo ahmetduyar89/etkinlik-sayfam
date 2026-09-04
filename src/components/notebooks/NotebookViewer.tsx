@@ -10,15 +10,15 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
 import { TextBoxLayer } from '../tools/TextBoxLayer';
 import { FullscreenToggle } from '../common/FullscreenToggle';
-import { fetchDocById } from '../../lib/firebase';
+import { watchDocById } from '../../lib/firebase';
+import { loadNotebookPages } from './notebookContent';
+import { watchOps } from './notebookOps';
 import { paperBackground } from './paper';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
     DrawingCanvasHandle,
     Notebook,
-    NotebookContent,
-    NotebookPage,
     Stroke,
     TextBoxData,
     Viewport,
@@ -35,20 +35,6 @@ const VIEW_CONFIG: DrawConfig = {
     width: 2,
 } as DrawConfig;
 
-function parsePages(raw?: string): NotebookPage[] {
-    if (!raw) return [{ strokes: [], boxes: [] }];
-    try {
-        const parsed = JSON.parse(raw) as NotebookPage[];
-        if (!Array.isArray(parsed) || parsed.length === 0) return [{ strokes: [], boxes: [] }];
-        return parsed.map((p) => ({
-            strokes: Array.isArray(p?.strokes) ? p.strokes : [],
-            boxes: Array.isArray(p?.boxes) ? p.boxes : [],
-        }));
-    } catch {
-        return [{ strokes: [], boxes: [] }];
-    }
-}
-
 interface NotebookViewerProps {
     notebookId: string;
 }
@@ -64,31 +50,125 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
     const [view, setView] = React.useState<Viewport>({ scale: 1, tx: 0, ty: 0 });
     const [canvasSize, setCanvasSize] = React.useState({ w: 0, h: 0 });
     const [error, setError] = React.useState<string | null>(null);
+    /** Son canlı işlemin zamanı: akış sürerken tam içerik indirilmez. */
+    const lastOpAtRef = React.useRef(0);
+    /** Akış yüzünden ertelenen sürüm; akış susunca indirilir. */
+    const pendingRevRef = React.useRef<number | null>(null);
 
+    // Defterin üst verisi canlı dinlenir: öğretmen tahtaya yazıp içerik
+    // kaydedildiğinde `content_rev` artar ve sayfa verisi yeniden çekilir.
+    // Böylece öğrenci ekranı yenilemeden güncel tahtayı görür; ağır sayfa
+    // verisi ise yalnızca gerçekten değiştiğinde iner.
     React.useEffect(() => {
         let cancelled = false;
-        (async () => {
+        /** İçeriği en son hangi sürüm için indirdik. */
+        let loadedRev = -1;
+        let loading = false;
+        /** Art arda gelen değişiklikler için tek tazeleme (debounce). */
+        let timer: number | null = null;
+
+        const refresh = async (rev: number) => {
+            loading = true;
+            const isFirst = loadedRev < 0;
             try {
-                const meta = await fetchDocById<Notebook>('notebooks', notebookId);
+                const content = await loadNotebookPages(notebookId);
+                if (cancelled) return;
+                loadedRev = rev;
+                const strokes = content.pages.map((p) => p.strokes);
+                const page = canvasRef.current?.getCurrentPage() ?? 0;
+                setPages(strokes);
+                setBoxesByPage(content.pages.map((p) => p.boxes ?? []));
+                // İlk yüklemede tuval `initialPages` ile kurulur; sonrakiler
+                // tuvale doğrudan verilir ve öğrenci baktığı sayfada kalır.
+                if (!isFirst) {
+                    canvasRef.current?.loadPages(strokes);
+                    canvasRef.current?.goToPage(Math.min(page, strokes.length - 1));
+                }
+            } catch (e) {
+                // İlk yükleme başarısızsa ekran açılamaz; sonraki tazelemelerde
+                // eldeki sürüm gösterilmeye devam eder.
+                if (!cancelled && loadedRev < 0) {
+                    setError(firestoreErrorMessage(e, 'Defter yüklenemedi.'));
+                }
+            } finally {
+                loading = false;
+            }
+        };
+
+        const unsub = watchDocById<Notebook>(
+            'notebooks',
+            notebookId,
+            (meta) => {
                 if (cancelled) return;
                 if (!meta) {
                     setError('Bu defter bulunamadı. Bağlantı güncel olmayabilir.');
                     return;
                 }
                 setNotebook(meta);
-                const content = await fetchDocById<NotebookContent>('notebook_content', notebookId);
-                if (cancelled) return;
-                const parsed = parsePages(content?.pages_json);
-                setPages(parsed.map((p) => p.strokes));
-                setBoxesByPage(parsed.map((p) => p.boxes ?? []));
-            } catch (e) {
+                const rev = meta.content_rev ?? 0;
+                if (rev === loadedRev) return;
+                // Öğretmen yazarken sürüm saniyede bir artar; ilk açılış
+                // hemen, sonraki güncellemeler kısa bir beklemeyle yüklenir.
+                if (loadedRev < 0) {
+                    void refresh(rev);
+                    return;
+                }
+                if (timer) window.clearTimeout(timer);
+                timer = window.setTimeout(() => {
+                    timer = null;
+                    if (loading) return;
+                    // Canlı işlem akışı sürerken ekran zaten güncel; ağır
+                    // sayfa verisi akış susunca indirilir.
+                    if (Date.now() - lastOpAtRef.current < 20000) {
+                        // Akış susunca bu sürüm yine de indirilecek.
+                        pendingRevRef.current = rev;
+                        return;
+                    }
+                    void refresh(rev);
+                }, 1500);
+            },
+            (e) => {
                 if (!cancelled) setError(firestoreErrorMessage(e, 'Defter yüklenemedi.'));
             }
-        })();
+        );
+        // Canlı akış susunca, akış sırasında atlanan sürüm bir kez indirilir:
+        // sayfa ekleme/silme gibi yapısal değişiklikler ancak böyle gelir.
+        const settle = window.setInterval(() => {
+            const rev = pendingRevRef.current;
+            if (rev === null || loading || Date.now() - lastOpAtRef.current < 20000) return;
+            pendingRevRef.current = null;
+            void refresh(rev);
+        }, 5000);
+
         return () => {
             cancelled = true;
+            if (timer) window.clearTimeout(timer);
+            window.clearInterval(settle);
+            unsub();
         };
     }, [notebookId]);
+
+    // Ortak çizim akışı: öğretmen tahtaya yazdıkça çizgiler anında burada da
+    // belirir. Anlık görüntü senkronu (yukarıdaki dinleyici) daha yavaştır ve
+    // arada kaçan bir işlem olursa ekranı yine eşitler.
+    const ready = pages !== null;
+    React.useEffect(() => {
+        if (!ready) return;
+        return watchOps(notebookId, (ops) => {
+            canvasRef.current?.applyOps(ops);
+            lastOpAtRef.current = Date.now();
+            for (const op of ops) {
+                if (op.type !== 'boxes') continue;
+                setBoxesByPage((prev) => {
+                    const next = [...prev];
+                    while (next.length <= op.page) next.push([]);
+                    next[op.page] = op.boxes;
+                    return next;
+                });
+            }
+        });
+        // Tuval yalnızca ilk yükleme bittikten sonra var olur.
+    }, [notebookId, ready]);
 
     // Öğrenci sayfalar arasında ok tuşlarıyla da gezebilsin.
     React.useEffect(() => {

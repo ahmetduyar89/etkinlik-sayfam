@@ -22,7 +22,7 @@ import {
     Search,
     Trash2,
 } from 'lucide-react';
-import { useFirestore, deleteDocById } from '../../lib/firebase';
+import { useFirestore } from '../../lib/firebase';
 import { cn } from '../../utils/cn';
 import { copyText } from '../../utils/clipboard';
 import { Modal } from '../common/Modal';
@@ -30,6 +30,7 @@ import { useToast } from '../common/ToastProvider';
 import { useConfirm } from '../common/ConfirmDialog';
 import { usePrompt } from '../common/PromptDialog';
 import { NotebookEditor } from './NotebookEditor';
+import { deleteNotebookPages } from './notebookContent';
 import { ActivityPicker } from './ActivityPicker';
 import { ActivityFolderDialog } from './ActivityFolderDialog';
 import { activityFolderIds, isInFolder } from './activityFolders';
@@ -300,7 +301,7 @@ export function NotebooksView() {
             await Promise.all(
                 notebookIds.map(async (id) => {
                     await notebooksHandler.remove(id);
-                    await deleteDocById('notebook_content', id).catch(() => undefined);
+                    await deleteNotebookPages(id);
                 })
             );
             // Etkinlikler İçerikler sekmesinde kalmalı; yalnızca silinen
@@ -332,7 +333,7 @@ export function NotebooksView() {
         if (!ok) return;
         try {
             await notebooksHandler.remove(n.id);
-            await deleteDocById('notebook_content', n.id).catch(() => undefined);
+            await deleteNotebookPages(n.id);
             toast.success('Defter silindi.');
         } catch {
             toast.error('Defter silinemedi.');

@@ -88,6 +88,12 @@ export interface BoundingBox {
 }
 
 export interface Stroke {
+    /**
+     * Çizime özgü kimlik. Ortak çizimde bir çizgiyi cihazlar arasında
+     * adlandırmak için gerekir (taşıma/silme/renk değişimi bu kimliğe
+     * dayanır). Eski kayıtlarda yoktur; yüklenirken atanır.
+     */
+    id?: string;
     tool: DrawingTool;
     color: string;
     width?: number;
@@ -186,18 +192,31 @@ export type MathObjectKind =
     | 'sun_earth_moon'
     // ── Canlı simülasyonlar ─────────────────────────────────────────
     | 'optics_bench'
+    | 'refraction_sim'
     | 'circuit_sim'
     | 'matter_sim'
     // ── 8. sınıf üniteleri ──────────────────────────────────────────
     | 'seasons_sim'
+    | 'light_angle_sim'
+    | 'wind_pressure_sim'
+    | 'shadow_sim'
+    | 'dna_replication_sim'
+    | 'modification_sim'
+    | 'nucleotide_sim'
     | 'punnett_sim'
     | 'liquid_pressure_sim'
     | 'solid_pressure_sim'
+    | 'pascal_sim'
+    | 'torricelli_sim'
+    | 'liquid_paradox_sim'
     | 'lever_sim'
     | 'pulley_sim'
     | 'incline_sim'
     | 'division_sim'
     | 'ph_sim'
+    | 'reaction_change_sim'
+    | 'specific_heat_sim'
+    | 'acid_base_lab_sim'
     | 'pyramid_sim'
     | 'electro_sim'
     // ── Canlı matematik ─────────────────────────────────────────────
@@ -249,7 +268,14 @@ export type MathObjectKind =
     | 'work_sim'
     | 'newton_cannon_sim'
     | 'water_cycle_sim'
-    | 'coulomb_sim';
+    | 'coulomb_sim'
+    // ── 3D ve Gelişmiş Laboratuvar Simülasyonları ─────────────────────
+    | 'solids_3d_sim'
+    | 'seasons_3d_sim'
+    | 'atom_3d_sim'
+    | 'dna_3d_sim'
+    | 'circuit_lab_sim'
+    | 'gears_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile
@@ -353,11 +379,42 @@ export interface DrawingCanvasHandle {
     getPages: () => Stroke[][];
     /** Kayıtlı sayfa verisini canvas'a yükler. */
     loadPages: (pages: Stroke[][]) => void;
+    /** Başka bir cihazdan gelen değişiklikleri uygular (ortak çizim). */
+    applyOps: (ops: NotebookOp[]) => void;
     /**
      * Sayfayı PNG olarak indirir. `paper` verilirse kağıt deseni de çizilir —
      * desen ekranda CSS arka planı olduğundan aksi hâlde çıktıda görünmez.
      */
     screenshot: (wbMode: boolean, color: string, paper?: PaperStyle) => void;
+}
+
+// ── Ortak çizim (canlı operasyon akışı) ─────────────────────────────────
+/**
+ * Bir cihazın yaptığı değişikliğin diğer cihazlara iletilen hâli. Kalıcı
+ * kayıt yine tam sayfa anlık görüntüsüdür (bkz. notebookContent.ts);
+ * operasyonlar yalnızca "şu anda" olan biteni taşır.
+ */
+export type NotebookOp =
+    /** Sayfaya yeni çizimler eklendi. */
+    | { type: 'add'; page: number; strokes: Stroke[] }
+    /** Bu kimlikli çizimler silindi. */
+    | { type: 'remove'; page: number; ids: string[] }
+    /** Bu çizimler değişti (taşındı, boyutlandı, rengi değişti). */
+    | { type: 'update'; page: number; strokes: Stroke[] }
+    /** Sayfanın tamamı değişti (geri al, temizle, piksel silgisi). */
+    | { type: 'page_set'; page: number; strokes: Stroke[] }
+    /** Sayfanın metin kutuları değişti. */
+    | { type: 'boxes'; page: number; boxes: TextBoxData[] };
+
+/** Firestore'a yazılan operasyon dokümanı. */
+export interface NotebookOpDoc {
+    id: string;
+    /** Operasyonun kendisi (JSON olarak; Firestore iç içe dizi tutmaz). */
+    op_json: string;
+    /** Yayınlayan sekmenin kimliği; kendi operasyonumuzu geri uygulamayız. */
+    writer: string;
+    /** Yayın zamanı (istemci saati, ms). Sıralama ve temizlik için. */
+    at: number;
 }
 
 export type ToastVariant = 'success' | 'error' | 'info';
@@ -406,6 +463,14 @@ export interface Notebook {
     subject?: string;
     grade_level?: string;
     favorite?: boolean;
+    /**
+     * Sayfa içeriğinin sürüm numarası. Her kayıtta artar; editör ve
+     * görüntüleyici bu küçük üst veri dokümanını dinleyerek içeriğin başka
+     * bir cihazda değiştiğini ağır sayfa verisini indirmeden anlar.
+     */
+    content_rev?: number;
+    /** İçeriği en son yazan sekmenin kimliği (kendi yazımızı ayırt etmek için). */
+    content_writer?: string;
     updated_at?: string;
     created_at?: string;
 }
@@ -423,6 +488,18 @@ export interface NotebookPage {
  */
 export interface NotebookContent {
     id: string;
-    pages_json: string;
+    /** Sayfa içeriğinin sürüm numarası; eşzamanlı kayıtta çakışmayı yakalar. */
+    rev?: number;
+    /** İçeriği en son yazan sekmenin kimliği. */
+    writer?: string;
+    /**
+     * Eski düzende içeriğin tamamı buradaydı. Yeni kayıtlarda `null` yazılır;
+     * içerik `{id}__c0…` dokümanlarında durur.
+     */
+    pages_json?: string | null;
+    /** İçerik kaç parça dokümana bölündü. */
+    chunk_count?: number;
+    /** `{id}__c…` dokümanlarında JSON'un o parçası. */
+    chunk?: string;
     updated_at?: string;
 }

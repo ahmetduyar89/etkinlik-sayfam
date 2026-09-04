@@ -296,6 +296,524 @@ export const seasonsSpec: SimSpec = {
     ],
 };
 
+// ── Işığın Geliş Açısı ve Birim Alan (Mevsimlerin Oluşumu) ──────────
+
+function lightAngleGeom(r: Rect, o: MathObject) {
+    const cx = r.x + r.w * 0.42;
+    const groundY = r.y + r.h * 0.76;
+    const angleDeg = clamp(simValue(o, 'angle', 60), 20, 90);
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const dist = Math.min(r.w, r.h) * 0.52;
+
+    const srcX = cx - dist * Math.cos(angleRad);
+    const srcY = groundY - dist * Math.sin(angleRad);
+    const beamW = 40;
+    const spotW = beamW / Math.sin(angleRad);
+    const intensity = Math.sin(angleRad); // 0..1
+    const temp = Math.round(10 + intensity * 28); // 10°C .. 38°C
+
+    return {
+        cx,
+        groundY,
+        angleDeg,
+        angleRad,
+        srcX,
+        srcY,
+        beamW,
+        spotW,
+        intensity,
+        temp,
+    };
+}
+
+export const lightAngleRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = lightAngleGeom(r, k.o);
+
+    // Zemin çizgisi
+    line(k, r.x + 10, g.groundY, r.x + r.w - 10, g.groundY, Math.max(2, k.lw * 1.4));
+
+    // Aydınlanan zemin alanı (parlak sarı/turuncu şerit)
+    k.c.save();
+    const spotLeft = g.cx - g.spotW / 2;
+    const spotRight = g.cx + g.spotW / 2;
+    k.c.fillStyle = withAlpha('#f59e0b', 0.45);
+    k.c.fillRect(spotLeft, g.groundY - 4, g.spotW, 8);
+    k.c.strokeStyle = '#d97706';
+    k.c.lineWidth = 2;
+    k.c.strokeRect(spotLeft, g.groundY - 4, g.spotW, 8);
+    k.c.restore();
+
+    // Işık konisi (fenerden zemine)
+    k.c.save();
+    const perpX = Math.sin(g.angleRad) * (g.beamW / 2);
+    const perpY = -Math.cos(g.angleRad) * (g.beamW / 2);
+    const grad = k.c.createLinearGradient(g.srcX, g.srcY, g.cx, g.groundY);
+    grad.addColorStop(0, withAlpha('#fef08a', 0.85));
+    grad.addColorStop(1, withAlpha('#f59e0b', 0.25));
+    k.c.fillStyle = grad;
+    k.c.beginPath();
+    k.c.moveTo(g.srcX - perpX, g.srcY - perpY);
+    k.c.lineTo(g.srcX + perpX, g.srcY + perpY);
+    k.c.lineTo(spotRight, g.groundY);
+    k.c.lineTo(spotLeft, g.groundY);
+    k.c.closePath();
+    k.c.fill();
+    k.c.restore();
+
+    // Fener / Güneş başlığı
+    k.c.save();
+    k.c.fillStyle = '#eab308';
+    k.c.beginPath();
+    k.c.arc(g.srcX, g.srcY, 14, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.strokeStyle = '#ca8a04';
+    k.c.lineWidth = 2;
+    k.c.stroke();
+    k.c.restore();
+
+    // Geliş açısı yayı
+    k.c.save();
+    k.c.beginPath();
+    k.c.strokeStyle = '#ef4444';
+    k.c.lineWidth = 1.6;
+    k.c.arc(g.cx, g.groundY, 36, Math.PI, Math.PI + g.angleRad);
+    k.c.stroke();
+    label(k, `${Math.round(g.angleDeg)}°`, g.cx - 44, g.groundY - 14, 'right', 'bottom', 0.72);
+    k.c.restore();
+
+    // Aydınlanan alan etiket oku
+    label(
+        k,
+        `Aydınlanan Alan: ${Math.round(g.spotW * 1.5)} br²`,
+        g.cx,
+        g.groundY + 16,
+        'center',
+        'top',
+        0.75
+    );
+
+    // Sağ tarafta Termometre ve Enerji göstergesi
+    const thermoX = r.x + r.w - 38;
+    const thermoY = r.y + r.h * 0.25;
+    const thermoH = r.h * 0.42;
+    k.c.save();
+    // Termometre tüpü
+    k.c.strokeStyle = withAlpha(k.color, 0.5);
+    k.c.lineWidth = 2;
+    k.c.strokeRect(thermoX - 5, thermoY, 10, thermoH);
+    // Hazne
+    k.c.beginPath();
+    k.c.arc(thermoX, thermoY + thermoH + 6, 9, 0, Math.PI * 2);
+    k.c.fillStyle = '#ef4444';
+    k.c.fill();
+    k.c.stroke();
+    // Cıva sütunu
+    const fillH = (thermoH * (g.temp - 5)) / 40;
+    k.c.fillRect(thermoX - 3, thermoY + thermoH - fillH, 6, fillH);
+    k.c.restore();
+
+    label(k, `${g.temp} °C`, thermoX, thermoY - 12, 'center', 'bottom', 0.82);
+    label(k, `Enerji: %${Math.round(g.intensity * 100)}`, thermoX, thermoY + thermoH + 20, 'center', 'top', 0.68);
+
+    // Açıklama yazısı
+    const seasonState =
+        g.angleDeg >= 70
+            ? 'DİK AÇI → Dar Alan → Yüksek Enerji Yoğunluğu → Sıcaklık Fazla (YAZ)'
+            : g.angleDeg <= 40
+              ? 'EĞİK AÇI → Geniş Alan → Düşük Enerji Yoğunluğu → Sıcaklık Az (KIŞ)'
+              : 'ORTA AÇI → Ilıman Sıcaklık (İLKBAHAR / SONBAHAR)';
+    label(k, seasonState, r.x + r.w / 2, r.y + 10, 'center', 'top', 0.78);
+
+    k.c.restore();
+};
+
+export const lightAngleSpec: SimSpec = {
+    controls: (r, o) => {
+        const g = lightAngleGeom(r, o);
+        return [
+            {
+                id: 'src',
+                x: g.srcX,
+                y: g.srcY,
+                type: 'drag',
+                label: 'Güneş / Fener açısını ayarla',
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (id === 'src') {
+            const cx = r.x + r.w * 0.42;
+            const groundY = r.y + r.h * 0.76;
+            const dx = cx - p.x;
+            const dy = groundY - p.y;
+            if (dy <= 0) return { angle: 20 };
+            const deg = Math.round((Math.atan2(dy, dx) * 180) / Math.PI);
+            return { angle: clamp(deg, 20, 90) };
+        }
+        return {};
+    },
+    params: [
+        { key: 'angle', label: 'Geliş açısı', min: 20, max: 90, step: 1, unit: '°' },
+    ],
+};
+
+// ── Rüzgar ve Basınç Alanları (İklim ve Hava Hareketleri) ────────────
+
+function windPressureGeom(r: Rect, o: MathObject) {
+    const tempA = clampInt(simValue(o, 'tempA', 14), 5, 40, 14);
+    const tempB = clampInt(simValue(o, 'tempB', 32), 5, 40, 32);
+    const deltaT = Math.abs(tempA - tempB);
+    const pA = tempA <= tempB ? 'YAB' : 'AAB';
+    const pB = tempB < tempA ? 'YAB' : 'AAB';
+    const windSpeed = deltaT * 2.6; // km/h
+    const fromAtoB = tempA < tempB;
+    const balanced = deltaT < 2;
+
+    const midX = r.x + r.w / 2;
+    const groundY = r.y + r.h * 0.78;
+
+    return {
+        tempA,
+        tempB,
+        deltaT,
+        pA,
+        pB,
+        windSpeed,
+        fromAtoB,
+        balanced,
+        midX,
+        groundY,
+    };
+}
+
+export const windPressureRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = windPressureGeom(r, k.o);
+    const midX = g.midX;
+    const groundY = g.groundY;
+
+    // Bölge arka planları (Soğuk mavi, Sıcak turuncu)
+    k.c.save();
+    // Bölge A
+    k.c.fillStyle = withAlpha(g.tempA < 22 ? '#0284c7' : '#ea580c', 0.12);
+    k.c.fillRect(r.x, r.y, r.w / 2, groundY - r.y);
+    // Bölge B
+    k.c.fillStyle = withAlpha(g.tempB < 22 ? '#0284c7' : '#ea580c', 0.12);
+    k.c.fillRect(midX, r.y, r.w / 2, groundY - r.y);
+    k.c.restore();
+
+    // Sınır kesikli çizgi
+    k.c.save();
+    k.c.setLineDash([4, 4]);
+    k.c.strokeStyle = withAlpha(k.color, 0.3);
+    line(k, midX, r.y + 24, midX, groundY, 1);
+    k.c.restore();
+
+    // Zemin
+    line(k, r.x, groundY, r.x + r.w, groundY, Math.max(2, k.lw * 1.4));
+
+    // Bölge A ve B dikey hava hareketleri (Oklar)
+    const drawAirMotion = (cx: number, isRising: boolean) => {
+        k.c.save();
+        k.c.strokeStyle = withAlpha(isRising ? '#ef4444' : '#0284c7', 0.75);
+        k.c.lineWidth = 2.2;
+        const arrowY = groundY - r.h * 0.35;
+        if (isRising) {
+            // Yükselici hava
+            arrow(k, cx - 20, groundY - 15, cx - 20, arrowY, 7);
+            arrow(k, cx + 20, groundY - 15, cx + 20, arrowY, 7);
+        } else {
+            // Alçalıcı hava
+            arrow(k, cx - 20, arrowY, cx - 20, groundY - 15, 7);
+            arrow(k, cx + 20, arrowY, cx + 20, groundY - 15, 7);
+        }
+        k.c.restore();
+    };
+
+    const centerA = r.x + r.w * 0.25;
+    const centerB = r.x + r.w * 0.75;
+    drawAirMotion(centerA, g.tempA > g.tempB);
+    drawAirMotion(centerB, g.tempB > g.tempA);
+
+    // Bulut (Alçak Basınç alanında)
+    const drawCloud = (cx: number, cy: number) => {
+        k.c.save();
+        k.c.fillStyle = withAlpha('#94a3b8', 0.5);
+        k.c.beginPath();
+        k.c.arc(cx - 16, cy, 14, 0, Math.PI * 2);
+        k.c.arc(cx + 16, cy, 14, 0, Math.PI * 2);
+        k.c.arc(cx, cy - 10, 18, 0, Math.PI * 2);
+        k.c.fill();
+        // Yağmur damlaları
+        k.c.strokeStyle = withAlpha('#0284c7', 0.7);
+        line(k, cx - 12, cy + 18, cx - 16, cy + 26);
+        line(k, cx + 4, cy + 18, cx, cy + 26);
+        line(k, cx + 18, cy + 18, cx + 14, cy + 26);
+        k.c.restore();
+    };
+
+    if (g.tempA > g.tempB && !g.balanced) drawCloud(centerA, r.y + r.h * 0.2);
+    if (g.tempB > g.tempA && !g.balanced) drawCloud(centerB, r.y + r.h * 0.2);
+
+    // Güneş simgesi (Yüksek Basınç alanında açık hava)
+    const drawSun = (cx: number, cy: number) => {
+        k.c.save();
+        k.c.fillStyle = '#f59e0b';
+        k.c.beginPath();
+        k.c.arc(cx, cy, 13, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+    };
+    if (g.tempA < g.tempB && !g.balanced) drawSun(centerA, r.y + r.h * 0.2);
+    if (g.tempB < g.tempA && !g.balanced) drawSun(centerB, r.y + r.h * 0.2);
+
+    // Yatay Rüzgar Akımı (Zemin üzerinde YAB -> AAB yönünde)
+    if (!g.balanced) {
+        k.c.save();
+        k.c.strokeStyle = '#0284c7';
+        k.c.lineWidth = Math.min(4.5, 1.8 + g.windSpeed * 0.05);
+        const windY = groundY - 24;
+        const startX = g.fromAtoB ? r.x + r.w * 0.22 : r.x + r.w * 0.78;
+        const endX = g.fromAtoB ? r.x + r.w * 0.78 : r.x + r.w * 0.22;
+        arrow(k, startX, windY, endX, windY, 10);
+
+        // Akan rüzgar parçacıkları
+        const phase = (k.t * (30 + g.windSpeed * 2.5)) % 60;
+        const dir = g.fromAtoB ? 1 : -1;
+        k.c.fillStyle = '#38bdf8';
+        for (let i = 0; i < 6; i++) {
+            const px = startX + dir * ((phase + i * 45) % Math.abs(endX - startX));
+            k.c.beginPath();
+            k.c.arc(px, windY, 2.5, 0, Math.PI * 2);
+            k.c.fill();
+        }
+        k.c.restore();
+    }
+
+    // Başlıklar ve Etiketler
+    label(k, `A BÖLGESİ (${g.tempA} °C)`, centerA, r.y + 12, 'center', 'top', 0.85);
+    label(k, `B BÖLGESİ (${g.tempB} °C)`, centerB, r.y + 12, 'center', 'top', 0.85);
+
+    label(
+        k,
+        g.pA === 'YAB' ? 'YÜKSEK BASINÇ (YAB) · Alçalıcı Hava' : 'ALÇAK BASINÇ (AAB) · Yükselici Hava',
+        centerA,
+        groundY + 12,
+        'center',
+        'top',
+        0.75
+    );
+    label(
+        k,
+        g.pB === 'YAB' ? 'YÜKSEK BASINÇ (YAB) · Alçalıcı Hava' : 'ALÇAK BASINÇ (AAB) · Yükselici Hava',
+        centerB,
+        groundY + 12,
+        'center',
+        'top',
+        0.75
+    );
+
+    // Durum açıklaması
+    const verdict = g.balanced
+        ? 'Sıcaklıklar eşit → Basınç farkı yok → RÜZGAR ESMEZ'
+        : `Rüzgar Yönü: ${g.fromAtoB ? 'A (Soğuk/YAB) → B (Sıcak/AAB)' : 'B (Soğuk/YAB) → A (Sıcak/AAB)'} · Hız: ${Math.round(g.windSpeed)} km/h`;
+    label(k, verdict, r.x + r.w / 2, r.y + r.h - 8, 'center', 'bottom', 0.82);
+
+    k.c.restore();
+};
+
+export const windPressureSpec: SimSpec = {
+    animated: true,
+    controls: (r, o) => {
+        return [
+            {
+                id: 'swap',
+                x: r.x + r.w / 2,
+                y: r.y + 20,
+                type: 'toggle',
+                label: 'Sıcaklıkları ters çevir',
+            },
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        if (id === 'swap') {
+            const ta = simValue(o, 'tempA', 14);
+            const tb = simValue(o, 'tempB', 32);
+            return { tempA: tb, tempB: ta };
+        }
+        return {};
+    },
+    params: [
+        { key: 'tempA', label: 'A Bölgesi Sıcaklığı', min: 5, max: 40, step: 1, unit: '°C' },
+        { key: 'tempB', label: 'B Bölgesi Sıcaklığı', min: 5, max: 40, step: 1, unit: '°C' },
+    ],
+};
+
+// ── Güneş Yüksekliği ve Gölge Boyu ──────────────────────────────────
+
+function shadowGeom(r: Rect, o: MathObject) {
+    const cx = r.x + r.w * 0.38;
+    const groundY = r.y + r.h * 0.78;
+    const poleH = Math.min(r.h * 0.32, 90);
+    const angleDeg = clamp(simValue(o, 'angle', 45), 15, 90);
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const sunDist = Math.min(r.w, r.h) * 0.55;
+
+    const sunX = cx - sunDist * Math.cos(angleRad);
+    const sunY = groundY - sunDist * Math.sin(angleRad);
+
+    const shadowLen = angleDeg >= 89 ? 0 : poleH / Math.tan(angleRad);
+    const shadowCm = angleDeg >= 89 ? 0 : Math.round((100 / Math.tan(angleRad)));
+
+    return {
+        cx,
+        groundY,
+        poleH,
+        angleDeg,
+        angleRad,
+        sunX,
+        sunY,
+        shadowLen,
+        shadowCm,
+    };
+}
+
+export const shadowRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = shadowGeom(r, k.o);
+
+    // Zemin çizgisi
+    line(k, r.x, g.groundY, r.x + r.w, g.groundY, Math.max(2, k.lw * 1.4));
+
+    // Gölge (çubuğun dibinden sağa uzanan koyu şerit)
+    if (g.shadowLen > 0) {
+        k.c.save();
+        k.c.fillStyle = withAlpha('#1e293b', 0.65);
+        k.c.fillRect(g.cx, g.groundY - 2, g.shadowLen, 5);
+        k.c.restore();
+
+        // Cetvel ve ölçü etiketi
+        label(
+            k,
+            `Gölge Boyu: ${g.shadowCm} cm`,
+            g.cx + g.shadowLen / 2,
+            g.groundY + 16,
+            'center',
+            'top',
+            0.75
+        );
+    } else {
+        label(k, 'Gölge Boyu: 0 cm (Gölge Oluşmaz)', g.cx, g.groundY + 16, 'center', 'top', 0.75);
+    }
+
+    // Güneşten çubuğun tepesine uzanan ışın hattı
+    k.c.save();
+    k.c.setLineDash([4, 4]);
+    k.c.strokeStyle = withAlpha('#eab308', 0.6);
+    const poleTopY = g.groundY - g.poleH;
+    line(k, g.sunX, g.sunY, g.cx + g.shadowLen, g.groundY, 1.5);
+    k.c.restore();
+
+    // Referans Çubuk
+    k.c.save();
+    k.c.fillStyle = '#ef4444';
+    k.c.fillRect(g.cx - 3, poleTopY, 6, g.poleH);
+    k.c.strokeStyle = '#991b1b';
+    k.c.lineWidth = 1.5;
+    k.c.strokeRect(g.cx - 3, poleTopY, 6, g.poleH);
+    label(k, 'Çubuk (1 m)', g.cx - 8, g.groundY - g.poleH / 2, 'right', 'middle', 0.7);
+    k.c.restore();
+
+    // Güneş
+    k.c.save();
+    k.c.fillStyle = '#facc15';
+    k.c.beginPath();
+    k.c.arc(g.sunX, g.sunY, 16, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.strokeStyle = '#ca8a04';
+    k.c.lineWidth = 2;
+    k.c.stroke();
+    // Güneş ışınları
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+        line(
+            k,
+            g.sunX + Math.cos(a) * 19,
+            g.sunY + Math.sin(a) * 19,
+            g.sunX + Math.cos(a) * 26,
+            g.sunY + Math.sin(a) * 26,
+            1.6
+        );
+    }
+    k.c.restore();
+
+    // Yükseklik açısı yayı
+    k.c.save();
+    k.c.beginPath();
+    k.c.strokeStyle = '#f59e0b';
+    k.c.lineWidth = 1.5;
+    k.c.arc(g.cx, g.groundY, 32, Math.PI, Math.PI + g.angleRad);
+    k.c.stroke();
+    label(k, `${Math.round(g.angleDeg)}°`, g.cx - 38, g.groundY - 14, 'right', 'bottom', 0.72);
+    k.c.restore();
+
+    // Üst açıklama
+    const note =
+        g.angleDeg >= 80
+            ? 'ÖĞLE VAKTİ / YAZ MEVSİMİ → Güneş tepeye yakın (dik) → Gölge boyu en KISA'
+            : g.angleDeg <= 35
+              ? 'SABAH-AKŞAM / KIŞ MEVSİMİ → Güneş ufka yakın (eğik) → Gölge boyu en UZUN'
+              : 'Güneş yükseldikçe geliş açısı artar, gölge boyu kısalır';
+    label(k, note, r.x + r.w / 2, r.y + 10, 'center', 'top', 0.8);
+
+    k.c.restore();
+};
+
+export const shadowSpec: SimSpec = {
+    controls: (r, o) => {
+        const g = shadowGeom(r, o);
+        return [
+            {
+                id: 'sun',
+                x: g.sunX,
+                y: g.sunY,
+                type: 'drag',
+                label: 'Güneş yüksekliğini ayarla',
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (id === 'sun') {
+            const cx = r.x + r.w * 0.38;
+            const groundY = r.y + r.h * 0.78;
+            const dx = cx - p.x;
+            const dy = groundY - p.y;
+            if (dy <= 0) return { angle: 15 };
+            const deg = Math.round((Math.atan2(dy, dx) * 180) / Math.PI);
+            return { angle: clamp(deg, 15, 90) };
+        }
+        return {};
+    },
+    params: [
+        { key: 'angle', label: 'Güneş açısı', min: 15, max: 90, step: 1, unit: '°' },
+    ],
+};
+
 // ── Punnett karesi (DNA ve Genetik Kod) ──────────────────────────────
 
 /** 0 = baskın (A), 1 = çekinik (a). Cinsiyet kipinde 0 = X, 1 = Y. */
@@ -433,6 +951,601 @@ export const punnettSpec: SimSpec = {
             max: 1,
             step: 1,
         },
+    ],
+};
+
+// ── DNA Eşlenmesi ve Hata Onarımı ────────────────────────────────────
+
+const DNA_PAIRS = [
+    { a: 'A', b: 'T' },
+    { a: 'G', b: 'C' },
+    { a: 'T', b: 'A' },
+    { a: 'C', b: 'G' },
+    { a: 'A', b: 'T' },
+];
+
+function dnaReplicationGeom(r: Rect, o: MathObject) {
+    const stage = clampInt(simValue(o, 'stage', 0), 0, 3, 0);
+    const errMode = clampInt(simValue(o, 'err', 0), 0, 3, 0);
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h * 0.52;
+    const split = stage === 0 ? 0 : stage === 1 ? 42 : stage === 2 ? 75 : 95;
+
+    return {
+        stage,
+        errMode,
+        cx,
+        cy,
+        split,
+    };
+}
+
+export const dnaReplicationRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = dnaReplicationGeom(r, k.o);
+    const { stage, errMode, cx, cy, split } = g;
+
+    // Renk tablosu
+    const baseColors: Record<string, string> = {
+        A: '#16a34a', // Yeşil
+        T: '#dc2626', // Kırmızı
+        G: '#2563eb', // Mavi
+        C: '#ca8a04', // Sarı
+    };
+
+    const rungCount = DNA_PAIRS.length;
+    const rungH = Math.min(28, (r.h * 0.55) / rungCount);
+    const startY = cy - (rungCount * rungH) / 2;
+
+    // Aşamalara göre çizim
+    for (let i = 0; i < rungCount; i++) {
+        const y = startY + i * rungH;
+        let baseA = DNA_PAIRS[i].a;
+        let baseB = DNA_PAIRS[i].b;
+
+        // Hata onarım senaryoları (3. basamakta uygula)
+        const isErrorRung = i === 2 && errMode > 0;
+        let showRepairStatus = false;
+
+        if (isErrorRung) {
+            if (errMode === 1) {
+                // Tek zincirde baz eksik
+                baseB = stage >= 2 ? '?' : baseB;
+            } else if (errMode === 2) {
+                // Yanlış eşleşme (A-C)
+                baseB = stage >= 2 ? 'C' : baseB;
+            } else if (errMode === 3) {
+                // Karşılıklı çift eksik
+                baseA = stage >= 2 ? '?' : baseA;
+                baseB = stage >= 2 ? '?' : baseB;
+            }
+            showRepairStatus = stage >= 2;
+        }
+
+        // Sol Zincir
+        const leftX = cx - split - 24;
+        k.c.save();
+        k.c.fillStyle = baseA === '?' ? withAlpha('#ef4444', 0.25) : withAlpha(baseColors[baseA] || '#64748b', 0.85);
+        k.c.fillRect(leftX - 16, y - rungH * 0.38, 32, rungH * 0.76);
+        k.c.strokeStyle = baseA === '?' ? '#ef4444' : '#334155';
+        k.c.strokeRect(leftX - 16, y - rungH * 0.38, 32, rungH * 0.76);
+        label(k, baseA, leftX, y, 'center', 'middle', 0.82);
+        k.c.restore();
+
+        // Sağ Zincir
+        const rightX = cx + split + 24;
+        k.c.save();
+        k.c.fillStyle = baseB === '?' ? withAlpha('#ef4444', 0.25) : withAlpha(baseColors[baseB] || '#64748b', 0.85);
+        k.c.fillRect(rightX - 16, y - rungH * 0.38, 32, rungH * 0.76);
+        k.c.strokeStyle = baseB === '?' ? '#ef4444' : '#334155';
+        k.c.strokeRect(rightX - 16, y - rungH * 0.38, 32, rungH * 0.76);
+        label(k, baseB, rightX, y, 'center', 'middle', 0.82);
+        k.c.restore();
+
+        // Bağlantı çizgileri (Hidrojen bağı / Replikasyon durumu)
+        if (stage === 0) {
+            // Bağlı
+            k.c.save();
+            k.c.setLineDash([3, 3]);
+            k.c.strokeStyle = withAlpha(k.color, 0.45);
+            line(k, leftX + 16, y, rightX - 16, y, 1.5);
+            k.c.restore();
+        } else if (stage >= 2) {
+            // Yeni nükleotidler karşılarına geldi
+            // Solun karşısına yeni gelen
+            const newLeftPairX = leftX + 38;
+            const pairOfA = DNA_PAIRS[i].b;
+            k.c.save();
+            k.c.fillStyle = withAlpha(baseColors[pairOfA], 0.75);
+            k.c.fillRect(newLeftPairX - 14, y - rungH * 0.35, 28, rungH * 0.7);
+            k.c.strokeRect(newLeftPairX - 14, y - rungH * 0.35, 28, rungH * 0.7);
+            label(k, pairOfA, newLeftPairX, y, 'center', 'middle', 0.78);
+            line(k, leftX + 16, y, newLeftPairX - 14, y, 1);
+            k.c.restore();
+
+            // Sağın karşısına yeni gelen
+            const newRightPairX = rightX - 38;
+            const pairOfB = baseB === '?' ? '?' : DNA_PAIRS[i].a;
+            k.c.save();
+            k.c.fillStyle = pairOfB === '?' ? withAlpha('#ef4444', 0.25) : withAlpha(baseColors[pairOfB] || '#64748b', 0.75);
+            k.c.fillRect(newRightPairX - 14, y - rungH * 0.35, 28, rungH * 0.7);
+            k.c.strokeRect(newRightPairX - 14, y - rungH * 0.35, 28, rungH * 0.7);
+            label(k, pairOfB, newRightPairX, y, 'center', 'middle', 0.78);
+            line(k, newRightPairX + 14, y, rightX - 16, y, 1);
+            k.c.restore();
+        }
+
+        // Hata durum uyarısı oku
+        if (showRepairStatus) {
+            k.c.save();
+            const statusText =
+                errMode === 1
+                    ? 'Tek zincirde baz eksik → ONARILABİLİR ✅'
+                    : errMode === 2
+                      ? 'Yanlış eşleşme (A-C) → ONARILABİLİR ✅'
+                      : 'Karşılıklı çift eksik → ONARILAMAZ (MUTASYON!) ❌';
+            k.c.fillStyle = errMode === 3 ? '#dc2626' : '#16a34a';
+            label(k, statusText, cx, y + rungH * 0.45, 'center', 'top', 0.68);
+            k.c.restore();
+        }
+    }
+
+    // Aşama Başlığı ve Açıklama
+    const stageTitles = [
+        '1. AŞAMA: Orijinal DNA Çift Sarmalı (A=T, G≡C)',
+        '2. AŞAMA: DNA Fermuar Gibi Açılıyor (Hidrojen bağları kopar)',
+        '3. AŞAMA: Serbest Nükleotidler Çekirdeğe Girip Eşleşiyor',
+        '4. AŞAMA: Birebir Aynı 2 Yeni DNA Molekülü Oluştu (Yarı Korunumlu)',
+    ];
+    label(k, stageTitles[stage], cx, r.y + 10, 'center', 'top', 0.82);
+
+    // Alt durum çubuğu
+    const errTitles = [
+        'Mod: Hatasız Normal Eşlenme',
+        'Senaryo: Tek Zincirde Eksik Baz',
+        'Senaryo: Yanlış Baz Eşleşmesi',
+        'Senaryo: Karşılıklı Çift Eksiklik (Mutasyon)',
+    ];
+    label(k, errTitles[errMode], cx, r.y + r.h - 10, 'center', 'bottom', 0.75);
+
+    k.c.restore();
+};
+
+export const dnaReplicationSpec: SimSpec = {
+    controls: (r, o) => {
+        const stage = clampInt(simValue(o, 'stage', 0), 0, 3, 0);
+        return [
+            {
+                id: 'next',
+                x: r.x + r.w - 18,
+                y: r.y + r.h - 18,
+                type: 'toggle',
+                label: 'Sonraki aşama ▶',
+                on: stage > 0,
+            },
+            {
+                id: 'prev',
+                x: r.x + r.w - 44,
+                y: r.y + r.h - 18,
+                type: 'toggle',
+                label: '◀ Önceki aşama',
+                on: stage > 0,
+            },
+            {
+                id: 'err',
+                x: r.x + 20,
+                y: r.y + r.h - 18,
+                type: 'toggle',
+                label: 'Hata senaryosunu değiştir',
+            },
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        const stage = clampInt(simValue(o, 'stage', 0), 0, 3, 0);
+        const err = clampInt(simValue(o, 'err', 0), 0, 3, 0);
+        if (id === 'next') return { stage: (stage + 1) % 4 };
+        if (id === 'prev') return { stage: (stage - 1 + 4) % 4 };
+        if (id === 'err') return { err: (err + 1) % 4 };
+        return {};
+    },
+    params: [
+        { key: 'stage', label: 'Eşlenme Aşaması (0-3)', min: 0, max: 3, step: 1 },
+        { key: 'err', label: 'Hata Modu (0-3)', min: 0, max: 3, step: 1 },
+    ],
+};
+
+// ── Mutasyon ve Modifikasyon Laboratuvarı ─────────────────────────────
+
+function modificationGeom(r: Rect, o: MathObject) {
+    const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0); // 0: Tavşan, 1: Çuha Çiçeği
+    const ice = simValue(o, 'ice', 0) > 0.5;
+    const temp = clampInt(simValue(o, 'temp', 18), 15, 35, 18);
+    const bred = simValue(o, 'bred', 0) > 0.5; // Yavru / tohum testi yapıldı mı
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h * 0.5;
+
+    return {
+        mode,
+        ice,
+        temp,
+        bred,
+        cx,
+        cy,
+    };
+}
+
+export const modificationRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = modificationGeom(r, k.o);
+    const { mode, ice, temp, bred, cx, cy } = g;
+
+    if (mode === 0) {
+        // ── HİMALAYA TAVŞANI DENEYİ ──
+        label(k, 'DENEY 1: Himalaya Tavşanı (Modifikasyon)', cx, r.y + 10, 'center', 'top', 0.85);
+
+        const rabbitX = cx - 40;
+        const rabbitY = cy - 10;
+
+        // Tavşan gövdesi (oval)
+        k.c.save();
+        k.c.fillStyle = '#f8fafc';
+        k.c.strokeStyle = '#64748b';
+        k.c.lineWidth = 2;
+        k.c.beginPath();
+        k.c.ellipse(rabbitX, rabbitY + 15, 65, 42, 0, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+
+        // Tavşan kafası
+        k.c.beginPath();
+        k.c.arc(rabbitX + 55, rabbitY - 5, 26, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+
+        // Kulaklar (Himalaya tavşanın uçları doğaldan siyahtır)
+        k.c.fillStyle = '#1e293b';
+        k.c.beginPath();
+        k.c.ellipse(rabbitX + 60, rabbitY - 38, 8, 22, 0.2, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+
+        // Burun ucu siyah
+        k.c.beginPath();
+        k.c.arc(rabbitX + 78, rabbitY - 5, 5, 0, Math.PI * 2);
+        k.c.fill();
+
+        // Göz
+        k.c.fillStyle = '#ef4444';
+        k.c.beginPath();
+        k.c.arc(rabbitX + 66, rabbitY - 12, 3, 0, Math.PI * 2);
+        k.c.fill();
+
+        // Sırt Bölgesi (Tıraş edilen ve buz konulan alan)
+        const patchColor = ice ? '#0f172a' : '#f8fafc'; // Buz varsa siyah kıl çıkar!
+        k.c.fillStyle = patchColor;
+        k.c.beginPath();
+        k.c.ellipse(rabbitX - 10, rabbitY - 12, 28, 16, 0, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.strokeStyle = '#94a3b8';
+        k.c.setLineDash([3, 3]);
+        k.c.stroke();
+        k.c.restore();
+
+        // Buz Torbası
+        if (ice) {
+            k.c.save();
+            k.c.fillStyle = withAlpha('#38bdf8', 0.8);
+            k.c.strokeStyle = '#0284c7';
+            k.c.lineWidth = 1.8;
+            k.c.fillRect(rabbitX - 25, rabbitY - 44, 34, 24);
+            k.c.strokeRect(rabbitX - 25, rabbitY - 44, 34, 24);
+            k.c.fillStyle = '#ffffff';
+            label(k, 'BUZ', rabbitX - 8, rabbitY - 32, 'center', 'middle', 0.65);
+            k.c.restore();
+        }
+
+        // Açıklama Kutusu
+        const furText = ice
+            ? 'Buz konuldu → Çıkan tüyler: SİYAH (Soğukta melanin geni aktifleşti)'
+            : 'Normal sıcaklıkta çıkan tüyler: BEYAZ';
+        label(k, furText, cx, cy + 65, 'center', 'top', 0.78);
+
+        const verdict = bred
+            ? 'Yavru Testi: Yavrular daima BEYAZ doğar → Kalıtsal DEĞİLDİR (MODİFİKASYON) ✅'
+            : 'Genin yapısı DEĞİL, çevre etkisiyle İŞLEYİŞİ değişti.';
+        k.c.save();
+        k.c.fillStyle = bred ? '#16a34a' : '#0284c7';
+        label(k, verdict, cx, r.y + r.h - 12, 'center', 'bottom', 0.8);
+        k.c.restore();
+    } else {
+        // ── ÇUHA ÇİÇEĞİ DENEYİ ──
+        label(k, 'DENEY 2: Çuha Çiçeği (Sıcaklık Modifikasyonu)', cx, r.y + 10, 'center', 'top', 0.85);
+
+        const isRed = temp <= 22;
+        const flowerColor = isRed ? '#dc2626' : '#f8fafc'; // Kırmızı / Beyaz
+
+        // Saksı
+        const potX = cx;
+        const potY = cy + 25;
+        k.c.save();
+        k.c.fillStyle = '#b45309';
+        k.c.beginPath();
+        k.c.moveTo(potX - 30, potY);
+        k.c.lineTo(potX + 30, potY);
+        k.c.lineTo(potX + 22, potY + 45);
+        k.c.lineTo(potX - 22, potY + 45);
+        k.c.closePath();
+        k.c.fill();
+        k.c.stroke();
+
+        // Sap ve yapraklar
+        k.c.strokeStyle = '#15803d';
+        k.c.lineWidth = 4;
+        line(k, potX, potY, potX, potY - 50);
+
+        // Çiçek Taç Yaprakları
+        k.c.fillStyle = flowerColor;
+        k.c.strokeStyle = '#475569';
+        k.c.lineWidth = 1.6;
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 2.5) {
+            const petX = potX + Math.cos(a) * 22;
+            const petY = potY - 50 + Math.sin(a) * 22;
+            k.c.beginPath();
+            k.c.arc(petX, petY, 14, 0, Math.PI * 2);
+            k.c.fill();
+            k.c.stroke();
+        }
+        // Çiçek göbeği
+        k.c.fillStyle = '#eab308';
+        k.c.beginPath();
+        k.c.arc(potX, potY - 50, 10, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+        k.c.restore();
+
+        // Sıcaklık ve Renk etiketi
+        label(k, `Sıcaklık: ${temp} °C → Çiçek Rengi: ${isRed ? 'KIRMIZI' : 'BEYAZ'}`, cx, cy + 85, 'center', 'top', 0.82);
+        label(
+            k,
+            '15-25°C: Kırmızı Çiçek   |   30-35°C: Beyaz Çiçek (Genin işleyişi değişir)',
+            cx,
+            r.y + r.h - 12,
+            'center',
+            'bottom',
+            0.75
+        );
+    }
+
+    k.c.restore();
+};
+
+export const modificationSpec: SimSpec = {
+    controls: (r, o) => {
+        const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0);
+        const ice = simValue(o, 'ice', 0) > 0.5;
+        const bred = simValue(o, 'bred', 0) > 0.5;
+        return [
+            {
+                id: 'toggleMode',
+                x: r.x + 24,
+                y: r.y + 20,
+                type: 'toggle',
+                label: mode === 0 ? 'Çuha Çiçeğine Geç' : 'Himalaya Tavşanına Geç',
+            },
+            ...(mode === 0
+                ? [
+                      {
+                          id: 'toggleIce',
+                          x: r.x + r.w - 24,
+                          y: r.y + 20,
+                          type: 'toggle' as const,
+                          label: ice ? 'Buz Torbasını Kaldır' : 'Sırta Buz Torbası Koy',
+                          on: ice,
+                      },
+                      {
+                          id: 'breed',
+                          x: r.x + r.w / 2,
+                          y: r.y + r.h - 32,
+                          type: 'toggle' as const,
+                          label: bred ? 'Yavru Testini Sıfırla' : 'Yavruyu Doğurt (Kalıtsal mı?)',
+                          on: bred,
+                      },
+                  ]
+                : []),
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        if (id === 'toggleMode') return { mode: simValue(o, 'mode', 0) > 0.5 ? 0 : 1 };
+        if (id === 'toggleIce') return { ice: simValue(o, 'ice', 0) > 0.5 ? 0 : 1 };
+        if (id === 'breed') return { bred: simValue(o, 'bred', 0) > 0.5 ? 0 : 1 };
+        return {};
+    },
+    params: [
+        { key: 'mode', label: 'Deney (0 Tavşan / 1 Çuha)', min: 0, max: 1, step: 1 },
+        { key: 'temp', label: 'Çiçek Sıcaklığı', min: 15, max: 35, step: 1, unit: '°C' },
+    ],
+};
+
+// ── Nükleotid Yapısı ve KeDiGeNi Hiyerarşisi ──────────────────────────
+
+function nucleotideGeom(r: Rect, o: MathObject) {
+    const baseIdx = clampInt(simValue(o, 'base', 0), 0, 3, 0);
+    const bases = ['A', 'T', 'G', 'C'];
+    const baseNames = ['Adenin', 'Timin', 'Guanin', 'Sitozin'];
+    const baseColors = ['#16a34a', '#dc2626', '#2563eb', '#ca8a04'];
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h * 0.58;
+
+    return {
+        baseIdx,
+        baseSym: bases[baseIdx],
+        baseName: baseNames[baseIdx],
+        baseColor: baseColors[baseIdx],
+        cx,
+        cy,
+    };
+}
+
+export const nucleotideRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = nucleotideGeom(r, k.o);
+    const cx = g.cx;
+    const cy = g.cy;
+
+    // ── Üst Kısım: KeDiGeNi Hiyerarşisi (Kromozom > DNA > Gen > Nükleotid) ──
+    const hieY = r.y + 22;
+    const boxW = Math.min(68, r.w * 0.18);
+    const boxH = 26;
+    const gap = 16;
+    const startX = cx - (4 * boxW + 3 * gap) / 2;
+
+    const items = [
+        { code: 'K', label: 'Kromozom' },
+        { code: 'D', label: 'DNA' },
+        { code: 'G', label: 'Gen' },
+        { code: 'N', label: 'Nükleotid' },
+    ];
+
+    items.forEach((it, i) => {
+        const bx = startX + i * (boxW + gap);
+        k.c.save();
+        k.c.fillStyle = i === 3 ? withAlpha('#6366f1', 0.25) : withAlpha('#0284c7', 0.15);
+        k.c.strokeStyle = i === 3 ? '#6366f1' : '#0284c7';
+        k.c.lineWidth = 1.5;
+        k.c.strokeRect(bx, hieY, boxW, boxH);
+        k.c.fillRect(bx, hieY, boxW, boxH);
+        label(k, `${it.code} · ${it.label}`, bx + boxW / 2, hieY + boxH / 2, 'center', 'middle', 0.68);
+        k.c.restore();
+
+        if (i < 3) {
+            label(k, '>', bx + boxW + gap / 2, hieY + boxH / 2, 'center', 'middle', 0.85);
+        }
+    });
+
+    label(k, 'Karmaşıktan Basite Sıralama (KeDiGeNi)', cx, r.y + 4, 'center', 'top', 0.72);
+
+    // ── Alt Kısım: 1 Nükleotidin 3 Temel Parçası ──
+    const nucY = cy + 5;
+
+    // 1. Fosfat (Daire P)
+    const phosX = cx - 95;
+    k.c.save();
+    k.c.fillStyle = '#f59e0b';
+    k.c.strokeStyle = '#b45309';
+    k.c.lineWidth = 2;
+    k.c.beginPath();
+    k.c.arc(phosX, nucY, 22, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+    k.c.fillStyle = '#ffffff';
+    label(k, 'P', phosX, nucY - 2, 'center', 'middle', 0.9);
+    k.c.fillStyle = k.color;
+    label(k, 'Fosfat', phosX, nucY + 30, 'center', 'top', 0.7);
+    k.c.restore();
+
+    // Fosfat ile Şeker Arası Bağ
+    line(k, phosX + 22, nucY, cx - 40, nucY, 2.5);
+
+    // 2. Deoksiriboz Şekeri (5-gen D)
+    const sugarX = cx - 10;
+    k.c.save();
+    k.c.fillStyle = '#38bdf8';
+    k.c.strokeStyle = '#0284c7';
+    k.c.lineWidth = 2;
+    k.c.beginPath();
+    for (let a = 0; a < 5; a++) {
+        const ang = (a * 2 * Math.PI) / 5 - Math.PI / 2;
+        const px = sugarX + Math.cos(ang) * 26;
+        const py = nucY + Math.sin(ang) * 26;
+        if (a === 0) k.c.moveTo(px, py);
+        else k.c.lineTo(px, py);
+    }
+    k.c.closePath();
+    k.c.fill();
+    k.c.stroke();
+    k.c.fillStyle = '#ffffff';
+    label(k, 'D', sugarX, nucY - 2, 'center', 'middle', 0.9);
+    k.c.fillStyle = k.color;
+    label(k, 'Deoksiriboz', sugarX, nucY + 30, 'center', 'top', 0.7);
+    k.c.restore();
+
+    // Şeker ile Baz Arası Bağ
+    line(k, sugarX + 26, nucY, cx + 50, nucY, 2.5);
+
+    // 3. Organik Baz (Dikdörtgen A/T/G/C)
+    const baseX = cx + 85;
+    k.c.save();
+    k.c.fillStyle = g.baseColor;
+    k.c.strokeStyle = '#334155';
+    k.c.lineWidth = 2;
+    k.c.fillRect(baseX - 30, nucY - 22, 60, 44);
+    k.c.strokeRect(baseX - 30, nucY - 22, 60, 44);
+    k.c.fillStyle = '#ffffff';
+    label(k, g.baseSym, baseX, nucY - 3, 'center', 'middle', 1.0);
+    k.c.fillStyle = k.color;
+    label(k, g.baseName, baseX, nucY + 30, 'center', 'top', 0.75);
+    k.c.restore();
+
+    // Alt Kural & İsimlendirme
+    label(
+        k,
+        `Bu nükleotid: "${g.baseName} Nükleotidi" (İçerdiği baza göre isimlendirilir)`,
+        cx,
+        r.y + r.h - 26,
+        'center',
+        'bottom',
+        0.82
+    );
+    label(
+        k,
+        'Kural: Toplam Nükleotid = Toplam Şeker = Toplam Fosfat = Toplam Baz (A+T+G+C)',
+        cx,
+        r.y + r.h - 8,
+        'center',
+        'bottom',
+        0.72
+    );
+
+    k.c.restore();
+};
+
+export const nucleotideSpec: SimSpec = {
+    controls: (r, o) => {
+        const cx = r.x + r.w / 2;
+        return [
+            {
+                id: 'nextBase',
+                x: cx + 85,
+                y: r.y + r.h * 0.58,
+                type: 'toggle',
+                label: 'Organik bazı değiştir (A, T, G, C)',
+            },
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        if (id === 'nextBase') {
+            const b = clampInt(simValue(o, 'base', 0), 0, 3, 0);
+            return { base: (b + 1) % 4 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'base', label: 'Baz (0:A / 1:T / 2:G / 3:C)', min: 0, max: 3, step: 1 },
     ],
 };
 
@@ -741,6 +1854,560 @@ export const solidSpec: SimSpec = {
     params: [
         { key: 'face', label: 'Hangi yüz yerde', min: 0, max: 2, step: 1 },
         { key: 'f', label: 'Ağırlık', min: 10, max: 200, step: 5, unit: 'N' },
+    ],
+};
+
+// ── Pascal Prensibi ve Su Cenderesi (Sıvıların Basıncı İletmesi) ─────
+
+function pascalGeom(r: Rect, o: MathObject) {
+    const f1 = clamp(simValue(o, 'f1', 100), 40, 200);
+    const ratio = clampInt(simValue(o, 'ratio', 4), 2, 5, 4); // S2 / S1
+    const pushDown = clamp(simValue(o, 'push', 35), 0, 50); // cm
+    const h1 = pushDown;
+    const h2 = h1 / ratio; // cm (yoldan kayıp)
+    const f2 = f1 * ratio; // N (kuvvetten kazanç)
+    const p = f1; // Temsili basınç birimi (Pa)
+
+    const cx = r.x + r.w / 2;
+    const groundY = r.y + r.h * 0.82;
+    const leftW = Math.min(50, r.w * 0.16);
+    const rightW = leftW * 2.2;
+    const leftX = cx - r.w * 0.28;
+    const rightX = cx + r.w * 0.2;
+
+    return {
+        f1,
+        f2,
+        ratio,
+        h1,
+        h2,
+        p,
+        cx,
+        groundY,
+        leftW,
+        rightW,
+        leftX,
+        rightX,
+    };
+}
+
+export const pascalRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = pascalGeom(r, k.o);
+    const bottomTubeY = g.groundY;
+    const tubeH = 34;
+
+    // Hidrolik Sıvı (Açık Mavi / Yağ)
+    k.c.save();
+    k.c.fillStyle = withAlpha('#0284c7', 0.28);
+    // Sol boru sıvısı
+    const leftPistonY = g.groundY - 70 + g.h1 * 0.8;
+    k.c.fillRect(g.leftX - g.leftW / 2, leftPistonY, g.leftW, g.groundY - leftPistonY);
+    // Sağ boru sıvısı
+    const rightPistonY = g.groundY - 70 - g.h2 * 0.8;
+    k.c.fillRect(g.rightX - g.rightW / 2, rightPistonY, g.rightW, g.groundY - rightPistonY);
+    // Alt bağlantı borusu
+    k.c.fillRect(g.leftX - g.leftW / 2, bottomTubeY - tubeH, (g.rightX + g.rightW / 2) - (g.leftX - g.leftW / 2), tubeH);
+    k.c.restore();
+
+    // Boru Çeperleri (Metalik gri sınırlar)
+    k.c.save();
+    k.c.strokeStyle = '#334155';
+    k.c.lineWidth = 2.5;
+    // Sol boru dış duvar
+    line(k, g.leftX - g.leftW / 2, g.groundY - 100, g.leftX - g.leftW / 2, bottomTubeY);
+    // Sol boru iç duvar
+    line(k, g.leftX + g.leftW / 2, g.groundY - 100, g.leftX + g.leftW / 2, bottomTubeY - tubeH);
+    // Taban
+    line(k, g.leftX - g.leftW / 2, bottomTubeY, g.rightX + g.rightW / 2, bottomTubeY);
+    // Ara tavan
+    line(k, g.leftX + g.leftW / 2, bottomTubeY - tubeH, g.rightX - g.rightW / 2, bottomTubeY - tubeH);
+    // Sağ boru iç duvar
+    line(k, g.rightX - g.rightW / 2, bottomTubeY - tubeH, g.rightX - g.rightW / 2, g.groundY - 100);
+    // Sağ boru dış duvar
+    line(k, g.rightX + g.rightW / 2, bottomTubeY, g.rightX + g.rightW / 2, g.groundY - 100);
+    k.c.restore();
+
+    // Sol Küçük Piston (S1)
+    k.c.save();
+    k.c.fillStyle = '#64748b';
+    k.c.fillRect(g.leftX - g.leftW / 2 + 1, leftPistonY - 8, g.leftW - 2, 8);
+    k.c.strokeRect(g.leftX - g.leftW / 2 + 1, leftPistonY - 8, g.leftW - 2, 8);
+    // Piston kolu ve kuvvet oku F1
+    line(k, g.leftX, leftPistonY - 8, g.leftX, leftPistonY - 36, 3);
+    arrow(k, g.leftX, leftPistonY - 48, g.leftX, leftPistonY - 12, 8, 2.5);
+    k.c.restore();
+    label(k, `F₁ = ${Math.round(g.f1)} N`, g.leftX, leftPistonY - 54, 'center', 'bottom', 0.78);
+    label(k, `S₁ = 1 br²`, g.leftX, leftPistonY + 12, 'center', 'top', 0.68);
+
+    // Sağ Büyük Piston (S2)
+    k.c.save();
+    k.c.fillStyle = '#64748b';
+    k.c.fillRect(g.rightX - g.rightW / 2 + 1, rightPistonY - 10, g.rightW - 2, 10);
+    k.c.strokeRect(g.rightX - g.rightW / 2 + 1, rightPistonY - 10, g.rightW - 2, 10);
+
+    // Sağ Piston Üzerindeki Ağır Yük (Araba / Kütle)
+    const carX = g.rightX;
+    const carY = rightPistonY - 26;
+    k.c.fillStyle = '#ef4444';
+    k.c.fillRect(carX - 26, carY, 52, 16);
+    k.c.beginPath();
+    k.c.arc(carX - 14, carY + 16, 5, 0, Math.PI * 2);
+    k.c.arc(carX + 14, carY + 16, 5, 0, Math.PI * 2);
+    k.c.fillStyle = '#1e293b';
+    k.c.fill();
+    // Kaldırma kuvveti oku F2
+    arrow(k, g.rightX, rightPistonY + 16, g.rightX, rightPistonY - 32, 8, 2);
+    k.c.restore();
+
+    label(k, `F₂ = ${Math.round(g.f2)} N`, g.rightX, carY - 8, 'center', 'bottom', 0.85);
+    label(k, `S₂ = ${g.ratio} br²`, g.rightX, rightPistonY + 12, 'center', 'top', 0.72);
+
+    // Sıvı İçinde Basınç Okları (Pascal İletimi)
+    k.c.save();
+    k.c.setLineDash([2, 2]);
+    k.c.strokeStyle = withAlpha('#0284c7', 0.6);
+    const midX = (g.leftX + g.rightX) / 2;
+    arrow(k, g.leftX + 15, bottomTubeY - tubeH / 2, g.rightX - 15, bottomTubeY - tubeH / 2, 6);
+    k.c.restore();
+
+    // Üst Başlık & Formül
+    label(k, 'PASCAL PRENSİBİ: Sıvılar Basıncı Aynen İletir (P₁ = P₂)', r.x + r.w / 2, r.y + 10, 'center', 'top', 0.82);
+
+    // Alt Bilgi Şeridi
+    k.c.save();
+    k.c.fillStyle = '#16a34a';
+    label(
+        k,
+        `Kuvvet Kazancı: ${g.ratio} Kat  (F₂ = F₁ × S₂/S₁)  |  İşten Kazanç Yoktur! (F₁·h₁ = F₂·h₂)`,
+        r.x + r.w / 2,
+        r.y + r.h - 22,
+        'center',
+        'bottom',
+        0.75
+    );
+    k.c.fillStyle = '#64748b';
+    label(
+        k,
+        'Kullanım Alanları: Berber koltuğu, hidrolik fren, itfaiye merdiveni, vinç',
+        r.x + r.w / 2,
+        r.y + r.h - 6,
+        'center',
+        'bottom',
+        0.68
+    );
+    k.c.restore();
+
+    k.c.restore();
+};
+
+export const pascalSpec: SimSpec = {
+    controls: (r, o) => {
+        const g = pascalGeom(r, o);
+        const leftPistonY = g.groundY - 70 + g.h1 * 0.8;
+        return [
+            {
+                id: 'piston',
+                x: g.leftX,
+                y: leftPistonY - 24,
+                type: 'drag',
+                label: 'Küçük pistona bas',
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (id === 'piston') {
+            const g = pascalGeom(r, o);
+            const raw = (p.y - (g.groundY - 70)) / 0.8;
+            return { push: clamp(raw, 0, 50) };
+        }
+        return {};
+    },
+    params: [
+        { key: 'f1', label: 'Uygulanan Kuvvet (F₁)', min: 40, max: 200, step: 10, unit: 'N' },
+        { key: 'ratio', label: 'Piston Alan Oranı (S₂/S₁)', min: 2, max: 5, step: 1 },
+        { key: 'push', label: 'Piston İtme Mesafesi (h₁)', min: 0, max: 50, step: 5, unit: 'cm' },
+    ],
+};
+
+// ── Torricelli Deneyi ve Açık Hava Basıncı (P₀) ──────────────────────
+
+function torricelliGeom(r: Rect, o: MathObject) {
+    const alt = clamp(simValue(o, 'alt', 0), 0, 2400); // Rakım (metre)
+    const tilt = clamp(simValue(o, 'tilt', 0), 0, 40); // Boru açısı (derece)
+    const balloonMode = simValue(o, 'balloon', 1) > 0.5;
+
+    // Her 120 metrede açık hava basıncı yaklaşık 1 cm-Hg düşer
+    const hHg = Math.round(76 - alt / 150); // 76 .. 60 cm-Hg
+    const tiltRad = (tilt * Math.PI) / 180;
+    const colLen = hHg / Math.cos(tiltRad); // Boru boyunca cıva uzunluğu
+
+    const cx = r.x + r.w * 0.38;
+    const groundY = r.y + r.h * 0.8;
+    const dishW = Math.min(130, r.w * 0.35);
+    const dishH = 26;
+
+    return {
+        alt,
+        tilt,
+        tiltRad,
+        balloonMode,
+        hHg,
+        colLen,
+        cx,
+        groundY,
+        dishW,
+        dishH,
+    };
+}
+
+export const torricelliRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = torricelliGeom(r, k.o);
+    const { cx, groundY, dishW, dishH, hHg, tiltRad, alt } = g;
+
+    // Cıva Çanağı (Alttaki kap)
+    k.c.save();
+    k.c.fillStyle = '#94a3b8'; // Cıva metalik gri
+    k.c.fillRect(cx - dishW / 2, groundY - dishH, dishW, dishH);
+    k.c.strokeStyle = '#334155';
+    k.c.lineWidth = 2;
+    k.c.strokeRect(cx - dishW / 2, groundY - dishH, dishW, dishH);
+    label(k, 'Cıva (d = 13.6 g/cm³)', cx, groundY + 12, 'center', 'top', 0.7);
+    k.c.restore();
+
+    // Açık Hava Basıncı Okları (P₀) Çanağın üstüne bastırır
+    k.c.save();
+    k.c.strokeStyle = '#ef4444';
+    k.c.lineWidth = 2;
+    arrow(k, cx - dishW * 0.35, groundY - dishH - 25, cx - dishW * 0.35, groundY - dishH - 3, 7);
+    arrow(k, cx + dishW * 0.35, groundY - dishH - 25, cx + dishW * 0.35, groundY - dishH - 3, 7);
+    k.c.fillStyle = '#ef4444';
+    label(k, 'P₀', cx - dishW * 0.35, groundY - dishH - 30, 'center', 'bottom', 0.75);
+    label(k, 'P₀', cx + dishW * 0.35, groundY - dishH - 30, 'center', 'bottom', 0.75);
+    k.c.restore();
+
+    // Cam Boru ve Cıva Sütunu
+    const tubeW = 14;
+    const maxTubeH = 150;
+    const pixelH = (hHg / 76) * 115; // Ekrandaki dikey yükseklik
+
+    k.c.save();
+    k.c.translate(cx, groundY - dishH);
+    k.c.rotate(tiltRad);
+
+    // Boş cam boru
+    k.c.strokeStyle = withAlpha(k.color, 0.5);
+    k.c.lineWidth = 1.5;
+    k.c.strokeRect(-tubeW / 2, -maxTubeH, tubeW, maxTubeH);
+
+    // Boru içindeki cıva
+    const tubeColLen = (pixelH / Math.cos(tiltRad));
+    k.c.fillStyle = '#64748b';
+    k.c.fillRect(-tubeW / 2 + 1, -tubeColLen, tubeW - 2, tubeColLen);
+
+    // Üst kısımdaki boşluk (Torricelli Vakumu)
+    k.c.fillStyle = '#e2e8f0';
+    label(k, 'Boşluk', 0, -maxTubeH + 14, 'center', 'middle', 0.6);
+    k.c.restore();
+
+    // Dikey Yükseklik Çizgisi (h = 76 cm)
+    k.c.save();
+    k.c.setLineDash([3, 3]);
+    k.c.strokeStyle = '#0284c7';
+    const topHgY = (groundY - dishH) - pixelH;
+    line(k, cx + 25, groundY - dishH, cx + 55, groundY - dishH, 1.2);
+    line(k, cx + 25, topHgY, cx + 55, topHgY, 1.2);
+    line(k, cx + 45, groundY - dishH, cx + 45, topHgY, 1.5);
+    k.c.fillStyle = '#0284c7';
+    label(k, `h = ${hHg} cm`, cx + 60, (groundY - dishH + topHgY) / 2, 'left', 'middle', 0.82);
+    k.c.restore();
+
+    // Sağ Taraf: Dağ Grafiği ve Esnek Balon Testi
+    const rightSideX = r.x + r.w * 0.78;
+    const mountainBaseY = groundY;
+
+    // Dağ silüeti
+    k.c.save();
+    k.c.fillStyle = withAlpha('#64748b', 0.2);
+    k.c.beginPath();
+    k.c.moveTo(rightSideX - 60, mountainBaseY);
+    k.c.lineTo(rightSideX, mountainBaseY - 110);
+    k.c.lineTo(rightSideX + 60, mountainBaseY);
+    k.c.closePath();
+    k.c.fill();
+    k.c.restore();
+
+    // Esnek Balon (Dağa çıktıkça dış basınç düştüğü için genleşir!)
+    const balloonRadius = 16 + (alt / 2400) * 16; // 16px .. 32px
+    const balloonY = mountainBaseY - (alt / 2400) * 100 - 15;
+    k.c.save();
+    k.c.fillStyle = withAlpha('#f43f5e', 0.85);
+    k.c.beginPath();
+    k.c.arc(rightSideX, balloonY, balloonRadius, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+    // Balon ipi
+    line(k, rightSideX, balloonY + balloonRadius, rightSideX, balloonY + balloonRadius + 14);
+    k.c.restore();
+
+    label(k, `Rakım: ${Math.round(alt)} m`, rightSideX, mountainBaseY + 12, 'center', 'top', 0.75);
+    label(k, alt === 0 ? 'Deniz Seviyesi (P₀ = 76 cm-Hg)' : `Dağ Zirvesi (P₀ = ${hHg} cm-Hg)`, rightSideX, balloonY - balloonRadius - 6, 'center', 'bottom', 0.72);
+
+    // Üst Başlık & Açıklama
+    label(k, 'TORRİCELLİ DENEYİ & AÇIK HAVA BASINCI', r.x + r.w / 2, r.y + 10, 'center', 'top', 0.85);
+
+    // Kritik LGS Uyarısı
+    const tip =
+        g.tilt > 0
+            ? 'Borunun eğik olması cıva yüksekliğini (h) DEĞİŞTİRMEZ! Dikey seviye sabittir.'
+            : 'Yukarı çıkıldıkça açık hava basıncı (P₀) düşer → Cıva seviyesi azalır, balon şişer!';
+    k.c.save();
+    k.c.fillStyle = g.tilt > 0 ? '#b45309' : '#0284c7';
+    label(k, tip, r.x + r.w / 2, r.y + r.h - 12, 'center', 'bottom', 0.78);
+    k.c.restore();
+
+    k.c.restore();
+};
+
+export const torricelliSpec: SimSpec = {
+    controls: (r, o) => {
+        const g = torricelliGeom(r, o);
+        return [
+            {
+                id: 'tiltTube',
+                x: g.cx + 20,
+                y: r.y + 36,
+                type: 'toggle',
+                label: g.tilt > 0 ? 'Boruyu Düzelt' : 'Boruyu Yana Eğ',
+                on: g.tilt > 0,
+            },
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        if (id === 'tiltTube') {
+            const current = simValue(o, 'tilt', 0);
+            return { tilt: current > 0 ? 0 : 25 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'alt', label: 'Rakım / Yükseklik', min: 0, max: 2400, step: 100, unit: 'm' },
+        { key: 'tilt', label: 'Boru Eğimi', min: 0, max: 40, step: 5, unit: '°' },
+    ],
+};
+
+// ── Sıvı Basıncı Paradoksu ve Bileşik Kaplar ─────────────────────────
+
+function liquidParadoxGeom(r: Rect, o: MathObject) {
+    const depth = clamp(simValue(o, 'h', 60), 20, 90); // cm
+    const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0); // 0: Paradoks, 1: Bileşik kap
+    const groundY = r.y + r.h * 0.78;
+    const cx = r.x + r.w / 2;
+
+    return {
+        depth,
+        mode,
+        groundY,
+        cx,
+    };
+}
+
+export const liquidParadoxRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = liquidParadoxGeom(r, k.o);
+    const { depth, mode, groundY, cx } = g;
+    const pixelH = (depth / 90) * (r.h * 0.42);
+
+    if (mode === 0) {
+        // ── 3 FARKLI ŞEKİLLİ KAP (SIVI BASINCI PARADOKSU) ──
+        label(k, 'SIVI BASINCI PARADOKSU: Basınç Kabın Şekline Bağlı Değildir!', cx, r.y + 10, 'center', 'top', 0.82);
+
+        const capW = 50;
+        const spacing = r.w * 0.28;
+        const xA = cx - spacing;
+        const xB = cx;
+        const xC = cx + spacing;
+
+        const drawVessel = (x: number, type: 'wide' | 'straight' | 'narrow', name: string, weightText: string) => {
+            const baseW = 44;
+            const topW = type === 'wide' ? 22 : type === 'narrow' ? 68 : 44;
+            const topY = groundY - r.h * 0.46;
+
+            // Sıvı Alanı
+            k.c.save();
+            k.c.fillStyle = withAlpha('#0284c7', 0.35);
+            k.c.beginPath();
+            const liquidTopW = baseW + (topW - baseW) * (pixelH / (r.h * 0.46));
+            k.c.moveTo(x - baseW / 2, groundY);
+            k.c.lineTo(x + baseW / 2, groundY);
+            k.c.lineTo(x + liquidTopW / 2, groundY - pixelH);
+            k.c.lineTo(x - liquidTopW / 2, groundY - pixelH);
+            k.c.closePath();
+            k.c.fill();
+
+            // Kap Çeperi
+            k.c.strokeStyle = '#334155';
+            k.c.lineWidth = 2;
+            k.c.beginPath();
+            k.c.moveTo(x - topW / 2, topY);
+            k.c.lineTo(x - baseW / 2, groundY);
+            k.c.lineTo(x + baseW / 2, groundY);
+            k.c.lineTo(x + topW / 2, topY);
+            k.c.stroke();
+            k.c.restore();
+
+            // Kap İsim ve Ağırlık Bilgisi
+            label(k, name, x, groundY + 12, 'center', 'top', 0.75);
+            label(k, weightText, x, groundY + 28, 'center', 'top', 0.68);
+
+            // Taban Basınç Göstergesi
+            k.c.save();
+            k.c.fillStyle = '#16a34a';
+            label(k, `P = ${Math.round(depth)} Pa`, x, groundY - 8, 'center', 'bottom', 0.72);
+            k.c.restore();
+        };
+
+        // Kap A (Geniş taban, dar ağız), Kap B (Düz), Kap C (Dar taban, geniş ağız)
+        drawVessel(xA, 'wide', '1. Kap (Daralan)', 'Sıvı: G₁ (Az)');
+        drawVessel(xB, 'straight', '2. Kap (Düz)', 'Sıvı: G₂ (Orta)');
+        drawVessel(xC, 'narrow', '3. Kap (Genişleyen)', 'Sıvı: G₃ (Çok)');
+
+        // Sıvı Seviyesi Kesikli Çizgisi (Tüm kaplarda eşit h)
+        k.c.save();
+        k.c.setLineDash([4, 4]);
+        k.c.strokeStyle = '#ef4444';
+        const liquidLevelY = groundY - pixelH;
+        line(k, xA - 40, liquidLevelY, xC + 40, liquidLevelY, 1.5);
+        k.c.fillStyle = '#ef4444';
+        label(k, `h = ${Math.round(depth)} cm (Eşit Yükseklik)`, cx, liquidLevelY - 8, 'center', 'bottom', 0.75);
+        k.c.restore();
+
+        // Alt Açıklama
+        k.c.save();
+        k.c.fillStyle = '#16a34a';
+        label(
+            k,
+            'Sıvı Ağırlıkları Farklı (G₃ > G₂ > G₁)  |  Taban Sıvı Basınçları EŞİTTİR: P₁ = P₂ = P₃ = h · d',
+            cx,
+            r.y + r.h - 10,
+            'center',
+            'bottom',
+            0.78
+        );
+        k.c.restore();
+    } else {
+        // ── BİLEŞİK KAPLAR (U BORUSU & FARKLI KOLLAR) ──
+        label(k, 'BİLEŞİK KAPLAR: Kollardaki Sıvı Seviyesi Daima Aynı Yatay Hizada Dengelenir', cx, r.y + 10, 'center', 'top', 0.82);
+
+        const col1X = cx - r.w * 0.26;
+        const col2X = cx;
+        const col3X = cx + r.w * 0.26;
+        const tubeH = 26;
+
+        // Sıvı Dolgusu (Alttan birbirine bağlı)
+        k.c.save();
+        k.c.fillStyle = withAlpha('#0284c7', 0.35);
+        const liquidTopY = groundY - pixelH;
+        // Kol 1 (Dar)
+        k.c.fillRect(col1X - 12, liquidTopY, 24, groundY - liquidTopY);
+        // Kol 2 (Geniş)
+        k.c.fillRect(col2X - 25, liquidTopY, 50, groundY - liquidTopY);
+        // Kol 3 (Eğik/Kıvrımlı temsili)
+        k.c.fillRect(col3X - 18, liquidTopY, 36, groundY - liquidTopY);
+        // Alt bağlantı borusu
+        k.c.fillRect(col1X - 12, groundY - tubeH, (col3X + 18) - (col1X - 12), tubeH);
+        k.c.restore();
+
+        // Çeperler
+        k.c.save();
+        k.c.strokeStyle = '#334155';
+        k.c.lineWidth = 2;
+        // Kol 1
+        line(k, col1X - 12, groundY - r.h * 0.45, col1X - 12, groundY);
+        line(k, col1X + 12, groundY - r.h * 0.45, col1X + 12, groundY - tubeH);
+        // Alt zemin
+        line(k, col1X - 12, groundY, col3X + 18, groundY);
+        // Kol 2
+        line(k, col1X + 12, groundY - tubeH, col2X - 25, groundY - tubeH);
+        line(k, col2X - 25, groundY - r.h * 0.45, col2X - 25, groundY - tubeH);
+        line(k, col2X + 25, groundY - r.h * 0.45, col2X + 25, groundY - tubeH);
+        // Kol 3
+        line(k, col2X + 25, groundY - tubeH, col3X - 18, groundY - tubeH);
+        line(k, col3X - 18, groundY - r.h * 0.45, col3X - 18, groundY - tubeH);
+        line(k, col3X + 18, groundY - r.h * 0.45, col3X + 18, groundY);
+        k.c.restore();
+
+        // Ortak Su Terazisi Çizgisi
+        k.c.save();
+        k.c.setLineDash([4, 4]);
+        k.c.strokeStyle = '#ef4444';
+        line(k, col1X - 25, liquidTopY, col3X + 30, liquidTopY, 1.5);
+        k.c.fillStyle = '#ef4444';
+        label(k, `Ortak Sıvı Denge Seviyesi (h = ${Math.round(depth)} cm)`, cx, liquidTopY - 10, 'center', 'bottom', 0.75);
+        k.c.restore();
+
+        label(k, 'Dar Kol', col1X, groundY + 12, 'center', 'top', 0.7);
+        label(k, 'Geniş Kol', col2X, groundY + 12, 'center', 'top', 0.7);
+        label(k, 'Orta Kol', col3X, groundY + 12, 'center', 'top', 0.7);
+
+        // Açıklama
+        k.c.save();
+        k.c.fillStyle = '#0284c7';
+        label(
+            k,
+            'Kolların genişliği veya şekli ne olursa olsun, açık uçlu bileşik kaplarda sıvı seviyesi eşittir.',
+            cx,
+            r.y + r.h - 10,
+            'center',
+            'bottom',
+            0.75
+        );
+        k.c.restore();
+    }
+
+    k.c.restore();
+};
+
+export const liquidParadoxSpec: SimSpec = {
+    controls: (r, o) => {
+        const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0);
+        return [
+            {
+                id: 'toggleMode',
+                x: r.x + r.w - 24,
+                y: r.y + 20,
+                type: 'toggle',
+                label: mode === 0 ? 'Bileşik Kaplara Geç' : 'Paradoks Kaplara Geç',
+                on: mode > 0,
+            },
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        if (id === 'toggleMode') {
+            const m = clampInt(simValue(o, 'mode', 0), 0, 1, 0);
+            return { mode: m > 0 ? 0 : 1 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'mode', label: 'Kip (0 Paradoks / 1 Bileşik Kaplar)', min: 0, max: 1, step: 1 },
+        { key: 'h', label: 'Sıvı Derinliği (h)', min: 20, max: 90, step: 5, unit: 'cm' },
     ],
 };
 
@@ -1661,7 +3328,15 @@ const divisionSpec: SimSpec = {
                 x: r.x + r.w - 16,
                 y: r.y + r.h - 16,
                 type: 'toggle',
-                label: 'Sonraki aşama',
+                label: 'Sonraki aşama ▶',
+                on: g.idx > 0,
+            },
+            {
+                id: 'prev',
+                x: r.x + r.w - 40,
+                y: r.y + r.h - 16,
+                type: 'toggle',
+                label: '◀ Önceki aşama',
                 on: g.idx > 0,
             },
             {
@@ -1679,6 +3354,7 @@ const divisionSpec: SimSpec = {
         // Kip değişince aşama sayısı değiştiğinden başa sarılır.
         if (id === 'mode') return { mode: g.meiosis ? 0 : 1, stage: 0 };
         if (id === 'next') return { stage: (g.idx + 1) % g.stages.length };
+        if (id === 'prev') return { stage: (g.idx - 1 + g.stages.length) % g.stages.length };
         return {};
     },
     params: [
@@ -1881,6 +3557,696 @@ const phSpec: SimSpec = {
             unit: 'mL',
         },
         { key: 'k', label: 'Kuvvet (zayıf→kuvvetli)', min: 1, max: 6, step: 1 },
+    ],
+};
+
+// ── Fiziksel ve Kimyasal Değişim Laboratuvarı ────────────────────────
+
+function reactionChangeGeom(r: Rect, o: MathObject) {
+    const exp = clampInt(simValue(o, 'exp', 0), 0, 2, 0); // 0: Mum, 1: Kağıt, 2: Asit-Metal
+    const acted = simValue(o, 'act', 0) > 0.5; // Olay gerçekleşti mi
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h * 0.52;
+
+    return {
+        exp,
+        acted,
+        cx,
+        cy,
+    };
+}
+
+export const reactionChangeRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = reactionChangeGeom(r, k.o);
+    const { exp, acted, cx, cy } = g;
+
+    // Sol Taraf: Makroskobik Deney Alanı
+    const macroX = cx - r.w * 0.25;
+    const microX = cx + r.w * 0.25;
+
+    // Ayırıcı dikey kesikli çizgi
+    k.c.save();
+    k.c.setLineDash([4, 4]);
+    k.c.strokeStyle = withAlpha(k.color, 0.3);
+    line(k, cx, r.y + 24, cx, r.y + r.h - 32, 1);
+    k.c.restore();
+
+    label(k, 'MAKRO GÖRÜNÜM (Gözle Görülen)', macroX, r.y + 12, 'center', 'top', 0.8);
+    label(k, 'MİKRO TANECİK (Moleküler Yapı)', microX, r.y + 12, 'center', 'top', 0.8);
+
+    if (exp === 0) {
+        // ── MUM DENEYİ ──
+        label(k, 'DENEY 1: Mumun Erimesi vs Yanması', cx, r.y + 2, 'center', 'top', 0.85);
+
+        // Mum Gövdesi
+        k.c.save();
+        k.c.fillStyle = '#fef08a';
+        k.c.fillRect(macroX - 16, cy - 10, 32, 60);
+        k.c.strokeStyle = '#ca8a04';
+        k.c.strokeRect(macroX - 16, cy - 10, 32, 60);
+
+        // Fitil
+        line(k, macroX, cy - 10, macroX, cy - 22, 2);
+
+        if (acted) {
+            // Alev (Kimyasal Yanma)
+            k.c.fillStyle = '#ea580c';
+            k.c.beginPath();
+            k.c.ellipse(macroX, cy - 32, 8, 14, 0, 0, Math.PI * 2);
+            k.c.fill();
+            k.c.fillStyle = '#facc15';
+            k.c.beginPath();
+            k.c.ellipse(macroX, cy - 30, 4, 8, 0, 0, Math.PI * 2);
+            k.c.fill();
+
+            // Eriyen Parafin Damlaları (Fiziksel Değişim)
+            k.c.fillStyle = '#fef08a';
+            k.c.beginPath();
+            k.c.arc(macroX - 18, cy + 15, 5, 0, Math.PI * 2);
+            k.c.arc(macroX + 18, cy + 25, 4, 0, Math.PI * 2);
+            k.c.arc(macroX - 14, cy + 50, 6, 0, Math.PI * 2);
+            k.c.fill();
+            k.c.restore();
+
+            label(k, 'Alev & Duman → KİMYASAL', macroX + 26, cy - 34, 'left', 'middle', 0.72);
+            label(k, 'Eriyen Sıvı Mum → FİZİKSEL', macroX - 22, cy + 50, 'right', 'middle', 0.72);
+        } else {
+            k.c.restore();
+            label(k, 'Mum henüz yakılmadı', macroX, cy + 65, 'center', 'top', 0.75);
+        }
+    } else if (exp === 1) {
+        // ── KAĞIT DENEYİ ──
+        label(k, 'DENEY 2: Kağıdın Yırtılması vs Yanması', cx, r.y + 2, 'center', 'top', 0.85);
+
+        k.c.save();
+        if (!acted) {
+            k.c.fillStyle = '#f8fafc';
+            k.c.strokeStyle = '#94a3b8';
+            k.c.fillRect(macroX - 35, cy - 25, 70, 50);
+            k.c.strokeRect(macroX - 35, cy - 25, 70, 50);
+            k.c.restore();
+            label(k, 'Bütün Kağıt', macroX, cy + 35, 'center', 'top', 0.75);
+        } else {
+            // Yırtılan parça (Fiziksel)
+            k.c.fillStyle = '#f8fafc';
+            k.c.strokeStyle = '#94a3b8';
+            k.c.fillRect(macroX - 40, cy - 25, 30, 45);
+            k.c.strokeRect(macroX - 40, cy - 25, 30, 45);
+            label(k, 'Yırtma: FİZİKSEL', macroX - 25, cy + 25, 'center', 'top', 0.7);
+
+            // Yanan / Kül olan parça (Kimyasal)
+            k.c.fillStyle = '#475569';
+            k.c.fillRect(macroX + 10, cy - 15, 30, 35);
+            k.c.strokeRect(macroX + 10, cy - 15, 30, 35);
+            k.c.restore();
+            label(k, 'Kül: KİMYASAL', macroX + 25, cy + 25, 'center', 'top', 0.7);
+        }
+    } else {
+        // ── ASİT - METAL TEPKİMESİ ──
+        label(k, 'DENEY 3: Çinko Metali + Asit (Kimyasal Tepkime)', cx, r.y + 2, 'center', 'top', 0.85);
+
+        // Beher
+        k.c.save();
+        k.c.fillStyle = withAlpha('#0284c7', 0.2);
+        k.c.fillRect(macroX - 30, cy - 15, 60, 55);
+        k.c.strokeStyle = '#334155';
+        k.c.lineWidth = 2;
+        k.c.strokeRect(macroX - 30, cy - 25, 60, 65);
+
+        // Çinko parçaları
+        k.c.fillStyle = '#94a3b8';
+        k.c.fillRect(macroX - 16, cy + 28, 12, 8);
+        k.c.fillRect(macroX + 4, cy + 30, 10, 7);
+
+        if (acted) {
+            // Gaz kabarcıkları (H2)
+            k.c.fillStyle = '#38bdf8';
+            for (let i = 0; i < 6; i++) {
+                const bx = macroX - 18 + i * 7;
+                const by = cy + 15 - (i * 6);
+                k.c.beginPath();
+                k.c.arc(bx, by, 3, 0, Math.PI * 2);
+                k.c.fill();
+            }
+            label(k, 'H₂ Gazı Çıkışı! (Fokurdama)', macroX, cy - 35, 'center', 'bottom', 0.72);
+        }
+        k.c.restore();
+        label(k, 'Çinko (Zn) + Asit (HCl)', macroX, cy + 45, 'center', 'top', 0.72);
+    }
+
+    // Sağ Taraf: Moleküler / Tanecik Görünümü
+    k.c.save();
+    if (!acted) {
+        // Normal moleküller (Aynı renk çiftli küreler)
+        for (let i = 0; i < 4; i++) {
+            const mx = microX - 30 + (i % 2) * 55;
+            const my = cy - 25 + Math.floor(i / 2) * 45;
+            k.c.fillStyle = '#3b82f6';
+            k.c.beginPath();
+            k.c.arc(mx, my, 10, 0, Math.PI * 2);
+            k.c.arc(mx + 16, my, 10, 0, Math.PI * 2);
+            k.c.fill();
+            line(k, mx, my, mx + 16, my, 2);
+        }
+        label(k, 'Orijinal Moleküller (Bağlar Sağlam)', microX, cy + 50, 'center', 'top', 0.72);
+    } else {
+        if (exp === 0 || exp === 1) {
+            // Fizikselde: Moleküller aynı kalır, sadece mesafe değişir
+            for (let i = 0; i < 4; i++) {
+                const mx = microX - 40 + i * 26;
+                const my = cy - 30 + (i % 2) * 35;
+                k.c.fillStyle = '#3b82f6';
+                k.c.beginPath();
+                k.c.arc(mx, my, 8, 0, Math.PI * 2);
+                k.c.arc(mx + 12, my, 8, 0, Math.PI * 2);
+                k.c.fill();
+                line(k, mx, my, mx + 12, my, 2);
+            }
+            k.c.fillStyle = '#16a34a';
+            label(k, 'Fiziksel: İç bağlar KOPMAZ, kimlik değişmez', microX, cy + 50, 'center', 'top', 0.72);
+        } else {
+            // Kimyasalda: Eski bağlar kopar, yeni atomlarla yeni bağ kurulur
+            k.c.fillStyle = '#ef4444';
+            k.c.beginPath();
+            k.c.arc(microX - 25, cy - 10, 11, 0, Math.PI * 2);
+            k.c.fill();
+            k.c.fillStyle = '#22c55e';
+            k.c.beginPath();
+            k.c.arc(microX - 7, cy - 10, 9, 0, Math.PI * 2);
+            k.c.fill();
+            line(k, microX - 25, cy - 10, microX - 7, cy - 10, 2);
+
+            k.c.fillStyle = '#eab308';
+            k.c.beginPath();
+            k.c.arc(microX + 22, cy - 10, 9, 0, Math.PI * 2);
+            k.c.arc(microX + 38, cy - 10, 9, 0, Math.PI * 2);
+            k.c.fill();
+            line(k, microX + 22, cy - 10, microX + 38, cy - 10, 2);
+
+            k.c.fillStyle = '#dc2626';
+            label(k, 'Kimyasal: Eski bağlar KOPAR, yeni bağlar oluşur!', microX, cy + 50, 'center', 'top', 0.72);
+        }
+    }
+    k.c.restore();
+
+    // Alt Bilgi Şeridi
+    k.c.save();
+    k.c.fillStyle = acted ? (exp === 2 ? '#dc2626' : '#16a34a') : '#64748b';
+    const note = !acted
+        ? 'Olayı başlatmak için aşağıdaki "Değişimi Başlat" butonuna tıklayın'
+        : exp === 0
+          ? 'Mum Erimesi: Fiziksel Değişim  |  Fitilin Yanması: Kimyasal Değişim'
+          : exp === 1
+            ? 'Kağıt Yırtılması: Fiziksel  |  Kağıt Yanması: Kimyasal (Kül, Gaz, Duman)'
+            : 'Asit + Metal: Gaz Çıkışı ve Isı Açığa Çıkar → KİMYASAL TEPKİME';
+    label(k, note, cx, r.y + r.h - 10, 'center', 'bottom', 0.78);
+    k.c.restore();
+
+    k.c.restore();
+};
+
+export const reactionChangeSpec: SimSpec = {
+    controls: (r, o) => {
+        const acted = simValue(o, 'act', 0) > 0.5;
+        return [
+            {
+                id: 'nextExp',
+                x: r.x + 24,
+                y: r.y + 20,
+                type: 'toggle',
+                label: 'Deneyi Değiştir (Mum / Kağıt / Asit)',
+            },
+            {
+                id: 'toggleAct',
+                x: r.x + r.w - 24,
+                y: r.y + 20,
+                type: 'toggle',
+                label: acted ? 'Başa Dön' : 'Değişimi Başlat',
+                on: acted,
+            },
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        if (id === 'nextExp') {
+            const current = clampInt(simValue(o, 'exp', 0), 0, 2, 0);
+            return { exp: (current + 1) % 3, act: 0 };
+        }
+        if (id === 'toggleAct') {
+            const acted = simValue(o, 'act', 0) > 0.5;
+            return { act: acted ? 0 : 1 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'exp', label: 'Deney (0 Mum / 1 Kağıt / 2 Asit-Metal)', min: 0, max: 2, step: 1 },
+        { key: 'act', label: 'Değişim Durumu (0 Önce / 1 Sonra)', min: 0, max: 1, step: 1 },
+    ],
+};
+
+// ── Öz Isı ve Isınma Yarışı Simülatörü ────────────────────────────────
+
+function specificHeatGeom(r: Rect, o: MathObject) {
+    const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0); // 0: Isınma Yarışı, 1: Buz Kalıbı
+    const timeSec = clamp(simValue(o, 't', 50), 0, 100); // Isıtma süresi (sn)
+
+    // Sıcaklık hesabı (ΔT = Q / (m · c))
+    // Başlangıç: 20°C
+    // Zeytinyağı (c = 1.96): Hızla ısınır
+    // Su (c = 4.18): Yavaş ısınır
+    const tempOil = Math.round(20 + timeSec * 0.44); // 20 .. 64°C
+    const tempWater = Math.round(20 + timeSec * 0.20); // 20 .. 40°C
+
+    const cx = r.x + r.w / 2;
+    const groundY = r.y + r.h * 0.78;
+
+    return {
+        mode,
+        timeSec,
+        tempOil,
+        tempWater,
+        cx,
+        groundY,
+    };
+}
+
+export const specificHeatRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = specificHeatGeom(r, k.o);
+    const { mode, cx, groundY, tempWater, tempOil, timeSec } = g;
+
+    if (mode === 0) {
+        // ── DENEY 1: ISINMA YARIŞI ──
+        label(k, 'ÖZ ISI & ISINMA YARIŞI (Özdeş Isıtıcılar, Eşit Kütle m = 100 g)', cx, r.y + 8, 'center', 'top', 0.82);
+
+        const leftX = cx - r.w * 0.25;
+        const rightX = cx + r.w * 0.25;
+        const beakerW = 60;
+        const beakerH = 75;
+
+        // Sol Beher: SU (c = 4.18 J/g°C)
+        k.c.save();
+        k.c.fillStyle = withAlpha('#0284c7', 0.35); // Mavi su
+        k.c.fillRect(leftX - beakerW / 2, groundY - beakerH + 18, beakerW, beakerH - 18);
+        k.c.strokeStyle = '#334155';
+        k.c.lineWidth = 2;
+        k.c.strokeRect(leftX - beakerW / 2, groundY - beakerH, beakerW, beakerH);
+
+        // Termometre Su
+        const thH = 65;
+        const fillW = (thH * (tempWater - 10)) / 60;
+        k.c.fillStyle = '#ef4444';
+        k.c.fillRect(leftX - 3, groundY - beakerH - fillW, 6, fillW);
+        k.c.strokeRect(leftX - 4, groundY - beakerH - thH, 8, thH);
+
+        // İspirto Ocağı ve Alev (Sol)
+        k.c.fillStyle = '#64748b';
+        k.c.fillRect(leftX - 18, groundY + 4, 36, 16);
+        if (timeSec > 0) {
+            k.c.fillStyle = '#f59e0b';
+            k.c.beginPath();
+            k.c.ellipse(leftX, groundY + 2, 7, 10, 0, 0, Math.PI * 2);
+            k.c.fill();
+        }
+        k.c.restore();
+
+        label(k, `SU (c = 4.18 J/g°C)`, leftX, groundY + 24, 'center', 'top', 0.75);
+        label(k, `Öz Isı BÜYÜK`, leftX, groundY + 38, 'center', 'top', 0.68);
+        k.c.save();
+        k.c.fillStyle = '#0284c7';
+        label(k, `${tempWater} °C`, leftX, groundY - beakerH - thH - 8, 'center', 'bottom', 0.85);
+        k.c.restore();
+
+        // Sağ Beher: ZEYTİNYAĞI (c = 1.96 J/g°C)
+        k.c.save();
+        k.c.fillStyle = withAlpha('#eab308', 0.4); // Sarı yağ
+        k.c.fillRect(rightX - beakerW / 2, groundY - beakerH + 18, beakerW, beakerH - 18);
+        k.c.strokeStyle = '#334155';
+        k.c.lineWidth = 2;
+        k.c.strokeRect(rightX - beakerW / 2, groundY - beakerH, beakerW, beakerH);
+
+        // Termometre Yağ
+        const fillO = (thH * (tempOil - 10)) / 60;
+        k.c.fillStyle = '#ef4444';
+        k.c.fillRect(rightX - 3, groundY - beakerH - fillO, 6, fillO);
+        k.c.strokeRect(rightX - 4, groundY - beakerH - thH, 8, thH);
+
+        // İspirto Ocağı ve Alev (Sağ)
+        k.c.fillStyle = '#64748b';
+        k.c.fillRect(rightX - 18, groundY + 4, 36, 16);
+        if (timeSec > 0) {
+            k.c.fillStyle = '#f59e0b';
+            k.c.beginPath();
+            k.c.ellipse(rightX, groundY + 2, 7, 10, 0, 0, Math.PI * 2);
+            k.c.fill();
+        }
+        k.c.restore();
+
+        label(k, `ZEYTİNYAĞI (c = 1.96 J/g°C)`, rightX, groundY + 24, 'center', 'top', 0.75);
+        label(k, `Öz Isı KÜÇÜK`, rightX, groundY + 38, 'center', 'top', 0.68);
+        k.c.save();
+        k.c.fillStyle = '#eab308';
+        label(k, `${tempOil} °C`, rightX, groundY - beakerH - thH - 8, 'center', 'bottom', 0.85);
+        k.c.restore();
+
+        // Alt Çıkarım
+        k.c.save();
+        k.c.fillStyle = '#16a34a';
+        label(
+            k,
+            `Süre: ${Math.round(timeSec)} sn  →  Öz ısısı küçük olan zeytinyağı ÇABUK ISINDI (${tempOil} °C vs ${tempWater} °C)`,
+            cx,
+            r.y + r.h - 10,
+            'center',
+            'bottom',
+            0.78
+        );
+        k.c.restore();
+    } else {
+        // ── DENEY 2: BUZ KALIBI TESTİ (KLASİK LGS SORUSU) ──
+        label(k, 'BUZ KALIBI DENEYİ (80 °C Sıcaklıkta Eşit Kütleli Sıvılar Buzu Eritiyor)', cx, r.y + 8, 'center', 'top', 0.82);
+
+        // Buz Kalıbı
+        k.c.save();
+        k.c.fillStyle = withAlpha('#bae6fd', 0.5);
+        k.c.fillRect(cx - 130, groundY - 50, 260, 60);
+        k.c.strokeStyle = '#0284c7';
+        k.c.lineWidth = 2;
+        k.c.strokeRect(cx - 130, groundY - 50, 260, 60);
+        k.c.restore();
+        label(k, 'Dev Buz Kalıbı (0 °C)', cx, groundY + 16, 'center', 'top', 0.72);
+
+        // Sol Kap: SU (Öz ısısı büyük → Daha derine batar!)
+        const leftX = cx - 65;
+        const waterMelt = 34; // Derin çukur
+        k.c.save();
+        k.c.fillStyle = withAlpha('#0284c7', 0.8);
+        k.c.fillRect(leftX - 22, groundY - 50 + waterMelt - 28, 44, 28);
+        k.c.strokeRect(leftX - 22, groundY - 50 + waterMelt - 28, 44, 28);
+        label(k, 'SU (80°C)', leftX, groundY - 50 + waterMelt - 14, 'center', 'middle', 0.68);
+        k.c.restore();
+
+        // Sağ Kap: YAĞ (Öz ısısı küçük → Sığ kalır!)
+        const rightX = cx + 65;
+        const oilMelt = 15; // Sığ çukur
+        k.c.save();
+        k.c.fillStyle = withAlpha('#eab308', 0.8);
+        k.c.fillRect(rightX - 22, groundY - 50 + oilMelt - 28, 44, 28);
+        k.c.strokeRect(rightX - 22, groundY - 50 + oilMelt - 28, 44, 28);
+        label(k, 'YAĞ (80°C)', rightX, groundY - 50 + oilMelt - 14, 'center', 'middle', 0.68);
+        k.c.restore();
+
+        // Karşılaştırma Okları
+        k.c.save();
+        k.c.fillStyle = '#16a34a';
+        label(k, 'Derine Battı (Çok Isı Verdi)', leftX, groundY - 70, 'center', 'bottom', 0.72);
+        k.c.fillStyle = '#b45309';
+        label(k, 'Sığ Kaldı (Az Isı Verdi)', rightX, groundY - 70, 'center', 'bottom', 0.72);
+        k.c.restore();
+
+        // Alt Bilgi
+        k.c.save();
+        k.c.fillStyle = '#16a34a';
+        label(
+            k,
+            'Öz ısısı büyük olan su, buza daha çok ısı enerjisi aktarır (Q = m · c · ΔT) → Daha çok eritir!',
+            cx,
+            r.y + r.h - 10,
+            'center',
+            'bottom',
+            0.78
+        );
+        k.c.restore();
+    }
+
+    k.c.restore();
+};
+
+export const specificHeatSpec: SimSpec = {
+    controls: (r, o) => {
+        const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0);
+        return [
+            {
+                id: 'toggleMode',
+                x: r.x + r.w - 24,
+                y: r.y + 18,
+                type: 'toggle',
+                label: mode === 0 ? 'Buz Kalıbı Deneyine Geç' : 'Isınma Yarışına Geç',
+                on: mode > 0,
+            },
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        if (id === 'toggleMode') {
+            const m = clampInt(simValue(o, 'mode', 0), 0, 1, 0);
+            return { mode: m > 0 ? 0 : 1 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'mode', label: 'Deney Modu (0 Yarış / 1 Buz)', min: 0, max: 1, step: 1 },
+        { key: 't', label: 'Isıtma Süresi', min: 0, max: 100, step: 10, unit: 'sn' },
+    ],
+};
+
+// ── Doğal Ayıraçlar ve Asit-Baz Aşınma Laboratuvarı ───────────────────
+
+function acidBaseLabGeom(r: Rect, o: MathObject) {
+    const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0); // 0: Ayıraçlar, 1: Kap Aşınma
+    const ind = clampInt(simValue(o, 'ind', 0), 0, 2, 0); // 0: Lahana Suyu, 1: Fenolftalein, 2: Metil Oranj
+    const cx = r.x + r.w / 2;
+    const groundY = r.y + r.h * 0.78;
+
+    return {
+        mode,
+        ind,
+        cx,
+        groundY,
+    };
+}
+
+export const acidBaseLabRender: Renderer = (k) => {
+    const r = k.r;
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const g = acidBaseLabGeom(r, k.o);
+    const { mode, ind, cx, groundY } = g;
+
+    if (mode === 0) {
+        // ── DOĞAL VE YAPAY AYIRAÇLAR (KIRMIZI LAHANA, FENOLFTALEİN, METİL ORANJ) ──
+        const indNames = ['Kırmızı Lahana Suyu (Doğal Ayıraç)', 'Fenolftalein Ayıracı', 'Metil Oranj Ayıracı'];
+        label(k, indNames[ind], cx, r.y + 8, 'center', 'top', 0.85);
+
+        const tubeW = 34;
+        const tubeH = 95;
+        const spacing = r.w * 0.26;
+        const t1X = cx - spacing;
+        const t2X = cx;
+        const t3X = cx + spacing;
+
+        // Renk tabloları: [Asit, Nötr, Baz]
+        // Kırmızı lahana: Kırmızı/Pembe (Asit), Mor (Nötr), Yeşil/Sarı (Baz)
+        // Fenolftalein: Renksiz (Asit), Renksiz (Nötr), Pembe (Baz)
+        // Metil oranj: Kırmızı (Asit), Turuncu (Nötr), Sarı (Baz)
+        const palette =
+            ind === 0
+                ? ['#e11d48', '#8b5cf6', '#84cc16']
+                : ind === 1
+                  ? ['#f8fafc', '#f8fafc', '#ec4899']
+                  : ['#ef4444', '#f97316', '#eab308'];
+
+        const drawTube = (x: number, col: string, name: string, phText: string, resultNote: string) => {
+            // Cam Deney Tüpü
+            k.c.save();
+            k.c.fillStyle = withAlpha(col, 0.55);
+            k.c.fillRect(x - tubeW / 2, groundY - tubeH + 20, tubeW, tubeH - 20);
+            k.c.strokeStyle = '#334155';
+            k.c.lineWidth = 2;
+            k.c.beginPath();
+            k.c.moveTo(x - tubeW / 2, groundY - tubeH);
+            k.c.lineTo(x - tubeW / 2, groundY);
+            k.c.arc(x, groundY, tubeW / 2, Math.PI, 0, true);
+            k.c.lineTo(x + tubeW / 2, groundY - tubeH);
+            k.c.stroke();
+            k.c.restore();
+
+            label(k, name, x, groundY + 22, 'center', 'top', 0.75);
+            label(k, phText, x, groundY + 36, 'center', 'top', 0.68);
+            k.c.save();
+            k.c.fillStyle = col === '#f8fafc' ? '#64748b' : col;
+            label(k, resultNote, x, groundY - tubeH - 10, 'center', 'bottom', 0.72);
+            k.c.restore();
+        };
+
+        const notes =
+            ind === 0
+                ? ['Kırmızı / Pembe', 'Mor (Nötr)', 'Yeşil / Sarı']
+                : ind === 1
+                  ? ['Renksiz', 'Renksiz', 'Pembe']
+                  : ['Kırmızı', 'Turuncu', 'Sarı'];
+
+        drawTube(t1X, palette[0], 'Limon Suyu / HCl', 'ASİT (pH ≈ 2)', notes[0]);
+        drawTube(t2X, palette[1], 'Saf Su', 'NÖTR (pH = 7)', notes[1]);
+        drawTube(t3X, palette[2], 'Sabun / NaOH', 'BAZ (pH ≈ 11)', notes[2]);
+
+        // Alt Bilgi
+        k.c.save();
+        k.c.fillStyle = '#16a34a';
+        label(
+            k,
+            ind === 0
+                ? 'LGS İpucu: Kırmızı lahana suyu asitte pembe-kırmızı, bazda yeşil-sarı renk verir.'
+                : ind === 1
+                  ? 'LGS İpucu: Fenolftalein asitte ve nötrde RENKSİZ, yalnızca bazda PEMBE renk alır.'
+                  : 'LGS İpucu: Metil oranj asitte KIRMIZI, bazda SARI renk verir.',
+            cx,
+            r.y + r.h - 10,
+            'center',
+            'bottom',
+            0.78
+        );
+        k.c.restore();
+    } else {
+        // ── KAP AŞINMA TESTİ (ASİT & BAZLARIN MADDELERLE ETKİLEŞİMİ) ──
+        label(k, 'ASİT VE BAZLARIN MADDELERE ETKİSİ (KAP AŞINMA TESTİ)', cx, r.y + 8, 'center', 'top', 0.85);
+
+        const leftX = cx - r.w * 0.25;
+        const rightX = cx + r.w * 0.25;
+
+        // Sol Taraf: ASİT (Mermer ve Metal)
+        k.c.save();
+        k.c.fillStyle = '#64748b';
+        k.c.fillRect(leftX - 45, groundY - 30, 90, 24); // Metal levha
+        k.c.strokeStyle = '#334155';
+        k.c.strokeRect(leftX - 45, groundY - 30, 90, 24);
+
+        // Damlayan Asit
+        k.c.fillStyle = '#ef4444';
+        k.c.beginPath();
+        k.c.arc(leftX, groundY - 50, 5, 0, Math.PI * 2);
+        k.c.fill();
+
+        // Aşınma ve Gaz çıkışı (H2)
+        k.c.fillStyle = '#38bdf8';
+        for (let i = 0; i < 4; i++) {
+            k.c.beginPath();
+            k.c.arc(leftX - 12 + i * 8, groundY - 38 - i * 6, 2.5, 0, Math.PI * 2);
+            k.c.fill();
+        }
+        k.c.restore();
+
+        k.c.save();
+        k.c.fillStyle = '#dc2626';
+        label(k, 'ASİT ETKİSİ', leftX, groundY - 70, 'center', 'bottom', 0.8);
+        k.c.restore();
+        label(k, 'Metal & Mermer Yüzey', leftX, groundY + 10, 'center', 'top', 0.75);
+        label(k, 'Metali aşındırır, H₂ gazı çıkarır!', leftX, groundY + 24, 'center', 'top', 0.68);
+        k.c.save();
+        k.c.fillStyle = '#b45309';
+        label(k, '→ Asitler metal/mermer kapta saklanmaz!', leftX, groundY + 38, 'center', 'top', 0.68);
+        k.c.restore();
+
+        // Sağ Taraf: BAZ (Cam ve Porselen)
+        k.c.save();
+        k.c.fillStyle = withAlpha('#93c5fd', 0.35); // Cam tabak
+        k.c.fillRect(rightX - 45, groundY - 30, 90, 24);
+        k.c.strokeStyle = '#38bdf8';
+        k.c.strokeRect(rightX - 45, groundY - 30, 90, 24);
+
+        // Damlayan Baz
+        k.c.fillStyle = '#3b82f6';
+        k.c.beginPath();
+        k.c.arc(rightX, groundY - 50, 5, 0, Math.PI * 2);
+        k.c.fill();
+
+        // Matlaşma / Çizik çizgileri
+        k.c.strokeStyle = '#64748b';
+        k.c.lineWidth = 1.5;
+        line(k, rightX - 25, groundY - 22, rightX - 10, groundY - 14);
+        line(k, rightX + 5, groundY - 24, rightX + 22, groundY - 16);
+        k.c.restore();
+
+        k.c.save();
+        k.c.fillStyle = '#2563eb';
+        label(k, 'BAZ ETKİSİ', rightX, groundY - 70, 'center', 'bottom', 0.8);
+        k.c.restore();
+        label(k, 'Cam & Porselen Yüzey', rightX, groundY + 10, 'center', 'top', 0.75);
+        label(k, 'Camı matlaştırır, çizer ve aşındırır!', rightX, groundY + 24, 'center', 'top', 0.68);
+        k.c.save();
+        k.c.fillStyle = '#b45309';
+        label(k, '→ Bazlar cam ve porselende saklanmaz!', rightX, groundY + 38, 'center', 'top', 0.68);
+        k.c.restore();
+
+        // Alt Bilgi
+        k.c.save();
+        k.c.fillStyle = '#16a34a';
+        label(
+            k,
+            'Günlük Hayat: Bulaşık deterjanları (bazik) zamanla bardakları matlaştırır / Asitli içecekler diş minesini aşındırır.',
+            cx,
+            r.y + r.h - 10,
+            'center',
+            'bottom',
+            0.78
+        );
+        k.c.restore();
+    }
+
+    k.c.restore();
+};
+
+export const acidBaseLabSpec: SimSpec = {
+    controls: (r, o) => {
+        const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0);
+        return [
+            {
+                id: 'toggleMode',
+                x: r.x + r.w - 24,
+                y: r.y + 18,
+                type: 'toggle',
+                label: mode === 0 ? 'Kap Aşınma Testine Geç' : 'Ayıraçlar Deneyine Geç',
+                on: mode > 0,
+            },
+            ...(mode === 0
+                ? [
+                      {
+                          id: 'nextInd',
+                          x: r.x + 24,
+                          y: r.y + 18,
+                          type: 'toggle' as const,
+                          label: 'Ayıracı Değiştir (Lahana / Fenolftalein / Metil)',
+                      },
+                  ]
+                : []),
+        ];
+    },
+    onControl: (r, o, id): Record<string, number> => {
+        if (id === 'toggleMode') {
+            const m = clampInt(simValue(o, 'mode', 0), 0, 1, 0);
+            return { mode: m > 0 ? 0 : 1 };
+        }
+        if (id === 'nextInd') {
+            const current = clampInt(simValue(o, 'ind', 0), 0, 2, 0);
+            return { ind: (current + 1) % 3 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'mode', label: 'Deney (0 Ayıraçlar / 1 Aşınma)', min: 0, max: 1, step: 1 },
+        { key: 'ind', label: 'Ayıraç (0 Lahana / 1 Fenolftalein / 2 Metil)', min: 0, max: 2, step: 1 },
     ],
 };
 
@@ -2289,28 +4655,52 @@ const electroSpec: SimSpec = {
 
 export const GRADE8_RENDERERS: Record<string, Renderer> = {
     seasons_sim: seasonsRender,
+    light_angle_sim: lightAngleRender,
+    wind_pressure_sim: windPressureRender,
+    shadow_sim: shadowRender,
+    dna_replication_sim: dnaReplicationRender,
+    modification_sim: modificationRender,
+    nucleotide_sim: nucleotideRender,
     punnett_sim: punnettRender,
     liquid_pressure_sim: liquidRender,
     solid_pressure_sim: solidRender,
+    pascal_sim: pascalRender,
+    torricelli_sim: torricelliRender,
+    liquid_paradox_sim: liquidParadoxRender,
     lever_sim: leverRender,
     pulley_sim: pulleyRender,
     incline_sim: inclineRender,
     division_sim: divisionRender,
     ph_sim: phRender,
+    reaction_change_sim: reactionChangeRender,
+    specific_heat_sim: specificHeatRender,
+    acid_base_lab_sim: acidBaseLabRender,
     pyramid_sim: pyramidRender,
     electro_sim: electroRender,
 };
 
 export const GRADE8_SPECS: Record<string, SimSpec> = {
     seasons_sim: seasonsSpec,
+    light_angle_sim: lightAngleSpec,
+    wind_pressure_sim: windPressureSpec,
+    shadow_sim: shadowSpec,
+    dna_replication_sim: dnaReplicationSpec,
+    modification_sim: modificationSpec,
+    nucleotide_sim: nucleotideSpec,
     punnett_sim: punnettSpec,
     liquid_pressure_sim: liquidSpec,
     solid_pressure_sim: solidSpec,
+    pascal_sim: pascalSpec,
+    torricelli_sim: torricelliSpec,
+    liquid_paradox_sim: liquidParadoxSpec,
     lever_sim: leverSpec,
     pulley_sim: pulleySpec,
     incline_sim: inclineSpec,
     division_sim: divisionSpec,
     ph_sim: phSpec,
+    reaction_change_sim: reactionChangeSpec,
+    specific_heat_sim: specificHeatSpec,
+    acid_base_lab_sim: acidBaseLabSpec,
     pyramid_sim: pyramidSpec,
     electro_sim: electroSpec,
 };
@@ -2325,6 +4715,41 @@ export const GRADE8_ITEMS: ReadonlyArray<MathCatalogItem> = [
         defaults: { labels: true, sim: { pos: 0, play: 1 } },
     },
     {
+        kind: 'light_angle_sim',
+        label: 'Işığın Geliş Açısı & Birim Alan',
+        hint: 'Geliş açısını ayarla; dik ve eğik açının sıcaklığa ve alana etkisi',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { angle: 60 } },
+    },
+    {
+        kind: 'wind_pressure_sim',
+        label: 'Rüzgar ve Basınç Alanları',
+        hint: 'Sıcaklık farkı, YAB ve AAB; rüzgarın yönü ve hızı',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { tempA: 14, tempB: 32 } },
+    },
+    {
+        kind: 'shadow_sim',
+        label: 'Gölge Boyu & Güneş Açısı',
+        hint: 'Güneş yüksekliğini ayarla; öğle ve kış gölge boyu değişimi',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { angle: 45 } },
+    },
+    {
+        kind: 'nucleotide_sim',
+        label: 'Nükleotid & KeDiGeNi',
+        hint: 'Kromozom > DNA > Gen > Nükleotid ve P-D-Baz yapısı',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { base: 0 } },
+    },
+    {
+        kind: 'dna_replication_sim',
+        label: 'DNA Eşlenmesi & Hata Onarımı',
+        hint: 'Fermuar açılma, serbest nükleotidler ve mutasyon senaryoları',
+        size: { w: 480, h: 340 },
+        defaults: { labels: true, sim: { stage: 0, err: 0 } },
+    },
+    {
         kind: 'punnett_sim',
         label: 'Punnett Karesi',
         hint: 'Ebeveyn alellerini seç, oranları gör',
@@ -2335,6 +4760,13 @@ export const GRADE8_ITEMS: ReadonlyArray<MathCatalogItem> = [
             sim: { p1a: 0, p1b: 1, p2a: 0, p2b: 1, mode: 0 },
         },
         fields: [{ key: 'text', label: 'Karakter harfi', type: 'text' }],
+    },
+    {
+        kind: 'modification_sim',
+        label: 'Modifikasyon Laboratuvarı',
+        hint: 'Himalaya tavşanı buz deneyi ve çuha çiçeği sıcaklık deneyi',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { mode: 0, ice: 0, temp: 18 } },
     },
     {
         kind: 'liquid_pressure_sim',
@@ -2349,6 +4781,27 @@ export const GRADE8_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Yüzü değiştir, batma derinliği değişsin',
         size: { w: 420, h: 300 },
         defaults: { labels: true, sim: { face: 0, f: 60 } },
+    },
+    {
+        kind: 'pascal_sim',
+        label: 'Pascal Prensibi & Su Cenderesi',
+        hint: 'Küçük pistona bas, ağır yükü kaldır; sıvı basıncı aynen iletir',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { f1: 100, ratio: 4, push: 35 } },
+    },
+    {
+        kind: 'torricelli_sim',
+        label: 'Torricelli & Açık Hava Basıncı',
+        hint: 'Rakım ve boru eğimi; dağa çıkıldıkça P₀ düşer ve balon şişer',
+        size: { w: 480, h: 340 },
+        defaults: { labels: true, sim: { alt: 0, tilt: 0, balloon: 1 } },
+    },
+    {
+        kind: 'liquid_paradox_sim',
+        label: 'Sıvı Basıncı Paradoksu',
+        hint: 'Geniş, düz, daralan kaplar ve bileşik kaplar su dengesi',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { mode: 0, h: 60 } },
     },
     {
         kind: 'lever_sim',
@@ -2387,6 +4840,27 @@ export const GRADE8_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Asit ve baz ekle, nötrleşmeyi ve rengi gör',
         size: { w: 500, h: 300 },
         defaults: { labels: true, sim: { acid: 40, base: 40, k: 3 } },
+    },
+    {
+        kind: 'reaction_change_sim',
+        label: 'Fiziksel & Kimyasal Değişim',
+        hint: 'Mum, kağıt ve asit-metal deneyleri; makro ve mikro tanecik yapısı',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { exp: 0, act: 0 } },
+    },
+    {
+        kind: 'specific_heat_sim',
+        label: 'Öz Isı & Isınma Yarışı',
+        hint: 'Su vs zeytinyağı ısınma yarışı ve buz kalıbı eritme deneyi',
+        size: { w: 480, h: 320 },
+        defaults: { labels: true, sim: { mode: 0, t: 50 } },
+    },
+    {
+        kind: 'acid_base_lab_sim',
+        label: 'Doğal Ayıraçlar & Asit-Baz Lab',
+        hint: 'Kırmızı lahana suyu, fenolftalein ve metal/mermer/cam aşınma testi',
+        size: { w: 480, h: 340 },
+        defaults: { labels: true, sim: { mode: 0, ind: 0 } },
     },
     {
         kind: 'pyramid_sim',
