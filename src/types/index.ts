@@ -269,6 +269,9 @@ export type MathObjectKind =
     | 'newton_cannon_sim'
     | 'water_cycle_sim'
     | 'coulomb_sim'
+    | 'digestion_sim'
+    | 'apparent_depth_sim'
+    | 'molecule_build_sim'
     // ── 3D ve Gelişmiş Laboratuvar Simülasyonları ─────────────────────
     | 'solids_3d_sim'
     | 'seasons_3d_sim'

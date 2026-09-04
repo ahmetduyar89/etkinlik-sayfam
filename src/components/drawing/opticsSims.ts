@@ -1,12 +1,14 @@
 // src/components/drawing/opticsSims.ts
-// Işığın kırılması ve mercekler ünitesi: göz kusurları ve düzeltilmesi.
+// Işığın kırılması ve mercekler ünitesi: göz kusurları ve görünen derinlik.
 
 import type { MathObject } from '../../types';
 import {
+    arrow,
     clamp,
     clampInt,
     fillShape,
     fitText,
+    fmtNum,
     isIconSize,
     label,
     line,
@@ -365,12 +367,303 @@ export const eyeDefectSpec: SimSpec = {
     ],
 };
 
+// ── Görünen derinlik (Işığın Kırılması ve Mercekler) ─────────────────
+//
+// Kilit fikir: sudan havaya çıkan ışık normalden UZAKLAŞIR. Gözümüz
+// ışığı geldiği doğrultuda gördüğü için, ışınların geriye uzantısı
+// gerçek cisimden daha YUKARIDA kesişir. Bu yüzden havuzun dibi olduğundan
+// sığ, sudaki balık olduğundan yukarıda görünür. (h' = h / n)
+
+interface Medium {
+    name: string;
+    n: number;
+}
+
+const DEPTH_MEDIA: ReadonlyArray<Medium> = [
+    { name: 'Su', n: 1.33 },
+    { name: 'Cam', n: 1.5 },
+];
+
+const depthState = (o: MathObject) => ({
+    h: clamp(simValue(o, 'h', 3), 1, 5),
+    medium: clampInt(simValue(o, 'med', 0), 0, DEPTH_MEDIA.length - 1, 0),
+});
+
+/**
+ * Cisimden çıkıp yüzeyde kırılan ve göz düzleminde hedef noktaya varan
+ * ışının su içindeki açısını (normale göre) bulur. f(θ) tek yönlü arttığı
+ * için ikili arama yeterlidir.
+ */
+function solveRay(hPx: number, ox: number, sy: number, ey: number, targetX: number, n: number): number | null {
+    const reach = (t1: number) => {
+        const s2 = n * Math.sin(t1);
+        if (s2 >= 1) return Number.POSITIVE_INFINITY;
+        const t2 = Math.asin(s2);
+        return ox + hPx * Math.tan(t1) + (sy - ey) * Math.tan(t2);
+    };
+    let lo = 0;
+    let hi = Math.asin(Math.min(0.999, 1 / n)) * 0.995;
+    if (reach(hi) < targetX) return null;
+    for (let i = 0; i < 60; i++) {
+        const mid = (lo + hi) / 2;
+        if (reach(mid) < targetX) lo = mid;
+        else hi = mid;
+    }
+    return (lo + hi) / 2;
+}
+
+/** Basit balık: gövde, kuyruk ve göz. */
+function drawFish(k: Ctx, x: number, y: number, size: number, ghost: boolean) {
+    const body: Array<[number, number]> = [
+        [x - size, y],
+        [x - size * 0.25, y - size * 0.5],
+        [x + size * 0.55, y - size * 0.3],
+        [x + size * 0.85, y],
+        [x + size * 0.55, y + size * 0.3],
+        [x - size * 0.25, y + size * 0.5],
+    ];
+    k.c.save();
+    if (ghost) {
+        k.c.setLineDash([4, 3]);
+        k.c.strokeStyle = withAlpha(k.color, 0.75);
+    } else {
+        fillShape(k, () => smoothPath(k, body), 0.16);
+    }
+    smooth(k, body, true, Math.max(1.5, k.lw));
+    // Kuyruk
+    k.c.beginPath();
+    k.c.lineWidth = Math.max(1.5, k.lw);
+    k.c.moveTo(x - size * 0.95, y);
+    k.c.lineTo(x - size * 1.5, y - size * 0.45);
+    k.c.lineTo(x - size * 1.5, y + size * 0.45);
+    k.c.closePath();
+    k.c.stroke();
+    if (!ghost) {
+        k.c.fillStyle = k.color;
+        k.c.beginPath();
+        k.c.arc(x + size * 0.45, y - size * 0.12, size * 0.1, 0, Math.PI * 2);
+        k.c.fill();
+    }
+    k.c.restore();
+}
+
+/** Bakan göz simgesi. */
+function drawEye(k: Ctx, x: number, y: number, size: number) {
+    k.c.save();
+    k.c.beginPath();
+    k.c.lineWidth = Math.max(1.6, k.lw);
+    k.c.moveTo(x - size, y);
+    k.c.quadraticCurveTo(x, y - size * 0.8, x + size, y);
+    k.c.quadraticCurveTo(x, y + size * 0.8, x - size, y);
+    k.c.stroke();
+    k.c.fillStyle = k.color;
+    k.c.beginPath();
+    k.c.arc(x, y, size * 0.28, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.restore();
+}
+
+export const apparentDepthRender: Renderer = (k) => {
+    const r = k.r;
+    const s = depthState(k.o);
+    const m = DEPTH_MEDIA[s.medium];
+    const icon = isIconSize(r);
+    const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineJoin = 'round';
+
+    const stage: Rect = icon
+        ? r
+        : { x: r.x + fs * 0.5, y: r.y + fs * 2.2, w: r.w * 0.62, h: r.h - fs * 3.2 };
+    const sy = stage.y + stage.h * (icon ? 0.34 : 0.36);
+    const by = stage.y + stage.h * (icon ? 0.94 : 0.96);
+    const unit = (by - sy) / 5.4;
+    const ox = stage.x + stage.w * 0.28;
+    const oy = sy + s.h * unit;
+
+    // Kap ve su
+    fillShape(k, () => k.c.rect(stage.x, sy, stage.w, by - sy), 0.12);
+    k.c.save();
+    k.c.lineWidth = Math.max(1.8, k.lw);
+    k.c.beginPath();
+    k.c.moveTo(stage.x, sy);
+    k.c.lineTo(stage.x, by);
+    k.c.lineTo(stage.x + stage.w, by);
+    k.c.lineTo(stage.x + stage.w, sy);
+    k.c.stroke();
+    k.c.restore();
+    line(k, stage.x, sy, stage.x + stage.w, sy, Math.max(2, k.lw * 1.3));
+
+    const fishSize = Math.min(unit * 0.55, stage.w * 0.05);
+    drawFish(k, ox, oy, fishSize, false);
+
+    // Göz ve ışın çifti
+    const ex = stage.x + stage.w * 0.78;
+    const ey = stage.y + stage.h * 0.08;
+    const pupil = Math.min(stage.w * 0.055, fs * 1.3);
+    const hits: Array<{ px: number; t2: number }> = [];
+    for (const dx of [-pupil, pupil]) {
+        const t1 = solveRay(oy - sy, ox, sy, ey, ex + dx, m.n);
+        if (t1 === null) continue;
+        const t2 = Math.asin(Math.min(0.999, m.n * Math.sin(t1)));
+        const px = ox + (oy - sy) * Math.tan(t1);
+        hits.push({ px, t2 });
+        line(k, ox, oy, px, sy, Math.max(1.4, k.lw * 0.9));
+        line(k, px, sy, ex + dx, ey, Math.max(1.4, k.lw * 0.9));
+    }
+
+    // Görünen konum: ışınların geriye uzantılarının kesiştiği derinlik (h / n)
+    const hPrime = s.h / m.n;
+    const apparentY = sy + hPrime * unit;
+    k.c.save();
+    k.c.setLineDash([5, 4]);
+    k.c.strokeStyle = withAlpha(k.color, 0.6);
+    for (const hh of hits) {
+        const t = (apparentY - sy) / Math.cos(hh.t2);
+        line(k, hh.px, sy, hh.px - t * Math.sin(hh.t2), apparentY, 1.2);
+    }
+    k.c.restore();
+
+    if (!icon) {
+        drawFish(k, ox, apparentY, fishSize, true);
+        drawEye(k, ex, ey, fs * 0.95);
+    }
+
+    if (icon) {
+        k.c.restore();
+        return;
+    }
+
+    // Derinlik ölçüleri
+    const mx = stage.x + fs * 2.9;
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.6);
+    arrow(k, mx, sy, mx, oy, fs * 0.4, 1.3);
+    arrow(k, mx, oy, mx, sy, fs * 0.4, 1.3);
+    k.c.setLineDash([3, 3]);
+    line(k, mx, oy, ox - fishSize * 1.6, oy, 1);
+    line(k, mx + fs * 1.5, apparentY, ox - fishSize * 1.6, apparentY, 1);
+    k.c.restore();
+    label(k, `h = ${fmtNum(s.h, 1)}`, mx - fs * 0.3, (sy + oy) / 2, 'right', 'middle', 0.56);
+    const hx = mx + fs * 1.5;
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.6);
+    arrow(k, hx, sy, hx, apparentY, fs * 0.35, 1.3);
+    arrow(k, hx, apparentY, hx, sy, fs * 0.35, 1.3);
+    k.c.restore();
+    label(k, `h′ = ${fmtNum(hPrime, 1)}`, hx, sy - fs * 0.25, 'center', 'bottom', 0.56);
+    label(k, 'gerçek', ox, oy + fishSize * 1.1, 'center', 'top', 0.52);
+    label(k, 'görünen', ox, apparentY - fishSize * 1.1, 'center', 'bottom', 0.52);
+    label(k, `${m.name} (n = ${fmtNum(m.n, 2)})`, stage.x + stage.w - fs * 0.3, by - fs * 0.3, 'right', 'bottom', 0.56);
+    label(k, 'hava', stage.x + stage.w - fs * 0.3, sy - fs * 0.3, 'right', 'bottom', 0.56);
+
+    if (k.o.labels !== false) {
+        const px = r.x + r.w * 0.65;
+        const pw = r.w - (px - r.x) - fs * 0.4;
+        const py = r.y + fs * 2.2;
+        const ph = fs * 8;
+        panel(k, px, py, pw, ph);
+        label(k, 'h′ = h / n', px + fs * 0.6, py + fs * 1, 'left', 'middle', 0.66);
+        const rows: ReadonlyArray<[string, string]> = [
+            ['Ortam', `${m.name} · n = ${fmtNum(m.n, 2)}`],
+            ['Gerçek derinlik', `h = ${fmtNum(s.h, 1)} birim`],
+            ['Görünen derinlik', `h′ = ${fmtNum(hPrime, 1)} birim`],
+        ];
+        rows.forEach(([a, b], i) => {
+            const y = py + fs * (2.5 + i * 1.5);
+            label(k, a, px + fs * 0.6, y, 'left', 'middle', 0.52);
+            label(k, fitText(k, [b], pw - fs * 1.1, 0.6), px + fs * 0.6, y + fs * 0.72, 'left', 'middle', 0.6);
+        });
+        label(k, 'Balık olduğundan yukarıda', px + fs * 0.6, py + fs * 7.2, 'left', 'middle', 0.58);
+
+        const ny = py + ph + fs * 0.8;
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.5);
+        roundRect(k, px + fs * 0.4, ny, pw - fs * 0.8, fs * 2.5, 5);
+        k.c.lineWidth = 1;
+        k.c.stroke();
+        k.c.restore();
+        label(k, 'Sudan havaya geçen ışık', px + fs * 0.8, ny + fs * 0.8, 'left', 'middle', 0.52);
+        label(k, 'normalden uzaklaşır', px + fs * 0.8, ny + fs * 1.7, 'left', 'middle', 0.6);
+    }
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                'Görünen derinlik: balık gerçekte nerede?',
+                'Görünen derinlik',
+            ],
+            r.w - fs * 3,
+            0.8
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8
+    );
+    k.c.restore();
+};
+
+const depthGeom = (r: Rect) => {
+    const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+    const stage: Rect = { x: r.x + fs * 0.5, y: r.y + fs * 2.2, w: r.w * 0.62, h: r.h - fs * 3.2 };
+    const sy = stage.y + stage.h * 0.36;
+    const by = stage.y + stage.h * 0.96;
+    return { fs, stage, sy, unit: (by - sy) / 5.4, ox: stage.x + stage.w * 0.28 };
+};
+
+export const apparentDepthSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = depthState(o);
+        const g = depthGeom(r);
+        return [
+            {
+                id: 'med',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: `Ortamı değiştir (şimdi ${DEPTH_MEDIA[s.medium].name.toLowerCase()})`,
+                on: s.medium > 0,
+            },
+            {
+                id: 'h',
+                x: g.ox,
+                y: g.sy + s.h * g.unit,
+                type: 'drag',
+                label: 'Balığı derine indir ya da yüzeye çıkar',
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const s = depthState(o);
+        if (id === 'med') return { med: (s.medium + 1) % DEPTH_MEDIA.length };
+        if (id === 'h' && p) {
+            const g = depthGeom(r);
+            return { h: clamp((p.y - g.sy) / g.unit, 1, 5) };
+        }
+        return {};
+    },
+    params: [
+        { key: 'h', label: 'Gerçek derinlik h (birim)', min: 1, max: 5, step: 0.5 },
+        { key: 'med', label: 'Ortam (0 su · 1 cam)', min: 0, max: 1, step: 1 },
+    ],
+};
+
 export const OPTICS_SIM_RENDERERS: Record<string, Renderer> = {
     eye_defect_sim: eyeDefectRender,
+    apparent_depth_sim: apparentDepthRender,
 };
 
 export const OPTICS_SIM_SPECS: Record<string, SimSpec> = {
     eye_defect_sim: eyeDefectSpec,
+    apparent_depth_sim: apparentDepthSpec,
 };
 
 export const OPTICS_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -380,5 +673,12 @@ export const OPTICS_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Miyop ve hipermetropta odak nerede? Gözlük camını tak, izle',
         size: { w: 580, h: 360 },
         defaults: { labels: true, sim: { defect: 1, glass: 0 } },
+    },
+    {
+        kind: 'apparent_depth_sim',
+        label: 'Görünen Derinlik',
+        hint: 'Sudaki balık neden olduğundan yukarıda görünür?',
+        size: { w: 600, h: 400 },
+        defaults: { labels: true, sim: { h: 3, med: 0 } },
     },
 ];
