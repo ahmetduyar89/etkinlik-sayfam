@@ -647,7 +647,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         .filter((id): id is string => !!id);
                     strokesRef.current = strokesRef.current.filter((_, i) => !idxs.has(i));
                     commitStrokes();
-                    emit({ type: 'remove', page: currentPageRef.current, ids: removed });
+                    if (removed.length)
+                        emit({ type: 'remove', page: currentPageRef.current, ids: removed });
                     deselect();
                     redraw();
                 },
@@ -1473,11 +1474,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     // Taşıma/boyutlandırma bittiğinde son hâl yayınlanır;
                     // hareket boyunca her kare için yayın yapılmaz.
                     const moved = new Set(selectedIdxsRef.current);
-                    emit({
-                        type: 'update',
-                        page: currentPageRef.current,
-                        strokes: strokesRef.current.filter((_, i) => moved.has(i)),
-                    });
+                    const changed = strokesRef.current.filter((_, i) => moved.has(i));
+                    if (changed.length)
+                        emit({ type: 'update', page: currentPageRef.current, strokes: changed });
                 }
                 return;
             }
@@ -1490,13 +1489,17 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 if (erasedRef.current) {
                     erasedRef.current = false;
                     if (config.eraserMode === 'stroke') {
-                        emit({
-                            type: 'remove',
-                            page: currentPageRef.current,
-                            ids: erasedIdsRef.current,
-                        });
+                        if (erasedIdsRef.current.length)
+                            emit({
+                                type: 'remove',
+                                page: currentPageRef.current,
+                                ids: erasedIdsRef.current,
+                            });
                     } else {
+                        // Piksel silgisi çizgileri bölerek kopyaladığı için
+                        // kimlikler tekrar edebilir; önce benzersizleştirilir.
                         strokesRef.current = withIds(strokesRef.current);
+                        commitStrokes();
                         emitPage();
                     }
                     erasedIdsRef.current = [];

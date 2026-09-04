@@ -129,8 +129,13 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const collabAtRef = React.useRef(0);
     /** Ortak çizim göstergesi (şeritte "birlikte çiziliyor" rozeti). */
     const [collab, setCollab] = React.useState(false);
+    /** Tam eşitlemeyi sayaçtan çağırmak için (tanım sırası nedeniyle). */
+    const applyRemoteRef = React.useRef<(() => Promise<void>) | null>(null);
     /** `save` içinden yeniden kayıt planlamak için (tanım sırası nedeniyle). */
     const scheduleSaveRef = React.useRef<(() => void) | null>(null);
+    /** Yayını bekleyen yapışkan not durumu (seyreltme için). */
+    const pendingBoxesRef = React.useRef<{ page: number; boxes: TextBoxData[] } | null>(null);
+    const boxTimerRef = React.useRef<number | null>(null);
 
     const [title, setTitle] = React.useState(notebook.title);
     const [paper, setPaper] = React.useState<PaperStyle>(
@@ -313,12 +318,35 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         [notebook.id]
     );
 
+    /**
+     * Yapışkan not yayınını seyreltir: metin kutusuna yazarken her tuş
+     * vuruşu bir kayıt üretirdi. Son hâl her zaman gönderilir.
+     */
+    const publishBoxes = React.useCallback(
+        (page: number, boxes: TextBoxData[]) => {
+            pendingBoxesRef.current = { page, boxes };
+            if (boxTimerRef.current) return;
+            boxTimerRef.current = window.setTimeout(() => {
+                boxTimerRef.current = null;
+                const pending = pendingBoxesRef.current;
+                pendingBoxesRef.current = null;
+                if (pending) handleLocalOp({ type: 'boxes', ...pending });
+            }, 400);
+        },
+        [handleLocalOp]
+    );
+
     React.useEffect(() => {
         if (isLoading) return;
         // Kapanmış sekmelerden kalan işlem kayıtlarını topla.
         void pruneOps(notebook.id);
         return watchOps(notebook.id, (ops) => {
             canvasRef.current?.applyOps(ops);
+            // Gelen çizimi bu cihaz da kaydeder: karşı sekme kaydetmeden
+            // kapanırsa çizim yalnızca geçici işlem kaydında kalırdı.
+            // Kirli sayıldığı için anlık görüntü tazelemesi de atlanır —
+            // zaten işlem akışıyla senkronuz.
+            scheduleSaveRef.current?.();
             // Metin kutuları tuvalde değil, bu bileşende tutulur.
             for (const op of ops) {
                 if (op.type !== 'boxes') continue;
@@ -334,11 +362,14 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         });
     }, [isLoading, notebook.id]);
 
-    // Ortak çizim rozetini bir süre sessizlikten sonra söndür.
+    // Ortak çizim durunca rozeti söndür ve içeriği bir kez tam eşitle:
+    // akış sırasında atlanan anlık görüntü tazelemesi burada telafi edilir.
     React.useEffect(() => {
         if (!collab) return;
         const timer = window.setInterval(() => {
-            if (Date.now() - collabAtRef.current > 20000) setCollab(false);
+            if (Date.now() - collabAtRef.current <= 20000) return;
+            setCollab(false);
+            if (!dirtyRef.current) void applyRemoteRef.current?.();
         }, 5000);
         return () => window.clearInterval(timer);
     }, [collab]);
@@ -378,6 +409,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             applyingRef.current = false;
         }
     }, [notebook.id, toast]);
+    applyRemoteRef.current = applyRemote;
 
     React.useEffect(() => {
         if (isLoading || saveBlockRef.current === 'load') return;
@@ -387,6 +419,10 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         // Kaydedilmemiş çizim varken ekranı değiştirmek çizimi silmek olurdu;
         // bu durum ilk kayıt denemesinde çakışma olarak kullanıcıya sorulur.
         if (dirtyRef.current) return;
+        // Ortak çizim sürerken içerik zaten işlem akışıyla senkron; her
+        // kayıtta tüm sayfaları yeniden indirmek boşuna trafik olurdu.
+        // Akış susunca yukarıdaki sayaç bir kez tam eşitleme yapar.
+        if (Date.now() - collabAtRef.current < 20000) return;
         // Karşı taraf yazarken sürüm saniyede bir artar; art arda gelen
         // değişiklikler için tek bir tazeleme yeter.
         if (remoteTimerRef.current) window.clearTimeout(remoteTimerRef.current);
@@ -450,6 +486,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             }
             if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
             if (remoteTimerRef.current) window.clearTimeout(remoteTimerRef.current);
+            if (boxTimerRef.current) window.clearTimeout(boxTimerRef.current);
         },
         []
     );
@@ -588,8 +625,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             next[page] = boxes;
             return next;
         });
-        // Yapışkan notlar da diğer cihazlara anında gitsin.
-        handleLocalOp({ type: 'boxes', page, boxes });
+        // Yapışkan notlar da diğer cihazlara gitsin.
+        publishBoxes(page, boxes);
         scheduleSave();
     };
 

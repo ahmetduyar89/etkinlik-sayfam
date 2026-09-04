@@ -50,6 +50,10 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
     const [view, setView] = React.useState<Viewport>({ scale: 1, tx: 0, ty: 0 });
     const [canvasSize, setCanvasSize] = React.useState({ w: 0, h: 0 });
     const [error, setError] = React.useState<string | null>(null);
+    /** Son canlı işlemin zamanı: akış sürerken tam içerik indirilmez. */
+    const lastOpAtRef = React.useRef(0);
+    /** Akış yüzünden ertelenen sürüm; akış susunca indirilir. */
+    const pendingRevRef = React.useRef<number | null>(null);
 
     // Defterin üst verisi canlı dinlenir: öğretmen tahtaya yazıp içerik
     // kaydedildiğinde `content_rev` artar ve sayfa verisi yeniden çekilir.
@@ -112,16 +116,34 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
                 if (timer) window.clearTimeout(timer);
                 timer = window.setTimeout(() => {
                     timer = null;
-                    if (!loading) void refresh(rev);
+                    if (loading) return;
+                    // Canlı işlem akışı sürerken ekran zaten güncel; ağır
+                    // sayfa verisi akış susunca indirilir.
+                    if (Date.now() - lastOpAtRef.current < 20000) {
+                        // Akış susunca bu sürüm yine de indirilecek.
+                        pendingRevRef.current = rev;
+                        return;
+                    }
+                    void refresh(rev);
                 }, 1500);
             },
             (e) => {
                 if (!cancelled) setError(firestoreErrorMessage(e, 'Defter yüklenemedi.'));
             }
         );
+        // Canlı akış susunca, akış sırasında atlanan sürüm bir kez indirilir:
+        // sayfa ekleme/silme gibi yapısal değişiklikler ancak böyle gelir.
+        const settle = window.setInterval(() => {
+            const rev = pendingRevRef.current;
+            if (rev === null || loading || Date.now() - lastOpAtRef.current < 20000) return;
+            pendingRevRef.current = null;
+            void refresh(rev);
+        }, 5000);
+
         return () => {
             cancelled = true;
             if (timer) window.clearTimeout(timer);
+            window.clearInterval(settle);
             unsub();
         };
     }, [notebookId]);
@@ -134,6 +156,7 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
         if (!ready) return;
         return watchOps(notebookId, (ops) => {
             canvasRef.current?.applyOps(ops);
+            lastOpAtRef.current = Date.now();
             for (const op of ops) {
                 if (op.type !== 'boxes') continue;
                 setBoxesByPage((prev) => {
