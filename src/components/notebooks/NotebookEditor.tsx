@@ -21,6 +21,7 @@ import {
     Save,
     Trash2,
     Undo2,
+    Users,
 } from 'lucide-react';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
 import { DrawingToolbar } from '../drawing/DrawingToolbar';
@@ -34,6 +35,7 @@ import { PAPER_STYLES, paperBackground } from './paper';
 import { PageThumbnails } from './PageThumbnails';
 import { importImageFile } from '../drawing/imageStore';
 import { measurePages } from './pageCodec';
+import { publishOp, pruneOps, watchOps } from './notebookOps';
 import {
     MAX_CONTENT_BYTES,
     NotebookConflictError,
@@ -55,6 +57,7 @@ import type {
     DrawingCanvasHandle,
     MathObject,
     Notebook,
+    NotebookOp,
     NotebookPage,
     PaperStyle,
     Stroke,
@@ -122,6 +125,12 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const remoteTimerRef = React.useRef<number | null>(null);
     /** "Başka cihazda güncellendi" bilgisini seyrek göstermek için. */
     const remoteToastAtRef = React.useRef(0);
+    /** Son uzak çizim işleminin zamanı: ortak çizim sürüyor mu. */
+    const collabAtRef = React.useRef(0);
+    /** Ortak çizim göstergesi (şeritte "birlikte çiziliyor" rozeti). */
+    const [collab, setCollab] = React.useState(false);
+    /** `save` içinden yeniden kayıt planlamak için (tanım sırası nedeniyle). */
+    const scheduleSaveRef = React.useRef<(() => void) | null>(null);
 
     const [title, setTitle] = React.useState(notebook.title);
     const [paper, setPaper] = React.useState<PaperStyle>(
@@ -253,8 +262,18 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         } catch (e) {
             setSaveState('idle');
             if (e instanceof NotebookConflictError) {
-                // Defter iki cihazda birden düzenleniyor. Otomatik kayıt durur;
-                // hangi sürümün kalacağına kullanıcı şerideki rozetten karar verir.
+                // Ortak çizim sürerken çakışma beklenen bir durumdur: iki
+                // taraf da aynı operasyonları uyguladığı için içerikler
+                // aynıdır, kaydı sunucudaki sürümün üstüne yazmak yeterli.
+                if (Date.now() - collabAtRef.current < 20000) {
+                    revRef.current = e.serverRev;
+                    forceSaveRef.current = true;
+                    scheduleSaveRef.current?.();
+                    return;
+                }
+                // Ortak çizim yoksa defter başka bir cihazda ayrıca
+                // düzenlenmiş demektir; hangi sürümün kalacağına kullanıcı
+                // şerideki rozetten karar verir.
                 setSaveBlock('conflict');
                 saveBlockRef.current = 'conflict';
                 if (conflictWarnedRef.current) return;
@@ -282,6 +301,47 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             );
         }
     }, [collectPages, notebook.id, toast]);
+
+    // ── Ortak çizim ──────────────────────────────────────────────────
+    // Anlık görüntü saniyeler arayla yazılır; o kadar beklemek "aynı anda
+    // çizme" hissini yok eder. Bu yüzden her değişiklik ayrıca küçük bir
+    // operasyon olarak yayınlanır ve karşı tuvale hemen uygulanır.
+    const handleLocalOp = React.useCallback(
+        (op: NotebookOp) => {
+            void publishOp(notebook.id, op);
+        },
+        [notebook.id]
+    );
+
+    React.useEffect(() => {
+        if (isLoading) return;
+        // Kapanmış sekmelerden kalan işlem kayıtlarını topla.
+        void pruneOps(notebook.id);
+        return watchOps(notebook.id, (ops) => {
+            canvasRef.current?.applyOps(ops);
+            // Metin kutuları tuvalde değil, bu bileşende tutulur.
+            for (const op of ops) {
+                if (op.type !== 'boxes') continue;
+                setBoxesByPage((prev) => {
+                    const next = [...prev];
+                    while (next.length <= op.page) next.push([]);
+                    next[op.page] = op.boxes;
+                    return next;
+                });
+            }
+            collabAtRef.current = Date.now();
+            setCollab(true);
+        });
+    }, [isLoading, notebook.id]);
+
+    // Ortak çizim rozetini bir süre sessizlikten sonra söndür.
+    React.useEffect(() => {
+        if (!collab) return;
+        const timer = window.setInterval(() => {
+            if (Date.now() - collabAtRef.current > 20000) setCollab(false);
+        }, 5000);
+        return () => window.clearInterval(timer);
+    }, [collab]);
 
     // ── Canlı senkron ────────────────────────────────────────────────
     // Defter üst verisi (`notebooks/{id}`) zaten canlı dinleniyor; içerik
@@ -336,15 +396,31 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         }, 1500);
     }, [applyRemote, isLoading, notebook.content_rev, notebook.content_writer]);
 
+    /**
+     * Sayfa yapısı değişimlerinde kullanılır: metin kutusu durumu bir sonraki
+     * render'da güncellendiği için kayıt bir tık sonraya bırakılır, ama
+     * otomatik kaydın 1,2 saniyesi beklenmez — diğer cihaz yeni sayfa
+     * düzenini hemen görsün.
+     */
+    const saveSoon = React.useCallback(() => {
+        window.setTimeout(() => void save(), 50);
+    }, [save]);
+
     const scheduleSave = React.useCallback(() => {
         if (isLoading) return;
         dirtyRef.current = true;
         if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = window.setTimeout(() => {
-            saveTimerRef.current = null;
-            void save();
-        }, 1200);
+        saveTimerRef.current = window.setTimeout(
+            () => {
+                saveTimerRef.current = null;
+                void save();
+            },
+            // Ortak çizimde canlılığı işlem akışı sağlar; anlık görüntü daha
+            // seyrek yazılır, iki cihaz birbirini sürekli tetiklemesin.
+            Date.now() - collabAtRef.current < 20000 ? 3000 : 1200
+        );
     }, [isLoading, save]);
+    scheduleSaveRef.current = scheduleSave;
 
     /** Çakışmayı kullanıcı çözer: kendi sürümünü yazar ya da diğerini alır. */
     const resolveConflict = React.useCallback(async () => {
@@ -504,19 +580,25 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const currentBoxes = boxesByPage[pageInfo.current] ?? [];
 
     const updateCurrentBoxes = (updater: (list: TextBoxData[]) => TextBoxData[]) => {
+        const page = pageInfo.current;
+        const boxes = updater(boxesRef.current[page] ?? []);
         setBoxesByPage((prev) => {
             const next = [...prev];
-            while (next.length <= pageInfo.current) next.push([]);
-            next[pageInfo.current] = updater(next[pageInfo.current] ?? []);
+            while (next.length <= page) next.push([]);
+            next[page] = boxes;
             return next;
         });
+        // Yapışkan notlar da diğer cihazlara anında gitsin.
+        handleLocalOp({ type: 'boxes', page, boxes });
         scheduleSave();
     };
 
     const handleAddPage = () => {
         setBoxesByPage((prev) => [...prev, []]);
         canvasRef.current?.addPage();
-        scheduleSave();
+        // Sayfa yapısı işlem akışıyla değil, anlık görüntüyle paylaşılır;
+        // diğer cihaz beklemesin diye hemen yazılır.
+        saveSoon();
     };
 
     /**
@@ -540,7 +622,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             return next;
         });
         canvasRef.current?.deletePage();
-        scheduleSave();
+        // Sayfa yapısı anlık görüntüyle paylaşılır; hemen yazılır.
+        saveSoon();
     };
 
     const handleDuplicatePage = (index: number) => {
@@ -555,7 +638,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             return next;
         });
         canvasRef.current?.duplicatePage();
-        scheduleSave();
+        // Sayfa yapısı anlık görüntüyle paylaşılır; hemen yazılır.
+        saveSoon();
     };
 
     const handleMovePage = (from: number, to: number) => {
@@ -568,7 +652,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             return next;
         });
         canvasRef.current?.movePage(from, to);
-        scheduleSave();
+        // Sayfa yapısı anlık görüntüyle paylaşılır; hemen yazılır.
+        saveSoon();
     };
 
     const handleTitleCommit = () => {
@@ -722,6 +807,15 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 </div>
 
                 <div className="ml-auto flex items-center gap-1.5">
+                    {/* Ortak çizim: başka bir cihaz da bu deftere yazıyor */}
+                    {collab && (
+                        <span
+                            className="hidden sm:flex items-center gap-1.5 text-[12px] font-semibold text-white bg-emerald-600/90 rounded-lg px-2 py-1"
+                            title="Bu deftere başka bir cihazdan da çiziliyor; değişiklikler anında paylaşılıyor."
+                        >
+                            <Users className="w-3.5 h-3.5" /> Birlikte çiziliyor
+                        </span>
+                    )}
                     {/* Kayıt durumu */}
                     {saveBlock === 'conflict' ? (
                         <button
@@ -906,6 +1000,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             bgColor={bgColor}
                             initialPages={initialStrokes}
                             onDirty={scheduleSave}
+                            onLocalOp={handleLocalOp}
                             onHistoryChange={(canUndo, canRedo) =>
                                 setHistory({ canUndo, canRedo })
                             }

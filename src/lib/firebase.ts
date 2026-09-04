@@ -11,6 +11,8 @@ import {
     setDoc,
     query,
     orderBy,
+    limit as queryLimit,
+    getDocs,
     Timestamp,
     DocumentReference,
     runTransaction,
@@ -136,6 +138,76 @@ export async function saveDocsTransaction(
         }
         return true;
     });
+}
+
+/**
+ * Bir dokümanın alt koleksiyonunu canlı dinler ve YALNIZCA yeni eklenen
+ * dokümanları bildirir. İlk anlık görüntü atlanır: çağıran taraf zaten
+ * güncel durumu ayrıca yüklemiştir, geçmiş kayıtları tekrar uygulamamalıdır.
+ */
+export function watchNewDocs<T>(
+    path: [string, string, string],
+    options: { orderBy: string; limit: number },
+    onAdded: (docs: T[]) => void,
+    onError?: (e: Error) => void
+): () => void {
+    const [parent, parentId, sub] = path;
+    const q = query(
+        collection(db, parent, parentId, sub),
+        orderBy(options.orderBy, 'desc'),
+        queryLimit(options.limit)
+    );
+    let first = true;
+    return onSnapshot(
+        q,
+        (snap) => {
+            if (first) {
+                first = false;
+                return;
+            }
+            const added = snap
+                .docChanges()
+                .filter((c) => c.type === 'added')
+                .map((c) => ({ id: c.doc.id, ...c.doc.data() } as unknown as T));
+            if (added.length) onAdded(added);
+        },
+        (error) => onError?.(error)
+    );
+}
+
+/** Alt koleksiyona doküman ekler ve id'sini döner. */
+export async function addSubDoc(
+    path: [string, string, string],
+    data: Record<string, unknown>
+): Promise<string> {
+    const [parent, parentId, sub] = path;
+    const ref = await addDoc(collection(db, parent, parentId, sub), data);
+    return ref.id;
+}
+
+/** Alt koleksiyondaki dokümanları (sıralı, sınırlı) tek seferlik okur. */
+export async function fetchSubDocs<T>(
+    path: [string, string, string],
+    options: { orderBy: string; limit: number }
+): Promise<T[]> {
+    const [parent, parentId, sub] = path;
+    const snap = await getDocs(
+        query(
+            collection(db, parent, parentId, sub),
+            orderBy(options.orderBy, 'desc'),
+            queryLimit(options.limit)
+        )
+    );
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as unknown as T));
+}
+
+/** Alt koleksiyondaki dokümanı siler. */
+export async function deleteSubDoc(
+    path: [string, string, string],
+    id: string
+): Promise<void> {
+    const [parent, parentId, sub] = path;
+    await deleteDoc(doc(db, parent, parentId, sub, id));
 }
 
 /** Dokümanı id ile siler. */

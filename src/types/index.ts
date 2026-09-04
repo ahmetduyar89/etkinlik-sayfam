@@ -88,6 +88,12 @@ export interface BoundingBox {
 }
 
 export interface Stroke {
+    /**
+     * Çizime özgü kimlik. Ortak çizimde bir çizgiyi cihazlar arasında
+     * adlandırmak için gerekir (taşıma/silme/renk değişimi bu kimliğe
+     * dayanır). Eski kayıtlarda yoktur; yüklenirken atanır.
+     */
+    id?: string;
     tool: DrawingTool;
     color: string;
     width?: number;
@@ -358,11 +364,42 @@ export interface DrawingCanvasHandle {
     getPages: () => Stroke[][];
     /** Kayıtlı sayfa verisini canvas'a yükler. */
     loadPages: (pages: Stroke[][]) => void;
+    /** Başka bir cihazdan gelen değişiklikleri uygular (ortak çizim). */
+    applyOps: (ops: NotebookOp[]) => void;
     /**
      * Sayfayı PNG olarak indirir. `paper` verilirse kağıt deseni de çizilir —
      * desen ekranda CSS arka planı olduğundan aksi hâlde çıktıda görünmez.
      */
     screenshot: (wbMode: boolean, color: string, paper?: PaperStyle) => void;
+}
+
+// ── Ortak çizim (canlı operasyon akışı) ─────────────────────────────────
+/**
+ * Bir cihazın yaptığı değişikliğin diğer cihazlara iletilen hâli. Kalıcı
+ * kayıt yine tam sayfa anlık görüntüsüdür (bkz. notebookContent.ts);
+ * operasyonlar yalnızca "şu anda" olan biteni taşır.
+ */
+export type NotebookOp =
+    /** Sayfaya yeni çizimler eklendi. */
+    | { type: 'add'; page: number; strokes: Stroke[] }
+    /** Bu kimlikli çizimler silindi. */
+    | { type: 'remove'; page: number; ids: string[] }
+    /** Bu çizimler değişti (taşındı, boyutlandı, rengi değişti). */
+    | { type: 'update'; page: number; strokes: Stroke[] }
+    /** Sayfanın tamamı değişti (geri al, temizle, piksel silgisi). */
+    | { type: 'page_set'; page: number; strokes: Stroke[] }
+    /** Sayfanın metin kutuları değişti. */
+    | { type: 'boxes'; page: number; boxes: TextBoxData[] };
+
+/** Firestore'a yazılan operasyon dokümanı. */
+export interface NotebookOpDoc {
+    id: string;
+    /** Operasyonun kendisi (JSON olarak; Firestore iç içe dizi tutmaz). */
+    op_json: string;
+    /** Yayınlayan sekmenin kimliği; kendi operasyonumuzu geri uygulamayız. */
+    writer: string;
+    /** Yayın zamanı (istemci saati, ms). Sıralama ve temizlik için. */
+    at: number;
 }
 
 export type ToastVariant = 'success' | 'error' | 'info';

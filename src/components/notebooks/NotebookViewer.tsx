@@ -12,6 +12,7 @@ import { TextBoxLayer } from '../tools/TextBoxLayer';
 import { FullscreenToggle } from '../common/FullscreenToggle';
 import { watchDocById } from '../../lib/firebase';
 import { loadNotebookPages } from './notebookContent';
+import { watchOps } from './notebookOps';
 import { paperBackground } from './paper';
 import { firestoreErrorMessage } from './errors';
 import type {
@@ -124,6 +125,27 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
             unsub();
         };
     }, [notebookId]);
+
+    // Ortak çizim akışı: öğretmen tahtaya yazdıkça çizgiler anında burada da
+    // belirir. Anlık görüntü senkronu (yukarıdaki dinleyici) daha yavaştır ve
+    // arada kaçan bir işlem olursa ekranı yine eşitler.
+    const ready = pages !== null;
+    React.useEffect(() => {
+        if (!ready) return;
+        return watchOps(notebookId, (ops) => {
+            canvasRef.current?.applyOps(ops);
+            for (const op of ops) {
+                if (op.type !== 'boxes') continue;
+                setBoxesByPage((prev) => {
+                    const next = [...prev];
+                    while (next.length <= op.page) next.push([]);
+                    next[op.page] = op.boxes;
+                    return next;
+                });
+            }
+        });
+        // Tuval yalnızca ilk yükleme bittikten sonra var olur.
+    }, [notebookId, ready]);
 
     // Öğrenci sayfalar arasında ok tuşlarıyla da gezebilsin.
     React.useEffect(() => {

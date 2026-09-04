@@ -30,5 +30,9 @@ service cloud.firestore {
         match /notebook_content/{document=**} {
             allow read, write: if true;
         }
+        // Ortak çizimin canlı işlem akışı (geçici kayıtlar)
+        match /notebook_ops/{document=**} {
+            allow read, write: if true;
+        }
     }
 }
