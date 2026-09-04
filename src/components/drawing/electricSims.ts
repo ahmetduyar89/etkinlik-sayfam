@@ -1,11 +1,14 @@
 // src/components/drawing/electricSims.ts
-// Elektrik konularının simülasyonları. Şimdilik elektroskop.
+// Elektrik konularının simülasyonları: elektroskop ve yükler arası kuvvet.
 
 import type { MathObject } from '../../types';
 import {
+    arrow,
     clamp,
     clampInt,
+    fillShape,
     fitText,
+    fmtNum,
     isIconSize,
     label,
     line,
@@ -334,12 +337,256 @@ export const electroscopeSpec: SimSpec = {
 
 // ── Kayıt ────────────────────────────────────────────────────────────
 
+// ── Yükler arası kuvvet (Elektriklenme) ──────────────────────────────
+//
+// Kilit fikir: aynı işaretli yükler birbirini iter, zıt işaretliler
+// çeker. Kuvvetin büyüklüğü yüklerin çarpımıyla doğru, uzaklığın
+// KARESİYLE ters orantılıdır — uzaklık iki katına çıkınca kuvvet dörtte
+// bire iner. İki küreye etkiyen kuvvetler eşit büyüklükte ve zıt yönlüdür.
+
+const COULOMB_STEPS = [-2, -1, 0, 1, 2] as const;
+
+interface CoulombState {
+    q1: number;
+    q2: number;
+    /** Küre merkezleri arası uzaklık (birim). */
+    d: number;
+    /** Bağıl kuvvet büyüklüğü (birim). */
+    f: number;
+    attract: boolean;
+    zero: boolean;
+}
+
+const coulombState = (o: MathObject): CoulombState => {
+    const q1 = clampInt(simValue(o, 'q1', 2), -2, 2, 2);
+    const q2 = clampInt(simValue(o, 'q2', -1), -2, 2, -1);
+    const d = clamp(simValue(o, 'd', 3), 1, 6);
+    const prod = q1 * q2;
+    return { q1, q2, d, f: Math.abs(prod) / (d * d), attract: prod < 0, zero: prod === 0 };
+};
+
+/** Yüklü küre: sehpası, yük işaretleri ve parlaklığıyla. */
+function chargedSphere(k: Ctx, cx: number, cy: number, R: number, q: number, fs: number, icon: boolean) {
+    // Yalıtkan sehpa
+    if (!icon) {
+        line(k, cx, cy + R, cx, cy + R * 2.1, Math.max(1.6, k.lw));
+        line(k, cx - R * 0.7, cy + R * 2.1, cx + R * 0.7, cy + R * 2.1, Math.max(2, k.lw * 1.2));
+    }
+    fillShape(k, () => k.c.arc(cx, cy, R, 0, Math.PI * 2), 0.1);
+    k.c.beginPath();
+    k.c.lineWidth = Math.max(1.8, k.lw);
+    k.c.arc(cx, cy, R, 0, Math.PI * 2);
+    k.c.stroke();
+    // Parlama
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.3);
+    k.c.beginPath();
+    k.c.lineWidth = 1.4;
+    k.c.arc(cx, cy, R * 0.68, Math.PI * 1.05, Math.PI * 1.5);
+    k.c.stroke();
+    k.c.restore();
+    if (icon) return;
+
+    const n = Math.abs(q);
+    const sign = q > 0 ? 1 : -1;
+    const marks = n === 0 ? 2 : n * 2;
+    for (let i = 0; i < marks; i++) {
+        const a = (i / marks) * Math.PI * 2 + 0.5;
+        const mx = cx + Math.cos(a) * R * 0.52;
+        const my = cy + Math.sin(a) * R * 0.52;
+        const sg = n === 0 ? (i % 2 === 0 ? 1 : -1) : sign;
+        const sz = fs * 0.3;
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, n === 0 ? 0.5 : 0.9);
+        line(k, mx - sz, my, mx + sz, my, 1.8);
+        if (sg > 0) line(k, mx, my - sz, mx, my + sz, 1.8);
+        k.c.restore();
+    }
+}
+
+export const coulombRender: Renderer = (k) => {
+    const r = k.r;
+    const s = coulombState(k.o);
+    const icon = isIconSize(r);
+    const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineJoin = 'round';
+
+    const stage: Rect = icon
+        ? r
+        : { x: r.x + fs * 0.5, y: r.y + fs * 2.2, w: r.w * 0.63, h: r.h - fs * 3.4 };
+    const cy = stage.y + stage.h * (icon ? 0.5 : 0.42);
+    const R = Math.min(stage.h * 0.17, stage.w * 0.1);
+    const unit = (stage.w - R * 2.6) / 6;
+    const x1 = stage.x + R * 1.3;
+    const x2 = x1 + s.d * unit;
+
+    chargedSphere(k, x1, cy, R, s.q1, fs, icon);
+    chargedSphere(k, x2, cy, R, s.q2, fs, icon);
+
+    // Kuvvet okları: eşit büyüklükte, zıt yönlü
+    const maxLen = Math.min(unit * 1.6, stage.w * 0.22);
+    const len = s.zero ? 0 : clamp(s.f / 4, 0.12, 1) * maxLen;
+    if (!s.zero) {
+        k.c.save();
+        k.c.strokeStyle = k.color;
+        const w = Math.max(2.2, k.lw * 1.5);
+        if (s.attract) {
+            arrow(k, x1 + R * 1.1, cy, x1 + R * 1.1 + len, cy, fs * 0.5, w);
+            arrow(k, x2 - R * 1.1, cy, x2 - R * 1.1 - len, cy, fs * 0.5, w);
+        } else {
+            arrow(k, x1 - R * 1.1, cy, x1 - R * 1.1 - len, cy, fs * 0.5, w);
+            arrow(k, x2 + R * 1.1, cy, x2 + R * 1.1 + len, cy, fs * 0.5, w);
+        }
+        k.c.restore();
+    }
+
+    if (icon) {
+        k.c.restore();
+        return;
+    }
+
+    // Uzaklık ölçüsü
+    const my = cy + R * 2.9;
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.6);
+    line(k, x1, cy + R * 2.2, x1, my + fs * 0.4, 1);
+    line(k, x2, cy + R * 2.2, x2, my + fs * 0.4, 1);
+    arrow(k, x1, my, x2, my, fs * 0.4, 1.3);
+    arrow(k, x2, my, x1, my, fs * 0.4, 1.3);
+    k.c.restore();
+    label(k, `d = ${fmtNum(s.d, 1)} birim`, (x1 + x2) / 2, my + fs * 0.55, 'center', 'top', 0.58);
+    label(k, `q₁ = ${s.q1 > 0 ? '+' : ''}${s.q1}`, x1, cy - R * 1.35, 'center', 'bottom', 0.62);
+    label(k, `q₂ = ${s.q2 > 0 ? '+' : ''}${s.q2}`, x2, cy - R * 1.35, 'center', 'bottom', 0.62);
+
+    if (k.o.labels !== false) {
+        const px = r.x + r.w * 0.65;
+        const pw = r.w - (px - r.x) - fs * 0.4;
+        const py = r.y + fs * 2.2;
+        const ph = fs * 8;
+        panel(k, px, py, pw, ph);
+        label(k, 'F = k · q₁ · q₂ / d²', px + fs * 0.6, py + fs * 1, 'left', 'middle', 0.64);
+        const rows: ReadonlyArray<[string, string]> = [
+            ['Yükler', `${s.q1 > 0 ? '+' : ''}${s.q1} ve ${s.q2 > 0 ? '+' : ''}${s.q2}`],
+            ['Uzaklık', `${fmtNum(s.d, 1)} birim`],
+            ['Kuvvet', s.zero ? 'yok (yük sıfır)' : `${fmtNum(s.f, 2)} birim`],
+        ];
+        rows.forEach(([a, b], i) => {
+            const y = py + fs * (2.5 + i * 1.5);
+            label(k, a, px + fs * 0.6, y, 'left', 'middle', 0.52);
+            label(k, fitText(k, [b], pw - fs * 1.1, 0.6), px + fs * 0.6, y + fs * 0.72, 'left', 'middle', 0.6);
+        });
+        label(
+            k,
+            s.zero ? 'Kuvvet oluşmaz' : s.attract ? 'ZIT yükler → ÇEKME' : 'AYNI yükler → İTME',
+            px + fs * 0.6,
+            py + fs * 7.2,
+            'left',
+            'middle',
+            0.66
+        );
+
+        // Kural şeridi
+        const ny = py + ph + fs * 0.8;
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.5);
+        roundRect(k, px + fs * 0.4, ny, pw - fs * 0.8, fs * 2.5, 5);
+        k.c.lineWidth = 1;
+        k.c.stroke();
+        k.c.restore();
+        label(k, 'Uzaklık 2 katına çıkarsa', px + fs * 0.8, ny + fs * 0.8, 'left', 'middle', 0.52);
+        label(k, 'kuvvet 1/4’e iner', px + fs * 0.8, ny + fs * 1.7, 'left', 'middle', 0.6);
+    }
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                'Yükler arası kuvvet: çarpımla doğru, uzaklığın karesiyle ters orantılı',
+                'Yükler arası kuvvet: F = k · q₁ · q₂ / d²',
+                'Yükler arası kuvvet',
+            ],
+            r.w - fs * 3,
+            0.8
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8
+    );
+    k.c.restore();
+};
+
+const coulombGeom = (r: Rect) => {
+    const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+    const stage: Rect = { x: r.x + fs * 0.5, y: r.y + fs * 2.2, w: r.w * 0.63, h: r.h - fs * 3.4 };
+    const R = Math.min(stage.h * 0.17, stage.w * 0.1);
+    return { fs, stage, R, cy: stage.y + stage.h * 0.42, unit: (stage.w - R * 2.6) / 6, x1: stage.x + R * 1.3 };
+};
+
+const nextCharge = (q: number) => COULOMB_STEPS[(COULOMB_STEPS.indexOf(q as -2) + 1) % COULOMB_STEPS.length];
+
+export const coulombSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = coulombState(o);
+        const g = coulombGeom(r);
+        return [
+            {
+                id: 'q1',
+                x: g.x1,
+                y: g.cy - g.R * 2.1,
+                type: 'toggle',
+                label: 'Sol kürenin yükünü değiştir',
+                on: s.q1 !== 0,
+            },
+            {
+                id: 'q2',
+                x: g.x1 + s.d * g.unit,
+                y: g.cy - g.R * 2.1,
+                type: 'toggle',
+                label: 'Sağ kürenin yükünü değiştir',
+                on: s.q2 !== 0,
+            },
+            {
+                id: 'd',
+                x: g.x1 + s.d * g.unit,
+                y: g.cy + g.R * 2.9,
+                type: 'drag',
+                label: 'Küreleri yaklaştır ya da uzaklaştır',
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const s = coulombState(o);
+        if (id === 'q1') return { q1: nextCharge(s.q1) };
+        if (id === 'q2') return { q2: nextCharge(s.q2) };
+        if (id === 'd' && p) {
+            const g = coulombGeom(r);
+            return { d: clamp((p.x - g.x1) / g.unit, 1, 6) };
+        }
+        return {};
+    },
+    params: [
+        { key: 'q1', label: 'Sol yük q₁', min: -2, max: 2, step: 1 },
+        { key: 'q2', label: 'Sağ yük q₂', min: -2, max: 2, step: 1 },
+        { key: 'd', label: 'Uzaklık d (birim)', min: 1, max: 6, step: 0.5 },
+    ],
+};
+
 export const ELECTRIC_SIM_RENDERERS: Record<string, Renderer> = {
     electroscope_sim: electroscopeRender,
+    coulomb_sim: coulombRender,
 };
 
 export const ELECTRIC_SIM_SPECS: Record<string, SimSpec> = {
     electroscope_sim: electroscopeSpec,
+    coulomb_sim: coulombSpec,
 };
 
 export const ELECTRIC_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -349,5 +596,12 @@ export const ELECTRIC_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Yüklü çubuğu yaklaştır ya da dokundur; yaprakları oku',
         size: { w: 540, h: 380 },
         defaults: { labels: true, sim: { q: 0, rod: -1, near: 0 } },
+    },
+    {
+        kind: 'coulomb_sim',
+        label: 'Yükler Arası Kuvvet',
+        hint: 'Yükleri ve uzaklığı değiştir: çekme mi itme mi, ne kadar?',
+        size: { w: 600, h: 360 },
+        defaults: { labels: true, sim: { q1: 2, q2: -1, d: 3 } },
     },
 ];

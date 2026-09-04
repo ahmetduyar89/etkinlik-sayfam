@@ -1009,7 +1009,7 @@ export const dnaReplicationRender: Renderer = (k) => {
         let baseB = DNA_PAIRS[i].b;
 
         // Hata onarım senaryoları (3. basamakta uygula)
-        let isErrorRung = i === 2 && errMode > 0;
+        const isErrorRung = i === 2 && errMode > 0;
         let showRepairStatus = false;
 
         if (isErrorRung) {

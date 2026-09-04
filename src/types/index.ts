@@ -266,6 +266,9 @@ export type MathObjectKind =
     | 'breathing_sim'
     | 'eye_defect_sim'
     | 'work_sim'
+    | 'newton_cannon_sim'
+    | 'water_cycle_sim'
+    | 'coulomb_sim'
     // ── 3D ve Gelişmiş Laboratuvar Simülasyonları ─────────────────────
     | 'solids_3d_sim'
     | 'seasons_3d_sim'
