@@ -51,6 +51,7 @@ import { CompassTool } from '../tools/CompassTool';
 import { NumberLineTool } from '../tools/NumberLineTool';
 import { MiniCalculatorTool } from '../tools/MiniCalculatorTool';
 import { PeriodicTableTool } from '../tools/PeriodicTableTool';
+import { Interactive3DStationTool } from '../tools/Interactive3DStationTool';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
@@ -174,12 +175,14 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const [showNumberLine, setShowNumberLine] = React.useState(false);
     const [showCalculator, setShowCalculator] = React.useState(false);
     const [showPeriodicTable, setShowPeriodicTable] = React.useState(false);
+    const [show3DStation, setShow3DStation] = React.useState(false);
 
     const handleSelectTool = (toolId: string) => {
         if (toolId === 'compass') setShowCompass(true);
         else if (toolId === 'numberLine' || toolId === 'number_line') setShowNumberLine(true);
         else if (toolId === 'calculator') setShowCalculator(true);
         else if (toolId === 'periodicTable' || toolId === 'periodic_table') setShowPeriodicTable(true);
+        else if (toolId === '3dStation' || toolId === '3d_station' || toolId === 'station_3d') setShow3DStation(true);
     };
 
     const boxesRef = React.useRef<TextBoxData[][]>([[]]);
@@ -1152,6 +1155,15 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             {showNumberLine && <NumberLineTool onClose={() => setShowNumberLine(false)} />}
             {showCalculator && <MiniCalculatorTool onClose={() => setShowCalculator(false)} />}
             {showPeriodicTable && <PeriodicTableTool onClose={() => setShowPeriodicTable(false)} />}
+            {show3DStation && (
+                <Interactive3DStationTool
+                    onClose={() => setShow3DStation(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('3D model görüntüsü tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
         </div>
     );
 }

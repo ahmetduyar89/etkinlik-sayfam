@@ -29,6 +29,54 @@ import {
 } from './dna3DSim';
 
 export const THREE_SIM_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
+    tool_3d_station: (k) => {
+        const { c, r } = k;
+        c.save();
+        c.strokeStyle = '#6366f1';
+        c.lineWidth = 1.8;
+        const cx = r.x + r.w / 2;
+        const cy = r.y + r.h / 2 - 4;
+        const s = Math.min(r.w, r.h) * 0.3;
+
+        // Üst yüz
+        c.beginPath();
+        c.moveTo(cx, cy - s);
+        c.lineTo(cx + s * 0.86, cy - s * 0.5);
+        c.lineTo(cx, cy);
+        c.lineTo(cx - s * 0.86, cy - s * 0.5);
+        c.closePath();
+        c.fillStyle = 'rgba(99, 102, 241, 0.3)';
+        c.fill();
+        c.stroke();
+
+        // Sol yüz
+        c.beginPath();
+        c.moveTo(cx - s * 0.86, cy - s * 0.5);
+        c.lineTo(cx, cy);
+        c.lineTo(cx, cy + s);
+        c.lineTo(cx - s * 0.86, cy + s * 0.5);
+        c.closePath();
+        c.fillStyle = 'rgba(168, 85, 247, 0.3)';
+        c.fill();
+        c.stroke();
+
+        // Sağ yüz
+        c.beginPath();
+        c.moveTo(cx + s * 0.86, cy - s * 0.5);
+        c.lineTo(cx, cy);
+        c.lineTo(cx, cy + s);
+        c.lineTo(cx + s * 0.86, cy + s * 0.5);
+        c.closePath();
+        c.fillStyle = 'rgba(236, 72, 153, 0.3)';
+        c.fill();
+        c.stroke();
+
+        c.font = 'bold 9px sans-serif';
+        c.fillStyle = '#818cf8';
+        c.textAlign = 'center';
+        c.fillText('3D LAB', cx, cy + s + 12);
+        c.restore();
+    },
     solids_3d_sim: renderSolids3D,
     seasons_3d_sim: renderSeasons3D,
     atom_3d_sim: renderAtom3D,
@@ -63,6 +111,13 @@ export const THREE_SIM_SPECS: Partial<Record<MathObjectKind, SimSpec>> = {
 };
 
 export const THREE_SIM_ITEMS: MathCatalogItem[] = [
+    {
+        kind: 'tool_3d_station',
+        label: '✨ 3D Laboratuvar İstasyonu',
+        hint: 'Kusursuz dokunmatik 3D döndürme, katı cisim açınımı, mevsimler, atom, DNA ve GeoGebra 3D',
+        size: { w: 480, h: 360 },
+        defaults: {},
+    },
     {
         kind: 'solids_3d_sim',
         label: '3D Katı Cisimler & Açınım',

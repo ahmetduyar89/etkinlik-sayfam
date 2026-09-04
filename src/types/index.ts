@@ -156,6 +156,7 @@ export type MathObjectKind =
     | 'tool_number_line'
     | 'tool_calculator'
     | 'tool_periodic_table'
+    | 'tool_3d_station'
     // ── Fen: laboratuvar ────────────────────────────────────────────
     | 'beaker'
     | 'flask'
