@@ -13,7 +13,7 @@ import {
     orderBy,
     Timestamp,
     DocumentReference,
-    writeBatch,
+    runTransaction,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -85,6 +85,20 @@ export async function fetchDocById<T>(
     return { id: snap.id, ...snap.data() } as unknown as T;
 }
 
+/** Tek bir dokümanı canlı dinler; abonelikten çıkma fonksiyonu döner. */
+export function watchDocById<T>(
+    collectionName: string,
+    id: string,
+    onUpdate: (data: T | null) => void,
+    onError?: (e: Error) => void
+): () => void {
+    return onSnapshot(
+        doc(db, collectionName, id),
+        (snap) => onUpdate(snap.exists() ? ({ id: snap.id, ...snap.data() } as unknown as T) : null),
+        (error) => onError?.(error)
+    );
+}
+
 /** Dokümanı id ile oluşturur veya birleştirerek günceller. */
 export async function saveDocById(
     collectionName: string,
@@ -94,19 +108,34 @@ export async function saveDocById(
     await setDoc(doc(db, collectionName, id), data, { merge: true });
 }
 
-/** Tek bir işlemde birden fazla dokümanı yazar veya siler (hepsi ya da hiçbiri). */
-export async function saveDocsBatch(
-    collectionName: string,
-    writes: { id: string; data?: Record<string, unknown> }[]
-): Promise<void> {
-    if (writes.length === 0) return;
-    const batch = writeBatch(db);
-    for (const w of writes) {
-        const ref = doc(db, collectionName, w.id);
-        if (w.data) batch.set(ref, w.data, { merge: true });
-        else batch.delete(ref);
-    }
-    await batch.commit();
+/** Bir işlemde yazılacak (veya `data` yoksa silinecek) doküman. */
+export interface DocWrite {
+    collection: string;
+    id: string;
+    data?: Record<string, unknown>;
+}
+
+/**
+ * Bir dokümanı işlem (transaction) içinde okur, yazılacakları ona bakarak
+ * hazırlar ve hepsini tek seferde yazar. `build` null dönerse hiçbir şey
+ * yazılmaz ve `false` döner — eşzamanlı düzenlemede kimin kazandığına çağıran
+ * karar verir. Okunan doküman küçük tutulmalıdır; her yazmada indirilir.
+ */
+export async function saveDocsTransaction(
+    read: { collection: string; id: string },
+    build: (current: Record<string, unknown> | null) => DocWrite[] | null
+): Promise<boolean> {
+    return runTransaction(db, async (tx) => {
+        const snap = await tx.get(doc(db, read.collection, read.id));
+        const writes = build(snap.exists() ? (snap.data() as Record<string, unknown>) : null);
+        if (!writes) return false;
+        for (const w of writes) {
+            const ref = doc(db, w.collection, w.id);
+            if (w.data) tx.set(ref, w.data, { merge: true });
+            else tx.delete(ref);
+        }
+        return true;
+    });
 }
 
 /** Dokümanı id ile siler. */

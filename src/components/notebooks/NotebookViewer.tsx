@@ -10,7 +10,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
 import { TextBoxLayer } from '../tools/TextBoxLayer';
 import { FullscreenToggle } from '../common/FullscreenToggle';
-import { fetchDocById } from '../../lib/firebase';
+import { watchDocById } from '../../lib/firebase';
 import { loadNotebookPages } from './notebookContent';
 import { paperBackground } from './paper';
 import { firestoreErrorMessage } from './errors';
@@ -50,27 +50,78 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
     const [canvasSize, setCanvasSize] = React.useState({ w: 0, h: 0 });
     const [error, setError] = React.useState<string | null>(null);
 
+    // Defterin üst verisi canlı dinlenir: öğretmen tahtaya yazıp içerik
+    // kaydedildiğinde `content_rev` artar ve sayfa verisi yeniden çekilir.
+    // Böylece öğrenci ekranı yenilemeden güncel tahtayı görür; ağır sayfa
+    // verisi ise yalnızca gerçekten değiştiğinde iner.
     React.useEffect(() => {
         let cancelled = false;
-        (async () => {
+        /** İçeriği en son hangi sürüm için indirdik. */
+        let loadedRev = -1;
+        let loading = false;
+        /** Art arda gelen değişiklikler için tek tazeleme (debounce). */
+        let timer: number | null = null;
+
+        const refresh = async (rev: number) => {
+            loading = true;
+            const isFirst = loadedRev < 0;
             try {
-                const meta = await fetchDocById<Notebook>('notebooks', notebookId);
+                const content = await loadNotebookPages(notebookId);
+                if (cancelled) return;
+                loadedRev = rev;
+                const strokes = content.pages.map((p) => p.strokes);
+                const page = canvasRef.current?.getCurrentPage() ?? 0;
+                setPages(strokes);
+                setBoxesByPage(content.pages.map((p) => p.boxes ?? []));
+                // İlk yüklemede tuval `initialPages` ile kurulur; sonrakiler
+                // tuvale doğrudan verilir ve öğrenci baktığı sayfada kalır.
+                if (!isFirst) {
+                    canvasRef.current?.loadPages(strokes);
+                    canvasRef.current?.goToPage(Math.min(page, strokes.length - 1));
+                }
+            } catch (e) {
+                // İlk yükleme başarısızsa ekran açılamaz; sonraki tazelemelerde
+                // eldeki sürüm gösterilmeye devam eder.
+                if (!cancelled && loadedRev < 0) {
+                    setError(firestoreErrorMessage(e, 'Defter yüklenemedi.'));
+                }
+            } finally {
+                loading = false;
+            }
+        };
+
+        const unsub = watchDocById<Notebook>(
+            'notebooks',
+            notebookId,
+            (meta) => {
                 if (cancelled) return;
                 if (!meta) {
                     setError('Bu defter bulunamadı. Bağlantı güncel olmayabilir.');
                     return;
                 }
                 setNotebook(meta);
-                const { pages: parsed } = await loadNotebookPages(notebookId);
-                if (cancelled) return;
-                setPages(parsed.map((p) => p.strokes));
-                setBoxesByPage(parsed.map((p) => p.boxes ?? []));
-            } catch (e) {
+                const rev = meta.content_rev ?? 0;
+                if (rev === loadedRev) return;
+                // Öğretmen yazarken sürüm saniyede bir artar; ilk açılış
+                // hemen, sonraki güncellemeler kısa bir beklemeyle yüklenir.
+                if (loadedRev < 0) {
+                    void refresh(rev);
+                    return;
+                }
+                if (timer) window.clearTimeout(timer);
+                timer = window.setTimeout(() => {
+                    timer = null;
+                    if (!loading) void refresh(rev);
+                }, 1500);
+            },
+            (e) => {
                 if (!cancelled) setError(firestoreErrorMessage(e, 'Defter yüklenemedi.'));
             }
-        })();
+        );
         return () => {
             cancelled = true;
+            if (timer) window.clearTimeout(timer);
+            unsub();
         };
     }, [notebookId]);
 

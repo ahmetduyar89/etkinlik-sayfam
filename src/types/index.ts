@@ -411,6 +411,14 @@ export interface Notebook {
     subject?: string;
     grade_level?: string;
     favorite?: boolean;
+    /**
+     * Sayfa içeriğinin sürüm numarası. Her kayıtta artar; editör ve
+     * görüntüleyici bu küçük üst veri dokümanını dinleyerek içeriğin başka
+     * bir cihazda değiştiğini ağır sayfa verisini indirmeden anlar.
+     */
+    content_rev?: number;
+    /** İçeriği en son yazan sekmenin kimliği (kendi yazımızı ayırt etmek için). */
+    content_writer?: string;
     updated_at?: string;
     created_at?: string;
 }
@@ -428,12 +436,16 @@ export interface NotebookPage {
  */
 export interface NotebookContent {
     id: string;
-    /** İçeriğin ilk parçası (tek parçalı defterlerde tamamı). */
-    pages_json?: string;
+    /** Sayfa içeriğinin sürüm numarası; eşzamanlı kayıtta çakışmayı yakalar. */
+    rev?: number;
+    /** İçeriği en son yazan sekmenin kimliği. */
+    writer?: string;
     /**
-     * İçerik kaç dokümana bölündü. 1 veya tanımsızsa içerik yalnızca
-     * `pages_json` alanındadır; büyükse `{id}__c1…` dokümanları eklenir.
+     * Eski düzende içeriğin tamamı buradaydı. Yeni kayıtlarda `null` yazılır;
+     * içerik `{id}__c0…` dokümanlarında durur.
      */
+    pages_json?: string | null;
+    /** İçerik kaç parça dokümana bölündü. */
     chunk_count?: number;
     /** `{id}__c…` dokümanlarında JSON'un o parçası. */
     chunk?: string;
