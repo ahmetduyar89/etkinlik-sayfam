@@ -807,6 +807,7 @@ import { SORTING_SIM_ITEMS, SORTING_SIM_RENDERERS, SORTING_SIM_SPECS } from './s
 import { TASK_SIM_ITEMS, TASK_SIM_RENDERERS, TASK_SIM_SPECS } from './taskSims';
 import { MATH_SIM_ITEMS, MATH_SIM_RENDERERS, MATH_SIM_SPECS } from './mathSims';
 import { SCIENCE_SIM_ITEMS, SCIENCE_SIM_RENDERERS, SCIENCE_SIM_SPECS } from './scienceSims';
+import { THREE_SIM_ITEMS, THREE_SIM_RENDERERS, THREE_SIM_SPECS } from './threeEngine';
 
 // ── Kayıt ────────────────────────────────────────────────────────────
 
@@ -828,6 +829,7 @@ export const SIM_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
     ...(ELECTRIC_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(OPTICS_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(SCIENCE_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
+    ...(THREE_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
 };
 
 export const SIM_SPECS: Partial<Record<MathObjectKind, SimSpec>> = {
@@ -848,9 +850,14 @@ export const SIM_SPECS: Partial<Record<MathObjectKind, SimSpec>> = {
     ...(ELECTRIC_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(OPTICS_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(SCIENCE_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
+    ...(THREE_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
 };
 
 export const SIM_CATEGORIES: ReadonlyArray<ObjectCategory> = [
+    {
+        label: '✨ Gerçek 3D & Lab',
+        items: THREE_SIM_ITEMS,
+    },
     {
         label: 'Canlı Simülasyonlar',
         items: [

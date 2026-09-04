@@ -265,7 +265,14 @@ export type MathObjectKind =
     | 'atom_models_sim'
     | 'breathing_sim'
     | 'eye_defect_sim'
-    | 'work_sim';
+    | 'work_sim'
+    // ── 3D ve Gelişmiş Laboratuvar Simülasyonları ─────────────────────
+    | 'solids_3d_sim'
+    | 'seasons_3d_sim'
+    | 'atom_3d_sim'
+    | 'dna_3d_sim'
+    | 'circuit_lab_sim'
+    | 'gears_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile
