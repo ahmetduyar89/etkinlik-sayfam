@@ -241,7 +241,12 @@ export type MathObjectKind =
     | 'spring_sim'
     | 'electromagnet_sim'
     | 'mass_conservation_sim'
-    | 'food_web_sim';
+    | 'food_web_sim'
+    | 'electroscope_sim'
+    | 'atom_models_sim'
+    | 'breathing_sim'
+    | 'eye_defect_sim'
+    | 'work_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile

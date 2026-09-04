@@ -5,16 +5,21 @@ import type { MathObject } from '../../types';
 import {
     arrow,
     clamp,
+    fillShape,
     clampInt,
     fitText,
     fmtNum,
     isIconSize,
     label,
     line,
+    panel,
     path,
     roundRect,
     simValue,
+    smooth,
+    smoothPath,
     withAlpha,
+    type Ctx,
     type MathCatalogItem,
     type Rect,
     type Renderer,
@@ -993,12 +998,307 @@ export const foodWebSpec: SimSpec = {
 
 // ── Kayıt ────────────────────────────────────────────────────────────
 
+// ── Solunum mekaniği (Vücudumuzdaki Sistemler) ───────────────────────
+//
+// Kilit fikir: soluk alıp verme kas hareketiyle olur. Diyafram kasılıp
+// düzleşince göğüs boşluğunun hacmi artar, akciğer içi basınç dış
+// basıncın altına düşer ve hava içeri girer. Gevşeyip kubbeleşince tam
+// tersi olur.
+
+interface BreathState {
+    /** 0 = tam soluk verme, 1 = tam soluk alma. */
+    p: number;
+    playing: boolean;
+    inhaling: boolean;
+}
+
+const breathState = (o: MathObject, t: number): BreathState => {
+    const playing = simValue(o, 'play', 0) > 0.5;
+    if (playing) {
+        const phase = (t * 0.28) % 1;
+        return { p: 0.5 - 0.5 * Math.cos(phase * Math.PI * 2), playing, inhaling: phase < 0.5 };
+    }
+    const p = clamp(simValue(o, 'p', 0), 0, 1);
+    return { p, playing, inhaling: p > 0.5 };
+};
+
+/** Akciğer dış hattı: birim ölçekte, sağ akciğer (izleyene göre solda). */
+const LUNG_R: ReadonlyArray<[number, number]> = [
+    [-0.14, -0.98],
+    [-0.52, -0.82],
+    [-0.82, -0.34],
+    [-0.92, 0.28],
+    [-0.78, 0.86],
+    [-0.36, 1.0],
+    [-0.14, 0.62],
+    [-0.06, 0.1],
+    [-0.05, -0.5],
+];
+
+/** Sol akciğer: kalp çentiği (medial kenarda girinti) vardır. */
+const LUNG_L: ReadonlyArray<[number, number]> = [
+    [0.14, -0.98],
+    [0.52, -0.82],
+    [0.82, -0.34],
+    [0.9, 0.28],
+    [0.74, 0.86],
+    [0.34, 1.0],
+    [0.16, 0.66],
+    [0.3, 0.24],
+    [0.1, 0.02],
+    [0.05, -0.5],
+];
+
+/** Akciğer içi hava yollarını (bronşçuklar) çizer. */
+function bronchioles(k: Ctx, hx: number, hy: number, dir: number, lx: number, ly: number) {
+    const seg = (
+        x1: number,
+        y1: number,
+        dx: number,
+        dy: number,
+        depth: number,
+        w: number
+    ) => {
+        const x2 = x1 + dx;
+        const y2 = y1 + dy;
+        line(k, x1, y1, x2, y2, w);
+        if (depth === 0) return;
+        seg(x2, y2, dx * 0.62 + dir * lx * 0.05, dy * 0.55 - ly * 0.12, depth - 1, w * 0.7);
+        seg(x2, y2, dx * 0.55, dy * 0.5 + ly * 0.14, depth - 1, w * 0.7);
+    };
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.55);
+    k.c.lineCap = 'round';
+    seg(hx, hy, dir * lx * 0.3, ly * 0.12, 2, Math.max(1.2, k.lw * 0.8));
+    k.c.restore();
+}
+
+export const breathingRender: Renderer = (k) => {
+    const r = k.r;
+    const s = breathState(k.o, k.t);
+    const icon = isIconSize(r);
+    const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineJoin = 'round';
+
+    const stage: Rect = icon
+        ? r
+        : { x: r.x + fs * 0.3, y: r.y + fs * 2.1, w: r.w * 0.58, h: r.h - fs * 2.6 };
+    const W = stage.w;
+    const H = stage.h;
+    const cx = stage.x + W / 2;
+
+    // Ölçüler: soluk alırken göğüs kafesi yükselir, akciğerler genişler.
+    const lungCy = stage.y + H * (icon ? 0.44 : 0.47) - s.p * H * 0.02;
+    const lx = Math.min(W * 0.3, H * 0.3) * (1 + s.p * 0.1);
+    const ly = Math.min(W * 0.34, H * 0.3) * (1 + s.p * 0.14);
+    const offX = lx * 0.32;
+    const baseY = stage.y + H * (icon ? 0.86 : 0.9);
+    const domeH = H * 0.13;
+    const apexY = baseY - domeH * (0.12 + 0.88 * (1 - s.p));
+    const halfW = W * 0.42;
+
+    // Akciğerler
+    for (const [pts, dir] of [
+        [LUNG_R, -1],
+        [LUNG_L, 1],
+    ] as ReadonlyArray<[ReadonlyArray<[number, number]>, number]>) {
+        const g = dir < 0 ? 1.05 : 1;
+        const abs = pts.map(
+            ([ux, uy]) => [cx + dir * offX + ux * lx * g, lungCy + uy * ly * g] as [number, number]
+        );
+        fillShape(k, () => smoothPath(k, abs), 0.1 + s.p * 0.09);
+        smooth(k, abs, true, Math.max(1.6, k.lw));
+        if (!icon) bronchioles(k, cx + dir * offX * 1.1, lungCy - ly * 0.32, dir, lx, ly);
+    }
+
+    // Göğüs kafesi (akciğerlerin önünde)
+    if (!icon) {
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.42);
+        for (let i = 0; i < 6; i++) {
+            const y = stage.y + H * 0.2 + i * H * 0.11 - s.p * fs * 0.32;
+            const out = W * (0.28 + i * 0.03) * (1 + s.p * 0.07);
+            const drop = H * (0.05 + i * 0.012);
+            for (const side of [-1, 1]) {
+                k.c.beginPath();
+                k.c.lineWidth = Math.max(1.4, k.lw * 0.9);
+                k.c.moveTo(cx + side * W * 0.045, y);
+                k.c.quadraticCurveTo(cx + side * out * 0.86, y - drop * 0.34, cx + side * out, y + drop);
+                k.c.stroke();
+            }
+        }
+        k.c.restore();
+    }
+
+    // Soluk borusu ve ana bronşlar
+    const trTop = stage.y + H * (icon ? 0.04 : 0.06);
+    const bifY = lungCy - ly * 0.72;
+    const tw = Math.max(2.5, fs * 0.3);
+    line(k, cx - tw, trTop, cx - tw, bifY - fs * 0.2, Math.max(1.6, k.lw));
+    line(k, cx + tw, trTop, cx + tw, bifY - fs * 0.2, Math.max(1.6, k.lw));
+    if (!icon) {
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.45);
+        for (let y = trTop + fs * 0.35; y < bifY - fs * 0.4; y += fs * 0.42) {
+            line(k, cx - tw, y, cx + tw, y, 1);
+        }
+        k.c.restore();
+    }
+    for (const dir of [-1, 1]) {
+        k.c.beginPath();
+        k.c.lineWidth = Math.max(1.6, k.lw);
+        k.c.moveTo(cx + dir * tw, bifY - fs * 0.2);
+        k.c.quadraticCurveTo(
+            cx + dir * offX * 0.7,
+            bifY + fs * 0.1,
+            cx + dir * offX * 1.1,
+            lungCy - ly * 0.32
+        );
+        k.c.stroke();
+    }
+
+    // Diyafram: kasılınca düzleşir, gevşeyince kubbeleşir
+    k.c.save();
+    k.c.strokeStyle = k.color;
+    k.c.beginPath();
+    k.c.lineWidth = Math.max(2.4, k.lw * 1.5);
+    k.c.moveTo(cx - halfW, baseY);
+    k.c.quadraticCurveTo(cx, apexY - domeH * (1 - s.p), cx + halfW, baseY);
+    k.c.stroke();
+    k.c.restore();
+
+    if (icon) {
+        k.c.restore();
+        return;
+    }
+
+    // Hava akış oku
+    const flowY = trTop + fs * 0.2;
+    k.c.save();
+    k.c.strokeStyle = k.color;
+    if (s.inhaling) arrow(k, cx, flowY - fs * 1.5, cx, flowY + fs * 0.2, fs * 0.5, Math.max(1.6, k.lw));
+    else arrow(k, cx, flowY + fs * 0.2, cx, flowY - fs * 1.5, fs * 0.5, Math.max(1.6, k.lw));
+    k.c.restore();
+    label(k, s.inhaling ? 'hava girer' : 'hava çıkar', cx + fs * 0.6, flowY - fs * 0.7, 'left', 'middle', 0.6);
+    label(k, 'diyafram', cx - halfW, baseY + fs * 0.25, 'left', 'top', 0.58);
+
+    if (k.o.labels !== false) {
+        const px = r.x + r.w * 0.62;
+        const pw = r.w - (px - r.x) - fs * 0.4;
+        const py = r.y + fs * 2.2;
+        const rows: ReadonlyArray<[string, string]> = [
+            ['Diyafram', s.inhaling ? 'kasılır, düzleşir' : 'gevşer, kubbeleşir'],
+            ['Kaburgalar', s.inhaling ? 'yukarı ve dışa' : 'aşağı ve içe'],
+            ['Göğüs hacmi', s.inhaling ? 'artar' : 'azalır'],
+            ['Akciğer basıncı', s.inhaling ? 'azalır (dış basınçtan düşük)' : 'artar (dış basınçtan yüksek)'],
+            ['Hava', s.inhaling ? 'dışarıdan içeri' : 'içeriden dışarı'],
+        ];
+        const ph = fs * (2.6 + rows.length * 1.55);
+        panel(k, px, py, pw, ph);
+        label(k, s.inhaling ? 'SOLUK ALMA' : 'SOLUK VERME', px + fs * 0.6, py + fs * 1.05, 'left', 'middle', 0.72);
+        rows.forEach(([a, b], i) => {
+            const y = py + fs * (2.3 + i * 1.55);
+            label(k, a, px + fs * 0.6, y, 'left', 'middle', 0.54);
+            label(
+                k,
+                fitText(k, [b, b.split(' (')[0]], pw - fs * 1.2, 0.6),
+                px + fs * 0.6,
+                y + fs * 0.75,
+                'left',
+                'middle',
+                0.6
+            );
+        });
+        // Hacim çubuğu
+        const barY = py + ph + fs * 0.9;
+        const barW = pw - fs * 0.6;
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.4);
+        roundRect(k, px + fs * 0.3, barY, barW, fs * 0.7, fs * 0.35);
+        k.c.lineWidth = 1;
+        k.c.stroke();
+        k.c.restore();
+        fillShape(
+            k,
+            () => roundRect(k, px + fs * 0.3, barY, Math.max(fs * 0.7, barW * (0.35 + s.p * 0.65)), fs * 0.7, fs * 0.35),
+            0.3
+        );
+        label(k, `Göğüs boşluğu hacmi · %${Math.round(35 + s.p * 65)}`, px + fs * 0.3, barY + fs * 1.05, 'left', 'top', 0.54);
+    }
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                'Solunum mekaniği: hacim artar, basınç düşer, hava girer',
+                'Solunum mekaniği: hacim–basınç ilişkisi',
+                'Solunum mekaniği',
+            ],
+            r.w - fs * 3,
+            0.8
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8
+    );
+    k.c.restore();
+};
+
+export const breathingSpec: SimSpec = {
+    animated: (o) => simValue(o, 'play', 0) > 0.5,
+    controls: (r, o): SimControl[] => {
+        const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+        const s = breathState(o, 0);
+        const stage: Rect = { x: r.x + fs * 0.3, y: r.y + fs * 2.1, w: r.w * 0.58, h: r.h - fs * 2.6 };
+        const baseY = stage.y + stage.h * 0.9;
+        const domeH = stage.h * 0.13;
+        return [
+            {
+                id: 'play',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.playing ? 'Durdur' : 'Soluk alıp vermeyi oynat',
+                on: s.playing,
+            },
+            {
+                id: 'dia',
+                x: stage.x + stage.w / 2 + stage.w * 0.42 + fs * 0.6,
+                y: baseY - domeH * (0.12 + 0.88 * (1 - s.p)),
+                type: 'drag',
+                label: 'Diyaframı aşağı çek: soluk al',
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (id === 'play') return { play: simValue(o, 'play', 0) > 0.5 ? 0 : 1 };
+        if (id === 'dia' && p) {
+            const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+            const stage: Rect = { x: r.x + fs * 0.3, y: r.y + fs * 2.1, w: r.w * 0.58, h: r.h - fs * 2.6 };
+            const baseY = stage.y + stage.h * 0.9;
+            const domeH = stage.h * 0.13;
+            return { p: clamp((p.y - (baseY - domeH)) / (domeH * 0.88), 0, 1), play: 0 };
+        }
+        return {};
+    },
+    params: [{ key: 'p', label: 'Soluk (0 ver – 1 al)', min: 0, max: 1, step: 0.05 }],
+};
+
 export const BIO_SIM_RENDERERS: Record<string, Renderer> = {
     photosynthesis_sim: photosynthesisRender,
     dna_pair_sim: dnaRender,
     selection_sim: selectionRender,
     circulation_sim: circulationRender,
     food_web_sim: foodWebRender,
+    breathing_sim: breathingRender,
 };
 
 export const BIO_SIM_SPECS: Record<string, SimSpec> = {
@@ -1007,6 +1307,7 @@ export const BIO_SIM_SPECS: Record<string, SimSpec> = {
     selection_sim: selectionSpec,
     circulation_sim: circulationSpec,
     food_web_sim: foodWebSpec,
+    breathing_sim: breathingSpec,
 };
 
 export const BIO_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
@@ -1044,5 +1345,12 @@ export const BIO_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Bir türü çıkar; etkinin ağ boyunca yayılmasını izle',
         size: { w: 500, h: 380 },
         defaults: { labels: true, sim: { removed: -1 } },
+    },
+    {
+        kind: 'breathing_sim',
+        label: 'Solunum Mekaniği',
+        hint: 'Diyaframı çek: hacim–basınç ilişkisini soluk alıp vermede gör',
+        size: { w: 540, h: 380 },
+        defaults: { labels: true, sim: { p: 0, play: 0 } },
     },
 ];

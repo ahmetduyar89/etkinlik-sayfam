@@ -13,6 +13,7 @@ import {
     label,
     roundRect,
     simValue,
+    textWidth,
     withAlpha,
     type MathCatalogItem,
     type Rect,
@@ -23,8 +24,9 @@ import {
 
 interface SortingSet {
     title: string;
-    bins: [string, string];
-    /** Kart metni ve ait olduğu kutu (0 ya da 1). */
+    /** 2–4 kutu; kutu sayısı sete göre değişir. */
+    bins: ReadonlyArray<string>;
+    /** Kart metni ve ait olduğu kutunun sırası (0'dan başlar). */
     items: ReadonlyArray<[string, number]>;
 }
 
@@ -66,6 +68,44 @@ const SORTING_SETS: ReadonlyArray<SortingSet> = [
         ],
     },
     {
+        title: 'Homojen mi, heterojen mi?',
+        bins: ['Homojen karışım', 'Heterojen karışım'],
+        items: [
+            ['Şekerli su', 0],
+            ['Ayran', 1],
+            ['Kolonya', 0],
+            ['Zeytinyağı - su', 1],
+            ['Çelik (alaşım)', 0],
+            ['Kum - su', 1],
+        ],
+    },
+    {
+        title: 'Elektriklenmiş cisimlerin yükü',
+        bins: ['Pozitif (+) yüklü', 'Negatif (−) yüklü', 'Nötr'],
+        items: [
+            ['Elektron veren cisim', 0],
+            ['Elektron alan cisim', 1],
+            ['Proton sayısı = elektron sayısı', 2],
+            ['Yünle sürtülen ebonit çubuk', 1],
+            ['İpekle sürtülen cam çubuk', 0],
+            ['Topraklanmış iletken küre', 2],
+        ],
+    },
+    {
+        title: 'Atıklar hangi kutuya?',
+        bins: ['Kâğıt', 'Plastik', 'Cam', 'Metal'],
+        items: [
+            ['Gazete', 0],
+            ['Su şişesi', 1],
+            ['Reçel kavanozu', 2],
+            ['Konserve kutusu', 3],
+            ['Karton koli', 0],
+            ['Deterjan bidonu', 1],
+            ['Cam bardak', 2],
+            ['Alüminyum folyo', 3],
+        ],
+    },
+    {
         title: 'Kuvvet temas gerektirir mi?',
         bins: ['Temas gerektirir', 'Temas gerektirmez'],
         items: [
@@ -80,32 +120,36 @@ const SORTING_SETS: ReadonlyArray<SortingSet> = [
 ];
 
 const MAX_ITEMS = Math.max(...SORTING_SETS.map((s) => s.items.length));
+const MAX_ROWS = Math.max(...SORTING_SETS.map((s) => Math.ceil(s.items.length / 2)));
 
 function sortingLayout(r: Rect, o: MathObject) {
     const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
     const icon = isIconSize(r);
     const mode = clampInt(simValue(o, 'mode', 0), 0, SORTING_SETS.length - 1, 0);
     const set = SORTING_SETS[mode];
-    // 0: havuz, 1: sol kutu, 2: sağ kutu
-    const placed = set.items.map((_, i) => clampInt(simValue(o, `p${i}`, 0), 0, 2, 0));
+    const binCount = set.bins.length;
+    // 0: havuz, 1..binCount: kutular
+    const placed = set.items.map((_, i) => clampInt(simValue(o, `p${i}`, 0), 0, binCount, 0));
 
     const chipH = fs * 1.6;
     const trayTop = r.y + fs * 1.9;
-    const trayRows = 2;
-    const trayH = chipH * trayRows + fs * 0.6;
+    // Havuz yüksekliği en kalabalık sete göre sabittir; kutular yer değiştirmesin.
+    const trayRows = Math.max(2, Math.min(MAX_ROWS, Math.ceil(set.items.length / 2)));
+    const trayH = chipH * trayRows + fs * 0.5;
     const binTop = trayTop + trayH + fs * 0.4;
-    const binH = r.y + r.h - binTop - fs * 1.4;
-    const binW = (r.w - fs * 1.6) / 2;
+    const binH = r.y + r.h - binTop - fs * 1.2;
+    const gap = fs * 0.5;
+    const binW = (r.w - fs - gap * (binCount - 1)) / binCount;
 
-    const bins = [0, 1].map((i) => ({
-        x: r.x + fs * 0.5 + i * (binW + fs * 0.6),
+    const bins = set.bins.map((_, i) => ({
+        x: r.x + fs * 0.5 + i * (binW + gap),
         y: binTop,
         w: binW,
         h: binH,
     }));
 
-    // Havuzdaki kartlar iki satıra yayılır, kutudakiler kutu içinde dizilir.
-    const pos = set.items.map(() => ({ x: 0, y: 0, w: binW * 0.92, h: chipH }));
+    // Havuzdaki kartlar iki sütuna yayılır, kutudakiler kutu içinde dizilir.
+    const pos = set.items.map(() => ({ x: 0, y: 0, w: binW * 0.9, h: chipH }));
     const trayIdx = placed.map((p, i) => (p === 0 ? i : -1)).filter((i) => i >= 0);
     trayIdx.forEach((idx, n) => {
         const row = Math.floor(n / 2);
@@ -114,18 +158,17 @@ function sortingLayout(r: Rect, o: MathObject) {
         pos[idx].x = r.x + fs * 0.6 + pos[idx].w / 2 + col * (pos[idx].w + fs * 0.6);
         pos[idx].y = trayTop + chipH / 2 + row * chipH;
     });
-    [1, 2].forEach((bin) => {
-        const inBin = placed.map((p, i) => (p === bin ? i : -1)).filter((i) => i >= 0);
+    bins.forEach((b, bi) => {
+        const inBin = placed.map((p, i) => (p === bi + 1 ? i : -1)).filter((i) => i >= 0);
         inBin.forEach((idx, n) => {
-            const b = bins[bin - 1];
             pos[idx].w = b.w * 0.9;
             pos[idx].x = b.x + b.w / 2;
-            pos[idx].y = b.y + fs * 1.8 + chipH / 2 + n * (chipH + fs * 0.25);
+            pos[idx].y = b.y + fs * 2.2 + chipH / 2 + n * (chipH + fs * 0.2);
         });
     });
 
     const correct = placed.filter((p, i) => p === set.items[i][1] + 1).length;
-    return { fs, icon, mode, set, placed, pos, bins, trayTop, trayH, chipH, correct };
+    return { fs, icon, mode, set, binCount, placed, pos, bins, trayTop, trayH, chipH, correct };
 }
 
 export const sortingRender: Renderer = (k) => {
@@ -141,21 +184,23 @@ export const sortingRender: Renderer = (k) => {
 
     if (L.icon) {
         // Simge ölçeğinde yazı okunmaz: iki kutu ve birkaç kart yeter.
-        L.bins.forEach((b, i) => {
-            roundRect(k, r.x + r.w * (0.08 + i * 0.48), r.y + r.h * 0.34, r.w * 0.44, r.h * 0.58, 5);
+        const n = Math.min(3, L.binCount);
+        const bw = 0.88 / n;
+        for (let i = 0; i < n; i++) {
+            roundRect(k, r.x + r.w * (0.06 + i * bw), r.y + r.h * 0.34, r.w * (bw - 0.04), r.h * 0.58, 5);
             k.c.stroke();
-            for (let n = 0; n < 2; n++) {
+            for (let m = 0; m < 2; m++) {
                 roundRect(
                     k,
-                    r.x + r.w * (0.12 + i * 0.48),
-                    r.y + r.h * (0.46 + n * 0.2),
-                    r.w * 0.36,
+                    r.x + r.w * (0.09 + i * bw),
+                    r.y + r.h * (0.46 + m * 0.2),
+                    r.w * (bw - 0.1),
                     r.h * 0.13,
                     3,
                 );
                 k.c.stroke();
             }
-        });
+        }
         roundRect(k, r.x + r.w * 0.3, r.y + r.h * 0.08, r.w * 0.4, r.h * 0.16, 4);
         k.c.stroke();
         k.c.restore();
@@ -179,7 +224,20 @@ export const sortingRender: Renderer = (k) => {
         k.c.globalAlpha = 0.05;
         k.c.fill();
         k.c.restore();
-        label(k, L.set.bins[i], b.x + b.w / 2, b.y + L.fs * 0.9, 'center', 'middle', 0.82);
+        const parts = L.set.bins[i].split(' ');
+        const head = fitText(k, [L.set.bins[i], parts[0]], b.w - L.fs * 0.5, 0.78);
+        label(k, head, b.x + b.w / 2, b.y + L.fs * 0.85, 'center', 'middle', 0.78);
+        if (head !== L.set.bins[i]) {
+            label(
+                k,
+                fitText(k, [parts.slice(1).join(' ')], b.w - L.fs * 0.5, 0.66),
+                b.x + b.w / 2,
+                b.y + L.fs * 1.7,
+                'center',
+                'middle',
+                0.66,
+            );
+        }
     });
 
     // Kartlar
@@ -197,15 +255,11 @@ export const sortingRender: Renderer = (k) => {
         k.c.restore();
         k.c.restore();
         const mark = show && L.placed[i] > 0 ? (ok ? ' ✓' : ' ✕') : '';
-        label(
-            k,
-            fitText(k, [text + mark, text], box.w - L.fs * 0.8, 0.7),
-            box.x,
-            box.y,
-            'center',
-            'middle',
-            0.7,
-        );
+        // Tutamak kartın solunda durduğu için yazı sağa kayar ve sığana dek küçülür.
+        const maxW = box.w - L.fs * 1.9;
+        let sc = 0.7;
+        while (sc > 0.42 && textWidth(k, text + mark, sc) > maxW) sc -= 0.04;
+        label(k, text + mark, box.x + L.fs * 0.45, box.y, 'center', 'middle', sc);
     });
 
     if (k.o.labels === false) {
@@ -287,7 +341,7 @@ export const sortingSpec: SimSpec = {
         const bin = L.bins.findIndex(
             (b) => p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h
         );
-        return { [`p${i}`]: bin < 0 ? 0 : clamp(bin + 1, 1, 2) };
+        return { [`p${i}`]: bin < 0 ? 0 : clamp(bin + 1, 1, L.binCount) };
     },
     params: [
         { key: 'mode', label: `Konu (0-${SORTING_SETS.length - 1})`, min: 0, max: SORTING_SETS.length - 1, step: 1 },
@@ -306,7 +360,7 @@ export const SORTING_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         kind: 'sorting_sim',
         label: 'Sınıflandırma Kutuları',
         hint: `Kartları doğru kutuya sürükle, kontrol et (${SORTING_SETS.length} konu)`,
-        size: { w: 540, h: 380 },
+        size: { w: 620, h: 420 },
         defaults: { labels: true, sim: { mode: 0, show: 0 } },
     },
 ];
