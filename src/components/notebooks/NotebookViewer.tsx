@@ -11,14 +11,13 @@ import { DrawingCanvas } from '../drawing/DrawingCanvas';
 import { TextBoxLayer } from '../tools/TextBoxLayer';
 import { FullscreenToggle } from '../common/FullscreenToggle';
 import { fetchDocById } from '../../lib/firebase';
+import { loadNotebookPages } from './notebookContent';
 import { paperBackground } from './paper';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
     DrawingCanvasHandle,
     Notebook,
-    NotebookContent,
-    NotebookPage,
     Stroke,
     TextBoxData,
     Viewport,
@@ -34,20 +33,6 @@ const VIEW_CONFIG: DrawConfig = {
     color: '#000000',
     width: 2,
 } as DrawConfig;
-
-function parsePages(raw?: string): NotebookPage[] {
-    if (!raw) return [{ strokes: [], boxes: [] }];
-    try {
-        const parsed = JSON.parse(raw) as NotebookPage[];
-        if (!Array.isArray(parsed) || parsed.length === 0) return [{ strokes: [], boxes: [] }];
-        return parsed.map((p) => ({
-            strokes: Array.isArray(p?.strokes) ? p.strokes : [],
-            boxes: Array.isArray(p?.boxes) ? p.boxes : [],
-        }));
-    } catch {
-        return [{ strokes: [], boxes: [] }];
-    }
-}
 
 interface NotebookViewerProps {
     notebookId: string;
@@ -76,9 +61,8 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
                     return;
                 }
                 setNotebook(meta);
-                const content = await fetchDocById<NotebookContent>('notebook_content', notebookId);
+                const { pages: parsed } = await loadNotebookPages(notebookId);
                 if (cancelled) return;
-                const parsed = parsePages(content?.pages_json);
                 setPages(parsed.map((p) => p.strokes));
                 setBoxesByPage(parsed.map((p) => p.boxes ?? []));
             } catch (e) {

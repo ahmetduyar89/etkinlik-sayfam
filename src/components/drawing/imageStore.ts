@@ -6,13 +6,12 @@
 //  1. Tuval dışa aktarımı (PNG indirme) çalışmaya devam eder — uzak bir URL
 //     canvas'ı "kirletir" (tainted) ve toDataURL çağrısı hata verir.
 //  2. Ayrı bir depolama kuralı/CORS ayarı gerekmez.
-// Karşılığında boyut önemlidir: Firestore doküman sınırı 1 MiB olduğu için
+// Karşılığında boyut önemlidir: sayfa verisi Firestore'a yazılırken 1 MiB'lık
+// doküman sınırına göre parçalanır (bkz. notebooks/notebookContent.ts), o yüzden
 // görseller içe aktarılırken agresif biçimde küçültülür.
 
 /** Tek bir görselin hedeflediği azami kodlanmış boyut. */
 export const IMAGE_TARGET_BYTES = 190 * 1024;
-/** Bir defter içeriğinin güvenli kabul edilen azami boyutu (1 MiB sınırı için pay bırakır). */
-export const CONTENT_LIMIT_BYTES = 880 * 1024;
 
 const cache = new Map<string, HTMLImageElement>();
 const listeners = new Set<() => void>();

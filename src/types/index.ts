@@ -428,6 +428,14 @@ export interface NotebookPage {
  */
 export interface NotebookContent {
     id: string;
-    pages_json: string;
+    /** İçeriğin ilk parçası (tek parçalı defterlerde tamamı). */
+    pages_json?: string;
+    /**
+     * İçerik kaç dokümana bölündü. 1 veya tanımsızsa içerik yalnızca
+     * `pages_json` alanındadır; büyükse `{id}__c1…` dokümanları eklenir.
+     */
+    chunk_count?: number;
+    /** `{id}__c…` dokümanlarında JSON'un o parçası. */
+    chunk?: string;
     updated_at?: string;
 }

@@ -5,6 +5,7 @@
 // otomatik kaydedilir (yazma sonrası ~1.2 sn beklenir).
 import React from 'react';
 import {
+    AlertTriangle,
     ArrowLeft,
     Camera,
     Check,
@@ -27,12 +28,18 @@ import { TextBoxLayer } from '../tools/TextBoxLayer';
 import { usePrompt } from '../common/PromptDialog';
 import { useToast } from '../common/ToastProvider';
 import { useConfirm } from '../common/ConfirmDialog';
-import { fetchDocById, saveDocById } from '../../lib/firebase';
 import { cn } from '../../utils/cn';
 import { BG_COLORS } from '../../constants/drawing';
 import { PAPER_STYLES, paperBackground } from './paper';
 import { PageThumbnails } from './PageThumbnails';
-import { CONTENT_LIMIT_BYTES, importImageFile } from '../drawing/imageStore';
+import { importImageFile } from '../drawing/imageStore';
+import { measurePages } from './pageCodec';
+import {
+    MAX_CONTENT_BYTES,
+    NotebookTooLargeError,
+    loadNotebookPages,
+    saveNotebookPages,
+} from './notebookContent';
 import { Curtain, Spotlight } from './LessonTools';
 import { LessonModeToolbar, type LessonOverlay } from './LessonModeToolbar';
 import { NotebookQrModal } from './NotebookQrModal';
@@ -46,7 +53,6 @@ import type {
     DrawingCanvasHandle,
     MathObject,
     Notebook,
-    NotebookContent,
     NotebookPage,
     PaperStyle,
     Stroke,
@@ -75,20 +81,6 @@ const PAPER_GROUPS = PAPER_STYLES.reduce<
     return groups;
 }, []);
 
-function parsePages(raw?: string): NotebookPage[] {
-    if (!raw) return [emptyPage()];
-    try {
-        const parsed = JSON.parse(raw) as NotebookPage[];
-        if (!Array.isArray(parsed) || parsed.length === 0) return [emptyPage()];
-        return parsed.map((p) => ({
-            strokes: Array.isArray(p?.strokes) ? p.strokes : [],
-            boxes: Array.isArray(p?.boxes) ? p.boxes : [],
-        }));
-    } catch {
-        return [emptyPage()];
-    }
-}
-
 export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEditorProps) {
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
     const prompt = usePrompt();
@@ -100,6 +92,18 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const [boxesByPage, setBoxesByPage] = React.useState<TextBoxData[][]>([[]]);
     const [pageInfo, setPageInfo] = React.useState({ current: 0, total: 1 });
     const [saveState, setSaveState] = React.useState<SaveState>('idle');
+    /**
+     * Otomatik kaydı durduran engel: 'full' içerik sınırı aşıldı,
+     * 'load' içerik okunamadı (üstüne yazıp veriyi silmemek için).
+     */
+    const [saveBlock, setSaveBlock] = React.useState<'full' | 'load' | null>(null);
+    const saveBlockRef = React.useRef<'full' | 'load' | null>(null);
+    /** Sınır uyarısı her kayıt denemesinde değil, bir kez gösterilir. */
+    const fullWarnedRef = React.useRef(false);
+    /** Son kaydedilen içerik parçaları; değişmeyen parça yeniden yazılmaz. */
+    const chunksRef = React.useRef<string[]>([]);
+    /** Kaydedilmemiş değişiklik var mı (kapanış uyarısı için). */
+    const dirtyRef = React.useRef(false);
 
     const [title, setTitle] = React.useState(notebook.title);
     const [paper, setPaper] = React.useState<PaperStyle>(
@@ -157,13 +161,21 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         (async () => {
             let pages: NotebookPage[] = [emptyPage()];
             try {
-                const content = await fetchDocById<NotebookContent>(
-                    'notebook_content',
-                    notebook.id
-                );
-                pages = parsePages(content?.pages_json);
+                const content = await loadNotebookPages(notebook.id);
+                pages = content.pages;
+                // Okunan parça sayısı bilinsin ki defter küçüldüğünde artan
+                // parçalar ilk kayıtta silinsin.
+                chunksRef.current = new Array<string>(content.chunkCount).fill('');
             } catch {
-                toast.error('Defter içeriği yüklenemedi, boş sayfa açıldı.');
+                // İçerik okunamadıysa boş sayfa açılır ama otomatik kayıt
+                // kilitlenir: aksi halde ilk kayıt gerçek içeriği silerdi.
+                if (alive) {
+                    setSaveBlock('load');
+                    saveBlockRef.current = 'load';
+                }
+                toast.error(
+                    'Defter içeriği yüklenemedi. Veriyi korumak için kayıt durduruldu; sayfayı yenileyin.'
+                );
             }
             if (!alive) return;
             setInitialStrokes(pages.map((p) => p.strokes));
@@ -178,43 +190,58 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     }, [notebook.id]);
 
     // ── Kaydetme ─────────────────────────────────────────────────────
-    const save = React.useCallback(async () => {
+    /** Tuvaldeki çizimlerle metin kutularını tek bir sayfa dizisinde toplar. */
+    const collectPages = React.useCallback((): NotebookPage[] => {
         const strokePages = canvasRef.current?.getPages() ?? [];
         const boxes = boxesRef.current;
         const total = Math.max(strokePages.length, boxes.length, 1);
-        const pages: NotebookPage[] = Array.from({ length: total }, (_, i) => ({
+        return Array.from({ length: total }, (_, i) => ({
             strokes: strokePages[i] ?? [],
             boxes: boxes[i] ?? [],
         }));
-        const pagesJson = JSON.stringify(pages);
-        // Firestore doküman sınırı 1 MiB. Fotoğraflar sayfa verisine gömüldüğü
-        // için sınırı aşan içerik daha kaydetmeden burada yakalanır; aksi halde
-        // sunucu hatası kullanıcıya sebebini söylemez.
-        if (pagesJson.length > CONTENT_LIMIT_BYTES) {
-            setSaveState('idle');
-            toast.error(
-                'Defter çok büyüdü (fotoğraflar sınırı aşıyor). Kaydedebilmek için bazı fotoğrafları silin.'
-            );
-            return;
-        }
+    }, []);
+
+    const save = React.useCallback(async () => {
+        // İçerik okunamadıysa yazmak defteri silmek olurdu.
+        if (saveBlockRef.current === 'load') return;
+        const pages = collectPages();
         setSaveState('saving');
         try {
-            await saveDocById('notebook_content', notebook.id, {
-                pages_json: pagesJson,
-                updated_at: new Date().toISOString(),
-            });
+            // İçerik 1 MiB'lık doküman sınırını aşarsa parçalara bölünerek
+            // yazılır; defter büyüdükçe kayıt durmaz.
+            chunksRef.current = await saveNotebookPages(notebook.id, pages, chunksRef.current);
+            dirtyRef.current = false;
+            setSaveBlock(null);
+            saveBlockRef.current = null;
+            fullWarnedRef.current = false;
             onMetaChange({ page_count: pages.length, updated_at: new Date().toISOString() });
             setSaveState('saved');
             if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
             savedTimerRef.current = window.setTimeout(() => setSaveState('idle'), 2000);
         } catch (e) {
             setSaveState('idle');
-            toast.error(firestoreErrorMessage(e, 'Defter kaydedilemedi.'));
+            if (!(e instanceof NotebookTooLargeError)) {
+                toast.error(firestoreErrorMessage(e, 'Defter kaydedilemedi.'));
+                return;
+            }
+            setSaveBlock('full');
+            saveBlockRef.current = 'full';
+            // Yazmaya devam edildikçe otomatik kayıt saniyede bir denenir;
+            // uyarı yalnızca sınır ilk aşıldığında çıkar.
+            if (fullWarnedRef.current) return;
+            fullWarnedRef.current = true;
+            const { imageBytes } = measurePages(pages);
+            toast.error(
+                imageBytes * 2 > e.bytes
+                    ? 'Defter doldu: yerin çoğunu fotoğraflar kaplıyor. Kaydedebilmek için birkaç fotoğrafı silin.'
+                    : 'Defter doldu: çizim verisi sınıra ulaştı. Kaydedebilmek için bazı sayfaları silin ya da kalanını yeni bir deftere çizin.'
+            );
         }
-    }, [notebook.id, onMetaChange, toast]);
+    }, [collectPages, notebook.id, onMetaChange, toast]);
 
     const scheduleSave = React.useCallback(() => {
         if (isLoading) return;
+        dirtyRef.current = true;
         if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
         saveTimerRef.current = window.setTimeout(() => {
             saveTimerRef.current = null;
@@ -239,6 +266,20 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             window.clearTimeout(saveTimerRef.current);
             saveTimerRef.current = null;
             await save();
+        }
+        // Kayıt engelliyken kapanış sessizce veri kaybettirmesin.
+        if (saveBlockRef.current && dirtyRef.current) {
+            const ok = await confirm({
+                title: 'Kaydedilemeyen değişiklikler var',
+                message:
+                    saveBlockRef.current === 'full'
+                        ? 'Defter dolduğu için son değişiklikler kaydedilemedi. Kapatırsanız bu değişiklikler kaybolur.'
+                        : 'Defter içeriği yüklenemediği için değişiklikler kaydedilmedi. Kapatırsanız bu değişiklikler kaybolur.',
+                confirmLabel: 'Yine de kapat',
+                cancelLabel: 'Defterde kal',
+                variant: 'danger',
+            });
+            if (!ok) return;
         }
         onClose();
     };
@@ -293,6 +334,15 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             try {
                 for (const file of list) {
                     const img = await importImageFile(file);
+                    // Fotoğraf sayfa verisine gömüldüğü için sınırı aşacaksa
+                    // eklenmeden durdurulur; yoksa eklenir ama defter bir daha
+                    // kaydedilemez.
+                    if (measurePages(collectPages()).bytes + img.dataUrl.length > MAX_CONTENT_BYTES) {
+                        toast.error(
+                            'Bu fotoğraf deftere sığmıyor: defter neredeyse dolu. Birkaç fotoğrafı silin ya da yeni bir defter açın.'
+                        );
+                        break;
+                    }
                     canvasRef.current?.insertImage(img.dataUrl, img.width, img.height);
                 }
                 setConfig((c) => ({ ...c, tool: 'select' }));
@@ -303,7 +353,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 setIsInsertingImage(false);
             }
         },
-        [scheduleSave, toast]
+        [collectPages, scheduleSave, toast]
     );
 
     // Panodan yapıştırma (ekran görüntüsü / kopyalanan fotoğraf).
@@ -554,21 +604,35 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
 
                 <div className="ml-auto flex items-center gap-1.5">
                     {/* Kayıt durumu */}
-                    <span className="hidden sm:flex items-center gap-1.5 text-[12px] font-semibold text-white/85 px-2">
-                        {saveState === 'saving' ? (
-                            <>
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Kaydediliyor…
-                            </>
-                        ) : saveState === 'saved' ? (
-                            <>
-                                <Check className="w-3.5 h-3.5" /> Kaydedildi
-                            </>
-                        ) : (
-                            <>
-                                <Cloud className="w-3.5 h-3.5" /> Otomatik kayıt
-                            </>
-                        )}
-                    </span>
+                    {saveBlock ? (
+                        <span
+                            className="flex items-center gap-1.5 text-[12px] font-semibold text-white bg-red-600 rounded-lg px-2 py-1"
+                            title={
+                                saveBlock === 'full'
+                                    ? 'Defter azami boyuta ulaştı; otomatik kayıt durdu.'
+                                    : 'İçerik yüklenemedi; veriyi korumak için otomatik kayıt durdu.'
+                            }
+                        >
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            {saveBlock === 'full' ? 'Defter dolu — kaydedilmiyor' : 'Kayıt durduruldu'}
+                        </span>
+                    ) : (
+                        <span className="hidden sm:flex items-center gap-1.5 text-[12px] font-semibold text-white/85 px-2">
+                            {saveState === 'saving' ? (
+                                <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Kaydediliyor…
+                                </>
+                            ) : saveState === 'saved' ? (
+                                <>
+                                    <Check className="w-3.5 h-3.5" /> Kaydedildi
+                                </>
+                            ) : (
+                                <>
+                                    <Cloud className="w-3.5 h-3.5" /> Otomatik kayıt
+                                </>
+                            )}
+                        </span>
+                    )}
 
                     <button
                         onClick={handleUndo}

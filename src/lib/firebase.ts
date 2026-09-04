@@ -13,6 +13,7 @@ import {
     orderBy,
     Timestamp,
     DocumentReference,
+    writeBatch,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -91,6 +92,21 @@ export async function saveDocById(
     data: Record<string, unknown>
 ): Promise<void> {
     await setDoc(doc(db, collectionName, id), data, { merge: true });
+}
+
+/** Tek bir işlemde birden fazla dokümanı yazar veya siler (hepsi ya da hiçbiri). */
+export async function saveDocsBatch(
+    collectionName: string,
+    writes: { id: string; data?: Record<string, unknown> }[]
+): Promise<void> {
+    if (writes.length === 0) return;
+    const batch = writeBatch(db);
+    for (const w of writes) {
+        const ref = doc(db, collectionName, w.id);
+        if (w.data) batch.set(ref, w.data, { merge: true });
+        else batch.delete(ref);
+    }
+    await batch.commit();
 }
 
 /** Dokümanı id ile siler. */
