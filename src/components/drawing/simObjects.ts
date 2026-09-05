@@ -813,6 +813,11 @@ import {
     GRADE10_GEOM_RENDERERS,
     GRADE10_GEOM_SPECS,
 } from './grade10GeomSims';
+import {
+    GRADE10_STATS_ITEMS,
+    GRADE10_STATS_RENDERERS,
+    GRADE10_STATS_SPECS,
+} from './grade10StatsSims';
 
 // ── Kayıt ────────────────────────────────────────────────────────────
 
@@ -823,6 +828,7 @@ export const SIM_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
     matter_sim: matterRender,
     ...(GRADE8_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(GRADE10_GEOM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
+    ...(GRADE10_STATS_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(MATH_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(GEOMETRY_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(NUMBER_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
@@ -845,6 +851,7 @@ export const SIM_SPECS: Partial<Record<MathObjectKind, SimSpec>> = {
     matter_sim: matterSpec,
     ...(GRADE8_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(GRADE10_GEOM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
+    ...(GRADE10_STATS_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(MATH_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(GEOMETRY_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(NUMBER_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
@@ -1008,9 +1015,10 @@ export const SIM_CATEGORIES: ReadonlyArray<ObjectCategory> = [
     },
     { label: '8. Sınıf', items: GRADE8_ITEMS },
     { label: '10. Sınıf Geometri', items: GRADE10_GEOM_ITEMS },
+    { label: '10. Sınıf İstatistik', items: GRADE10_STATS_ITEMS },
     {
         label: 'Canlı Matematik',
-        items: [...MATH_SIM_ITEMS, ...GEOMETRY_SIM_ITEMS, ...NUMBER_SIM_ITEMS, ...GRADE10_GEOM_ITEMS],
+        items: [...MATH_SIM_ITEMS, ...GEOMETRY_SIM_ITEMS, ...NUMBER_SIM_ITEMS, ...GRADE10_GEOM_ITEMS, ...GRADE10_STATS_ITEMS],
     },
     {
         label: 'Etkileşimli Fen',
