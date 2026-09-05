@@ -36,6 +36,7 @@ import { ContentFilterBar, type SortBy } from './components/content/ContentFilte
 import { RecentActivities } from './components/content/RecentActivities';
 import { formatGradeLevel } from './constants/education';
 import { subjectColor } from './constants/appearance';
+import { GEOMETRI_10_ACTIVITIES, DEFAULT_GEOMETRI_FOLDERS } from './constants/activities-10-geometri';
 import type { Activity, DriveFolder, Unit } from './types';
 
 const LESSON_MODE_KEY = 'icerik-merkezi:lesson-mode';
@@ -146,6 +147,7 @@ const MOCK_ACTIVITIES: Activity[] = [
         tags: 'mikroskop, hücre',
         is_test: false,
     },
+    ...GEOMETRI_10_ACTIVITIES,
 ];
 
 interface Shelf {
@@ -201,19 +203,45 @@ export default function App() {
 
     useEffect(() => {
         const unsub = activitiesHandler.sync((data) => {
-            setActivities(data && data.length > 0 ? data : MOCK_ACTIVITIES);
+            const list = data && data.length > 0 ? [...data] : [...MOCK_ACTIVITIES];
+            // 10. Sınıf Geometrik Şekiller etkinliklerinin kütüphanede daima bulunmasını sağla
+            for (const ga of GEOMETRI_10_ACTIVITIES) {
+                if (!list.some((a) => a.id === ga.id || a.title === ga.title)) {
+                    list.unshift(ga);
+                }
+            }
+            setActivities(list);
             setIsLoading(false);
         });
         return () => unsub();
     }, []);
 
     useEffect(() => {
-        const unsub = unitsHandler.sync((data) => setUnits(data || []));
+        const unsub = unitsHandler.sync((data) => {
+            const list = data ? [...data] : [];
+            if (!list.some((u) => u.grade_level === '10' && u.name === 'Geometrik Şekiller')) {
+                list.push({
+                    id: 'unit-10-geometrik-sekiller',
+                    grade_level: '10',
+                    subject: 'Matematik',
+                    name: 'Geometrik Şekiller',
+                });
+            }
+            setUnits(list);
+        });
         return () => unsub();
     }, []);
 
     useEffect(() => {
-        const unsub = foldersHandler.sync((data) => setFolders(data || []));
+        const unsub = foldersHandler.sync((data) => {
+            const list = data && data.length > 0 ? [...data] : [];
+            for (const df of DEFAULT_GEOMETRI_FOLDERS) {
+                if (!list.some((f) => f.id === df.id || (f.name === df.name && f.parent_id === df.parent_id))) {
+                    list.push(df);
+                }
+            }
+            setFolders(list);
+        });
         return () => unsub();
     }, []);
 

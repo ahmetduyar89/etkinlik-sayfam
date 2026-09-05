@@ -37,6 +37,7 @@ import { activityFolderIds, isInFolder } from './activityFolders';
 import { firestoreErrorMessage } from './errors';
 import { ActivityPreviewModal } from '../activities/ActivityPreviewModal';
 import { formatGradeLevel } from '../../constants/education';
+import { DEFAULT_GEOMETRI_FOLDERS, GEOMETRI_10_ACTIVITIES } from '../../constants/activities-10-geometri';
 import type { Activity, DriveFolder, Notebook, NotebookKind } from '../../types';
 
 type MoveTarget =
@@ -83,7 +84,16 @@ export function NotebooksView() {
 
     React.useEffect(() => {
         const unsub = foldersHandler.sync(
-            (data) => setFolders(data || []),
+            (data) => {
+                const list = data && data.length > 0 ? [...data] : [];
+                // Maarif modeli Geometrik Şekiller klasörlerini ekle
+                for (const df of DEFAULT_GEOMETRI_FOLDERS) {
+                    if (!list.some((f) => f.id === df.id || (f.name === df.name && f.parent_id === df.parent_id))) {
+                        list.push(df);
+                    }
+                }
+                setFolders(list);
+            },
             (e) => setLoadError(firestoreErrorMessage(e, 'Klasörler yüklenemedi.'))
         );
         return () => unsub();
@@ -106,7 +116,15 @@ export function NotebooksView() {
     }, []);
 
     React.useEffect(() => {
-        const unsub = activitiesHandler.sync((data) => setActivities(data || []));
+        const unsub = activitiesHandler.sync((data) => {
+            const list = data && data.length > 0 ? [...data] : [];
+            for (const ga of GEOMETRI_10_ACTIVITIES) {
+                if (!list.some((a) => a.id === ga.id || a.title === ga.title)) {
+                    list.push(ga);
+                }
+            }
+            setActivities(list);
+        });
         return () => unsub();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -165,22 +183,28 @@ export function NotebooksView() {
      * listelenmezler (hepsi zaten "İçerikler" sekmesinde duruyor).
      */
     const visibleActivities = React.useMemo(() => {
-        const filed = activities.filter((a) => activityFolderIds(a).length > 0);
+        const folderName = currentFolderId ? folderById.get(currentFolderId)?.name : undefined;
+        const filed = activities.filter(
+            (a) => activityFolderIds(a).length > 0 || (currentFolderId && isInFolder(a, currentFolderId, folderName))
+        );
         const list = needle
             ? filed.filter((a) => a.title.toLocaleLowerCase('tr').includes(needle))
             : currentFolderId
-            ? filed.filter((a) => isInFolder(a, currentFolderId))
+            ? filed.filter((a) => isInFolder(a, currentFolderId, folderName))
             : [];
         return [...list].sort((a, b) => a.title.localeCompare(b.title, 'tr'));
-    }, [activities, currentFolderId, needle]);
+    }, [activities, currentFolderId, needle, folderById]);
 
     const countsFor = React.useCallback(
-        (folderId: string) => ({
-            folders: folders.filter((f) => f.parent_id === folderId).length,
-            notebooks: notebooks.filter((n) => n.parent_id === folderId).length,
-            activities: activities.filter((a) => isInFolder(a, folderId)).length,
-        }),
-        [folders, notebooks, activities]
+        (folderId: string) => {
+            const fName = folderById.get(folderId)?.name;
+            return {
+                folders: folders.filter((f) => f.parent_id === folderId).length,
+                notebooks: notebooks.filter((n) => n.parent_id === folderId).length,
+                activities: activities.filter((a) => isInFolder(a, folderId, fName)).length,
+            };
+        },
+        [folders, notebooks, activities, folderById]
     );
 
     // ── Oluşturma ────────────────────────────────────────────────────

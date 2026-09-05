@@ -10,8 +10,14 @@ export function activityFolderIds(activity: Activity): string[] {
     return activity.folder_id ? [activity.folder_id] : [];
 }
 
-/** Etkinlik bu klasörde mi? */
-export function isInFolder(activity: Activity, folderId: string | null): boolean {
+/** Etkinlik bu klasörde mi? Klasör ID veya klasör adı eşleşmesi kontrol edilir. */
+export function isInFolder(activity: Activity, folderId: string | null, folderName?: string): boolean {
     if (!folderId) return false;
-    return activityFolderIds(activity).includes(folderId);
+    if (activityFolderIds(activity).includes(folderId)) return true;
+    if (folderName) {
+        const fn = folderName.trim().toLocaleLowerCase('tr');
+        const at = (activity.title || '').trim().toLocaleLowerCase('tr');
+        if (fn && (at.includes(fn) || fn.includes(at))) return true;
+    }
+    return false;
 }
