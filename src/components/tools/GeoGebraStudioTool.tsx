@@ -24,6 +24,7 @@ import {
     Calculator,
     Share2,
     Check,
+    Crosshair,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -183,6 +184,8 @@ export function GeoGebraStudioTool({
     const [isExporting, setIsExporting] = React.useState<boolean>(false);
     const [exportSuccess, setExportSuccess] = React.useState<boolean>(false);
     const [loadError, setLoadError] = React.useState<string | null>(null);
+    const [isDragging, setIsDragging] = React.useState<boolean>(false);
+    const [resetPositionKey, setResetPositionKey] = React.useState<number>(0);
 
     // GeoGebra API referansı
     const ggbApiRef = React.useRef<any>(null);
@@ -228,8 +231,8 @@ export function GeoGebraStudioTool({
 
             const params: Record<string, any> = {
                 appName: appType,
-                width: viewMode === 'docked' ? 440 : viewMode === 'maximized' ? window.innerWidth - 40 : 860,
-                height: viewMode === 'docked' ? 340 : viewMode === 'maximized' ? window.innerHeight - 140 : 540,
+                width: viewMode === 'docked' ? 460 : viewMode === 'maximized' ? window.innerWidth - 40 : 880,
+                height: viewMode === 'docked' ? 340 : viewMode === 'maximized' ? window.innerHeight - 150 : 480,
                 showToolBar: true,
                 showAlgebraInput: true,
                 showMenuBar: false,
@@ -243,7 +246,6 @@ export function GeoGebraStudioTool({
                 language: 'tr',
                 appletOnLoad: (api: any) => {
                     ggbApiRef.current = api;
-                    // Global referans
                     window[appletContainerId + '_api'] = api;
                 },
             };
@@ -265,7 +267,6 @@ export function GeoGebraStudioTool({
 
     React.useEffect(() => {
         if (scriptLoaded) {
-            // Küçük gecikmeyle DOM elementinin hazır olmasını bekle
             const timer = setTimeout(() => {
                 initApplet(activeApp, materialInput.trim() || undefined);
             }, 100);
@@ -276,8 +277,8 @@ export function GeoGebraStudioTool({
     // ── Pencere Boyutu Değiştiğinde Applet Yeniden Boyutlandırma ──────
     React.useEffect(() => {
         if (ggbApiRef.current && typeof ggbApiRef.current.setSize === 'function') {
-            const w = viewMode === 'docked' ? 440 : viewMode === 'maximized' ? window.innerWidth - 40 : 860;
-            const h = viewMode === 'docked' ? 340 : viewMode === 'maximized' ? window.innerHeight - 140 : 540;
+            const w = viewMode === 'docked' ? 460 : viewMode === 'maximized' ? window.innerWidth - 40 : 880;
+            const h = viewMode === 'docked' ? 340 : viewMode === 'maximized' ? window.innerHeight - 150 : 480;
             try {
                 ggbApiRef.current.setSize(w, h);
             } catch {
@@ -297,7 +298,7 @@ export function GeoGebraStudioTool({
                 api.exportPNG(2, 300, (dataUrl: string) => {
                     setIsExporting(false);
                     if (dataUrl && onInsertImage) {
-                        const w = viewMode === 'docked' ? 440 : 860;
+                        const w = viewMode === 'docked' ? 460 : 880;
                         const h = viewMode === 'docked' ? 340 : 540;
                         onInsertImage(dataUrl, w, h);
                         setExportSuccess(true);
@@ -365,7 +366,6 @@ export function GeoGebraStudioTool({
         const raw = materialInput.trim();
         if (!raw) return;
 
-        // URL formatları: geogebra.org/m/abc12345 veya geogebra.org/material/show/id/12345
         let matId = raw;
         const mMatch = raw.match(/\/m\/([a-zA-Z0-9]+)/);
         if (mMatch) {
@@ -380,37 +380,60 @@ export function GeoGebraStudioTool({
 
     return (
         <motion.div
+            key={`${viewMode}_${resetPositionKey}`}
             ref={containerRef}
             drag={viewMode !== 'maximized'}
             dragControls={dragControls}
             dragListener={false}
             dragMomentum={false}
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            dragElastic={0}
+            onDragStart={() => setIsDragging(true)}
+            onDragEnd={() => setIsDragging(false)}
+            initial={{ opacity: 0, scale: 0.96 }}
             animate={{
                 opacity: isSemiTransparent ? 0.82 : 1,
                 scale: 1,
-                y: 0,
             }}
-            exit={{ opacity: 0, scale: 0.95 }}
+            exit={{ opacity: 0, scale: 0.96 }}
             className={cn(
-                'fixed z-[5500] flex flex-col bg-slate-900 border border-slate-700/80 shadow-2xl rounded-2xl overflow-hidden backdrop-blur-xl transition-all duration-200',
+                'fixed z-[5500] flex flex-col bg-slate-900 border border-slate-700/80 shadow-2xl rounded-2xl overflow-hidden backdrop-blur-xl transition-[width,height,opacity] duration-200',
                 viewMode === 'maximized'
-                    ? 'top-4 left-4 right-4 bottom-4 w-auto h-auto'
+                    ? 'top-3 left-3 right-3 bottom-3 w-auto h-auto'
                     : viewMode === 'docked'
-                    ? 'bottom-6 right-6 w-[470px] h-[450px] shadow-indigo-500/20'
-                    : 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[670px] max-w-[96vw] max-h-[92vh]'
+                    ? 'bottom-6 right-6 w-[min(92vw,480px)] h-[min(70vh,440px)] shadow-indigo-500/20'
+                    : 'top-[65px] left-[max(12px,calc(50%-445px))] w-[min(95vw,890px)] h-[min(78vh,600px)]'
             )}
             style={{ touchAction: 'none' }}
         >
+            {/* ── İframe Fare Kalkanı (Sürükleme anında iframenin fareyi yutmasını önler) ── */}
+            {isDragging && (
+                <div className="absolute inset-0 z-50 bg-transparent cursor-grabbing select-none" />
+            )}
+
             {/* ── Üst Başlık Barı (Draggable Header) ── */}
             <div
-                onPointerDown={(e) => viewMode !== 'maximized' && dragControls.start(e)}
-                className="px-4 py-3 bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border-b border-white/10 flex items-center justify-between cursor-move select-none"
+                onPointerDown={(e) => {
+                    // Yalnızca buton olmayan boş alanlara tıklandığında taşımayı başlat
+                    if (viewMode !== 'maximized' && (e.target as HTMLElement).tagName !== 'BUTTON' && !(e.target as HTMLElement).closest('button')) {
+                        dragControls.start(e);
+                    }
+                }}
+                className="px-4 py-2.5 bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border-b border-white/10 flex items-center justify-between cursor-grab active:cursor-grabbing select-none"
             >
                 <div className="flex items-center gap-2.5">
-                    <div className="p-1.5 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                        <Compass className="w-5 h-5" />
+                    {/* Belirgin Taşıma Tutamacı */}
+                    <div
+                        onPointerDown={(e) => {
+                            e.stopPropagation();
+                            if (viewMode !== 'maximized') dragControls.start(e);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 hover:text-white border border-indigo-500/30 cursor-grab active:cursor-grabbing transition"
+                        title="Pencereyi Taşımak İçin Sürükleyin"
+                    >
+                        <Move className="w-4 h-4 text-indigo-400" />
+                        <span className="text-xs font-bold hidden sm:inline">Taşı</span>
                     </div>
+
                     <div>
                         <div className="flex items-center gap-2">
                             <span className="font-extrabold text-white text-sm tracking-wide">
@@ -420,13 +443,28 @@ export function GeoGebraStudioTool({
                                 Pro
                             </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 hidden sm:block">
+                        <p className="text-[11px] text-slate-400 hidden md:block">
                             Dinamik geometri, cebirsel grafikler ve 3D cisimleri oluşturup tahtaya aktarın
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div
+                    className="flex items-center gap-1.5"
+                    onPointerDown={(e) => e.stopPropagation()}
+                >
+                    {/* Konumu Sıfırla / Ortala */}
+                    {viewMode === 'normal' && (
+                        <button
+                            type="button"
+                            onClick={() => setResetPositionKey((k) => k + 1)}
+                            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition"
+                            title="Pencereyi Merkeze Getir"
+                        >
+                            <Crosshair className="w-4 h-4" />
+                        </button>
+                    )}
+
                     {/* Sayfaya Ekle / Yapıştır Butonu (Primary Glow) */}
                     {onInsertImage && (
                         <button
@@ -536,7 +574,10 @@ export function GeoGebraStudioTool({
             </div>
 
             {/* ── Alt Araç Seçim Barı (App Tabs & Quick Actions) ── */}
-            <div className="px-3 py-2 bg-slate-950/80 border-b border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div
+                className="px-3 py-2 bg-slate-950/80 border-b border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs"
+                onPointerDown={(e) => e.stopPropagation()}
+            >
                 {/* 5 App Sekmesi */}
                 <div className="flex items-center gap-1 overflow-x-auto py-0.5">
                     {APP_OPTIONS.map((app) => (
@@ -567,7 +608,7 @@ export function GeoGebraStudioTool({
                         placeholder="GeoGebra Linki veya ID (örn: m/abc123)"
                         value={materialInput}
                         onChange={(e) => setMaterialInput(e.target.value)}
-                        className="w-44 md:w-56 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 placeholder-slate-500 text-[11px] focus:outline-none focus:border-indigo-500"
+                        className="w-40 sm:w-56 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 placeholder-slate-500 text-[11px] focus:outline-none focus:border-indigo-500"
                     />
                     <button
                         type="submit"
@@ -589,7 +630,10 @@ export function GeoGebraStudioTool({
 
             {/* ── Şablonlar Çekmecesi (Maarif Hazır Konuları) ── */}
             {showTemplates && (
-                <div className="p-3 bg-slate-950/95 border-b border-indigo-500/20 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                <div
+                    className="p-3 bg-slate-950/95 border-b border-indigo-500/20 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-xs"
+                    onPointerDown={(e) => e.stopPropagation()}
+                >
                     {MAARIF_TEMPLATES.map((tmpl) => (
                         <div
                             key={tmpl.title}
@@ -646,8 +690,15 @@ export function GeoGebraStudioTool({
                 )}
             </div>
 
-            {/* ── Alt Durum ve İpuçları ── */}
-            <div className="px-3 py-1.5 bg-slate-950 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+            {/* ── Alt Durum ve İpuçları (Also Draggable) ── */}
+            <div
+                onPointerDown={(e) => {
+                    if (viewMode !== 'maximized' && (e.target as HTMLElement).tagName !== 'BUTTON' && !(e.target as HTMLElement).closest('button')) {
+                        dragControls.start(e);
+                    }
+                }}
+                className="px-3 py-1.5 bg-slate-950 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400 select-none cursor-grab active:cursor-grabbing"
+            >
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     <span>
@@ -662,8 +713,21 @@ export function GeoGebraStudioTool({
                     </span>
                 </div>
 
-                <div className="flex items-center gap-2 text-slate-400">
-                    <span className="hidden md:inline">
+                <div className="flex items-center gap-2.5">
+                    {/* Alt Çubuk Taşıma Butonu */}
+                    <div
+                        onPointerDown={(e) => {
+                            e.stopPropagation();
+                            if (viewMode !== 'maximized') dragControls.start(e);
+                        }}
+                        className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/5 hover:bg-white/10 text-indigo-300 hover:text-white cursor-grab active:cursor-grabbing transition"
+                        title="Pencereyi Taşımak İçin Sürükleyin"
+                    >
+                        <Move className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold">Taşı</span>
+                    </div>
+
+                    <span className="hidden md:inline text-slate-400">
                         💡 <strong>İpucu:</strong> Çizimi tahtaya aktarmak için sağ üstteki{' '}
                         <strong className="text-indigo-300">"Sayfaya Yapıştır"</strong> butonuna basın.
                     </span>
