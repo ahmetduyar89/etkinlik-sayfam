@@ -143,6 +143,38 @@ export const MATH_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
         k.c.restore();
     },
 
+    tool_geogebra: (k) => {
+        const { r } = k;
+        const cx = r.x + r.w * 0.5;
+        const cy = r.y + r.h * 0.5;
+        const radius = Math.min(r.w, r.h) * 0.38;
+        k.c.save();
+        k.c.strokeStyle = '#2563eb';
+        k.c.lineWidth = 2;
+        k.c.beginPath();
+        k.c.arc(cx, cy, radius, 0, Math.PI * 2);
+        k.c.stroke();
+        const pts = [
+            { a: -0.3, d: 0.7 },
+            { a: 0.9, d: 0.8 },
+            { a: 2.1, d: 0.65 },
+            { a: 3.3, d: 0.75 },
+            { a: 4.5, d: 0.7 },
+        ];
+        pts.forEach((p) => {
+            const px = cx + Math.cos(p.a) * radius * p.d;
+            const py = cy + Math.sin(p.a) * radius * p.d;
+            k.c.beginPath();
+            k.c.arc(px, py, radius * 0.14, 0, Math.PI * 2);
+            k.c.fillStyle = '#3b82f6';
+            k.c.fill();
+            k.c.strokeStyle = '#1d4ed8';
+            k.c.lineWidth = 1.2;
+            k.c.stroke();
+        });
+        k.c.restore();
+    },
+
     axes: (k) =>
         void drawGridAxes(k, {
             unitsX: clampInt(k.o.n, 1, 20, 5),
@@ -914,6 +946,13 @@ export const MATH_CATEGORIES: ReadonlyArray<ObjectCategory> = [
                 label: 'Sayı Doğrusu Aracı',
                 hint: 'Tam sayı, kesir ve ondalık modlu işaretlenebilir sayı doğrusu',
                 size: { w: 420, h: 100 },
+                defaults: {},
+            },
+            {
+                kind: 'tool_geogebra',
+                label: '🌐 GeoGebra Matematik Laboratuvarı',
+                hint: 'Klasik, Geometri, Grafik Çizici, 3D ve CAS; doğrudan sayfaya aktarılabilir',
+                size: { w: 520, h: 380 },
                 defaults: {},
             },
         ],

@@ -157,6 +157,7 @@ export type MathObjectKind =
     | 'tool_calculator'
     | 'tool_periodic_table'
     | 'tool_3d_station'
+    | 'tool_geogebra'
     // ── Fen: laboratuvar ────────────────────────────────────────────
     | 'beaker'
     | 'flask'

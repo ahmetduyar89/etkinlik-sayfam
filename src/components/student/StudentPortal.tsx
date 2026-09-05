@@ -11,6 +11,7 @@ import { CompassTool } from '../tools/CompassTool';
 import { NumberLineTool } from '../tools/NumberLineTool';
 import { MiniCalculatorTool } from '../tools/MiniCalculatorTool';
 import { PeriodicTableTool } from '../tools/PeriodicTableTool';
+import { GeoGebraStudioTool } from '../tools/GeoGebraStudioTool';
 import { useToast } from '../common/ToastProvider';
 import type { Activity, DrawConfig, DrawingCanvasHandle, Submission } from '../../types';
 
@@ -39,6 +40,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
     const [showNumberLine, setShowNumberLine] = useState(false);
     const [showCalculator, setShowCalculator] = useState(false);
     const [showPeriodicTable, setShowPeriodicTable] = useState(false);
+    const [showGeogebra, setShowGeogebra] = useState(false);
     const [drawHistory, setDrawHistory] = useState({ canUndo: false, canRedo: false });
     const [iframeHeight, setIframeHeight] = useState(1000);
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
@@ -391,6 +393,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
                                 else if (toolId === 'numberLine' || toolId === 'number_line') setShowNumberLine(true);
                                 else if (toolId === 'calculator') setShowCalculator(true);
                                 else if (toolId === 'periodicTable' || toolId === 'periodic_table') setShowPeriodicTable(true);
+                                else if (toolId === 'geogebra' || toolId === 'tool_geogebra') setShowGeogebra(true);
                             }}
                         />
                     )}
@@ -407,6 +410,15 @@ export function StudentPortal({ act }: StudentPortalProps) {
                 {showNumberLine && <NumberLineTool onClose={() => setShowNumberLine(false)} />}
                 {showCalculator && <MiniCalculatorTool onClose={() => setShowCalculator(false)} />}
                 {showPeriodicTable && <PeriodicTableTool onClose={() => setShowPeriodicTable(false)} />}
+                {showGeogebra && (
+                    <GeoGebraStudioTool
+                        onClose={() => setShowGeogebra(false)}
+                        onInsertImage={(dataUrl, w, h) => {
+                            canvasRef.current?.insertImage(dataUrl, w, h);
+                            toast.success('GeoGebra çizimi sayfaya eklendi.');
+                        }}
+                    />
+                )}
             </main>
         </div>
     );

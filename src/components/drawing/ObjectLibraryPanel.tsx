@@ -102,6 +102,7 @@ export function ObjectLibraryPanel({ open, onClose, onInsert, onSelectTool }: Ob
                 else if (item.kind === 'tool_calculator') onSelectTool('calculator');
                 else if (item.kind === 'tool_periodic_table') onSelectTool('periodicTable');
                 else if (item.kind === 'tool_3d_station') onSelectTool('3dStation');
+                else if (item.kind === 'tool_geogebra') onSelectTool('geogebra');
             }
             onClose();
             return;

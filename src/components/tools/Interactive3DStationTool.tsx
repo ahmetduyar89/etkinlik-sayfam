@@ -606,6 +606,28 @@ export function Interactive3DStationTool({ onClose, onInsertImage }: Interactive
                     )}
                 </div>
             )}
+
+            {activeTab === 'geogebra' && (
+                <div className="px-4 py-3 bg-slate-900/95 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2 text-slate-300">
+                        <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+                        <span className="font-semibold text-white">GeoGebra 3D Uzay Geometri Laboratuvarı</span>
+                        <span className="text-slate-500 hidden sm:inline">|</span>
+                        <span className="text-slate-400 hidden sm:inline">Katı cisimler, düzlemler ve uzay koordinatları</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <a
+                            href="https://www.geogebra.org/3d"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 font-bold transition flex items-center gap-1.5"
+                        >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Tarayıcıda Tam Ekran Aç</span>
+                        </a>
+                    </div>
+                </div>
+            )}
         </motion.div>
     );
 }

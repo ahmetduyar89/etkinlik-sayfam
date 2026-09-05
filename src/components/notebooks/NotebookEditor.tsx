@@ -52,6 +52,7 @@ import { NumberLineTool } from '../tools/NumberLineTool';
 import { MiniCalculatorTool } from '../tools/MiniCalculatorTool';
 import { PeriodicTableTool } from '../tools/PeriodicTableTool';
 import { Interactive3DStationTool } from '../tools/Interactive3DStationTool';
+import { GeoGebraStudioTool } from '../tools/GeoGebraStudioTool';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
@@ -176,6 +177,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const [showCalculator, setShowCalculator] = React.useState(false);
     const [showPeriodicTable, setShowPeriodicTable] = React.useState(false);
     const [show3DStation, setShow3DStation] = React.useState(false);
+    const [showGeogebra, setShowGeogebra] = React.useState(false);
 
     const handleSelectTool = (toolId: string) => {
         if (toolId === 'compass') setShowCompass(true);
@@ -183,6 +185,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         else if (toolId === 'calculator') setShowCalculator(true);
         else if (toolId === 'periodicTable' || toolId === 'periodic_table') setShowPeriodicTable(true);
         else if (toolId === '3dStation' || toolId === '3d_station' || toolId === 'station_3d') setShow3DStation(true);
+        else if (toolId === 'geogebra' || toolId === 'tool_geogebra') setShowGeogebra(true);
     };
 
     const boxesRef = React.useRef<TextBoxData[][]>([[]]);
@@ -1161,6 +1164,15 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     onInsertImage={(dataUrl, w, h) => {
                         canvasRef.current?.insertImage(dataUrl, w, h);
                         toast.success('3D model görüntüsü tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showGeogebra && (
+                <GeoGebraStudioTool
+                    onClose={() => setShowGeogebra(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('GeoGebra çizimi tahta sayfasına yapıştırıldı.');
                     }}
                 />
             )}
