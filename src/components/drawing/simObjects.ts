@@ -828,10 +828,20 @@ import {
     GRADE8_MATH_RENDERERS,
     GRADE8_MATH_SPECS,
 } from './grade8MathSims';
+import {
+    MIDDLE_SCHOOL_ITEMS,
+    MIDDLE_SCHOOL_MATH_ITEMS,
+    MIDDLE_SCHOOL_SCIENCE_ITEMS,
+    MIDDLE_SCHOOL_RENDERERS,
+    MIDDLE_SCHOOL_SPECS,
+} from './middleSchoolSims';
 
 export {
     GRADE8_ITEMS,
     GRADE8_MATH_ITEMS,
+    MIDDLE_SCHOOL_ITEMS,
+    MIDDLE_SCHOOL_MATH_ITEMS,
+    MIDDLE_SCHOOL_SCIENCE_ITEMS,
     GRADE10_GEOM_ITEMS,
     GRADE10_STATS_ITEMS,
     GRADE10_NUMBERS_ITEMS,
@@ -859,6 +869,7 @@ export const SIM_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
     matter_sim: matterRender,
     ...(GRADE8_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(GRADE8_MATH_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
+    ...(MIDDLE_SCHOOL_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(GRADE10_GEOM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(GRADE10_STATS_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(GRADE10_NUMBERS_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
@@ -884,6 +895,7 @@ export const SIM_SPECS: Partial<Record<MathObjectKind, SimSpec>> = {
     matter_sim: matterSpec,
     ...(GRADE8_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(GRADE8_MATH_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
+    ...(MIDDLE_SCHOOL_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(GRADE10_GEOM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(GRADE10_STATS_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(GRADE10_NUMBERS_SPECS as Partial<Record<MathObjectKind, SimSpec>>),

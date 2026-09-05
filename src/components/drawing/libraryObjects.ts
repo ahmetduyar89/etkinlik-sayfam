@@ -8,6 +8,8 @@ import { SCIENCE_CATEGORIES, SCIENCE_RENDERERS } from './scienceObjects';
 import {
     GRADE8_ITEMS,
     GRADE8_MATH_ITEMS,
+    MIDDLE_SCHOOL_MATH_ITEMS,
+    MIDDLE_SCHOOL_SCIENCE_ITEMS,
     GRADE10_GEOM_ITEMS,
     GRADE10_STATS_ITEMS,
     GRADE10_NUMBERS_ITEMS,
@@ -41,11 +43,12 @@ export interface ObjectGroup {
 /**
  * Branşlara göre sistemli gruplama:
  * 1. 🎯 8. Sınıf LGS (LGS Matematik & LGS Fen Bilimleri)
- * 2. 📐 Matematik (Geometri, Grafik & Fonksiyon, Sayılar & Kesirler, 10. Sınıf)
- * 3. ⚡ Fizik (Mekanik & Hareket, Elektrik & Manyetizma, Optik & Dalgalar)
- * 4. 🧪 Kimya (Laboratuvar, Kimya Deneyleri, Atom & Madde)
- * 5. 🧬 Biyoloji (Hücre & Genetik, Ekoloji & Canlı Sistemleri)
- * 6. ✨ 3D Laboratuvar (Three.js 3D İnteraktif Modeller)
+ * 2. 🎒 Ortaokul (5-7) (Ortaokul Matematik & Fen Bilimleri)
+ * 3. 📐 Matematik (Geometri, Grafik & Fonksiyon, Sayılar & Kesirler, 10. Sınıf)
+ * 4. ⚡ Fizik (Mekanik & Hareket, Elektrik & Manyetizma, Optik & Dalgalar)
+ * 5. 🧪 Kimya (Laboratuvar, Kimya Deneyleri, Atom & Madde)
+ * 6. 🧬 Biyoloji (Hücre & Genetik, Ekoloji & Canlı Sistemleri)
+ * 7. ✨ 3D Laboratuvar (Three.js 3D İnteraktif Modeller)
  */
 export const LIBRARY_GROUPS: ReadonlyArray<ObjectGroup> = [
     {
@@ -56,11 +59,18 @@ export const LIBRARY_GROUPS: ReadonlyArray<ObjectGroup> = [
         ],
     },
     {
+        label: '🎒 Ortaokul (5-7)',
+        categories: [
+            { label: 'Ortaokul Matematik', items: MIDDLE_SCHOOL_MATH_ITEMS },
+            { label: 'Ortaokul Fen', items: MIDDLE_SCHOOL_SCIENCE_ITEMS },
+        ],
+    },
+    {
         label: '📐 Matematik',
         categories: [
-            { label: 'Geometri & Çizim', items: [...MATH_CATEGORIES[1].items, ...GEOMETRY_SIM_ITEMS] },
-            { label: 'Grafik & Fonksiyon', items: [...MATH_CATEGORIES[0].items, ...MATH_SIM_ITEMS] },
-            { label: 'Sayılar & Kesirler', items: [...MATH_CATEGORIES[2].items, ...NUMBER_SIM_ITEMS] },
+            { label: 'Geometri & Çizim', items: [...MATH_CATEGORIES[1].items, ...GEOMETRY_SIM_ITEMS, ...MIDDLE_SCHOOL_MATH_ITEMS.filter(it => it.kind === 'polygon_angles_sim')] },
+            { label: 'Grafik & Fonksiyon', items: [...MATH_CATEGORIES[0].items, ...MATH_SIM_ITEMS, ...MIDDLE_SCHOOL_MATH_ITEMS.filter(it => it.kind === 'algebra_balance_sim')] },
+            { label: 'Sayılar & Kesirler', items: [...MATH_CATEGORIES[2].items, ...NUMBER_SIM_ITEMS, ...MIDDLE_SCHOOL_MATH_ITEMS.filter(it => ['integer_counters_sim', 'factor_tree_sim', 'fraction_percent_decimal_sim'].includes(it.kind))] },
             { label: '10. Sınıf Matematik', items: [...GRADE10_GEOM_ITEMS, ...GRADE10_STATS_ITEMS, ...GRADE10_NUMBERS_ITEMS] },
         ],
     },
@@ -71,6 +81,7 @@ export const LIBRARY_GROUPS: ReadonlyArray<ObjectGroup> = [
                 label: 'Mekanik & Hareket',
                 items: [
                     ...SCIENCE_CATEGORIES[1].items,
+                    ...MIDDLE_SCHOOL_SCIENCE_ITEMS.filter(it => ['roller_coaster_sim', 'mass_weight_gravity_sim'].includes(it.kind)),
                     ...PHYSICS_SIM_ITEMS,
                     ...TASK_SIM_ITEMS,
                     ...MEASURE_SIM_ITEMS,
@@ -107,6 +118,7 @@ export const LIBRARY_GROUPS: ReadonlyArray<ObjectGroup> = [
                         defaults: { labels: true, sim: { theta1: 45, n1: 1.5, n2: 1.0 } },
                     },
                     ...OPTICS_SIM_ITEMS,
+                    ...MIDDLE_SCHOOL_SCIENCE_ITEMS.filter(it => it.kind === 'shadow_screen_sim'),
                 ],
             },
         ],
@@ -118,6 +130,7 @@ export const LIBRARY_GROUPS: ReadonlyArray<ObjectGroup> = [
                 label: 'Laboratuvar & Deneyler',
                 items: [
                     ...SCIENCE_CATEGORIES[0].items,
+                    ...MIDDLE_SCHOOL_SCIENCE_ITEMS.filter(it => it.kind === 'density_column_sim'),
                     ...CHEMISTRY_SIM_ITEMS,
                 ],
             },
@@ -131,6 +144,7 @@ export const LIBRARY_GROUPS: ReadonlyArray<ObjectGroup> = [
                         size: { w: 380, h: 280 },
                         defaults: { labels: true, sim: { temp: 20 } },
                     },
+                    ...MIDDLE_SCHOOL_SCIENCE_ITEMS.filter(it => it.kind === 'expansion_ring_sim'),
                     ...SCIENCE_CATEGORIES[2].items.filter((it) =>
                         ['bohr_atom', 'element_card', 'states_of_matter', 'tool_periodic_table', 'ph_sim'].includes(it.kind)
                     ),

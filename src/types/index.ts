@@ -315,7 +315,18 @@ export type MathObjectKind =
     | 'gear_wheel_pulley_sim'
     | 'heating_cooling_curve_sim'
     | 'biotech_cloning_sim'
-    | 'fermentation_sim';
+    | 'fermentation_sim'
+    // ── Ortaokul (5, 6, 7. Sınıf) Matematik ve Fen Simülasyonları ───
+    | 'integer_counters_sim'
+    | 'algebra_balance_sim'
+    | 'factor_tree_sim'
+    | 'polygon_angles_sim'
+    | 'fraction_percent_decimal_sim'
+    | 'shadow_screen_sim'
+    | 'roller_coaster_sim'
+    | 'density_column_sim'
+    | 'expansion_ring_sim'
+    | 'mass_weight_gravity_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile
