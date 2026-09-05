@@ -57,6 +57,7 @@ export const MAIN_TOOLS: ReadonlyArray<MainTool> = [
     { id: 'select', icon: MousePointer2, label: 'Seç & Düzenle' },
     { id: 'lasso', icon: Lasso, label: 'Kement (çoklu seçim)' },
     { id: 'pencil', icon: Pencil, label: 'Kalem' },
+    { id: 'polygon', icon: Pentagon, label: 'Noktalarla Çokgen (A-B-C)' },
     { id: 'pan', icon: Hand, label: 'El' },
     { id: 'highlighter', icon: Highlighter, label: 'Fosforlu' },
     { id: 'sun', icon: Sun, label: 'Lazer' },

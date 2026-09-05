@@ -18,6 +18,7 @@ import {
     Trash2,
     Undo,
     Wand2,
+    Pentagon,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, MathObject, PenType } from '../../types';
@@ -295,6 +296,35 @@ export function DrawingToolbar({
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                         className="pointer-events-auto flex flex-col gap-2 max-h-[62vh] overflow-y-auto bg-[#1a1b26]/95 backdrop-blur-md p-3 rounded-2xl border border-white/10 shadow-2xl"
                     >
+                        {/* Noktalarla Çokgen Vurgulu Buton */}
+                        <button
+                            type="button"
+                            onClick={() => selectTool('polygon')}
+                            className={cn(
+                                'w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl border text-left transition-all',
+                                config.tool === 'polygon'
+                                    ? 'bg-indigo-600/30 border-indigo-500/70 text-white shadow-lg ring-1 ring-indigo-500/50'
+                                    : 'bg-white/[0.04] border-white/10 hover:bg-white/10 text-slate-200'
+                            )}
+                        >
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 shrink-0">
+                                    <Pentagon className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <span className="block text-[12.5px] font-bold text-white leading-tight">
+                                        Noktalarla Çokgen (A-B-C...)
+                                    </span>
+                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                        GeoGebra gibi noktalara tıklayarak üçgen, dörtgen ve çokgen oluşturun
+                                    </span>
+                                </div>
+                            </div>
+                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-indigo-500/25 text-indigo-300 shrink-0">
+                                {config.tool === 'polygon' ? 'Seçili' : 'Seç'}
+                            </span>
+                        </button>
+
                         {/* 2B Şekiller */}
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] text-slate-400 font-semibold w-[78px] shrink-0 leading-tight">

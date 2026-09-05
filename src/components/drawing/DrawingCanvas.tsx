@@ -120,10 +120,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const dragStateRef = React.useRef<DragState | null>(null);
         const lassoRef = React.useRef<Point[] | null>(null);
         const polyPointsRef = React.useRef<Point[]>([]);
+        const [polyCount, setPolyCount] = React.useState<number>(0);
 
         React.useEffect(() => {
             if (config.tool !== 'polygon' && polyPointsRef.current.length > 0) {
                 polyPointsRef.current = [];
+                setPolyCount(0);
                 clearOverlay();
             }
         }, [config.tool]);
@@ -132,6 +134,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const handleKeyDown = (e: KeyboardEvent) => {
                 if (e.key === 'Escape' && polyPointsRef.current.length > 0) {
                     polyPointsRef.current = [];
+                    setPolyCount(0);
                     clearOverlay();
                 }
             };
@@ -964,6 +967,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             cancelHoldTimer();
             heldShapeRef.current = null;
             polyPointsRef.current = [];
+            setPolyCount(0);
             if (!isDrawingRef.current && !currentStrokeRef.current) return;
             isDrawingRef.current = false;
             currentStrokeRef.current = null;
@@ -1392,6 +1396,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         commitStrokes();
                         emit({ type: 'add', page: currentPageRef.current, strokes: [s] });
                         polyPointsRef.current = [];
+                        setPolyCount(0);
                         clearOverlay();
                         redraw();
                         return;
@@ -1399,6 +1404,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 }
 
                 polyPointsRef.current.push({ x, y });
+                setPolyCount(polyPointsRef.current.length);
                 drawPolygonOverlay({ x, y });
                 return;
             }
@@ -1876,6 +1882,20 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     className="absolute left-0 z-[4001] pointer-events-none touch-none"
                     style={{ top: 0 }}
                 />
+
+                {enabled && config.tool === 'polygon' && (
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[4600] pointer-events-none flex items-center gap-2.5 px-4 py-2 bg-slate-900/90 backdrop-blur-md border border-indigo-500/50 rounded-full shadow-2xl text-white text-[13px] font-medium transition-all">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>
+                            {polyCount === 0
+                                ? 'Noktalarla Çokgen (A-B-C): Tuvale tıklayarak köşe noktaları ekleyin.'
+                                : `${polyCount} nokta eklendi. Kapatmak için ilk noktaya (A) tıklayın.`}
+                        </span>
+                        <span className="text-[11px] text-slate-300 bg-white/10 px-2 py-0.5 rounded-full ml-1">
+                            İptal: Esc
+                        </span>
+                    </div>
+                )}
 
                 {enabled && selectedIdxs.length > 0 && selBB && selScreenBB && (
                     <div
