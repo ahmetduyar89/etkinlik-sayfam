@@ -192,12 +192,29 @@ export const label = (
     y: number,
     align: CanvasTextAlign = 'center',
     baseline: CanvasTextBaseline = 'middle',
-    scale = 1
+    scale = 1,
+    color?: string,
+    halo: boolean = true
 ) => {
     k.c.save();
-    k.c.font = `600 ${Math.round(k.fs * scale)}px ui-sans-serif, system-ui, Arial`;
+    const fs = Math.round(k.fs * scale);
+    k.c.font = `700 ${fs}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
     k.c.textAlign = align;
     k.c.textBaseline = baseline;
+    const finalColor = color || (k.color ? k.color : '#0f172a');
+    if (halo) {
+        const isWhiteText =
+            finalColor.startsWith('#fff') ||
+            finalColor.startsWith('#FFF') ||
+            finalColor.toLowerCase() === 'white';
+        k.c.strokeStyle = isWhiteText
+            ? 'rgba(15, 23, 42, 0.85)'
+            : 'rgba(255, 255, 255, 0.95)';
+        k.c.lineWidth = Math.max(2, fs * 0.22);
+        k.c.lineJoin = 'round';
+        k.c.strokeText(text, x, y);
+    }
+    k.c.fillStyle = finalColor;
     k.c.fillText(text, x, y);
     k.c.restore();
 };
