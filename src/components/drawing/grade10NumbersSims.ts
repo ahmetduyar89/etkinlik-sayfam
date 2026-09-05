@@ -18,8 +18,16 @@ import {
 } from './objectDrawing';
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   GÖRSEL YARDIMCILAR
+   GÖRSEL YARDIMCILAR & MATEMATİKSEL DÖNÜŞTÜRÜCÜLER
    ───────────────────────────────────────────────────────────────────────────── */
+
+function toSuperscript(num: number): string {
+    const sups: Record<string, string> = {
+        '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+        '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+    };
+    return String(num).split('').map((d) => sups[d] || d).join('');
+}
 
 function drawText(
     k: Ctx,
@@ -33,6 +41,7 @@ function drawText(
         color?: string;
         halo?: boolean;
         bold?: boolean;
+        maxW?: number;
     } = {}
 ) {
     const {
@@ -42,17 +51,28 @@ function drawText(
         color = '#0f172a',
         halo = true,
         bold = true,
+        maxW,
     } = options;
 
-    const fs = Math.round(k.fs * scale);
+    let fs = Math.round(k.fs * scale);
     k.c.save();
     k.c.font = `${bold ? '700' : '600'} ${fs}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
+
+    if (maxW && maxW > 30) {
+        const m = k.c.measureText(text);
+        if (m.width > maxW) {
+            const ratio = maxW / m.width;
+            fs = Math.max(7, Math.floor(fs * ratio));
+            k.c.font = `${bold ? '700' : '600'} ${fs}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
+        }
+    }
+
     k.c.textAlign = align;
     k.c.textBaseline = baseline;
 
     if (halo) {
-        k.c.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-        k.c.lineWidth = Math.max(3, fs * 0.28);
+        k.c.strokeStyle = 'rgba(255, 255, 255, 0.96)';
+        k.c.lineWidth = Math.max(2.5, fs * 0.28);
         k.c.lineJoin = 'round';
         k.c.strokeText(text, x, y);
     }
@@ -72,6 +92,7 @@ function drawBadge(
         textColor?: string;
         borderColor?: string;
         scale?: number;
+        maxW?: number;
     } = {}
 ) {
     const {
@@ -79,23 +100,33 @@ function drawBadge(
         textColor = '#0f172a',
         borderColor = '#cbd5e1',
         scale = 0.80,
+        maxW,
     } = options;
 
-    const fs = Math.round(k.fs * scale);
+    let fs = Math.round(k.fs * scale);
     k.c.save();
     k.c.font = `700 ${fs}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
-    const m = k.c.measureText(text);
-    const padX = fs * 0.85;
-    const padY = fs * 0.35;
+    let m = k.c.measureText(text);
+
+    const limitW = maxW ?? (k.r.w * 0.92);
+    if (m.width + fs * 1.6 > limitW && limitW > 40) {
+        const ratio = (limitW - fs * 1.2) / m.width;
+        fs = Math.max(7, Math.floor(fs * ratio));
+        k.c.font = `700 ${fs}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
+        m = k.c.measureText(text);
+    }
+
+    const padX = fs * 0.75;
+    const padY = fs * 0.30;
     const bw = m.width + padX * 2;
-    const bh = fs * 1.4 + padY * 2;
+    const bh = fs * 1.35 + padY * 2;
     const bx = cx - bw / 2;
     const by = cy - bh / 2;
     const rad = bh / 2;
 
     k.c.fillStyle = bgColor;
     k.c.strokeStyle = borderColor;
-    k.c.lineWidth = 1.3;
+    k.c.lineWidth = 1.2;
     k.c.beginPath();
     if (typeof k.c.roundRect === 'function') {
         k.c.roundRect(bx, by, bw, bh, rad);
@@ -112,7 +143,6 @@ function drawBadge(
     k.c.restore();
 }
 
-// Asal çarpanlara ayırma yardımcı fonksiyonu
 function getPrimeFactors(n: number): { p: number; exp: number }[] {
     const res: { p: number; exp: number }[] = [];
     let rem = n;
@@ -160,6 +190,8 @@ function gcd(a: number, b: number): number {
    1. ASAL ÇARPANLAR & POZİTİF BÖLEN SAYISI (prime_factors_sim)
    ───────────────────────────────────────────────────────────────────────────── */
 
+const PRIME_NUM_SAMPLES = [28, 48, 60, 72, 120, 180, 240, 360, 496];
+
 interface PrimeFactorsState {
     num: number; // 12..720
 }
@@ -173,7 +205,7 @@ export const primeFactorsRender: Renderer = (k: Ctx) => {
     const s = primeFactorsState(k.o);
     const N = s.num;
 
-    const fs = Math.max(9, Math.min(16, Math.min(r.w, r.h) / 16));
+    const fs = Math.max(9, Math.min(15, Math.min(r.w, r.h) / 18));
     const icon = isIconSize(r);
 
     c.save();
@@ -188,19 +220,28 @@ export const primeFactorsRender: Renderer = (k: Ctx) => {
     const isPerfect = properSum === N;
 
     if (!icon) {
-        // Üst Başlık Rozeti
-        drawBadge(k, `Asal Çarpanlar ve Bölen Sayısı (N = ${N})`, r.x + r.w / 2, r.y + fs * 1.2, {
+        // Üst Başlık Rozeti (Sol/Orta)
+        drawBadge(k, `Asal Çarpanlar & Bölen Sayısı (N = ${N})`, r.x + r.w * 0.40, r.y + fs * 1.2, {
             bgColor: '#f8fafc',
             textColor: '#0f172a',
             borderColor: '#cbd5e1',
             scale: 0.82,
+            maxW: r.w * 0.62,
+        });
+
+        // Üst Sağ: Buton Rozeti
+        drawBadge(k, '⟳ Sayı Seç', r.x + r.w * 0.85, r.y + fs * 1.2, {
+            bgColor: '#eff6ff',
+            textColor: '#1d4ed8',
+            borderColor: '#bfdbfe',
+            scale: 0.76,
+            maxW: r.w * 0.24,
         });
     }
 
     // ── Sol Panel: Asal Çarpan Bölen Algoritması Çizgisi ──
-    const algoX = r.x + (icon ? 12 : r.w * 0.12);
+    const lineX = r.x + (icon ? 24 : r.w * 0.16);
     const algoY = r.y + (icon ? 10 : fs * 2.8);
-    const lineX = algoX + fs * 3.5;
 
     // Adımları hesapla
     const steps: { val: number; prime: number }[] = [];
@@ -212,8 +253,8 @@ export const primeFactorsRender: Renderer = (k: Ctx) => {
         }
     });
 
-    const maxStepsShow = Math.min(steps.length, 7);
-    const stepH = Math.min(fs * 1.6, (r.h * 0.55) / (maxStepsShow + 1));
+    const maxStepsShow = Math.min(steps.length, 6);
+    const stepH = Math.min(fs * 1.7, (r.h * 0.52) / (maxStepsShow + 1));
 
     if (!icon) {
         c.save();
@@ -229,7 +270,7 @@ export const primeFactorsRender: Renderer = (k: Ctx) => {
         steps.slice(0, maxStepsShow).forEach((st, idx) => {
             const y = algoY + (idx + 0.6) * stepH;
             // Sol: Bölünen sayı
-            drawText(k, `${st.val}`, lineX - fs * 0.8, y, { align: 'right', color: '#0f172a', scale: 0.85 });
+            drawText(k, `${st.val}`, lineX - fs * 0.8, y, { align: 'right', color: '#0f172a', scale: 0.86 });
             // Sağ: Asal bölen
             drawText(k, `${st.prime}`, lineX + fs * 0.8, y, { align: 'left', color: '#2563eb', scale: 0.88 });
         });
@@ -242,10 +283,10 @@ export const primeFactorsRender: Renderer = (k: Ctx) => {
     }
 
     // ── Sağ Panel: Formül Kartı & Bölenler ──
-    const cardX = r.x + (icon ? 6 : r.w * 0.38);
+    const cardX = r.x + (icon ? 6 : r.w * 0.32);
     const cardY = r.y + (icon ? 6 : fs * 2.8);
-    const cardW = icon ? r.w - 12 : r.w * 0.58;
-    const cardH = icon ? r.h - 12 : r.h * 0.54;
+    const cardW = icon ? r.w - 12 : r.w * 0.64;
+    const cardH = icon ? r.h - 12 : r.h * 0.55;
 
     c.save();
     c.fillStyle = '#ffffff';
@@ -258,47 +299,54 @@ export const primeFactorsRender: Renderer = (k: Ctx) => {
     c.stroke();
 
     if (!icon) {
-        // 1. Asal Üslü Gösterim: N = p1^a * p2^b...
-        const expStr = factors.map((f) => `${f.p}${f.exp > 1 ? `^${f.exp}` : ''}`).join(' · ');
+        const innerMaxW = cardW - fs * 1.5;
+
+        // 1. Asal Üslü Gösterim: N = p1^a * p2^b... (Üst simgelerle temiz)
+        const expStr = factors.map((f) => `${f.p}${f.exp > 1 ? toSuperscript(f.exp) : ''}`).join(' · ');
         drawText(k, `Asal Çarpan Açılımı: ${N} = ${expStr}`, cardX + cardW / 2, cardY + fs * 1.2, {
             color: '#1e40af',
-            scale: 0.85,
+            scale: 0.86,
+            maxW: innerMaxW,
         });
 
         // 2. Pozitif Bölen Sayısı (PBS) Formülü
         const pbsFormula = factors.map((f) => `(${f.exp}+1)`).join(' · ');
-        const pbsValues = factors.map((f) => `${f.exp + 1}`).join(' · ');
-        drawText(k, `PBS = ${pbsFormula} = ${pbsValues} = ${pbs} adet`, cardX + cardW / 2, cardY + fs * 2.6, {
+        drawText(k, `PBS = ${pbsFormula} = ${pbs} adet pozitif bölen`, cardX + cardW / 2, cardY + fs * 2.5, {
             color: '#059669',
             scale: 0.85,
+            maxW: innerMaxW,
         });
 
         // 3. Tam Sayı Bölen Sayısı
-        drawText(k, `Tam Sayı Bölenleri (TBS) = 2 · PBS = ${2 * pbs} adet (Negatifler dahil)`, cardX + cardW / 2, cardY + fs * 3.8, {
+        drawText(k, `TBS = 2 · PBS = ${2 * pbs} adet tam sayı bölen (±)`, cardX + cardW / 2, cardY + fs * 3.7, {
             color: '#64748b',
-            scale: 0.74,
+            scale: 0.78,
+            maxW: innerMaxW,
         });
 
-        // 4. Pozitif Bölenler Listesi (İlk 14 tanesi)
-        const divListStr = divisors.slice(0, 14).join(', ') + (divisors.length > 14 ? '...' : '');
-        drawText(k, `Bölenler: { ${divListStr} }`, cardX + cardW / 2, cardY + fs * 5.1, {
+        // 4. Pozitif Bölenler Listesi (Taşmayacak şekilde ilk 9-10 tanesi)
+        const showCount = cardW < 300 ? 6 : 10;
+        const divListStr = divisors.slice(0, showCount).join(', ') + (divisors.length > showCount ? ', ...' : '');
+        drawText(k, `Bölenler: { ${divListStr} }`, cardX + cardW / 2, cardY + fs * 4.9, {
             color: '#334155',
-            scale: 0.72,
+            scale: 0.75,
+            maxW: innerMaxW,
         });
     }
     c.restore();
 
     if (!icon) {
-        // Alt Bilgi & İbni Fellûs (Mardini) Rozeti
+        // Alt Bilgi Rozeti (Oto-ölçeklenen, asla taşmayan)
         const perfectText = isPerfect
-            ? `✦ Mükemmel Sayı! Kendisi hariç bölenleri toplamı kendisine eşit (${properSum} = ${N}) [İbni Fellûs]`
-            : `Kendisi hariç bölenler toplamı: ${properSum} (${properSum > N ? 'Zengin Sayı' : 'Eksik Sayı'}) · Aritmetiğin Temel Teoremi`;
+            ? `✦ İbni Fellûs: ${N} Mükemmel Sayıdır! (Bölenler toplamı = ${properSum})`
+            : `✦ İbni Fellûs: Kendisi hariç bölenler toplamı = ${properSum} (${properSum > N ? 'Zengin Sayı' : 'Eksik Sayı'})`;
 
-        drawBadge(k, perfectText, r.x + r.w / 2, cardY + cardH + fs * 1.6, {
+        drawBadge(k, perfectText, r.x + r.w / 2, r.y + r.h - fs * 1.1, {
             bgColor: isPerfect ? '#fef3c7' : '#ede9fe',
             textColor: isPerfect ? '#92400e' : '#5b21b6',
             borderColor: isPerfect ? '#fde68a' : '#c4b5fd',
             scale: 0.78,
+            maxW: r.w * 0.94,
         });
     }
 
@@ -308,25 +356,24 @@ export const primeFactorsRender: Renderer = (k: Ctx) => {
 export const primeFactorsSpec: SimSpec = {
     controls: (r: Rect, o: MathObject): SimControl[] => {
         const s = primeFactorsState(o);
-        const fs = Math.max(9, Math.min(16, Math.min(r.w, r.h) / 16));
+        const fs = Math.max(9, Math.min(15, Math.min(r.w, r.h) / 18));
 
         return [
             {
                 id: 'nextNum',
-                x: r.x + r.w * 0.88,
+                x: r.x + r.w * 0.85,
                 y: r.y + fs * 1.2,
                 type: 'toggle',
-                label: 'Örnek Sayıları Değiştir',
+                label: 'Sayıyı Değiştir',
                 on: s.num === 28 || s.num === 72,
             },
         ];
     },
     onControl: (r: Rect, o: MathObject, id: string): Record<string, number> => {
         if (id === 'nextNum') {
-            const list = [28, 48, 60, 72, 120, 180, 240, 360, 496];
             const cur = primeFactorsState(o).num;
-            const nextIdx = (list.indexOf(cur) + 1) % list.length;
-            return { num: list[nextIdx] };
+            const nextIdx = (PRIME_NUM_SAMPLES.indexOf(cur) + 1) % PRIME_NUM_SAMPLES.length;
+            return { num: PRIME_NUM_SAMPLES[nextIdx] };
         }
         return {};
     },
@@ -338,6 +385,15 @@ export const primeFactorsSpec: SimSpec = {
 /* ─────────────────────────────────────────────────────────────────────────────
    2. GEOMETRİK EBOB-EKOK & ÖKLİD KARO DÖŞEME (ebob_ekok_tiling_sim)
    ───────────────────────────────────────────────────────────────────────────── */
+
+const EBOB_SAMPLES = [
+    { a: 36, b: 24 },
+    { a: 48, b: 18 },
+    { a: 40, b: 25 },
+    { a: 60, b: 45 },
+    { a: 28, b: 21 },
+    { a: 15, b: 8 },
+];
 
 interface EbobEkokState {
     numA: number; // 12..60
@@ -355,7 +411,7 @@ export const ebobEkokRender: Renderer = (k: Ctx) => {
     const A = s.numA;
     const B = s.numB;
 
-    const fs = Math.max(9, Math.min(16, Math.min(r.w, r.h) / 16));
+    const fs = Math.max(9, Math.min(15, Math.min(r.w, r.h) / 18));
     const icon = isIconSize(r);
 
     c.save();
@@ -371,20 +427,30 @@ export const ebobEkokRender: Renderer = (k: Ctx) => {
     const areCoprime = g === 1;
 
     if (!icon) {
-        // Üst Başlık Rozeti
-        drawBadge(k, `EBOB(${A}, ${B}) = ${g}  ·  EKOK(${A}, ${B}) = ${l}`, r.x + r.w / 2, r.y + fs * 1.2, {
+        // Üst Başlık Rozeti (Sol/Orta)
+        drawBadge(k, `EBOB(${A}, ${B}) = ${g}  ·  EKOK(${A}, ${B}) = ${l}`, r.x + r.w * 0.40, r.y + fs * 1.2, {
             bgColor: '#eff6ff',
             textColor: '#1d4ed8',
             borderColor: '#bfdbfe',
             scale: 0.82,
+            maxW: r.w * 0.62,
+        });
+
+        // Üst Sağ: Buton Rozeti
+        drawBadge(k, '⟳ Örnek Seç', r.x + r.w * 0.85, r.y + fs * 1.2, {
+            bgColor: '#f0fdf4',
+            textColor: '#15803d',
+            borderColor: '#bbf7d0',
+            scale: 0.76,
+            maxW: r.w * 0.24,
         });
     }
 
     // ── Geometrik Zemin (Dikdörtgen Fayans Döşeme Alanı) ──
-    const roomAreaW = icon ? r.w - 12 : r.w * 0.48;
-    const roomAreaH = icon ? r.h - 12 : r.h * 0.54;
+    const roomAreaW = icon ? r.w - 12 : r.w * 0.44;
+    const roomAreaH = icon ? r.h - 12 : r.h * 0.50;
     const roomX = r.x + (icon ? 6 : r.w * 0.06);
-    const roomY = r.y + (icon ? 6 : fs * 2.8);
+    const roomY = r.y + (icon ? 6 : fs * 3.0);
 
     // Orantılı çizim
     const scaleFactor = Math.min(roomAreaW / A, roomAreaH / B);
@@ -397,7 +463,7 @@ export const ebobEkokRender: Renderer = (k: Ctx) => {
     // Zemin çerçevesi
     c.fillStyle = '#f8fafc';
     c.strokeStyle = '#0f172a';
-    c.lineWidth = 2;
+    c.lineWidth = 1.8;
     c.fillRect(startX, startY, drawW, drawH);
     c.strokeRect(startX, startY, drawW, drawH);
 
@@ -410,8 +476,7 @@ export const ebobEkokRender: Renderer = (k: Ctx) => {
         for (let iy = 0; iy < tilesY; iy++) {
             const tx = startX + ix * tilePx;
             const ty = startY + iy * tilePx;
-            // Satranç vari hafif renk tonu
-            c.fillStyle = (ix + iy) % 2 === 0 ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.22)';
+            c.fillStyle = (ix + iy) % 2 === 0 ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.24)';
             c.fillRect(tx, ty, tilePx, tilePx);
             c.strokeRect(tx, ty, tilePx, tilePx);
         }
@@ -420,17 +485,17 @@ export const ebobEkokRender: Renderer = (k: Ctx) => {
 
     if (!icon) {
         // Zemin Boyut Etiketleri
-        drawText(k, `A = ${A} br`, startX + drawW / 2, startY - fs * 0.7, { color: '#0f172a', scale: 0.82 });
-        drawText(k, `B = ${B} br`, startX - fs * 0.8, startY + drawH / 2, { align: 'right', color: '#0f172a', scale: 0.82 });
+        drawText(k, `A = ${A} br`, startX + drawW / 2, startY - fs * 0.8, { color: '#0f172a', scale: 0.82 });
+        drawText(k, `B = ${B} br`, startX - fs * 1.0, startY + drawH / 2, { align: 'right', color: '#0f172a', scale: 0.82 });
 
         // Fayans Bilgisi
-        drawText(k, `Fayans: ${g}×${g} br`, startX + drawW / 2, startY + drawH + fs * 0.9, { color: '#2563eb', scale: 0.8 });
+        drawText(k, `Karo: ${g}×${g} br`, startX + drawW / 2, startY + drawH + fs * 0.9, { color: '#2563eb', scale: 0.80 });
 
         // ── Sağ Panel: Formül ve Kanıt Kartı ──
-        const cardX = r.x + r.w * 0.57;
+        const cardX = r.x + r.w * 0.54;
         const cardY = r.y + fs * 2.8;
-        const cardW = r.w * 0.38;
-        const cardH = r.h * 0.54;
+        const cardW = r.w * 0.42;
+        const cardH = r.h * 0.55;
 
         c.save();
         c.fillStyle = '#ffffff';
@@ -442,36 +507,40 @@ export const ebobEkokRender: Renderer = (k: Ctx) => {
         c.fill();
         c.stroke();
 
+        const innerMaxW = cardW - fs * 1.2;
+
         // 1. Fayans hesabı
-        drawText(k, 'ÖKLİD ALGORİTMASI & EBOB', cardX + cardW / 2, cardY + fs * 1.1, { color: '#0f172a', scale: 0.76 });
-        drawText(k, `En Büyük Eş Kare Karo: ${g}×${g}`, cardX + cardW / 2, cardY + fs * 2.2, { color: '#2563eb', scale: 0.82 });
-        drawText(k, `Gereken En Az Karo: ${tilesX} · ${tilesY} = ${totalTiles}`, cardX + cardW / 2, cardY + fs * 3.3, {
+        drawText(k, 'ÖKLİD ALGORİTMASI & EBOB', cardX + cardW / 2, cardY + fs * 1.1, { color: '#0f172a', scale: 0.76, maxW: innerMaxW });
+        drawText(k, `Eş Kare Karo: ${g} × ${g}`, cardX + cardW / 2, cardY + fs * 2.2, { color: '#2563eb', scale: 0.82, maxW: innerMaxW });
+        drawText(k, `En Az Karo: ${tilesX} · ${tilesY} = ${totalTiles} adet`, cardX + cardW / 2, cardY + fs * 3.3, {
             color: '#059669',
             scale: 0.82,
+            maxW: innerMaxW,
         });
 
         // 2. a * b = EBOB * EKOK bağıntısı
         c.strokeStyle = '#e2e8f0';
         c.beginPath();
-        c.moveTo(cardX + fs * 0.8, cardY + fs * 4.2);
-        c.lineTo(cardX + cardW - fs * 0.8, cardY + fs * 4.2);
+        c.moveTo(cardX + fs * 0.8, cardY + fs * 4.1);
+        c.lineTo(cardX + cardW - fs * 0.8, cardY + fs * 4.1);
         c.stroke();
 
-        drawText(k, 'Temel EBOB-EKOK Bağıntısı:', cardX + cardW / 2, cardY + fs * 5.1, { color: '#475569', scale: 0.74 });
-        drawText(k, `A · B = EBOB · EKOK`, cardX + cardW / 2, cardY + fs * 6.2, { color: '#9333ea', scale: 0.85 });
-        drawText(k, `${A} · ${B} = ${g} · ${l} = ${A * B} ✓`, cardX + cardW / 2, cardY + fs * 7.3, { color: '#0f172a', scale: 0.82 });
+        drawText(k, 'Temel EBOB-EKOK Bağıntısı:', cardX + cardW / 2, cardY + fs * 4.9, { color: '#475569', scale: 0.74, maxW: innerMaxW });
+        drawText(k, `A · B = EBOB · EKOK`, cardX + cardW / 2, cardY + fs * 5.9, { color: '#9333ea', scale: 0.84, maxW: innerMaxW });
+        drawText(k, `${A} · ${B} = ${g} · ${l} = ${A * B} ✓`, cardX + cardW / 2, cardY + fs * 6.9, { color: '#0f172a', scale: 0.80, maxW: innerMaxW });
         c.restore();
 
         // Alt Bilgi Rozeti
         const bottomMsg = areCoprime
             ? `✦ ${A} ve ${B} Aralarında Asal! (EBOB = 1, EKOK = ${A * B})`
-            : `Fayans kenarı (${g}), her iki kenarı (${A} ve ${B}) kalansız bölen en büyük sayıdır.`;
+            : `✦ Geometrik Kural: Dikdörtgenin alanı (${A * B}), ${totalTiles} adet (${g}×${g}) karonun alanına eşittir.`;
 
-        drawBadge(k, bottomMsg, r.x + r.w / 2, r.y + r.h - fs * 1.0, {
+        drawBadge(k, bottomMsg, r.x + r.w / 2, r.y + r.h - fs * 1.1, {
             bgColor: areCoprime ? '#fef3c7' : '#f1f5f9',
             textColor: areCoprime ? '#92400e' : '#334155',
             borderColor: areCoprime ? '#fde68a' : '#cbd5e1',
             scale: 0.76,
+            maxW: r.w * 0.94,
         });
     }
 
@@ -480,9 +549,27 @@ export const ebobEkokRender: Renderer = (k: Ctx) => {
 
 export const ebobEkokSpec: SimSpec = {
     controls: (r: Rect, o: MathObject): SimControl[] => {
-        return [];
+        const fs = Math.max(9, Math.min(15, Math.min(r.w, r.h) / 18));
+        return [
+            {
+                id: 'nextSample',
+                x: r.x + r.w * 0.85,
+                y: r.y + fs * 1.2,
+                type: 'toggle',
+                label: 'Örnek Boyutları Değiştir',
+                on: false,
+            },
+        ];
     },
-    onControl: (): Record<string, number> => ({}),
+    onControl: (r: Rect, o: MathObject, id: string): Record<string, number> => {
+        if (id === 'nextSample') {
+            const s = ebobEkokState(o);
+            const curIdx = EBOB_SAMPLES.findIndex((p) => p.a === s.numA && p.b === s.numB);
+            const nextIdx = (curIdx + 1) % EBOB_SAMPLES.length;
+            return { numA: EBOB_SAMPLES[nextIdx].a, numB: EBOB_SAMPLES[nextIdx].b };
+        }
+        return {};
+    },
     params: [
         { key: 'numA', label: 'Kenar A (Genişlik)', min: 12, max: 60, step: 2 },
         { key: 'numB', label: 'Kenar B (Yükseklik)', min: 8, max: 48, step: 2 },
@@ -492,6 +579,14 @@ export const ebobEkokSpec: SimSpec = {
 /* ─────────────────────────────────────────────────────────────────────────────
    3. DİŞLİ ÇARKLAR & PERİYODİK EKOK SİMÜLATÖRÜ (periodic_ekok_sim)
    ───────────────────────────────────────────────────────────────────────────── */
+
+const GEAR_SAMPLES = [
+    { a: 12, b: 18 },
+    { a: 8, b: 12 },
+    { a: 10, b: 15 },
+    { a: 16, b: 24 },
+    { a: 14, b: 21 },
+];
 
 interface PeriodicEkokState {
     teethA: number; // 6..24
@@ -511,7 +606,7 @@ export const periodicEkokRender: Renderer = (k: Ctx) => {
     const TA = s.teethA;
     const TB = s.teethB;
 
-    const fs = Math.max(9, Math.min(16, Math.min(r.w, r.h) / 16));
+    const fs = Math.max(9, Math.min(15, Math.min(r.w, r.h) / 18));
     const icon = isIconSize(r);
 
     c.save();
@@ -525,26 +620,49 @@ export const periodicEkokRender: Renderer = (k: Ctx) => {
     const lapsB = l / TB;
 
     if (!icon) {
-        // Üst Başlık Rozeti
-        drawBadge(k, `Dişli Çarklar & Periyodik Buluşma (EKOK)`, r.x + r.w / 2, r.y + fs * 1.2, {
+        // Üst Başlık Rozeti (Sol)
+        drawBadge(k, `Dişli Çarklar & Periyodik EKOK`, r.x + r.w * 0.35, r.y + fs * 1.2, {
             bgColor: '#f8fafc',
             textColor: '#0f172a',
             borderColor: '#cbd5e1',
             scale: 0.82,
+            maxW: r.w * 0.50,
+        });
+
+        // Üst Sağ Buton 1: Başlat / Durdur
+        drawBadge(k, s.running ? '⏸ Durdur' : '▶ Başlat', r.x + r.w * 0.74, r.y + fs * 1.2, {
+            bgColor: s.running ? '#fef2f2' : '#f0fdf4',
+            textColor: s.running ? '#b91c1c' : '#15803d',
+            borderColor: s.running ? '#fecaca' : '#bbf7d0',
+            scale: 0.74,
+            maxW: r.w * 0.22,
+        });
+
+        // Üst Sağ Buton 2: Örnek Seç
+        drawBadge(k, '⟳ Örnek', r.x + r.w * 0.90, r.y + fs * 1.2, {
+            bgColor: '#eff6ff',
+            textColor: '#1d4ed8',
+            borderColor: '#bfdbfe',
+            scale: 0.74,
+            maxW: r.w * 0.16,
         });
     }
 
-    // ── Çark Geometrisi ──
-    const toothPitch = 12; // Diş aralığı
-    const rA = (TA * toothPitch) / (2 * Math.PI);
-    const rB = (TB * toothPitch) / (2 * Math.PI);
+    // ── Çark Geometrisi (Ferah ve orantılı) ──
+    const totalTeeth = TA + TB;
+    const maxGearAreaW = r.w * 0.48;
+    const maxGearAreaH = r.h * 0.52;
+    const targetSpan = Math.min(maxGearAreaW, maxGearAreaH * 1.6);
 
-    const cxA = r.x + r.w * 0.26;
+    const rA = Math.max(26, (TA / totalTeeth) * targetSpan * 0.85);
+    const rB = Math.max(26, (TB / totalTeeth) * targetSpan * 0.85);
+
+    const cxA = r.x + r.w * 0.07 + rA;
     const cxB = cxA + rA + rB;
-    const cy = r.y + fs * 2.8 + r.h * 0.28;
+    const cy = r.y + fs * 2.8 + (r.h * 0.54) / 2;
 
     // Dönme açısı (k.t ile dinamik)
-    const speed = s.running ? (k.t || 0) * 0.0015 : 0;
+    const speed = s.running ? (k.t || 0) * 0.0016 : 0;
     const angA = speed;
     const angB = -speed * (TA / TB); // Karşı dişli ters döner
 
@@ -554,19 +672,19 @@ export const periodicEkokRender: Renderer = (k: Ctx) => {
         c.translate(cx, cy);
         c.rotate(angle);
 
-        c.fillStyle = withAlpha(color, 0.15);
+        c.fillStyle = withAlpha(color, 0.16);
         c.strokeStyle = color;
-        c.lineWidth = 2;
+        c.lineWidth = 1.8;
 
         c.beginPath();
         for (let i = 0; i < teeth; i++) {
             const a0 = (i * 2 * Math.PI) / teeth;
-            const a1 = ((i + 0.4) * 2 * Math.PI) / teeth;
-            const a2 = ((i + 0.6) * 2 * Math.PI) / teeth;
+            const a1 = ((i + 0.35) * 2 * Math.PI) / teeth;
+            const a2 = ((i + 0.65) * 2 * Math.PI) / teeth;
             const a3 = ((i + 1.0) * 2 * Math.PI) / teeth;
 
-            const rInner = radius - 6;
-            const rOuter = radius + 6;
+            const rInner = radius - 5;
+            const rOuter = radius + 5;
 
             if (i === 0) c.moveTo(Math.cos(a0) * rInner, Math.sin(a0) * rInner);
             c.lineTo(Math.cos(a1) * rOuter, Math.sin(a1) * rOuter);
@@ -579,33 +697,35 @@ export const periodicEkokRender: Renderer = (k: Ctx) => {
 
         // İç göbek çemberi
         c.beginPath();
-        c.arc(0, 0, radius * 0.35, 0, Math.PI * 2);
+        c.arc(0, 0, Math.max(10, radius * 0.34), 0, Math.PI * 2);
         c.fillStyle = '#ffffff';
         c.fill();
         c.stroke();
 
         // Başlangıç temas noktası belirteci (kırmızı işaret)
         c.beginPath();
-        c.arc(radius, 0, 4.5, 0, Math.PI * 2);
+        c.arc(radius, 0, 4.0, 0, Math.PI * 2);
         c.fillStyle = '#ef4444';
         c.fill();
         c.stroke();
 
         c.restore();
 
-        // İsim etiketi
-        drawText(k, `${name} (${teeth} Diş)`, cx, cy, { color: color, scale: 0.78 });
+        // Göbekte kısa harf, üstte/altta başlık ve diş sayısı (ASLA ÇAKIŞMAZ)
+        drawText(k, name.slice(-1), cx, cy, { color: color, scale: 0.9, bold: true });
+        drawText(k, name, cx, cy - radius - fs * 0.9, { color: color, scale: 0.80 });
+        drawText(k, `${teeth} Diş`, cx, cy + radius + fs * 0.9, { color: '#334155', scale: 0.76 });
     };
 
     drawGear(cxA, cy, rA, TA, angA, '#2563eb', 'Çark A');
-    drawGear(cxB, cy, rB, TB, angB, '#f59e0b', 'Çark B');
+    drawGear(cxB, cy, rB, TB, angB, '#d97706', 'Çark B');
 
     if (!icon) {
         // Sağ Bilgi Kartı
-        const cardX = r.x + r.w * 0.64;
+        const cardX = r.x + r.w * 0.60;
         const cardY = r.y + fs * 2.8;
-        const cardW = r.w * 0.32;
-        const cardH = r.h * 0.54;
+        const cardW = r.w * 0.36;
+        const cardH = r.h * 0.55;
 
         c.save();
         c.fillStyle = '#ffffff';
@@ -617,8 +737,10 @@ export const periodicEkokRender: Renderer = (k: Ctx) => {
         c.fill();
         c.stroke();
 
-        drawText(k, 'PERİYODİK BULUŞMA', cardX + cardW / 2, cardY + fs * 1.1, { color: '#0f172a', scale: 0.76 });
-        drawText(k, `EKOK(${TA}, ${TB}) = ${l} Diş`, cardX + cardW / 2, cardY + fs * 2.3, { color: '#9333ea', scale: 0.85 });
+        const innerMaxW = cardW - fs * 1.2;
+
+        drawText(k, 'PERİYODİK BULUŞMA', cardX + cardW / 2, cardY + fs * 1.1, { color: '#0f172a', scale: 0.76, maxW: innerMaxW });
+        drawText(k, `EKOK(${TA}, ${TB}) = ${l} Diş`, cardX + cardW / 2, cardY + fs * 2.3, { color: '#9333ea', scale: 0.86, maxW: innerMaxW });
 
         c.strokeStyle = '#e2e8f0';
         c.beginPath();
@@ -626,18 +748,18 @@ export const periodicEkokRender: Renderer = (k: Ctx) => {
         c.lineTo(cardX + cardW - fs * 0.6, cardY + fs * 3.3);
         c.stroke();
 
-        drawText(k, 'İlk Buluşma Tur Sayıları:', cardX + cardW / 2, cardY + fs * 4.2, { color: '#64748b', scale: 0.72 });
-        drawText(k, `Çark A: ${l} / ${TA} = ${lapsA} Tur`, cardX + cardW / 2, cardY + fs * 5.4, { color: '#2563eb', scale: 0.82 });
-        drawText(k, `Çark B: ${l} / ${TB} = ${lapsB} Tur`, cardX + cardW / 2, cardY + fs * 6.6, { color: '#d97706', scale: 0.82 });
+        drawText(k, 'İlk Buluşma Tur Sayıları:', cardX + cardW / 2, cardY + fs * 4.2, { color: '#64748b', scale: 0.74, maxW: innerMaxW });
+        drawText(k, `Çark A: ${l} / ${TA} = ${lapsA} Tur`, cardX + cardW / 2, cardY + fs * 5.3, { color: '#2563eb', scale: 0.82, maxW: innerMaxW });
+        drawText(k, `Çark B: ${l} / ${TB} = ${lapsB} Tur`, cardX + cardW / 2, cardY + fs * 6.4, { color: '#d97706', scale: 0.82, maxW: innerMaxW });
         c.restore();
 
         // Alt Maarif Bağlantı Rozeti
         drawBadge(
             k,
-            `💡 Gerçek Yaşam: Nöbet günleri, sefer saatleri ve sinyal lambaları periyotları EKOK ile modellenir.`,
+            `💡 Periyodik EKOK: İki çark ${l} diş geçişinde (A: ${lapsA} tur, B: ${lapsB} tur) ilk temas noktasına döner.`,
             r.x + r.w / 2,
-            r.y + r.h - fs * 1.0,
-            { bgColor: '#f0fdf4', textColor: '#166534', borderColor: '#bbf7d0', scale: 0.76 }
+            r.y + r.h - fs * 1.1,
+            { bgColor: '#f0fdf4', textColor: '#166534', borderColor: '#bbf7d0', scale: 0.76, maxW: r.w * 0.94 }
         );
     }
 
@@ -648,15 +770,23 @@ export const periodicEkokSpec: SimSpec = {
     animated: (o: MathObject) => simValue(o, 'running', 1) === 1,
     controls: (r: Rect, o: MathObject): SimControl[] => {
         const s = periodicEkokState(o);
-        const fs = Math.max(9, Math.min(16, Math.min(r.w, r.h) / 16));
+        const fs = Math.max(9, Math.min(15, Math.min(r.w, r.h) / 18));
         return [
             {
                 id: 'toggleRun',
-                x: r.x + r.w * 0.88,
+                x: r.x + r.w * 0.74,
                 y: r.y + fs * 1.2,
                 type: 'toggle',
                 label: 'Döndür / Durdur',
                 on: s.running === 1,
+            },
+            {
+                id: 'nextGears',
+                x: r.x + r.w * 0.90,
+                y: r.y + fs * 1.2,
+                type: 'toggle',
+                label: 'Örnek Dişlileri Değiştir',
+                on: false,
             },
         ];
     },
@@ -664,6 +794,12 @@ export const periodicEkokSpec: SimSpec = {
         if (id === 'toggleRun') {
             const cur = periodicEkokState(o).running;
             return { running: cur === 1 ? 0 : 1 };
+        }
+        if (id === 'nextGears') {
+            const s = periodicEkokState(o);
+            const curIdx = GEAR_SAMPLES.findIndex((p) => p.a === s.teethA && p.b === s.teethB);
+            const nextIdx = (curIdx + 1) % GEAR_SAMPLES.length;
+            return { teethA: GEAR_SAMPLES[nextIdx].a, teethB: GEAR_SAMPLES[nextIdx].b };
         }
         return {};
     },
@@ -704,7 +840,7 @@ export const divisibilityRender: Renderer = (k: Ctx) => {
     const N = s.num;
     const rData = RULES_DATA[s.rule] || RULES_DATA[2];
 
-    const fs = Math.max(9, Math.min(16, Math.min(r.w, r.h) / 16));
+    const fs = Math.max(9, Math.min(15, Math.min(r.w, r.h) / 18));
     const icon = isIconSize(r);
 
     c.save();
@@ -717,20 +853,30 @@ export const divisibilityRender: Renderer = (k: Ctx) => {
     const digitsSum = digits.reduce((a, b) => a + b, 0);
 
     if (!icon) {
-        // Üst Başlık Rozeti
-        drawBadge(k, `${rData.name} & Kalan Muhakemesi (N = ${N})`, r.x + r.w / 2, r.y + fs * 1.2, {
+        // Üst Başlık Rozeti (Sol/Orta)
+        drawBadge(k, `${rData.name} & Kalan (N = ${N})`, r.x + r.w * 0.40, r.y + fs * 1.2, {
             bgColor: '#f8fafc',
             textColor: '#0f172a',
             borderColor: '#cbd5e1',
             scale: 0.82,
+            maxW: r.w * 0.62,
+        });
+
+        // Üst Sağ Buton: Kural Seç
+        drawBadge(k, '⟳ Kural Seç', r.x + r.w * 0.85, r.y + fs * 1.2, {
+            bgColor: '#eff6ff',
+            textColor: '#1d4ed8',
+            borderColor: '#bfdbfe',
+            scale: 0.76,
+            maxW: r.w * 0.24,
         });
     }
 
     // ── Basamak Çözümleme Kartı ──
-    const cardX = r.x + (icon ? 6 : r.w * 0.08);
+    const cardX = r.x + (icon ? 6 : r.w * 0.06);
     const cardY = r.y + (icon ? 6 : fs * 2.8);
-    const cardW = icon ? r.w - 12 : r.w * 0.84;
-    const cardH = icon ? r.h - 12 : r.h * 0.54;
+    const cardW = icon ? r.w - 12 : r.w * 0.88;
+    const cardH = icon ? r.h - 12 : r.h * 0.55;
 
     c.save();
     c.fillStyle = '#ffffff';
@@ -743,20 +889,33 @@ export const divisibilityRender: Renderer = (k: Ctx) => {
     c.stroke();
 
     if (!icon) {
-        // Basamak Kutucukları
-        const boxSize = fs * 2.2;
-        const totalBoxesW = digits.length * boxSize + (digits.length - 1) * 8;
+        const innerMaxW = cardW - fs * 1.5;
+
+        // Basamak Kutucukları (Kutunun üstünde basamak adı)
+        const boxSize = Math.min(fs * 2.1, 38);
+        const gap = 10;
+        const totalBoxesW = digits.length * boxSize + (digits.length - 1) * gap;
         const boxStartX = cardX + (cardW - totalBoxesW) / 2;
-        const boxY = cardY + fs * 1.0;
+        const boxY = cardY + fs * 1.4;
+
+        const placeNames = ['Birler', 'Onlar', 'Yüzler', 'Binler'];
 
         digits.forEach((d, i) => {
-            const bx = boxStartX + i * (boxSize + 8);
-            // Kritik basamakları vurgula
+            const bx = boxStartX + i * (boxSize + gap);
+            // Kritik basamakları belirle
             let isKey = false;
             if (rData.div === 2 || rData.div === 5 || rData.div === 10) isKey = i === digits.length - 1;
             else if (rData.div === 4) isKey = i >= digits.length - 2;
             else if (rData.div === 8) isKey = i >= digits.length - 3;
             else isKey = true; // 3 ve 9 için hepsi
+
+            // Basamak basamak adı etiketi
+            const placeIdx = digits.length - 1 - i;
+            drawText(k, placeNames[placeIdx] || `${Math.pow(10, placeIdx)}`, bx + boxSize / 2, boxY - fs * 0.6, {
+                color: isKey ? '#2563eb' : '#94a3b8',
+                scale: 0.68,
+                bold: isKey,
+            });
 
             c.fillStyle = isKey ? '#eff6ff' : '#f8fafc';
             c.strokeStyle = isKey ? '#2563eb' : '#cbd5e1';
@@ -775,9 +934,10 @@ export const divisibilityRender: Renderer = (k: Ctx) => {
         });
 
         // Cebirsel Açıklama
-        drawText(k, `Cebirsel İspat: ${rData.reason}`, cardX + cardW / 2, cardY + fs * 4.2, {
+        drawText(k, `Cebirsel İspat: ${rData.reason}`, cardX + cardW / 2, cardY + fs * 4.3, {
             color: '#1e40af',
             scale: 0.82,
+            maxW: innerMaxW,
         });
 
         // Kalan Hesabı
@@ -795,7 +955,7 @@ export const divisibilityRender: Renderer = (k: Ctx) => {
             calcStr = `Birler Basamağı = ${last1} ⇒ Kalan = ${rem}`;
         }
 
-        drawText(k, calcStr, cardX + cardW / 2, cardY + fs * 5.6, { color: '#059669', scale: 0.85 });
+        drawText(k, calcStr, cardX + cardW / 2, cardY + fs * 5.6, { color: '#059669', scale: 0.84, maxW: innerMaxW });
 
         // Sonuç Rozeti
         const resultText = rem === 0 ? `✓ ${N}, ${rData.div} ile KALANSIZ bölünür!` : `✦ ${N}'nin ${rData.div} ile bölümünden KALAN = ${rem}`;
@@ -804,19 +964,20 @@ export const divisibilityRender: Renderer = (k: Ctx) => {
             bgColor: rem === 0 ? '#dcfce7' : '#fee2e2',
             textColor: rem === 0 ? '#166534' : '#991b1b',
             borderColor: rem === 0 ? '#86efac' : '#fca5a5',
-            scale: 0.82,
+            scale: 0.80,
+            maxW: innerMaxW,
         });
     }
     c.restore();
 
     if (!icon) {
-        // Alt Maarif Miras Notu
-        drawText(
+        // Alt Maarif Miras Notu (Oto-ölçeklenen, asla taşmayan)
+        drawBadge(
             k,
-            '📜 Kültürel Miras: Basamak çözümlemesiyle bölünebilme teoremleri Mehmed Nâdir’in "Hesâb-ı Nazarî" eserinde ayrıntılı incelenmiştir.',
+            '📜 Mehmed Nâdir (Hesâb-ı Nazarî): Bölünebilme kuralları basamak çözümleme teoremine dayanır.',
             r.x + r.w / 2,
-            r.y + r.h - fs * 1.0,
-            { align: 'center', color: '#64748b', halo: true, scale: 0.72 }
+            r.y + r.h - fs * 1.1,
+            { bgColor: '#f8fafc', textColor: '#475569', borderColor: '#e2e8f0', scale: 0.75, maxW: r.w * 0.94 }
         );
     }
 
@@ -826,11 +987,11 @@ export const divisibilityRender: Renderer = (k: Ctx) => {
 export const divisibilitySpec: SimSpec = {
     controls: (r: Rect, o: MathObject): SimControl[] => {
         const s = divisibilityState(o);
-        const fs = Math.max(9, Math.min(16, Math.min(r.w, r.h) / 16));
+        const fs = Math.max(9, Math.min(15, Math.min(r.w, r.h) / 18));
         return [
             {
                 id: 'nextRule',
-                x: r.x + r.w * 0.88,
+                x: r.x + r.w * 0.85,
                 y: r.y + fs * 1.2,
                 type: 'toggle',
                 label: 'Bölünebilme Kuralını Değiştir',
@@ -878,7 +1039,7 @@ export const compoundRemainderRender: Renderer = (k: Ctx) => {
     const data = COMPOUNDS[s.choice] || COMPOUNDS[0];
     const rem = Math.min(s.rem, data.mod - 1);
 
-    const fs = Math.max(9, Math.min(16, Math.min(r.w, r.h) / 16));
+    const fs = Math.max(9, Math.min(15, Math.min(r.w, r.h) / 18));
     const icon = isIconSize(r);
 
     c.save();
@@ -891,20 +1052,30 @@ export const compoundRemainderRender: Renderer = (k: Ctx) => {
     const rem2 = rem % data.f2;
 
     if (!icon) {
-        // Üst Başlık Rozeti
-        drawBadge(k, `Bileşik Kalan Teoremi: ${data.name}`, r.x + r.w / 2, r.y + fs * 1.2, {
+        // Üst Başlık Rozeti (Sol/Orta)
+        drawBadge(k, `Bileşik Kalan Teoremi: ${data.name}`, r.x + r.w * 0.40, r.y + fs * 1.2, {
             bgColor: '#f8fafc',
             textColor: '#0f172a',
             borderColor: '#cbd5e1',
             scale: 0.82,
+            maxW: r.w * 0.62,
+        });
+
+        // Üst Sağ Buton: Bölen Seç
+        drawBadge(k, '⟳ Bölen Seç', r.x + r.w * 0.85, r.y + fs * 1.2, {
+            bgColor: '#eff6ff',
+            textColor: '#1d4ed8',
+            borderColor: '#bfdbfe',
+            scale: 0.76,
+            maxW: r.w * 0.24,
         });
     }
 
     // ── Ana Gövde Kartı ──
-    const cardX = r.x + (icon ? 6 : r.w * 0.08);
+    const cardX = r.x + (icon ? 6 : r.w * 0.06);
     const cardY = r.y + (icon ? 6 : fs * 2.8);
-    const cardW = icon ? r.w - 12 : r.w * 0.84;
-    const cardH = icon ? r.h - 12 : r.h * 0.54;
+    const cardW = icon ? r.w - 12 : r.w * 0.88;
+    const cardH = icon ? r.h - 12 : r.h * 0.55;
 
     c.save();
     c.fillStyle = '#ffffff';
@@ -917,11 +1088,14 @@ export const compoundRemainderRender: Renderer = (k: Ctx) => {
     c.stroke();
 
     if (!icon) {
+        const innerMaxW = cardW - fs * 1.5;
+
         // Teorem İfadesi
-        drawText(k, `Sayı Modeli: X = ${data.mod}k + ${rem}`, cardX + cardW / 2, cardY + fs * 1.2, {
+        drawText(k, `Sayı Modeli: X = ${data.mod} · k + ${rem}`, cardX + cardW / 2, cardY + fs * 1.2, {
             color: '#1e40af',
-            scale: 0.9,
+            scale: 0.90,
             bold: true,
+            maxW: innerMaxW,
         });
 
         // Ayrıştırma Adımları
@@ -930,48 +1104,50 @@ export const compoundRemainderRender: Renderer = (k: Ctx) => {
 
         drawText(
             k,
-            `1) ${data.f1} ile Bölümünden Kalan: ${rem} = ${data.f1} · ${q1} + ${rem1}  ⇒  Kalan = ${rem1}`,
+            `1) ${data.f1} ile Kalan: ${rem} = ${data.f1} · ${q1} + ${rem1}  ⇒  Kalan = ${rem1}`,
             cardX + cardW / 2,
-            cardY + fs * 2.6,
-            { color: '#2563eb', scale: 0.84 }
+            cardY + fs * 2.5,
+            { color: '#2563eb', scale: 0.84, maxW: innerMaxW }
         );
 
         drawText(
             k,
-            `2) ${data.f2} ile Bölümünden Kalan: ${rem} = ${data.f2} · ${q2} + ${rem2}  ⇒  Kalan = ${rem2}`,
+            `2) ${data.f2} ile Kalan: ${rem} = ${data.f2} · ${q2} + ${rem2}  ⇒  Kalan = ${rem2}`,
             cardX + cardW / 2,
-            cardY + fs * 3.8,
-            { color: '#d97706', scale: 0.84 }
+            cardY + fs * 3.7,
+            { color: '#d97706', scale: 0.84, maxW: innerMaxW }
         );
 
         // Örnek Değerler
         const ex1 = rem;
         const ex2 = data.mod + rem;
         const ex3 = data.mod * 2 + rem;
-        drawText(k, `Örnek X Sayıları: { ${ex1}, ${ex2}, ${ex3}, ... } (Hepsi bu kalanları sağlar)`, cardX + cardW / 2, cardY + fs * 5.1, {
+
+        drawText(k, `Örnek X Sayıları: { ${ex1}, ${ex2}, ${ex3}, ... } (Hepsi bu kalanları sağlar)`, cardX + cardW / 2, cardY + fs * 4.9, {
             color: '#059669',
-            scale: 0.8,
+            scale: 0.80,
+            maxW: innerMaxW,
         });
 
         // Rozet
         drawBadge(
             k,
-            `✦ Çarpanlar Aralarında Asal Olmalıdır: EBOB(${data.f1}, ${data.f2}) = 1`,
+            `✦ Çarpanlar Aralarında Asal: EBOB(${data.f1}, ${data.f2}) = 1`,
             cardX + cardW / 2,
-            cardY + fs * 6.5,
-            { bgColor: '#fef3c7', textColor: '#92400e', borderColor: '#fde68a', scale: 0.78 }
+            cardY + fs * 6.3,
+            { bgColor: '#fef3c7', textColor: '#92400e', borderColor: '#fde68a', scale: 0.78, maxW: innerMaxW }
         );
     }
     c.restore();
 
     if (!icon) {
-        // Alt Maarif Modeli Açıklaması
-        drawText(
+        // Alt Maarif Modeli Açıklaması (Oto-ölçeklenen rozet)
+        drawBadge(
             k,
-            `💡 Müfredat İlkesi: X'in ${data.mod} ile bölümünden kalan c ise; ${data.f1} ve ${data.f2} ile kalanlar c'nin bu sayılara bölümünden kalandır.`,
+            `💡 İlke: X mod ${data.mod} = ${rem} ise; ${data.f1} ile kalan ${rem1}, ${data.f2} ile kalan ${rem2}'dir.`,
             r.x + r.w / 2,
-            r.y + r.h - fs * 1.0,
-            { align: 'center', color: '#64748b', halo: true, scale: 0.72 }
+            r.y + r.h - fs * 1.1,
+            { bgColor: '#f8fafc', textColor: '#475569', borderColor: '#e2e8f0', scale: 0.75, maxW: r.w * 0.94 }
         );
     }
 
@@ -981,11 +1157,11 @@ export const compoundRemainderRender: Renderer = (k: Ctx) => {
 export const compoundRemainderSpec: SimSpec = {
     controls: (r: Rect, o: MathObject): SimControl[] => {
         const s = compoundState(o);
-        const fs = Math.max(9, Math.min(16, Math.min(r.w, r.h) / 16));
+        const fs = Math.max(9, Math.min(15, Math.min(r.w, r.h) / 18));
         return [
             {
                 id: 'nextCompound',
-                x: r.x + r.w * 0.88,
+                x: r.x + r.w * 0.85,
                 y: r.y + fs * 1.2,
                 type: 'toggle',
                 label: 'Bileşik Sayıyı Değiştir (12, 15, 30, 45)',
