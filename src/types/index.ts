@@ -279,7 +279,12 @@ export type MathObjectKind =
     | 'atom_3d_sim'
     | 'dna_3d_sim'
     | 'circuit_lab_sim'
-    | 'gears_sim';
+    | 'gears_sim'
+    // ── 10. Sınıf Geometrik Şekiller (Yeni Maarif Modeli) ─────────────
+    | 'trig_ratio_sim'
+    | 'sine_cosine_sim'
+    | 'triangle_centers_sim'
+    | 'triangle_area_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile

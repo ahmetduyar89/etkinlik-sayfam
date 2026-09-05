@@ -16,6 +16,7 @@ import {
     type ObjectCategory,
     type Renderer,
 } from './objectDrawing';
+import { GRADE10_GEOM_ITEMS } from './grade10GeomSims';
 
 /** Ekseni ve ızgarayı çizen ortak yardımcı (koordinat düzlemi türevleri). */
 function drawGridAxes(
@@ -971,6 +972,10 @@ export const MATH_CATEGORIES: ReadonlyArray<ObjectCategory> = [
                 fields: [{ key: 'n', label: 'Uzunluk (cm)', type: 'number', min: 2, max: 40 }],
             },
         ],
+    },
+    {
+        label: '10. Sınıf Geometri',
+        items: GRADE10_GEOM_ITEMS,
     },
     {
         label: 'Geometrik Cisimler',

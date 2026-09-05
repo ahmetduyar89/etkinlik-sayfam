@@ -11,6 +11,7 @@ export type LibrarySubCategory =
     | 'Fizik & Kuvvet'
     | 'Biyoloji & Canlılar'
     // Simülasyon
+    | '10. Sınıf Geometri'
     | 'Matematik Lab'
     | 'Fen Lab';
 
@@ -27,6 +28,7 @@ export interface LibraryItem {
 
 export const LIBRARY_SUB_CATEGORIES: Record<LibraryCategory, LibrarySubCategory[]> = {
     Matematik: [
+        '10. Sınıf Geometri',
         'Koordinat & Grafik',
         'Geometri',
         'Geometrik Cisimler',
@@ -38,6 +40,7 @@ export const LIBRARY_SUB_CATEGORIES: Record<LibraryCategory, LibrarySubCategory[
         'Biyoloji & Canlılar',
     ],
     Simülasyon: [
+        '10. Sınıf Geometri',
         'Matematik Lab',
         'Fen Lab',
     ],
@@ -622,5 +625,42 @@ export const LIBRARY_ITEMS: LibraryItem[] = [
         iconType: 'fraction_pie',
         actionType: 'stamp',
         description: 'Pay ve paydayı dinamik değiştirme',
+    },
+    // ────────────── 10. SINIF GEOMETRİK ŞEKİLLER (MAARİF MODELİ) ──────────────
+    {
+        id: 'sim_trig_ratio',
+        title: 'Trigonometrik Oranlar & Özdeşlikler',
+        category: 'Simülasyon',
+        subCategory: '10. Sınıf Geometri',
+        iconType: 'right_triangle',
+        actionType: 'stamp',
+        description: 'Dik üçgende açı değişimi, sin, cos, tan, cot ve sin²α+cos²α=1',
+    },
+    {
+        id: 'sim_sine_cosine',
+        title: 'Sinüs & Kosinüs Teoremleri',
+        category: 'Simülasyon',
+        subCategory: '10. Sınıf Geometri',
+        iconType: 'equilateral_triangle',
+        actionType: 'stamp',
+        description: 'Kosinüs Teoremi Pisagor karşılaştırması ve Çevrel Çember çapı (2R)',
+    },
+    {
+        id: 'sim_triangle_centers',
+        title: 'Özel Merkezler & Euler Doğrusu',
+        category: 'Simülasyon',
+        subCategory: '10. Sınıf Geometri',
+        iconType: 'compass',
+        actionType: 'stamp',
+        description: 'Ağırlık M. (G), Diklik M. (H), Çevrel M. (O) ve H-G-O Euler Doğrusu',
+    },
+    {
+        id: 'sim_triangle_area',
+        title: 'Üçgenin Alanı & Cavalieri İlkesi',
+        category: 'Simülasyon',
+        subCategory: '10. Sınıf Geometri',
+        iconType: 'parallelogram',
+        actionType: 'stamp',
+        description: 'Paralel hatta tepe kaydırma, yükseklik ve alan korunumu',
     },
 ];

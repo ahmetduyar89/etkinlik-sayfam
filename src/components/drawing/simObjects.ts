@@ -808,6 +808,11 @@ import { TASK_SIM_ITEMS, TASK_SIM_RENDERERS, TASK_SIM_SPECS } from './taskSims';
 import { MATH_SIM_ITEMS, MATH_SIM_RENDERERS, MATH_SIM_SPECS } from './mathSims';
 import { SCIENCE_SIM_ITEMS, SCIENCE_SIM_RENDERERS, SCIENCE_SIM_SPECS } from './scienceSims';
 import { THREE_SIM_ITEMS, THREE_SIM_RENDERERS, THREE_SIM_SPECS } from './threeEngine';
+import {
+    GRADE10_GEOM_ITEMS,
+    GRADE10_GEOM_RENDERERS,
+    GRADE10_GEOM_SPECS,
+} from './grade10GeomSims';
 
 // ── Kayıt ────────────────────────────────────────────────────────────
 
@@ -817,6 +822,7 @@ export const SIM_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
     circuit_sim: circuitRender,
     matter_sim: matterRender,
     ...(GRADE8_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
+    ...(GRADE10_GEOM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(MATH_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(GEOMETRY_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(NUMBER_SIM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
@@ -838,6 +844,7 @@ export const SIM_SPECS: Partial<Record<MathObjectKind, SimSpec>> = {
     circuit_sim: circuitSpec,
     matter_sim: matterSpec,
     ...(GRADE8_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
+    ...(GRADE10_GEOM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(MATH_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(GEOMETRY_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(NUMBER_SIM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
@@ -1000,9 +1007,10 @@ export const SIM_CATEGORIES: ReadonlyArray<ObjectCategory> = [
         ],
     },
     { label: '8. Sınıf', items: GRADE8_ITEMS },
+    { label: '10. Sınıf Geometri', items: GRADE10_GEOM_ITEMS },
     {
         label: 'Canlı Matematik',
-        items: [...MATH_SIM_ITEMS, ...GEOMETRY_SIM_ITEMS, ...NUMBER_SIM_ITEMS],
+        items: [...MATH_SIM_ITEMS, ...GEOMETRY_SIM_ITEMS, ...NUMBER_SIM_ITEMS, ...GRADE10_GEOM_ITEMS],
     },
     {
         label: 'Etkileşimli Fen',
