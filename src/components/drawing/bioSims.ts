@@ -1663,6 +1663,984 @@ export const digestionSpec: SimSpec = {
     ],
 };
 
+// ── Soy Ağacı & Kalıtım (Pedigree & Genetik) ────────────────────────
+interface PedigreeState {
+    mode: number; // 0: Otozomal Çekinik, 1: X'e Bağlı Çekinik
+    states: number[]; // 0: Sağlam, 1: Taşıyıcı, 2: Hasta (7 birey için)
+}
+
+function pedigreeState(o: MathObject): PedigreeState {
+    const mode = clampInt(simValue(o, 'mode', 0), 0, 1, 0);
+    // 7 birey: 1(Dede), 2(Nine), 3(Damat/Baba), 4(Anne), 5(Oğul 1), 6(Kız), 7(Oğul 2)
+    const defaults = mode === 0 ? [1, 1, 0, 1, 2, 0, 1] : [0, 1, 0, 1, 1, 0, 0];
+    const states = [1, 2, 3, 4, 5, 6, 7].map((i, idx) =>
+        clampInt(simValue(o, `p${i}`, defaults[idx]), 0, 2, defaults[idx])
+    );
+    return { mode, states };
+}
+
+export const pedigreeRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = pedigreeState(k.o);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    // Ağaç koordinatları
+    const treeW = r.w * (icon ? 0.9 : 0.58);
+    const startX = r.x + fs * 1.5;
+    const y1 = r.y + fs * 3.2; // I. Kuşak
+    const y2 = r.y + fs * 7.5; // II. Kuşak
+    const y3 = r.y + fs * 12.0; // III. Kuşak
+    const indR = fs * 1.2;
+
+    // Birey koordinatları [x, y, isMale]
+    const p1 = { x: startX + treeW * 0.22, y: y1, male: true, id: 1 };
+    const p2 = { x: startX + treeW * 0.48, y: y1, male: false, id: 2 };
+    const p3 = { x: startX + treeW * 0.18, y: y2, male: true, id: 3 };
+    const p4 = { x: startX + treeW * 0.48, y: y2, male: false, id: 4 };
+    const p5 = { x: startX + treeW * 0.15, y: y3, male: true, id: 5 };
+    const p6 = { x: startX + treeW * 0.33, y: y3, male: false, id: 6 };
+    const p7 = { x: startX + treeW * 0.51, y: y3, male: true, id: 7 };
+
+    // Soy ağacı bağlantı çizgileri
+    // 1-2 Evlilik ve çocuk 4
+    line(k, p1.x + indR, p1.y, p2.x - indR, p1.y, 2);
+    const mid12X = (p1.x + p2.x) / 2;
+    line(k, mid12X, p1.y, mid12X, (p1.y + p2.y) / 2 + fs * 1.8, 1.8);
+    line(k, mid12X, (p1.y + p2.y) / 2 + fs * 1.8, p4.x, (p1.y + p2.y) / 2 + fs * 1.8, 1.8);
+    line(k, p4.x, (p1.y + p2.y) / 2 + fs * 1.8, p4.x, p4.y - indR, 1.8);
+
+    // 3-4 Evlilik ve çocuklar 5, 6, 7
+    line(k, p3.x + indR, p3.y, p4.x - indR, p3.y, 2);
+    const mid34X = (p3.x + p4.x) / 2;
+    const dropY = p3.y + fs * 2.2;
+    line(k, mid34X, p3.y, mid34X, dropY, 1.8);
+    line(k, p5.x, dropY, p7.x, dropY, 1.8);
+    line(k, p5.x, dropY, p5.x, p5.y - indR, 1.8);
+    line(k, p6.x, dropY, p6.x, p6.y - indR, 1.8);
+    line(k, p7.x, dropY, p7.x, p7.y - indR, 1.8);
+
+    // Kuşak isimleri
+    if (!icon) {
+        label(k, 'I', startX - fs * 0.5, y1, 'center', 'middle', 0.7);
+        label(k, 'II', startX - fs * 0.5, y2, 'center', 'middle', 0.7);
+        label(k, 'III', startX - fs * 0.5, y3, 'center', 'middle', 0.7);
+    }
+
+    // Bireyleri çiz
+    const individuals = [p1, p2, p3, p4, p5, p6, p7];
+    individuals.forEach((ind, i) => {
+        const st = s.states[i];
+        k.c.save();
+        k.c.lineWidth = 2;
+        k.c.strokeStyle = k.color;
+
+        if (ind.male) {
+            // Kare
+            const sz = indR * 1.8;
+            const x0 = ind.x - sz / 2;
+            const y0 = ind.y - sz / 2;
+            if (st === 2) {
+                // Hasta: Tam dolu
+                k.c.fillStyle = '#dc2626';
+                k.c.fillRect(x0, y0, sz, sz);
+            } else if (st === 1) {
+                // Taşıyıcı: Yarı dolu
+                k.c.fillStyle = '#f59e0b';
+                k.c.fillRect(x0, y0, sz / 2, sz);
+            }
+            k.c.strokeRect(x0, y0, sz, sz);
+        } else {
+            // Daire
+            k.c.beginPath();
+            k.c.arc(ind.x, ind.y, indR, 0, Math.PI * 2);
+            if (st === 2) {
+                k.c.fillStyle = '#dc2626';
+                k.c.fill();
+            } else if (st === 1) {
+                k.c.save();
+                k.c.beginPath();
+                k.c.arc(ind.x, ind.y, indR, Math.PI / 2, (3 * Math.PI) / 2);
+                k.c.fillStyle = '#f59e0b';
+                k.c.fill();
+                k.c.restore();
+            }
+            k.c.stroke();
+        }
+        k.c.restore();
+
+        // Birey Numarası ve Olası Genotip
+        if (!icon) {
+            label(k, `${ind.id}`, ind.x, ind.y, 'center', 'middle', 0.55);
+            let geno = '';
+            if (s.mode === 0) {
+                geno = st === 2 ? 'aa' : st === 1 ? 'Aa' : 'A_';
+            } else {
+                if (ind.male) geno = st === 1 ? 'XʳY' : 'XᴿY';
+                else geno = st === 2 ? 'XʳXʳ' : st === 1 ? 'XᴿXʳ' : 'XᴿXᴿ';
+            }
+            label(k, geno, ind.x, ind.y + indR + fs * 0.7, 'center', 'top', 0.52);
+        }
+    });
+
+    // Sağ Bilgi ve İpuçları Paneli
+    if (!icon && k.o.labels !== false) {
+        const pw = r.w * 0.36;
+        const ph = r.h * 0.76;
+        const px = r.x + r.w - pw - fs * 1.0;
+        const py = r.y + fs * 2.2;
+        panel(k, px, py, pw, ph);
+
+        const modeTitle = s.mode === 0 ? 'Otozomal Çekinik Kalıtım' : "X'e Bağlı Çekinik Kalıtım";
+        label(k, modeTitle, px + fs * 0.5, py + fs * 0.8, 'left', 'middle', 0.62);
+
+        // Lejant
+        k.c.save();
+        k.c.strokeStyle = k.color;
+        k.c.strokeRect(px + fs * 0.6, py + fs * 1.8, fs * 0.9, fs * 0.9);
+        label(k, 'Erkek', px + fs * 1.8, py + fs * 2.2, 'left', 'middle', 0.5);
+
+        k.c.beginPath();
+        k.c.arc(px + fs * 5.0, py + fs * 2.2, fs * 0.45, 0, Math.PI * 2);
+        k.c.stroke();
+        label(k, 'Dişi', px + fs * 5.8, py + fs * 2.2, 'left', 'middle', 0.5);
+
+        // Renk anlamları
+        k.c.fillStyle = '#dc2626';
+        k.c.fillRect(px + fs * 0.6, py + fs * 3.2, fs * 0.8, fs * 0.8);
+        label(k, 'Hasta Birey (Koyu)', px + fs * 1.8, py + fs * 3.6, 'left', 'middle', 0.5);
+
+        k.c.fillStyle = '#f59e0b';
+        k.c.fillRect(px + fs * 0.6, py + fs * 4.4, fs * 0.4, fs * 0.8);
+        k.c.strokeRect(px + fs * 0.6, py + fs * 4.4, fs * 0.8, fs * 0.8);
+        label(k, 'Taşıyıcı Birey (Yarı)', px + fs * 1.8, py + fs * 4.8, 'left', 'middle', 0.5);
+        k.c.restore();
+
+        // Olasılık / Kural İpuçları
+        if (s.mode === 0) {
+            label(k, '• Anne ve baba taşıyıcıysa (Aa x Aa):', px + fs * 0.5, py + fs * 6.2, 'left', 'middle', 0.48);
+            label(k, '  - %25 Hasta (aa)', px + fs * 0.5, py + fs * 7.0, 'left', 'middle', 0.5);
+            label(k, '  - %50 Taşıyıcı (Aa)', px + fs * 0.5, py + fs * 7.8, 'left', 'middle', 0.5);
+            label(k, '  - %25 Sağlam (AA)', px + fs * 0.5, py + fs * 8.6, 'left', 'middle', 0.5);
+            label(k, '• Hasta kız çocuğunun babası mutlaka', px + fs * 0.5, py + fs * 9.6, 'left', 'middle', 0.46);
+            label(k, '  hastalık genini (a) taşır.', px + fs * 0.5, py + fs * 10.3, 'left', 'middle', 0.46);
+        } else {
+            label(k, "• Anne taşıyıcı (XᴿXʳ) ise:", px + fs * 0.5, py + fs * 6.2, 'left', 'middle', 0.48);
+            label(k, '  - Erkek çocukların %50 hasta (XʳY)', px + fs * 0.5, py + fs * 7.0, 'left', 'middle', 0.5);
+            label(k, '• Hasta bir dişinin babası MUTLAKA', px + fs * 0.5, py + fs * 8.2, 'left', 'middle', 0.48);
+            label(k, '  hastadır (XʳY) ve tüm erkek', px + fs * 0.5, py + fs * 9.0, 'left', 'middle', 0.48);
+            label(k, '  çocukları da kesinlikle hastadır.', px + fs * 0.5, py + fs * 9.8, 'left', 'middle', 0.48);
+        }
+
+        // Birey tıklama ipucu
+        label(k, '💡 Bireylere dokunarak fenotipini değiştir', px + fs * 0.5, py + ph - fs * 0.8, 'left', 'middle', 0.48);
+    }
+
+    // Üst Başlık & Mod Butonu
+    if (!icon) {
+        label(k, 'Soy Ağacı & Kalıtım Analizi', r.x + fs * 1.5, r.y + fs * 1.2, 'left', 'middle', 0.75);
+    }
+
+    k.c.restore();
+};
+
+export const pedigreeSpec: SimSpec = {
+    controls: (r, o) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        const icon = isIconSize(r);
+        const treeW = r.w * (icon ? 0.9 : 0.58);
+        const startX = r.x + fs * 1.5;
+        const y1 = r.y + fs * 3.2;
+        const y2 = r.y + fs * 7.5;
+        const y3 = r.y + fs * 12.0;
+
+        const coords = [
+            { x: startX + treeW * 0.22, y: y1 },
+            { x: startX + treeW * 0.48, y: y1 },
+            { x: startX + treeW * 0.18, y: y2 },
+            { x: startX + treeW * 0.48, y: y2 },
+            { x: startX + treeW * 0.15, y: y3 },
+            { x: startX + treeW * 0.33, y: y3 },
+            { x: startX + treeW * 0.51, y: y3 },
+        ];
+
+        const ctrls: SimControl[] = coords.map((c, i) => ({
+            id: `ind_${i + 1}`,
+            x: c.x,
+            y: c.y,
+            type: 'toggle',
+            label: `${i + 1}. bireyin fenotipini değiştir`,
+        }));
+
+        ctrls.push({
+            id: 'btn_mode',
+            x: r.x + fs * 14.5,
+            y: r.y + fs * 1.2,
+            type: 'toggle',
+            label: 'Kalıtım Modunu Değiştir (Otozomal / X-bağlı)',
+        });
+
+        return ctrls;
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        if (id === 'btn_mode') {
+            const cur = simValue(o, 'mode', 0);
+            return { mode: (cur + 1) % 2 };
+        }
+        if (id.startsWith('ind_')) {
+            const num = id.replace('ind_', '');
+            const cur = simValue(o, `p${num}`, 0);
+            return { [`p${num}`]: (cur + 1) % 3 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'mode', label: 'Mod (0: Otozomal, 1: X-bağlı)', min: 0, max: 1, step: 1 },
+    ],
+};
+
+// ── Hücre Zarı & Osmoz Laboratuvarı ─────────────────────────────────
+interface OsmosisState {
+    sol: number;      // 0: Hipotonik, 1: İzotonik, 2: Hipertonik
+    cellType: number; // 0: Hayvan (Alyuvar), 1: Bitki (Çeperli)
+}
+
+function osmosisState(o: MathObject): OsmosisState {
+    const sol = clampInt(simValue(o, 'sol', 0), 0, 2, 0);
+    const cellType = clampInt(simValue(o, 'cell', 0), 0, 1, 0);
+    return { sol, cellType };
+}
+
+export const osmosisCellRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = osmosisState(k.o);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    // Beher ve Ortam Çözeltisi
+    const bw = r.w * (icon ? 0.9 : 0.52);
+    const bh = r.h * 0.65;
+    const bx = r.x + fs * 2.0;
+    const by = r.y + fs * 3.0;
+
+    // Çözelti rengi: Hipotonik (çok açık mavi), İzotonik (mavi), Hipertonik (koyu mavi/tuzlu)
+    const solColors = ['rgba(224, 242, 254, 0.4)', 'rgba(186, 230, 253, 0.55)', 'rgba(125, 211, 252, 0.75)'];
+    k.c.save();
+    k.c.fillStyle = solColors[s.sol];
+    k.c.fillRect(bx, by, bw, bh);
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 2.5;
+    line(k, bx, by - fs * 0.5, bx, by + bh, 2.5);
+    line(k, bx, by + bh, bx + bw, by + bh, 2.5);
+    line(k, bx + bw, by + bh, bx + bw, by - fs * 0.5, 2.5);
+    k.c.restore();
+
+    // Ortam tuz tanecikleri
+    const saltCount = s.sol === 0 ? 4 : s.sol === 1 ? 16 : 40;
+    for (let i = 0; i < saltCount; i++) {
+        const sx = bx + fs * 1.0 + ((i * 37) % Math.floor(bw - fs * 2.0));
+        const sy = by + fs * 1.0 + ((i * 53) % Math.floor(bh - fs * 2.0));
+        // Hücrenin içine düşmesin
+        const cx = bx + bw / 2;
+        const cy = by + bh / 2;
+        if (Math.hypot(sx - cx, sy - cy) > fs * 3.5) {
+            k.c.save();
+            k.c.fillStyle = '#64748b';
+            k.c.beginPath();
+            k.c.arc(sx, sy, 2.2, 0, Math.PI * 2);
+            k.c.fill();
+            k.c.restore();
+        }
+    }
+
+    // Hücre Çizimi (Merkezde)
+    const cx = bx + bw / 2;
+    const cy = by + bh / 2;
+
+    if (s.cellType === 0) {
+        // Hayvan Hücresi (Alyuvar)
+        let cellR = fs * 3.0;
+        let note = 'Normal Alyuvar';
+        if (s.sol === 0) {
+            cellR = fs * 4.4;
+            note = 'Şişmiş / Hemoliz Riski (Saf su)';
+        } else if (s.sol === 2) {
+            cellR = fs * 2.0;
+            note = 'Büzüşmüş (Krenasyon)';
+        }
+
+        k.c.save();
+        k.c.fillStyle = '#ef4444';
+        k.c.strokeStyle = '#991b1b';
+        k.c.lineWidth = 2;
+        k.c.beginPath();
+        if (s.sol === 2) {
+            // Dikenli büzüşmüş şekil
+            for (let i = 0; i < 12; i++) {
+                const ang = (i / 12) * Math.PI * 2;
+                const rVal = i % 2 === 0 ? cellR : cellR * 0.75;
+                const px = cx + Math.cos(ang) * rVal;
+                const py = cy + Math.sin(ang) * rVal;
+                if (i === 0) k.c.moveTo(px, py);
+                else k.c.lineTo(px, py);
+            }
+            k.c.closePath();
+        } else {
+            k.c.arc(cx, cy, cellR, 0, Math.PI * 2);
+        }
+        k.c.fill();
+        k.c.stroke();
+        k.c.restore();
+
+        if (!icon) {
+            label(k, note, cx, cy + cellR + fs * 1.0, 'center', 'top', 0.55);
+        }
+    } else {
+        // Bitki Hücresi (Çeperli)
+        const wallW = fs * 7.5;
+        const wallH = fs * 6.0;
+        // Dış Çeper (Sabit sert kutu)
+        k.c.save();
+        k.c.strokeStyle = '#15803d';
+        k.c.lineWidth = 3.5;
+        k.c.strokeRect(cx - wallW / 2, cy - wallH / 2, wallW, wallH);
+        k.c.restore();
+
+        // İç Hücre Zarı
+        let shrink = 0.92;
+        let note = 'Normal Turgor';
+        if (s.sol === 0) {
+            shrink = 0.97; // Çepere tam yapışık
+            note = 'Maksimum Turgor Basıncı';
+        } else if (s.sol === 2) {
+            shrink = 0.65; // Plazmoliz!
+            note = 'Plazmoliz (Sitoplazma büzüldü)';
+        }
+
+        const memW = wallW * shrink;
+        const memH = wallH * shrink;
+        k.c.save();
+        k.c.fillStyle = 'rgba(74, 222, 128, 0.4)';
+        k.c.strokeStyle = '#22c55e';
+        k.c.lineWidth = 2;
+        roundRect(k, cx - memW / 2, cy - memH / 2, memW, memH, 8);
+        k.c.fill();
+        k.c.stroke();
+
+        // Merkezi Koful (Su deposu)
+        const vacFrac = s.sol === 0 ? 0.65 : s.sol === 1 ? 0.45 : 0.2;
+        k.c.fillStyle = 'rgba(56, 189, 248, 0.6)';
+        roundRect(k, cx - (memW * vacFrac) / 2, cy - (memH * vacFrac) / 2, memW * vacFrac, memH * vacFrac, 6);
+        k.c.fill();
+        k.c.restore();
+
+        if (!icon) {
+            label(k, 'Hücre Çeperi', cx + wallW / 2 + fs * 0.4, cy - wallH / 2 + fs * 0.5, 'left', 'middle', 0.48);
+            label(k, note, cx, cy + wallH / 2 + fs * 1.0, 'center', 'top', 0.55);
+        }
+    }
+
+    // Su Molekülleri Geçiş Okları Animasyonu
+    if (!icon) {
+        const numArrows = 4;
+        for (let i = 0; i < numArrows; i++) {
+            const ang = (i / numArrows) * Math.PI * 2;
+            const rStart = fs * 5.0;
+            const rEnd = fs * 2.8;
+            let p1x = cx + Math.cos(ang) * rStart;
+            let p1y = cy + Math.sin(ang) * rStart;
+            let p2x = cx + Math.cos(ang) * rEnd;
+            let p2y = cy + Math.sin(ang) * rEnd;
+
+            if (s.sol === 2) {
+                // Su dışarı akar
+                const tempX = p1x; const tempY = p1y;
+                p1x = p2x; p1y = p2y;
+                p2x = tempX; p2y = tempY;
+            }
+
+            if (s.sol !== 1) {
+                arrow(k, p1x, p1y, p2x, p2y, fs * 0.35, 1.5);
+            }
+        }
+        const dirText = s.sol === 0 ? 'Su Girişi (H₂O) →' : s.sol === 2 ? 'Su Çıkışı (H₂O) ←' : 'Dinamik Denge (Net su geçişi = 0)';
+        label(k, dirText, bx + bw / 2, by + fs * 1.0, 'center', 'bottom', 0.55);
+    }
+
+    // Sağ Basınç Grafiği & Karşılaştırma Paneli
+    if (!icon && k.o.labels !== false) {
+        const pw = r.w * 0.38;
+        const ph = r.h * 0.75;
+        const px = r.x + r.w - pw - fs * 1.0;
+        const py = r.y + fs * 2.5;
+        panel(k, px, py, pw, ph);
+
+        label(k, 'Ozmotik Olaylar & Basınçlar', px + fs * 0.5, py + fs * 0.8, 'left', 'middle', 0.62);
+
+        // Bar grafikleri: Turgor Basıncı (TB), Ozmotik Basınç (OB), Emme Kuvveti (EK = OB - TB)
+        const tbVal = s.sol === 0 ? 90 : s.sol === 1 ? 45 : 10;
+        const obVal = s.sol === 0 ? 20 : s.sol === 1 ? 45 : 95;
+        const ekVal = Math.max(0, obVal - tbVal);
+
+        const bars = [
+            { name: 'Turgor Basıncı (TB)', val: tbVal, color: '#38bdf8' },
+            { name: 'Ozmotik Basınç (OB)', val: obVal, color: '#f59e0b' },
+            { name: 'Emme Kuvveti (EK)', val: ekVal, color: '#ec4899' },
+        ];
+
+        bars.forEach((b, idx) => {
+            const barY = py + fs * (2.2 + idx * 2.3);
+            label(k, b.name, px + fs * 0.5, barY, 'left', 'middle', 0.52);
+            label(k, `%${b.val}`, px + pw - fs * 0.8, barY, 'right', 'middle', 0.52);
+
+            k.c.save();
+            k.c.strokeStyle = withAlpha(k.color, 0.3);
+            k.c.strokeRect(px + fs * 0.5, barY + fs * 0.6, pw - fs * 1.3, fs * 0.8);
+            k.c.fillStyle = b.color;
+            k.c.fillRect(px + fs * 0.5, barY + fs * 0.6, ((pw - fs * 1.3) * b.val) / 100, fs * 0.8);
+            k.c.restore();
+        });
+
+        // Formül ve İpuçları
+        const infoY = py + fs * 9.4;
+        line(k, px + fs * 0.5, infoY, px + pw - fs * 0.5, infoY, 1);
+        label(k, 'Temel Kural:  EK = OB − TB', px + fs * 0.5, infoY + fs * 0.8, 'left', 'middle', 0.55);
+        const expl = s.sol === 0
+            ? 'Hipotonik: Hücreye su girer. TB tavan yapar, OB ve EK düşer.'
+            : s.sol === 2
+              ? 'Hipertonik: Hücre su kaybeder. OB tavan yapar, su alma isteği (EK) artar.'
+              : 'İzotonik: Hücre içi ve dışı derişim eşit; net su akışı sıfırdır.';
+        label(k, fitText(k, [expl], pw - fs * 1.0, 0.46), px + fs * 0.5, infoY + fs * 1.8, 'left', 'middle', 0.46);
+    }
+
+    // Üst Butonlar
+    if (!icon) {
+        label(k, 'Hücre Zarı & Osmoz Laboratuvarı', r.x + fs * 2.0, r.y + fs * 1.2, 'left', 'middle', 0.75);
+    }
+
+    k.c.restore();
+};
+
+export const osmosisCellSpec: SimSpec = {
+    animated: true,
+    controls: (r) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        return [
+            { id: 'btn_sol', x: r.x + fs * 12.0, y: r.y + fs * 1.2, type: 'toggle', label: 'Çözelti Ortamını Değiştir (Hipotonik/İzotonik/Hipertonik)' },
+            { id: 'btn_cell', x: r.x + fs * 18.5, y: r.y + fs * 1.2, type: 'toggle', label: 'Hücre Tipini Değiştir (Hayvan/Bitki)' },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        if (id === 'btn_sol') {
+            const cur = simValue(o, 'sol', 0);
+            return { sol: (cur + 1) % 3 };
+        }
+        if (id === 'btn_cell') {
+            const cur = simValue(o, 'cell', 0);
+            return { cell: (cur + 1) % 2 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'sol', label: 'Çözelti (0:Hipo, 1:İzo, 2:Hiper)', min: 0, max: 2, step: 1 },
+        { key: 'cell', label: 'Hücre Tipi (0:Hayvan, 1:Bitki)', min: 0, max: 1, step: 1 },
+    ],
+};
+
+// ── Enzim Çalışma Hızı & Kinetik ────────────────────────────────────
+interface EnzymeState {
+    temp: number;     // 0 - 65 °C
+    pH: number;       // 1 - 14
+    sub: number;      // 10 - 100
+    enzType: number;  // 0: Amilaz (pH 7), 1: Pepsin (pH 2), 2: Tripsin (pH 8.5)
+    rate: number;     // 0 - 100
+    isDenatured: boolean;
+}
+
+function enzymeState(o: MathObject): EnzymeState {
+    const temp = clamp(simValue(o, 'temp', 37), 0, 65);
+    const pH = clamp(simValue(o, 'pH', 7.0), 1, 14);
+    const sub = clamp(simValue(o, 'sub', 60), 10, 100);
+    const enzType = clampInt(simValue(o, 'enz', 0), 0, 2, 0);
+
+    const optPH = enzType === 0 ? 7.0 : enzType === 1 ? 2.0 : 8.5;
+
+    // Sıcaklık faktörü
+    let fT = 0;
+    const isDenatured = temp >= 55;
+    if (temp < 37) {
+        fT = Math.pow(2, (temp - 37) / 12);
+    } else if (temp <= 55) {
+        fT = Math.max(0, 1 - Math.pow((temp - 37) / 18, 2));
+    } else {
+        fT = 0;
+    }
+
+    // pH faktörü
+    const fPH = Math.exp(-Math.pow(pH - optPH, 2) / 2.5);
+
+    // Substrat faktörü
+    const fS = sub / (sub + 25);
+
+    const rate = clamp(fT * fPH * fS * 100, 0, 100);
+
+    return { temp, pH, sub, enzType, rate, isDenatured };
+}
+
+export const enzymeRateRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = enzymeState(k.o);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    // Sol Taraf: Mikroskobik Reaksiyon Odası
+    const chamberW = r.w * (icon ? 0.9 : 0.48);
+    const chamberH = r.h * 0.68;
+    const cx0 = r.x + fs * 1.5;
+    const cy0 = r.y + fs * 2.8;
+
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.04);
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 2;
+    roundRect(k, cx0, cy0, chamberW, chamberH, 10);
+    k.c.fill();
+    k.c.stroke();
+    k.c.restore();
+
+    // Büyük Enzim Makromolekülü ve Aktif Merkez
+    const enzX = cx0 + chamberW / 2;
+    const enzY = cy0 + chamberH / 2;
+    const enzR = fs * 3.6;
+
+    k.c.save();
+    k.c.fillStyle = s.isDenatured ? '#94a3b8' : '#6366f1';
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 2.5;
+
+    k.c.beginPath();
+    if (s.isDenatured) {
+        // Denatüre olmuş bozuk yumruk şekli
+        for (let i = 0; i < 16; i++) {
+            const a = (i / 16) * Math.PI * 2;
+            const dist = enzR + Math.sin(a * 4 + k.t * 3) * fs * 0.6;
+            const px = enzX + Math.cos(a) * dist;
+            const py = enzY + Math.sin(a) * dist;
+            if (i === 0) k.c.moveTo(px, py);
+            else k.c.lineTo(px, py);
+        }
+        k.c.closePath();
+    } else {
+        // Normal enzim + aktif merkez cebi (Anahtar-Kilit Yuvası)
+        k.c.arc(enzX, enzY, enzR, 0.25 * Math.PI, 1.75 * Math.PI);
+        // Aktif merkez yuvası
+        k.c.lineTo(enzX + fs * 0.5, enzY - fs * 1.2);
+        k.c.lineTo(enzX - fs * 1.0, enzY);
+        k.c.lineTo(enzX + fs * 0.5, enzY + fs * 1.2);
+        k.c.closePath();
+    }
+    k.c.fill();
+    k.c.stroke();
+    k.c.restore();
+
+    // Substrat ve Ürün Parçacıkları Animasyonu
+    if (!icon) {
+        if (s.isDenatured) {
+            label(k, '⚠️ DENATÜRASYON', enzX, enzY - fs * 0.4, 'center', 'middle', 0.65);
+            label(k, '3D protein yapısı geri dönüşsüz bozuldu', enzX, enzY + fs * 0.6, 'center', 'middle', 0.45);
+        } else {
+            label(k, 'Enzim', enzX - fs * 1.2, enzY, 'center', 'middle', 0.65);
+            label(k, 'Aktif Merkez', enzX + fs * 1.8, enzY, 'left', 'middle', 0.48);
+
+            // Substrat yanaşması
+            const subFrac = (k.t * (0.5 + s.rate * 0.015)) % 1;
+            const subX = enzX + fs * 4.5 - subFrac * fs * 3.5;
+            const subY = enzY;
+            k.c.save();
+            k.c.fillStyle = '#f59e0b';
+            roundRect(k, subX - fs * 0.8, subY - fs * 0.8, fs * 1.6, fs * 1.6, 4);
+            k.c.fill();
+            k.c.restore();
+            label(k, 'Substrat', subX, subY - fs * 1.1, 'center', 'bottom', 0.45);
+        }
+    }
+
+    // Sağ Taraf: Hız Göstergesi ve Optimum Eğrisi
+    if (!icon && k.o.labels !== false) {
+        const pw = r.w * 0.44;
+        const ph = r.h * 0.76;
+        const px = r.x + r.w - pw - fs * 1.0;
+        const py = r.y + fs * 2.2;
+        panel(k, px, py, pw, ph);
+
+        const enzNames = ['Tükürük Amilazı (pH 7)', 'Mide Pepsini (pH 2)', 'Bağırsak Tripsini (pH 8.5)'];
+        label(k, enzNames[s.enzType], px + fs * 0.5, py + fs * 0.8, 'left', 'middle', 0.62);
+
+        // Canlı Tepkime Hızı Barı
+        label(k, `Tepkime Hızı (V): %${fmtNum(s.rate, 0)}`, px + fs * 0.5, py + fs * 2.0, 'left', 'middle', 0.58);
+        k.c.save();
+        k.c.strokeRect(px + fs * 0.5, py + fs * 2.6, pw - fs * 1.0, fs * 1.0);
+        k.c.fillStyle = s.rate > 60 ? '#22c55e' : s.rate > 20 ? '#eab308' : '#ef4444';
+        k.c.fillRect(px + fs * 0.5, py + fs * 2.6, ((pw - fs * 1.0) * s.rate) / 100, fs * 1.0);
+        k.c.restore();
+
+        // Çan Eğrisi Grafiği (Sıcaklık Grafiği)
+        const gx = px + fs * 1.0;
+        const gy = py + fs * 4.4;
+        const gw = pw - fs * 2.0;
+        const gh = fs * 4.2;
+        const gbot = gy + gh;
+
+        line(k, gx, gbot, gx + gw, gbot, 1.5);
+        line(k, gx, gbot, gx, gy, 1.5);
+        label(k, 'T (°C)', gx + gw, gbot + fs * 0.4, 'right', 'top', 0.48);
+        label(k, 'Hız', gx - fs * 0.2, gy, 'right', 'middle', 0.48);
+
+        // Çan eğrisi çizimi
+        k.c.save();
+        k.c.strokeStyle = '#6366f1';
+        k.c.lineWidth = 2;
+        k.c.beginPath();
+        for (let i = 0; i <= 65; i++) {
+            const curX = gx + (i / 65) * gw;
+            let val = 0;
+            if (i < 37) val = Math.pow(2, (i - 37) / 12);
+            else if (i <= 55) val = Math.max(0, 1 - Math.pow((i - 37) / 18, 2));
+            const curY = gbot - clamp(val, 0, 1) * gh;
+            if (i === 0) k.c.moveTo(curX, curY);
+            else k.c.lineTo(curX, curY);
+        }
+        k.c.stroke();
+
+        // Anlık Sıcaklık Noktası
+        const ptX = gx + (s.temp / 65) * gw;
+        const curFrac = s.temp < 37 ? Math.pow(2, (s.temp - 37) / 12) : s.temp <= 55 ? Math.max(0, 1 - Math.pow((s.temp - 37) / 18, 2)) : 0;
+        const ptY = gbot - clamp(curFrac, 0, 1) * gh;
+        k.c.fillStyle = '#ef4444';
+        k.c.beginPath();
+        k.c.arc(ptX, ptY, 4, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+
+        label(k, `${fmtNum(s.temp, 0)}°C`, ptX, ptY - fs * 0.5, 'center', 'bottom', 0.52);
+
+        // Parametre Değerleri
+        const pValY = gbot + fs * 1.5;
+        label(k, `Sıcaklık: ${fmtNum(s.temp, 0)}°C  |  pH: ${fmtNum(s.pH, 1)}  |  [S]: ${fmtNum(s.sub, 0)}`, px + fs * 0.5, pValY, 'left', 'middle', 0.5);
+    }
+
+    // Üst Başlık & Butonlar
+    if (!icon) {
+        label(k, 'Enzim Kinetiği & Çalışma Hızı', r.x + fs * 1.5, r.y + fs * 1.2, 'left', 'middle', 0.75);
+    }
+
+    k.c.restore();
+};
+
+export const enzymeRateSpec: SimSpec = {
+    animated: true,
+    controls: (r, o) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        const s = enzymeState(o);
+        const pw = r.w * 0.44;
+        const px = r.x + r.w - pw - fs * 1.0;
+        const gx = px + fs * 1.0;
+        const gw = pw - fs * 2.0;
+        const gy = r.y + fs * 6.6;
+
+        return [
+            { id: 'btn_enz', x: r.x + fs * 14.5, y: r.y + fs * 1.2, type: 'toggle', label: 'Enzim Tipini Değiştir' },
+            { id: 'temp_drag', x: gx + (s.temp / 65) * gw, y: gy, type: 'drag', label: 'Sıcaklığı Sürükle (0-65°C)' },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (id === 'btn_enz') {
+            const cur = simValue(o, 'enz', 0);
+            return { enz: (cur + 1) % 3 };
+        }
+        if (id === 'temp_drag' && p) {
+            const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+            const pw = r.w * 0.44;
+            const px = r.x + r.w - pw - fs * 1.0;
+            const gx = px + fs * 1.0;
+            const gw = pw - fs * 2.0;
+            const temp = clamp(((p.x - gx) / gw) * 65, 0, 65);
+            return { temp: Math.round(temp) };
+        }
+        return {};
+    },
+    params: [
+        { key: 'temp', label: 'Sıcaklık T', min: 0, max: 65, step: 1, unit: '°C' },
+        { key: 'pH', label: 'pH Seviyesi', min: 1, max: 14, step: 0.5 },
+        { key: 'sub', label: 'Substrat Derişimi [S]', min: 10, max: 100, step: 5 },
+    ],
+};
+
+// ── Nöron & Aksiyon Potansiyeli (Sinirsel İletim) ────────────────────
+interface ActionPotentialState {
+    playing: boolean;
+    tProg: number;    // 0.0 - 1.0
+    voltage: number;  // -85 ile +40 mV
+    phaseName: string;
+}
+
+function actionPotentialState(o: MathObject, t = 0): ActionPotentialState {
+    const playing = simValue(o, 'play', 0) === 1;
+    let tProg = 0;
+    if (playing) {
+        tProg = (t * 0.35) % 1.0;
+    } else {
+        tProg = clamp(simValue(o, 'prog', 0), 0, 1);
+    }
+
+    // 4 ms'lik döngü:
+    // 0.0 - 0.2: Dinlenme (-70 mV)
+    // 0.2 - 0.45: Depolarizasyon (-70 -> +40 mV)
+    // 0.45 - 0.7: Repolarizasyon (+40 -> -70 mV)
+    // 0.7 - 0.85: Hiperpolarizasyon (-70 -> -85 mV)
+    // 0.85 - 1.0: Pompalanma (-85 -> -70 mV)
+
+    let voltage = -70;
+    let phaseName = 'Polarizasyon (Dinlenme Potansiyeli)';
+
+    if (tProg < 0.2) {
+        voltage = -70;
+        phaseName = 'Dinlenme Potansiyeli (-70 mV)';
+    } else if (tProg < 0.45) {
+        const frac = (tProg - 0.2) / 0.25;
+        voltage = -70 + frac * 110;
+        phaseName = 'Depolarizasyon (Na⁺ Hücumu)';
+    } else if (tProg < 0.7) {
+        const frac = (tProg - 0.45) / 0.25;
+        voltage = 40 - frac * 110;
+        phaseName = 'Repolarizasyon (K⁺ Dışarı Çıkışı)';
+    } else if (tProg < 0.85) {
+        const frac = (tProg - 0.7) / 0.15;
+        voltage = -70 - Math.sin(frac * Math.PI) * 15;
+        phaseName = 'Hiperpolarizasyon (-85 mV)';
+    } else {
+        const frac = (tProg - 0.85) / 0.15;
+        voltage = -85 + frac * 15;
+        phaseName = 'Na⁺/K⁺ Pompası (Denge Kuruluyor)';
+    }
+
+    return { playing, tProg, voltage: Math.round(voltage), phaseName };
+}
+
+export const actionPotentialRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = actionPotentialState(k.o, k.t);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    // Sol Taraf: Akson Zarı Enine Kesiti
+    const axW = r.w * (icon ? 0.9 : 0.48);
+    const axH = r.h * 0.68;
+    const axX = r.x + fs * 1.5;
+    const axY = r.y + fs * 2.8;
+
+    // Dış Ortam (Hücre Dışı Sıvı)
+    k.c.save();
+    k.c.fillStyle = 'rgba(239, 246, 255, 0.6)';
+    k.c.fillRect(axX, axY, axW, axH);
+    k.c.restore();
+
+    // Çift Katlı Fosfolipit Zarı (Ortadan Geçer)
+    const memY = axY + axH * 0.5;
+    const memThick = fs * 2.4;
+
+    k.c.save();
+    k.c.fillStyle = 'rgba(254, 243, 199, 0.8)';
+    k.c.fillRect(axX, memY - memThick / 2, axW, memThick);
+
+    // Fosfolipit Baş ve Kuyrukları
+    const numLipids = Math.floor(axW / (fs * 0.9));
+    k.c.fillStyle = '#f59e0b';
+    k.c.strokeStyle = '#d97706';
+    k.c.lineWidth = 1;
+    for (let i = 0; i < numLipids; i++) {
+        const lx = axX + fs * 0.5 + i * fs * 0.9;
+        // Üst tabaka
+        k.c.beginPath();
+        k.c.arc(lx, memY - memThick / 2 + 3, 3, 0, Math.PI * 2);
+        k.c.fill();
+        // Alt tabaka
+        k.c.beginPath();
+        k.c.arc(lx, memY + memThick / 2 - 3, 3, 0, Math.PI * 2);
+        k.c.fill();
+    }
+    k.c.restore();
+
+    // Voltaj Kapılı İyon Kanalları
+    const naGateX = axX + axW * 0.28;
+    const kGateX = axX + axW * 0.68;
+    const gateW = fs * 2.4;
+
+    // Na+ Kanalı
+    k.c.save();
+    const naOpen = s.voltage > -50 && s.voltage < 35 && s.tProg < 0.45;
+    k.c.fillStyle = naOpen ? 'rgba(56, 189, 248, 0.3)' : '#0284c7';
+    k.c.fillRect(naGateX - gateW / 2, memY - memThick / 2 - 2, gateW, memThick + 4);
+    k.c.strokeStyle = k.color;
+    k.c.strokeRect(naGateX - gateW / 2, memY - memThick / 2 - 2, gateW, memThick + 4);
+    k.c.restore();
+    if (!icon) {
+        label(k, naOpen ? 'Na⁺ (AÇIK)' : 'Na⁺ Kapalı', naGateX, memY - memThick / 2 - fs * 0.8, 'center', 'bottom', 0.5);
+    }
+
+    // K+ Kanalı
+    k.c.save();
+    const kOpen = s.tProg >= 0.45 && s.tProg < 0.85;
+    k.c.fillStyle = kOpen ? 'rgba(168, 85, 247, 0.3)' : '#7c3aed';
+    k.c.fillRect(kGateX - gateW / 2, memY - memThick / 2 - 2, gateW, memThick + 4);
+    k.c.strokeStyle = k.color;
+    k.c.strokeRect(kGateX - gateW / 2, memY - memThick / 2 - 2, gateW, memThick + 4);
+    k.c.restore();
+    if (!icon) {
+        label(k, kOpen ? 'K⁺ (AÇIK)' : 'K⁺ Kapalı', kGateX, memY - memThick / 2 - fs * 0.8, 'center', 'bottom', 0.5);
+    }
+
+    // Yük İşaretleri (+ ve -)
+    if (!icon) {
+        const topSign = s.voltage > 0 ? '−' : '+';
+        const botSign = s.voltage > 0 ? '+' : '−';
+        for (let i = 0; i < 6; i++) {
+            const qx = axX + fs * 1.5 + i * (axW / 6.5);
+            label(k, topSign, qx, memY - memThick / 2 - fs * 0.3, 'center', 'middle', 0.65);
+            label(k, botSign, qx, memY + memThick / 2 + fs * 0.3, 'center', 'middle', 0.65);
+        }
+        label(k, 'Hücre Dışı Sıvı (Yüksek Na⁺)', axX + fs * 0.5, axY + fs * 0.7, 'left', 'middle', 0.48);
+        label(k, 'Aksoplazma / Hücre İçi (Yüksek K⁺)', axX + fs * 0.5, axY + axH - fs * 0.7, 'left', 'middle', 0.48);
+    }
+
+    // Sağ Taraf: Canlı Aksiyon Potansiyeli Grafiği (mV vs t)
+    if (!icon && k.o.labels !== false) {
+        const pw = r.w * 0.44;
+        const ph = r.h * 0.76;
+        const px = r.x + r.w - pw - fs * 1.0;
+        const py = r.y + fs * 2.2;
+        panel(k, px, py, pw, ph);
+
+        label(k, 'Aksiyon Potansiyeli Grafiği', px + fs * 0.5, py + fs * 0.8, 'left', 'middle', 0.62);
+
+        const gx = px + fs * 2.2;
+        const gy = py + fs * 2.5;
+        const gw = pw - fs * 3.0;
+        const gh = fs * 7.5;
+        const gbot = gy + gh;
+
+        // Eksenler
+        line(k, gx, gbot, gx + gw, gbot, 1.5);
+        line(k, gx, gbot, gx, gy, 1.5);
+
+        // Voltaj seviyeleri (+40, 0, -55 eşik, -70 dinlenme, -85)
+        const vToY = (v: number) => gbot - ((v - (-90)) / 140) * gh;
+
+        const y40 = vToY(40);
+        const y0 = vToY(0);
+        const y55 = vToY(-55);
+        const y70 = vToY(-70);
+
+        // Çizgiler
+        line(k, gx, y0, gx + gw, y0, 0.8);
+        line(k, gx, y70, gx + gw, y70, 1);
+        label(k, '+40 mV', gx - fs * 0.2, y40, 'right', 'middle', 0.45);
+        label(k, '0 mV', gx - fs * 0.2, y0, 'right', 'middle', 0.45);
+        label(k, '-55 (Eşik)', gx - fs * 0.2, y55, 'right', 'middle', 0.45);
+        label(k, '-70 mV', gx - fs * 0.2, y70, 'right', 'middle', 0.48);
+
+        // Aksiyon Potansiyeli Dalga Formu
+        k.c.save();
+        k.c.strokeStyle = '#0284c7';
+        k.c.lineWidth = 2.5;
+        k.c.beginPath();
+        const numSteps = 50;
+        for (let i = 0; i <= numSteps; i++) {
+            const frac = i / numSteps;
+            const curX = gx + frac * gw;
+            let vVal = -70;
+            if (frac < 0.2) vVal = -70;
+            else if (frac < 0.45) vVal = -70 + ((frac - 0.2) / 0.25) * 110;
+            else if (frac < 0.7) vVal = 40 - ((frac - 0.45) / 0.25) * 110;
+            else if (frac < 0.85) vVal = -70 - Math.sin(((frac - 0.7) / 0.15) * Math.PI) * 15;
+            else vVal = -85 + ((frac - 0.85) / 0.15) * 15;
+
+            const curY = vToY(vVal);
+            if (i === 0) k.c.moveTo(curX, curY);
+            else k.c.lineTo(curX, curY);
+        }
+        k.c.stroke();
+
+        // Anlık Tarama Noktası
+        const scanX = gx + s.tProg * gw;
+        const scanY = vToY(s.voltage);
+        k.c.fillStyle = '#ef4444';
+        k.c.beginPath();
+        k.c.arc(scanX, scanY, 5, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+
+        // Faz Açıklaması ve Potansiyel Değeri
+        const infoY = gbot + fs * 1.5;
+        label(k, `Zar Potansiyeli: ${s.voltage} mV`, px + fs * 0.5, infoY, 'left', 'middle', 0.6);
+        label(k, s.phaseName, px + fs * 0.5, infoY + fs * 0.9, 'left', 'middle', 0.5);
+    }
+
+    // Üst Başlık & Butonlar
+    if (!icon) {
+        label(k, 'Nöron & Aksiyon Potansiyeli', r.x + fs * 1.5, r.y + fs * 1.2, 'left', 'middle', 0.75);
+    }
+
+    k.c.restore();
+};
+
+export const actionPotentialSpec: SimSpec = {
+    animated: (o) => simValue(o, 'play', 0) === 1,
+    controls: (r, o) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        const s = actionPotentialState(o);
+        return [
+            { id: 'btn_fire', x: r.x + fs * 14.5, y: r.y + fs * 1.2, type: 'toggle', on: s.playing, label: 'İmpuls Ver (Aksiyon Potansiyeli)' },
+            { id: 'btn_step', x: r.x + fs * 20.5, y: r.y + fs * 1.2, type: 'toggle', label: 'Adım Adım İlerlet' },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        if (id === 'btn_fire') {
+            const cur = simValue(o, 'play', 0);
+            return { play: cur === 1 ? 0 : 1 };
+        }
+        if (id === 'btn_step') {
+            const cur = simValue(o, 'prog', 0);
+            return { prog: (cur + 0.15) % 1.0, play: 0 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'play', label: 'Animasyon (0/1)', min: 0, max: 1, step: 1 },
+        { key: 'prog', label: 'Aşama İlerlemesi', min: 0, max: 1, step: 0.05 },
+    ],
+};
+
 export const BIO_SIM_RENDERERS: Record<string, Renderer> = {
     photosynthesis_sim: photosynthesisRender,
     dna_pair_sim: dnaRender,
@@ -1671,6 +2649,10 @@ export const BIO_SIM_RENDERERS: Record<string, Renderer> = {
     food_web_sim: foodWebRender,
     breathing_sim: breathingRender,
     digestion_sim: digestionRender,
+    pedigree_sim: pedigreeRender,
+    osmosis_cell_sim: osmosisCellRender,
+    enzyme_rate_sim: enzymeRateRender,
+    action_potential_sim: actionPotentialRender,
 };
 
 export const BIO_SIM_SPECS: Record<string, SimSpec> = {
@@ -1681,9 +2663,41 @@ export const BIO_SIM_SPECS: Record<string, SimSpec> = {
     food_web_sim: foodWebSpec,
     breathing_sim: breathingSpec,
     digestion_sim: digestionSpec,
+    pedigree_sim: pedigreeSpec,
+    osmosis_cell_sim: osmosisCellSpec,
+    enzyme_rate_sim: enzymeRateSpec,
+    action_potential_sim: actionPotentialSpec,
 };
 
 export const BIO_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
+    {
+        kind: 'pedigree_sim',
+        label: 'Soy Ağacı & Kalıtım',
+        hint: "Otozomal ve X'e bağlı çekinik kalıtım; bireylere dokunup genotipleri ve olasılıkları gör",
+        size: { w: 620, h: 400 },
+        defaults: { labels: true, sim: { mode: 0 } },
+    },
+    {
+        kind: 'osmosis_cell_sim',
+        label: 'Hücre Zarı & Osmoz Lab',
+        hint: 'Hipotonik, izotonik ve hipertonik ortam; plazmoliz, hemoliz ve turgor basıncını canlı izle',
+        size: { w: 620, h: 380 },
+        defaults: { labels: true, sim: { sol: 0, cell: 0 } },
+    },
+    {
+        kind: 'enzyme_rate_sim',
+        label: 'Enzim Çalışma Hızı',
+        hint: 'Sıcaklık ve pH çan eğrisi, optimum 37°C ve denatürasyon; anahtar-kilit modelini izle',
+        size: { w: 620, h: 380 },
+        defaults: { labels: true, sim: { temp: 37, pH: 7.0, sub: 60, enz: 0 } },
+    },
+    {
+        kind: 'action_potential_sim',
+        label: 'Nöron & Aksiyon Potansiyeli',
+        hint: 'Akson zarı, voltaj kapılı Na+/K+ kanalları ve mV osiloskop dalgası; impulsu canlı gör',
+        size: { w: 620, h: 380 },
+        defaults: { labels: true, sim: { play: 1, prog: 0 } },
+    },
     {
         kind: 'photosynthesis_sim',
         label: 'Fotosentez Hızı',

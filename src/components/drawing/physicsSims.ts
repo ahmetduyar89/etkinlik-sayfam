@@ -1892,6 +1892,605 @@ export const workSpec: SimSpec = {
     ],
 };
 
+// ── Eğik ve Yatay Atış Laboratuvarı ─────────────────────────────────
+interface ProjectileState {
+    angle: number;
+    v0: number;
+    playing: boolean;
+    t: number;
+    tTotal: number;
+    tPeak: number;
+    hMax: number;
+    range: number;
+    targetX: number;
+    hitTarget: boolean;
+}
+
+function projectileState(o: MathObject, animTime = 0): ProjectileState {
+    const angle = clamp(simValue(o, 'angle', 45), 10, 85);
+    const v0 = clamp(simValue(o, 'v0', 25), 10, 42);
+    const targetX = clamp(simValue(o, 'targetX', 55), 15, 120);
+    const g = 9.8;
+    const rad = (angle * Math.PI) / 180;
+    const v0x = v0 * Math.cos(rad);
+    const v0y = v0 * Math.sin(rad);
+    const tPeak = v0y / g;
+    const hMax = (v0y * v0y) / (2 * g);
+    const tTotal = (2 * v0y) / g;
+    const range = v0x * tTotal;
+
+    const playing = simValue(o, 'play', 0) === 1;
+    let t = simValue(o, 't', 0);
+    if (playing) {
+        t = animTime % (tTotal + 1.5);
+        if (t > tTotal) t = tTotal;
+    }
+
+    const currentX = v0x * t;
+    const hitTarget = Math.abs(currentX - targetX) < 4 && t >= tTotal * 0.95;
+
+    return {
+        angle,
+        v0,
+        playing,
+        t,
+        tTotal,
+        tPeak,
+        hMax,
+        range,
+        targetX,
+        hitTarget,
+    };
+}
+
+export const projectileRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = projectileState(k.o, k.t);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const gy = r.y + r.h - (icon ? fs * 1.5 : fs * 2.8);
+    const x0 = r.x + (icon ? fs * 1.5 : fs * 3.5);
+
+    const maxWorldX = 120;
+    const maxWorldY = 55;
+    const scaleX = (r.w - (x0 - r.x) - fs * 2) / maxWorldX;
+    const scaleY = (gy - r.y - fs * 4) / maxWorldY;
+    const scale = Math.min(scaleX, scaleY);
+
+    const toScrX = (wx: number) => x0 + wx * scale;
+    const toScrY = (wy: number) => gy - wy * scale;
+
+    line(k, r.x, gy, r.x + r.w, gy, 1.8);
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.08);
+    k.c.fillRect(r.x, gy, r.w, r.y + r.h - gy);
+    k.c.restore();
+
+    if (!icon) {
+        for (let m = 20; m <= 110; m += 20) {
+            const tx = toScrX(m);
+            if (tx < r.x + r.w - fs * 1.5) {
+                line(k, tx, gy, tx, gy + fs * 0.4, 1);
+                label(k, `${m}m`, tx, gy + fs * 0.9, 'center', 'top', 0.52);
+            }
+        }
+    }
+
+    const rad = (s.angle * Math.PI) / 180;
+    const v0x = s.v0 * Math.cos(rad);
+    const v0y = s.v0 * Math.sin(rad);
+    const g = 9.8;
+
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.45);
+    k.c.lineWidth = icon ? 1.5 : 2;
+    k.c.setLineDash([4, 4]);
+    k.c.beginPath();
+    const steps = 40;
+    for (let i = 0; i <= steps; i++) {
+        const ti = (i / steps) * s.tTotal;
+        const wx = v0x * ti;
+        const wy = Math.max(0, v0y * ti - 0.5 * g * ti * ti);
+        const px = toScrX(wx);
+        const py = toScrY(wy);
+        if (i === 0) k.c.moveTo(px, py);
+        else k.c.lineTo(px, py);
+    }
+    k.c.stroke();
+    k.c.restore();
+
+    if (!icon) {
+        const peakX = toScrX(v0x * s.tPeak);
+        const peakY = toScrY(s.hMax);
+        line(k, peakX, gy, peakX, peakY, 1);
+        k.c.save();
+        k.c.fillStyle = withAlpha(k.color, 0.15);
+        k.c.beginPath();
+        k.c.arc(peakX, peakY, fs * 0.35, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+        label(k, `h_max: ${fmtNum(s.hMax, 1)}m`, peakX, peakY - fs * 0.7, 'center', 'bottom', 0.65);
+
+        const rangeX = toScrX(s.range);
+        label(k, `X_menzil: ${fmtNum(s.range, 1)}m`, rangeX, gy + fs * 1.2, 'center', 'top', 0.65);
+    }
+
+    const targetScrX = toScrX(s.targetX);
+    line(k, targetScrX, gy, targetScrX, gy - fs * 2.2, 2);
+    k.c.save();
+    k.c.fillStyle = '#ef4444';
+    k.c.beginPath();
+    k.c.moveTo(targetScrX, gy - fs * 2.2);
+    k.c.lineTo(targetScrX + fs * 1.3, gy - fs * 1.6);
+    k.c.lineTo(targetScrX, gy - fs * 1.0);
+    k.c.closePath();
+    k.c.fill();
+    k.c.restore();
+    if (!icon) {
+        label(k, `Hedef (${fmtNum(s.targetX, 0)}m)`, targetScrX, gy - fs * 2.5, 'center', 'bottom', 0.58);
+    }
+
+    const barrelLen = fs * 2.4;
+    const muzzleX = x0 + Math.cos(rad) * barrelLen;
+    const muzzleY = gy - Math.sin(rad) * barrelLen;
+
+    k.c.save();
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = fs * 0.65;
+    k.c.lineCap = 'round';
+    line(k, x0, gy, muzzleX, muzzleY, fs * 0.65);
+    k.c.restore();
+
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.3);
+    k.c.beginPath();
+    k.c.arc(x0, gy, fs * 0.7, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.lineWidth = 1.5;
+    k.c.stroke();
+    k.c.restore();
+
+    const curWx = v0x * s.t;
+    const curWy = Math.max(0, v0y * s.t - 0.5 * g * s.t * s.t);
+    const curPx = toScrX(curWx);
+    const curPy = toScrY(curWy);
+
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.2);
+    k.c.beginPath();
+    k.c.ellipse(curPx, gy, fs * 0.4, fs * 0.15, 0, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.restore();
+
+    k.c.save();
+    k.c.fillStyle = '#f59e0b';
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 1.5;
+    k.c.beginPath();
+    k.c.arc(curPx, curPy, fs * 0.42, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+    k.c.restore();
+
+    if (!icon && s.playing && s.t > 0 && s.t < s.tTotal) {
+        const curVy = v0y - g * s.t;
+        const vLen = fs * 1.5;
+        const vxLen = (v0x / s.v0) * vLen;
+        const vyLen = -(curVy / s.v0) * vLen;
+        arrow(k, curPx, curPy, curPx + vxLen, curPy, 1.2);
+        arrow(k, curPx, curPy, curPx, curPy + vyLen, 1.2);
+        arrow(k, curPx, curPy, curPx + vxLen, curPy + vyLen, 1.8);
+    }
+
+    if (s.hitTarget) {
+        k.c.save();
+        k.c.fillStyle = '#10b981';
+        roundRect(k, targetScrX - fs * 3.5, gy - fs * 4.2, fs * 7, fs * 1.5, 6);
+        k.c.fill();
+        k.c.restore();
+        k.c.save();
+        k.c.fillStyle = '#ffffff';
+        label(k, '🎯 HEDEF VURULDU!', targetScrX, gy - fs * 3.45, 'center', 'middle', 0.65);
+        k.c.restore();
+    }
+
+    if (!icon && k.o.labels !== false) {
+        const pw = fs * 11.5;
+        const ph = fs * 5.8;
+        const px = r.x + r.w - pw - fs * 0.8;
+        const py = r.y + fs * 0.8;
+        panel(k, px, py, pw, ph);
+
+        label(k, 'Eğik Atış Parametreleri', px + fs * 0.5, py + fs * 0.7, 'left', 'middle', 0.65);
+        label(k, `Açı (θ): ${fmtNum(s.angle, 0)}°`, px + fs * 0.5, py + fs * 1.6, 'left', 'middle', 0.55);
+        label(k, `İlk Hız (v₀): ${fmtNum(s.v0, 0)} m/s`, px + fs * 0.5, py + fs * 2.4, 'left', 'middle', 0.55);
+        label(k, `v₀x = ${fmtNum(v0x, 1)} m/s | v₀y = ${fmtNum(v0y, 1)} m/s`, px + fs * 0.5, py + fs * 3.2, 'left', 'middle', 0.52);
+        label(k, `Uçuş Süresi (t): ${fmtNum(s.tTotal, 2)} s`, px + fs * 0.5, py + fs * 4.0, 'left', 'middle', 0.55);
+        label(k, `Maks Yükseklik: ${fmtNum(s.hMax, 1)} m`, px + fs * 0.5, py + fs * 4.8, 'left', 'middle', 0.55);
+    }
+
+    if (!icon) {
+        const btnW = fs * 4.4;
+        const btnH = fs * 1.4;
+        const bx1 = r.x + fs * 1.2;
+        const by1 = r.y + fs * 1.0;
+
+        k.c.save();
+        k.c.fillStyle = s.playing ? '#ef4444' : '#6366f1';
+        roundRect(k, bx1, by1, btnW, btnH, 6);
+        k.c.fill();
+        k.c.restore();
+        k.c.save();
+        k.c.fillStyle = '#ffffff';
+        label(k, s.playing ? '⏹ Durdur' : '🚀 Ateş Et', bx1 + btnW / 2, by1 + btnH / 2, 'center', 'middle', 0.62);
+        k.c.restore();
+
+        const bx2 = bx1 + btnW + fs * 0.6;
+        k.c.save();
+        k.c.fillStyle = withAlpha(k.color, 0.15);
+        roundRect(k, bx2, by1, fs * 3.2, btnH, 6);
+        k.c.fill();
+        k.c.stroke();
+        k.c.restore();
+        label(k, '↺ Sıfırla', bx2 + fs * 1.6, by1 + btnH / 2, 'center', 'middle', 0.58);
+    }
+
+    k.c.restore();
+};
+
+export const projectileSpec: SimSpec = {
+    animated: (o) => simValue(o, 'play', 0) === 1,
+    controls: (r, o) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        const s = projectileState(o);
+        const gy = r.y + r.h - fs * 2.8;
+        const x0 = r.x + fs * 3.5;
+        const rad = (s.angle * Math.PI) / 180;
+        const barrelLen = fs * 2.4;
+        const muzzleX = x0 + Math.cos(rad) * barrelLen;
+        const muzzleY = gy - Math.sin(rad) * barrelLen;
+
+        const maxWorldX = 120;
+        const scaleX = (r.w - (x0 - r.x) - fs * 2) / maxWorldX;
+        const targetScrX = x0 + s.targetX * scaleX;
+
+        return [
+            { id: 'barrel', x: muzzleX, y: muzzleY, type: 'drag', label: 'Namlu açısını ve hızını ayarla' },
+            { id: 'target', x: targetScrX, y: gy - fs * 1.2, type: 'drag', label: 'Hedef mesafesini ayarla' },
+            { id: 'btn_fire', x: r.x + fs * 3.4, y: r.y + fs * 1.7, type: 'toggle', label: 'Ateşle / Durdur', on: s.playing },
+            { id: 'btn_reset', x: r.x + fs * 7.5, y: r.y + fs * 1.7, type: 'toggle', label: 'Sıfırla' },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        const gy = r.y + r.h - fs * 2.8;
+        const x0 = r.x + fs * 3.5;
+
+        if (id === 'barrel' && p) {
+            const dx = p.x - x0;
+            const dy = gy - p.y;
+            const angRad = Math.atan2(Math.max(1, dy), Math.max(1, dx));
+            const angle = Math.round((angRad * 180) / Math.PI);
+            const dist = Math.hypot(dx, dy);
+            const v0 = Math.round(clamp(dist * 0.8, 12, 42));
+            return { angle: clamp(angle, 15, 82), v0 };
+        }
+        if (id === 'target' && p) {
+            const maxWorldX = 120;
+            const scaleX = (r.w - (x0 - r.x) - fs * 2) / maxWorldX;
+            const targetX = Math.round(clamp((p.x - x0) / scaleX, 15, 115));
+            return { targetX };
+        }
+        if (id === 'btn_fire') {
+            const cur = simValue(o, 'play', 0) === 1;
+            return { play: cur ? 0 : 1, t: 0 };
+        }
+        if (id === 'btn_reset') {
+            return { play: 0, t: 0 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'angle', label: 'Atış Açısı θ', min: 15, max: 80, step: 1, unit: '°' },
+        { key: 'v0', label: 'İlk Hız v₀', min: 10, max: 45, step: 1, unit: 'm/s' },
+        { key: 'targetX', label: 'Hedef Mesafesi', min: 15, max: 110, step: 5, unit: 'm' },
+        { key: 'play', label: 'Uçuş Hareketi (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
+// ── Geometrik Optik: Mercekler ve Aynalar (Ray Tracing) ──────────────
+const OPTIC_MODES = [
+    { id: 0, name: 'Çukur Ayna', type: 'mirror', conv: true },
+    { id: 1, name: 'Tümsek Ayna', type: 'mirror', conv: false },
+    { id: 2, name: 'İnce Mercek', type: 'lens', conv: true },
+    { id: 3, name: 'Kalın Mercek', type: 'lens', conv: false },
+];
+
+interface LensMirrorState {
+    mode: number;
+    opt: typeof OPTIC_MODES[0];
+    f: number;
+    doVal: number;
+    hoVal: number;
+    diVal: number | null;
+    hiVal: number;
+    m: number;
+    isReal: boolean;
+    isUpright: boolean;
+}
+
+function lensMirrorState(o: MathObject): LensMirrorState {
+    const mode = clampInt(simValue(o, 'mode', 0), 0, 3, 0);
+    const opt = OPTIC_MODES[mode];
+    const fMag = clamp(simValue(o, 'f', 3.5), 2.0, 5.5);
+    const f = opt.conv ? fMag : -fMag;
+    const doVal = clamp(simValue(o, 'do', 6.5), 1.0, 12.0);
+    const hoVal = clamp(simValue(o, 'ho', 2.4), 0.8, 4.0);
+
+    const denom = 1 / f - 1 / doVal;
+    const diVal = Math.abs(denom) < 1e-3 ? null : 1 / denom;
+    const m = diVal === null ? 0 : -diVal / doVal;
+    const hiVal = m * hoVal;
+    const isReal = diVal !== null && diVal > 0;
+    const isUpright = m > 0;
+
+    return {
+        mode,
+        opt,
+        f: fMag,
+        doVal,
+        hoVal,
+        diVal,
+        hiVal,
+        m,
+        isReal,
+        isUpright,
+    };
+}
+
+export const lensMirrorRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = lensMirrorState(k.o);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const cx = r.x + r.w * 0.48;
+    const cy = r.y + r.h * 0.52;
+    const unit = Math.min(r.w / 24, r.h / 14);
+
+    line(k, r.x, cy, r.x + r.w, cy, 1.2);
+    if (!icon) {
+        label(k, 'Asal Eksen', r.x + fs * 0.5, cy - fs * 0.4, 'left', 'bottom', 0.5);
+    }
+
+    const elemH = unit * 7;
+    k.c.save();
+    k.c.lineWidth = 3;
+    k.c.strokeStyle = k.color;
+
+    if (s.opt.type === 'lens') {
+        if (s.opt.conv) {
+            k.c.beginPath();
+            k.c.moveTo(cx, cy - elemH / 2);
+            k.c.quadraticCurveTo(cx + unit * 0.6, cy, cx, cy + elemH / 2);
+            k.c.quadraticCurveTo(cx - unit * 0.6, cy, cx, cy - elemH / 2);
+            k.c.fillStyle = withAlpha('#38bdf8', 0.2);
+            k.c.fill();
+            k.c.stroke();
+        } else {
+            k.c.beginPath();
+            k.c.moveTo(cx - unit * 0.4, cy - elemH / 2);
+            k.c.lineTo(cx + unit * 0.4, cy - elemH / 2);
+            k.c.quadraticCurveTo(cx, cy, cx + unit * 0.4, cy + elemH / 2);
+            k.c.lineTo(cx - unit * 0.4, cy + elemH / 2);
+            k.c.quadraticCurveTo(cx, cy, cx - unit * 0.4, cy - elemH / 2);
+            k.c.fillStyle = withAlpha('#38bdf8', 0.2);
+            k.c.fill();
+            k.c.stroke();
+        }
+    } else {
+        k.c.beginPath();
+        if (s.opt.conv) {
+            k.c.arc(cx + unit * 5, cy, unit * 5, Math.PI - 0.7, Math.PI + 0.7);
+        } else {
+            k.c.arc(cx - unit * 5, cy, unit * 5, -0.7, 0.7);
+        }
+        k.c.stroke();
+        for (let i = -6; i <= 6; i++) {
+            const my = cy + (i * elemH) / 14;
+            line(k, cx, my, cx + unit * 0.35, my - unit * 0.25, 1);
+        }
+    }
+    k.c.restore();
+
+    const fPix = s.f * unit;
+    const fLeftX = cx - fPix;
+    const mLeftX = cx - 2 * fPix;
+    const fRightX = cx + fPix;
+    const mRightX = cx + 2 * fPix;
+
+    const drawPoint = (px: number, txt: string) => {
+        k.c.save();
+        k.c.fillStyle = '#f59e0b';
+        k.c.beginPath();
+        k.c.arc(px, cy, 3.5, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+        label(k, txt, px, cy + fs * 0.4, 'center', 'top', 0.55);
+    };
+
+    drawPoint(fLeftX, 'F');
+    drawPoint(mLeftX, '2F (M)');
+    if (s.opt.type === 'lens') {
+        drawPoint(fRightX, "F'");
+        drawPoint(mRightX, "2F'");
+    }
+
+    const objX = cx - s.doVal * unit;
+    const objTopY = cy - s.hoVal * unit;
+    arrow(k, objX, cy, objX, objTopY, 2.5);
+    label(k, 'Cisim', objX, objTopY - fs * 0.4, 'center', 'bottom', 0.58);
+
+    if (!icon) {
+        k.c.save();
+        k.c.strokeStyle = '#38bdf8';
+        k.c.lineWidth = 1.6;
+        line(k, objX, objTopY, cx, objTopY, 1.6);
+
+        if (s.opt.type === 'lens') {
+            if (s.opt.conv) {
+                line(k, cx, objTopY, cx + (r.w - cx), objTopY + ((cy - objTopY) / fPix) * (r.w - cx), 1.6);
+            } else {
+                line(k, cx, objTopY, r.x + r.w, objTopY - ((objTopY - cy) / fPix) * (r.w - cx), 1.6);
+                k.c.setLineDash([3, 3]);
+                line(k, cx, objTopY, fLeftX, cy, 1.2);
+            }
+        } else {
+            if (s.opt.conv) {
+                line(k, cx, objTopY, r.x, cy + ((cy - objTopY) / fPix) * (cx - r.x), 1.6);
+            } else {
+                line(k, cx, objTopY, r.x, objTopY - ((cy - objTopY) / fPix) * (cx - r.x), 1.6);
+                k.c.setLineDash([3, 3]);
+                line(k, cx, objTopY, fRightX, cy, 1.2);
+            }
+        }
+        k.c.restore();
+
+        k.c.save();
+        k.c.strokeStyle = '#c084fc';
+        k.c.lineWidth = 1.6;
+        if (s.opt.type === 'lens') {
+            line(k, objX, objTopY, r.x + r.w, cy + ((cy - objTopY) / (cx - objX)) * (r.x + r.w - cx), 1.6);
+        } else {
+            line(k, objX, objTopY, cx, cy, 1.6);
+            line(k, cx, cy, r.x, cy + (cy - objTopY) * ((cx - r.x) / (cx - objX)), 1.6);
+        }
+        k.c.restore();
+    }
+
+    if (s.diVal !== null && Math.abs(s.diVal) < 25) {
+        let imgX = cx;
+        if (s.opt.type === 'lens') {
+            imgX = cx + s.diVal * unit;
+        } else {
+            imgX = cx - s.diVal * unit;
+        }
+        const imgTopY = cy - s.hiVal * unit;
+
+        k.c.save();
+        if (s.isReal) {
+            k.c.strokeStyle = '#ef4444';
+            arrow(k, imgX, cy, imgX, imgTopY, 2.5);
+            label(k, 'Gerçek Görüntü', imgX, s.isUpright ? imgTopY - fs * 0.4 : imgTopY + fs * 0.4, 'center', s.isUpright ? 'bottom' : 'top', 0.58);
+        } else {
+            k.c.strokeStyle = '#a855f7';
+            k.c.setLineDash([4, 4]);
+            arrow(k, imgX, cy, imgX, imgTopY, 2.5);
+            label(k, 'Sanal Görüntü', imgX, s.isUpright ? imgTopY - fs * 0.4 : imgTopY + fs * 0.4, 'center', s.isUpright ? 'bottom' : 'top', 0.58);
+        }
+        k.c.restore();
+    }
+
+    if (!icon) {
+        const btnW = fs * 7.5;
+        const btnH = fs * 1.5;
+        const bx = r.x + fs * 1.0;
+        const by = r.y + fs * 1.0;
+        k.c.save();
+        k.c.fillStyle = '#4f46e5';
+        roundRect(k, bx, by, btnW, btnH, 6);
+        k.c.fill();
+        k.c.restore();
+        k.c.save();
+        k.c.fillStyle = '#ffffff';
+        label(k, `Optik: ${s.opt.name} ↻`, bx + btnW / 2, by + btnH / 2, 'center', 'middle', 0.62);
+        k.c.restore();
+
+        if (k.o.labels !== false) {
+            const pw = fs * 11.2;
+            const ph = fs * 5.2;
+            const px = r.x + r.w - pw - fs * 0.8;
+            const py = r.y + fs * 0.8;
+            panel(k, px, py, pw, ph);
+
+            label(k, 'Görüntü Özellikleri', px + fs * 0.5, py + fs * 0.7, 'left', 'middle', 0.65);
+            label(k, `Cisim Mesafesi (do): ${fmtNum(s.doVal, 1)} br`, px + fs * 0.5, py + fs * 1.6, 'left', 'middle', 0.55);
+            label(k, `Odak Uzaklığı (f): ${fmtNum(s.f, 1)} br`, px + fs * 0.5, py + fs * 2.4, 'left', 'middle', 0.55);
+            if (s.diVal !== null) {
+                label(k, `Görüntü Mesafesi (di): ${fmtNum(Math.abs(s.diVal), 1)} br`, px + fs * 0.5, py + fs * 3.2, 'left', 'middle', 0.55);
+                label(k, `Büyütme (m): ${fmtNum(s.m, 2)} kat`, px + fs * 0.5, py + fs * 4.0, 'left', 'middle', 0.55);
+                const desc = `${s.isReal ? 'Gerçek' : 'Sanal'}, ${s.isUpright ? 'Düz' : 'Ters'}, ${Math.abs(s.m) > 1.05 ? 'Büyütülmüş' : Math.abs(s.m) < 0.95 ? 'Küçültülmüş' : 'Eşit Boyda'}`;
+                label(k, desc, px + fs * 0.5, py + fs * 4.7, 'left', 'middle', 0.58);
+            } else {
+                label(k, 'Görüntü sonsuzdadır', px + fs * 0.5, py + fs * 3.4, 'left', 'middle', 0.6);
+            }
+        }
+    }
+
+    k.c.restore();
+};
+
+export const lensMirrorSpec: SimSpec = {
+    controls: (r, o) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        const s = lensMirrorState(o);
+        const cx = r.x + r.w * 0.48;
+        const cy = r.y + r.h * 0.52;
+        const unit = Math.min(r.w / 24, r.h / 14);
+
+        const objX = cx - s.doVal * unit;
+        const objTopY = cy - s.hoVal * unit;
+        const fLeftX = cx - s.f * unit;
+
+        return [
+            { id: 'btn_mode', x: r.x + fs * 4.5, y: r.y + fs * 1.7, type: 'toggle', label: 'Optik elemanı değiştir' },
+            { id: 'obj_dist', x: objX, y: cy, type: 'drag', label: 'Cisim mesafesini değiştir (do)' },
+            { id: 'obj_height', x: objX, y: objTopY, type: 'drag', label: 'Cisim boyunu ayarla (ho)' },
+            { id: 'focal', x: fLeftX, y: cy, type: 'drag', label: 'Odak noktasını ayarla (F)' },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const cx = r.x + r.w * 0.48;
+        const cy = r.y + r.h * 0.52;
+        const unit = Math.min(r.w / 24, r.h / 14);
+
+        if (id === 'obj_dist' && p) {
+            const doVal = clamp((cx - p.x) / unit, 1.2, 11.5);
+            return { do: Math.round(doVal * 10) / 10 };
+        }
+        if (id === 'obj_height' && p) {
+            const hoVal = clamp((cy - p.y) / unit, 0.8, 3.8);
+            return { ho: Math.round(hoVal * 10) / 10 };
+        }
+        if (id === 'focal' && p) {
+            const fVal = clamp((cx - p.x) / unit, 2.0, 5.0);
+            return { f: Math.round(fVal * 10) / 10 };
+        }
+        if (id === 'btn_mode') {
+            const cur = simValue(o, 'mode', 0);
+            return { mode: (cur + 1) % 4 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'mode', label: 'Optik Mod (0-3)', min: 0, max: 3, step: 1 },
+        { key: 'f', label: 'Odak Uzaklığı f', min: 2, max: 5.5, step: 0.5, unit: 'br' },
+        { key: 'do', label: 'Cisim Mesafesi do', min: 1.5, max: 11, step: 0.5, unit: 'br' },
+        { key: 'ho', label: 'Cisim Boyu ho', min: 1, max: 3.5, step: 0.2, unit: 'br' },
+    ],
+};
+
 export const PHYSICS_SIM_RENDERERS: Record<string, Renderer> = {
     refraction_sim: refractionRender,
     motion_graph_sim: motionRender,
@@ -1903,6 +2502,8 @@ export const PHYSICS_SIM_RENDERERS: Record<string, Renderer> = {
     spring_sim: springRender,
     electromagnet_sim: electromagnetRender,
     work_sim: workRender,
+    projectile_sim: projectileRender,
+    lens_mirror_sim: lensMirrorRender,
 };
 
 export const PHYSICS_SIM_SPECS: Record<string, SimSpec> = {
@@ -1916,9 +2517,25 @@ export const PHYSICS_SIM_SPECS: Record<string, SimSpec> = {
     spring_sim: springSpec,
     electromagnet_sim: electromagnetSpec,
     work_sim: workSpec,
+    projectile_sim: projectileSpec,
+    lens_mirror_sim: lensMirrorSpec,
 };
 
 export const PHYSICS_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
+    {
+        kind: 'projectile_sim',
+        label: 'Eğik & Yatay Atış',
+        hint: 'Namlu açısını ve ilk hızı sürükle; menzil, tepe noktası ve yörüngeyi canlı gör',
+        size: { w: 620, h: 400 },
+        defaults: { labels: true, sim: { angle: 45, v0: 28, play: 0, t: 0, targetX: 65 } },
+    },
+    {
+        kind: 'lens_mirror_sim',
+        label: 'Mercekler & Aynalar',
+        hint: 'Cismi ve odağı kaydır; asal eksende özel ışınları ve canlı görüntüyü izle',
+        size: { w: 640, h: 380 },
+        defaults: { labels: true, sim: { mode: 0, f: 3.5, do: 6.5, ho: 2.4 } },
+    },
     {
         kind: 'refraction_sim',
         label: 'Işığın Kırılması',

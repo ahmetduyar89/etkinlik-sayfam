@@ -294,7 +294,18 @@ export type MathObjectKind =
     | 'ebob_ekok_tiling_sim'
     | 'periodic_ekok_sim'
     | 'divisibility_proof_sim'
-    | 'compound_remainder_sim';
+    | 'compound_remainder_sim'
+    // ── Profesyonel Canlı Fen Simülasyonları (Fizik, Kimya, Biyoloji) ─
+    | 'projectile_sim'
+    | 'lens_mirror_sim'
+    | 'gas_laws_sim'
+    | 'vsepr_shapes_sim'
+    | 'titration_sim'
+    | 'galvanic_cell_sim'
+    | 'pedigree_sim'
+    | 'osmosis_cell_sim'
+    | 'enzyme_rate_sim'
+    | 'action_potential_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile

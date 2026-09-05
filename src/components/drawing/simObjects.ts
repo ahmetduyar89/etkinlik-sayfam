@@ -876,6 +876,18 @@ export const SIM_SPECS: Partial<Record<MathObjectKind, SimSpec>> = {
 
 export const SIM_CATEGORIES: ReadonlyArray<ObjectCategory> = [
     {
+        label: '⚡ Fizik (Canlı)',
+        items: [...PHYSICS_SIM_ITEMS, ...ELECTRIC_SIM_ITEMS, ...OPTICS_SIM_ITEMS],
+    },
+    {
+        label: '🧪 Kimya (Canlı)',
+        items: CHEMISTRY_SIM_ITEMS,
+    },
+    {
+        label: '🧬 Biyoloji (Canlı)',
+        items: BIO_SIM_ITEMS,
+    },
+    {
         label: '✨ Gerçek 3D & Lab',
         items: THREE_SIM_ITEMS,
     },

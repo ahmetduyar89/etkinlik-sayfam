@@ -1691,6 +1691,791 @@ export const moleculeBuildSpec: SimSpec = {
     ],
 };
 
+// ── Gaz Yasaları & Pistonlu Kap (PV = nRT) ──────────────────────────
+interface GasLawsState {
+    v: number;      // Hacim (Litre): 1.0 - 5.0
+    t: number;      // Sıcaklık (K): 200 - 500
+    n: number;      // Mol sayısı: 1 - 3
+    p: number;      // Basınç (atm): P = n * 0.0821 * T / V
+}
+
+function gasLawsState(o: MathObject): GasLawsState {
+    const v = clamp(simValue(o, 'v', 2.5), 1.0, 5.0);
+    const t = clamp(simValue(o, 't', 300), 200, 500);
+    const n = clampInt(simValue(o, 'n', 1), 1, 3, 1);
+    const p = (n * 0.0821 * t) / v;
+    return { v, t, n, p };
+}
+
+export const gasLawsRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = gasLawsState(k.o);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    // Silindir Kap Geometrisi
+    const cylX = r.x + fs * 2.0;
+    const cylY = r.y + fs * 2.5;
+    const cylW = r.w * 0.42;
+    const cylH = r.h * 0.58;
+    const botY = cylY + cylH;
+
+    // Hacme göre piston konumu (v: 1.0 -> en altta, 5.0 -> en üstte)
+    const pistonFrac = (s.v - 1.0) / 4.0;
+    const pistonY = botY - (fs * 1.5 + pistonFrac * (cylH - fs * 2.2));
+
+    // Silindir Gövdesi
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.04);
+    k.c.fillRect(cylX, cylY, cylW, cylH);
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 2.5;
+    line(k, cylX, cylY, cylX, botY, 2.5);
+    line(k, cylX, botY, cylX + cylW, botY, 2.5);
+    line(k, cylX + cylW, botY, cylX + cylW, cylY, 2.5);
+    k.c.restore();
+
+    // Gaz Tanecikleri (Moleküller)
+    const numParticles = s.n * 16;
+    const speedMult = Math.sqrt(s.t / 300) * 1.5;
+    k.c.save();
+    for (let i = 0; i < numParticles; i++) {
+        const px = cylX + fs * 0.6 + ((i * 37 + k.t * 40 * speedMult * (i % 2 === 0 ? 1 : -1)) % (cylW - fs * 1.2) + (cylW - fs * 1.2)) % (cylW - fs * 1.2);
+        const py = pistonY + fs * 0.6 + ((i * 23 + k.t * 35 * speedMult * (i % 3 === 0 ? 1 : -1)) % (botY - pistonY - fs * 1.2) + (botY - pistonY - fs * 1.2)) % (botY - pistonY - fs * 1.2);
+
+        k.c.fillStyle = '#38bdf8';
+        k.c.beginPath();
+        k.c.arc(px, py, 3.2, 0, Math.PI * 2);
+        k.c.fill();
+    }
+    k.c.restore();
+
+    // Piston Bloğu ve Tutamacı
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.25);
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 2;
+    roundRect(k, cylX + 2, pistonY - fs * 0.6, cylW - 4, fs * 0.6, 3);
+    k.c.fill();
+    k.c.stroke();
+
+    // Piston Kolu
+    const rodX = cylX + cylW / 2;
+    line(k, rodX, pistonY - fs * 0.6, rodX, pistonY - fs * 2.2, 4);
+    k.c.fillStyle = '#f59e0b';
+    k.c.beginPath();
+    k.c.arc(rodX, pistonY - fs * 2.2, fs * 0.5, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+    k.c.restore();
+    if (!icon) {
+        label(k, 'Piston (Sürükle)', rodX, pistonY - fs * 2.9, 'center', 'bottom', 0.52);
+    }
+
+    // Ocak Alevi (Isıtıcı)
+    const fireY = botY + fs * 0.4;
+    k.c.save();
+    const flameH = (s.t / 500) * fs * 1.6;
+    for (let f = -2; f <= 2; f++) {
+        const fx = rodX + f * fs * 1.1;
+        k.c.fillStyle = f % 2 === 0 ? '#ef4444' : '#f59e0b';
+        k.c.beginPath();
+        k.c.moveTo(fx - fs * 0.4, fireY + fs * 0.5);
+        k.c.quadraticCurveTo(fx, fireY - flameH, fx + fs * 0.4, fireY + fs * 0.5);
+        k.c.fill();
+    }
+    k.c.restore();
+    if (!icon) {
+        label(k, `Ocak: ${fmtNum(s.t, 0)} K (${fmtNum(s.t - 273, 0)} °C)`, rodX, fireY + fs * 1.2, 'center', 'top', 0.55);
+    }
+
+    // Manometre (Basınç Göstergesi)
+    const manoX = cylX + cylW + fs * 2.2;
+    const manoY = cylY + fs * 1.5;
+    const manoR = fs * 1.8;
+
+    // Bağlantı borusu
+    line(k, cylX + cylW, manoY, manoX - manoR, manoY, 2);
+
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.06);
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 2;
+    k.c.beginPath();
+    k.c.arc(manoX, manoY, manoR, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+
+    // Kadran ibresi
+    const pFrac = clamp(s.p / 12, 0, 1);
+    const pAng = -Math.PI * 0.8 + pFrac * Math.PI * 1.6;
+    k.c.strokeStyle = '#ef4444';
+    k.c.lineWidth = 2.5;
+    line(k, manoX, manoY, manoX + Math.cos(pAng) * manoR * 0.75, manoY + Math.sin(pAng) * manoR * 0.75, 2.5);
+    k.c.fillStyle = k.color;
+    k.c.beginPath();
+    k.c.arc(manoX, manoY, 3, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.restore();
+    if (!icon) {
+        label(k, 'Manometre', manoX, manoY - manoR - fs * 0.3, 'center', 'bottom', 0.55);
+        label(k, `${fmtNum(s.p, 2)} atm`, manoX, manoY + manoR + fs * 0.4, 'center', 'top', 0.65);
+    }
+
+    // Sağ Taraf Canlı P-V Grafiği
+    if (!icon && k.o.labels !== false) {
+        const gx = r.x + r.w * 0.64;
+        const gy = r.y + fs * 2.0;
+        const gw = r.w * 0.32;
+        const gh = r.h * 0.45;
+        const gbot = gy + gh;
+
+        panel(k, gx - fs * 0.5, gy - fs * 1.0, gw + fs * 1.0, gh + fs * 2.2);
+        label(k, 'P-V İzoterm Grafiği', gx, gy - fs * 0.4, 'left', 'bottom', 0.6);
+
+        // Eksenler
+        line(k, gx, gbot, gx + gw, gbot, 1.5);
+        line(k, gx, gbot, gx, gy, 1.5);
+        label(k, 'V (L)', gx + gw, gbot + fs * 0.4, 'right', 'top', 0.5);
+        label(k, 'P (atm)', gx - fs * 0.3, gy, 'right', 'top', 0.5);
+
+        // Hiperbol P = nRT/V eğrisi
+        k.c.save();
+        k.c.strokeStyle = '#6366f1';
+        k.c.lineWidth = 1.8;
+        k.c.beginPath();
+        const pts = 25;
+        for (let i = 0; i <= pts; i++) {
+            const vVal = 1.0 + (i / pts) * 4.0;
+            const pVal = (s.n * 0.0821 * s.t) / vVal;
+            const px = gx + ((vVal - 1.0) / 4.0) * gw;
+            const py = gbot - clamp(pVal / 12, 0, 1) * gh;
+            if (i === 0) k.c.moveTo(px, py);
+            else k.c.lineTo(px, py);
+        }
+        k.c.stroke();
+
+        // Çalışma noktası (Current Operating Point)
+        const curPx = gx + ((s.v - 1.0) / 4.0) * gw;
+        const curPy = gbot - clamp(s.p / 12, 0, 1) * gh;
+        k.c.fillStyle = '#ef4444';
+        k.c.beginPath();
+        k.c.arc(curPx, curPy, 4.5, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+
+        label(k, `(${fmtNum(s.v, 1)}L, ${fmtNum(s.p, 1)}atm)`, curPx, curPy - fs * 0.5, 'center', 'bottom', 0.55);
+
+        // İdeal Gaz Formül Özeti
+        const infoY = gbot + fs * 2.0;
+        panel(k, gx - fs * 0.5, infoY, gw + fs * 1.0, fs * 3.8);
+        label(k, 'P · V = n · R · T', gx, infoY + fs * 0.8, 'left', 'middle', 0.65);
+        label(k, `Hacim (V): ${fmtNum(s.v, 1)} L | Mol (n): ${s.n} mol`, gx, infoY + fs * 1.8, 'left', 'middle', 0.52);
+        label(k, `Sıcaklık (T): ${fmtNum(s.t, 0)} K`, gx, infoY + fs * 2.8, 'left', 'middle', 0.52);
+    }
+
+    k.c.restore();
+};
+
+export const gasLawsSpec: SimSpec = {
+    animated: true,
+    controls: (r, o) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        const s = gasLawsState(o);
+        const cylX = r.x + fs * 1.5;
+        const cylY = r.y + fs * 2.5;
+        const cylW = r.w * 0.42;
+        const cylH = r.h * 0.58;
+        const botY = cylY + cylH;
+
+        const pistonFrac = (s.v - 1.0) / 4.0;
+        const pistonY = botY - (fs * 1.5 + pistonFrac * (cylH - fs * 2.2));
+        const rodX = cylX + cylW / 2;
+
+        return [
+            { id: 'piston', x: rodX, y: pistonY - fs * 2.2, type: 'drag', label: 'Pistonu it/çek (Hacim V)' },
+            { id: 'heater', x: rodX, y: botY + fs * 0.8, type: 'drag', label: 'Ocağı ayarla (Sıcaklık T)' },
+            { id: 'btn_mol', x: cylX + fs * 1.5, y: r.y + fs * 1.2, type: 'toggle', label: 'Gaz molekülü ekle' },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        const cylY = r.y + fs * 2.5;
+        const cylH = r.h * 0.58;
+        const botY = cylY + cylH;
+
+        if (id === 'piston' && p) {
+            const frac = clamp((botY - p.y - fs * 1.5) / (cylH - fs * 2.2), 0, 1);
+            const v = 1.0 + frac * 4.0;
+            return { v: Math.round(v * 10) / 10 };
+        }
+        if (id === 'heater' && p) {
+            const t = clamp(200 + ((p.x - r.x) / (r.w * 0.5)) * 300, 200, 500);
+            return { t: Math.round(t) };
+        }
+        if (id === 'btn_mol') {
+            const cur = simValue(o, 'n', 1);
+            return { n: (cur % 3) + 1 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'v', label: 'Hacim V', min: 1, max: 5, step: 0.1, unit: 'L' },
+        { key: 't', label: 'Sıcaklık T', min: 200, max: 500, step: 10, unit: 'K' },
+        { key: 'n', label: 'Madde Miktarı n', min: 1, max: 3, step: 1, unit: 'mol' },
+    ],
+};
+
+// ── Molekül Geometrisi & VSEPR (Molecule Shapes) ────────────────────
+const VSEPR_CONFIGS = [
+    { name: 'Doğrusal (Linear)', formula: 'AX₂', bondAng: '180°', hyb: 'sp', ex: 'BeCl₂, CO₂', bonds: [0, 180], lps: [] },
+    { name: 'Düzlem Üçgen (Trigonal Planar)', formula: 'AX₃', bondAng: '120°', hyb: 'sp²', ex: 'BF₃, SO₃', bonds: [-90, 30, 150], lps: [] },
+    { name: 'Kırık Doğru (Bent)', formula: 'AX₂E₁', bondAng: '119°', hyb: 'sp²', ex: 'SO₂, O₃', bonds: [30, 150], lps: [-90] },
+    { name: 'Düzgün Dörtyüzlü (Tetrahedral)', formula: 'AX₄', bondAng: '109.5°', hyb: 'sp³', ex: 'CH₄, CCl₄', bonds: [-90, 30, 110, 160], lps: [] },
+    { name: 'Üçgen Piramit (Trigonal Pyramidal)', formula: 'AX₃E₁', bondAng: '107.3°', hyb: 'sp³', ex: 'NH₃, PCl₃', bonds: [30, 110, 160], lps: [-90] },
+    { name: 'Kırık Doğru / Açısal (Bent)', formula: 'AX₂E₂', bondAng: '104.5°', hyb: 'sp³', ex: 'H₂O, H₂S', bonds: [35, 145], lps: [-60, -120] },
+];
+
+function vseprState(o: MathObject) {
+    const idx = clampInt(simValue(o, 'geom', 0), 0, VSEPR_CONFIGS.length - 1, 0);
+    return VSEPR_CONFIGS[idx];
+}
+
+export const vseprRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = vseprState(k.o);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const cx = r.x + r.w * 0.44;
+    const cy = r.y + r.h * 0.52;
+    const bondLen = Math.min(r.w / 6.5, r.h / 4.2);
+
+    // Ortaklanmamış elektron çiftleri (Orbital Lobları)
+    s.lps.forEach((lpAng) => {
+        const rad = (lpAng * Math.PI) / 180;
+        const lx = cx + Math.cos(rad) * bondLen * 0.85;
+        const ly = cy + Math.sin(rad) * bondLen * 0.85;
+
+        k.c.save();
+        k.c.fillStyle = withAlpha('#a855f7', 0.22);
+        k.c.strokeStyle = '#a855f7';
+        k.c.lineWidth = 1.5;
+        k.c.beginPath();
+        k.c.ellipse(lx, ly, fs * 0.8, fs * 1.3, rad + Math.PI / 2, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+
+        // 2 adet elektron noktası
+        k.c.fillStyle = '#c084fc';
+        const perp = rad + Math.PI / 2;
+        k.c.beginPath();
+        k.c.arc(lx + Math.cos(perp) * fs * 0.35, ly + Math.sin(perp) * fs * 0.35, 3, 0, Math.PI * 2);
+        k.c.arc(lx - Math.cos(perp) * fs * 0.35, ly - Math.sin(perp) * fs * 0.35, 3, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+    });
+
+    // Kimyasal Bağlar ve Çevre Atomlar
+    s.bonds.forEach((bAng) => {
+        const rad = (bAng * Math.PI) / 180;
+        const bx = cx + Math.cos(rad) * bondLen;
+        const by = cy + Math.sin(rad) * bondLen;
+
+        // Bağ çubuğu
+        line(k, cx, cy, bx, by, 3);
+
+        // Çevre atom
+        k.c.save();
+        k.c.fillStyle = '#38bdf8';
+        k.c.strokeStyle = k.color;
+        k.c.lineWidth = 2;
+        k.c.beginPath();
+        k.c.arc(bx, by, fs * 0.85, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+        k.c.restore();
+
+        label(k, 'X', bx, by, 'center', 'middle', 0.65);
+    });
+
+    // Merkez Atom (A)
+    k.c.save();
+    k.c.fillStyle = '#f59e0b';
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 2.5;
+    k.c.beginPath();
+    k.c.arc(cx, cy, fs * 1.15, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+    k.c.restore();
+    label(k, 'A', cx, cy, 'center', 'middle', 0.75);
+
+    // Bağ Açısı Yayı
+    if (s.bonds.length >= 2 && !icon) {
+        const a1 = (s.bonds[0] * Math.PI) / 180;
+        const a2 = (s.bonds[1] * Math.PI) / 180;
+        const arcR = bondLen * 0.45;
+        k.c.save();
+        k.c.strokeStyle = '#ef4444';
+        k.c.lineWidth = 1.5;
+        k.c.beginPath();
+        k.c.arc(cx, cy, arcR, a1, a2);
+        k.c.stroke();
+        k.c.restore();
+        const midA = (a1 + a2) / 2;
+        label(k, s.bondAng, cx + Math.cos(midA) * arcR * 1.35, cy + Math.sin(midA) * arcR * 1.35, 'center', 'middle', 0.62);
+    }
+
+    // Üst Buton & Bilgi Paneli
+    if (!icon) {
+        const btnW = fs * 11.5;
+        const btnH = fs * 1.5;
+        const bx = r.x + fs * 1.0;
+        const by = r.y + fs * 0.8;
+
+        k.c.save();
+        k.c.fillStyle = '#4f46e5';
+        roundRect(k, bx, by, btnW, btnH, 6);
+        k.c.fill();
+        k.c.restore();
+        k.c.save();
+        k.c.fillStyle = '#ffffff';
+        label(k, `Geometri: ${s.name} ↻`, bx + btnW / 2, by + btnH / 2, 'center', 'middle', 0.62);
+        k.c.restore();
+
+        if (k.o.labels !== false) {
+            const pw = fs * 11.5;
+            const ph = fs * 6.2;
+            const px = r.x + r.w - pw - fs * 0.8;
+            const py = r.y + fs * 0.8;
+            panel(k, px, py, pw, ph);
+
+            label(k, 'VSEPR & Molekül Özellikleri', px + fs * 0.5, py + fs * 0.7, 'left', 'middle', 0.65);
+            label(k, `VSEPR Formülü: ${s.formula}`, px + fs * 0.5, py + fs * 1.6, 'left', 'middle', 0.58);
+            label(k, `Bağ Açısı: ${s.bondAng}`, px + fs * 0.5, py + fs * 2.4, 'left', 'middle', 0.58);
+            label(k, `Hibritleşme: ${s.hyb}`, px + fs * 0.5, py + fs * 3.2, 'left', 'middle', 0.58);
+            label(k, `Örnek Moleküller: ${s.ex}`, px + fs * 0.5, py + fs * 4.0, 'left', 'middle', 0.58);
+            const polar = s.lps.length > 0 ? 'Polar (Kutuplu)' : 'Apolar (Simetrik)';
+            label(k, `Molekül Polarlığı: ${polar}`, px + fs * 0.5, py + fs * 4.8, 'left', 'middle', 0.55);
+        }
+    }
+
+    k.c.restore();
+};
+
+export const vseprSpec: SimSpec = {
+    controls: (r) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        return [
+            { id: 'btn_next', x: r.x + fs * 6.5, y: r.y + fs * 1.55, type: 'toggle', label: 'Sonraki VSEPR Şekli' },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        if (id === 'btn_next') {
+            const cur = simValue(o, 'geom', 0);
+            return { geom: (cur + 1) % VSEPR_CONFIGS.length };
+        }
+        return {};
+    },
+    params: [
+        { key: 'geom', label: `Molekül Şekli (0-${VSEPR_CONFIGS.length - 1})`, min: 0, max: VSEPR_CONFIGS.length - 1, step: 1 },
+    ],
+};
+
+// ── Asit-Baz Titrasyonu & pH Eğrisi ─────────────────────────────────
+interface TitrationState {
+    vBase: number;    // Eklenen baz hacmi (mL): 0 - 50
+    mBase: number;    // 0.1 M
+    vAcid: number;    // 25 mL
+    mAcid: number;    // 0.1 M
+    pH: number;
+    color: string;
+    isEquiv: boolean;
+}
+
+function titrationState(o: MathObject): TitrationState {
+    const vBase = clamp(simValue(o, 'vb', 0), 0, 50);
+    const mBase = 0.1;
+    const vAcid = 25;
+    const mAcid = 0.1;
+
+    const nAcid = vAcid * mAcid; // 2.5 mmol
+    const nBase = vBase * mBase; // mmol
+
+    let pH = 1.0;
+    const vTotal = vAcid + vBase;
+
+    if (vBase < 24.9) {
+        const excessH = (nAcid - nBase) / vTotal;
+        pH = -Math.log10(Math.max(1e-7, excessH));
+    } else if (vBase > 25.1) {
+        const excessOH = (nBase - nAcid) / vTotal;
+        const pOH = -Math.log10(Math.max(1e-7, excessOH));
+        pH = 14 - pOH;
+    } else {
+        pH = 7.0;
+    }
+
+    const isEquiv = Math.abs(vBase - 25) < 0.3;
+    // Fenolftalein: pH > 8.2 pembe
+    let color = 'rgba(241, 245, 249, 0.4)';
+    if (pH >= 8.2) {
+        color = 'rgba(244, 114, 182, 0.65)';
+    } else if (pH >= 7.0) {
+        color = 'rgba(251, 207, 232, 0.35)';
+    }
+
+    return {
+        vBase,
+        mBase,
+        vAcid,
+        mAcid,
+        pH: clamp(pH, 1.0, 13.0),
+        color,
+        isEquiv,
+    };
+}
+
+export const titrationRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = titrationState(k.o);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    // Titrasyon Düzeneği (Sol Taraf)
+    const bx = r.x + fs * 4.2;
+    const by = r.y + fs * 1.8;
+    const bW = fs * 1.6;
+    const bH = r.h * 0.45;
+
+    // Destek Çubuğu
+    line(k, bx - fs * 1.8, by - fs * 0.5, bx - fs * 1.8, r.y + r.h - fs * 1.5, 3.5);
+    line(k, bx - fs * 2.8, r.y + r.h - fs * 1.5, bx - fs * 0.8, r.y + r.h - fs * 1.5, 4);
+    line(k, bx - fs * 1.8, by + fs * 2.0, bx, by + fs * 2.0, 2);
+
+    // Büret Gövdesi
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.05);
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 1.8;
+    k.c.strokeRect(bx, by, bW, bH);
+    k.c.fillRect(bx, by, bW, bH);
+
+    // Büret sıvı seviyesi (50 mL - vBase)
+    const liquidFrac = (50 - s.vBase) / 50;
+    const liquidY = by + (1 - liquidFrac) * bH;
+    k.c.fillStyle = 'rgba(56, 189, 248, 0.25)';
+    k.c.fillRect(bx + 1, liquidY, bW - 2, by + bH - liquidY);
+    k.c.restore();
+
+    // Büret musluğu
+    const tapY = by + bH;
+    line(k, bx + bW / 2, tapY, bx + bW / 2, tapY + fs * 1.2, 2.5);
+    k.c.save();
+    k.c.fillStyle = '#ef4444';
+    k.c.fillRect(bx + bW / 2 - fs * 0.5, tapY + fs * 0.3, fs * 1.0, fs * 0.4);
+    k.c.restore();
+
+    // Erlenmayer (Altta)
+    const erlX = bx + bW / 2;
+    const erlY = tapY + fs * 2.4;
+    const erlW = fs * 4.8;
+    const erlH = fs * 4.2;
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.moveTo(erlX - fs * 0.6, erlY);
+    k.c.lineTo(erlX + fs * 0.6, erlY);
+    k.c.lineTo(erlX + erlW / 2, erlY + erlH);
+    k.c.lineTo(erlX - erlW / 2, erlY + erlH);
+    k.c.closePath();
+    k.c.fillStyle = s.color;
+    k.c.fill();
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 2;
+    k.c.stroke();
+    k.c.restore();
+
+    if (!icon) {
+        label(k, `Büret (0.1M NaOH)`, bx + bW + fs * 0.4, by + fs * 1.0, 'left', 'middle', 0.52);
+        label(k, `Erlenmayer (0.1M HCl)`, erlX, erlY + erlH + fs * 0.8, 'center', 'top', 0.55);
+        label(k, `Eklenen Baz: ${fmtNum(s.vBase, 1)} mL`, bx + bW + fs * 0.4, by + fs * 2.2, 'left', 'middle', 0.58);
+    }
+
+    // Sağ Taraf pH Titrasyon Eğrisi
+    if (!icon && k.o.labels !== false) {
+        const gx = r.x + r.w * 0.54;
+        const gy = r.y + fs * 2.0;
+        const gw = r.w * 0.42;
+        const gh = r.h * 0.58;
+        const gbot = gy + gh;
+
+        panel(k, gx - fs * 0.5, gy - fs * 1.0, gw + fs * 1.0, gh + fs * 2.6);
+        label(k, 'Titrasyon Eğrisi (pH – V_baz)', gx, gy - fs * 0.4, 'left', 'bottom', 0.6);
+
+        line(k, gx, gbot, gx + gw, gbot, 1.5);
+        line(k, gx, gbot, gx, gy, 1.5);
+        label(k, 'V_baz (mL)', gx + gw, gbot + fs * 0.4, 'right', 'top', 0.5);
+        label(k, 'pH', gx - fs * 0.3, gy, 'right', 'top', 0.5);
+
+        // pH=7 eşdeğerlik yatay kesikli çizgisi
+        const y7 = gbot - (7 / 14) * gh;
+        line(k, gx, y7, gx + gw, y7, 1);
+        label(k, 'pH = 7', gx + gw - fs * 0.2, y7 - fs * 0.3, 'right', 'bottom', 0.48);
+
+        // S eğrisi çizimi
+        k.c.save();
+        k.c.strokeStyle = '#ec4899';
+        k.c.lineWidth = 2;
+        k.c.beginPath();
+        const pts = 50;
+        for (let i = 0; i <= pts; i++) {
+            const vb = (i / pts) * 50;
+            let pVal = 1;
+            if (vb < 24.9) {
+                const ex = (2.5 - vb * 0.1) / (25 + vb);
+                pVal = -Math.log10(Math.max(1e-7, ex));
+            } else if (vb > 25.1) {
+                const exOH = (vb * 0.1 - 2.5) / (25 + vb);
+                pVal = 14 + Math.log10(Math.max(1e-7, exOH));
+            } else {
+                pVal = 7;
+            }
+            const px = gx + (vb / 50) * gw;
+            const py = gbot - clamp(pVal / 14, 0, 1) * gh;
+            if (i === 0) k.c.moveTo(px, py);
+            else k.c.lineTo(px, py);
+        }
+        k.c.stroke();
+
+        // Anlık Nokta
+        const curPx = gx + (s.vBase / 50) * gw;
+        const curPy = gbot - clamp(s.pH / 14, 0, 1) * gh;
+        k.c.fillStyle = s.pH >= 8.2 ? '#ec4899' : '#38bdf8';
+        k.c.beginPath();
+        k.c.arc(curPx, curPy, 4.5, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+
+        // pH Değeri Göstergesi
+        label(k, `pH: ${fmtNum(s.pH, 2)}`, curPx, curPy - fs * 0.6, 'center', 'bottom', 0.65);
+        if (s.isEquiv) {
+            label(k, '🎯 Eşdeğerlik Noktası (Dönüm)', gx + gw / 2, gy + fs * 0.8, 'center', 'middle', 0.62);
+        }
+    }
+
+    k.c.restore();
+};
+
+export const titrationSpec: SimSpec = {
+    controls: (r) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        const bx = r.x + fs * 4.2;
+        const bW = fs * 1.6;
+        const bH = r.h * 0.45;
+        const tapY = r.y + fs * 1.8 + bH;
+
+        return [
+            { id: 'tap_drop', x: bx + bW / 2, y: tapY + fs * 0.5, type: 'toggle', label: 'Musluktan damlat (+2.5 mL)' },
+            { id: 'btn_reset', x: bx + bW / 2, y: r.y + fs * 0.8, type: 'toggle', label: 'Titrasyonu sıfırla' },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        const cur = simValue(o, 'vb', 0);
+        if (id === 'tap_drop') {
+            return { vb: clamp(cur + 2.5, 0, 50) };
+        }
+        if (id === 'btn_reset') {
+            return { vb: 0 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'vb', label: 'Eklenen Baz V_baz', min: 0, max: 50, step: 2.5, unit: 'mL' },
+    ],
+};
+
+// ── Galvanik Pil & Elektrokimya (Daniell Pili) ───────────────────────
+interface GalvanicState {
+    closed: boolean;
+    t: number;
+}
+
+function galvanicState(o: MathObject, t = 0): GalvanicState {
+    const closed = simValue(o, 'closed', 1) === 1;
+    return { closed, t };
+}
+
+export const galvanicRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = galvanicState(k.o, k.t);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const cx = r.x + r.w * 0.48;
+    const cy = r.y + r.h * 0.55;
+
+    // İki beher
+    const beakerW = fs * 5.2;
+    const beakerH = fs * 5.5;
+    const b1X = cx - beakerW - fs * 1.5;
+    const b2X = cx + fs * 1.5;
+    const bY = cy - fs * 0.5;
+
+    // Beher 1 (ZnSO4 - Şeffaf)
+    k.c.save();
+    k.c.fillStyle = 'rgba(241, 245, 249, 0.25)';
+    k.c.fillRect(b1X, bY + fs * 1.5, beakerW, beakerH - fs * 1.5);
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 2;
+    line(k, b1X, bY, b1X, bY + beakerH, 2);
+    line(k, b1X, bY + beakerH, b1X + beakerW, bY + beakerH, 2);
+    line(k, b1X + beakerW, bY + beakerH, b1X + beakerW, bY, 2);
+
+    // Beher 2 (CuSO4 - Mavi)
+    k.c.fillStyle = 'rgba(56, 189, 248, 0.4)';
+    k.c.fillRect(b2X, bY + fs * 1.5, beakerW, beakerH - fs * 1.5);
+    line(k, b2X, bY, b2X, bY + beakerH, 2);
+    line(k, b2X, bY + beakerH, b2X + beakerW, bY + beakerH, 2);
+    line(k, b2X + beakerW, bY + beakerH, b2X + beakerW, bY, 2);
+    k.c.restore();
+
+    // Zn Elektrot (Anot - Gri)
+    const znX = b1X + beakerW * 0.45;
+    k.c.save();
+    k.c.fillStyle = '#94a3b8';
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 1.5;
+    k.c.fillRect(znX - fs * 0.5, bY - fs * 1.2, fs * 1.0, beakerH * 0.8);
+    k.c.strokeRect(znX - fs * 0.5, bY - fs * 1.2, fs * 1.0, beakerH * 0.8);
+
+    // Cu Elektrot (Katot - Bakır Kırmızı)
+    const cuX = b2X + beakerW * 0.55;
+    k.c.fillStyle = '#b45309';
+    k.c.fillRect(cuX - fs * 0.5, bY - fs * 1.2, fs * 1.0, beakerH * 0.8);
+    k.c.strokeRect(cuX - fs * 0.5, bY - fs * 1.2, fs * 1.0, beakerH * 0.8);
+    k.c.restore();
+
+    if (!icon) {
+        label(k, 'Zn (Anot -)', znX, bY - fs * 1.5, 'center', 'bottom', 0.6);
+        label(k, 'Cu (Katot +)', cuX, bY - fs * 1.5, 'center', 'bottom', 0.6);
+        label(k, '1M ZnSO₄', b1X + beakerW / 2, bY + beakerH + fs * 0.8, 'center', 'top', 0.52);
+        label(k, '1M CuSO₄', b2X + beakerW / 2, bY + beakerH + fs * 0.8, 'center', 'top', 0.52);
+    }
+
+    // Tuz Köprüsü (Ters U borusu)
+    const bridgeY = bY + fs * 0.2;
+    const bridgeW = fs * 4.5;
+    k.c.save();
+    k.c.strokeStyle = withAlpha('#a855f7', 0.8);
+    k.c.lineWidth = fs * 0.7;
+    k.c.lineCap = 'round';
+    k.c.lineJoin = 'round';
+    k.c.beginPath();
+    k.c.moveTo(cx - bridgeW / 2, bY + fs * 2.8);
+    k.c.lineTo(cx - bridgeW / 2, bridgeY);
+    k.c.lineTo(cx + bridgeW / 2, bridgeY);
+    k.c.lineTo(cx + bridgeW / 2, bY + fs * 2.8);
+    k.c.stroke();
+    k.c.restore();
+    if (!icon) {
+        label(k, 'Tuz Köprüsü (KNO₃)', cx, bridgeY - fs * 0.4, 'center', 'bottom', 0.5);
+    }
+
+    // İletken Tel ve Voltmetre
+    const wireY = bY - fs * 2.2;
+    line(k, znX, bY - fs * 1.2, znX, wireY, 2);
+    line(k, znX, wireY, cx - fs * 1.2, wireY, 2);
+    line(k, cx + fs * 1.2, wireY, cuX, wireY, 2);
+    line(k, cuX, wireY, cuX, bY - fs * 1.2, 2);
+
+    // Voltmetre
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.1);
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 2;
+    k.c.beginPath();
+    k.c.arc(cx, wireY, fs * 1.2, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+    k.c.restore();
+    label(k, s.closed ? '1.10 V' : '0.00 V', cx, wireY, 'center', 'middle', 0.6);
+
+    // Elektron Akışı Animasyonu (Zn -> Cu)
+    if (s.closed && !icon) {
+        const numDots = 8;
+        for (let i = 0; i < numDots; i++) {
+            const phase = (k.t * 0.8 + i * (1 / numDots)) % 1;
+            const dotX = znX + phase * (cuX - znX);
+            k.c.save();
+            k.c.fillStyle = '#f59e0b';
+            k.c.beginPath();
+            k.c.arc(dotX, wireY, 2.8, 0, Math.PI * 2);
+            k.c.fill();
+            k.c.restore();
+        }
+        label(k, 'e⁻ akışı →', cx, wireY - fs * 1.5, 'center', 'bottom', 0.55);
+    }
+
+    // Bilgi Paneli
+    if (!icon && k.o.labels !== false) {
+        const pw = fs * 12.0;
+        const ph = fs * 4.8;
+        const px = r.x + r.w - pw - fs * 0.8;
+        const py = r.y + fs * 0.8;
+        panel(k, px, py, pw, ph);
+
+        label(k, 'Standart Daniell Pili', px + fs * 0.5, py + fs * 0.7, 'left', 'middle', 0.65);
+        label(k, 'Anot: Zn(k) → Zn²⁺(suda) + 2e⁻ (E°= +0.76V)', px + fs * 0.5, py + fs * 1.6, 'left', 'middle', 0.52);
+        label(k, 'Katot: Cu²⁺(suda) + 2e⁻ → Cu(k) (E°= +0.34V)', px + fs * 0.5, py + fs * 2.4, 'left', 'middle', 0.52);
+        label(k, 'Net: Zn(k) + Cu²⁺(suda) → Zn²⁺ + Cu(k)', px + fs * 0.5, py + fs * 3.2, 'left', 'middle', 0.55);
+        label(k, 'E°_pil = 0.76 + 0.34 = 1.10 V', px + fs * 0.5, py + fs * 4.0, 'left', 'middle', 0.6);
+    }
+
+    k.c.restore();
+};
+
+export const galvanicSpec: SimSpec = {
+    animated: true,
+    controls: (r) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        return [
+            { id: 'btn_toggle', x: r.x + fs * 4.5, y: r.y + fs * 1.2, type: 'toggle', label: 'Devreyi Aç / Kapat' },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        if (id === 'btn_toggle') {
+            const cur = simValue(o, 'closed', 1);
+            return { closed: cur === 1 ? 0 : 1 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'closed', label: 'Devre Durumu (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
 export const CHEMISTRY_SIM_RENDERERS: Record<string, Renderer> = {
     electron_config_sim: electronRender,
     balance_eq_sim: balanceRender,
@@ -1699,6 +2484,10 @@ export const CHEMISTRY_SIM_RENDERERS: Record<string, Renderer> = {
     mass_conservation_sim: massConservationRender,
     atom_models_sim: atomModelsRender,
     molecule_build_sim: moleculeBuildRender,
+    gas_laws_sim: gasLawsRender,
+    vsepr_shapes_sim: vseprRender,
+    titration_sim: titrationRender,
+    galvanic_cell_sim: galvanicRender,
 };
 
 export const CHEMISTRY_SIM_SPECS: Record<string, SimSpec> = {
@@ -1709,9 +2498,41 @@ export const CHEMISTRY_SIM_SPECS: Record<string, SimSpec> = {
     mass_conservation_sim: massConservationSpec,
     atom_models_sim: atomModelsSpec,
     molecule_build_sim: moleculeBuildSpec,
+    gas_laws_sim: gasLawsSpec,
+    vsepr_shapes_sim: vseprSpec,
+    titration_sim: titrationSpec,
+    galvanic_cell_sim: galvanicSpec,
 };
 
 export const CHEMISTRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
+    {
+        kind: 'gas_laws_sim',
+        label: 'Gaz Yasaları & Pistonlu Kap',
+        hint: 'Pistonu ve ocağı ayarla; PV=nRT bağıntısını ve P-V grafiğini gör',
+        size: { w: 600, h: 380 },
+        defaults: { labels: true, sim: { v: 2.5, t: 300, n: 1 } },
+    },
+    {
+        kind: 'vsepr_shapes_sim',
+        label: 'Molekül Geometrisi & VSEPR',
+        hint: 'Bağ ve elektron çifti itmesi; bağ açılarını ve hibritleşmeyi incele',
+        size: { w: 600, h: 380 },
+        defaults: { labels: true, sim: { geom: 0 } },
+    },
+    {
+        kind: 'titration_sim',
+        label: 'Asit-Baz Titrasyonu',
+        hint: 'Büretten baz damlat; dönüm noktasını ve pH eğrisini canlı izle',
+        size: { w: 620, h: 400 },
+        defaults: { labels: true, sim: { vb: 0 } },
+    },
+    {
+        kind: 'galvanic_cell_sim',
+        label: 'Galvanik Pil & Daniell Pili',
+        hint: 'Zn-Cu elektrotlar ve tuz köprüsü; elektron akışını ve 1.10V potansiyeli gör',
+        size: { w: 600, h: 380 },
+        defaults: { labels: true, sim: { closed: 1 } },
+    },
     {
         kind: 'electron_config_sim',
         label: 'Elektron Dizilimi',

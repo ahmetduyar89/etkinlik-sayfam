@@ -579,23 +579,415 @@ export const coulombSpec: SimSpec = {
     ],
 };
 
+// ── Çoklu Devre Laboratuvarı & Lamba Parlaklığı ────────────────────
+interface CircuitLabState {
+    mode: number; // 0: Karışık (L1 seri, L2||L3), 1: Seri (L1-L2-L3), 2: Paralel (L1||L2||L3)
+    s1: boolean;  // Anahtar 1 (Açık/Kapalı)
+    s2: boolean;  // Anahtar 2 (Açık/Kapalı)
+    v: number;   // Pil gerilimi (V)
+    i1: number;
+    i2: number;
+    i3: number;
+    v1: number;
+    v2: number;
+    v3: number;
+    p1: number;
+    p2: number;
+    p3: number;
+    rEq: number;
+    iTotal: number;
+}
+
+function circuitLabState(o: MathObject): CircuitLabState {
+    const mode = clampInt(simValue(o, 'mode', 0), 0, 2, 0);
+    const s1 = simValue(o, 's1', 1) === 1;
+    const s2 = simValue(o, 's2', 1) === 1;
+    const v = clamp(simValue(o, 'v', 12), 6, 24);
+
+    const R = 6; // Her lambanın öz direnci 6 ohm
+    let i1 = 0, i2 = 0, i3 = 0;
+    let v1 = 0, v2 = 0, v3 = 0;
+    let rEq = 0;
+    let iTotal = 0;
+
+    if (mode === 0) {
+        // Karışık: L1 ana kolda seri, ardından (L2 + s1) || (L3 + s2)
+        let rParallel = 0;
+        if (s1 && s2) {
+            rParallel = (R * R) / (R + R); // 3 ohm
+        } else if (s1) {
+            rParallel = R;
+        } else if (s2) {
+            rParallel = R;
+        } else {
+            rParallel = 1e9; // İki paralel kol da açık
+        }
+
+        rEq = R + (rParallel > 1e6 ? 0 : rParallel);
+        if (rParallel > 1e6) {
+            // Paralel kısım tamamen açık, akım geçmez
+            iTotal = 0;
+            i1 = 0; i2 = 0; i3 = 0;
+        } else {
+            iTotal = v / rEq;
+            i1 = iTotal;
+            v1 = i1 * R;
+            const vPar = v - v1;
+            if (s1 && s2) {
+                i2 = vPar / R;
+                i3 = vPar / R;
+                v2 = vPar;
+                v3 = vPar;
+            } else if (s1) {
+                i2 = iTotal;
+                v2 = vPar;
+            } else if (s2) {
+                i3 = iTotal;
+                v3 = vPar;
+            }
+        }
+    } else if (mode === 1) {
+        // Seri: L1 - (s1) - L2 - (s2) - L3
+        if (s1 && s2) {
+            rEq = 3 * R;
+            iTotal = v / rEq;
+            i1 = iTotal; i2 = iTotal; i3 = iTotal;
+            v1 = i1 * R; v2 = i2 * R; v3 = i3 * R;
+        } else {
+            rEq = 1e9;
+            iTotal = 0;
+        }
+    } else {
+        // Paralel: L1 || (s1 + L2) || (s2 + L3)
+        let count = 1 + (s1 ? 1 : 0) + (s2 ? 1 : 0);
+        rEq = R / count;
+        i1 = v / R;
+        v1 = v;
+        if (s1) { i2 = v / R; v2 = v; }
+        if (s2) { i3 = v / R; v3 = v; }
+        iTotal = i1 + i2 + i3;
+    }
+
+    const p1 = v1 * i1;
+    const p2 = v2 * i2;
+    const p3 = v3 * i3;
+
+    return {
+        mode,
+        s1,
+        s2,
+        v,
+        i1,
+        i2,
+        i3,
+        v1,
+        v2,
+        v3,
+        p1,
+        p2,
+        p3,
+        rEq: rEq > 1e6 ? 0 : rEq,
+        iTotal,
+    };
+}
+
+export const circuitLabRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = circuitLabState(k.o);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    // Devre sınırları
+    const cx = r.x + r.w * 0.44;
+    const cy = r.y + r.h * 0.52;
+    const cw = r.w * 0.72;
+    const ch = r.h * 0.58;
+
+    const leftX = cx - cw / 2;
+    const rightX = cx + cw / 2;
+    const topY = cy - ch / 2;
+    const botY = cy + ch / 2;
+
+    // Alt kol: Pil (DC Güç Kaynağı)
+    line(k, leftX, botY, cx - fs * 1.5, botY, 2);
+    line(k, cx + fs * 1.5, botY, rightX, botY, 2);
+
+    // Pil plakaları (+ uzun, - kısa)
+    line(k, cx - fs * 0.5, botY - fs * 1.0, cx - fs * 0.5, botY + fs * 1.0, 3);
+    line(k, cx + fs * 0.5, botY - fs * 0.55, cx + fs * 0.5, botY + fs * 0.55, 4.5);
+    label(k, '+', cx - fs * 1.0, botY - fs * 0.6, 'center', 'middle', 0.65);
+    label(k, '-', cx + fs * 1.0, botY - fs * 0.6, 'center', 'middle', 0.65);
+    label(k, `${fmtNum(s.v, 0)}V`, cx, botY + fs * 1.2, 'center', 'top', 0.65);
+
+    // Yan kollar
+    line(k, leftX, botY, leftX, topY, 2);
+    line(k, rightX, botY, rightX, topY, 2);
+
+    // Lambayı ve ışımasını çizen yardımcı
+    const drawBulb = (bx: number, by: number, name: string, power: number, voltage: number, current: number) => {
+        const on = power > 0.1;
+        const glowR = on ? Math.min(fs * 2.6, fs * 1.2 + Math.sqrt(power) * fs * 0.35) : 0;
+
+        // Sarı akkor parlama
+        if (on && !icon) {
+            k.c.save();
+            const grad = k.c.createRadialGradient(bx, by, fs * 0.4, bx, by, glowR);
+            grad.addColorStop(0, 'rgba(251, 191, 36, 0.7)');
+            grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.3)');
+            grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+            k.c.fillStyle = grad;
+            k.c.beginPath();
+            k.c.arc(bx, by, glowR, 0, Math.PI * 2);
+            k.c.fill();
+            k.c.restore();
+        }
+
+        // Cam fanus
+        k.c.save();
+        k.c.fillStyle = on ? '#fef3c7' : withAlpha(k.color, 0.08);
+        k.c.strokeStyle = k.color;
+        k.c.lineWidth = 1.8;
+        k.c.beginPath();
+        k.c.arc(bx, by, fs * 0.9, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+
+        // Flaman (X işareti)
+        const d = fs * 0.45;
+        k.c.strokeStyle = on ? '#d97706' : withAlpha(k.color, 0.4);
+        k.c.lineWidth = 1.5;
+        line(k, bx - d, by - d, bx + d, by + d, 1.5);
+        line(k, bx - d, by + d, bx + d, by - d, 1.5);
+        k.c.restore();
+
+        if (!icon) {
+            label(k, name, bx, by - fs * 1.3, 'center', 'bottom', 0.65);
+            const badge = on ? `${fmtNum(power, 1)}W (${fmtNum(voltage, 1)}V)` : 'KAPALI (0W)';
+            label(k, badge, bx, by + fs * 1.3, 'center', 'top', 0.52);
+        }
+    };
+
+    // Anahtar çizen yardımcı
+    const drawSwitch = (sx: number, sy: number, name: string, closed: boolean) => {
+        k.c.save();
+        k.c.fillStyle = k.color;
+        k.c.beginPath();
+        k.c.arc(sx - fs * 0.7, sy, 3, 0, Math.PI * 2);
+        k.c.arc(sx + fs * 0.7, sy, 3, 0, Math.PI * 2);
+        k.c.fill();
+
+        k.c.lineWidth = 2.2;
+        k.c.strokeStyle = closed ? '#10b981' : '#ef4444';
+        if (closed) {
+            line(k, sx - fs * 0.7, sy, sx + fs * 0.7, sy, 2.2);
+        } else {
+            // Açık anahtar kolu
+            line(k, sx - fs * 0.7, sy, sx + fs * 0.5, sy - fs * 0.8, 2.2);
+        }
+        k.c.restore();
+        if (!icon) {
+            label(k, `${name}: ${closed ? 'Kapalı' : 'Açık'}`, sx, sy - fs * 1.0, 'center', 'bottom', 0.52);
+        }
+    };
+
+    if (s.mode === 0) {
+        // Karışık Devre
+        const midY1 = cy - ch * 0.25;
+        const midY2 = cy + ch * 0.25;
+        const forkX = cx - cw * 0.08;
+
+        // L1 sol ana kolda
+        line(k, leftX, topY, forkX, topY, 2);
+        drawBulb(leftX + (forkX - leftX) / 2, topY, 'L₁', s.p1, s.v1, s.i1);
+
+        // Kolların ayrımı
+        line(k, forkX, topY, forkX, midY1, 2);
+        line(k, forkX, topY, forkX, midY2, 2);
+        line(k, forkX, midY1, rightX, midY1, 2);
+        line(k, forkX, midY2, rightX, midY2, 2);
+
+        // Üst paralel kol (L2 ve S1)
+        drawSwitch(forkX + (rightX - forkX) * 0.35, midY1, 'S₁', s.s1);
+        drawBulb(forkX + (rightX - forkX) * 0.75, midY1, 'L₂', s.p2, s.v2, s.i2);
+
+        // Alt paralel kol (L3 ve S2)
+        drawSwitch(forkX + (rightX - forkX) * 0.35, midY2, 'S₂', s.s2);
+        drawBulb(forkX + (rightX - forkX) * 0.75, midY2, 'L₃', s.p3, s.v3, s.i3);
+
+        // Sağ birleşim
+        line(k, rightX, midY1, rightX, botY, 2);
+        line(k, rightX, midY2, rightX, botY, 2);
+
+    } else if (s.mode === 1) {
+        // 3 Lamba Seri
+        line(k, leftX, topY, rightX, topY, 2);
+        const bulb1X = leftX + cw * 0.2;
+        const sw1X = leftX + cw * 0.38;
+        const bulb2X = leftX + cw * 0.56;
+        const sw2X = leftX + cw * 0.74;
+        const bulb3X = leftX + cw * 0.88;
+
+        drawBulb(bulb1X, topY, 'L₁', s.p1, s.v1, s.i1);
+        drawSwitch(sw1X, topY, 'S₁', s.s1);
+        drawBulb(bulb2X, topY, 'L₂', s.p2, s.v2, s.i2);
+        drawSwitch(sw2X, topY, 'S₂', s.s2);
+        drawBulb(bulb3X, topY, 'L₃', s.p3, s.v3, s.i3);
+
+    } else {
+        // 3 Lamba Paralel
+        const yL1 = topY;
+        const yL2 = cy;
+        const yL3 = botY - ch * 0.35;
+
+        line(k, leftX, topY, rightX, topY, 2);
+        line(k, leftX, yL2, rightX, yL2, 2);
+        line(k, leftX, yL3, rightX, yL3, 2);
+
+        drawBulb(cx, yL1, 'L₁', s.p1, s.v1, s.i1);
+
+        drawSwitch(cx - cw * 0.22, yL2, 'S₁', s.s1);
+        drawBulb(cx + cw * 0.15, yL2, 'L₂', s.p2, s.v2, s.i2);
+
+        drawSwitch(cx - cw * 0.22, yL3, 'S₂', s.s2);
+        drawBulb(cx + cw * 0.15, yL3, 'L₃', s.p3, s.v3, s.i3);
+    }
+
+    // Akım akışı animasyon tanecikleri (yeşil elektronlar)
+    if (s.iTotal > 0.05 && !icon) {
+        const numDots = 10;
+        const speed = s.iTotal * 0.7;
+        for (let i = 0; i < numDots; i++) {
+            const phase = ((k.t * speed + i * (1 / numDots)) % 1);
+            const dotX = leftX + phase * cw;
+            k.c.save();
+            k.c.fillStyle = '#10b981';
+            k.c.beginPath();
+            k.c.arc(dotX, botY, 2.8, 0, Math.PI * 2);
+            k.c.fill();
+            k.c.restore();
+        }
+    }
+
+    // Üst Mod Değiştirme Butonu
+    if (!icon) {
+        const modeNames = ['Karışık Bağlama (L₁ + L₂ ∥ L₃)', '3 Lamba Seri', '3 Lamba Paralel'];
+        const btnW = fs * 12.0;
+        const btnH = fs * 1.5;
+        const bx = r.x + fs * 1.0;
+        const by = r.y + fs * 0.8;
+
+        k.c.save();
+        k.c.fillStyle = '#4f46e5';
+        roundRect(k, bx, by, btnW, btnH, 6);
+        k.c.fill();
+        k.c.restore();
+        k.c.save();
+        k.c.fillStyle = '#ffffff';
+        label(k, `Devre Modu: ${modeNames[s.mode]} ↻`, bx + btnW / 2, by + btnH / 2, 'center', 'middle', 0.62);
+        k.c.restore();
+
+        // Sağ Bilgi Paneli
+        if (k.o.labels !== false) {
+            const pw = fs * 11.2;
+            const ph = fs * 5.8;
+            const px = r.x + r.w - pw - fs * 0.8;
+            const py = r.y + fs * 0.8;
+            panel(k, px, py, pw, ph);
+
+            label(k, 'Devre Ölçüm Değerleri', px + fs * 0.5, py + fs * 0.7, 'left', 'middle', 0.65);
+            label(k, `Üreteç: ${fmtNum(s.v, 0)} V`, px + fs * 0.5, py + fs * 1.6, 'left', 'middle', 0.55);
+            label(k, `Eşdeğer Direnç (R_eş): ${fmtNum(s.rEq, 1)} Ω`, px + fs * 0.5, py + fs * 2.4, 'left', 'middle', 0.55);
+            label(k, `Ana Kol Akımı: ${fmtNum(s.iTotal, 2)} A`, px + fs * 0.5, py + fs * 3.2, 'left', 'middle', 0.55);
+            label(k, `L₁ Gücü: ${fmtNum(s.p1, 1)} W`, px + fs * 0.5, py + fs * 4.0, 'left', 'middle', 0.55);
+            label(k, `L₂ Gücü: ${fmtNum(s.p2, 1)} W | L₃: ${fmtNum(s.p3, 1)} W`, px + fs * 0.5, py + fs * 4.8, 'left', 'middle', 0.52);
+        }
+    }
+
+    k.c.restore();
+};
+
+export const circuitLabSpec: SimSpec = {
+    animated: true,
+    controls: (r, o) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        const s = circuitLabState(o);
+        const cx = r.x + r.w * 0.44;
+        const cy = r.y + r.h * 0.52;
+        const cw = r.w * 0.72;
+        const ch = r.h * 0.58;
+
+        const leftX = cx - cw / 2;
+        const rightX = cx + cw / 2;
+        const topY = cy - ch / 2;
+
+        let s1Pos = { x: cx, y: cy };
+        let s2Pos = { x: cx, y: cy };
+
+        if (s.mode === 0) {
+            const forkX = cx - cw * 0.08;
+            s1Pos = { x: forkX + (rightX - forkX) * 0.35, y: cy - ch * 0.25 };
+            s2Pos = { x: forkX + (rightX - forkX) * 0.35, y: cy + ch * 0.25 };
+        } else if (s.mode === 1) {
+            s1Pos = { x: leftX + cw * 0.38, y: topY };
+            s2Pos = { x: leftX + cw * 0.74, y: topY };
+        } else {
+            s1Pos = { x: cx - cw * 0.22, y: cy };
+            s2Pos = { x: cx - cw * 0.22, y: cy + ch * 0.25 };
+        }
+
+        return [
+            { id: 'btn_mode', x: r.x + fs * 6.5, y: r.y + fs * 1.55, type: 'toggle', label: 'Devre modunu değiştir' },
+            { id: 's1', x: s1Pos.x, y: s1Pos.y, type: 'toggle', on: s.s1, label: 'S₁ anahtarını aç / kapa' },
+            { id: 's2', x: s2Pos.x, y: s2Pos.y, type: 'toggle', on: s.s2, label: 'S₂ anahtarını aç / kapa' },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        if (id === 'btn_mode') {
+            const cur = simValue(o, 'mode', 0);
+            return { mode: (cur + 1) % 3 };
+        }
+        if (id === 's1') {
+            const cur = simValue(o, 's1', 1);
+            return { s1: cur === 1 ? 0 : 1 };
+        }
+        if (id === 's2') {
+            const cur = simValue(o, 's2', 1);
+            return { s2: cur === 1 ? 0 : 1 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'mode', label: 'Devre Şeması (0-2)', min: 0, max: 2, step: 1 },
+        { key: 'v', label: 'Pil Gerilimi V', min: 6, max: 24, step: 2, unit: 'V' },
+        { key: 's1', label: 'S₁ Anahtarı (0/1)', min: 0, max: 1, step: 1 },
+        { key: 's2', label: 'S₂ Anahtarı (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
 export const ELECTRIC_SIM_RENDERERS: Record<string, Renderer> = {
     electroscope_sim: electroscopeRender,
     coulomb_sim: coulombRender,
+    circuit_lab_sim: circuitLabRender,
 };
 
 export const ELECTRIC_SIM_SPECS: Record<string, SimSpec> = {
     electroscope_sim: electroscopeSpec,
     coulomb_sim: coulombSpec,
+    circuit_lab_sim: circuitLabSpec,
 };
 
 export const ELECTRIC_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
     {
-        kind: 'electroscope_sim',
-        label: 'Elektroskop',
-        hint: 'Yüklü çubuğu yaklaştır ya da dokundur; yaprakları oku',
-        size: { w: 540, h: 380 },
-        defaults: { labels: true, sim: { q: 0, rod: -1, near: 0 } },
+        kind: 'circuit_lab_sim',
+        label: 'Çoklu Devre & Lamba Parlaklığı',
+        hint: '3 lambayı seri/paralel bağla, anahtarları aç-kapa; lamba parlaklıklarını incele',
+        size: { w: 620, h: 380 },
+        defaults: { labels: true, sim: { mode: 0, s1: 1, s2: 1, v: 12 } },
     },
     {
         kind: 'coulomb_sim',
@@ -603,5 +995,12 @@ export const ELECTRIC_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         hint: 'Yükleri ve uzaklığı değiştir: çekme mi itme mi, ne kadar?',
         size: { w: 600, h: 360 },
         defaults: { labels: true, sim: { q1: 2, q2: -1, d: 3 } },
+    },
+    {
+        kind: 'electroscope_sim',
+        label: 'Elektroskop',
+        hint: 'Yüklü çubuğu yaklaştır ya da dokundur; yaprakları oku',
+        size: { w: 540, h: 380 },
+        defaults: { labels: true, sim: { q: 0, rod: -1, near: 0 } },
     },
 ];
