@@ -578,10 +578,15 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     const item = findLibraryItem(math.kind);
                     const vis = visibleWorldRect();
                     const scale = viewRef.current.scale;
-                    // Ekranda hep benzer büyüklükte görünsün diye dünya boyutu
-                    // yakınlaştırmaya göre ölçeklenir.
-                    const boxW = Math.min((item?.size.w ?? 320) / scale, vis.w * 0.85);
-                    const boxH = Math.min((item?.size.h ?? 280) / scale, vis.h * 0.85);
+                    // Ekranda hep benzer büyüklükte ve kendi en-boy oranında
+                    // görünsün diye dünya boyutu yakınlaştırmaya göre ölçeklenir.
+                    const targetW = (item?.size.w ?? 380) / scale;
+                    const targetH = (item?.size.h ?? 280) / scale;
+                    const maxW = vis.w * 0.90;
+                    const maxH = vis.h * 0.85;
+                    const fitRatio = Math.min(1, maxW / targetW, maxH / targetH);
+                    const boxW = targetW * fitRatio;
+                    const boxH = targetH * fitRatio;
                     const offset =
                         (strokesRef.current.filter((st) => st.tool === 'math').length % 5) *
                         (18 / scale);
@@ -1717,6 +1722,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         {/* Canlı simülasyonun üzerindeki etkileşim noktaları */}
                         {simControls.map((ctrl) => {
                             const pos = toScreenPoint({ x: ctrl.x, y: ctrl.y }, view);
+                            const isToggle = ctrl.type === 'toggle';
+                            const hasLabel = Boolean(ctrl.label && ctrl.label.trim().length > 0);
+
                             return (
                                 <button
                                     key={ctrl.id}
@@ -1724,24 +1732,31 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                     title={ctrl.label}
                                     aria-label={ctrl.label ?? ctrl.id}
                                     className={cn(
-                                        'absolute pointer-events-auto rounded-full border-2 shadow-md transition-colors',
-                                        ctrl.type === 'toggle'
-                                            ? ctrl.on
-                                                ? 'bg-amber-400 border-amber-600'
-                                                : 'bg-white border-amber-500'
-                                            : 'bg-amber-400 border-amber-600 cursor-grab active:cursor-grabbing'
+                                        'absolute pointer-events-auto shadow-md transition-all select-none',
+                                        isToggle
+                                            ? hasLabel
+                                                ? cn(
+                                                      'px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1.5 whitespace-nowrap active:scale-95 cursor-pointer backdrop-blur-md',
+                                                      ctrl.on
+                                                          ? 'bg-amber-500 text-slate-950 border border-amber-400 font-bold shadow-amber-500/25'
+                                                          : 'bg-slate-900/90 hover:bg-slate-800 text-slate-100 border border-white/20 hover:border-amber-400/50'
+                                                  )
+                                                : cn(
+                                                      'w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer active:scale-95',
+                                                      ctrl.on ? 'bg-amber-400 border-amber-600' : 'bg-white border-amber-500'
+                                                  )
+                                            : 'w-6 h-6 rounded-full bg-amber-400/95 border-2 border-amber-600 cursor-grab active:cursor-grabbing hover:scale-110 active:scale-95 shadow-amber-500/40 flex items-center justify-center'
                                     )}
                                     style={{
-                                        left: pos.x - 9,
-                                        top: pos.y - 9,
-                                        width: 18,
-                                        height: 18,
+                                        left: pos.x,
+                                        top: pos.y,
+                                        transform: 'translate(-50%, -50%)',
                                         zIndex: 4650,
                                         touchAction: 'none',
                                     }}
                                     onPointerDown={(e) => {
                                         e.stopPropagation();
-                                        if (ctrl.type === 'toggle') return;
+                                        if (isToggle) return;
                                         e.currentTarget.setPointerCapture(e.pointerId);
                                         simGestureRef.current = false;
                                     }}
@@ -1763,7 +1778,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                     }}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        if (ctrl.type !== 'toggle') return;
+                                        if (!isToggle) return;
                                         if (!simSpec?.onControl || !simRect || !selSimMath) return;
                                         patchSim(
                                             simSpec.onControl(simRect, selSimMath, ctrl.id, {
@@ -1773,59 +1788,96 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                             false
                                         );
                                     }}
-                                />
+                                >
+                                    {isToggle ? (
+                                        hasLabel ? (
+                                            <>
+                                                {ctrl.on !== undefined && (
+                                                    <span
+                                                        className={cn(
+                                                            'w-2 h-2 rounded-full shrink-0',
+                                                            ctrl.on ? 'bg-slate-950' : 'bg-amber-400'
+                                                        )}
+                                                    />
+                                                )}
+                                                <span>{ctrl.label}</span>
+                                            </>
+                                        ) : (
+                                            <span
+                                                className={cn(
+                                                    'w-2 h-2 rounded-full',
+                                                    ctrl.on ? 'bg-slate-900' : 'bg-amber-500'
+                                                )}
+                                            />
+                                        )
+                                    ) : (
+                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-900 pointer-events-none" />
+                                    )}
+                                </button>
                             );
                         })}
 
                         {/* Simülasyon ayarları */}
-                        {simSpec?.params && selSimMath && (
-                            <div
-                                className="absolute pointer-events-auto flex flex-col gap-1.5 bg-[#1a1b26]/95 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10 shadow-xl"
-                                style={{
-                                    left: Math.max(4, selScreenBB.x1),
-                                    top: selScreenBB.y2 + 8,
-                                    minWidth: 208,
-                                    zIndex: 4700,
-                                }}
-                                onPointerDown={(e) => e.stopPropagation()}
-                            >
-                                {simSpec.params.map((prm) => {
-                                    const value = selSimMath.sim?.[prm.key] ?? prm.min;
-                                    return (
-                                        <label key={prm.key} className="flex items-center gap-2">
-                                            <span className="text-[10.5px] font-semibold text-slate-300 w-[104px] shrink-0 leading-tight">
-                                                {prm.label}
-                                            </span>
-                                            <input
-                                                type="range"
-                                                min={prm.min}
-                                                max={prm.max}
-                                                step={prm.step ?? 1}
-                                                value={value}
-                                                onChange={(e) =>
-                                                    patchSim(
-                                                        { [prm.key]: Number(e.target.value) },
-                                                        true
-                                                    )
-                                                }
-                                                onPointerUp={() => {
-                                                    simGestureRef.current = false;
-                                                }}
-                                                className="flex-1 accent-amber-400 h-1"
-                                            />
-                                            <span className="text-[10.5px] font-bold text-white tabular-nums w-[42px] text-right shrink-0">
-                                                {typeof value === 'number'
-                                                    ? Number.isInteger(value)
-                                                        ? value
-                                                        : Number(value.toFixed(2))
-                                                    : value}
-                                                {prm.unit ? ` ${prm.unit}` : ''}
-                                            </span>
-                                        </label>
-                                    );
-                                })}
-                            </div>
-                        )}
+                        {simSpec?.params && selSimMath && (() => {
+                            const popupW = 230;
+                            const popupH = (simSpec.params.length || 1) * 34 + 24;
+                            const screenW = typeof window !== 'undefined' ? window.innerWidth : 1200;
+                            const screenH = typeof window !== 'undefined' ? window.innerHeight : 800;
+                            const popupLeft = Math.max(8, Math.min(selScreenBB.x1, screenW - popupW - 16));
+                            const fitsBelow = selScreenBB.y2 + popupH + 16 <= screenH;
+                            const popupTop = fitsBelow
+                                ? selScreenBB.y2 + 8
+                                : Math.max(8, selScreenBB.y1 - popupH - 8);
+
+                            return (
+                                <div
+                                    className="absolute pointer-events-auto flex flex-col gap-1.5 bg-[#1a1b26]/95 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10 shadow-xl"
+                                    style={{
+                                        left: popupLeft,
+                                        top: popupTop,
+                                        minWidth: popupW,
+                                        zIndex: 4700,
+                                    }}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                >
+                                    {simSpec.params.map((prm) => {
+                                        const value = selSimMath.sim?.[prm.key] ?? prm.min;
+                                        return (
+                                            <label key={prm.key} className="flex items-center gap-2">
+                                                <span className="text-[10.5px] font-semibold text-slate-300 w-[104px] shrink-0 leading-tight">
+                                                    {prm.label}
+                                                </span>
+                                                <input
+                                                    type="range"
+                                                    min={prm.min}
+                                                    max={prm.max}
+                                                    step={prm.step ?? 1}
+                                                    value={value}
+                                                    onChange={(e) =>
+                                                        patchSim(
+                                                            { [prm.key]: Number(e.target.value) },
+                                                            true
+                                                        )
+                                                    }
+                                                    onPointerUp={() => {
+                                                        simGestureRef.current = false;
+                                                    }}
+                                                    className="flex-1 accent-amber-400 h-1"
+                                                />
+                                                <span className="text-[10.5px] font-bold text-white tabular-nums w-[42px] text-right shrink-0">
+                                                    {typeof value === 'number'
+                                                        ? Number.isInteger(value)
+                                                            ? value
+                                                            : Number(value.toFixed(2))
+                                                        : value}
+                                                    {prm.unit ? ` ${prm.unit}` : ''}
+                                                </span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
 
                         <div
                             role="toolbar"

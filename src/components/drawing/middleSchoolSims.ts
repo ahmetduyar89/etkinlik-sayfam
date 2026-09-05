@@ -237,39 +237,39 @@ export const integerCountersSpec: SimSpec = {
         return [
             {
                 id: 'a_sub',
-                x: r.x + fs * 2.0,
+                x: r.x + r.w * 0.12,
                 y: by,
                 type: 'toggle',
-                label: 'A azalt',
+                label: 'A (−)',
             },
             {
                 id: 'a_add',
-                x: r.x + fs * 4.5,
+                x: r.x + r.w * 0.28,
                 y: by,
                 type: 'toggle',
-                label: 'A artır',
+                label: 'A (+)',
             },
             {
                 id: 'op_toggle',
-                x: r.x + r.w * 0.5,
+                x: r.x + r.w * 0.50,
                 y: by,
                 type: 'toggle',
-                label: s.op === 0 ? 'İşlem: Toplama (+)' : 'İşlem: Çıkarma (−)',
+                label: s.op === 0 ? 'İşlem: (+)' : 'İşlem: (−)',
                 on: s.op === 1,
             },
             {
                 id: 'b_sub',
-                x: r.x + r.w - fs * 4.5,
+                x: r.x + r.w * 0.72,
                 y: by,
                 type: 'toggle',
-                label: 'B azalt',
+                label: 'B (−)',
             },
             {
                 id: 'b_add',
-                x: r.x + r.w - fs * 2.0,
+                x: r.x + r.w * 0.88,
                 y: by,
                 type: 'toggle',
-                label: 'B artır',
+                label: 'B (+)',
             },
         ];
     },
@@ -812,24 +812,24 @@ export const polygonAnglesSpec: SimSpec = {
         return [
             {
                 id: 'n_sub',
-                x: r.x + fs * 2.5,
+                x: r.x + r.w * 0.16,
                 y: by,
                 type: 'toggle',
-                label: 'Kenar Azalt',
+                label: 'Kenar (−)',
             },
             {
                 id: 'n_add',
-                x: r.x + fs * 6.0,
+                x: r.x + r.w * 0.38,
                 y: by,
                 type: 'toggle',
-                label: 'Kenar Artır',
+                label: 'Kenar (+)',
             },
             {
                 id: 'mode_toggle',
-                x: r.x + r.w * 0.44,
+                x: r.x + r.w * 0.72,
                 y: by,
                 type: 'toggle',
-                label: s.mode === 0 ? 'Mod: İç Açılar (Üçgenler)' : 'Mod: Dış Açılar (360°)',
+                label: s.mode === 0 ? 'İç Açılar' : 'Dış Açılar (360°)',
                 on: s.mode === 1,
             },
         ];
@@ -951,12 +951,12 @@ export const fractionPercentDecimalSpec: SimSpec = {
         const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
         const by = r.y + r.h - fs * 1.2;
         return [
-            { id: 'sub_10', x: r.x + fs * 2.5, y: by, type: 'toggle', label: '−10' },
-            { id: 'add_10', x: r.x + fs * 5.5, y: by, type: 'toggle', label: '+10' },
-            { id: 'set_25', x: r.x + r.w * 0.40, y: by, type: 'toggle', label: 'Çeyrek (%25)' },
-            { id: 'set_50', x: r.x + r.w * 0.58, y: by, type: 'toggle', label: 'Yarım (%50)' },
-            { id: 'set_75', x: r.x + r.w * 0.76, y: by, type: 'toggle', label: '%75' },
-            { id: 'set_100', x: r.x + r.w - fs * 2.5, y: by, type: 'toggle', label: 'Tam (%100)' },
+            { id: 'sub_10', x: r.x + r.w * 0.10, y: by, type: 'toggle', label: '−10' },
+            { id: 'add_10', x: r.x + r.w * 0.24, y: by, type: 'toggle', label: '+10' },
+            { id: 'set_25', x: r.x + r.w * 0.42, y: by, type: 'toggle', label: 'Çeyrek (%25)' },
+            { id: 'set_50', x: r.x + r.w * 0.60, y: by, type: 'toggle', label: 'Yarım (%50)' },
+            { id: 'set_75', x: r.x + r.w * 0.77, y: by, type: 'toggle', label: '%75' },
+            { id: 'set_100', x: r.x + r.w * 0.92, y: by, type: 'toggle', label: 'Tam' },
         ];
     },
     onControl: (_r, o, id): Record<string, number> => {
@@ -1128,9 +1128,9 @@ export const shadowScreenSpec: SimSpec = {
         const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
         const by = r.y + r.h - fs * 1.2;
         return [
-            { id: 'obj_near', x: r.x + fs * 3.0, y: by, type: 'toggle', label: 'Engeli Işığa Yaklaştır (Gölge Büyür)' },
-            { id: 'obj_far', x: r.x + r.w * 0.38, y: by, type: 'toggle', label: 'Engeli Perdeye Yaklaştır (Küçülür)' },
-            { id: 'size_up', x: r.x + r.w * 0.72, y: by, type: 'toggle', label: 'Engel Çapı (+)' },
+            { id: 'obj_near', x: r.x + r.w * 0.22, y: by, type: 'toggle', label: '◀ Işığa Yaklaştır' },
+            { id: 'obj_far', x: r.x + r.w * 0.52, y: by, type: 'toggle', label: 'Perdeye Yaklaştır ▶' },
+            { id: 'size_up', x: r.x + r.w * 0.82, y: by, type: 'toggle', label: 'Engel Çapı (+)' },
         ];
     },
     onControl: (_r, o, id): Record<string, number> => {
@@ -1558,10 +1558,10 @@ export const expansionRingSpec: SimSpec = {
         const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
         const by = r.y + r.h - fs * 1.2;
         return [
-            { id: 'heat', x: r.x + fs * 3.0, y: by, type: 'toggle', label: '🔥 Isıt (150°C)' },
-            { id: 'cool', x: r.x + r.w * 0.35, y: by, type: 'toggle', label: '❄️ Soğut (0°C)' },
-            { id: 'room', x: r.x + r.w * 0.62, y: by, type: 'toggle', label: 'Oda Sıcaklığı (20°C)' },
-            { id: 'try_pass', x: r.x + r.w - fs * 3.0, y: by, type: 'toggle', label: s.testing ? 'Geri Çek' : 'Geçirmeyi Dene' },
+            { id: 'heat', x: r.x + r.w * 0.16, y: by, type: 'toggle', label: '🔥 Isıt (150°C)', on: s.temp === 150 },
+            { id: 'cool', x: r.x + r.w * 0.38, y: by, type: 'toggle', label: '❄️ Soğut (0°C)', on: s.temp === 0 },
+            { id: 'room', x: r.x + r.w * 0.60, y: by, type: 'toggle', label: 'Oda (20°C)', on: s.temp === 20 },
+            { id: 'try_pass', x: r.x + r.w * 0.84, y: by, type: 'toggle', label: s.testing ? 'Geri Çek' : 'Test Et 🎯', on: s.testing === 1 },
         ];
     },
     onControl: (_r, o, id): Record<string, number> => {
