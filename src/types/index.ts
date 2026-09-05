@@ -287,7 +287,13 @@ export type MathObjectKind =
     | 'triangle_area_sim'
     // ── 10. Sınıf İstatistiksel Araştırma Süreci (Yeni Maarif Modeli) ──
     | 'two_way_table_sim'
-    | 'clustered_bar_sim';
+    | 'clustered_bar_sim'
+    // ── 10. Sınıf Sayılar (Yeni Maarif Modeli) ─────────────────────────
+    | 'prime_factors_sim'
+    | 'ebob_ekok_tiling_sim'
+    | 'periodic_ekok_sim'
+    | 'divisibility_proof_sim'
+    | 'compound_remainder_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile

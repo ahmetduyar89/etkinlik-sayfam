@@ -78,7 +78,7 @@ function drawBadge(
         bgColor = '#ffffff',
         textColor = '#0f172a',
         borderColor = '#cbd5e1',
-        scale = 0.82,
+        scale = 0.80,
     } = options;
 
     const fs = Math.round(k.fs * scale);
@@ -86,16 +86,16 @@ function drawBadge(
     k.c.font = `700 ${fs}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
     const m = k.c.measureText(text);
     const padX = fs * 0.85;
-    const padY = fs * 0.4;
+    const padY = fs * 0.35;
     const bw = m.width + padX * 2;
-    const bh = fs * 1.45 + padY * 2;
+    const bh = fs * 1.4 + padY * 2;
     const bx = cx - bw / 2;
     const by = cy - bh / 2;
     const rad = bh / 2;
 
     k.c.fillStyle = bgColor;
     k.c.strokeStyle = borderColor;
-    k.c.lineWidth = 1.4;
+    k.c.lineWidth = 1.3;
     k.c.beginPath();
     if (typeof k.c.roundRect === 'function') {
         k.c.roundRect(bx, by, bw, bh, rad);
@@ -187,7 +187,7 @@ export const twoWayTableRender: Renderer = (k: Ctx) => {
     const s = twoWayTableState(k.o);
     const ctxData = TABLE_CONTEXTS[s.contextIdx] || TABLE_CONTEXTS[0];
 
-    const fs = Math.max(9, Math.min(17, Math.min(r.w, r.h) / 15));
+    const fs = Math.max(9, Math.min(16, Math.min(r.w, r.h) / 16));
     const icon = isIconSize(r);
 
     c.save();
@@ -195,7 +195,7 @@ export const twoWayTableRender: Renderer = (k: Ctx) => {
     c.rect(r.x, r.y, r.w, r.h);
     c.clip();
 
-    // Frekansları hesapla (shift ile ilişki gücü dinamik artırılıp azaltılabilir)
+    // Frekanslar
     const rawA = Math.max(5, Math.round(ctxData.base[0] + s.shift));
     const rawB = Math.max(5, Math.round(ctxData.base[1] - s.shift * 0.7));
     const rawC = Math.max(5, Math.round(ctxData.base[2] - s.shift * 0.7));
@@ -207,37 +207,44 @@ export const twoWayTableRender: Renderer = (k: Ctx) => {
     const c2Sum = rawB + rawD;
     const totalN = rawA + rawB + rawC + rawD;
 
-    // Satır koşullu oranları
-    const p1 = rawA / r1Sum; // 1. satırın 1. sütun oranı
-    const p2 = rawC / r2Sum; // 2. satırın 1. sütun oranı
+    // Koşullu oranlar
+    const p1 = rawA / r1Sum;
+    const p2 = rawC / r2Sum;
     const diff = Math.abs(p1 - p2);
 
-    // Mod metni
     const modeNames = [
         'Mutlak Sıklık (Frekans)',
         'Toplamdaki Göreli Sıklık (%)',
-        'Satır Koşullu Göreli Sıklık (%)',
-        'Sütun Koşullu Göreli Sıklık (%)',
+        'Satır Koşullu Sıklık (%)',
+        'Sütun Koşullu Sıklık (%)',
     ];
 
     if (!icon) {
         // Üst Başlık ve Mod Rozeti
-        drawBadge(k, `${ctxData.title} · ${modeNames[s.mode]}`, r.x + r.w / 2, r.y + fs * 1.2, {
+        drawBadge(k, `${ctxData.title} · ${modeNames[s.mode]}`, r.x + r.w * 0.44, r.y + fs * 1.2, {
             bgColor: '#f8fafc',
             textColor: '#1e293b',
             borderColor: '#cbd5e1',
-            scale: 0.82,
+            scale: 0.80,
+        });
+
+        // Üst Sağ: Mod Değiştir Buton Rozeti
+        drawBadge(k, '⟳ Mod Değiştir', r.x + r.w * 0.88, r.y + fs * 1.2, {
+            bgColor: '#eff6ff',
+            textColor: '#1d4ed8',
+            borderColor: '#bfdbfe',
+            scale: 0.74,
         });
     }
 
-    // Tablo Çizim Alanı
+    // Tablo Boyutları (Ferah dikey bütçe)
     const tableX = r.x + (icon ? 6 : r.w * 0.05);
-    const tableY = r.y + (icon ? 6 : fs * 2.5);
+    const tableY = r.y + (icon ? 6 : fs * 2.6);
     const tableW = icon ? r.w - 12 : r.w * 0.90;
-    const tableH = icon ? r.h - 12 : r.h * 0.58;
+    const tableH = icon ? r.h - 12 : r.h * 0.48;
 
-    const cols = 4; // [Değişken, c1, c2, Toplam]
-    const rows = 4; // [Başlık, r1, r2, Toplam]
+    const cols = 4;
+    const rows = 4;
 
     const colW0 = tableW * 0.31;
     const colWRest = (tableW - colW0) / 3;
@@ -260,7 +267,7 @@ export const twoWayTableRender: Renderer = (k: Ctx) => {
     c.fillRect(colX[3], tableY, colWRest, tableH);
     c.fillRect(tableX, tableY + rowH * 3, tableW, rowH);
 
-    // Hücre Çerçeveleri
+    // Çizgiler
     c.strokeStyle = '#94a3b8';
     c.lineWidth = 1.2;
 
@@ -280,7 +287,7 @@ export const twoWayTableRender: Renderer = (k: Ctx) => {
     }
     c.restore();
 
-    // Hücre Metinlerini Biçimlendirme
+    // Değer formatlama
     const fmt = (val: number, rowTot: number, colTot: number) => {
         if (s.mode === 0) return `${val}`;
         if (s.mode === 1) return `%${((val / totalN) * 100).toFixed(1)}`;
@@ -321,7 +328,7 @@ export const twoWayTableRender: Renderer = (k: Ctx) => {
         halo: false,
     });
 
-    // 4. Satır: Sütun Toplamları
+    // 4. Satır: Toplamlar
     drawText(k, 'Toplam', cxAt(0), cyAt(3), { scale: 0.82, color: '#0f172a', halo: false });
     drawText(k, s.mode === 3 ? '%100' : s.mode === 1 ? `%${((c1Sum / totalN) * 100).toFixed(1)}` : `${c1Sum}`, cxAt(1), cyAt(3), {
         scale: 0.85,
@@ -340,29 +347,29 @@ export const twoWayTableRender: Renderer = (k: Ctx) => {
     });
 
     if (!icon) {
-        // İstatistiksel İlişkililik Analiz Kartı (Alt Rozet)
+        // İstatistiksel İlişkililik Analiz Rozeti
         const isAssociated = diff >= 0.12;
         const analysisText = isAssociated
             ? `✦ Koşullu Oran Farkı: %${(diff * 100).toFixed(1)} ⇒ Değişkenler Arasında İlişkililik Var!`
-            : `✓ Koşullu Oran Farkı: %${(diff * 100).toFixed(1)} ⇒ Değişkenler Birbirinden Bağımsız Görünüyor`;
+            : `✓ Koşullu Oran Farkı: %${(diff * 100).toFixed(1)} ⇒ Değişkenler Birbirinden Bağımsız`;
 
         const badgeBg = isAssociated ? '#fef3c7' : '#dcfce7';
         const badgeCol = isAssociated ? '#92400e' : '#166534';
         const badgeBdr = isAssociated ? '#fde68a' : '#86efac';
 
-        drawBadge(k, analysisText, r.x + r.w / 2, tableY + tableH + fs * 1.5, {
+        drawBadge(k, analysisText, r.x + r.w / 2, tableY + tableH + fs * 1.8, {
             bgColor: badgeBg,
             textColor: badgeCol,
             borderColor: badgeBdr,
-            scale: 0.8,
+            scale: 0.80,
         });
 
-        // Maarif Modeli Hayati Uyarısı: "İlişkililik ≠ Neden-Sonuç"
+        // Maarif Modeli Temel Uyarısı
         drawText(
             k,
             '⚠️ Önemli (Maarif Modeli): İki değişkenin ilişkili olması, aralarında bir "Neden-Sonuç" olduğu anlamına gelmez!',
             r.x + r.w / 2,
-            r.y + r.h - fs * 0.9,
+            tableY + tableH + fs * 3.4,
             { align: 'center', color: '#dc2626', halo: true, scale: 0.74 }
         );
     }
@@ -373,16 +380,13 @@ export const twoWayTableRender: Renderer = (k: Ctx) => {
 export const twoWayTableSpec: SimSpec = {
     controls: (r: Rect, o: MathObject): SimControl[] => {
         const s = twoWayTableState(o);
-        const fs = Math.max(9, Math.min(17, Math.min(r.w, r.h) / 15));
-        const tableY = r.y + fs * 2.5;
-        const tableH = r.h * 0.58;
+        const fs = Math.max(9, Math.min(16, Math.min(r.w, r.h) / 16));
 
-        // Mod değiştirici hızlı tıklama butonu (Tablonun hemen üstü sağında)
         return [
             {
                 id: 'nextMode',
-                x: r.x + r.w * 0.90,
-                y: tableY - fs * 0.8,
+                x: r.x + r.w * 0.88,
+                y: r.y + fs * 1.2,
                 type: 'toggle',
                 label: 'Gösterim Modunu Değiştir (Sıklık ⟷ Yüzde)',
                 on: s.mode > 0,
@@ -409,11 +413,10 @@ export const twoWayTableSpec: SimSpec = {
 
 interface ClusteredContext {
     title: string;
-    varA: string; // 1. Değişken adı
-    catA: [string, string]; // [Burada Doğan, Dışarıdan Gelen]
-    varB: string; // 2. Değişken adı
-    catB: [string, string]; // [Mutlu, Mutsuz]
-    // Veriler: [A1_B1, A1_B2, A2_B1, A2_B2]
+    varA: string;
+    catA: [string, string];
+    varB: string;
+    catB: [string, string];
     counts: [number, number, number, number];
 }
 
@@ -461,7 +464,7 @@ export const clusteredBarRender: Renderer = (k: Ctx) => {
     const s = clusteredBarState(k.o);
     const ctx = CLUSTERED_CONTEXTS[s.contextIdx] || CLUSTERED_CONTEXTS[0];
 
-    const fs = Math.max(9, Math.min(17, Math.min(r.w, r.h) / 15));
+    const fs = Math.max(9, Math.min(16, Math.min(r.w, r.h) / 16));
     const icon = isIconSize(r);
 
     c.save();
@@ -470,15 +473,13 @@ export const clusteredBarRender: Renderer = (k: Ctx) => {
     c.clip();
 
     // Eksen moduna göre grupları ve alt kategorileri ayarla
-    // axisMode === 0 : X ekseninde varA (Örn. Doğum Yeri), renkler varB (Mutluluk)
-    // axisMode === 1 : X ekseninde varB (Örn. Mutluluk), renkler varA (Doğum Yeri)
     const isSwapped = s.axisMode === 1;
     const groupVar = isSwapped ? ctx.varB : ctx.varA;
     const groupLabels = isSwapped ? ctx.catB : ctx.catA;
     const legendVar = isSwapped ? ctx.varA : ctx.varB;
     const legendLabels = isSwapped ? ctx.catA : ctx.catB;
 
-    // Veri matrisi: [grup0_alt0, grup0_alt1, grup1_alt0, grup1_alt1]
+    // Veri matrisi
     const d00 = isSwapped ? ctx.counts[0] : ctx.counts[0];
     const d01 = isSwapped ? ctx.counts[2] : ctx.counts[1];
     const d10 = isSwapped ? ctx.counts[1] : ctx.counts[2];
@@ -492,28 +493,38 @@ export const clusteredBarRender: Renderer = (k: Ctx) => {
     const col1 = '#f59e0b'; // Kehribar/Turuncu
 
     if (!icon) {
-        // Üst Başlık Rozeti
-        const titleText = `${ctx.title} · ${s.chartType === 0 ? 'Kümeli Sütun Grafiği' : '%100 Yığılmış Sütun Grafiği'}`;
-        drawBadge(k, titleText, r.x + r.w / 2, r.y + fs * 1.2, {
+        // Üst Başlık Rozeti (Ortada)
+        const titleText = `${ctx.title} · ${s.chartType === 0 ? 'Kümeli Sütun Grafiği' : '%100 Yığılmış Grafiği'}`;
+        drawBadge(k, titleText, r.x + r.w * 0.44, r.y + fs * 1.2, {
             bgColor: '#f8fafc',
             textColor: '#0f172a',
             borderColor: '#cbd5e1',
-            scale: 0.8,
+            scale: 0.78,
+        });
+
+        // Üst Sağ: Eksenleri Değiştir Buton Rozeti
+        drawBadge(k, '⇄ Eksenleri Değiştir', r.x + r.w * 0.86, r.y + fs * 1.2, {
+            bgColor: s.axisMode === 1 ? '#dbeafe' : '#eff6ff',
+            textColor: s.axisMode === 1 ? '#1e40af' : '#2563eb',
+            borderColor: s.axisMode === 1 ? '#93c5fd' : '#bfdbfe',
+            scale: 0.72,
         });
     }
 
-    // Grafik Alanı Boyutları
+    // Grafik Alanı Boyutları (Alt taraftaki rozetlere ferah alan bırakmak için chartH küçültüldü)
     const chartX = r.x + (icon ? 6 : r.w * 0.12);
     const chartY = r.y + (icon ? 6 : fs * 2.8);
-    const chartW = icon ? r.w - 12 : r.w * 0.65;
-    const chartH = icon ? r.h - 12 : r.h * 0.58;
+    const chartW = icon ? r.w - 12 : r.w * 0.64;
+    const chartH = icon ? r.h - 12 : r.h * 0.44; // 158px (bol dikey boşluk)
 
     // Y Ekseni ve Izgara Çizgileri
     c.save();
     c.strokeStyle = '#e2e8f0';
     c.lineWidth = 1;
 
-    const yMax = s.chartType === 1 ? 100 : Math.max(80, Math.ceil(Math.max(d00, d01, d10, d11) / 20) * 20);
+    // Sütunların üzerine rahatça taşmadan yazı sığması için tepeye bol boşluk bırakıyoruz
+    const maxVal = Math.max(d00, d01, d10, d11);
+    const yMax = s.chartType === 1 ? 100 : Math.max(100, Math.ceil((maxVal * 1.28) / 20) * 20);
     const yTicks = 4;
 
     for (let t = 0; t <= yTicks; t++) {
@@ -583,14 +594,17 @@ export const clusteredBarRender: Renderer = (k: Ctx) => {
             c.restore();
 
             if (!icon) {
-                // Sütun tepelerine değer ve yüzde etiketleri
+                // Sütun tepelerine değer ve yüzde etiketleri (Önce değer, altında yüzde)
                 const pct0 = ((v0 / tot) * 100).toFixed(0);
                 const pct1 = ((v1 / tot) * 100).toFixed(0);
-                drawText(k, `${v0}`, x0 + barW / 2, y0 - fs * 0.7, { color: col0, scale: 0.82 });
-                drawText(k, `(%${pct0})`, x0 + barW / 2, y0 - fs * 1.5, { color: '#64748b', scale: 0.68 });
 
-                drawText(k, `${v1}`, x1 + barW / 2, y1 - fs * 0.7, { color: col1, scale: 0.82 });
-                drawText(k, `(%${pct1})`, x1 + barW / 2, y1 - fs * 1.5, { color: '#64748b', scale: 0.68 });
+                // 1. Sütun tepesi
+                drawText(k, `${v0}`, x0 + barW / 2, y0 - fs * 1.3, { color: col0, scale: 0.85, bold: true });
+                drawText(k, `(%${pct0})`, x0 + barW / 2, y0 - fs * 0.55, { color: '#475569', scale: 0.72, bold: false });
+
+                // 2. Sütun tepesi
+                drawText(k, `${v1}`, x1 + barW / 2, y1 - fs * 1.3, { color: col1, scale: 0.85, bold: true });
+                drawText(k, `(%${pct1})`, x1 + barW / 2, y1 - fs * 0.55, { color: '#475569', scale: 0.72, bold: false });
             }
         } else {
             // ── %100 Yığılmış Sütun (Segmented) ─────────────────────
@@ -620,19 +634,19 @@ export const clusteredBarRender: Renderer = (k: Ctx) => {
 
             if (!icon) {
                 // Segment içi yüzde etiketleri
-                if (h0 > 20) drawText(k, `%${pct0.toFixed(0)}`, x + barW / 2, yBottom + h0 / 2, { color: '#ffffff', scale: 0.8 });
-                if (h1 > 20) drawText(k, `%${pct1.toFixed(0)}`, x + barW / 2, yTop + h1 / 2, { color: '#ffffff', scale: 0.8 });
+                if (h0 > 18) drawText(k, `%${pct0.toFixed(0)}`, x + barW / 2, yBottom + h0 / 2, { color: '#ffffff', scale: 0.82 });
+                if (h1 > 18) drawText(k, `%${pct1.toFixed(0)}`, x + barW / 2, yTop + h1 / 2, { color: '#ffffff', scale: 0.82 });
             }
         }
 
         if (!icon) {
-            // Grup eksen etiketi
-            drawText(k, groupLabels[gIdx], clusterCenterX, chartY + chartH + fs * 1.0, {
+            // Grup eksen etiketi ve örneklem sayısı (N = ...)
+            drawText(k, groupLabels[gIdx], clusterCenterX, chartY + chartH + fs * 0.9, {
                 scale: 0.85,
                 color: '#0f172a',
                 halo: true,
             });
-            drawText(k, `(N = ${tot})`, clusterCenterX, chartY + chartH + fs * 1.8, {
+            drawText(k, `(N = ${tot})`, clusterCenterX, chartY + chartH + fs * 1.75, {
                 scale: 0.72,
                 color: '#64748b',
                 halo: true,
@@ -646,9 +660,9 @@ export const clusteredBarRender: Renderer = (k: Ctx) => {
     if (!icon) {
         // Sağdaki Lejant / Gösterge Kutusu
         const legX = chartX + chartW + fs * 1.2;
-        const legY = chartY + fs * 1.0;
+        const legY = chartY + fs * 0.8;
         const legW = r.x + r.w - legX - fs * 0.8;
-        const legH = fs * 5.8;
+        const legH = fs * 5.6;
 
         c.save();
         c.fillStyle = '#ffffff';
@@ -661,7 +675,7 @@ export const clusteredBarRender: Renderer = (k: Ctx) => {
         c.stroke();
 
         // Lejant Başlığı
-        drawText(k, legendVar, legX + legW / 2, legY + fs * 0.9, {
+        drawText(k, legendVar, legX + legW / 2, legY + fs * 0.85, {
             scale: 0.78,
             color: '#0f172a',
             halo: false,
@@ -669,8 +683,8 @@ export const clusteredBarRender: Renderer = (k: Ctx) => {
 
         // 1. Öğe
         c.fillStyle = col0;
-        c.fillRect(legX + fs * 0.8, legY + fs * 2.0, fs * 0.9, fs * 0.9);
-        drawText(k, legendLabels[0], legX + fs * 2.2, legY + fs * 2.45, {
+        c.fillRect(legX + fs * 0.7, legY + fs * 1.9, fs * 0.9, fs * 0.9);
+        drawText(k, legendLabels[0], legX + fs * 2.0, legY + fs * 2.35, {
             align: 'left',
             scale: 0.75,
             color: '#1e293b',
@@ -679,8 +693,8 @@ export const clusteredBarRender: Renderer = (k: Ctx) => {
 
         // 2. Öğe
         c.fillStyle = col1;
-        c.fillRect(legX + fs * 0.8, legY + fs * 3.6, fs * 0.9, fs * 0.9);
-        drawText(k, legendLabels[1], legX + fs * 2.2, legY + fs * 4.05, {
+        c.fillRect(legX + fs * 0.7, legY + fs * 3.5, fs * 0.9, fs * 0.9);
+        drawText(k, legendLabels[1], legX + fs * 2.0, legY + fs * 3.95, {
             align: 'left',
             scale: 0.75,
             color: '#1e293b',
@@ -688,7 +702,7 @@ export const clusteredBarRender: Renderer = (k: Ctx) => {
         });
         c.restore();
 
-        // Alt Analitik Çıkarım Rozeti
+        // Alt Analitik Çıkarım Rozeti (Artık (N = 100) ile kesinlikle çakışmaz, fs * 3.2'ye taşındı)
         const pctG0 = (d00 / g0Total) * 100;
         const pctG1 = (d10 / g1Total) * 100;
         const diff = Math.abs(pctG0 - pctG1);
@@ -697,19 +711,19 @@ export const clusteredBarRender: Renderer = (k: Ctx) => {
             ? `${groupLabels[0]} grubunda ${legendLabels[0]} oranı (%${pctG0.toFixed(0)}), ${groupLabels[1]} grubuna (%${pctG1.toFixed(0)}) göre belirgin yüksek!`
             : `Her iki grupta da ${legendLabels[0]} oranları birbirine yakın (%${pctG0.toFixed(0)} vs %${pctG1.toFixed(0)}).`;
 
-        drawBadge(k, inferText, r.x + r.w / 2, chartY + chartH + fs * 2.8, {
+        drawBadge(k, inferText, r.x + r.w / 2, chartY + chartH + fs * 3.2, {
             bgColor: '#ede9fe',
             textColor: '#5b21b6',
             borderColor: '#c4b5fd',
             scale: 0.78,
         });
 
-        // Alt Maarif İlkesi
+        // Alt Maarif İlkesi (Kutu sınırının üstünde ferah konumda)
         drawText(
             k,
             '💡 Bağımsız değişkeni (X eksenini) değiştirmek, verilerin birlikte değişebilirliğini iki yönlü değerlendirmenizi sağlar.',
             r.x + r.w / 2,
-            r.y + r.h - fs * 0.8,
+            chartY + chartH + fs * 4.8,
             { align: 'center', color: '#64748b', halo: true, scale: 0.72 }
         );
     }
@@ -720,12 +734,12 @@ export const clusteredBarRender: Renderer = (k: Ctx) => {
 export const clusteredBarSpec: SimSpec = {
     controls: (r: Rect, o: MathObject): SimControl[] => {
         const s = clusteredBarState(o);
-        const fs = Math.max(9, Math.min(17, Math.min(r.w, r.h) / 15));
+        const fs = Math.max(9, Math.min(16, Math.min(r.w, r.h) / 16));
 
         return [
             {
                 id: 'swapAxis',
-                x: r.x + r.w * 0.88,
+                x: r.x + r.w * 0.86,
                 y: r.y + fs * 1.2,
                 type: 'toggle',
                 label: 'Eksenleri Ters Yüz Et (Bağımsız Değişkeni Değiştir)',

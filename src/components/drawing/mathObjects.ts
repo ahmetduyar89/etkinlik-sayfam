@@ -18,6 +18,7 @@ import {
 } from './objectDrawing';
 import { GRADE10_GEOM_ITEMS } from './grade10GeomSims';
 import { GRADE10_STATS_ITEMS } from './grade10StatsSims';
+import { GRADE10_NUMBERS_ITEMS } from './grade10NumbersSims';
 
 /** Ekseni ve ızgarayı çizen ortak yardımcı (koordinat düzlemi türevleri). */
 function drawGridAxes(
@@ -981,6 +982,10 @@ export const MATH_CATEGORIES: ReadonlyArray<ObjectCategory> = [
     {
         label: '10. Sınıf İstatistik',
         items: GRADE10_STATS_ITEMS,
+    },
+    {
+        label: '10. Sınıf Sayılar',
+        items: GRADE10_NUMBERS_ITEMS,
     },
     {
         label: 'Geometrik Cisimler',
