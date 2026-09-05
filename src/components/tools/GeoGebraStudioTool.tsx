@@ -27,6 +27,7 @@ import {
     Crosshair,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { useToast } from '../common/ToastProvider';
 
 export interface GeoGebraStudioToolProps {
     onClose: () => void;
@@ -166,12 +167,191 @@ declare global {
     }
 }
 
+/**
+ * SVG verisini yüksek kaliteli PNG dataURL'ine dönüştürür.
+ */
+function svgToPngDataUrl(svgString: string, defaultW = 880, defaultH = 540): Promise<string> {
+    return new Promise((resolve, reject) => {
+        try {
+            const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const img = new Image();
+            img.onload = () => {
+                const w = img.naturalWidth || defaultW;
+                const h = img.naturalHeight || defaultH;
+                const canvas = document.createElement('canvas');
+                canvas.width = w * 2;
+                canvas.height = h * 2;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    URL.revokeObjectURL(url);
+                    resolve(canvas.toDataURL('image/png'));
+                } else {
+                    URL.revokeObjectURL(url);
+                    resolve(url);
+                }
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('SVG yüklenemedi'));
+            };
+            img.src = url;
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
+
+/**
+ * GeoGebra çizimini kristal netliğinde PNG formatında yakalar.
+ * GeoGebra HTML5 getPNGBase64, exportSVG ve DOM çoklu canvas katmanı birleştirmesini destekler.
+ */
+async function captureGeoGebraImage(api: any, containerId: string): Promise<string | null> {
+    // 1. Yol: Resmi GeoGebra getPNGBase64 API (Senkron ve Asenkron)
+    if (api) {
+        // A) Senkron getPNGBase64 (2x scale, beyaz arka plan, undefined dpi)
+        if (typeof api.getPNGBase64 === 'function') {
+            try {
+                // transparent=false => beyaz zemin ile çizgiler ve yazılar tahtada net çıkar
+                const direct = api.getPNGBase64(2, false, undefined);
+                if (typeof direct === 'string' && direct.trim().length > 100) {
+                    return direct.startsWith('data:') ? direct : `data:image/png;base64,${direct}`;
+                }
+            } catch (e) {
+                console.warn('Sync getPNGBase64(2, false) failed:', e);
+            }
+
+            try {
+                const direct1 = api.getPNGBase64(1, false, undefined);
+                if (typeof direct1 === 'string' && direct1.trim().length > 100) {
+                    return direct1.startsWith('data:') ? direct1 : `data:image/png;base64,${direct1}`;
+                }
+            } catch (e) {
+                console.warn('Sync getPNGBase64(1, false) failed:', e);
+            }
+
+            // B) Callback tabanlı getPNGBase64 (Bazı GeoGebra sürümlerinde)
+            try {
+                const asyncB64 = await new Promise<string | null>((resolve) => {
+                    let done = false;
+                    try {
+                        const immediate = api.getPNGBase64(2, false, undefined, (res: string) => {
+                            if (!done && typeof res === 'string' && res.trim().length > 100) {
+                                done = true;
+                                resolve(res.startsWith('data:') ? res : `data:image/png;base64,${res}`);
+                            }
+                        });
+                        if (!done && typeof immediate === 'string' && immediate.trim().length > 100) {
+                            done = true;
+                            resolve(immediate.startsWith('data:') ? immediate : `data:image/png;base64,${immediate}`);
+                        }
+                    } catch {
+                        // ignore
+                    }
+                    setTimeout(() => {
+                        if (!done) {
+                            done = true;
+                            resolve(null);
+                        }
+                    }, 400);
+                });
+
+                if (asyncB64) return asyncB64;
+            } catch (e) {
+                console.warn('Async getPNGBase64 failed:', e);
+            }
+        }
+
+        // 2. Yol: exportSVG (Vektörel dışa aktarma -> Ultra net PNG)
+        if (typeof api.exportSVG === 'function') {
+            try {
+                const svgStr = await new Promise<string | null>((resolve) => {
+                    let done = false;
+                    try {
+                        const directSvg = api.exportSVG((svg: string) => {
+                            if (!done && typeof svg === 'string' && svg.includes('<svg')) {
+                                done = true;
+                                resolve(svg);
+                            }
+                        });
+                        if (!done && typeof directSvg === 'string' && directSvg.includes('<svg')) {
+                            done = true;
+                            resolve(directSvg);
+                        }
+                    } catch {
+                        // ignore
+                    }
+                    setTimeout(() => {
+                        if (!done) {
+                            done = true;
+                            resolve(null);
+                        }
+                    }, 500);
+                });
+
+                if (svgStr) {
+                    const pngData = await svgToPngDataUrl(svgStr);
+                    if (pngData && pngData.length > 500) {
+                        return pngData;
+                    }
+                }
+            } catch (e) {
+                console.warn('exportSVG fallback failed:', e);
+            }
+        }
+    }
+
+    // 3. Yol: Çok Katmanlı DOM Canvas Birleştirme (3D / WebGL / Fallback)
+    const container = document.getElementById(containerId);
+    if (container) {
+        const canvases = Array.from(container.querySelectorAll('canvas')).filter((c) => {
+            const w = c.width || c.clientWidth || 0;
+            const h = c.height || c.clientHeight || 0;
+            return w > 50 && h > 50;
+        });
+
+        if (canvases.length > 0) {
+            const maxW = Math.max(...canvases.map((c) => c.width || c.clientWidth));
+            const maxH = Math.max(...canvases.map((c) => c.height || c.clientHeight));
+
+            const offscreen = document.createElement('canvas');
+            offscreen.width = maxW;
+            offscreen.height = maxH;
+            const offCtx = offscreen.getContext('2d');
+            if (offCtx) {
+                // Beyaz zemin
+                offCtx.fillStyle = '#ffffff';
+                offCtx.fillRect(0, 0, maxW, maxH);
+
+                for (const c of canvases) {
+                    try {
+                        offCtx.drawImage(c, 0, 0, maxW, maxH);
+                    } catch (e) {
+                        console.warn('DOM canvas draw error:', e);
+                    }
+                }
+
+                const dataUrl = offscreen.toDataURL('image/png');
+                if (dataUrl && dataUrl.length > 1500) {
+                    return dataUrl;
+                }
+            }
+        }
+    }
+
+    return null;
+}
+
 export function GeoGebraStudioTool({
     onClose,
     onInsertImage,
     initialApp = 'geometry',
     initialMaterialId,
 }: GeoGebraStudioToolProps) {
+    const toast = useToast();
     const dragControls = useDragControls();
     const containerRef = React.useRef<HTMLDivElement>(null);
     const appletContainerId = React.useId().replace(/[:]/g, '_') + '_ggb';
@@ -190,6 +370,16 @@ export function GeoGebraStudioTool({
     // GeoGebra API referansı
     const ggbApiRef = React.useRef<any>(null);
     const appletInstanceRef = React.useRef<any>(null);
+
+    // Etkin API nesnesini getiren yardımcı
+    const getEffectiveApi = React.useCallback(() => {
+        return (
+            ggbApiRef.current ||
+            (window as any)[appletContainerId + '_api'] ||
+            (window as any)[appletContainerId + '_applet'] ||
+            (window as any).ggbApplet
+        );
+    }, [appletContainerId]);
 
     // ── GeoGebra Scriptini Dinamik Yükle ──────────────────────────────
     const [scriptLoaded, setScriptLoaded] = React.useState<boolean>(() => !!window.GGBApplet);
@@ -216,7 +406,11 @@ export function GeoGebraStudioTool({
             };
             document.head.appendChild(script);
         } else {
-            script.addEventListener('load', () => setScriptLoaded(true));
+            if (window.GGBApplet) {
+                setScriptLoaded(true);
+            } else {
+                script.addEventListener('load', () => setScriptLoaded(true));
+            }
         }
     }, []);
 
@@ -230,6 +424,7 @@ export function GeoGebraStudioTool({
             el.innerHTML = '';
 
             const params: Record<string, any> = {
+                id: appletContainerId + '_applet',
                 appName: appType,
                 width: viewMode === 'docked' ? 460 : viewMode === 'maximized' ? window.innerWidth - 40 : 880,
                 height: viewMode === 'docked' ? 340 : viewMode === 'maximized' ? window.innerHeight - 150 : 480,
@@ -245,8 +440,9 @@ export function GeoGebraStudioTool({
                 useBrowserForJS: false,
                 language: 'tr',
                 appletOnLoad: (api: any) => {
-                    ggbApiRef.current = api;
-                    window[appletContainerId + '_api'] = api;
+                    const effective = api || (window as any)[appletContainerId + '_applet'] || (window as any).ggbApplet;
+                    ggbApiRef.current = effective;
+                    (window as any)[appletContainerId + '_api'] = effective;
                 },
             };
 
@@ -276,69 +472,85 @@ export function GeoGebraStudioTool({
 
     // ── Pencere Boyutu Değiştiğinde Applet Yeniden Boyutlandırma ──────
     React.useEffect(() => {
-        if (ggbApiRef.current && typeof ggbApiRef.current.setSize === 'function') {
+        const api = getEffectiveApi();
+        if (api && typeof api.setSize === 'function') {
             const w = viewMode === 'docked' ? 460 : viewMode === 'maximized' ? window.innerWidth - 40 : 880;
             const h = viewMode === 'docked' ? 340 : viewMode === 'maximized' ? window.innerHeight - 150 : 480;
             try {
-                ggbApiRef.current.setSize(w, h);
+                api.setSize(w, h);
             } catch {
                 // Ignore resize errors
             }
         }
-    }, [viewMode]);
+    }, [viewMode, getEffectiveApi]);
 
     // ── Sayfaya / Tahtaya Yapıştırma (Export PNG to Canvas) ────────────
-    const handleInsertToCanvas = React.useCallback(() => {
+    const handleInsertToCanvas = React.useCallback(async () => {
+        if (!onInsertImage) return;
         setIsExporting(true);
 
-        const api = ggbApiRef.current;
-        if (api && typeof api.exportPNG === 'function') {
-            try {
-                // 2x ölçek ve 300 DPI kristal netliğinde dışa aktar
-                api.exportPNG(2, 300, (dataUrl: string) => {
-                    setIsExporting(false);
-                    if (dataUrl && onInsertImage) {
-                        const w = viewMode === 'docked' ? 460 : 880;
-                        const h = viewMode === 'docked' ? 340 : 540;
-                        onInsertImage(dataUrl, w, h);
-                        setExportSuccess(true);
-                        setTimeout(() => setExportSuccess(false), 2400);
-                    }
-                });
-                return;
-            } catch (err) {
-                console.warn('API exportPNG failed, trying canvas fallback', err);
-            }
-        }
+        const api = getEffectiveApi();
 
-        // Fallback: Dom Canvas screenshot
-        const container = document.getElementById(appletContainerId);
-        const internalCanvas = container?.querySelector('canvas');
-        if (internalCanvas && onInsertImage) {
-            try {
-                const dataUrl = internalCanvas.toDataURL('image/png');
-                onInsertImage(dataUrl, internalCanvas.width / 2, internalCanvas.height / 2);
-                setExportSuccess(true);
-                setTimeout(() => setExportSuccess(false), 2400);
-            } catch (e) {
-                console.error('Canvas capture failed:', e);
+        try {
+            const dataUrl = await captureGeoGebraImage(api, appletContainerId);
+            if (!dataUrl) {
+                toast.error('GeoGebra çizimi yakalanamadı. Lütfen çizimin hazır olduğundan emin olun.');
+                setIsExporting(false);
+                return;
             }
+
+            // Görseli doğrula ve doğal boyutlarını hesapla
+            const img = new Image();
+            img.onload = () => {
+                const nw = img.naturalWidth || 880;
+                const nh = img.naturalHeight || 540;
+
+                // Tahtada orantılı uygun boyutlandırma
+                const targetW = Math.min(Math.max(nw, 400), 800);
+                const targetH = Math.round(targetW * (nh / nw));
+
+                onInsertImage(dataUrl, targetW, targetH);
+                setExportSuccess(true);
+                setIsExporting(false);
+                setTimeout(() => setExportSuccess(false), 2400);
+            };
+            img.onerror = () => {
+                toast.error('Görsel sayfaya aktarılırken bir sorun oluştu.');
+                setIsExporting(false);
+            };
+            img.src = dataUrl;
+        } catch (err) {
+            console.error('handleInsertToCanvas failed:', err);
+            toast.error('Görsel dışa aktarılamadı.');
+            setIsExporting(false);
         }
-        setIsExporting(false);
-    }, [appletContainerId, onInsertImage, viewMode]);
+    }, [appletContainerId, getEffectiveApi, onInsertImage]);
 
     // ── Görsel Olarak İndir (PNG) ────────────────────────────────────
-    const handleDownloadPNG = React.useCallback(() => {
-        const api = ggbApiRef.current;
-        if (api && typeof api.exportPNG === 'function') {
-            api.exportPNG(2, 300, (dataUrl: string) => {
+    const handleDownloadPNG = React.useCallback(async () => {
+        setIsExporting(true);
+        const api = getEffectiveApi();
+
+        try {
+            const dataUrl = await captureGeoGebraImage(api, appletContainerId);
+            if (dataUrl) {
                 const a = document.createElement('a');
                 a.href = dataUrl;
                 a.download = `geogebra_${activeApp}_${Date.now()}.png`;
+                document.body.appendChild(a);
                 a.click();
-            });
+                document.body.removeChild(a);
+                toast.success('GeoGebra görseli indirildi.');
+            } else {
+                toast.error('Görsel dışa aktarılamadı.');
+            }
+        } catch (err) {
+            console.error('handleDownloadPNG failed:', err);
+            toast.error('İndirme sırasında hata oluştu.');
+        } finally {
+            setIsExporting(false);
         }
-    }, [activeApp]);
+    }, [activeApp, appletContainerId, getEffectiveApi]);
 
     // ── Şablon Uygula ────────────────────────────────────────────────
     const handleApplyTemplate = (tmpl: TemplateOption) => {
@@ -473,13 +685,20 @@ export function GeoGebraStudioTool({
                             disabled={isExporting}
                             className={cn(
                                 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-lg transition-all duration-200',
-                                exportSuccess
+                                isExporting
+                                    ? 'bg-indigo-700/80 text-white cursor-wait opacity-90'
+                                    : exportSuccess
                                     ? 'bg-emerald-600 text-white shadow-emerald-600/50'
                                     : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-indigo-500/30 hover:shadow-indigo-500/50 active:scale-95'
                             )}
                             title="Bu çizimi tahta sayfasına nesne olarak yapıştır"
                         >
-                            {exportSuccess ? (
+                            {isExporting ? (
+                                <>
+                                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    <span>Aktarılıyor…</span>
+                                </>
+                            ) : exportSuccess ? (
                                 <>
                                     <Check className="w-4 h-4 text-emerald-200" />
                                     <span>Sayfaya Eklendi!</span>
