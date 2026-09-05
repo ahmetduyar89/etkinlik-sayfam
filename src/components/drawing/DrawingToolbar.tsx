@@ -17,6 +17,7 @@ import {
     StickyNote,
     Trash2,
     Undo,
+    Wand2,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, MathObject, PenType } from '../../types';
@@ -223,10 +224,10 @@ export function DrawingToolbar({
                             >
                                 <span>
                                     <span className="block text-[12.5px] font-bold text-white">
-                                        Şekil düzeltme
+                                        Çizgiyle Şekil Çizme (Akıllı Kalem)
                                     </span>
                                     <span className="block text-[10.5px] text-slate-400 leading-tight">
-                                        Elle çizilen daire, kare, üçgen ve çizgiyi düzgün şekle çevirir
+                                        Çizilen çizgileri, okları, daire, kare ve üçgenleri geometrik şekle çevirir. Çizerken ucunda bekleyerek de yapabilirsiniz.
                                     </span>
                                 </span>
                                 <span
@@ -455,6 +456,29 @@ export function DrawingToolbar({
                         <PenTool className="w-5 h-5" />
                         {(config.snapShapes || penType !== 'ballpoint') && (
                             <div className="absolute top-1 right-1 w-2 h-2 bg-indigo-400 rounded-full border border-[#1a1b26]" />
+                        )}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setConfig({ ...config, snapShapes: !config.snapShapes })}
+                        aria-label="Çizgiyle Geometrik Şekil Çizme"
+                        aria-pressed={!!config.snapShapes}
+                        title={
+                            config.snapShapes
+                                ? 'Çizgiyle Şekil Çizme: Açık (Çizilen şekiller otomatik düzelir)'
+                                : 'Çizgiyle Şekil Çizme: Kapalı (Açmak için tıklayın veya kalemle çizerken ucunda bekleyin)'
+                        }
+                        className={cn(
+                            'p-2.5 rounded-xl transition-all duration-200 relative',
+                            config.snapShapes
+                                ? 'bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 shadow-sm'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        )}
+                    >
+                        <Wand2 className="w-5 h-5" />
+                        {config.snapShapes && (
+                            <div className="absolute top-1 right-1 w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
                         )}
                     </button>
                 </div>

@@ -3,7 +3,7 @@ import { cn } from '../../utils/cn';
 import { Copy, Trash2 } from 'lucide-react';
 import { DRAWING_COLORS, HANDLE_CURSORS } from '../../constants/drawing';
 import { samplePressure } from './penEngine';
-import { recognizeShape, snapAngle } from './shapeRecognizer';
+import { adjustSnappedShape, recognizeShape, snapAngle } from './shapeRecognizer';
 import { findLibraryItem, getSimSpec, isAnimated, objectRect } from './libraryObjects';
 import { onImageReady } from './imageStore';
 import { applyOpToStrokes, newStrokeId, withIds } from './strokeOps';
@@ -26,6 +26,7 @@ import type {
     DrawConfig,
     DrawingCanvasHandle,
     DragState,
+    DrawingTool,
     MathObject,
     NotebookOp,
     PaperStyle,
@@ -98,6 +99,18 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const overlayCanvasRef = React.useRef<HTMLCanvasElement>(null);
         const [strokes, setStrokes] = React.useState<Stroke[]>([]);
         const currentStrokeRef = React.useRef<Stroke | null>(null);
+        const holdTimerRef = React.useRef<number | null>(null);
+        const heldShapeRef = React.useRef<{
+            originalStroke: Stroke;
+            snappedShape: { tool: DrawingTool; points: Point[] };
+        } | null>(null);
+
+        const cancelHoldTimer = React.useCallback(() => {
+            if (holdTimerRef.current !== null) {
+                window.clearTimeout(holdTimerRef.current);
+                holdTimerRef.current = null;
+            }
+        }, []);
 
         const [selectedIdxs, setSelectedIdxs] = React.useState<number[]>([]);
         const [selBB, setSelBB] = React.useState<BoundingBox | null>(null);
@@ -928,6 +941,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
         /** Devam eden çizimi iptal eder (çift parmak dokunuşunda). */
         const cancelCurrentStroke = () => {
+            cancelHoldTimer();
+            heldShapeRef.current = null;
             if (!isDrawingRef.current && !currentStrokeRef.current) return;
             isDrawingRef.current = false;
             currentStrokeRef.current = null;
@@ -1241,6 +1256,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
 
+            cancelHoldTimer();
+            heldShapeRef.current = null;
             isDrawingRef.current = true;
             const first: Point = { x, y };
             lastPointTimeRef.current = performance.now();
@@ -1363,6 +1380,19 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
             if (!isDrawingRef.current || !currentStrokeRef.current) return;
             const stroke = currentStrokeRef.current;
+
+            // Draw-and-hold ile şekil kilitlendiyse ve kullanıcı parmağını kaldırmadan sürüklüyorsa:
+            if (heldShapeRef.current && stroke.tool !== 'pencil') {
+                const adjusted = adjustSnappedShape(heldShapeRef.current.snappedShape, { x, y }, config.snapAngle);
+                currentStrokeRef.current = {
+                    ...stroke,
+                    tool: adjusted.tool,
+                    points: adjusted.points,
+                };
+                paintMain([currentStrokeRef.current]);
+                return;
+            }
+
             const last = stroke.points[stroke.points.length - 1];
             if (!last) return;
             const step = Math.hypot(x - last.x, y - last.y);
@@ -1443,6 +1473,47 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 drawStroke(mainCtx, stroke);
                 applyIdentity(mainCtx);
             }
+
+            // Kalem modunda "Çiz ve Bekle" (Draw-and-Hold) zamanlayıcısı:
+            if (stroke.tool === 'pencil') {
+                cancelHoldTimer();
+                holdTimerRef.current = window.setTimeout(() => {
+                    if (!isDrawingRef.current || !currentStrokeRef.current) return;
+                    const cur = currentStrokeRef.current;
+                    if (cur.points.length >= 4) {
+                        const recognized = recognizeShape(cur.points);
+                        if (recognized) {
+                            heldShapeRef.current = {
+                                originalStroke: { ...cur },
+                                snappedShape: recognized,
+                            };
+                            currentStrokeRef.current = {
+                                ...cur,
+                                tool: recognized.tool,
+                                points: recognized.points,
+                                penType: undefined,
+                                fillEnabled: config.fillEnabled,
+                            };
+                            paintMain([currentStrokeRef.current]);
+
+                            // Görsel dokunsal geri bildirim: uca yeşil bir halka
+                            const oCtx = overlayCtxRef.current;
+                            if (oCtx) {
+                                const v = viewRef.current;
+                                const sp = toScreenPoint({ x, y }, v);
+                                oCtx.save();
+                                oCtx.strokeStyle = '#10b981';
+                                oCtx.lineWidth = 2.5;
+                                oCtx.beginPath();
+                                oCtx.arc(sp.x, sp.y, 14, 0, Math.PI * 2);
+                                oCtx.stroke();
+                                oCtx.restore();
+                                window.setTimeout(clearOverlay, 240);
+                            }
+                        }
+                    }
+                }, 400);
+            }
         };
 
         const stopDrawing = (e?: React.PointerEvent) => {
@@ -1512,12 +1583,16 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 clearOverlay();
                 return;
             }
+            cancelHoldTimer();
             if (isDrawingRef.current && currentStrokeRef.current) {
                 let stroke = currentStrokeRef.current;
                 let snapped = false;
 
-                // Şekil düzeltme: serbest çizilen kapalı/düz şekilleri tanı.
-                if (config.snapShapes && stroke.tool === 'pencil') {
+                if (heldShapeRef.current) {
+                    snapped = true;
+                    heldShapeRef.current = null;
+                } else if (config.snapShapes && stroke.tool === 'pencil') {
+                    // Şekil düzeltme: serbest çizilen kapalı/düz şekilleri tanı.
                     const recognized = recognizeShape(stroke.points);
                     if (recognized) {
                         stroke = {
@@ -1547,6 +1622,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             isDrawingRef.current = false;
             gestureDirtyRef.current = false;
             currentStrokeRef.current = null;
+            heldShapeRef.current = null;
             // Çizim biterken bekleyen uzak işlemler uygulanır.
             window.setTimeout(flushPendingOps, 0);
             if (config.tool === 'sun') clearOverlay();
