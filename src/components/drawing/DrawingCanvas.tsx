@@ -1814,7 +1814,11 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                                 className="flex-1 accent-amber-400 h-1"
                                             />
                                             <span className="text-[10.5px] font-bold text-white tabular-nums w-[42px] text-right shrink-0">
-                                                {value}
+                                                {typeof value === 'number'
+                                                    ? Number.isInteger(value)
+                                                        ? value
+                                                        : Number(value.toFixed(2))
+                                                    : value}
                                                 {prm.unit ? ` ${prm.unit}` : ''}
                                             </span>
                                         </label>
