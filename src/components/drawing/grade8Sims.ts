@@ -13,9 +13,14 @@ import {
     clampInt,
     ellipse,
     fillShape,
+    fitText,
+    fmtNum,
+    isIconSize,
     label,
     line,
+    panel,
     path,
+    roundRect,
     simValue,
     textWidth,
     withAlpha,
@@ -4651,6 +4656,781 @@ const electroSpec: SimSpec = {
     ],
 };
 
+// ── Çıkrık, Dişli Çark & Kasnak Sistemleri (Basit Makineler) ────────
+interface GearWheelState {
+    mode: number; // 0: Çıkrık, 1: Dişli Çarklar, 2: Kasnaklar
+    R: number;    // Çıkrık kolu / 1. dişli yarıçapı
+    r: number;    // Silindir / 2. dişli yarıçapı
+    turn: number; // Tur / açı
+}
+
+function gearWheelState(o: MathObject, t = 0): GearWheelState {
+    const mode = clampInt(simValue(o, 'mode', 0), 0, 2, 0);
+    const R = clamp(simValue(o, 'R', 40), 20, 60);
+    const r = clamp(simValue(o, 'r', 15), 10, 25);
+    const turn = t * 1.5;
+    return { mode, R, r, turn };
+}
+
+export const gearWheelPulleyRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = gearWheelState(k.o, k.t);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const drawW = r.w * (icon ? 0.9 : 0.52);
+    const drawH = r.h * 0.72;
+    const cx0 = r.x + fs * 2.0;
+    const cy0 = r.y + fs * 2.8;
+
+    if (s.mode === 0) {
+        // Çıkrık Modu (Kuyudan Su Çekme)
+        const wellX = cx0 + drawW * 0.38;
+        const wellY = cy0 + drawH * 0.42;
+        const cylR = fs * 1.6;
+        const armR = fs * 3.6;
+
+        // Kuyu Desteği & Silindir
+        k.c.save();
+        k.c.strokeStyle = k.color;
+        k.c.lineWidth = 2.5;
+
+        // Silindir (Küçük silindir - r)
+        k.c.fillStyle = '#cbd5e1';
+        k.c.beginPath();
+        k.c.arc(wellX, wellY, cylR, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+
+        // Çıkrık Kolu (Büyük daire / kol - R)
+        const armAng = s.turn;
+        const handleX = wellX + Math.cos(armAng) * armR;
+        const handleY = wellY + Math.sin(armAng) * armR;
+
+        line(k, wellX, wellY, handleX, handleY, 3.5);
+        k.c.fillStyle = '#ef4444';
+        k.c.beginPath();
+        k.c.arc(handleX, handleY, fs * 0.5, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+
+        // İp ve Kova
+        const ropeX = wellX - cylR;
+        const bucketY = wellY + fs * 4.2 - Math.sin(s.turn * 0.5) * fs * 1.5;
+        line(k, ropeX, wellY, ropeX, bucketY, 2);
+
+        // Kova (Yük G)
+        k.c.fillStyle = '#0284c7';
+        roundRect(k, ropeX - fs * 1.2, bucketY, fs * 2.4, fs * 2.2, 4);
+        k.c.fill();
+        k.c.stroke();
+        k.c.restore();
+
+        if (!icon) {
+            label(k, 'Yük (G = 60 N)', ropeX, bucketY + fs * 1.1, 'center', 'middle', 0.52);
+            label(k, 'F (Kuvvet)', handleX + fs * 0.8, handleY, 'left', 'middle', 0.55);
+            label(k, `Silindir (r = ${s.r} cm)`, wellX, wellY - cylR - fs * 0.5, 'center', 'bottom', 0.5);
+            label(k, `Çıkrık Kolu (R = ${s.R} cm)`, wellX + armR * 0.7, wellY - armR * 0.7, 'left', 'bottom', 0.52);
+        }
+    } else if (s.mode === 1) {
+        // Dişli Çarklar Modu
+        const g1X = cx0 + drawW * 0.32;
+        const g2X = cx0 + drawW * 0.68;
+        const gy = cy0 + drawH * 0.48;
+
+        const r1 = fs * 3.2;
+        const r2 = fs * 2.0;
+
+        // 1. Dişli (Büyük - r1)
+        k.c.save();
+        k.c.fillStyle = '#38bdf8';
+        k.c.strokeStyle = k.color;
+        k.c.lineWidth = 2;
+        k.c.beginPath();
+        k.c.arc(g1X, gy, r1, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+
+        // 2. Dişli (Küçük - r2)
+        k.c.fillStyle = '#f59e0b';
+        k.c.beginPath();
+        k.c.arc(g2X, gy, r2, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+
+        // Dişli okları (Zıt yön)
+        const a1 = s.turn;
+        const a2 = -s.turn * (r1 / r2);
+        line(k, g1X, gy, g1X + Math.cos(a1) * r1 * 0.8, gy + Math.sin(a1) * r1 * 0.8, 2.5);
+        line(k, g2X, gy, g2X + Math.cos(a2) * r2 * 0.8, gy + Math.sin(a2) * r2 * 0.8, 2.5);
+        k.c.restore();
+
+        if (!icon) {
+            label(k, '1. Dişli (2r)', g1X, gy + r1 + fs * 0.8, 'center', 'top', 0.52);
+            label(k, '2. Dişli (r)', g2X, gy + r2 + fs * 0.8, 'center', 'top', 0.52);
+            label(k, '↻ Saat Yönü (n tur)', g1X, gy - r1 - fs * 0.5, 'center', 'bottom', 0.5);
+            label(k, '↺ Zıt Yön (2n tur)', g2X, gy - r2 - fs * 0.5, 'center', 'bottom', 0.5);
+        }
+    } else {
+        // Kasnaklar Modu (Çapraz/Ters Bağlı)
+        const k1X = cx0 + drawW * 0.28;
+        const k2X = cx0 + drawW * 0.72;
+        const ky = cy0 + drawH * 0.48;
+        const kr1 = fs * 2.6;
+        const kr2 = fs * 2.6;
+
+        k.c.save();
+        k.c.strokeStyle = k.color;
+        k.c.lineWidth = 2;
+
+        // İki kasnak
+        k.c.fillStyle = '#4ade80';
+        k.c.beginPath();
+        k.c.arc(k1X, ky, kr1, 0, Math.PI * 2);
+        k.c.arc(k2X, ky, kr2, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.stroke();
+
+        // Çapraz Kayış (Ters Bağlantı)
+        k.c.strokeStyle = '#dc2626';
+        k.c.lineWidth = 2.5;
+        line(k, k1X, ky - kr1, k2X, ky + kr2, 2.5);
+        line(k, k1X, ky + kr1, k2X, ky - kr2, 2.5);
+        k.c.restore();
+
+        if (!icon) {
+            label(k, 'Çapraz Bağlı Kasnaklar: Dönme Yönleri ZITTIR!', cx0 + drawW / 2, cy0 + drawH - fs * 0.5, 'center', 'bottom', 0.55);
+        }
+    }
+
+    // Sağ Bilgi Paneli
+    if (!icon && k.o.labels !== false) {
+        const pw = r.w * 0.40;
+        const ph = r.h * 0.76;
+        const px = r.x + r.w - pw - fs * 1.0;
+        const py = r.y + fs * 2.2;
+        panel(k, px, py, pw, ph);
+
+        const titles = ['Çıkrık Sistemi', 'Dişli Çarklar', 'Kasnak Sistemleri'];
+        label(k, titles[s.mode], px + fs * 0.5, py + fs * 0.8, 'left', 'middle', 0.62);
+
+        if (s.mode === 0) {
+            label(k, 'Çıkrık Bağıntısı:  F · R = G · r', px + fs * 0.5, py + fs * 2.2, 'left', 'middle', 0.60);
+            const kazanc = fmtNum(s.R / s.r, 2);
+            const fEffort = fmtNum(60 * (s.r / s.R), 1);
+            label(k, `Kuvvet Kazancı = R / r = ${s.R} / ${s.r} = ${kazanc} kat`, px + fs * 0.5, py + fs * 3.4, 'left', 'middle', 0.55);
+            label(k, `Uygulanan Kuvvet (F) = ${fEffort} N (G=60N için)`, px + fs * 0.5, py + fs * 4.4, 'left', 'middle', 0.55);
+
+            line(k, px + fs * 0.5, py + fs * 5.6, px + pw - fs * 0.5, py + fs * 5.6, 1);
+            label(k, 'LGS Kuralı: Çıkrık kolu (R) uzadıkça', px + fs * 0.5, py + fs * 6.5, 'left', 'middle', 0.48);
+            label(k, 'kuvvet kazancı ARTAR, yoldan kayıp artar.', px + fs * 0.5, py + fs * 7.3, 'left', 'middle', 0.48);
+            label(k, 'İş veya enerjiden kazanç ASLA olmaz!', px + fs * 0.5, py + fs * 8.1, 'left', 'middle', 0.50);
+        } else {
+            label(k, 'Temel Kural:  n₁ · r₁ = n₂ · r₂', px + fs * 0.5, py + fs * 2.2, 'left', 'middle', 0.60);
+            label(k, '• Yarıçap ile tur sayısı TERS orantılıdır.', px + fs * 0.5, py + fs * 3.4, 'left', 'middle', 0.52);
+            label(k, '• Birbirini çeviren dişliler ZIT yönde döner.', px + fs * 0.5, py + fs * 4.4, 'left', 'middle', 0.52);
+            label(k, '• Eş merkezli dişlilerin tur sayıları ve', px + fs * 0.5, py + fs * 5.6, 'left', 'middle', 0.48);
+            label(k, '  dönme yönleri AYNIDIR.', px + fs * 0.5, py + fs * 6.4, 'left', 'middle', 0.48);
+        }
+    }
+
+    if (!icon) {
+        label(k, 'Çıkrık, Dişli Çark & Kasnak Sistemleri', r.x + fs * 1.5, r.y + fs * 1.2, 'left', 'middle', 0.75);
+    }
+
+    k.c.restore();
+};
+
+export const gearWheelPulleySpec: SimSpec = {
+    animated: true,
+    controls: (r) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        return [
+            { id: 'btn_mode', x: r.x + fs * 16.5, y: r.y + fs * 1.2, type: 'toggle', label: 'Çıkrık / Dişli / Kasnak Modu' },
+            { id: 'btn_inc_R', x: r.x + fs * 2.5, y: r.y + r.h - fs * 1.0, type: 'toggle', label: 'Çıkrık Kolunu (R) Değiştir' },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        if (id === 'btn_mode') {
+            const cur = simValue(o, 'mode', 0);
+            return { mode: (cur + 1) % 3 };
+        }
+        if (id === 'btn_inc_R') {
+            const cur = simValue(o, 'R', 40);
+            return { R: cur === 40 ? 55 : cur === 55 ? 30 : 40 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'mode', label: 'Sistem (0:Çıkrık, 1:Dişli, 2:Kasnak)', min: 0, max: 2, step: 1 },
+        { key: 'R', label: 'Kol Uzunluğu R', min: 20, max: 60, step: 5 },
+    ],
+};
+
+// ── Elektroskop Laboratuvarı ────────────────────────────────────────
+interface ElectroscopeState {
+    rodApproach: number; // 0: Uzak, 1: Yaklaştırıldı (-), 2: Yaklaştırıldı (+)
+    touch: boolean;      // Dokunma var mı?
+}
+
+function electroscopeState(o: MathObject): ElectroscopeState {
+    const rodApproach = clampInt(simValue(o, 'approach', 0), 0, 2, 0);
+    const touch = simValue(o, 'touch', 0) === 1;
+    return { rodApproach, touch };
+}
+
+export const electroscopeRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = electroscopeState(k.o);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const cx = r.x + r.w * (icon ? 0.5 : 0.28);
+    const cy = r.y + r.h * 0.52;
+
+    // Cam Fanus Gövdesi
+    const fanusW = fs * 9.0;
+    const fanusH = fs * 10.0;
+    k.c.save();
+    k.c.fillStyle = 'rgba(241, 245, 249, 0.4)';
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 2;
+    roundRect(k, cx - fanusW / 2, cy - fanusH / 2 + fs * 1.5, fanusW, fanusH, 12);
+    k.c.fill();
+    k.c.stroke();
+
+    // Yalıtkan Tıpa
+    k.c.fillStyle = '#94a3b8';
+    k.c.fillRect(cx - fs * 1.2, cy - fanusH / 2 + fs * 1.5, fs * 2.4, fs * 0.8);
+
+    // İletken Metal Topuz (Üstte)
+    const knobY = cy - fanusH / 2 + fs * 0.5;
+    k.c.fillStyle = '#f59e0b';
+    k.c.beginPath();
+    k.c.arc(cx, knobY, fs * 1.3, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+
+    // İletken Metal Gövde
+    line(k, cx, knobY, cx, cy + fs * 2.2, 3);
+
+    // İki Altın Yaprak
+    let leafAngle = 10; // Nötr başlangıç
+    if (s.rodApproach === 1) leafAngle = 45; // (-) yaklaştı -> yapraklar açıldı (-)
+    if (s.rodApproach === 2) leafAngle = 45; // (+) yaklaştı -> yapraklar açıldı (+)
+    if (s.touch) leafAngle = 55;
+
+    const leafLen = fs * 2.8;
+    const radL = (leafAngle * Math.PI) / 180;
+    const stemY = cy + fs * 2.2;
+
+    k.c.strokeStyle = '#eab308';
+    k.c.lineWidth = 2.5;
+    line(k, cx, stemY, cx - Math.sin(radL) * leafLen, stemY + Math.cos(radL) * leafLen, 2.5);
+    line(k, cx, stemY, cx + Math.sin(radL) * leafLen, stemY + Math.cos(radL) * leafLen, 2.5);
+    k.c.restore();
+
+    // Yüklü Çubuk
+    if (s.rodApproach > 0 && !icon) {
+        const rodX = cx - fs * 4.5;
+        const rodY = knobY - fs * 0.5;
+        k.c.save();
+        k.c.fillStyle = s.rodApproach === 1 ? '#0284c7' : '#ef4444';
+        roundRect(k, rodX - fs * 2.5, rodY - fs * 0.6, fs * 5.0, fs * 1.2, 4);
+        k.c.fill();
+        k.c.strokeStyle = k.color;
+        k.c.stroke();
+        k.c.restore();
+
+        const rodSign = s.rodApproach === 1 ? '− − − (Ebonit Çubuk)' : '+ + + (Cam Çubuk)';
+        label(k, rodSign, rodX, rodY, 'center', 'middle', 0.48);
+
+        // Topuz ve Yapraktaki Yük Dağılımı
+        const knobSign = s.rodApproach === 1 ? '+ + +' : '− − −';
+        const leafSign = s.rodApproach === 1 ? '− −' : '+ +';
+        label(k, knobSign, cx, knobY, 'center', 'middle', 0.55);
+        label(k, leafSign, cx, stemY + leafLen * 0.6, 'center', 'middle', 0.52);
+    }
+
+    // Sağ Bilgi Paneli
+    if (!icon && k.o.labels !== false) {
+        const pw = r.w * 0.42;
+        const ph = r.h * 0.76;
+        const px = r.x + r.w - pw - fs * 1.0;
+        const py = r.y + fs * 2.2;
+        panel(k, px, py, pw, ph);
+
+        label(k, 'Elektroskop & Etkiyle Elektriklenme', px + fs * 0.5, py + fs * 0.8, 'left', 'middle', 0.62);
+
+        let expl = 'Nötr elektroskopta yapraklar kapalıdır.';
+        if (s.rodApproach === 1) {
+            expl = 'Negatif (−) çubuk yaklaştırılınca topuzdaki e⁻ lar yapraklara itilir. Topuz (+), yapraklar (−) yüklenir ve yapraklar AÇILIR!';
+        } else if (s.rodApproach === 2) {
+            expl = 'Pozitif (+) çubuk yaklaştırılınca yapraklardaki e⁻ lar topuza çekilir. Topuz (−), yapraklar (+) yüklenir ve yapraklar AÇILIR!';
+        }
+
+        label(k, fitText(k, [expl], pw - fs * 1.0, 0.52), px + fs * 0.5, py + fs * 2.2, 'left', 'middle', 0.52);
+
+        line(k, px + fs * 0.5, py + fs * 4.6, px + pw - fs * 0.5, py + fs * 4.6, 1);
+        label(k, 'LGS İpuçları:', px + fs * 0.5, py + fs * 5.5, 'left', 'middle', 0.55);
+        label(k, '• Çubuk yalnız YAKLAŞTIRILIRSA (etki):', px + fs * 0.5, py + fs * 6.5, 'left', 'middle', 0.48);
+        label(k, '  Çubuk çekilince elektroskop tekrar nötrleşir.', px + fs * 0.5, py + fs * 7.3, 'left', 'middle', 0.46);
+        label(k, '• Çubuk DOKUNDURULURSA:', px + fs * 0.5, py + fs * 8.2, 'left', 'middle', 0.48);
+        label(k, '  Yük paylaşılır, çubuk çekilse de açık kalır.', px + fs * 0.5, py + fs * 9.0, 'left', 'middle', 0.46);
+    }
+
+    if (!icon) {
+        label(k, 'Elektroskop Laboratuvarı', r.x + fs * 1.5, r.y + fs * 1.2, 'left', 'middle', 0.75);
+    }
+
+    k.c.restore();
+};
+
+export const electroscopeSpec: SimSpec = {
+    controls: (r) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        return [
+            { id: 'btn_neg', x: r.x + fs * 14.5, y: r.y + fs * 1.2, type: 'toggle', label: '(−) Çubuk Yaklaştır' },
+            { id: 'btn_pos', x: r.x + fs * 21.0, y: r.y + fs * 1.2, type: 'toggle', label: '(+) Çubuk Yaklaştır' },
+            { id: 'btn_reset', x: r.x + fs * 2.5, y: r.y + r.h - fs * 1.0, type: 'toggle', label: 'Uzaklaştır (Sıfırla)' },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        if (id === 'btn_neg') return { approach: 1 };
+        if (id === 'btn_pos') return { approach: 2 };
+        if (id === 'btn_reset') return { approach: 0 };
+        return {};
+    },
+    params: [
+        { key: 'approach', label: 'Çubuk (0:Yok, 1:Neg, 2:Poz)', min: 0, max: 2, step: 1 },
+    ],
+};
+
+// ── Isınma - Soğuma Eğrisi & Hal Değişimi ────────────────────────────
+interface HeatingCurveState {
+    power: number; // 1: 100W, 2: 200W
+    tProg: number; // 0 - 100
+}
+
+function heatingCurveState(o: MathObject, t = 0): HeatingCurveState {
+    const power = clampInt(simValue(o, 'power', 1), 1, 2, 1);
+    const playing = simValue(o, 'play', 1) === 1;
+    const tProg = playing ? (t * 8 * power) % 100 : clamp(simValue(o, 'prog', 30), 0, 100);
+    return { power, tProg };
+}
+
+export const heatingCoolingCurveRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = heatingCurveState(k.o, k.t);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    // Sol Taraf: Isıtma Beheri ve Ocak
+    const bx = r.x + fs * 3.5;
+    const by = r.y + fs * 4.0;
+    const bw = fs * 6.0;
+    const bh = fs * 7.0;
+
+    // Beher
+    k.c.save();
+    k.c.fillStyle = s.tProg < 25 ? 'rgba(186, 230, 253, 0.4)' : s.tProg < 75 ? 'rgba(56, 189, 248, 0.5)' : 'rgba(224, 242, 254, 0.2)';
+    k.c.fillRect(bx, by, bw, bh);
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 2.5;
+    line(k, bx, by, bx, by + bh, 2.5);
+    line(k, bx, by + bh, bx + bw, by + bh, 2.5);
+    line(k, bx + bw, by + bh, bx + bw, by, 2.5);
+
+    // İspirto Ocağı (Alev)
+    const flameY = by + bh + fs * 1.5;
+    k.c.fillStyle = '#f97316';
+    k.c.beginPath();
+    k.c.arc(bx + bw / 2, flameY, fs * 0.8, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.restore();
+
+    let stateName = 'Katı (Buz)';
+    let tempVal = -10;
+    if (s.tProg < 18) {
+        tempVal = -10 + (s.tProg / 18) * 10; // -10 -> 0 °C
+        stateName = '1. Bölge: Buz ısınıyor';
+    } else if (s.tProg < 42) {
+        tempVal = 0; // 0 °C Plato
+        stateName = '2. Bölge: ERİME PLATOSU (Buz + Su)';
+    } else if (s.tProg < 68) {
+        tempVal = ((s.tProg - 42) / 26) * 100; // 0 -> 100 °C
+        stateName = '3. Bölge: Su ısınıyor';
+    } else if (s.tProg < 92) {
+        tempVal = 100; // 100 °C Plato
+        stateName = '4. Bölge: KAYNAMA PLATOSU (Su + Buhar)';
+    } else {
+        tempVal = 100 + ((s.tProg - 92) / 8) * 15;
+        stateName = '5. Bölge: Gaz (Buhar)';
+    }
+
+    if (!icon) {
+        label(k, stateName, bx + bw / 2, by + bh + fs * 3.0, 'center', 'top', 0.52);
+        label(k, `Sıcaklık: ${fmtNum(tempVal, 0)} °C`, bx + bw / 2, by - fs * 0.6, 'center', 'bottom', 0.58);
+    }
+
+    // Sağ Taraf: Sıcaklık-Zaman Grafiği (T - t)
+    const gw = r.w * (icon ? 0.9 : 0.48);
+    const gh = r.h * 0.62;
+    const gx = r.x + r.w - gw - fs * 1.0;
+    const gy = r.y + fs * 3.5;
+    const gbot = gy + gh;
+
+    if (!icon && k.o.labels !== false) {
+        panel(k, gx - fs * 0.5, gy - fs * 1.0, gw + fs * 1.0, gh + fs * 2.2);
+        label(k, 'Isınma Eğrisi (Sıcaklık – Zaman Grafiği)', gx, gy - fs * 0.4, 'left', 'bottom', 0.58);
+
+        // Eksenler
+        line(k, gx, gbot, gx + gw, gbot, 1.5);
+        line(k, gx, gbot, gx, gy, 1.5);
+
+        // 0°C ve 100°C seviyeleri
+        const y0 = gbot - gh * 0.32;
+        const y100 = gbot - gh * 0.82;
+        line(k, gx, y0, gx + gw, y0, 0.8);
+        line(k, gx, y100, gx + gw, y100, 0.8);
+        label(k, '100°C (Kaynama)', gx - fs * 0.2, y100, 'right', 'middle', 0.45);
+        label(k, '0°C (Erime)', gx - fs * 0.2, y0, 'right', 'middle', 0.45);
+
+        // Eğri parçaları
+        k.c.save();
+        k.c.strokeStyle = '#dc2626';
+        k.c.lineWidth = 2.5;
+        k.c.beginPath();
+        k.c.moveTo(gx, gbot - gh * 0.1);
+        k.c.lineTo(gx + gw * 0.18, y0);
+        k.c.lineTo(gx + gw * 0.42, y0); // Erime platosu
+        k.c.lineTo(gx + gw * 0.68, y100);
+        k.c.lineTo(gx + gw * 0.92, y100); // Kaynama platosu
+        k.c.lineTo(gx + gw, gy);
+        k.c.stroke();
+
+        // Anlık Tarama Noktası
+        const scanX = gx + (s.tProg / 100) * gw;
+        const scanY = gbot - clamp(((tempVal - (-10)) / 130) * gh, 5, gh);
+        k.c.fillStyle = '#38bdf8';
+        k.c.beginPath();
+        k.c.arc(scanX, scanY, 5, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+
+        // LGS Kural Notu
+        label(k, '💡 Hal değişimi süresince saf maddelerin sıcaklığı SABİTTİR!', gx, gbot + fs * 0.8, 'left', 'top', 0.48);
+    }
+
+    if (!icon) {
+        label(k, 'Isınma - Soğuma Eğrisi & Hal Değişimi', r.x + fs * 1.5, r.y + fs * 1.2, 'left', 'middle', 0.75);
+    }
+
+    k.c.restore();
+};
+
+export const heatingCoolingCurveSpec: SimSpec = {
+    animated: true,
+    controls: (r) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        return [
+            { id: 'btn_power', x: r.x + fs * 16.5, y: r.y + fs * 1.2, type: 'toggle', label: 'Isıtıcı Gücünü Değiştir (100W / 200W)' },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        if (id === 'btn_power') {
+            const cur = simValue(o, 'power', 1);
+            return { power: cur === 1 ? 2 : 1 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'power', label: 'Isıtıcı Gücü (1-2)', min: 1, max: 2, step: 1 },
+    ],
+};
+
+// ── Biyoteknoloji & Klonlama Laboratuvarı ────────────────────────────
+interface BiotechState {
+    step: number; // 0: Başlangıç, 1: Çekirdek Alma, 2: Boşaltma, 3: Aktarım & Embriyo, 4: Doğum
+}
+
+function biotechState(o: MathObject): BiotechState {
+    const step = clampInt(simValue(o, 'step', 0), 0, 4, 0);
+    return { step };
+}
+
+export const biotechCloningRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = biotechState(k.o);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const drawW = r.w * (icon ? 0.9 : 0.55);
+    const drawH = r.h * 0.72;
+    const cx0 = r.x + fs * 2.0;
+    const cy0 = r.y + fs * 2.8;
+
+    // 3 Koyun Temsili
+    const aX = cx0 + drawW * 0.22;
+    const bX = cx0 + drawW * 0.50;
+    const cX = cx0 + drawW * 0.78;
+    const sheepY = cy0 + fs * 2.5;
+
+    // A Koyunu (Beyaz Başlı - Vücut hücresi vericisi)
+    k.c.save();
+    k.c.fillStyle = '#f8fafc';
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 2;
+    k.c.beginPath();
+    k.c.arc(aX, sheepY, fs * 1.5, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+
+    // B Koyunu (Siyah Başlı - Yumurta vericisi)
+    k.c.fillStyle = '#334155';
+    k.c.beginPath();
+    k.c.arc(bX, sheepY, fs * 1.5, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+
+    // C Koyunu (Alacalı - Taşıyıcı Anne)
+    k.c.fillStyle = '#e2e8f0';
+    k.c.beginPath();
+    k.c.arc(cX, sheepY, fs * 1.5, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+    k.c.restore();
+
+    if (!icon) {
+        label(k, 'A Koyunu (2n Vücut)', aX, sheepY + fs * 2.0, 'center', 'top', 0.52);
+        label(k, 'B Koyunu (n Yumurta)', bX, sheepY + fs * 2.0, 'center', 'top', 0.52);
+        label(k, 'C Koyunu (Taşıyıcı)', cX, sheepY + fs * 2.0, 'center', 'top', 0.52);
+
+        // Klon Kuzu (Sonuç)
+        if (s.step >= 3) {
+            const babyX = cx0 + drawW / 2;
+            const babyY = cy0 + drawH - fs * 2.0;
+
+            k.c.save();
+            k.c.fillStyle = '#f8fafc'; // %100 A koyunu gibi beyaz!
+            k.c.strokeStyle = '#16a34a';
+            k.c.lineWidth = 3;
+            k.c.beginPath();
+            k.c.arc(babyX, babyY, fs * 1.8, 0, Math.PI * 2);
+            k.c.fill();
+            k.c.stroke();
+            k.c.restore();
+
+            label(k, '🐑 KLON KUZU (DOLLY)', babyX, babyY - fs * 2.2, 'center', 'bottom', 0.65);
+            label(k, 'Genetik İkizi: %100 A KOYUNU!', babyX, babyY + fs * 2.2, 'center', 'top', 0.60);
+        }
+    }
+
+    // Sağ Süreç ve Açıklama Paneli
+    if (!icon && k.o.labels !== false) {
+        const pw = r.w * 0.38;
+        const ph = r.h * 0.76;
+        const px = r.x + r.w - pw - fs * 1.0;
+        const py = r.y + fs * 2.2;
+        panel(k, px, py, pw, ph);
+
+        label(k, 'Klonlama Aşamaları (LGS)', px + fs * 0.5, py + fs * 0.8, 'left', 'middle', 0.62);
+
+        const steps = [
+            '1. Adım: A koyunundan vücut hücresi (2n) alınır.',
+            '2. Adım: B koyunundan yumurta alınır, çekirdeği çıkarılıp ATILIR.',
+            '3. Adım: A nın çekirdeği, B nin boş yumurtasına aktarılır.',
+            '4. Adım: Zigot çoğaltılarak embriyo C koyununa nakledilir.',
+            '5. Adım: Doğan kuzu çekirdeği veren A koyununa %100 benzer!',
+        ];
+
+        steps.forEach((st, idx) => {
+            const isCur = idx <= s.step;
+            k.c.fillStyle = isCur ? '#16a34a' : '#94a3b8';
+            label(k, st, px + fs * 0.5, py + fs * (2.2 + idx * 1.3), 'left', 'middle', isCur ? 0.50 : 0.45);
+        });
+
+        line(k, px + fs * 0.5, py + fs * 8.8, px + pw - fs * 0.5, py + fs * 8.8, 1);
+        label(k, 'LGS Çıkarımı: Genetik bilgi ÇEKİRDEKTE', px + fs * 0.5, py + fs * 9.6, 'left', 'middle', 0.50);
+        label(k, 'bulunduğu için kuzu A nın kopyasıdır.', px + fs * 0.5, py + fs * 10.4, 'left', 'middle', 0.50);
+    }
+
+    if (!icon) {
+        label(k, 'Biyoteknoloji & Klonlama Laboratuvarı', r.x + fs * 1.5, r.y + fs * 1.2, 'left', 'middle', 0.75);
+    }
+
+    k.c.restore();
+};
+
+export const biotechCloningSpec: SimSpec = {
+    controls: (r, o) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        const s = biotechState(o);
+        return [
+            { id: 'btn_step', x: r.x + fs * 16.5, y: r.y + fs * 1.2, type: 'toggle', label: `Sonraki Aşamaya Geç (${s.step + 1}/5)` },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        if (id === 'btn_step') {
+            const cur = simValue(o, 'step', 0);
+            return { step: (cur + 1) % 5 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'step', label: 'Aşama (0-4)', min: 0, max: 4, step: 1 },
+    ],
+};
+
+// ── Fermantasyon & Maya Deneyi (Solunum) ─────────────────────────────
+interface FermentationState {
+    temp: number;   // 0 - 60 °C
+    active: boolean;
+}
+
+function fermentationState(o: MathObject): FermentationState {
+    const temp = clamp(simValue(o, 'temp', 32), 0, 60);
+    const active = temp >= 15 && temp <= 45;
+    return { temp, active };
+}
+
+export const fermentationRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = fermentationState(k.o);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const drawW = r.w * (icon ? 0.9 : 0.52);
+    const drawH = r.h * 0.72;
+    const cx0 = r.x + fs * 2.0;
+    const cy0 = r.y + fs * 2.8;
+
+    // Erlenmayer (Ilık Su + Şeker + Maya)
+    const erlX = cx0 + drawW * 0.32;
+    const erlY = cy0 + drawH * 0.65;
+    const erlW = fs * 5.5;
+    const erlH = fs * 5.0;
+
+    k.c.save();
+    k.c.fillStyle = 'rgba(254, 240, 138, 0.4)'; // Mayalı sarı çözelti
+    k.c.beginPath();
+    k.c.moveTo(erlX - fs * 0.8, erlY - erlH);
+    k.c.lineTo(erlX + fs * 0.8, erlY - erlH);
+    k.c.lineTo(erlX + erlW / 2, erlY);
+    k.c.lineTo(erlX - erlW / 2, erlY);
+    k.c.closePath();
+    k.c.fill();
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 2;
+    k.c.stroke();
+
+    // Balon (Ağızda)
+    const balloonR = s.active ? fs * 2.4 : fs * 0.8;
+    k.c.fillStyle = '#ef4444';
+    k.c.beginPath();
+    k.c.arc(erlX, erlY - erlH - balloonR + fs * 0.3, balloonR, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+    k.c.restore();
+
+    // Kireç Suyu Test Tüpü (Sağda)
+    const tubeX = cx0 + drawW * 0.75;
+    const tubeY = erlY - erlH * 0.8;
+    const tubeW = fs * 1.8;
+    const tubeH = fs * 4.5;
+
+    k.c.save();
+    k.c.fillStyle = s.active ? 'rgba(241, 245, 249, 0.9)' : 'rgba(224, 242, 254, 0.3)'; // Bulanık süt beyazı
+    k.c.fillRect(tubeX, tubeY, tubeW, tubeH);
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 1.8;
+    k.c.strokeRect(tubeX, tubeY, tubeW, tubeH);
+
+    // Bağlantı Borusu
+    line(k, erlX, erlY - erlH, tubeX + tubeW / 2, tubeY + fs * 1.0, 2);
+    k.c.restore();
+
+    if (!icon) {
+        label(k, s.active ? 'Şişen Balon (CO₂)' : 'Sönük Balon', erlX, erlY - erlH - balloonR * 2 - fs * 0.4, 'center', 'bottom', 0.52);
+        label(k, 'Maya + Glikoz', erlX, erlY + fs * 0.8, 'center', 'top', 0.52);
+        label(k, s.active ? 'Kireç Suyu (BULANDI!)' : 'Kireç Suyu (Berrak)', tubeX + tubeW / 2, tubeY + tubeH + fs * 0.8, 'center', 'top', 0.5);
+    }
+
+    // Sağ Kimyasal Bilgi Paneli
+    if (!icon && k.o.labels !== false) {
+        const pw = r.w * 0.40;
+        const ph = r.h * 0.76;
+        const px = r.x + r.w - pw - fs * 1.0;
+        const py = r.y + fs * 2.2;
+        panel(k, px, py, pw, ph);
+
+        label(k, 'Fermantasyon (Mayalanma) Deneyi', px + fs * 0.5, py + fs * 0.8, 'left', 'middle', 0.62);
+
+        label(k, 'Etil Alkol Fermantasyonu Tepkimesi:', px + fs * 0.5, py + fs * 2.2, 'left', 'middle', 0.52);
+        label(k, 'Glikoz → 2 Etil Alkol + 2 CO₂ + 2 ATP', px + fs * 0.5, py + fs * 3.2, 'left', 'middle', 0.58);
+
+        line(k, px + fs * 0.5, py + fs * 4.4, px + pw - fs * 0.5, py + fs * 4.4, 1);
+        label(k, `Sıcaklık: ${s.temp} °C`, px + fs * 0.5, py + fs * 5.4, 'left', 'middle', 0.58);
+        const status = s.active ? '✓ Maya enzimleri aktif, gaz çıkışı sürüyor.' : s.temp < 15 ? '❌ Sıcaklık çok düşük, enzimler uyuyor.' : '❌ Sıcaklık çok yüksek, enzimler denatüre oldu!';
+        label(k, fitText(k, [status], pw - fs * 1.0, 0.48), px + fs * 0.5, py + fs * 6.5, 'left', 'middle', 0.48);
+
+        line(k, px + fs * 0.5, py + fs * 7.8, px + pw - fs * 0.5, py + fs * 7.8, 1);
+        label(k, 'LGS Notu: Kireç suyu CO₂ varlığında bulanır.', px + fs * 0.5, py + fs * 8.8, 'left', 'middle', 0.48);
+        label(k, 'Balonun şişmesi CO₂ gazını kanıtlar.', px + fs * 0.5, py + fs * 9.6, 'left', 'middle', 0.48);
+    }
+
+    if (!icon) {
+        label(k, 'Fermantasyon & Maya Deneyi (Solunum)', r.x + fs * 1.5, r.y + fs * 1.2, 'left', 'middle', 0.75);
+    }
+
+    k.c.restore();
+};
+
+export const fermentationSpec: SimSpec = {
+    animated: true,
+    controls: (r) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        return [
+            { id: 'btn_temp', x: r.x + fs * 16.5, y: r.y + fs * 1.2, type: 'toggle', label: 'Sıcaklığı Değiştir (0°C / 32°C / 60°C)' },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        if (id === 'btn_temp') {
+            const cur = simValue(o, 'temp', 32);
+            return { temp: cur === 32 ? 60 : cur === 60 ? 5 : 32 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'temp', label: 'Sıcaklık (°C)', min: 0, max: 60, step: 5 },
+    ],
+};
+
 // ── Bu dosyadaki simülasyonların kaydı ───────────────────────────────
 
 export const GRADE8_RENDERERS: Record<string, Renderer> = {
@@ -4677,6 +5457,11 @@ export const GRADE8_RENDERERS: Record<string, Renderer> = {
     acid_base_lab_sim: acidBaseLabRender,
     pyramid_sim: pyramidRender,
     electro_sim: electroRender,
+    gear_wheel_pulley_sim: gearWheelPulleyRender,
+    electroscope_sim: electroscopeRender,
+    heating_cooling_curve_sim: heatingCoolingCurveRender,
+    biotech_cloning_sim: biotechCloningRender,
+    fermentation_sim: fermentationRender,
 };
 
 export const GRADE8_SPECS: Record<string, SimSpec> = {
@@ -4703,10 +5488,50 @@ export const GRADE8_SPECS: Record<string, SimSpec> = {
     acid_base_lab_sim: acidBaseLabSpec,
     pyramid_sim: pyramidSpec,
     electro_sim: electroSpec,
+    gear_wheel_pulley_sim: gearWheelPulleySpec,
+    electroscope_sim: electroscopeSpec,
+    heating_cooling_curve_sim: heatingCoolingCurveSpec,
+    biotech_cloning_sim: biotechCloningSpec,
+    fermentation_sim: fermentationSpec,
 };
 
 /** Kütüphane panelindeki "8. Sınıf" kategorisinin içeriği. */
 export const GRADE8_ITEMS: ReadonlyArray<MathCatalogItem> = [
+    {
+        kind: 'gear_wheel_pulley_sim',
+        label: 'Çıkrık, Dişli & Kasnaklar',
+        hint: 'Çıkrık kuvvet kazancı (R/r) ve dişli çark tur sayıları (n₁·r₁ = n₂·r₂)',
+        size: { w: 600, h: 380 },
+        defaults: { labels: true, sim: { mode: 0, R: 40, r: 15 } },
+    },
+    {
+        kind: 'electroscope_sim',
+        label: 'Elektroskop Laboratuvarı',
+        hint: 'Nötr, (+) ve (−) çubuk yaklaştırma/dokundurma; yaprakların açılması',
+        size: { w: 600, h: 380 },
+        defaults: { labels: true, sim: { approach: 0 } },
+    },
+    {
+        kind: 'heating_cooling_curve_sim',
+        label: 'Isınma & Hal Değişim Eğrisi',
+        hint: '0°C erime ve 100°C kaynama platoları; sıcaklık-zaman grafiği analizi',
+        size: { w: 600, h: 380 },
+        defaults: { labels: true, sim: { power: 1, play: 1 } },
+    },
+    {
+        kind: 'biotech_cloning_sim',
+        label: 'Biyoteknoloji & Klonlama Lab',
+        hint: 'Dolly klonlama süreci; vücut hücresi, boş yumurta ve klon kuzunun genetiği',
+        size: { w: 620, h: 380 },
+        defaults: { labels: true, sim: { step: 0 } },
+    },
+    {
+        kind: 'fermentation_sim',
+        label: 'Fermantasyon & Maya Deneyi',
+        hint: 'Maya ve glikoz ile şişen balon; CO₂ gazı ve kireç suyunun bulanması',
+        size: { w: 600, h: 380 },
+        defaults: { labels: true, sim: { temp: 32 } },
+    },
     {
         kind: 'seasons_sim',
         label: 'Mevsimlerin Oluşumu',

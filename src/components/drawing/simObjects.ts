@@ -823,6 +823,32 @@ import {
     GRADE10_NUMBERS_RENDERERS,
     GRADE10_NUMBERS_SPECS,
 } from './grade10NumbersSims';
+import {
+    GRADE8_MATH_ITEMS,
+    GRADE8_MATH_RENDERERS,
+    GRADE8_MATH_SPECS,
+} from './grade8MathSims';
+
+export {
+    GRADE8_ITEMS,
+    GRADE8_MATH_ITEMS,
+    GRADE10_GEOM_ITEMS,
+    GRADE10_STATS_ITEMS,
+    GRADE10_NUMBERS_ITEMS,
+    MATH_SIM_ITEMS,
+    GEOMETRY_SIM_ITEMS,
+    NUMBER_SIM_ITEMS,
+    PHYSICS_SIM_ITEMS,
+    CHEMISTRY_SIM_ITEMS,
+    BIO_SIM_ITEMS,
+    SORTING_SIM_ITEMS,
+    TASK_SIM_ITEMS,
+    MEASURE_SIM_ITEMS,
+    ELECTRIC_SIM_ITEMS,
+    OPTICS_SIM_ITEMS,
+    SCIENCE_SIM_ITEMS,
+    THREE_SIM_ITEMS,
+};
 
 // ── Kayıt ────────────────────────────────────────────────────────────
 
@@ -832,6 +858,7 @@ export const SIM_RENDERERS: Partial<Record<MathObjectKind, Renderer>> = {
     circuit_sim: circuitRender,
     matter_sim: matterRender,
     ...(GRADE8_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
+    ...(GRADE8_MATH_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(GRADE10_GEOM_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(GRADE10_STATS_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
     ...(GRADE10_NUMBERS_RENDERERS as Partial<Record<MathObjectKind, Renderer>>),
@@ -856,6 +883,7 @@ export const SIM_SPECS: Partial<Record<MathObjectKind, SimSpec>> = {
     circuit_sim: circuitSpec,
     matter_sim: matterSpec,
     ...(GRADE8_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
+    ...(GRADE8_MATH_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(GRADE10_GEOM_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(GRADE10_STATS_SPECS as Partial<Record<MathObjectKind, SimSpec>>),
     ...(GRADE10_NUMBERS_SPECS as Partial<Record<MathObjectKind, SimSpec>>),

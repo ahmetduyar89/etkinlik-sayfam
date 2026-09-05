@@ -158,17 +158,16 @@ export function ObjectLibraryPanel({ open, onClose, onInsert, onSelectTool }: Ob
                     exit={{ opacity: 0, y: 14, scale: 0.97 }}
                     role="dialog"
                     aria-label="Nesne kütüphanesi"
-                    className="pointer-events-auto w-[min(92vw,620px)] max-h-[62vh] flex flex-col bg-[#1a1b26]/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden"
+                    className="pointer-events-auto w-[min(94vw,680px)] max-h-[64vh] flex flex-col bg-[#1a1b26]/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden"
                     onPointerDown={(e) => e.stopPropagation()}
                 >
                     <div className="flex flex-col gap-1.5 px-3 pt-2.5 pb-2 border-b border-white/10">
                         <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 shrink-0">
                                 Kütüphane
                             </span>
-                            {/* Üst kademe: ders. Dokuz kategoriyi tek satıra
-                                sıkıştırmak, sığmayanları gizli bırakıyordu. */}
-                            <div className="flex items-center gap-1">
+                            {/* Üst kademe: branş grupları */}
+                            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 max-w-[calc(100%-48px)]">
                                 {LIBRARY_GROUPS.map((g, i) => (
                                     <button
                                         key={g.label}
@@ -180,9 +179,9 @@ export function ObjectLibraryPanel({ open, onClose, onInsert, onSelectTool }: Ob
                                         }}
                                         aria-pressed={i === group}
                                         className={cn(
-                                            'px-3 py-1 rounded-full text-[12px] font-bold transition-colors',
+                                            'px-3 py-1 rounded-full text-[12px] font-bold whitespace-nowrap transition-all shrink-0',
                                             i === group
-                                                ? 'bg-indigo-600 text-white'
+                                                ? 'bg-indigo-600 text-white shadow-sm'
                                                 : 'text-slate-400 hover:text-white hover:bg-white/10'
                                         )}
                                     >

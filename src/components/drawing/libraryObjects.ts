@@ -5,7 +5,28 @@
 import type { MathObjectKind, Stroke } from '../../types';
 import { MATH_CATEGORIES, MATH_RENDERERS } from './mathObjects';
 import { SCIENCE_CATEGORIES, SCIENCE_RENDERERS } from './scienceObjects';
-import { SIM_CATEGORIES, SIM_RENDERERS, SIM_SPECS } from './simObjects';
+import {
+    GRADE8_ITEMS,
+    GRADE8_MATH_ITEMS,
+    GRADE10_GEOM_ITEMS,
+    GRADE10_STATS_ITEMS,
+    GRADE10_NUMBERS_ITEMS,
+    MATH_SIM_ITEMS,
+    GEOMETRY_SIM_ITEMS,
+    NUMBER_SIM_ITEMS,
+    PHYSICS_SIM_ITEMS,
+    CHEMISTRY_SIM_ITEMS,
+    BIO_SIM_ITEMS,
+    SORTING_SIM_ITEMS,
+    TASK_SIM_ITEMS,
+    MEASURE_SIM_ITEMS,
+    ELECTRIC_SIM_ITEMS,
+    OPTICS_SIM_ITEMS,
+    SCIENCE_SIM_ITEMS,
+    THREE_SIM_ITEMS,
+    SIM_RENDERERS,
+    SIM_SPECS,
+} from './simObjects';
 import type { MathCatalogItem, ObjectCategory, Rect, SimSpec } from './objectDrawing';
 
 export type { MathCatalogItem, ObjectCategory } from './objectDrawing';
@@ -18,14 +39,138 @@ export interface ObjectGroup {
 }
 
 /**
- * Panel iki kademeli: önce ders (Matematik / Fen), sonra o dersin
- * kategorileri. Dokuz kategoriyi tek satırda göstermek, sığmayanların
- * yatay kaydırmada gizli kalmasına yol açıyordu.
+ * Branşlara göre sistemli gruplama:
+ * 1. 🎯 8. Sınıf LGS (LGS Matematik & LGS Fen Bilimleri)
+ * 2. 📐 Matematik (Geometri, Grafik & Fonksiyon, Sayılar & Kesirler, 10. Sınıf)
+ * 3. ⚡ Fizik (Mekanik & Hareket, Elektrik & Manyetizma, Optik & Dalgalar)
+ * 4. 🧪 Kimya (Laboratuvar, Kimya Deneyleri, Atom & Madde)
+ * 5. 🧬 Biyoloji (Hücre & Genetik, Ekoloji & Canlı Sistemleri)
+ * 6. ✨ 3D Laboratuvar (Three.js 3D İnteraktif Modeller)
  */
 export const LIBRARY_GROUPS: ReadonlyArray<ObjectGroup> = [
-    { label: 'Matematik', categories: MATH_CATEGORIES },
-    { label: 'Fen', categories: SCIENCE_CATEGORIES },
-    { label: 'Simülasyon', categories: SIM_CATEGORIES },
+    {
+        label: '🎯 8. Sınıf LGS',
+        categories: [
+            { label: 'LGS Matematik', items: GRADE8_MATH_ITEMS },
+            { label: 'LGS Fen Bilimleri', items: GRADE8_ITEMS },
+        ],
+    },
+    {
+        label: '📐 Matematik',
+        categories: [
+            { label: 'Geometri & Çizim', items: [...MATH_CATEGORIES[1].items, ...GEOMETRY_SIM_ITEMS] },
+            { label: 'Grafik & Fonksiyon', items: [...MATH_CATEGORIES[0].items, ...MATH_SIM_ITEMS] },
+            { label: 'Sayılar & Kesirler', items: [...MATH_CATEGORIES[2].items, ...NUMBER_SIM_ITEMS] },
+            { label: '10. Sınıf Matematik', items: [...GRADE10_GEOM_ITEMS, ...GRADE10_STATS_ITEMS, ...GRADE10_NUMBERS_ITEMS] },
+        ],
+    },
+    {
+        label: '⚡ Fizik',
+        categories: [
+            {
+                label: 'Mekanik & Hareket',
+                items: [
+                    ...SCIENCE_CATEGORIES[1].items,
+                    ...PHYSICS_SIM_ITEMS,
+                    ...TASK_SIM_ITEMS,
+                    ...MEASURE_SIM_ITEMS,
+                ],
+            },
+            {
+                label: 'Elektrik & Manyetizma',
+                items: [
+                    {
+                        kind: 'circuit_sim',
+                        label: 'Canlı Devre (Mini PhET)',
+                        hint: 'Pil, lamba, anahtar ve direnç; Ohm kanununu canlı izle',
+                        size: { w: 440, h: 300 },
+                        defaults: { labels: true, sim: { parallel: 0, n: 2, v: 2, sw: 1, res: 10 } },
+                    },
+                    ...ELECTRIC_SIM_ITEMS,
+                ],
+            },
+            {
+                label: 'Optik & Dalgalar',
+                items: [
+                    {
+                        kind: 'optics_bench',
+                        label: 'Optik Düzeneği',
+                        hint: 'Cismi sürükle, görüntü canlı oluşsun',
+                        size: { w: 460, h: 300 },
+                        defaults: { labels: true, sim: { f: 4, a: 7, h: 2 } },
+                    },
+                    {
+                        kind: 'refraction_sim',
+                        label: 'Işık Kırılması & Tam Yansıma',
+                        hint: 'Lazer açısını sürükle; Snell yasası, sınır açısı ve tam yansıma',
+                        size: { w: 460, h: 320 },
+                        defaults: { labels: true, sim: { theta1: 45, n1: 1.5, n2: 1.0 } },
+                    },
+                    ...OPTICS_SIM_ITEMS,
+                ],
+            },
+        ],
+    },
+    {
+        label: '🧪 Kimya',
+        categories: [
+            {
+                label: 'Laboratuvar & Deneyler',
+                items: [
+                    ...SCIENCE_CATEGORIES[0].items,
+                    ...CHEMISTRY_SIM_ITEMS,
+                ],
+            },
+            {
+                label: 'Atom & Maddenin Halleri',
+                items: [
+                    {
+                        kind: 'matter_sim',
+                        label: 'Maddenin Halleri (Canlı)',
+                        hint: 'Sıcaklığı değiştir, tanecikleri izle',
+                        size: { w: 380, h: 280 },
+                        defaults: { labels: true, sim: { temp: 20 } },
+                    },
+                    ...SCIENCE_CATEGORIES[2].items.filter((it) =>
+                        ['bohr_atom', 'element_card', 'states_of_matter', 'tool_periodic_table', 'ph_sim'].includes(it.kind)
+                    ),
+                ],
+            },
+        ],
+    },
+    {
+        label: '🧬 Biyoloji',
+        categories: [
+            {
+                label: 'Hücre, Bölünme & Genetik',
+                items: [
+                    ...SCIENCE_CATEGORIES[2].items.filter((it) =>
+                        ['division_sim', 'animal_cell', 'plant_cell'].includes(it.kind)
+                    ),
+                    ...BIO_SIM_ITEMS,
+                ],
+            },
+            {
+                label: 'Ekoloji & Canlı Sistemleri',
+                items: [
+                    ...SCIENCE_CATEGORIES[2].items.filter((it) =>
+                        ['sun_earth_moon'].includes(it.kind)
+                    ),
+                    ...SORTING_SIM_ITEMS,
+                    ...SCIENCE_SIM_ITEMS,
+                ],
+            },
+        ],
+    },
+    {
+        label: '✨ 3D Lab',
+        categories: [
+            {
+                label: '3D İnteraktif Modeller',
+                items: THREE_SIM_ITEMS,
+            },
+        ],
+    },
 ];
 
 /** Bir nesnenin canlı simülasyon tanımı (yoksa undefined). */

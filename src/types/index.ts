@@ -305,7 +305,17 @@ export type MathObjectKind =
     | 'pedigree_sim'
     | 'osmosis_cell_sim'
     | 'enzyme_rate_sim'
-    | 'action_potential_sim';
+    | 'action_potential_sim'
+    // ── 8. Sınıf LGS Matematik ve Fen Simülasyonları ────────────────
+    | 'algebra_tiles_sim'
+    | 'pythagoras_inequality_sim'
+    | 'slope_linear_sim'
+    | 'data_chart_converter_sim'
+    | 'cylinder_cone_net_sim'
+    | 'gear_wheel_pulley_sim'
+    | 'heating_cooling_curve_sim'
+    | 'biotech_cloning_sim'
+    | 'fermentation_sim';
 
 /**
  * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile
