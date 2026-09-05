@@ -12,7 +12,23 @@ import type { BoundingBox, Point, Stroke } from '../../types';
 /** Kutusu birebir kullanılan (boşluk eklenmeyen) araçlar. */
 export const TIGHT_TOOLS = ['math', 'image'];
 
-export const SHAPE_TOOLS = ['rect', 'circle', 'triangle', 'line', 'dashed', 'arrow', 'double_arrow'];
+export const SHAPE_TOOLS = [
+    'rect',
+    'circle',
+    'triangle',
+    'polygon',
+    'cube',
+    'rect_prism',
+    'tri_prism',
+    'pyramid',
+    'cylinder',
+    'cone',
+    'sphere',
+    'line',
+    'dashed',
+    'arrow',
+    'double_arrow',
+];
 
 export const getBB = (s: Stroke): BoundingBox => {
     let x1 = Math.min(...s.points.map((p) => p.x));
@@ -125,6 +141,362 @@ export const resizePoints = (
     }));
 };
 
+export const drawPolygon = (
+    tCtx: CanvasRenderingContext2D,
+    points: Point[],
+    fill?: boolean,
+    color?: string
+) => {
+    if (!points || points.length < 2) return;
+    tCtx.save();
+    tCtx.beginPath();
+    tCtx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+        tCtx.lineTo(points[i].x, points[i].y);
+    }
+    tCtx.closePath();
+
+    if (fill) {
+        tCtx.save();
+        tCtx.globalAlpha = 0.22;
+        tCtx.fillStyle = color || tCtx.strokeStyle;
+        tCtx.fill();
+        tCtx.restore();
+    }
+    tCtx.stroke();
+
+    // GeoGebra stilinde köşeleri çiz ve etiketle: A, B, C, D...
+    const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
+    const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
+
+    points.forEach((p, idx) => {
+        // Köşe noktası
+        tCtx.save();
+        tCtx.beginPath();
+        tCtx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
+        tCtx.fillStyle = '#ffffff';
+        tCtx.fill();
+        tCtx.lineWidth = 2;
+        tCtx.strokeStyle = color || '#4f46e5';
+        tCtx.stroke();
+
+        // Köşe harf etiketi
+        const letter = labels[idx % labels.length];
+        const dx = p.x - cx;
+        const dy = p.y - cy;
+        const dist = Math.hypot(dx, dy) || 1;
+        const offset = 16;
+        const lx = p.x + (dx / dist) * offset;
+        const ly = p.y + (dy / dist) * offset;
+
+        tCtx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        tCtx.textAlign = 'center';
+        tCtx.textBaseline = 'middle';
+        tCtx.strokeStyle = '#ffffff';
+        tCtx.lineWidth = 3;
+        tCtx.strokeText(letter, lx, ly);
+        tCtx.fillStyle = '#0f172a';
+        tCtx.fillText(letter, lx, ly);
+        tCtx.restore();
+    });
+
+    tCtx.restore();
+};
+
+const draw3DShape = (
+    tCtx: CanvasRenderingContext2D,
+    tool: string,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    fill?: boolean
+) => {
+    const bx = Math.min(x1, x2);
+    const by = Math.min(y1, y2);
+    const bw = Math.max(Math.abs(x2 - x1), 30);
+    const bh = Math.max(Math.abs(y2 - y1), 30);
+
+    if (tool === 'cube') {
+        const d = Math.min(bw, bh) * 0.28;
+        const s = Math.min(bw - d, bh - d);
+        const fx = bx;
+        const fy = by + d;
+
+        // Ön kare
+        tCtx.beginPath();
+        tCtx.rect(fx, fy, s, s);
+        // Üst ve sağ dış ayrıtlar
+        tCtx.moveTo(fx, fy); tCtx.lineTo(fx + d, fy - d);
+        tCtx.lineTo(fx + s + d, fy - d);
+        tCtx.lineTo(fx + s, fy);
+        tCtx.moveTo(fx + s + d, fy - d); tCtx.lineTo(fx + s + d, fy + s - d);
+        tCtx.lineTo(fx + s, fy + s);
+        tCtx.stroke();
+
+        // Görünmeyen arka ayrıtlar (kesikli)
+        tCtx.save();
+        tCtx.setLineDash([5, 4]);
+        tCtx.beginPath();
+        tCtx.moveTo(fx, fy + s); tCtx.lineTo(fx + d, fy + s - d);
+        tCtx.lineTo(fx + d, fy - d);
+        tCtx.moveTo(fx + d, fy + s - d); tCtx.lineTo(fx + s + d, fy + s - d);
+        tCtx.stroke();
+        tCtx.restore();
+
+        if (fill) {
+            tCtx.save();
+            tCtx.globalAlpha = 0.2;
+            tCtx.fillRect(fx, fy, s, s);
+            tCtx.beginPath();
+            tCtx.moveTo(fx, fy); tCtx.lineTo(fx + d, fy - d);
+            tCtx.lineTo(fx + s + d, fy - d); tCtx.lineTo(fx + s, fy);
+            tCtx.closePath();
+            tCtx.globalAlpha = 0.3;
+            tCtx.fill();
+            tCtx.beginPath();
+            tCtx.moveTo(fx + s, fy); tCtx.lineTo(fx + s + d, fy - d);
+            tCtx.lineTo(fx + s + d, fy + s - d); tCtx.lineTo(fx + s, fy + s);
+            tCtx.closePath();
+            tCtx.globalAlpha = 0.12;
+            tCtx.fill();
+            tCtx.restore();
+        }
+        return;
+    }
+
+    if (tool === 'rect_prism') {
+        const d = Math.min(bw, bh) * 0.26;
+        const w = bw - d;
+        const h = bh - d;
+        const fx = bx;
+        const fy = by + d;
+
+        tCtx.beginPath();
+        tCtx.rect(fx, fy, w, h);
+        tCtx.moveTo(fx, fy); tCtx.lineTo(fx + d, fy - d);
+        tCtx.lineTo(fx + w + d, fy - d);
+        tCtx.lineTo(fx + w, fy);
+        tCtx.moveTo(fx + w + d, fy - d); tCtx.lineTo(fx + w + d, fy + h - d);
+        tCtx.lineTo(fx + w, fy + h);
+        tCtx.stroke();
+
+        tCtx.save();
+        tCtx.setLineDash([5, 4]);
+        tCtx.beginPath();
+        tCtx.moveTo(fx, fy + h); tCtx.lineTo(fx + d, fy + h - d);
+        tCtx.lineTo(fx + d, fy - d);
+        tCtx.moveTo(fx + d, fy + h - d); tCtx.lineTo(fx + w + d, fy + h - d);
+        tCtx.stroke();
+        tCtx.restore();
+
+        if (fill) {
+            tCtx.save();
+            tCtx.globalAlpha = 0.2;
+            tCtx.fillRect(fx, fy, w, h);
+            tCtx.beginPath();
+            tCtx.moveTo(fx, fy); tCtx.lineTo(fx + d, fy - d);
+            tCtx.lineTo(fx + w + d, fy - d); tCtx.lineTo(fx + w, fy);
+            tCtx.closePath();
+            tCtx.globalAlpha = 0.3;
+            tCtx.fill();
+            tCtx.beginPath();
+            tCtx.moveTo(fx + w, fy); tCtx.lineTo(fx + w + d, fy - d);
+            tCtx.lineTo(fx + w + d, fy + h - d); tCtx.lineTo(fx + w, fy + h);
+            tCtx.closePath();
+            tCtx.globalAlpha = 0.12;
+            tCtx.fill();
+            tCtx.restore();
+        }
+        return;
+    }
+
+    if (tool === 'tri_prism') {
+        const d = Math.min(bw, bh) * 0.28;
+        const w = bw - d;
+        const p1 = { x: bx + w / 2, y: by + d };
+        const p2 = { x: bx, y: by + bh };
+        const p3 = { x: bx + w, y: by + bh };
+        const b1 = { x: p1.x + d, y: p1.y - d };
+        const b2 = { x: p2.x + d, y: p2.y - d };
+        const b3 = { x: p3.x + d, y: p3.y - d };
+
+        tCtx.beginPath();
+        tCtx.moveTo(p1.x, p1.y); tCtx.lineTo(p2.x, p2.y); tCtx.lineTo(p3.x, p3.y); tCtx.closePath();
+        tCtx.moveTo(p1.x, p1.y); tCtx.lineTo(b1.x, b1.y);
+        tCtx.lineTo(b3.x, b3.y); tCtx.lineTo(p3.x, p3.y);
+        tCtx.stroke();
+
+        tCtx.save();
+        tCtx.setLineDash([5, 4]);
+        tCtx.beginPath();
+        tCtx.moveTo(p2.x, p2.y); tCtx.lineTo(b2.x, b2.y);
+        tCtx.lineTo(b1.x, b1.y);
+        tCtx.moveTo(b2.x, b2.y); tCtx.lineTo(b3.x, b3.y);
+        tCtx.stroke();
+        tCtx.restore();
+
+        if (fill) {
+            tCtx.save();
+            tCtx.globalAlpha = 0.2;
+            tCtx.beginPath();
+            tCtx.moveTo(p1.x, p1.y); tCtx.lineTo(p2.x, p2.y); tCtx.lineTo(p3.x, p3.y);
+            tCtx.closePath();
+            tCtx.fill();
+            tCtx.beginPath();
+            tCtx.moveTo(p1.x, p1.y); tCtx.lineTo(b1.x, b1.y); tCtx.lineTo(b3.x, b3.y); tCtx.lineTo(p3.x, p3.y);
+            tCtx.closePath();
+            tCtx.globalAlpha = 0.3;
+            tCtx.fill();
+            tCtx.restore();
+        }
+        return;
+    }
+
+    if (tool === 'pyramid') {
+        const apex = { x: bx + bw / 2, y: by };
+        const a = { x: bx + bw * 0.1, y: by + bh * 0.78 };
+        const b = { x: bx + bw * 0.7, y: by + bh };
+        const c = { x: bx + bw, y: by + bh * 0.78 };
+        const d = { x: bx + bw * 0.4, y: by + bh * 0.58 };
+
+        tCtx.beginPath();
+        tCtx.moveTo(a.x, a.y); tCtx.lineTo(b.x, b.y); tCtx.lineTo(c.x, c.y);
+        tCtx.moveTo(apex.x, apex.y); tCtx.lineTo(a.x, a.y);
+        tCtx.moveTo(apex.x, apex.y); tCtx.lineTo(b.x, b.y);
+        tCtx.moveTo(apex.x, apex.y); tCtx.lineTo(c.x, c.y);
+        tCtx.stroke();
+
+        tCtx.save();
+        tCtx.setLineDash([5, 4]);
+        tCtx.beginPath();
+        tCtx.moveTo(a.x, a.y); tCtx.lineTo(d.x, d.y); tCtx.lineTo(c.x, c.y);
+        tCtx.moveTo(apex.x, apex.y); tCtx.lineTo(d.x, d.y);
+        tCtx.stroke();
+        tCtx.restore();
+
+        if (fill) {
+            tCtx.save();
+            tCtx.globalAlpha = 0.25;
+            tCtx.beginPath();
+            tCtx.moveTo(apex.x, apex.y); tCtx.lineTo(a.x, a.y); tCtx.lineTo(b.x, b.y);
+            tCtx.closePath();
+            tCtx.fill();
+            tCtx.globalAlpha = 0.15;
+            tCtx.beginPath();
+            tCtx.moveTo(apex.x, apex.y); tCtx.lineTo(b.x, b.y); tCtx.lineTo(c.x, c.y);
+            tCtx.closePath();
+            tCtx.fill();
+            tCtx.restore();
+        }
+        return;
+    }
+
+    if (tool === 'cylinder') {
+        const rx = bw / 2;
+        const ry = Math.min(bh * 0.16, rx * 0.45);
+        const cx = bx + rx;
+        const topY = by + ry;
+        const botY = by + bh - ry;
+
+        tCtx.beginPath();
+        tCtx.ellipse(cx, topY, rx, ry, 0, 0, Math.PI * 2);
+        tCtx.stroke();
+
+        tCtx.beginPath();
+        tCtx.moveTo(cx - rx, topY); tCtx.lineTo(cx - rx, botY);
+        tCtx.moveTo(cx + rx, topY); tCtx.lineTo(cx + rx, botY);
+        tCtx.ellipse(cx, botY, rx, ry, 0, 0, Math.PI);
+        tCtx.stroke();
+
+        tCtx.save();
+        tCtx.setLineDash([5, 4]);
+        tCtx.beginPath();
+        tCtx.ellipse(cx, botY, rx, ry, 0, Math.PI, Math.PI * 2);
+        tCtx.stroke();
+        tCtx.restore();
+
+        if (fill) {
+            tCtx.save();
+            tCtx.globalAlpha = 0.2;
+            tCtx.beginPath();
+            tCtx.rect(cx - rx, topY, bw, botY - topY);
+            tCtx.ellipse(cx, botY, rx, ry, 0, 0, Math.PI);
+            tCtx.fill();
+            tCtx.beginPath();
+            tCtx.ellipse(cx, topY, rx, ry, 0, 0, Math.PI * 2);
+            tCtx.globalAlpha = 0.3;
+            tCtx.fill();
+            tCtx.restore();
+        }
+        return;
+    }
+
+    if (tool === 'cone') {
+        const rx = bw / 2;
+        const ry = Math.min(bh * 0.16, rx * 0.45);
+        const cx = bx + rx;
+        const apexY = by;
+        const botY = by + bh - ry;
+
+        tCtx.beginPath();
+        tCtx.moveTo(cx - rx, botY); tCtx.lineTo(cx, apexY); tCtx.lineTo(cx + rx, botY);
+        tCtx.ellipse(cx, botY, rx, ry, 0, 0, Math.PI);
+        tCtx.stroke();
+
+        tCtx.save();
+        tCtx.setLineDash([5, 4]);
+        tCtx.beginPath();
+        tCtx.ellipse(cx, botY, rx, ry, 0, Math.PI, Math.PI * 2);
+        tCtx.stroke();
+        tCtx.restore();
+
+        if (fill) {
+            tCtx.save();
+            tCtx.globalAlpha = 0.2;
+            tCtx.beginPath();
+            tCtx.moveTo(cx - rx, botY); tCtx.lineTo(cx, apexY); tCtx.lineTo(cx + rx, botY);
+            tCtx.ellipse(cx, botY, rx, ry, 0, 0, Math.PI);
+            tCtx.closePath();
+            tCtx.fill();
+            tCtx.restore();
+        }
+        return;
+    }
+
+    if (tool === 'sphere') {
+        const rad = Math.min(bw, bh) / 2;
+        const cx = bx + bw / 2;
+        const cy = by + bh / 2;
+
+        tCtx.beginPath();
+        tCtx.arc(cx, cy, rad, 0, Math.PI * 2);
+        tCtx.stroke();
+
+        tCtx.beginPath();
+        tCtx.ellipse(cx, cy, rad, rad * 0.28, 0, 0, Math.PI);
+        tCtx.stroke();
+
+        tCtx.save();
+        tCtx.setLineDash([5, 4]);
+        tCtx.beginPath();
+        tCtx.ellipse(cx, cy, rad, rad * 0.28, 0, Math.PI, Math.PI * 2);
+        tCtx.stroke();
+        tCtx.restore();
+
+        if (fill) {
+            tCtx.save();
+            tCtx.globalAlpha = 0.18;
+            tCtx.beginPath();
+            tCtx.arc(cx, cy, rad, 0, Math.PI * 2);
+            tCtx.fill();
+            tCtx.restore();
+        }
+        return;
+    }
+};
+
 const drawShape = (
     tCtx: CanvasRenderingContext2D,
     tool: string,
@@ -134,6 +506,13 @@ const drawShape = (
     y2: number,
     fill?: boolean
 ) => {
+    if (
+        ['cube', 'rect_prism', 'tri_prism', 'pyramid', 'cylinder', 'cone', 'sphere'].includes(tool)
+    ) {
+        draw3DShape(tCtx, tool, x1, y1, x2, y2, fill);
+        return;
+    }
+
     tCtx.beginPath();
     if (tool === 'rect') tCtx.rect(x1, y1, x2 - x1, y2 - y1);
     else if (tool === 'circle')
@@ -197,6 +576,14 @@ const distanceToSegment = (p: Point, a: Point, b: Point): number => {
 export const strokeNearPoint = (s: Stroke, x: number, y: number, radius: number): boolean => {
     const p = { x, y };
     const tolerance = radius + (s.width || 2) / 2;
+    if (s.tool === 'polygon' && s.points.length >= 2) {
+        for (let i = 0; i < s.points.length; i++) {
+            const pA = s.points[i];
+            const pB = s.points[(i + 1) % s.points.length];
+            if (distanceToSegment(p, pA, pB) <= tolerance) return true;
+        }
+        return false;
+    }
     if (['pencil', 'highlighter', 'eraser', 'line', 'dashed', 'arrow', 'double_arrow'].includes(s.tool)) {
         if (s.points.length === 1) return Math.hypot(x - s.points[0].x, y - s.points[0].y) <= tolerance;
         const pts = ['line', 'dashed', 'arrow', 'double_arrow'].includes(s.tool)
@@ -287,6 +674,8 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0) 
         tCtx.textAlign = 'center';
         tCtx.textBaseline = 'middle';
         tCtx.fillText(s.stampIcon || '', s.points[0].x, s.points[0].y);
+    } else if (s.tool === 'polygon') {
+        drawPolygon(tCtx, s.points, s.fillEnabled, s.color);
     } else {
         const p1 = s.points[0];
         const p2 = s.points[s.points.length - 1];

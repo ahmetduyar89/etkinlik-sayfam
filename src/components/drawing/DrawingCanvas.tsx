@@ -7,6 +7,7 @@ import { adjustSnappedShape, recognizeShape, snapAngle } from './shapeRecognizer
 import { findLibraryItem, getSimSpec, isAnimated, objectRect } from './libraryObjects';
 import { onImageReady } from './imageStore';
 import { applyOpToStrokes, newStrokeId, withIds } from './strokeOps';
+import { withAlpha } from './objectDrawing';
 import { drawPaper } from '../notebooks/paper';
 import {
     SHAPE_TOOLS,
@@ -118,6 +119,25 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const selBBRef = React.useRef<BoundingBox | null>(null);
         const dragStateRef = React.useRef<DragState | null>(null);
         const lassoRef = React.useRef<Point[] | null>(null);
+        const polyPointsRef = React.useRef<Point[]>([]);
+
+        React.useEffect(() => {
+            if (config.tool !== 'polygon' && polyPointsRef.current.length > 0) {
+                polyPointsRef.current = [];
+                clearOverlay();
+            }
+        }, [config.tool]);
+
+        React.useEffect(() => {
+            const handleKeyDown = (e: KeyboardEvent) => {
+                if (e.key === 'Escape' && polyPointsRef.current.length > 0) {
+                    polyPointsRef.current = [];
+                    clearOverlay();
+                }
+            };
+            window.addEventListener('keydown', handleKeyDown);
+            return () => window.removeEventListener('keydown', handleKeyDown);
+        }, []);
 
         const viewportEnabled = panMode === 'viewport';
         const viewRef = React.useRef<Viewport>({ ...IDENTITY_VIEW });
@@ -943,6 +963,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const cancelCurrentStroke = () => {
             cancelHoldTimer();
             heldShapeRef.current = null;
+            polyPointsRef.current = [];
             if (!isDrawingRef.current && !currentStrokeRef.current) return;
             isDrawingRef.current = false;
             currentStrokeRef.current = null;
@@ -1083,6 +1104,98 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             oCtx.fill();
             oCtx.stroke();
             oCtx.restore();
+        };
+
+        /** Çokgen oluşturma önizlemesini (lastik kılavuz, noktalar, A-B-C) üst katmana çizer. */
+        const drawPolygonOverlay = (curPos: Point) => {
+            const oCtx = overlayCtxRef.current;
+            if (!oCtx) return;
+            const pts = polyPointsRef.current;
+            if (pts.length === 0) return;
+
+            const { w, h } = getCanvasSize();
+            applyIdentity(oCtx);
+            oCtx.clearRect(0, 0, w, h);
+            applyView(oCtx);
+
+            const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            const v = viewRef.current;
+
+            // 1. Mevcut kenarlar
+            oCtx.save();
+            oCtx.beginPath();
+            oCtx.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i++) {
+                oCtx.lineTo(pts[i].x, pts[i].y);
+            }
+            oCtx.lineTo(curPos.x, curPos.y);
+
+            if (pts.length >= 2 && config.fillEnabled) {
+                oCtx.closePath();
+                oCtx.save();
+                oCtx.globalAlpha = 0.15;
+                oCtx.fillStyle = config.color;
+                oCtx.fill();
+                oCtx.restore();
+            }
+
+            oCtx.strokeStyle = config.color;
+            oCtx.lineWidth = config.width || 2;
+            oCtx.stroke();
+            oCtx.restore();
+
+            // 2. İmlece giden kesikli lastik kılavuz (rubberband)
+            oCtx.save();
+            oCtx.setLineDash([4, 4]);
+            oCtx.strokeStyle = withAlpha(config.color, 0.7);
+            oCtx.lineWidth = 1.5;
+            oCtx.beginPath();
+            oCtx.moveTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+            oCtx.lineTo(curPos.x, curPos.y);
+            oCtx.stroke();
+            oCtx.restore();
+
+            // 3. Başlangıç noktasına yaklaşılmış mı (manyetik kilit)
+            const p0 = pts[0];
+            const screenDist = Math.hypot((curPos.x - p0.x) * v.scale, (curPos.y - p0.y) * v.scale);
+            const isNearStart = pts.length >= 2 && screenDist <= 24;
+
+            // 4. Köşe noktaları ve etiketleri
+            pts.forEach((p, idx) => {
+                const isStart = idx === 0;
+                oCtx.save();
+                oCtx.beginPath();
+                oCtx.arc(p.x, p.y, isStart && isNearStart ? 7 : 4.5, 0, Math.PI * 2);
+                oCtx.fillStyle = isStart && isNearStart ? '#10b981' : '#ffffff';
+                oCtx.fill();
+                oCtx.lineWidth = 2;
+                oCtx.strokeStyle = isStart && isNearStart ? '#059669' : config.color;
+                oCtx.stroke();
+
+                const letter = labels[idx % labels.length];
+                oCtx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                oCtx.textAlign = 'center';
+                oCtx.textBaseline = 'bottom';
+                oCtx.strokeStyle = '#ffffff';
+                oCtx.lineWidth = 3;
+                oCtx.strokeText(letter, p.x, p.y - 7);
+                oCtx.fillStyle = '#0f172a';
+                oCtx.fillText(letter, p.x, p.y - 7);
+                oCtx.restore();
+            });
+
+            // Başlangıç noktasına yakınsa "Kapat (Tıkla)" rozeti
+            if (isNearStart) {
+                oCtx.save();
+                oCtx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                oCtx.textAlign = 'center';
+                oCtx.textBaseline = 'top';
+                oCtx.fillStyle = '#059669';
+                oCtx.fillText('Kapat (Tıkla)', p0.x, p0.y + 10);
+                oCtx.restore();
+            }
+
+            applyIdentity(oCtx);
         };
 
         const clearOverlay = () => {
@@ -1256,6 +1369,40 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
 
+            if (config.tool === 'polygon') {
+                const pts = polyPointsRef.current;
+                const v = viewRef.current;
+                if (pts.length >= 2) {
+                    const p0 = pts[0];
+                    const screenDist = Math.hypot((x - p0.x) * v.scale, (y - p0.y) * v.scale);
+                    const lastP = pts[pts.length - 1];
+                    const distToLast = Math.hypot((x - lastP.x) * v.scale, (y - lastP.y) * v.scale);
+
+                    if (screenDist <= 24 || (pts.length >= 3 && distToLast <= 10)) {
+                        const s: Stroke = {
+                            id: newStrokeId(),
+                            tool: 'polygon',
+                            color: config.color,
+                            width: config.width,
+                            fillEnabled: config.fillEnabled,
+                            points: [...pts],
+                        };
+                        pushHistory();
+                        strokesRef.current.push(s);
+                        commitStrokes();
+                        emit({ type: 'add', page: currentPageRef.current, strokes: [s] });
+                        polyPointsRef.current = [];
+                        clearOverlay();
+                        redraw();
+                        return;
+                    }
+                }
+
+                polyPointsRef.current.push({ x, y });
+                drawPolygonOverlay({ x, y });
+                return;
+            }
+
             cancelHoldTimer();
             heldShapeRef.current = null;
             isDrawingRef.current = true;
@@ -1290,20 +1437,19 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     MAX_SCALE,
                     Math.max(MIN_SCALE, (pinch.scale * dist) / pinch.dist)
                 );
-                const k = scale / pinch.scale;
-                applyViewChange({
-                    scale,
-                    tx: pinch.centerX - (pinch.centerX - pinch.tx) * k,
-                    ty: pinch.centerY - (pinch.centerY - pinch.ty) * k,
-                });
+                const focus = {
+                    x: pinch.centerX - (pinch.centerX - pinch.tx) * (scale / pinch.scale),
+                    y: pinch.centerY - (pinch.centerY - pinch.ty) * (scale / pinch.scale),
+                };
+                applyViewChange({ scale, tx: focus.x, ty: focus.y });
                 return;
             }
 
-            // El aracıyla kaydırma
+            // Tek parmak / fare ile kaydırma
             const pan = panRef.current;
             if (pan) {
                 applyViewChange({
-                    scale: viewRef.current.scale,
+                    ...viewRef.current,
                     tx: pan.tx + (e.clientX - pan.x),
                     ty: pan.ty + (e.clientY - pan.y),
                 });
@@ -1311,6 +1457,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
 
             const { x, y } = toWorld(e.clientX, e.clientY);
+
+            if (config.tool === 'polygon') {
+                if (polyPointsRef.current.length > 0) {
+                    drawPolygonOverlay({ x, y });
+                }
+                return;
+            }
 
             if (config.tool === 'lasso' && isDrawingRef.current && lassoRef.current) {
                 const last = lassoRef.current[lassoRef.current.length - 1];

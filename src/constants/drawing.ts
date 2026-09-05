@@ -13,6 +13,14 @@ import {
     Triangle,
     MoveRight,
     ArrowRightLeft,
+    Pentagon,
+    Box,
+    Cuboid,
+    Boxes,
+    Pyramid,
+    Cylinder,
+    Cone,
+    Globe,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -67,23 +75,50 @@ export const SHAPE_TOOL_IDS: DrawingTool[] = [
     'rect',
     'circle',
     'triangle',
+    'polygon',
+    'cube',
+    'rect_prism',
+    'tri_prism',
+    'pyramid',
+    'cylinder',
+    'cone',
+    'sphere',
     'line',
     'arrow',
     'double_arrow',
     'dashed',
 ];
 
-export const makeShapeTools = (
+export const make2DShapeTools = (
     SolidLineIcon: React.ComponentType,
     DashedLineIcon: React.ComponentType
 ): ReadonlyArray<ShapeTool> => [
     { id: 'rect', Icon: Square, label: 'Dikdörtgen' },
     { id: 'circle', Icon: Circle, label: 'Daire' },
     { id: 'triangle', Icon: Triangle, label: 'Üçgen' },
+    { id: 'polygon', Icon: Pentagon, label: 'Noktalarla Çokgen (A-B-C)' },
     { id: 'line', Svg: SolidLineIcon, label: 'Çizgi' },
     { id: 'arrow', Icon: MoveRight, label: 'Ok' },
     { id: 'double_arrow', Icon: ArrowRightLeft, label: 'Çift Ok' },
     { id: 'dashed', Svg: DashedLineIcon, label: 'Kesikli' },
+];
+
+export const make3DShapeTools = (): ReadonlyArray<ShapeTool> => [
+    { id: 'cube', Icon: Box, label: 'Küp' },
+    { id: 'rect_prism', Icon: Cuboid, label: 'Dikdörtgen Prizma' },
+    { id: 'tri_prism', Icon: Boxes, label: 'Üçgen Prizma' },
+    { id: 'pyramid', Icon: Pyramid, label: 'Kare Piramit' },
+    { id: 'cylinder', Icon: Cylinder, label: 'Silindir' },
+    { id: 'cone', Icon: Cone, label: 'Koni' },
+    { id: 'sphere', Icon: Globe, label: 'Küre' },
+];
+
+export const makeShapeTools = (
+    SolidLineIcon: React.ComponentType,
+    DashedLineIcon: React.ComponentType
+): ReadonlyArray<ShapeTool> => [
+    ...make2DShapeTools(SolidLineIcon, DashedLineIcon),
+    ...make3DShapeTools(),
 ];
 
 export const STAMP_CATEGORIES: ReadonlyArray<{

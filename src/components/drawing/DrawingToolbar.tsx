@@ -29,6 +29,8 @@ import {
     MAIN_TOOLS,
     SHAPE_TOOL_IDS,
     STAMP_CATEGORIES,
+    make2DShapeTools,
+    make3DShapeTools,
     makeShapeTools,
 } from '../../constants/drawing';
 import { PEN_TYPES } from './penEngine';
@@ -70,6 +72,8 @@ interface DrawingToolbarProps {
     onSelectTool?: (toolId: string) => void;
 }
 
+const shape2DTools = make2DShapeTools(SolidLineIcon, DashedLineIcon);
+const shape3DTools = make3DShapeTools();
 const shapeTools = makeShapeTools(SolidLineIcon, DashedLineIcon);
 
 export function DrawingToolbar({
@@ -291,12 +295,13 @@ export function DrawingToolbar({
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                         className="pointer-events-auto flex flex-col gap-2 max-h-[62vh] overflow-y-auto bg-[#1a1b26]/95 backdrop-blur-md p-3 rounded-2xl border border-white/10 shadow-2xl"
                     >
+                        {/* 2B Şekiller */}
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] text-slate-400 font-semibold w-[78px] shrink-0 leading-tight">
-                                Şekil
+                                2B Şekil
                             </span>
-                            <div className="flex items-center gap-0.5">
-                                {shapeTools.map((tool) => (
+                            <div className="flex items-center gap-0.5 flex-wrap">
+                                {shape2DTools.map((tool) => (
                                     <button
                                         key={tool.id}
                                         type="button"
@@ -306,7 +311,7 @@ export function DrawingToolbar({
                                         className={cn(
                                             'p-2 rounded-xl transition-all',
                                             config.tool === tool.id
-                                                ? 'bg-[#2d3045] text-white'
+                                                ? 'bg-[#2d3045] text-indigo-400 ring-1 ring-indigo-500/50'
                                                 : 'text-slate-400 hover:text-white hover:bg-white/5'
                                         )}
                                     >
@@ -322,7 +327,7 @@ export function DrawingToolbar({
                                     onClick={() =>
                                         setConfig({ ...config, fillEnabled: !config.fillEnabled })
                                     }
-                                    title="Şekli Doldur"
+                                    title="Şekli Doldur / Yarı Saydam Renk"
                                     aria-label="Şekli Doldur"
                                     aria-pressed={config.fillEnabled}
                                     className={cn(
@@ -334,6 +339,32 @@ export function DrawingToolbar({
                                 >
                                     <PaintBucket className="w-5 h-5" />
                                 </button>
+                            </div>
+                        </div>
+
+                        {/* 3B Cisimler */}
+                        <div className="flex items-center gap-2 border-t border-white/10 pt-2">
+                            <span className="text-[10px] text-emerald-400 font-semibold w-[78px] shrink-0 leading-tight">
+                                3B Cisimler
+                            </span>
+                            <div className="flex items-center gap-0.5 flex-wrap">
+                                {shape3DTools.map((tool) => (
+                                    <button
+                                        key={tool.id}
+                                        type="button"
+                                        onClick={() => selectTool(tool.id)}
+                                        title={tool.label}
+                                        aria-label={tool.label}
+                                        className={cn(
+                                            'p-2 rounded-xl transition-all flex items-center justify-center',
+                                            config.tool === tool.id
+                                                ? 'bg-emerald-600/30 text-emerald-300 ring-1 ring-emerald-500/50'
+                                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                        )}
+                                    >
+                                        {tool.Icon && <tool.Icon className="w-5 h-5" />}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
