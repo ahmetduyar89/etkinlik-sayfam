@@ -17,7 +17,25 @@ export interface Activity {
     content_mode?: 'raw_html' | 'composed';
     storage_url?: string;
     created_at?: string;
+    unit?: string;
+    /** Etkinliğin eklendiği klasörler ("Defterlerim"). Boşsa hiçbir klasörde değil. */
+    folder_ids?: string[];
+    /**
+     * Eski tek klasör alanı. Yeni kayıtlarda kullanılmaz; okurken
+     * `activityFolderIds()` yardımcısı bu alanı da hesaba katar.
+     * @deprecated `folder_ids` kullanın.
+     */
+    folder_id?: string | null;
 }
+
+export interface Unit {
+    id: string;
+    grade_level: string;
+    subject: string;
+    name: string;
+    created_at?: string;
+}
+
 
 export interface Submission {
     id: string;
@@ -38,17 +56,36 @@ export type DrawingTool =
     | 'eraser'
     | 'text'
     | 'stamp'
+    | 'math'
+    | 'image'
+    | 'lasso'
     | 'rect'
     | 'circle'
     | 'triangle'
+    | 'polygon'
+    | 'cube'
+    | 'rect_prism'
+    | 'tri_prism'
+    | 'pyramid'
+    | 'cylinder'
+    | 'cone'
+    | 'sphere'
     | 'line'
     | 'arrow'
     | 'double_arrow'
     | 'dashed';
 
+/** Kalem ucu karakteri: yazma hissini belirler. */
+export type PenType = 'ballpoint' | 'fountain' | 'brush' | 'marker';
+
+/** Silgi davranışı: piksel silgisi mi, çizgiyi komple silen silgi mi. */
+export type EraserMode = 'pixel' | 'stroke';
+
 export interface Point {
     x: number;
     y: number;
+    /** 0..1 arası uç baskısı; dolma/fırça kalemde kalınlığı belirler. */
+    p?: number;
 }
 
 export interface BoundingBox {
@@ -59,6 +96,12 @@ export interface BoundingBox {
 }
 
 export interface Stroke {
+    /**
+     * Çizime özgü kimlik. Ortak çizimde bir çizgiyi cihazlar arasında
+     * adlandırmak için gerekir (taşıma/silme/renk değişimi bu kimliğe
+     * dayanır). Eski kayıtlarda yoktur; yüklenirken atanır.
+     */
+    id?: string;
     tool: DrawingTool;
     color: string;
     width?: number;
@@ -66,6 +109,263 @@ export interface Stroke {
     points: Point[];
     text?: string;
     stampIcon?: string;
+    /** Serbest çizim kalemlerinde uç karakteri (varsayılan: ballpoint). */
+    penType?: PenType;
+    /** `tool === 'math'` olduğunda çizilecek matematik nesnesi. */
+    math?: MathObject;
+    /** `tool === 'image'` olduğunda görselin data URL'i. */
+    src?: string;
+}
+
+/** Çalışma alanının yakınlaştırma ve kaydırma durumu. */
+export interface Viewport {
+    /** 1 = %100. */
+    scale: number;
+    /** Ekran uzayındaki yatay kaydırma (px). */
+    tx: number;
+    /** Ekran uzayındaki dikey kaydırma (px). */
+    ty: number;
+}
+
+/** Kütüphaneden eklenebilen hazır matematik/geometri nesneleri. */
+export type MathObjectKind =
+    // Koordinat & grafik
+    | 'axes'
+    | 'axes_q1'
+    | 'number_line'
+    | 'function_plot'
+    | 'unit_circle'
+    | 'polar_grid'
+    // Geometri
+    | 'angle'
+    | 'triangle_labeled'
+    | 'right_triangle'
+    | 'circle_parts'
+    | 'polygon'
+    | 'ruler_strip'
+    // Cisimler
+    | 'cube'
+    | 'rect_prism'
+    | 'cylinder'
+    | 'cone'
+    | 'sphere'
+    | 'pyramid'
+    // Sayılar & modelleme
+    | 'fraction_circle'
+    | 'fraction_bar'
+    | 'base_ten'
+    | 'hundred_grid'
+    | 'times_table'
+    | 'venn'
+    | 'clock'
+    | 'balance'
+    // İnteraktif araçlar
+    | 'tool_compass'
+    | 'tool_number_line'
+    | 'tool_calculator'
+    | 'tool_periodic_table'
+    | 'tool_3d_station'
+    | 'tool_geogebra'
+    | 'tool_simple_machines'
+    | 'tool_dna_genetics'
+    | 'tool_linear_graph'
+    | 'tool_math_formula'
+    | 'tool_pdf_viewer'
+    // ── Fen: laboratuvar ────────────────────────────────────────────
+    | 'beaker'
+    | 'flask'
+    | 'graduated_cylinder'
+    | 'test_tube'
+    | 'heating_setup'
+    | 'thermometer'
+    // ── Fen: elektrik ve devre ──────────────────────────────────────
+    | 'battery'
+    | 'bulb'
+    | 'resistor'
+    | 'switch'
+    | 'meter'
+    | 'circuit_series'
+    | 'circuit_parallel'
+    // ── Fen: optik ──────────────────────────────────────────────────
+    | 'convex_lens'
+    | 'concave_lens'
+    | 'plane_mirror'
+    | 'concave_mirror'
+    | 'prism'
+    // ── Fen: kuvvet ve hareket ──────────────────────────────────────
+    | 'force_arrows'
+    | 'inclined_plane'
+    | 'pulley'
+    | 'lever'
+    | 'spring_scale'
+    // ── Fen: madde ve canlılar ──────────────────────────────────────
+    | 'bohr_atom'
+    | 'element_card'
+    | 'states_of_matter'
+    | 'animal_cell'
+    | 'plant_cell'
+    | 'sun_earth_moon'
+    // ── Canlı simülasyonlar ─────────────────────────────────────────
+    | 'optics_bench'
+    | 'refraction_sim'
+    | 'circuit_sim'
+    | 'matter_sim'
+    // ── 8. sınıf üniteleri ──────────────────────────────────────────
+    | 'seasons_sim'
+    | 'light_angle_sim'
+    | 'wind_pressure_sim'
+    | 'shadow_sim'
+    | 'dna_replication_sim'
+    | 'modification_sim'
+    | 'nucleotide_sim'
+    | 'punnett_sim'
+    | 'liquid_pressure_sim'
+    | 'solid_pressure_sim'
+    | 'pascal_sim'
+    | 'torricelli_sim'
+    | 'liquid_paradox_sim'
+    | 'lever_sim'
+    | 'pulley_sim'
+    | 'incline_sim'
+    | 'division_sim'
+    | 'ph_sim'
+    | 'reaction_change_sim'
+    | 'specific_heat_sim'
+    | 'acid_base_lab_sim'
+    | 'pyramid_sim'
+    | 'electro_sim'
+    // ── Canlı matematik ─────────────────────────────────────────────
+    | 'equation_sim'
+    | 'area_perimeter_sim'
+    | 'probability_sim'
+    | 'transform_sim'
+    | 'data_stats_sim'
+    | 'net_fold_sim'
+    | 'fraction_add_sim'
+    | 'scale_zoom_sim'
+    // ── Etkileşimli fen ─────────────────────────────────────────────
+    | 'moon_phase_sim'
+    | 'label_drag_sim'
+    | 'heating_curve_sim'
+    | 'density_sim'
+    | 'refraction_sim'
+    | 'motion_graph_sim'
+    | 'electron_config_sim'
+    | 'balance_eq_sim'
+    | 'photosynthesis_sim'
+    | 'dna_pair_sim'
+    | 'net_force_sim'
+    | 'energy_sim'
+    | 'solubility_sim'
+    | 'sorting_sim'
+    | 'sequence_sim'
+    | 'match_sim'
+    | 'angles_sim'
+    | 'ohm_sim'
+    | 'eclipse_sim'
+    | 'selection_sim'
+    | 'slope_sim'
+    | 'pythagoras_sim'
+    | 'sound_wave_sim'
+    | 'gas_pressure_sim'
+    | 'ion_bond_sim'
+    | 'circulation_sim'
+    | 'measure_read_sim'
+    | 'ratio_sim'
+    | 'spring_sim'
+    | 'electromagnet_sim'
+    | 'mass_conservation_sim'
+    | 'food_web_sim'
+    | 'electroscope_sim'
+    | 'atom_models_sim'
+    | 'breathing_sim'
+    | 'eye_defect_sim'
+    | 'work_sim'
+    | 'newton_cannon_sim'
+    | 'water_cycle_sim'
+    | 'coulomb_sim'
+    | 'digestion_sim'
+    | 'apparent_depth_sim'
+    | 'molecule_build_sim'
+    // ── 3D ve Gelişmiş Laboratuvar Simülasyonları ─────────────────────
+    | 'solids_3d_sim'
+    | 'seasons_3d_sim'
+    | 'atom_3d_sim'
+    | 'dna_3d_sim'
+    | 'circuit_lab_sim'
+    | 'gears_sim'
+    // ── 10. Sınıf Geometrik Şekiller (Yeni Maarif Modeli) ─────────────
+    | 'trig_ratio_sim'
+    | 'sine_cosine_sim'
+    | 'triangle_centers_sim'
+    | 'triangle_area_sim'
+    // ── 10. Sınıf İstatistiksel Araştırma Süreci (Yeni Maarif Modeli) ──
+    | 'two_way_table_sim'
+    | 'clustered_bar_sim'
+    // ── 10. Sınıf Sayılar (Yeni Maarif Modeli) ─────────────────────────
+    | 'prime_factors_sim'
+    | 'ebob_ekok_tiling_sim'
+    | 'periodic_ekok_sim'
+    | 'divisibility_proof_sim'
+    | 'compound_remainder_sim'
+    // ── Profesyonel Canlı Fen Simülasyonları (Fizik, Kimya, Biyoloji) ─
+    | 'projectile_sim'
+    | 'lens_mirror_sim'
+    | 'gas_laws_sim'
+    | 'vsepr_shapes_sim'
+    | 'titration_sim'
+    | 'galvanic_cell_sim'
+    | 'pedigree_sim'
+    | 'osmosis_cell_sim'
+    | 'enzyme_rate_sim'
+    | 'action_potential_sim'
+    // ── 8. Sınıf LGS Matematik ve Fen Simülasyonları ────────────────
+    | 'algebra_tiles_sim'
+    | 'pythagoras_inequality_sim'
+    | 'slope_linear_sim'
+    | 'data_chart_converter_sim'
+    | 'cylinder_cone_net_sim'
+    | 'gear_wheel_pulley_sim'
+    | 'heating_cooling_curve_sim'
+    | 'biotech_cloning_sim'
+    | 'fermentation_sim'
+    // ── Ortaokul (5, 6, 7. Sınıf) Matematik ve Fen Simülasyonları ───
+    | 'integer_counters_sim'
+    | 'algebra_balance_sim'
+    | 'factor_tree_sim'
+    | 'polygon_angles_sim'
+    | 'fraction_percent_decimal_sim'
+    | 'shadow_screen_sim'
+    | 'roller_coaster_sim'
+    | 'density_column_sim'
+    | 'expansion_ring_sim'
+    | 'mass_weight_gravity_sim';
+
+/**
+ * Matematik nesnesinin parametreleri. Nesne, `points[0]` ve `points[1]` ile
+ * verilen dikdörtgenin içine çizilir; böylece mevcut taşı/ölçekle mantığı
+ * hiçbir değişiklik olmadan çalışır.
+ */
+export interface MathObject {
+    kind: MathObjectKind;
+    /** Bölme/dilim/kenar sayısı (kesir paydası, çokgen kenarı, tablo boyutu…). */
+    n?: number;
+    /** Vurgulanan miktar (kesir payı, açı derecesi, saat…). */
+    k?: number;
+    /** Ek değer (saatte dakika, fonksiyonda x aralığı…). */
+    m?: number;
+    /** Fonksiyon grafiği için ifade, ör. "x^2 - 3". */
+    expr?: string;
+    /** Nesnenin üzerine yazılacak serbest metin (element sembolü, etiket…). */
+    text?: string;
+    /** Etiketler (sayı, derece, isim) çizilsin mi. */
+    labels?: boolean;
+    /**
+     * Canlı simülasyonların kullanıcı tarafından ayarlanan değerleri
+     * (odak uzaklığı, sıcaklık, anahtar durumu…). Yalnızca kalıcı ayarlar
+     * burada tutulur; animasyonun anlık evresi saklanmaz, zamandan üretilir.
+     */
+    sim?: Record<string, number>;
 }
 
 export interface DrawConfig {
@@ -74,6 +374,14 @@ export interface DrawConfig {
     width: number;
     fillEnabled: boolean;
     stampIcon: string;
+    /** Serbest çizim kaleminin ucu. */
+    penType?: PenType;
+    /** Serbest çizilen şekli tanıyıp düzgün şekle çevir. */
+    snapShapes?: boolean;
+    /** Şekil/çizgi çizerken 15° açı kilidi. */
+    snapAngle?: boolean;
+    /** Silgi davranışı. */
+    eraserMode?: EraserMode;
 }
 
 export interface TextBoxData {
@@ -85,20 +393,37 @@ export interface TextBoxData {
     fontSize: number;
 }
 
+/**
+ * Sürükleme durumu. `orig`, seçili çizimlerin sürükleme başındaki nokta
+ * listeleridir (seçim sırasıyla aynı hizada).
+ */
 export type DragState =
-    | { type: 'move'; startX: number; startY: number; origPoints: Point[] }
+    | { type: 'move'; startX: number; startY: number; orig: Point[][] }
     | {
           type: 'resize';
           handle: string;
           startX: number;
           startY: number;
-          origPoints: Point[];
+          orig: Point[][];
           origBB: BoundingBox;
       };
 
 export interface DrawingCanvasHandle {
     undo: () => void;
+    redo: () => void;
+    /** Geri al / ileri al yığınlarında iş var mı. */
+    canUndo: () => boolean;
+    canRedo: () => boolean;
     clear: () => void;
+    /** Kütüphaneden seçilen matematik nesnesini sayfanın ortasına ekler. */
+    insertMath: (math: MathObject, color?: string) => void;
+    /** Sıkıştırılmış bir görseli sayfanın ortasına ekler. */
+    insertImage: (src: string, width: number, height: number) => void;
+    /** Görünümü verilen çarpanla yakınlaştırır (ekranın ortasına göre). */
+    zoomBy: (factor: number) => void;
+    /** Yakınlaştırmayı %100'e döndürür ve kaydırmayı sıfırlar. */
+    resetView: () => void;
+    getView: () => Viewport;
     deleteSelected: () => void;
     setSelectedColor: (color: string) => void;
     duplicateSelected: () => void;
@@ -106,9 +431,54 @@ export interface DrawingCanvasHandle {
     prevPage: () => void;
     addPage: () => void;
     deletePage: () => void;
+    /** Belirtilen sayfaya geçer. */
+    goToPage: (index: number) => void;
+    /** Geçerli sayfanın bir kopyasını hemen arkasına ekler. */
+    duplicatePage: () => void;
+    /** Sayfayı yeni sıraya taşır. */
+    movePage: (from: number, to: number) => void;
     getCurrentPage: () => number;
     getPageCount: () => number;
-    screenshot: (wbMode: boolean, color: string) => void;
+    /** Tüm sayfaların çizim verisini (kayıt için) döndürür. */
+    getPages: () => Stroke[][];
+    /** Kayıtlı sayfa verisini canvas'a yükler. */
+    loadPages: (pages: Stroke[][]) => void;
+    /** Başka bir cihazdan gelen değişiklikleri uygular (ortak çizim). */
+    applyOps: (ops: NotebookOp[]) => void;
+    /**
+     * Sayfayı PNG olarak indirir. `paper` verilirse kağıt deseni de çizilir —
+     * desen ekranda CSS arka planı olduğundan aksi hâlde çıktıda görünmez.
+     */
+    screenshot: (wbMode: boolean, color: string, paper?: PaperStyle) => void;
+}
+
+// ── Ortak çizim (canlı operasyon akışı) ─────────────────────────────────
+/**
+ * Bir cihazın yaptığı değişikliğin diğer cihazlara iletilen hâli. Kalıcı
+ * kayıt yine tam sayfa anlık görüntüsüdür (bkz. notebookContent.ts);
+ * operasyonlar yalnızca "şu anda" olan biteni taşır.
+ */
+export type NotebookOp =
+    /** Sayfaya yeni çizimler eklendi. */
+    | { type: 'add'; page: number; strokes: Stroke[] }
+    /** Bu kimlikli çizimler silindi. */
+    | { type: 'remove'; page: number; ids: string[] }
+    /** Bu çizimler değişti (taşındı, boyutlandı, rengi değişti). */
+    | { type: 'update'; page: number; strokes: Stroke[] }
+    /** Sayfanın tamamı değişti (geri al, temizle, piksel silgisi). */
+    | { type: 'page_set'; page: number; strokes: Stroke[] }
+    /** Sayfanın metin kutuları değişti. */
+    | { type: 'boxes'; page: number; boxes: TextBoxData[] };
+
+/** Firestore'a yazılan operasyon dokümanı. */
+export interface NotebookOpDoc {
+    id: string;
+    /** Operasyonun kendisi (JSON olarak; Firestore iç içe dizi tutmaz). */
+    op_json: string;
+    /** Yayınlayan sekmenin kimliği; kendi operasyonumuzu geri uygulamayız. */
+    writer: string;
+    /** Yayın zamanı (istemci saati, ms). Sıralama ve temizlik için. */
+    at: number;
 }
 
 export type ToastVariant = 'success' | 'error' | 'info';
@@ -117,4 +487,89 @@ export interface ToastMessage {
     id: string;
     variant: ToastVariant;
     message: string;
+}
+
+// ── Defter / Klasör (Not Defteri modülü) ────────────────────────────────
+export type NotebookKind = 'notebook' | 'whiteboard';
+
+export type PaperStyle =
+    | 'grid'
+    | 'lined'
+    | 'dotted'
+    | 'blank'
+    | 'graph_mm'
+    | 'isometric'
+    | 'coordinate'
+    | 'cornell'
+    | 'music'
+    | 'handwriting'
+    | 'wide_lined'
+    | 'todo';
+
+export interface DriveFolder {
+    id: string;
+    name: string;
+    parent_id: string | null;
+    color?: string;
+    subject?: string;
+    grade_level?: string;
+    created_at?: string;
+}
+
+export interface Notebook {
+    id: string;
+    title: string;
+    kind: NotebookKind;
+    parent_id: string | null;
+    paper: PaperStyle;
+    bg_color?: string;
+    page_count?: number;
+    subject?: string;
+    grade_level?: string;
+    favorite?: boolean;
+    /** Bağlı PDF dokümanı kimliği (IndexedDB anahtarı) */
+    pdf_id?: string;
+    /** Bağlı PDF dosyasının adı */
+    pdf_name?: string;
+    /** PDF'in toplam sayfa sayısı */
+    pdf_total_pages?: number;
+    /**
+     * Sayfa içeriğinin sürüm numarası. Her kayıtta artar; editör ve
+     * görüntüleyici bu küçük üst veri dokümanını dinleyerek içeriğin başka
+     * bir cihazda değiştiğini ağır sayfa verisini indirmeden anlar.
+     */
+    content_rev?: number;
+    /** İçeriği en son yazan sekmenin kimliği (kendi yazımızı ayırt etmek için). */
+    content_writer?: string;
+    updated_at?: string;
+    created_at?: string;
+}
+
+/** Tek bir defter sayfası: çizimler + metin kutuları. */
+export interface NotebookPage {
+    strokes: Stroke[];
+    boxes: TextBoxData[];
+}
+
+/**
+ * Defter içeriği ayrı bir koleksiyonda tutulur; liste ekranı ağır
+ * sayfa verisini indirmesin diye yalnızca açıldığında çekilir.
+ * Firestore iç içe dizi desteklemediği için `pages_json` string'tir.
+ */
+export interface NotebookContent {
+    id: string;
+    /** Sayfa içeriğinin sürüm numarası; eşzamanlı kayıtta çakışmayı yakalar. */
+    rev?: number;
+    /** İçeriği en son yazan sekmenin kimliği. */
+    writer?: string;
+    /**
+     * Eski düzende içeriğin tamamı buradaydı. Yeni kayıtlarda `null` yazılır;
+     * içerik `{id}__c0…` dokümanlarında durur.
+     */
+    pages_json?: string | null;
+    /** İçerik kaç parça dokümana bölündü. */
+    chunk_count?: number;
+    /** `{id}__c…` dokümanlarında JSON'un o parçası. */
+    chunk?: string;
+    updated_at?: string;
 }

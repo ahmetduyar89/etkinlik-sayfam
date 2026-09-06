@@ -2,10 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Clock, Pencil, User, Zap } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { FullscreenToggle } from '../common/FullscreenToggle';
 import { getFormattedHtml } from '../../utils/format-html';
 import { useFirestore } from '../../lib/firebase';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
 import { DrawingToolbar } from '../drawing/DrawingToolbar';
+import { CompassTool } from '../tools/CompassTool';
+import { NumberLineTool } from '../tools/NumberLineTool';
+import { MiniCalculatorTool } from '../tools/MiniCalculatorTool';
+import { PeriodicTableTool } from '../tools/PeriodicTableTool';
+import { GeoGebraStudioTool } from '../tools/GeoGebraStudioTool';
+import { SimpleMachinesTool } from '../tools/SimpleMachinesTool';
+import { DnaGeneticsTool } from '../tools/DnaGeneticsTool';
+import { MoleculeBuilderTool } from '../tools/MoleculeBuilderTool';
+import { LinearGraphTool } from '../tools/LinearGraphTool';
+import { MathFormulaTool } from '../tools/MathFormulaTool';
 import { useToast } from '../common/ToastProvider';
 import type { Activity, DrawConfig, DrawingCanvasHandle, Submission } from '../../types';
 
@@ -30,6 +41,17 @@ export function StudentPortal({ act }: StudentPortalProps) {
         stampIcon: '✅',
     });
     const [showWhiteboard, setShowWhiteboard] = useState(false);
+    const [showCompass, setShowCompass] = useState(false);
+    const [showNumberLine, setShowNumberLine] = useState(false);
+    const [showCalculator, setShowCalculator] = useState(false);
+    const [showPeriodicTable, setShowPeriodicTable] = useState(false);
+    const [showGeogebra, setShowGeogebra] = useState(false);
+    const [showSimpleMachines, setShowSimpleMachines] = useState(false);
+    const [showDnaGenetics, setShowDnaGenetics] = useState(false);
+    const [showMoleculeBuilder, setShowMoleculeBuilder] = useState(false);
+    const [showLinearGraph, setShowLinearGraph] = useState(false);
+    const [showMathFormula, setShowMathFormula] = useState(false);
+    const [drawHistory, setDrawHistory] = useState({ canUndo: false, canRedo: false });
     const [iframeHeight, setIframeHeight] = useState(1000);
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
@@ -144,6 +166,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
 
     const handleToolbarCommand = (type: string) => {
         if (type === 'UNDO_DRAWING') canvasRef.current?.undo();
+        else if (type === 'REDO_DRAWING') canvasRef.current?.redo();
         else if (type === 'CLEAR_DRAWING') canvasRef.current?.clear();
         else if (type === 'TOGGLE_WHITEBOARD') setShowWhiteboard((v) => !v);
     };
@@ -311,6 +334,8 @@ export function StudentPortal({ act }: StudentPortalProps) {
                             {isDrawingMode ? 'Çizimi Kapat' : 'Kalem Modu'}
                         </span>
                     </button>
+                    <FullscreenToggle variant="dark" />
+
                     {act.is_test && (
                         <button
                             type="button"
@@ -358,6 +383,9 @@ export function StudentPortal({ act }: StudentPortalProps) {
                         config={drawConfig}
                         enabled={isDrawingMode}
                         whiteboardMode={showWhiteboard}
+                        onHistoryChange={(canUndo, canRedo) =>
+                            setDrawHistory({ canUndo, canRedo })
+                        }
                     />
                 </div>
                 <AnimatePresence>
@@ -368,9 +396,89 @@ export function StudentPortal({ act }: StudentPortalProps) {
                             setConfig={setDrawConfig}
                             showWhiteboard={showWhiteboard}
                             setShowWhiteboard={setShowWhiteboard}
+                            canUndo={drawHistory.canUndo}
+                            canRedo={drawHistory.canRedo}
+                            onSelectTool={(toolId) => {
+                                if (toolId === 'compass') setShowCompass(true);
+                                else if (toolId === 'numberLine' || toolId === 'number_line') setShowNumberLine(true);
+                                else if (toolId === 'calculator') setShowCalculator(true);
+                                else if (toolId === 'periodicTable' || toolId === 'periodic_table') setShowPeriodicTable(true);
+                                else if (toolId === 'geogebra' || toolId === 'tool_geogebra') setShowGeogebra(true);
+                                else if (toolId === 'simpleMachines' || toolId === 'simple_machines' || toolId === 'tool_simple_machines') setShowSimpleMachines(true);
+                                else if (toolId === 'dnaGenetics' || toolId === 'dna_genetics' || toolId === 'tool_dna_genetics') setShowDnaGenetics(true);
+                                else if (toolId === 'moleculeBuilder' || toolId === 'molecule_builder' || toolId === 'tool_molecule_builder') setShowMoleculeBuilder(true);
+                                else if (toolId === 'linearGraph' || toolId === 'linear_graph' || toolId === 'tool_linear_graph') setShowLinearGraph(true);
+                                else if (toolId === 'mathFormula' || toolId === 'math_formula' || toolId === 'tool_math_formula') setShowMathFormula(true);
+                            }}
                         />
                     )}
                 </AnimatePresence>
+
+                {showCompass && (
+                    <CompassTool
+                        onClose={() => setShowCompass(false)}
+                        onDrawCircle={(cx, cy, r) => {
+                            toast.success(`Yarıçapı ${r}px olan çember çizildi.`);
+                        }}
+                    />
+                )}
+                {showNumberLine && <NumberLineTool onClose={() => setShowNumberLine(false)} />}
+                {showCalculator && <MiniCalculatorTool onClose={() => setShowCalculator(false)} />}
+                {showPeriodicTable && <PeriodicTableTool onClose={() => setShowPeriodicTable(false)} />}
+                {showGeogebra && (
+                    <GeoGebraStudioTool
+                        onClose={() => setShowGeogebra(false)}
+                        onInsertImage={(dataUrl, w, h) => {
+                            canvasRef.current?.insertImage(dataUrl, w, h);
+                            toast.success('GeoGebra çizimi sayfaya eklendi.');
+                        }}
+                    />
+                )}
+                {showSimpleMachines && (
+                    <SimpleMachinesTool
+                        onClose={() => setShowSimpleMachines(false)}
+                        onInsertImage={(dataUrl, w, h) => {
+                            canvasRef.current?.insertImage(dataUrl, w, h);
+                            toast.success('Basit makineler düzeneği sayfaya eklendi.');
+                        }}
+                    />
+                )}
+                {showDnaGenetics && (
+                    <DnaGeneticsTool
+                        onClose={() => setShowDnaGenetics(false)}
+                        onInsertImage={(dataUrl, w, h) => {
+                            canvasRef.current?.insertImage(dataUrl, w, h);
+                            toast.success('DNA / Çaprazlama tablosu sayfaya eklendi.');
+                        }}
+                    />
+                )}
+                {showMoleculeBuilder && (
+                    <MoleculeBuilderTool
+                        onClose={() => setShowMoleculeBuilder(false)}
+                        onInsertImage={(dataUrl, w, h) => {
+                            canvasRef.current?.insertImage(dataUrl, w, h);
+                            toast.success('Molekül modeli sayfaya eklendi.');
+                        }}
+                    />
+                )}
+                {showLinearGraph && (
+                    <LinearGraphTool
+                        onClose={() => setShowLinearGraph(false)}
+                        onInsertImage={(dataUrl, w, h) => {
+                            canvasRef.current?.insertImage(dataUrl, w, h);
+                            toast.success('Doğrusal denklem grafiği sayfaya eklendi.');
+                        }}
+                    />
+                )}
+                {showMathFormula && (
+                    <MathFormulaTool
+                        onClose={() => setShowMathFormula(false)}
+                        onInsertImage={(dataUrl, w, h) => {
+                            canvasRef.current?.insertImage(dataUrl, w, h);
+                            toast.success('Matematik formülü sayfaya eklendi.');
+                        }}
+                    />
+                )}
             </main>
         </div>
     );

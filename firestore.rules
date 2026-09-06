@@ -1,0 +1,38 @@
+rules_version = '2';
+
+// Bu uygulamada Firebase Authentication kullanılmıyor; giriş, tarayıcıda
+// çalışan basit bir şifre kilidiyle sağlanıyor. Bu nedenle kurallar,
+// uygulamanın kullandığı koleksiyonlara açık erişim verir — adresi bilen
+// herkes bu koleksiyonları okuyup yazabilir. Daha sıkı bir koruma isteniyorsa
+// Firebase Authentication eklenip aşağıdaki koşullar `request.auth != null`
+// ile değiştirilmelidir.
+service cloud.firestore {
+    match /databases/{database}/documents {
+
+        // İçerik merkezi
+        match /activities/{document=**} {
+            allow read, write: if true;
+        }
+        match /units/{document=**} {
+            allow read, write: if true;
+        }
+        match /submissions/{document=**} {
+            allow read, write: if true;
+        }
+
+        // Defterlerim: klasörler, defter üst verisi ve sayfa içerikleri
+        match /folders/{document=**} {
+            allow read, write: if true;
+        }
+        match /notebooks/{document=**} {
+            allow read, write: if true;
+        }
+        match /notebook_content/{document=**} {
+            allow read, write: if true;
+        }
+        // Ortak çizimin canlı işlem akışı (geçici kayıtlar)
+        match /notebook_ops/{document=**} {
+            allow read, write: if true;
+        }
+    }
+}
