@@ -527,6 +527,12 @@ export interface Notebook {
     subject?: string;
     grade_level?: string;
     favorite?: boolean;
+    /** Bağlı PDF dokümanı kimliği (IndexedDB anahtarı) */
+    pdf_id?: string;
+    /** Bağlı PDF dosyasının adı */
+    pdf_name?: string;
+    /** PDF'in toplam sayfa sayısı */
+    pdf_total_pages?: number;
     /**
      * Sayfa içeriğinin sürüm numarası. Her kayıtta artar; editör ve
      * görüntüleyici bu küçük üst veri dokümanını dinleyerek içeriğin başka

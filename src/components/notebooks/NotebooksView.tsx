@@ -21,8 +21,11 @@ import {
     Presentation,
     Search,
     Trash2,
+    FileText,
+    Loader2,
 } from 'lucide-react';
 import { useFirestore } from '../../lib/firebase';
+import { savePdfToDB, getPdfDocument } from '../../lib/pdfStorage';
 import { cn } from '../../utils/cn';
 import { copyText } from '../../utils/clipboard';
 import { Modal } from '../common/Modal';
@@ -81,6 +84,8 @@ export function NotebooksView() {
     const [previewActivityId, setPreviewActivityId] = React.useState<string | null>(null);
     const [isPickerOpen, setIsPickerOpen] = React.useState(false);
     const [folderEditActivityId, setFolderEditActivityId] = React.useState<string | null>(null);
+    const [isImportingPdf, setIsImportingPdf] = React.useState(false);
+    const pdfInputRef = React.useRef<HTMLInputElement>(null);
 
     React.useEffect(() => {
         const unsub = foldersHandler.sync(
@@ -248,6 +253,47 @@ export function NotebooksView() {
                     isWb ? 'Beyaz tahta oluşturulamadı.' : 'Defter oluşturulamadı.'
                 )
             );
+        }
+    };
+
+    const handleImportPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+
+        try {
+            setIsImportingPdf(true);
+            toast.info('PDF işleniyor ve sayfalar oluşturuluyor…');
+            const buffer = await file.arrayBuffer();
+            const pdfId = 'pdf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+
+            // IndexedDB'ye yerel olarak kaydet (sıfır Firestore kotası)
+            await savePdfToDB(pdfId, file.name, buffer);
+
+            // Sayfa sayısını dinamik algıla
+            const doc = await getPdfDocument(pdfId, buffer);
+            const numPages = doc.numPages || 1;
+
+            // GoodNotes tarzı defteri oluştur
+            const ref = await notebooksHandler.add({
+                title: file.name.replace(/\.pdf$/i, ''),
+                kind: 'notebook',
+                parent_id: currentFolderId,
+                paper: 'blank',
+                bg_color: '#f8fafc',
+                page_count: numPages,
+                pdf_id: pdfId,
+                pdf_name: file.name,
+                pdf_total_pages: numPages,
+                updated_at: new Date().toISOString(),
+            });
+
+            toast.success(`"${file.name}" başarıyla açıldı (${numPages} sayfa).`);
+            setOpenNotebookId(ref.id);
+        } catch (err: any) {
+            toast.error('PDF açılırken hata oluştu: ' + (err?.message || 'Bilinmeyen hata'));
+        } finally {
+            setIsImportingPdf(false);
         }
     };
 
@@ -669,12 +715,44 @@ export function NotebooksView() {
                                     <span className="text-[13px] font-semibold text-on-surface">Beyaz Tahta</span>
                                 </button>
                             </div>
+
+                            {/* GoodNotes Tarzı PDF Belgesi Aç / İçe Aktar */}
+                            <button
+                                onClick={() => {
+                                    setIsNewMenuOpen(false);
+                                    pdfInputRef.current?.click();
+                                }}
+                                disabled={isImportingPdf}
+                                className="mt-2.5 w-full flex items-center justify-between p-3 rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20 hover:bg-rose-50 hover:border-rose-400 transition-all text-left group"
+                            >
+                                <div className="flex items-center gap-2.5">
+                                    <span className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-900/50 text-rose-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                        {isImportingPdf ? (
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                        ) : (
+                                            <FileText className="w-5 h-5" />
+                                        )}
+                                    </span>
+                                    <div>
+                                        <span className="block text-[13px] font-bold text-slate-800 dark:text-slate-100">
+                                            PDF İçe Aktar (GoodNotes)
+                                        </span>
+                                        <span className="block text-[11px] text-slate-500 dark:text-slate-400">
+                                            MEB kitabı / test aç ve üzerine yaz
+                                        </span>
+                                    </div>
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 bg-rose-100 dark:bg-rose-900/60 px-2 py-0.5 rounded-full">
+                                    Kitap & Test
+                                </span>
+                            </button>
+
                             <button
                                 onClick={() => {
                                     setIsNewMenuOpen(false);
                                     void createFolder();
                                 }}
-                                className="mt-2.5 w-full flex items-center gap-2.5 px-3.5 py-3 rounded-2xl bg-surface-container-high hover:bg-surface-container-highest text-[13.5px] font-semibold text-on-surface transition-colors"
+                                className="mt-2 w-full flex items-center gap-2.5 px-3.5 py-3 rounded-2xl bg-surface-container-high hover:bg-surface-container-highest text-[13.5px] font-semibold text-on-surface transition-colors"
                             >
                                 <FolderPlus className="w-[18px] h-[18px] text-on-surface-variant" /> Yeni Klasör
                             </button>
@@ -701,6 +779,13 @@ export function NotebooksView() {
                             </p>
                         </div>
                     )}
+                    <input
+                        ref={pdfInputRef}
+                        type="file"
+                        accept="application/pdf"
+                        onChange={handleImportPdf}
+                        className="hidden"
+                    />
                 </div>
             </div>
 
@@ -789,19 +874,30 @@ export function NotebooksView() {
                             <span
                                 className={cn(
                                     'w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 border',
-                                    n.kind === 'whiteboard'
+                                    n.pdf_id
+                                        ? 'bg-[#fff1f2] border-[#fecdd3] text-rose-600'
+                                        : n.kind === 'whiteboard'
                                         ? 'bg-[#ecfdf5] border-[#a7f3d0] text-emerald-600'
                                         : 'bg-[#eef2ff] border-[#c7d2fe] text-primary'
                                 )}
                             >
-                                {n.kind === 'whiteboard' ? (
+                                {n.pdf_id ? (
+                                    <FileText className="w-[18px] h-[18px]" />
+                                ) : n.kind === 'whiteboard' ? (
                                     <Presentation className="w-[18px] h-[18px]" />
                                 ) : (
                                     <NotebookPen className="w-[18px] h-[18px]" />
                                 )}
                             </span>
                             <div className="min-w-0 flex-1">
-                                <p className="text-[14px] font-semibold text-on-surface truncate">{n.title}</p>
+                                <p className="text-[14px] font-semibold text-on-surface truncate flex items-center gap-1.5">
+                                    <span>{n.title}</span>
+                                    {n.pdf_id && (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">
+                                            PDF
+                                        </span>
+                                    )}
+                                </p>
                                 <p className="text-[12px] text-on-surface-variant">
                                     {n.page_count || 1} sayfa · {formatDate(n.updated_at || n.created_at)}
                                 </p>
@@ -886,10 +982,16 @@ export function NotebooksView() {
                             <div
                                 className={cn(
                                     'h-[104px] flex items-center justify-center rounded-t-[17px] overflow-hidden',
-                                    n.kind === 'whiteboard' ? 'bg-[#ecfdf5]' : 'bg-[#eef2ff]'
+                                    n.pdf_id
+                                        ? 'bg-[#fff1f2]'
+                                        : n.kind === 'whiteboard'
+                                        ? 'bg-[#ecfdf5]'
+                                        : 'bg-[#eef2ff]'
                                 )}
                                 style={
-                                    n.kind === 'whiteboard'
+                                    n.pdf_id
+                                        ? undefined
+                                        : n.kind === 'whiteboard'
                                         ? undefined
                                         : {
                                               backgroundImage:
@@ -898,7 +1000,9 @@ export function NotebooksView() {
                                           }
                                 }
                             >
-                                {n.kind === 'whiteboard' ? (
+                                {n.pdf_id ? (
+                                    <FileText className="w-8 h-8 text-rose-600" />
+                                ) : n.kind === 'whiteboard' ? (
                                     <Presentation className="w-8 h-8 text-emerald-600" />
                                 ) : (
                                     <NotebookPen className="w-8 h-8 text-primary" />
@@ -906,7 +1010,14 @@ export function NotebooksView() {
                             </div>
                             <div className="flex items-start gap-1 p-3">
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-[13.5px] font-semibold text-on-surface truncate">{n.title}</p>
+                                    <p className="text-[13.5px] font-semibold text-on-surface truncate flex items-center gap-1.5">
+                                        <span>{n.title}</span>
+                                        {n.pdf_id && (
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">
+                                                PDF
+                                            </span>
+                                        )}
+                                    </p>
                                     <p className="text-[11.5px] text-on-surface-variant">
                                         {n.page_count || 1} sayfa · {formatDate(n.updated_at || n.created_at)}
                                     </p>

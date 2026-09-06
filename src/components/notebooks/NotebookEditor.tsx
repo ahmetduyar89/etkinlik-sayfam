@@ -58,6 +58,8 @@ import { DnaGeneticsTool } from '../tools/DnaGeneticsTool';
 import { LinearGraphTool } from '../tools/LinearGraphTool';
 import { MathFormulaTool } from '../tools/MathFormulaTool';
 import { PdfViewerTool } from '../tools/PdfViewerTool';
+import { PdfPageBackground } from './PdfPageBackground';
+import { savePdfToDB, getPdfDocument } from '../../lib/pdfStorage';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
@@ -232,6 +234,10 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 );
             }
             if (!alive) return;
+            const targetTotal = Math.max(pages.length, notebook.pdf_total_pages || notebook.page_count || 1);
+            while (pages.length < targetTotal) {
+                pages.push(emptyPage());
+            }
             setInitialStrokes(pages.map((p) => p.strokes));
             setBoxesByPage(pages.map((p) => p.boxes));
             setPageInfo({ current: 0, total: pages.length });
@@ -714,6 +720,60 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         saveSoon();
     };
 
+    const pdfAttachInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleJumpToPage = async () => {
+        const input = await prompt({
+            title: 'Sayfaya Git',
+            message: `Gitmek istediğiniz sayfa numarasını girin (1 - ${pageInfo.total}):`,
+            defaultValue: String(pageInfo.current + 1),
+            placeholder: 'Örn. 12',
+            confirmLabel: 'Git',
+        });
+        if (!input) return;
+        const target = parseInt(input.trim(), 10);
+        if (!Number.isNaN(target) && target >= 1 && target <= pageInfo.total) {
+            canvasRef.current?.goToPage(target - 1);
+        } else {
+            toast.error(`Lütfen 1 ile ${pageInfo.total} arasında geçerli bir numara girin.`);
+        }
+    };
+
+    const handleAttachPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+        try {
+            toast.info('PDF işleniyor ve sayfalara bağlanıyor…');
+            const buffer = await file.arrayBuffer();
+            const pdfId = 'pdf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+            await savePdfToDB(pdfId, file.name, buffer);
+            const doc = await getPdfDocument(pdfId, buffer);
+            const numPages = doc.numPages || 1;
+
+            if (numPages > pageInfo.total) {
+                setBoxesByPage((prev) => {
+                    const next = [...prev];
+                    while (next.length < numPages) next.push([]);
+                    return next;
+                });
+                for (let i = pageInfo.total; i < numPages; i++) {
+                    canvasRef.current?.addPage();
+                }
+            }
+
+            onMetaChange({
+                pdf_id: pdfId,
+                pdf_name: file.name,
+                pdf_total_pages: numPages,
+                page_count: Math.max(pageInfo.total, numPages),
+            });
+            toast.success(`"${file.name}" deftere bağlandı (${numPages} sayfa).`);
+        } catch (err: any) {
+            toast.error('PDF eklenemedi: ' + (err?.message || 'Hata'));
+        }
+    };
+
     const handleTitleCommit = () => {
         const clean = title.trim() || (notebook.kind === 'whiteboard' ? 'Adsız beyaz tahta' : 'Adsız defter');
         setTitle(clean);
@@ -774,6 +834,15 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 <span className="hidden md:inline text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-white/15">
                     {notebook.kind === 'whiteboard' ? 'Beyaz Tahta' : 'Not Defteri'}
                 </span>
+
+                {notebook.pdf_id && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/25 border border-rose-300/30 text-white text-[11.5px] font-semibold shadow-sm">
+                        <FileText className="w-3.5 h-3.5 text-rose-200" />
+                        <span className="max-w-[130px] sm:max-w-[200px] truncate">
+                            {notebook.pdf_name || 'PDF Belgesi'}
+                        </span>
+                    </span>
+                )}
 
                 {/* Kağıt şablonu */}
                 <div className="relative hidden sm:block ml-1">
@@ -978,9 +1047,14 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 >
                     <ChevronLeft className="w-4 h-4" />
                 </button>
-                <span className="text-[12.5px] font-bold text-on-surface tabular-nums px-1">
+                <button
+                    type="button"
+                    onClick={handleJumpToPage}
+                    title="Sayfaya zıpla (tıklayın)"
+                    className="text-[12.5px] font-bold text-on-surface tabular-nums px-2 py-0.5 rounded-md hover:bg-surface-container-high transition-colors cursor-pointer border border-transparent hover:border-outline-variant"
+                >
                     Sayfa {pageInfo.current + 1} / {pageInfo.total}
-                </span>
+                </button>
                 <button
                     onClick={() => canvasRef.current?.nextPage()}
                     disabled={pageInfo.current >= pageInfo.total - 1}
@@ -1016,6 +1090,25 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     onOpenPdf={() => setShowPdfViewer(true)}
                     fullscreenTarget={stageRef}
                 />
+                <div className="w-px h-4 bg-outline-variant mx-1" />
+                <button
+                    type="button"
+                    onClick={() => pdfAttachInputRef.current?.click()}
+                    title={notebook.pdf_id ? 'PDF belgesini değiştir / yeni dosya bağla' : 'PDF belgesi bağla (GoodNotes tarzı)'}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12.5px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-colors"
+                >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span className="hidden xl:inline">
+                        {notebook.pdf_id ? 'PDF Değiştir' : 'PDF Bağla'}
+                    </span>
+                </button>
+                <input
+                    ref={pdfAttachInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleAttachPdf}
+                    className="hidden"
+                />
             </div>
 
             {/* Çalışma alanı */}
@@ -1029,6 +1122,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     bgColor={bgColor}
                     canvasSize={canvasSize}
                     current={pageInfo.current}
+                    pdfId={notebook.pdf_id}
                     onSelect={(i) => canvasRef.current?.goToPage(i)}
                     onAdd={handleAddPage}
                     onDuplicate={handleDuplicatePage}
@@ -1041,6 +1135,17 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     className="absolute inset-0"
                     style={paperBackground(paper, bgColor, view, canvasSize)}
                 />
+
+                {/* GoodNotes Tarzı Doğrudan PDF Sayfası */}
+                {notebook.pdf_id && (
+                    <PdfPageBackground
+                        pdfId={notebook.pdf_id}
+                        pdfName={notebook.pdf_name}
+                        pageNumber={pageInfo.current + 1}
+                        view={view}
+                        canvasSize={canvasSize}
+                    />
+                )}
 
                 {isLoading || initialStrokes === null ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">

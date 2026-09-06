@@ -9,6 +9,7 @@ import { ChevronDown, ChevronUp, Copy, GripVertical, Plus, Trash2, X } from 'luc
 import { cn } from '../../utils/cn';
 import { drawStroke } from '../drawing/strokeRenderer';
 import { paperBackground } from './paper';
+import { getPdfDocument } from '../../lib/pdfStorage';
 import type { PaperStyle, Stroke, TextBoxData } from '../../types';
 
 /** Küçük resmin genişliği (CSS px). */
@@ -19,12 +20,15 @@ interface PageThumbnailProps {
     boxes: TextBoxData[];
     /** Çalışma alanının gerçek boyutu — en/boy oranı buradan gelir. */
     canvasSize: { w: number; h: number };
+    pdfId?: string;
+    pageIndex?: number;
 }
 
-function PageThumbnail({ strokes, boxes, canvasSize }: PageThumbnailProps) {
+function PageThumbnail({ strokes, boxes, canvasSize, pdfId, pageIndex = 0 }: PageThumbnailProps) {
     const ref = React.useRef<HTMLCanvasElement>(null);
 
     React.useEffect(() => {
+        let isCancelled = false;
         const canvas = ref.current;
         if (!canvas) return;
         const srcW = canvasSize.w || 1000;
@@ -41,22 +45,46 @@ function PageThumbnail({ strokes, boxes, canvasSize }: PageThumbnailProps) {
         if (!ctx) return;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, THUMB_WIDTH, h);
-        ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
-        strokes.forEach((s) => drawStroke(ctx, s));
 
-        // Yapışkan notlar basit kutu olarak temsil edilir.
-        boxes.forEach((b) => {
-            ctx.save();
-            ctx.fillStyle = b.color;
-            ctx.globalAlpha = 0.9;
-            ctx.beginPath();
-            // roundRect eski tarayıcılarda yok; yoksa düz dikdörtgen çiz.
-            if (typeof ctx.roundRect === 'function') ctx.roundRect(b.x, b.y, 150, 60, 10);
-            else ctx.rect(b.x, b.y, 150, 60);
-            ctx.fill();
-            ctx.restore();
-        });
-    }, [strokes, boxes, canvasSize.w, canvasSize.h]);
+        (async () => {
+            if (pdfId) {
+                try {
+                    const doc = await getPdfDocument(pdfId);
+                    if (isCancelled) return;
+                    const pageNum = pageIndex + 1;
+                    if (pageNum <= doc.numPages) {
+                        const page = await doc.getPage(pageNum);
+                        if (isCancelled) return;
+                        const origVp = page.getViewport({ scale: 1 });
+                        const pdfScale = (THUMB_WIDTH / origVp.width) * dpr;
+                        const thumbVp = page.getViewport({ scale: pdfScale });
+                        await page.render({ canvasContext: ctx, viewport: thumbVp }).promise;
+                    }
+                } catch {
+                    // PDF sayfası çizilemediyse devam et
+                }
+            }
+            if (isCancelled) return;
+            ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
+            strokes.forEach((s) => drawStroke(ctx, s));
+
+            // Yapışkan notlar basit kutu olarak temsil edilir.
+            boxes.forEach((b) => {
+                ctx.save();
+                ctx.fillStyle = b.color;
+                ctx.globalAlpha = 0.9;
+                ctx.beginPath();
+                if (typeof ctx.roundRect === 'function') ctx.roundRect(b.x, b.y, 150, 60, 10);
+                else ctx.rect(b.x, b.y, 150, 60);
+                ctx.fill();
+                ctx.restore();
+            });
+        })();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [strokes, boxes, canvasSize.w, canvasSize.h, pdfId, pageIndex]);
 
     return <canvas ref={ref} aria-hidden="true" className="block" />;
 }
@@ -70,6 +98,7 @@ interface PageThumbnailsProps {
     bgColor: string;
     canvasSize: { w: number; h: number };
     current: number;
+    pdfId?: string;
     onSelect: (index: number) => void;
     onAdd: () => void;
     onDuplicate: (index: number) => void;
@@ -86,6 +115,7 @@ export function PageThumbnails({
     bgColor,
     canvasSize,
     current,
+    pdfId,
     onSelect,
     onAdd,
     onDuplicate,
@@ -219,6 +249,8 @@ export function PageThumbnails({
                                                     strokes={strokes}
                                                     boxes={boxesByPage[i] ?? []}
                                                     canvasSize={canvasSize}
+                                                    pdfId={pdfId}
+                                                    pageIndex={i}
                                                 />
                                             </div>
                                         </button>

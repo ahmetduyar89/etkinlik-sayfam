@@ -26,82 +26,23 @@ import {
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { useToast } from '../common/ToastProvider';
+import {
+    savePdfToDB,
+    loadPdfFromDB,
+    getRecentPdfsFromDB,
+    ensurePdfjsLoaded,
+} from '../../lib/pdfStorage';
 
 export interface PdfViewerToolProps {
     onClose: () => void;
     onInsertImage?: (dataUrl: string, width: number, height: number) => void;
 }
 
-const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-const PDFJS_WORKER_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
 interface CropRect {
     startX: number;
     startY: number;
     currentX: number;
     currentY: number;
-}
-
-// ── IndexedDB Yardımcısı (Büyük PDF'leri yerel olarak saklamak için) ──
-const DB_NAME = 'EtkinlikSitem_PdfDB';
-const DB_STORE = 'pdfs';
-
-function openPdfDB(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, 1);
-        req.onupgradeneeded = () => {
-            const db = req.result;
-            if (!db.objectStoreNames.contains(DB_STORE)) {
-                db.createObjectStore(DB_STORE, { keyPath: 'id' });
-            }
-        };
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
-}
-
-async function savePdfToDB(id: string, name: string, data: ArrayBuffer) {
-    try {
-        const db = await openPdfDB();
-        const tx = db.transaction(DB_STORE, 'readwrite');
-        tx.objectStore(DB_STORE).put({ id, name, data, updatedAt: Date.now() });
-    } catch {
-        // IndexedDB hatası durumunda sessizce devam et
-    }
-}
-
-async function getRecentPdfsFromDB(): Promise<Array<{ id: string; name: string }>> {
-    try {
-        const db = await openPdfDB();
-        return new Promise((resolve) => {
-            const tx = db.transaction(DB_STORE, 'readonly');
-            const req = tx.objectStore(DB_STORE).getAll();
-            req.onsuccess = () => {
-                const list = (req.result || []).map((item: any) => ({
-                    id: item.id,
-                    name: item.name,
-                }));
-                resolve(list);
-            };
-            req.onerror = () => resolve([]);
-        });
-    } catch {
-        return [];
-    }
-}
-
-async function loadPdfFromDB(id: string): Promise<ArrayBuffer | null> {
-    try {
-        const db = await openPdfDB();
-        return new Promise((resolve) => {
-            const tx = db.transaction(DB_STORE, 'readonly');
-            const req = tx.objectStore(DB_STORE).get(id);
-            req.onsuccess = () => resolve(req.result?.data || null);
-            req.onerror = () => resolve(null);
-        });
-    } catch {
-        return null;
-    }
 }
 
 export function PdfViewerTool({ onClose, onInsertImage }: PdfViewerToolProps) {
@@ -133,27 +74,7 @@ export function PdfViewerTool({ onClose, onInsertImage }: PdfViewerToolProps) {
     }, []);
 
     // ── PDF.js Kütüphanesini Yükleme ──────────────────────────────────
-    const loadPdfJs = async (): Promise<any> => {
-        const win = window as any;
-        if (win.pdfjsLib) return win.pdfjsLib;
-
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = PDFJS_CDN;
-            script.crossOrigin = 'anonymous';
-            script.onload = () => {
-                const pdfjs = (window as any).pdfjsLib;
-                if (pdfjs) {
-                    pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_CDN;
-                    resolve(pdfjs);
-                } else {
-                    reject(new Error('PDF.js yüklenemedi.'));
-                }
-            };
-            script.onerror = () => reject(new Error('PDF.js scripti yüklenirken hata oluştu.'));
-            document.head.appendChild(script);
-        });
-    };
+    const loadPdfJs = ensurePdfjsLoaded;
 
     // ── PDF Dosyasını İşleme ──────────────────────────────────────────
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
