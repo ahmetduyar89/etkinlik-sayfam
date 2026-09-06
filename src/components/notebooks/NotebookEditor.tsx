@@ -56,6 +56,7 @@ import { Interactive3DStationTool } from '../tools/Interactive3DStationTool';
 import { GeoGebraStudioTool } from '../tools/GeoGebraStudioTool';
 import { SimpleMachinesTool } from '../tools/SimpleMachinesTool';
 import { DnaGeneticsTool } from '../tools/DnaGeneticsTool';
+import { MoleculeBuilderTool } from '../tools/MoleculeBuilderTool';
 import { LinearGraphTool } from '../tools/LinearGraphTool';
 import { MathFormulaTool } from '../tools/MathFormulaTool';
 import { PdfViewerTool } from '../tools/PdfViewerTool';
@@ -188,6 +189,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const [showGeogebra, setShowGeogebra] = React.useState(false);
     const [showSimpleMachines, setShowSimpleMachines] = React.useState(false);
     const [showDnaGenetics, setShowDnaGenetics] = React.useState(false);
+    const [showMoleculeBuilder, setShowMoleculeBuilder] = React.useState(false);
     const [showLinearGraph, setShowLinearGraph] = React.useState(false);
     const [showMathFormula, setShowMathFormula] = React.useState(false);
     const [showPdfViewer, setShowPdfViewer] = React.useState(false);
@@ -201,6 +203,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         else if (toolId === 'geogebra' || toolId === 'tool_geogebra') setShowGeogebra(true);
         else if (toolId === 'simpleMachines' || toolId === 'simple_machines' || toolId === 'tool_simple_machines') setShowSimpleMachines(true);
         else if (toolId === 'dnaGenetics' || toolId === 'dna_genetics' || toolId === 'tool_dna_genetics') setShowDnaGenetics(true);
+        else if (toolId === 'moleculeBuilder' || toolId === 'molecule_builder' || toolId === 'tool_molecule_builder') setShowMoleculeBuilder(true);
         else if (toolId === 'linearGraph' || toolId === 'linear_graph' || toolId === 'tool_linear_graph') setShowLinearGraph(true);
         else if (toolId === 'mathFormula' || toolId === 'math_formula' || toolId === 'tool_math_formula') setShowMathFormula(true);
         else if (toolId === 'pdfViewer' || toolId === 'pdf_viewer' || toolId === 'tool_pdf_viewer') setShowPdfViewer(true);
@@ -1313,6 +1316,15 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     onInsertImage={(dataUrl, w, h) => {
                         canvasRef.current?.insertImage(dataUrl, w, h);
                         toast.success('DNA / Çaprazlama tablosu tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showMoleculeBuilder && (
+                <MoleculeBuilderTool
+                    onClose={() => setShowMoleculeBuilder(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('Molekül modeli tahta sayfasına yapıştırıldı.');
                     }}
                 />
             )}

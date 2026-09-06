@@ -25,6 +25,7 @@ import {
     TrendingUp,
     Type,
     FileText,
+    Atom,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, MathObject, PenType } from '../../types';
@@ -319,6 +320,27 @@ export function DrawingToolbar({
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onSelectTool?.('moleculeBuilder');
+                                    setShowLab(false);
+                                }}
+                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-indigo-600/25 border border-white/10 hover:border-indigo-500/50 text-left transition-all group"
+                            >
+                                <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500/30 to-purple-500/30 text-indigo-300 shrink-0 group-hover:scale-110 transition-transform">
+                                    <Atom className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <span className="block text-xs font-bold text-white group-hover:text-indigo-200">
+                                        Molekül İnşa Laboratuvarı
+                                    </span>
+                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                        PhET standardı kovalent bağ, manyetik kenetlenme & 3D model
+                                    </span>
+                                </div>
+                            </button>
+
                             <button
                                 type="button"
                                 onClick={() => {

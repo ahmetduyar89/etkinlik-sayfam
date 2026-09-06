@@ -26,6 +26,7 @@ import { PeriodicTableTool } from '../tools/PeriodicTableTool';
 import { GeoGebraStudioTool } from '../tools/GeoGebraStudioTool';
 import { SimpleMachinesTool } from '../tools/SimpleMachinesTool';
 import { DnaGeneticsTool } from '../tools/DnaGeneticsTool';
+import { MoleculeBuilderTool } from '../tools/MoleculeBuilderTool';
 import { LinearGraphTool } from '../tools/LinearGraphTool';
 import { MathFormulaTool } from '../tools/MathFormulaTool';
 import { SpotlightOverlay } from '../tools/SpotlightOverlay';
@@ -111,6 +112,7 @@ export function ActivityPreviewModal({
     const [showGeogebra, setShowGeogebra] = React.useState(false);
     const [showSimpleMachines, setShowSimpleMachines] = React.useState(false);
     const [showDnaGenetics, setShowDnaGenetics] = React.useState(false);
+    const [showMoleculeBuilder, setShowMoleculeBuilder] = React.useState(false);
     const [showLinearGraph, setShowLinearGraph] = React.useState(false);
     const [showMathFormula, setShowMathFormula] = React.useState(false);
     const mainRef = React.useRef<HTMLElement>(null);
@@ -586,6 +588,7 @@ export function ActivityPreviewModal({
                                     else if (toolId === 'geogebra' || toolId === 'tool_geogebra') setShowGeogebra(true);
                                     else if (toolId === 'simpleMachines' || toolId === 'simple_machines' || toolId === 'tool_simple_machines') setShowSimpleMachines(true);
                                     else if (toolId === 'dnaGenetics' || toolId === 'dna_genetics' || toolId === 'tool_dna_genetics') setShowDnaGenetics(true);
+                                    else if (toolId === 'moleculeBuilder' || toolId === 'molecule_builder' || toolId === 'tool_molecule_builder') setShowMoleculeBuilder(true);
                                     else if (toolId === 'linearGraph' || toolId === 'linear_graph' || toolId === 'tool_linear_graph') setShowLinearGraph(true);
                                     else if (toolId === 'mathFormula' || toolId === 'math_formula' || toolId === 'tool_math_formula') setShowMathFormula(true);
                                 }}
@@ -667,6 +670,15 @@ export function ActivityPreviewModal({
                     onInsertImage={(dataUrl, w, h) => {
                         canvasRef.current?.insertImage(dataUrl, w, h);
                         toast.success('DNA / Çaprazlama tablosu tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showMoleculeBuilder && (
+                <MoleculeBuilderTool
+                    onClose={() => setShowMoleculeBuilder(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('Molekül modeli tahta sayfasına yapıştırıldı.');
                     }}
                 />
             )}
