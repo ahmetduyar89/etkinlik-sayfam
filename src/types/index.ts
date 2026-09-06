@@ -170,6 +170,7 @@ export type MathObjectKind =
     | 'tool_dna_genetics'
     | 'tool_linear_graph'
     | 'tool_math_formula'
+    | 'tool_pdf_viewer'
     // ── Fen: laboratuvar ────────────────────────────────────────────
     | 'beaker'
     | 'flask'

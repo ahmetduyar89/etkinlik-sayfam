@@ -62,6 +62,13 @@ export const NEW_BRANCH_TOOL_ITEMS: MathCatalogItem[] = [
         size: { w: 500, h: 300 },
         defaults: {},
     },
+    {
+        kind: 'tool_pdf_viewer',
+        label: '📄 PDF Kitap & Soru Kırpıcı',
+        hint: 'MEB ders kitabı ve soru bankası PDF yükleme, soru kırpıp tahtaya yapıştırma',
+        size: { w: 560, h: 420 },
+        defaults: {},
+    },
 ];
 
 const NEW_TOOL_RENDERERS: Record<string, (k: any) => void> = {
@@ -148,6 +155,21 @@ const NEW_TOOL_RENDERERS: Record<string, (k: any) => void> = {
         k.c.fillText('∑ √x', cx, cy);
         k.c.restore();
     },
+    tool_pdf_viewer: (k) => {
+        const { r } = k;
+        const cx = r.x + r.w * 0.5;
+        const cy = r.y + r.h * 0.5;
+        k.c.save();
+        k.c.strokeStyle = '#f43f5e';
+        k.c.lineWidth = 2;
+        k.c.strokeRect(cx - 14, cy - 18, 28, 36);
+        k.c.fillStyle = '#f43f5e';
+        k.c.font = 'bold 10px sans-serif';
+        k.c.textAlign = 'center';
+        k.c.textBaseline = 'middle';
+        k.c.fillText('PDF', cx, cy);
+        k.c.restore();
+    },
 };
 
 const RENDERERS = { ...MATH_RENDERERS, ...SCIENCE_RENDERERS, ...SIM_RENDERERS, ...NEW_TOOL_RENDERERS };
@@ -171,8 +193,8 @@ export const LIBRARY_GROUPS: ReadonlyArray<ObjectGroup> = [
     {
         label: '🎯 8. Sınıf LGS',
         categories: [
-            { label: 'LGS Matematik', items: [NEW_BRANCH_TOOL_ITEMS[2], NEW_BRANCH_TOOL_ITEMS[3], ...GRADE8_MATH_ITEMS] },
-            { label: 'LGS Fen Bilimleri', items: [NEW_BRANCH_TOOL_ITEMS[0], NEW_BRANCH_TOOL_ITEMS[1], ...GRADE8_ITEMS] },
+            { label: 'LGS Matematik', items: [NEW_BRANCH_TOOL_ITEMS[4], NEW_BRANCH_TOOL_ITEMS[2], NEW_BRANCH_TOOL_ITEMS[3], ...GRADE8_MATH_ITEMS] },
+            { label: 'LGS Fen Bilimleri', items: [NEW_BRANCH_TOOL_ITEMS[4], NEW_BRANCH_TOOL_ITEMS[0], NEW_BRANCH_TOOL_ITEMS[1], ...GRADE8_ITEMS] },
         ],
     },
     {

@@ -107,6 +107,7 @@ export function ObjectLibraryPanel({ open, onClose, onInsert, onSelectTool }: Ob
                 else if (item.kind === 'tool_dna_genetics') onSelectTool('dnaGenetics');
                 else if (item.kind === 'tool_linear_graph') onSelectTool('linearGraph');
                 else if (item.kind === 'tool_math_formula') onSelectTool('mathFormula');
+                else if (item.kind === 'tool_pdf_viewer') onSelectTool('pdfViewer');
             }
             onClose();
             return;

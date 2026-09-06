@@ -57,6 +57,7 @@ import { SimpleMachinesTool } from '../tools/SimpleMachinesTool';
 import { DnaGeneticsTool } from '../tools/DnaGeneticsTool';
 import { LinearGraphTool } from '../tools/LinearGraphTool';
 import { MathFormulaTool } from '../tools/MathFormulaTool';
+import { PdfViewerTool } from '../tools/PdfViewerTool';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
@@ -186,6 +187,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const [showDnaGenetics, setShowDnaGenetics] = React.useState(false);
     const [showLinearGraph, setShowLinearGraph] = React.useState(false);
     const [showMathFormula, setShowMathFormula] = React.useState(false);
+    const [showPdfViewer, setShowPdfViewer] = React.useState(false);
 
     const handleSelectTool = (toolId: string) => {
         if (toolId === 'compass') setShowCompass(true);
@@ -198,6 +200,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         else if (toolId === 'dnaGenetics' || toolId === 'dna_genetics' || toolId === 'tool_dna_genetics') setShowDnaGenetics(true);
         else if (toolId === 'linearGraph' || toolId === 'linear_graph' || toolId === 'tool_linear_graph') setShowLinearGraph(true);
         else if (toolId === 'mathFormula' || toolId === 'math_formula' || toolId === 'tool_math_formula') setShowMathFormula(true);
+        else if (toolId === 'pdfViewer' || toolId === 'pdf_viewer' || toolId === 'tool_pdf_viewer') setShowPdfViewer(true);
     };
 
     const boxesRef = React.useRef<TextBoxData[][]>([[]]);
@@ -1010,6 +1013,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     presenting={presenting}
                     onPresentingChange={setPresenting}
                     onShare={() => setShowQr(true)}
+                    onOpenPdf={() => setShowPdfViewer(true)}
                     fullscreenTarget={stageRef}
                 />
             </div>
@@ -1221,6 +1225,14 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     onInsertImage={(dataUrl, w, h) => {
                         canvasRef.current?.insertImage(dataUrl, w, h);
                         toast.success('Matematik formülü tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showPdfViewer && (
+                <PdfViewerTool
+                    onClose={() => setShowPdfViewer(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
                     }}
                 />
             )}

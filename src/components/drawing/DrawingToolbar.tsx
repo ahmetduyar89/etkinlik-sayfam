@@ -24,6 +24,7 @@ import {
     Dna,
     TrendingUp,
     Type,
+    FileText,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, MathObject, PenType } from '../../types';
@@ -440,6 +441,27 @@ export function DrawingToolbar({
                                     </span>
                                     <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
                                         Katı açınımları, 3D mevsimler, atom modeli ve DNA
+                                    </span>
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onSelectTool?.('pdfViewer');
+                                    setShowLab(false);
+                                }}
+                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-rose-600/25 border border-white/10 hover:border-rose-500/50 text-left transition-all group"
+                            >
+                                <div className="p-2 rounded-lg bg-rose-500/20 text-rose-300 shrink-0 group-hover:scale-110 transition-transform">
+                                    <FileText className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <span className="block text-xs font-bold text-white group-hover:text-rose-200">
+                                        PDF Kitap & Soru Kırpıcı
+                                    </span>
+                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                        MEB kitaplarından veya testlerden soru kırpıp tahtaya yapıştır
                                     </span>
                                 </div>
                             </button>

@@ -2,7 +2,7 @@
 // Defterin ders anlatım çubuğu: spot ışığı, perde, sunum modu ve öğrenciye
 // gönderme. Yalnızca görünümü değiştirir, defter içeriğine dokunmaz.
 import type { RefObject } from 'react';
-import { Flashlight, PanelTopClose, Presentation, QrCode } from 'lucide-react';
+import { FileText, Flashlight, PanelTopClose, Presentation, QrCode } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { FullscreenToggle } from '../common/FullscreenToggle';
 
@@ -14,6 +14,7 @@ interface LessonModeToolbarProps {
     presenting: boolean;
     onPresentingChange: (v: boolean) => void;
     onShare: () => void;
+    onOpenPdf?: () => void;
     /** Tam ekrana alınacak öğe; sunum modunda tüm çalışma alanı verilir. */
     fullscreenTarget?: RefObject<HTMLElement>;
 }
@@ -24,6 +25,7 @@ export function LessonModeToolbar({
     presenting,
     onPresentingChange,
     onShare,
+    onOpenPdf,
     fullscreenTarget,
 }: LessonModeToolbarProps) {
     const toggle = (id: LessonOverlay) => onOverlayChange(overlay === id ? 'none' : id);
@@ -38,6 +40,17 @@ export function LessonModeToolbar({
 
     return (
         <div className="flex items-center gap-1">
+            {onOpenPdf && (
+                <button
+                    type="button"
+                    onClick={onOpenPdf}
+                    title="PDF Kitap & Soru Kırpıcı — MEB kitaplarından soru al"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12.5px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-colors mr-0.5"
+                >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span className="hidden lg:inline">PDF / Soru Kırp</span>
+                </button>
+            )}
             <button
                 type="button"
                 onClick={() => toggle('spotlight')}
