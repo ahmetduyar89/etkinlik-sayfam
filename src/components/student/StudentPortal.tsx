@@ -12,6 +12,10 @@ import { NumberLineTool } from '../tools/NumberLineTool';
 import { MiniCalculatorTool } from '../tools/MiniCalculatorTool';
 import { PeriodicTableTool } from '../tools/PeriodicTableTool';
 import { GeoGebraStudioTool } from '../tools/GeoGebraStudioTool';
+import { SimpleMachinesTool } from '../tools/SimpleMachinesTool';
+import { DnaGeneticsTool } from '../tools/DnaGeneticsTool';
+import { LinearGraphTool } from '../tools/LinearGraphTool';
+import { MathFormulaTool } from '../tools/MathFormulaTool';
 import { useToast } from '../common/ToastProvider';
 import type { Activity, DrawConfig, DrawingCanvasHandle, Submission } from '../../types';
 
@@ -41,6 +45,10 @@ export function StudentPortal({ act }: StudentPortalProps) {
     const [showCalculator, setShowCalculator] = useState(false);
     const [showPeriodicTable, setShowPeriodicTable] = useState(false);
     const [showGeogebra, setShowGeogebra] = useState(false);
+    const [showSimpleMachines, setShowSimpleMachines] = useState(false);
+    const [showDnaGenetics, setShowDnaGenetics] = useState(false);
+    const [showLinearGraph, setShowLinearGraph] = useState(false);
+    const [showMathFormula, setShowMathFormula] = useState(false);
     const [drawHistory, setDrawHistory] = useState({ canUndo: false, canRedo: false });
     const [iframeHeight, setIframeHeight] = useState(1000);
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
@@ -394,6 +402,10 @@ export function StudentPortal({ act }: StudentPortalProps) {
                                 else if (toolId === 'calculator') setShowCalculator(true);
                                 else if (toolId === 'periodicTable' || toolId === 'periodic_table') setShowPeriodicTable(true);
                                 else if (toolId === 'geogebra' || toolId === 'tool_geogebra') setShowGeogebra(true);
+                                else if (toolId === 'simpleMachines' || toolId === 'simple_machines' || toolId === 'tool_simple_machines') setShowSimpleMachines(true);
+                                else if (toolId === 'dnaGenetics' || toolId === 'dna_genetics' || toolId === 'tool_dna_genetics') setShowDnaGenetics(true);
+                                else if (toolId === 'linearGraph' || toolId === 'linear_graph' || toolId === 'tool_linear_graph') setShowLinearGraph(true);
+                                else if (toolId === 'mathFormula' || toolId === 'math_formula' || toolId === 'tool_math_formula') setShowMathFormula(true);
                             }}
                         />
                     )}
@@ -416,6 +428,42 @@ export function StudentPortal({ act }: StudentPortalProps) {
                         onInsertImage={(dataUrl, w, h) => {
                             canvasRef.current?.insertImage(dataUrl, w, h);
                             toast.success('GeoGebra çizimi sayfaya eklendi.');
+                        }}
+                    />
+                )}
+                {showSimpleMachines && (
+                    <SimpleMachinesTool
+                        onClose={() => setShowSimpleMachines(false)}
+                        onInsertImage={(dataUrl, w, h) => {
+                            canvasRef.current?.insertImage(dataUrl, w, h);
+                            toast.success('Basit makineler düzeneği sayfaya eklendi.');
+                        }}
+                    />
+                )}
+                {showDnaGenetics && (
+                    <DnaGeneticsTool
+                        onClose={() => setShowDnaGenetics(false)}
+                        onInsertImage={(dataUrl, w, h) => {
+                            canvasRef.current?.insertImage(dataUrl, w, h);
+                            toast.success('DNA / Çaprazlama tablosu sayfaya eklendi.');
+                        }}
+                    />
+                )}
+                {showLinearGraph && (
+                    <LinearGraphTool
+                        onClose={() => setShowLinearGraph(false)}
+                        onInsertImage={(dataUrl, w, h) => {
+                            canvasRef.current?.insertImage(dataUrl, w, h);
+                            toast.success('Doğrusal denklem grafiği sayfaya eklendi.');
+                        }}
+                    />
+                )}
+                {showMathFormula && (
+                    <MathFormulaTool
+                        onClose={() => setShowMathFormula(false)}
+                        onInsertImage={(dataUrl, w, h) => {
+                            canvasRef.current?.insertImage(dataUrl, w, h);
+                            toast.success('Matematik formülü sayfaya eklendi.');
                         }}
                     />
                 )}

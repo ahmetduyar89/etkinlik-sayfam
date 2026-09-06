@@ -33,7 +33,124 @@ import type { MathCatalogItem, ObjectCategory, Rect, SimSpec } from './objectDra
 
 export type { MathCatalogItem, ObjectCategory } from './objectDrawing';
 
-const RENDERERS = { ...MATH_RENDERERS, ...SCIENCE_RENDERERS, ...SIM_RENDERERS };
+export const NEW_BRANCH_TOOL_ITEMS: MathCatalogItem[] = [
+    {
+        kind: 'tool_simple_machines',
+        label: '🧪 Basit Makineler Dinamik Lab',
+        hint: 'Kaldıraç (1., 2., 3. tip), makara, palanga, eğik düzlem ve çıkrık; canlı kuvvet kazancı hesabı',
+        size: { w: 560, h: 380 },
+        defaults: {},
+    },
+    {
+        kind: 'tool_dna_genetics',
+        label: '🧬 DNA, Genetik & Çaprazlama',
+        hint: 'Mendel çaprazlama tablosu (Punnett karesi), fenotip/genotip oranları ve nükleotid bulmacası',
+        size: { w: 560, h: 390 },
+        defaults: {},
+    },
+    {
+        kind: 'tool_linear_graph',
+        label: '📈 Doğrusal Denklem & Grafik Çizici',
+        hint: 'y = mx + n doğrusu, eğim dik üçgeni, eksen kesişimleri ve çift doğru incelemesi',
+        size: { w: 540, h: 380 },
+        defaults: {},
+    },
+    {
+        kind: 'tool_math_formula',
+        label: '🧮 Formül & LaTeX Denklem Editörü',
+        hint: 'Kareköklü, üslü, kesirli ifadeler, geometri ve kimyasal reaksiyon okları; tahtaya damgala',
+        size: { w: 500, h: 300 },
+        defaults: {},
+    },
+];
+
+const NEW_TOOL_RENDERERS: Record<string, (k: any) => void> = {
+    tool_simple_machines: (k) => {
+        const { r } = k;
+        const cx = r.x + r.w * 0.5;
+        const cy = r.y + r.h * 0.55;
+        k.c.save();
+        k.c.strokeStyle = '#f59e0b';
+        k.c.lineWidth = 2;
+        k.c.beginPath();
+        k.c.moveTo(cx, cy);
+        k.c.lineTo(cx - 12, cy + 16);
+        k.c.lineTo(cx + 12, cy + 16);
+        k.c.closePath();
+        k.c.stroke();
+        k.c.strokeStyle = '#4f46e5';
+        k.c.lineWidth = 3;
+        k.c.beginPath();
+        k.c.moveTo(cx - 28, cy - 4);
+        k.c.lineTo(cx + 28, cy + 4);
+        k.c.stroke();
+        k.c.fillStyle = '#ef4444';
+        k.c.fillRect(cx - 28, cy - 16, 12, 12);
+        k.c.fillStyle = '#10b981';
+        k.c.beginPath();
+        k.c.arc(cx + 22, cy + 10, 6, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+    },
+    tool_dna_genetics: (k) => {
+        const { r } = k;
+        const cx = r.x + r.w * 0.5;
+        const cy = r.y + r.h * 0.5;
+        k.c.save();
+        k.c.strokeStyle = '#a855f7';
+        k.c.lineWidth = 2;
+        for (let i = -16; i <= 16; i += 8) {
+            k.c.beginPath();
+            k.c.moveTo(cx - 14, cy + i);
+            k.c.lineTo(cx + 14, cy + i);
+            k.c.stroke();
+        }
+        k.c.fillStyle = '#ef4444';
+        k.c.beginPath();
+        k.c.arc(cx - 14, cy - 8, 3, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.fillStyle = '#3b82f6';
+        k.c.beginPath();
+        k.c.arc(cx + 14, cy - 8, 3, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+    },
+    tool_linear_graph: (k) => {
+        const { r } = k;
+        const cx = r.x + r.w * 0.5;
+        const cy = r.y + r.h * 0.5;
+        k.c.save();
+        k.c.strokeStyle = '#64748b';
+        k.c.lineWidth = 1.5;
+        k.c.beginPath();
+        k.c.moveTo(r.x + 8, cy);
+        k.c.lineTo(r.x + r.w - 8, cy);
+        k.c.moveTo(cx, r.y + 8);
+        k.c.lineTo(cx, r.y + r.h - 8);
+        k.c.stroke();
+        k.c.strokeStyle = '#2563eb';
+        k.c.lineWidth = 2.5;
+        k.c.beginPath();
+        k.c.moveTo(cx - 20, cy + 16);
+        k.c.lineTo(cx + 20, cy - 16);
+        k.c.stroke();
+        k.c.restore();
+    },
+    tool_math_formula: (k) => {
+        const { r } = k;
+        const cx = r.x + r.w * 0.5;
+        const cy = r.y + r.h * 0.5;
+        k.c.save();
+        k.c.fillStyle = '#6366f1';
+        k.c.font = 'bold 16px serif';
+        k.c.textAlign = 'center';
+        k.c.textBaseline = 'middle';
+        k.c.fillText('∑ √x', cx, cy);
+        k.c.restore();
+    },
+};
+
+const RENDERERS = { ...MATH_RENDERERS, ...SCIENCE_RENDERERS, ...SIM_RENDERERS, ...NEW_TOOL_RENDERERS };
 
 export interface ObjectGroup {
     label: string;
@@ -54,8 +171,8 @@ export const LIBRARY_GROUPS: ReadonlyArray<ObjectGroup> = [
     {
         label: '🎯 8. Sınıf LGS',
         categories: [
-            { label: 'LGS Matematik', items: GRADE8_MATH_ITEMS },
-            { label: 'LGS Fen Bilimleri', items: GRADE8_ITEMS },
+            { label: 'LGS Matematik', items: [NEW_BRANCH_TOOL_ITEMS[2], NEW_BRANCH_TOOL_ITEMS[3], ...GRADE8_MATH_ITEMS] },
+            { label: 'LGS Fen Bilimleri', items: [NEW_BRANCH_TOOL_ITEMS[0], NEW_BRANCH_TOOL_ITEMS[1], ...GRADE8_ITEMS] },
         ],
     },
     {

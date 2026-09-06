@@ -53,6 +53,10 @@ import { MiniCalculatorTool } from '../tools/MiniCalculatorTool';
 import { PeriodicTableTool } from '../tools/PeriodicTableTool';
 import { Interactive3DStationTool } from '../tools/Interactive3DStationTool';
 import { GeoGebraStudioTool } from '../tools/GeoGebraStudioTool';
+import { SimpleMachinesTool } from '../tools/SimpleMachinesTool';
+import { DnaGeneticsTool } from '../tools/DnaGeneticsTool';
+import { LinearGraphTool } from '../tools/LinearGraphTool';
+import { MathFormulaTool } from '../tools/MathFormulaTool';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
@@ -178,6 +182,10 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const [showPeriodicTable, setShowPeriodicTable] = React.useState(false);
     const [show3DStation, setShow3DStation] = React.useState(false);
     const [showGeogebra, setShowGeogebra] = React.useState(false);
+    const [showSimpleMachines, setShowSimpleMachines] = React.useState(false);
+    const [showDnaGenetics, setShowDnaGenetics] = React.useState(false);
+    const [showLinearGraph, setShowLinearGraph] = React.useState(false);
+    const [showMathFormula, setShowMathFormula] = React.useState(false);
 
     const handleSelectTool = (toolId: string) => {
         if (toolId === 'compass') setShowCompass(true);
@@ -186,6 +194,10 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         else if (toolId === 'periodicTable' || toolId === 'periodic_table') setShowPeriodicTable(true);
         else if (toolId === '3dStation' || toolId === '3d_station' || toolId === 'station_3d') setShow3DStation(true);
         else if (toolId === 'geogebra' || toolId === 'tool_geogebra') setShowGeogebra(true);
+        else if (toolId === 'simpleMachines' || toolId === 'simple_machines' || toolId === 'tool_simple_machines') setShowSimpleMachines(true);
+        else if (toolId === 'dnaGenetics' || toolId === 'dna_genetics' || toolId === 'tool_dna_genetics') setShowDnaGenetics(true);
+        else if (toolId === 'linearGraph' || toolId === 'linear_graph' || toolId === 'tool_linear_graph') setShowLinearGraph(true);
+        else if (toolId === 'mathFormula' || toolId === 'math_formula' || toolId === 'tool_math_formula') setShowMathFormula(true);
     };
 
     const boxesRef = React.useRef<TextBoxData[][]>([[]]);
@@ -1173,6 +1185,42 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     onInsertImage={(dataUrl, w, h) => {
                         canvasRef.current?.insertImage(dataUrl, w, h);
                         toast.success('GeoGebra çizimi tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showSimpleMachines && (
+                <SimpleMachinesTool
+                    onClose={() => setShowSimpleMachines(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('Basit makineler düzeneği tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showDnaGenetics && (
+                <DnaGeneticsTool
+                    onClose={() => setShowDnaGenetics(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('DNA / Çaprazlama tablosu tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showLinearGraph && (
+                <LinearGraphTool
+                    onClose={() => setShowLinearGraph(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('Doğrusal denklem grafiği tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showMathFormula && (
+                <MathFormulaTool
+                    onClose={() => setShowMathFormula(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('Matematik formülü tahta sayfasına yapıştırıldı.');
                     }}
                 />
             )}

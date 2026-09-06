@@ -19,6 +19,11 @@ import {
     Undo,
     Wand2,
     Pentagon,
+    FlaskConical,
+    Scale,
+    Dna,
+    TrendingUp,
+    Type,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, MathObject, PenType } from '../../types';
@@ -106,17 +111,19 @@ export function DrawingToolbar({
     const [showExtras, setShowExtras] = React.useState(false);
     const [showPen, setShowPen] = React.useState(false);
     const [showMath, setShowMath] = React.useState(false);
+    const [showLab, setShowLab] = React.useState(false);
     const dragControls = useDragControls();
 
     const penType: PenType = config.penType ?? 'ballpoint';
     const eraserMode = config.eraserMode ?? 'pixel';
 
     /** Aynı anda tek bir açılır panel görünsün. */
-    const openOnly = (which: 'shapes' | 'pen' | 'math' | 'extras' | null) => {
+    const openOnly = (which: 'shapes' | 'pen' | 'math' | 'extras' | 'lab' | null) => {
         setShowShapes(which === 'shapes');
         setShowPen(which === 'pen');
         setShowMath(which === 'math');
         setShowExtras(which === 'extras');
+        setShowLab(which === 'lab');
     };
 
     const isShapeTool =
@@ -282,6 +289,159 @@ export function DrawingToolbar({
                                         )}
                                     />
                                 </span>
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {showLab && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="pointer-events-auto flex flex-col gap-2.5 max-h-[68vh] overflow-y-auto bg-[#161826]/95 backdrop-blur-xl p-3.5 rounded-2xl border border-indigo-500/30 shadow-2xl w-[min(94vw,560px)]"
+                    >
+                        <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                            <div className="flex items-center gap-2">
+                                <div className="p-1.5 rounded-lg bg-indigo-600/30 text-indigo-400">
+                                    <FlaskConical className="w-4 h-4" />
+                                </div>
+                                <span className="text-xs font-bold text-white uppercase tracking-wider">
+                                    Dinamik Laboratuvar & Matematik Araçları
+                                </span>
+                            </div>
+                            <span className="text-[10px] text-indigo-300 font-semibold bg-indigo-500/20 px-2 py-0.5 rounded-full border border-indigo-500/30">
+                                Canlı Deney
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onSelectTool?.('simpleMachines');
+                                    setShowLab(false);
+                                }}
+                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-indigo-600/25 border border-white/10 hover:border-indigo-500/50 text-left transition-all group"
+                            >
+                                <div className="p-2 rounded-lg bg-amber-500/20 text-amber-300 shrink-0 group-hover:scale-110 transition-transform">
+                                    <Scale className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <span className="block text-xs font-bold text-white group-hover:text-indigo-200">
+                                        Basit Makineler Laboratuvarı
+                                    </span>
+                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                        Kaldıraç, makara, palanga, eğik düzlem ve çıkrık simülasyonu
+                                    </span>
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onSelectTool?.('dnaGenetics');
+                                    setShowLab(false);
+                                }}
+                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-purple-600/25 border border-white/10 hover:border-purple-500/50 text-left transition-all group"
+                            >
+                                <div className="p-2 rounded-lg bg-purple-500/20 text-purple-300 shrink-0 group-hover:scale-110 transition-transform">
+                                    <Dna className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <span className="block text-xs font-bold text-white group-hover:text-purple-200">
+                                        DNA, Genetik & Çaprazlama
+                                    </span>
+                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                        Punnett karesi, fenotip oranları ve nükleotid bulmacası
+                                    </span>
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onSelectTool?.('linearGraph');
+                                    setShowLab(false);
+                                }}
+                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-blue-600/25 border border-white/10 hover:border-blue-500/50 text-left transition-all group"
+                            >
+                                <div className="p-2 rounded-lg bg-blue-500/20 text-blue-300 shrink-0 group-hover:scale-110 transition-transform">
+                                    <TrendingUp className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <span className="block text-xs font-bold text-white group-hover:text-blue-200">
+                                        Doğrusal Denklem & Grafik Damgası
+                                    </span>
+                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                        y = mx + n doğrusu, eğim dik üçgeni ve eksen kesişimleri
+                                    </span>
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onSelectTool?.('mathFormula');
+                                    setShowLab(false);
+                                }}
+                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-emerald-600/25 border border-white/10 hover:border-emerald-500/50 text-left transition-all group"
+                            >
+                                <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-300 shrink-0 group-hover:scale-110 transition-transform">
+                                    <Type className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <span className="block text-xs font-bold text-white group-hover:text-emerald-200">
+                                        Formül & LaTeX Editörü
+                                    </span>
+                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                        Kesirler, karekök, üs ve kimyasal reaksiyon okları
+                                    </span>
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onSelectTool?.('geogebra');
+                                    setShowLab(false);
+                                }}
+                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-indigo-600/25 border border-white/10 hover:border-indigo-500/50 text-left transition-all group"
+                            >
+                                <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-300 shrink-0 group-hover:scale-110 transition-transform">
+                                    <Sparkles className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <span className="block text-xs font-bold text-white group-hover:text-indigo-200">
+                                        GeoGebra Studio
+                                    </span>
+                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                        Klasik Geometri, Fonksiyonlar, 3D Geometri ve CAS
+                                    </span>
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onSelectTool?.('3dStation');
+                                    setShowLab(false);
+                                }}
+                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-teal-600/25 border border-white/10 hover:border-teal-500/50 text-left transition-all group"
+                            >
+                                <div className="p-2 rounded-lg bg-teal-500/20 text-teal-300 shrink-0 group-hover:scale-110 transition-transform">
+                                    <FlaskConical className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <span className="block text-xs font-bold text-white group-hover:text-teal-200">
+                                        3D Fen & Katı Cisim İstasyonu
+                                    </span>
+                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                        Katı açınımları, 3D mevsimler, atom modeli ve DNA
+                                    </span>
+                                </div>
                             </button>
                         </div>
                     </motion.div>
@@ -659,6 +819,27 @@ export function DrawingToolbar({
                         >
                             <span className="font-serif text-base leading-none">∑</span>
                             <span className="text-[11px] leading-none">✨</span>
+                        </button>
+                    )}
+                    {onSelectTool && (
+                        <button
+                            type="button"
+                            onClick={() => openOnly(showLab ? null : 'lab')}
+                            aria-label="Laboratuvar ve branş araçları"
+                            aria-expanded={showLab}
+                            className={cn(
+                                'p-2.5 rounded-xl transition-all relative',
+                                showLab
+                                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-white/20'
+                                    : 'text-slate-400 hover:text-purple-300 hover:bg-purple-500/10'
+                            )}
+                            title="Dinamik Laboratuvar & Matematik Araçları"
+                        >
+                            <FlaskConical className="w-5 h-5" />
+                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                            </span>
                         </button>
                     )}
                     {onInsertMath && !onOpenLibrary && (

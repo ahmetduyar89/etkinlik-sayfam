@@ -166,6 +166,10 @@ export type MathObjectKind =
     | 'tool_periodic_table'
     | 'tool_3d_station'
     | 'tool_geogebra'
+    | 'tool_simple_machines'
+    | 'tool_dna_genetics'
+    | 'tool_linear_graph'
+    | 'tool_math_formula'
     // ── Fen: laboratuvar ────────────────────────────────────────────
     | 'beaker'
     | 'flask'

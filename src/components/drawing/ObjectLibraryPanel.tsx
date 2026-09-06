@@ -103,6 +103,10 @@ export function ObjectLibraryPanel({ open, onClose, onInsert, onSelectTool }: Ob
                 else if (item.kind === 'tool_periodic_table') onSelectTool('periodicTable');
                 else if (item.kind === 'tool_3d_station') onSelectTool('3dStation');
                 else if (item.kind === 'tool_geogebra') onSelectTool('geogebra');
+                else if (item.kind === 'tool_simple_machines') onSelectTool('simpleMachines');
+                else if (item.kind === 'tool_dna_genetics') onSelectTool('dnaGenetics');
+                else if (item.kind === 'tool_linear_graph') onSelectTool('linearGraph');
+                else if (item.kind === 'tool_math_formula') onSelectTool('mathFormula');
             }
             onClose();
             return;
