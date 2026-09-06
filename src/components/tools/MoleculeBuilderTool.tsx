@@ -21,6 +21,7 @@ import {
     Atom,
     Plus,
     Flame,
+    Move,
 } from 'lucide-react';
 import * as THREE from 'three';
 import { cn } from '../../utils/cn';
@@ -875,32 +876,42 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
 
     return (
         <motion.div
+            key={isMaximized ? 'maximized' : 'normal'}
             ref={containerRef}
             drag={!isMaximized}
             dragControls={dragControls}
             dragListener={false}
             dragMomentum={false}
-            initial={{ opacity: 0, scale: 0.94, y: 20 }}
-            animate={{
-                opacity: 1,
-                scale: 1,
-                width: isMaximized ? '98vw' : '880px',
-                height: isMaximized ? '95vh' : '640px',
-            }}
-            exit={{ opacity: 0, scale: 0.94, y: 20 }}
+            dragElastic={0}
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
             className={cn(
-                'fixed z-[5100] flex flex-col bg-[#0f111a]/95 backdrop-blur-xl border border-indigo-500/30 rounded-2xl shadow-2xl overflow-hidden',
-                isMaximized ? 'top-3 left-3' : 'top-8 left-1/2 -translate-x-1/2'
+                'fixed z-[5100] flex flex-col bg-[#0f111a]/95 backdrop-blur-xl border border-indigo-500/30 rounded-2xl shadow-2xl overflow-hidden select-none',
+                isMaximized
+                    ? 'top-3 left-3 right-3 bottom-3 w-auto h-auto'
+                    : 'top-10 left-[max(12px,calc(50%-440px))] w-[min(96vw,880px)] h-[min(88vh,640px)]'
             )}
         >
             <canvas ref={canvasHiddenRef} className="hidden" />
 
             {/* ── Üst Başlık Çubuğu ────────────────────────────────────────── */}
             <div
-                onPointerDown={(e) => dragControls.start(e)}
-                className="flex items-center justify-between px-4 py-2.5 bg-white/[0.04] border-b border-white/10 cursor-grab active:cursor-grabbing select-none"
+                onPointerDown={(e) => {
+                    if ((e.target as HTMLElement).closest('button')) return;
+                    if (!isMaximized) dragControls.start(e);
+                }}
+                className={cn(
+                    'flex items-center justify-between px-4 py-2.5 bg-white/[0.04] border-b border-white/10 select-none',
+                    !isMaximized ? 'cursor-grab active:cursor-grabbing' : ''
+                )}
             >
                 <div className="flex items-center gap-2.5">
+                    {!isMaximized && (
+                        <div className="p-1 rounded-md text-slate-500 hover:text-white" title="Pencereyi Taşı">
+                            <Move className="w-4 h-4 text-slate-400" />
+                        </div>
+                    )}
                     <div className="p-1.5 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md">
                         <Atom className="w-5 h-5 animate-spin-slow" />
                     </div>
@@ -909,11 +920,11 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                             <span className="font-bold text-white text-sm tracking-wide">
                                 Molekül İnşa Laboratuvarı
                             </span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-500/40">
                                 PhET Standardı
                             </span>
                         </div>
-                        <span className="text-[11px] text-slate-400">
+                        <span className="text-xs text-slate-300 font-medium">
                             Manyetik Kovalent Bağlanma & 3D Molekül Modeli
                         </span>
                     </div>
@@ -972,6 +983,7 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                     <button
                         type="button"
                         onClick={() => setIsMaximized(!isMaximized)}
+                        title={isMaximized ? 'Normal Boyut / Ortala' : 'Tam Ekran Yap'}
                         className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                     >
                         {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -990,12 +1002,12 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
 
             {/* ── Koleksiyon Bilgi Şeridi (Game Mode) ────────────────────── */}
             {mode === 'game' && (
-                <div className="flex items-center justify-between px-4 py-2 bg-indigo-950/40 border-b border-indigo-500/20 text-xs">
+                <div className="flex items-center justify-between px-4 py-2 bg-indigo-950/60 border-b border-indigo-500/30 text-xs">
                     <div className="flex items-center gap-2">
-                        <span className="font-bold text-indigo-300">
+                        <span className="font-bold text-indigo-200">
                             {currentLevel.title}
                         </span>
-                        <span className="text-slate-400 hidden sm:inline">
+                        <span className="text-slate-300 hidden sm:inline">
                             · {currentLevel.subtitle}
                         </span>
                     </div>
@@ -1009,8 +1021,8 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                                 className={cn(
                                     'w-6 h-6 rounded-full flex items-center justify-center font-bold text-[11px] transition-all',
                                     currentLevelIdx === idx
-                                        ? 'bg-indigo-600 text-white ring-2 ring-indigo-400'
-                                        : 'bg-white/10 text-slate-400 hover:bg-white/20'
+                                        ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 shadow'
+                                        : 'bg-white/10 text-slate-200 hover:bg-white/20'
                                 )}
                             >
                                 {col.id}
@@ -1024,7 +1036,7 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
                 {/* Sol / Tezgah Alanı: SVG Interactive Canvas */}
                 <div className="flex-1 flex flex-col bg-[#0b0c14] relative select-none">
-                    <div className="absolute top-2 left-3 z-10 pointer-events-none flex items-center gap-2 text-[11px] text-slate-400 bg-black/40 px-2.5 py-1 rounded-full border border-white/5">
+                    <div className="absolute top-2 left-3 z-10 pointer-events-none flex items-center gap-2 text-xs text-slate-200 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-md">
                         <span>💡 İki atomu birbirine yaklaştırarak kovalent bağ kurun.</span>
                     </div>
 
@@ -1279,15 +1291,15 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                 </div>
 
                 {/* Sağ / Hedef & Koleksiyon Paneli (Game Mode) VEYA Bilgi Paneli (Sandbox) */}
-                <div className="w-full md:w-64 bg-[#131522] border-t md:border-t-0 md:border-l border-white/10 p-3 flex flex-col justify-between overflow-y-auto">
+                <div className="w-full md:w-68 bg-[#121526] border-t md:border-t-0 md:border-l border-white/10 p-3.5 flex flex-col justify-between overflow-y-auto">
                     {mode === 'game' ? (
-                        <div className="flex flex-col gap-2.5">
+                        <div className="flex flex-col gap-3">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                                     <Trophy className="w-4 h-4 text-amber-400" />
                                     Hedef Koleksiyon
                                 </span>
-                                <span className="text-[11px] text-slate-400 font-semibold">
+                                <span className="text-xs text-white font-bold bg-white/15 px-2.5 py-0.5 rounded-md border border-white/10 shadow-sm">
                                     {Object.values(collectedMolecules).reduce((a, b) => a + b, 0)} /{' '}
                                     {currentLevel.targets.reduce((a, b) => a + b.requiredCount, 0)}
                                 </span>
@@ -1304,33 +1316,42 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                                         <div
                                             key={target.moleculeId}
                                             className={cn(
-                                                'p-2.5 rounded-xl border transition-all flex items-center justify-between',
+                                                'p-2.5 rounded-xl border transition-all flex items-center justify-between shadow-sm',
                                                 isDone
-                                                    ? 'bg-emerald-950/40 border-emerald-500/50 text-white'
-                                                    : 'bg-white/[0.03] border-white/10 text-slate-300'
+                                                    ? 'bg-emerald-950/70 border-emerald-500/70 text-white'
+                                                    : 'bg-[#1e2338] border-slate-700/80 text-white'
                                             )}
                                         >
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2.5">
                                                 <div
                                                     className={cn(
-                                                        'w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs',
-                                                        isDone ? 'bg-emerald-500 text-white' : 'bg-white/10 text-slate-400'
+                                                        'w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shadow',
+                                                        isDone
+                                                            ? 'bg-emerald-500 text-white shadow-emerald-500/30'
+                                                            : 'bg-slate-700 text-slate-100 border border-slate-600'
                                                     )}
                                                 >
-                                                    {isDone ? '✓' : target.requiredCount}
+                                                    {isDone ? '✓' : `${target.requiredCount}x`}
                                                 </div>
                                                 <div>
-                                                    <span className="block text-xs font-bold leading-tight">
+                                                    <span className="block text-xs font-bold text-white leading-tight">
                                                         {km?.name}
                                                     </span>
-                                                    <span className="block text-[11px] text-indigo-300 font-mono">
+                                                    <span className="block text-xs text-sky-300 font-bold font-mono">
                                                         {km?.formula}
                                                     </span>
                                                 </div>
                                             </div>
 
                                             <div className="text-right">
-                                                <span className="text-[11px] font-semibold text-slate-400">
+                                                <span
+                                                    className={cn(
+                                                        'text-xs font-bold px-2 py-0.5 rounded-md',
+                                                        isDone
+                                                            ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-500/40'
+                                                            : 'bg-white/10 text-slate-100 border border-white/10'
+                                                    )}
+                                                >
                                                     {currentCount}/{target.requiredCount}
                                                 </span>
                                             </div>
@@ -1344,10 +1365,10 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                                 <motion.div
                                     initial={{ opacity: 0, scale: 0.9 }}
                                     animate={{ opacity: 1, scale: 1 }}
-                                    className="p-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-xl mt-1 text-center"
+                                    className="p-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-xl mt-1 text-center"
                                 >
                                     <div className="text-2xl mb-1">🎉</div>
-                                    <div className="text-xs font-bold">Harika İş! Koleksiyon Tamamlandı</div>
+                                    <div className="text-xs font-bold text-white">Harika İş! Koleksiyon Tamamlandı</div>
                                     {currentLevelIdx < COLLECTIONS.length - 1 ? (
                                         <button
                                             type="button"
@@ -1358,7 +1379,7 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                                             <ArrowRight className="w-3.5 h-3.5" />
                                         </button>
                                     ) : (
-                                        <div className="text-[11px] text-emerald-100 mt-1">
+                                        <div className="text-xs text-emerald-100 mt-1 font-medium">
                                             Tüm seviyeleri başarıyla tamamladınız!
                                         </div>
                                     )}
@@ -1367,34 +1388,48 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                         </div>
                     ) : (
                         /* Sandbox Bilgi Paneli */
-                        <div className="flex flex-col gap-2 text-xs">
-                            <span className="font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <div className="flex flex-col gap-2.5 text-xs text-slate-100">
+                            <span className="font-bold text-white text-sm uppercase tracking-wider flex items-center gap-1.5">
                                 <Flame className="w-4 h-4 text-orange-400" />
                                 Serbest Keşif
                             </span>
-                            <p className="text-slate-400 text-[11px]">
+                            <p className="text-slate-200 text-xs leading-relaxed">
                                 İstediğiniz atomları tezgaha alıp dilediğiniz molekülleri inşa edebilirsiniz.
                             </p>
 
-                            <div className="mt-2 p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-1 text-[11px]">
-                                <span className="font-bold text-indigo-300">Değerlik Kuralları:</span>
-                                <span>• H, Cl: 1 Bağ</span>
-                                <span>• O, S: 2 Bağ (Tekli veya İkili)</span>
-                                <span>• N, P: 3 Bağ (Tekli, İkili veya Üçlü)</span>
-                                <span>• C: 4 Bağ (Dörtlü kovalent)</span>
+                            <div className="mt-1 p-3 rounded-xl bg-[#1a1e33] border border-indigo-500/40 flex flex-col gap-2 text-xs text-white shadow-md">
+                                <span className="font-bold text-amber-300 flex items-center gap-1 text-[12.5px]">
+                                    ⚡ Değerlik & Bağ Kuralları
+                                </span>
+                                <div className="flex items-center justify-between text-slate-100 font-medium pt-1">
+                                    <span>• Hidrojen (H), Klor (Cl)</span>
+                                    <span className="px-2 py-0.5 rounded bg-white/20 font-bold text-white text-[11px] shadow-sm">1 Bağ</span>
+                                </div>
+                                <div className="flex items-center justify-between text-slate-100 font-medium">
+                                    <span>• Oksijen (O), Kükürt (S)</span>
+                                    <span className="px-2 py-0.5 rounded bg-rose-500/30 text-rose-200 font-bold text-[11px] border border-rose-500/40 shadow-sm">2 Bağ</span>
+                                </div>
+                                <div className="flex items-center justify-between text-slate-100 font-medium">
+                                    <span>• Azot (N), Fosfor (P)</span>
+                                    <span className="px-2 py-0.5 rounded bg-blue-500/30 text-blue-200 font-bold text-[11px] border border-blue-500/40 shadow-sm">3 Bağ</span>
+                                </div>
+                                <div className="flex items-center justify-between text-slate-100 font-medium">
+                                    <span>• Karbon (C)</span>
+                                    <span className="px-2 py-0.5 rounded bg-amber-500/30 text-amber-200 font-bold text-[11px] border border-amber-500/40 shadow-sm">4 Bağ</span>
+                                </div>
                             </div>
                         </div>
                     )}
 
                     {/* Hızlı Eylemler */}
-                    <div className="pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
-                        <span>Tezgahta: {placedAtoms.length} atom</span>
+                    <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-300">
+                        <span className="font-medium">Tezgahta: <strong className="text-white font-bold">{placedAtoms.length}</strong> atom</span>
                         <button
                             type="button"
                             onClick={handleResetWorkspace}
-                            className="text-rose-400 hover:underline flex items-center gap-1 font-semibold"
+                            className="text-rose-300 hover:text-white flex items-center gap-1 font-semibold hover:underline"
                         >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-3.5 h-3.5" />
                             Temizle
                         </button>
                     </div>
@@ -1404,7 +1439,7 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
             {/* ── Alt Atom Havuzları / Kovaları (Tepsisi) ───────────────────── */}
             <div className="px-4 py-3 bg-[#131522] border-t border-white/10 select-none">
                 <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                         📦 Atom Kovaları (Tıklayarak Tezgaha Ekleyin):
                     </span>
                 </div>
@@ -1423,10 +1458,10 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                                 disabled={isEmpty}
                                 onClick={() => handleAddAtomFromBucket(symbol)}
                                 className={cn(
-                                    'flex items-center gap-2 px-3 py-2 rounded-xl border transition-all shrink-0 relative group',
+                                    'flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all shrink-0 relative group shadow-md',
                                     isEmpty
-                                        ? 'opacity-35 bg-white/[0.02] border-white/5 cursor-not-allowed'
-                                        : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/10 hover:border-indigo-500/50 cursor-pointer active:scale-95 shadow'
+                                        ? 'opacity-40 bg-white/[0.02] border-white/5 cursor-not-allowed'
+                                        : 'bg-[#1e2338] hover:bg-[#272d47] border-slate-700 hover:border-indigo-500 cursor-pointer active:scale-95'
                                 )}
                             >
                                 <div
@@ -1434,7 +1469,7 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                                     style={{
                                         backgroundColor: info.color,
                                         color: info.textColor,
-                                        borderColor: '#334155',
+                                        borderColor: '#475569',
                                     }}
                                 >
                                     {info.symbol}
@@ -1444,17 +1479,14 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                                     <span className="block text-xs font-bold text-white group-hover:text-indigo-200">
                                         {info.name}
                                     </span>
-                                    <span className="block text-[10px] text-slate-400">
+                                    <span className="block text-[11px] text-slate-300 font-medium">
                                         {count} adet kaldı
                                     </span>
                                 </div>
 
-                                <div className="p-1 rounded-md bg-indigo-500/20 text-indigo-300 ml-1">
+                                <div className="p-1 rounded-md bg-indigo-500/30 text-indigo-200 ml-1">
                                     <Plus className="w-3.5 h-3.5" />
                                 </div>
-                            </button>
-                        );
-                    })}
                 </div>
             </div>
 
@@ -1629,7 +1661,7 @@ function Molecule3DViewerModal({
                             <span className="font-bold text-white text-sm">
                                 {molecule.name} ({molecule.formula})
                             </span>
-                            <span className="text-[11px] text-slate-400 block">
+                            <span className="text-xs text-indigo-300 font-medium block">
                                 360° Etkileşimli 3D Model
                             </span>
                         </div>
@@ -1639,7 +1671,7 @@ function Molecule3DViewerModal({
                         <button
                             type="button"
                             onClick={onToggleViewMode}
-                            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors"
+                            className="px-2.5 py-1 rounded-lg bg-indigo-600/30 border border-indigo-500/40 hover:bg-indigo-600/50 text-white text-xs font-semibold transition-colors"
                         >
                             {viewMode === 'ball_stick' ? 'Top & Çubuk Modu' : 'Uzay Dolgulu (CPK)'}
                         </button>
@@ -1647,7 +1679,7 @@ function Molecule3DViewerModal({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="p-1 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                            className="p-1 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                         >
                             <X className="w-4 h-4" />
                         </button>
@@ -1662,13 +1694,13 @@ function Molecule3DViewerModal({
                     className="w-full h-80 bg-radial from-slate-900 to-black relative cursor-grab active:cursor-grabbing select-none"
                 >
                     <canvas ref={canvas3DRef} className="w-full h-full block" />
-                    <div className="absolute bottom-2 left-3 text-[11px] text-slate-400 pointer-events-none bg-black/40 px-2 py-0.5 rounded-full border border-white/5">
+                    <div className="absolute bottom-2 left-3 text-xs text-slate-200 pointer-events-none bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/20 shadow-md">
                         🔄 Fare veya dokunarak 360° döndürün, tekerlekle yakınlaştırın
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between p-3 border-t border-white/10 bg-white/[0.02]">
-                    <span className="text-xs text-slate-400">
+                <div className="flex items-center justify-between p-3 border-t border-white/10 bg-white/[0.04]">
+                    <span className="text-xs text-slate-200 font-medium">
                         {molecule.description}
                     </span>
 
