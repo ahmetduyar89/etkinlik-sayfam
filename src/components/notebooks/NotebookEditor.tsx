@@ -22,6 +22,7 @@ import {
     Trash2,
     Undo2,
     Users,
+    FileText,
 } from 'lucide-react';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
 import { DrawingToolbar } from '../drawing/DrawingToolbar';

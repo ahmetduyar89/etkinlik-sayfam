@@ -126,7 +126,7 @@ export async function getPdfDocument(id: string, data?: ArrayBuffer): Promise<an
 
     const loadPromise = (async () => {
         const pdfjs = await ensurePdfjsLoaded();
-        let buffer = data;
+        let buffer: ArrayBuffer | null | undefined = data;
         if (!buffer) {
             buffer = await loadPdfFromDB(id);
         }
