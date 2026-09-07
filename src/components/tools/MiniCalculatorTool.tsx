@@ -103,29 +103,32 @@ export function MiniCalculatorTool({ onClose }: MiniCalculatorToolProps) {
     };
 
     return (
-        <motion.div
-            drag
-            dragControls={dragControls}
-            dragListener={false}
-            dragMomentum={false}
-            dragElastic={0}
-            className="fixed z-[11500] pointer-events-auto select-none"
-            style={{
-                top: 180,
-                left: 100,
-                touchAction: 'none',
-            }}
-        >
-            <div className="bg-slate-900/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl text-white w-64 overflow-hidden">
-                {/* Header */}
-                <div className="flex items-center justify-between px-3 py-2 bg-white/5 border-b border-white/10">
-                    <div
-                        onPointerDown={(e) => dragControls.start(e)}
-                        className="flex items-center gap-1.5 cursor-grab active:cursor-grabbing text-xs font-bold text-slate-300 hover:text-white"
-                    >
-                        <Move className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>Hesap Makinesi</span>
-                    </div>
+        <div className="fixed inset-0 z-[11500] pointer-events-none flex items-center justify-center p-4 overflow-hidden">
+            <motion.div
+                drag
+                dragControls={dragControls}
+                dragListener={false}
+                dragMomentum={false}
+                dragElastic={0}
+                className="pointer-events-auto select-none"
+                style={{
+                    touchAction: 'none',
+                }}
+            >
+                <div className="bg-slate-900/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl text-white w-64 overflow-hidden">
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-3 py-2 bg-white/5 border-b border-white/10">
+                        <div
+                            onPointerDown={(e) => {
+                                if ((e.target as HTMLElement).closest('button, input, select, textarea')) return;
+                                e.preventDefault();
+                                dragControls.start(e);
+                            }}
+                            className="flex items-center gap-1.5 cursor-grab active:cursor-grabbing text-xs font-bold text-slate-300 hover:text-white"
+                        >
+                            <Move className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>Hesap Makinesi</span>
+                        </div>
 
                     <div className="flex items-center gap-1">
                         <button
@@ -320,5 +323,6 @@ export function MiniCalculatorTool({ onClose }: MiniCalculatorToolProps) {
                 )}
             </div>
         </motion.div>
+        </div>
     );
 }

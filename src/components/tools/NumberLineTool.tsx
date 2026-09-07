@@ -113,29 +113,32 @@ export function NumberLineTool({ onClose }: NumberLineToolProps) {
     const lineY = 40;
 
     return (
-        <motion.div
-            drag
-            dragControls={dragControls}
-            dragListener={false}
-            dragMomentum={false}
-            dragElastic={0}
-            className="fixed z-[11500] pointer-events-auto select-none"
-            style={{
-                top: 280,
-                left: 220,
-                touchAction: 'none',
-            }}
-        >
-            <div className="bg-slate-900/95 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-2xl text-white w-[560px]">
-                {/* Header */}
-                <div className="flex items-center justify-between pb-3 border-b border-white/10 gap-2">
-                    <div
-                        onPointerDown={(e) => dragControls.start(e)}
-                        className="flex items-center gap-2 cursor-grab active:cursor-grabbing text-xs font-bold text-slate-300 hover:text-white"
-                    >
-                        <Move className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>Sayı Doğrusu Aracı</span>
-                    </div>
+        <div className="fixed inset-0 z-[11500] pointer-events-none flex items-center justify-center p-4 overflow-hidden">
+            <motion.div
+                drag
+                dragControls={dragControls}
+                dragListener={false}
+                dragMomentum={false}
+                dragElastic={0}
+                className="pointer-events-auto select-none"
+                style={{
+                    touchAction: 'none',
+                }}
+            >
+                <div className="bg-slate-900/95 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-2xl text-white w-[min(94vw,560px)]">
+                    {/* Header */}
+                    <div className="flex items-center justify-between pb-3 border-b border-white/10 gap-2">
+                        <div
+                            onPointerDown={(e) => {
+                                if ((e.target as HTMLElement).closest('button, input, select, textarea')) return;
+                                e.preventDefault();
+                                dragControls.start(e);
+                            }}
+                            className="flex items-center gap-2 cursor-grab active:cursor-grabbing text-xs font-bold text-slate-300 hover:text-white"
+                        >
+                            <Move className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>Sayı Doğrusu Aracı</span>
+                        </div>
 
                     <div className="flex items-center gap-1.5">
                         <button
@@ -369,5 +372,6 @@ export function NumberLineTool({ onClose }: NumberLineToolProps) {
                 </div>
             </div>
         </motion.div>
+        </div>
     );
 }

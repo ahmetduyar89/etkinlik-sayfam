@@ -271,26 +271,37 @@ export function Interactive3DStationTool({ onClose, onInsertImage }: Interactive
     };
 
     return (
-        <motion.div
-            drag={!isMaximized}
-            dragListener={false}
-            dragControls={dragControls}
-            dragMomentum={false}
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className={cn(
-                'fixed z-[5000] flex flex-col bg-[#0b101b]/95 backdrop-blur-2xl border border-indigo-500/30 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] rounded-2xl overflow-hidden transition-all duration-300 select-none text-white',
-                isMaximized
-                    ? 'inset-4 w-auto h-auto'
-                    : 'w-[min(94vw,700px)] h-[580px] top-[9%] left-[calc(50%-350px)] max-h-[88vh]'
-            )}
-        >
-            {/* Üst Bar */}
-            <div
-                onPointerDown={(e) => !isMaximized && dragControls.start(e)}
-                className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-slate-900/90 via-slate-800/80 to-slate-900/90 border-b border-white/10 cursor-grab active:cursor-grabbing"
+        <div className="fixed inset-0 z-[5000] pointer-events-none flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+            <motion.div
+                key={isMaximized ? 'maximized' : 'normal'}
+                drag={!isMaximized}
+                dragListener={false}
+                dragControls={dragControls}
+                dragMomentum={false}
+                dragElastic={0}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                style={{ touchAction: 'none' }}
+                className={cn(
+                    'pointer-events-auto flex flex-col bg-[#0b101b]/95 backdrop-blur-2xl border border-indigo-500/30 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] rounded-2xl overflow-hidden select-none text-white',
+                    isMaximized
+                        ? 'w-full h-full'
+                        : 'w-[min(94vw,760px)] h-[min(90vh,620px)]'
+                )}
             >
+                {/* Üst Bar */}
+                <div
+                    onPointerDown={(e) => {
+                        if ((e.target as HTMLElement).closest('button, input, select, textarea, a')) return;
+                        e.preventDefault();
+                        if (!isMaximized) dragControls.start(e);
+                    }}
+                    className={cn(
+                        'flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-slate-900/90 via-slate-800/80 to-slate-900/90 border-b border-white/10 select-none cursor-grab active:cursor-grabbing',
+                        isMaximized && 'cursor-default'
+                    )}
+                >
                 <div className="flex items-center gap-2">
                     <Move className="w-4 h-4 text-indigo-400" />
                     <span className="text-sm font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-sky-200 to-purple-300">
@@ -629,6 +640,7 @@ export function Interactive3DStationTool({ onClose, onInsertImage }: Interactive
                 </div>
             )}
         </motion.div>
+        </div>
     );
 }
 

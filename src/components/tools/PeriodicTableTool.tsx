@@ -79,29 +79,32 @@ export function PeriodicTableTool({ onClose }: PeriodicTableToolProps) {
     const activeColor = CATEGORY_COLORS[selectedElement.category] || CATEGORY_COLORS.nonmetal;
 
     return (
-        <motion.div
-            drag
-            dragControls={dragControls}
-            dragListener={false}
-            dragMomentum={false}
-            dragElastic={0}
-            className="fixed z-[11500] pointer-events-auto select-none"
-            style={{
-                top: 150,
-                left: 180,
-                touchAction: 'none',
-            }}
-        >
-            <div className="bg-slate-900/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl text-white w-[640px] overflow-hidden">
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 bg-white/5 border-b border-white/10">
-                    <div
-                        onPointerDown={(e) => dragControls.start(e)}
-                        className="flex items-center gap-2 cursor-grab active:cursor-grabbing text-xs font-bold text-slate-200 hover:text-white"
-                    >
-                        <Move className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>Periyodik Tablo Hızlı Referansı</span>
-                    </div>
+        <div className="fixed inset-0 z-[11500] pointer-events-none flex items-center justify-center p-4 overflow-hidden">
+            <motion.div
+                drag
+                dragControls={dragControls}
+                dragListener={false}
+                dragMomentum={false}
+                dragElastic={0}
+                className="pointer-events-auto select-none"
+                style={{
+                    touchAction: 'none',
+                }}
+            >
+                <div className="bg-slate-900/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl text-white w-[min(94vw,640px)] overflow-hidden">
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3 bg-white/5 border-b border-white/10">
+                        <div
+                            onPointerDown={(e) => {
+                                if ((e.target as HTMLElement).closest('button, input, select, textarea')) return;
+                                e.preventDefault();
+                                dragControls.start(e);
+                            }}
+                            className="flex items-center gap-2 cursor-grab active:cursor-grabbing text-xs font-bold text-slate-200 hover:text-white"
+                        >
+                            <Move className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>Periyodik Tablo Hızlı Referansı</span>
+                        </div>
 
                     <div className="flex items-center gap-2">
                         <div className="relative">
@@ -221,5 +224,6 @@ export function PeriodicTableTool({ onClose }: PeriodicTableToolProps) {
                 </div>
             </div>
         </motion.div>
+        </div>
     );
 }

@@ -623,30 +623,39 @@ export function SimpleMachinesTool({ onClose, onInsertImage }: SimpleMachinesToo
     };
 
     return (
-        <motion.div
-            ref={containerRef}
-            drag={!isMaximized}
-            dragControls={dragControls}
-            dragListener={false}
-            dragMomentum={false}
-            initial={{ opacity: 0, scale: 0.94, y: 20 }}
-            animate={{
-                opacity: 1,
-                scale: 1,
-                width: isMaximized ? '98vw' : '780px',
-                height: isMaximized ? '95vh' : '560px',
-            }}
-            exit={{ opacity: 0, scale: 0.94, y: 20 }}
-            className={cn(
-                'fixed z-[5100] flex flex-col bg-[#13151f]/95 backdrop-blur-xl border border-indigo-500/30 rounded-2xl shadow-2xl overflow-hidden',
-                isMaximized ? 'top-3 left-3' : 'top-14 left-1/2 -translate-x-1/2'
-            )}
-        >
-            {/* Üst Başlık Çubuğu */}
-            <div
-                onPointerDown={(e) => dragControls.start(e)}
-                className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-indigo-950/80 via-[#181a29] to-[#13151f] border-b border-white/10 cursor-grab active:cursor-grabbing select-none"
+        <div className="fixed inset-0 z-[5100] pointer-events-none flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+            <motion.div
+                key={isMaximized ? 'maximized' : 'normal'}
+                ref={containerRef}
+                drag={!isMaximized}
+                dragControls={dragControls}
+                dragListener={false}
+                dragMomentum={false}
+                dragElastic={0}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{
+                    opacity: 1,
+                    scale: 1,
+                }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                style={{ touchAction: 'none' }}
+                className={cn(
+                    'pointer-events-auto flex flex-col bg-[#13151f]/95 backdrop-blur-xl border border-indigo-500/30 rounded-2xl shadow-2xl overflow-hidden select-none',
+                    isMaximized ? 'w-full h-full' : 'w-[min(96vw,840px)] h-[min(90vh,600px)]'
+                )}
             >
+                {/* Üst Başlık Çubuğu */}
+                <div
+                    onPointerDown={(e) => {
+                        if ((e.target as HTMLElement).closest('button, input, select, textarea')) return;
+                        e.preventDefault();
+                        if (!isMaximized) dragControls.start(e);
+                    }}
+                    className={cn(
+                        'flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-indigo-950/80 via-[#181a29] to-[#13151f] border-b border-white/10 select-none cursor-grab active:cursor-grabbing',
+                        isMaximized && 'cursor-default'
+                    )}
+                >
                 <div className="flex items-center gap-2.5">
                     <div className="p-1.5 rounded-lg bg-indigo-600/30 text-indigo-400">
                         <Scale className="w-5 h-5" />
@@ -1070,5 +1079,6 @@ export function SimpleMachinesTool({ onClose, onInsertImage }: SimpleMachinesToo
                 </div>
             </div>
         </motion.div>
+        </div>
     );
 }

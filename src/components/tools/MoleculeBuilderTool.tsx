@@ -875,37 +875,40 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
     };
 
     return (
-        <motion.div
-            key={isMaximized ? 'maximized' : 'normal'}
-            ref={containerRef}
-            drag={!isMaximized}
-            dragControls={dragControls}
-            dragListener={false}
-            dragMomentum={false}
-            dragElastic={0}
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            className={cn(
-                'fixed z-[5100] flex flex-col bg-[#0f111a]/95 backdrop-blur-xl border border-indigo-500/30 rounded-2xl shadow-2xl overflow-hidden select-none',
-                isMaximized
-                    ? 'top-3 left-3 right-3 bottom-3 w-auto h-auto'
-                    : 'top-10 left-[max(12px,calc(50%-440px))] w-[min(96vw,880px)] h-[min(88vh,640px)]'
-            )}
-        >
-            <canvas ref={canvasHiddenRef} className="hidden" />
-
-            {/* ── Üst Başlık Çubuğu ────────────────────────────────────────── */}
-            <div
-                onPointerDown={(e) => {
-                    if ((e.target as HTMLElement).closest('button')) return;
-                    if (!isMaximized) dragControls.start(e);
-                }}
+        <div className="fixed inset-0 z-[5100] pointer-events-none flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+            <motion.div
+                key={isMaximized ? 'maximized' : 'normal'}
+                ref={containerRef}
+                drag={!isMaximized}
+                dragControls={dragControls}
+                dragListener={false}
+                dragMomentum={false}
+                dragElastic={0}
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                style={{ touchAction: 'none' }}
                 className={cn(
-                    'flex items-center justify-between px-4 py-2.5 bg-white/[0.04] border-b border-white/10 select-none',
-                    !isMaximized ? 'cursor-grab active:cursor-grabbing' : ''
+                    'pointer-events-auto flex flex-col bg-[#0f111a]/95 backdrop-blur-xl border border-indigo-500/30 rounded-2xl shadow-2xl overflow-hidden select-none',
+                    isMaximized
+                        ? 'w-full h-full'
+                        : 'w-[min(96vw,880px)] h-[min(88vh,640px)]'
                 )}
             >
+                <canvas ref={canvasHiddenRef} className="hidden" />
+
+                {/* ── Üst Başlık Çubuğu ────────────────────────────────────────── */}
+                <div
+                    onPointerDown={(e) => {
+                        if ((e.target as HTMLElement).closest('button, input, select, textarea')) return;
+                        e.preventDefault();
+                        if (!isMaximized) dragControls.start(e);
+                    }}
+                    className={cn(
+                        'flex items-center justify-between px-4 py-2.5 bg-white/[0.04] border-b border-white/10 select-none',
+                        !isMaximized ? 'cursor-grab active:cursor-grabbing' : ''
+                    )}
+                >
                 <div className="flex items-center gap-2.5">
                     {!isMaximized && (
                         <div className="p-1 rounded-md text-slate-500 hover:text-white" title="Pencereyi Taşı">
@@ -1487,6 +1490,9 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                                 <div className="p-1 rounded-md bg-indigo-500/30 text-indigo-200 ml-1">
                                     <Plus className="w-3.5 h-3.5" />
                                 </div>
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -1502,7 +1508,8 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                     onInsertImage={onInsertImage}
                 />
             )}
-        </motion.div>
+            </motion.div>
+        </div>
     );
 }
 

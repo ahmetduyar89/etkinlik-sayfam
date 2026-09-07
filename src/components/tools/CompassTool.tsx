@@ -40,30 +40,33 @@ export function CompassTool({ onClose, onDrawCircle }: CompassToolProps) {
     };
 
     return (
-        <motion.div
-            ref={toolRef}
-            drag
-            dragControls={dragControls}
-            dragListener={false}
-            dragMomentum={false}
-            dragElastic={0}
-            className="fixed z-[11500] pointer-events-auto select-none"
-            style={{
-                top: 200,
-                left: 300,
-                touchAction: 'none',
-            }}
-        >
-            <div className="relative bg-slate-900/90 backdrop-blur-md rounded-2xl p-3 border border-white/10 shadow-2xl text-white min-w-[280px]">
-                {/* Header controls */}
-                <div className="flex items-center justify-between pb-2 border-b border-white/10 gap-2">
-                    <div
-                        onPointerDown={(e) => dragControls.start(e)}
-                        className="flex items-center gap-1.5 cursor-grab active:cursor-grabbing text-xs font-bold text-slate-300 hover:text-white"
-                    >
-                        <Move className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>İnteraktif Pergel</span>
-                    </div>
+        <div className="fixed inset-0 z-[11500] pointer-events-none flex items-center justify-center p-4 overflow-hidden">
+            <motion.div
+                ref={toolRef}
+                drag
+                dragControls={dragControls}
+                dragListener={false}
+                dragMomentum={false}
+                dragElastic={0}
+                className="pointer-events-auto select-none"
+                style={{
+                    touchAction: 'none',
+                }}
+            >
+                <div className="relative bg-slate-900/90 backdrop-blur-md rounded-2xl p-3 border border-white/10 shadow-2xl text-white min-w-[280px]">
+                    {/* Header controls */}
+                    <div className="flex items-center justify-between pb-2 border-b border-white/10 gap-2">
+                        <div
+                            onPointerDown={(e) => {
+                                if ((e.target as HTMLElement).closest('button, input, select, textarea')) return;
+                                e.preventDefault();
+                                dragControls.start(e);
+                            }}
+                            className="flex items-center gap-1.5 cursor-grab active:cursor-grabbing text-xs font-bold text-slate-300 hover:text-white"
+                        >
+                            <Move className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>İnteraktif Pergel</span>
+                        </div>
 
                     <div className="flex items-center gap-1">
                         <button
@@ -187,5 +190,6 @@ export function CompassTool({ onClose, onDrawCircle }: CompassToolProps) {
                 </div>
             </div>
         </motion.div>
+        </div>
     );
 }

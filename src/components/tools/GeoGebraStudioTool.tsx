@@ -591,47 +591,57 @@ export function GeoGebraStudioTool({
     };
 
     return (
-        <motion.div
-            key={`${viewMode}_${resetPositionKey}`}
-            ref={containerRef}
-            drag={viewMode !== 'maximized'}
-            dragControls={dragControls}
-            dragListener={false}
-            dragMomentum={false}
-            dragElastic={0}
-            onDragStart={() => setIsDragging(true)}
-            onDragEnd={() => setIsDragging(false)}
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{
-                opacity: isSemiTransparent ? 0.82 : 1,
-                scale: 1,
-            }}
-            exit={{ opacity: 0, scale: 0.96 }}
+        <div
             className={cn(
-                'fixed z-[5500] flex flex-col bg-slate-900 border border-slate-700/80 shadow-2xl rounded-2xl overflow-hidden backdrop-blur-xl transition-[width,height,opacity] duration-200',
-                viewMode === 'maximized'
-                    ? 'top-3 left-3 right-3 bottom-3 w-auto h-auto'
-                    : viewMode === 'docked'
-                    ? 'bottom-6 right-6 w-[min(92vw,480px)] h-[min(70vh,440px)] shadow-indigo-500/20'
-                    : 'top-[65px] left-[max(12px,calc(50%-445px))] w-[min(95vw,890px)] h-[min(78vh,600px)]'
+                'fixed inset-0 z-[5500] pointer-events-none flex overflow-hidden',
+                viewMode === 'docked'
+                    ? 'items-end justify-end p-6'
+                    : 'items-center justify-center p-3 sm:p-6'
             )}
-            style={{ touchAction: 'none' }}
         >
-            {/* ── İframe Fare Kalkanı (Sürükleme anında iframenin fareyi yutmasını önler) ── */}
-            {isDragging && (
-                <div className="absolute inset-0 z-50 bg-transparent cursor-grabbing select-none" />
-            )}
-
-            {/* ── Üst Başlık Barı (Draggable Header) ── */}
-            <div
-                onPointerDown={(e) => {
-                    // Yalnızca buton olmayan boş alanlara tıklandığında taşımayı başlat
-                    if (viewMode !== 'maximized' && (e.target as HTMLElement).tagName !== 'BUTTON' && !(e.target as HTMLElement).closest('button')) {
-                        dragControls.start(e);
-                    }
+            <motion.div
+                key={`${viewMode}_${resetPositionKey}`}
+                ref={containerRef}
+                drag={viewMode !== 'maximized'}
+                dragControls={dragControls}
+                dragListener={false}
+                dragMomentum={false}
+                dragElastic={0}
+                onDragStart={() => setIsDragging(true)}
+                onDragEnd={() => setIsDragging(false)}
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{
+                    opacity: isSemiTransparent ? 0.82 : 1,
+                    scale: 1,
                 }}
-                className="px-4 py-2.5 bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border-b border-white/10 flex items-center justify-between cursor-grab active:cursor-grabbing select-none"
+                exit={{ opacity: 0, scale: 0.96 }}
+                className={cn(
+                    'pointer-events-auto flex flex-col bg-slate-900 border border-slate-700/80 shadow-2xl rounded-2xl overflow-hidden backdrop-blur-xl select-none',
+                    viewMode === 'maximized'
+                        ? 'w-full h-full'
+                        : viewMode === 'docked'
+                        ? 'w-[min(92vw,480px)] h-[min(70vh,440px)] shadow-indigo-500/20'
+                        : 'w-[min(95vw,890px)] h-[min(85vh,640px)]'
+                )}
+                style={{ touchAction: 'none' }}
             >
+                {/* ── İframe Fare Kalkanı (Sürükleme anında iframenin fareyi yutmasını önler) ── */}
+                {isDragging && (
+                    <div className="absolute inset-0 z-50 bg-transparent cursor-grabbing select-none" />
+                )}
+
+                {/* ── Üst Başlık Barı (Draggable Header) ── */}
+                <div
+                    onPointerDown={(e) => {
+                        if ((e.target as HTMLElement).closest('button, input, select, textarea, a')) return;
+                        e.preventDefault();
+                        if (viewMode !== 'maximized') dragControls.start(e);
+                    }}
+                    className={cn(
+                        'px-4 py-2.5 bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border-b border-white/10 flex items-center justify-between select-none cursor-grab active:cursor-grabbing',
+                        viewMode === 'maximized' && 'cursor-default'
+                    )}
+                >
                 <div className="flex items-center gap-2.5">
                     {/* Belirgin Taşıma Tutamacı */}
                     <div
@@ -953,5 +963,6 @@ export function GeoGebraStudioTool({
                 </div>
             </div>
         </motion.div>
+        </div>
     );
 }
