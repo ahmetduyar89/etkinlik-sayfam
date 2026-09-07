@@ -123,7 +123,8 @@ export function RulerTool({ onClose }: RulerToolProps) {
                     </button>
                 </div>
             </div>
-        </motion.div>
         </div>
+    </motion.div>
+</div>
     );
 }
