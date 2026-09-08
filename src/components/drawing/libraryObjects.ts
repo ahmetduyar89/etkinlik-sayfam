@@ -193,14 +193,14 @@ export const LIBRARY_GROUPS: ReadonlyArray<ObjectGroup> = [
     {
         label: '🎯 8. Sınıf LGS',
         categories: [
-            { label: 'LGS Matematik', items: [NEW_BRANCH_TOOL_ITEMS[4], NEW_BRANCH_TOOL_ITEMS[2], NEW_BRANCH_TOOL_ITEMS[3], ...GRADE8_MATH_ITEMS] },
+            { label: 'LGS Matematik', items: [GEOMETRY_SIM_ITEMS[0], NEW_BRANCH_TOOL_ITEMS[4], NEW_BRANCH_TOOL_ITEMS[2], NEW_BRANCH_TOOL_ITEMS[3], ...GRADE8_MATH_ITEMS] },
             { label: 'LGS Fen Bilimleri', items: [NEW_BRANCH_TOOL_ITEMS[4], NEW_BRANCH_TOOL_ITEMS[0], NEW_BRANCH_TOOL_ITEMS[1], ...GRADE8_ITEMS] },
         ],
     },
     {
         label: '🎒 Ortaokul (5-7)',
         categories: [
-            { label: 'Ortaokul Matematik', items: MIDDLE_SCHOOL_MATH_ITEMS },
+            { label: 'Ortaokul Matematik', items: [GEOMETRY_SIM_ITEMS[0], ...MIDDLE_SCHOOL_MATH_ITEMS] },
             { label: 'Ortaokul Fen', items: MIDDLE_SCHOOL_SCIENCE_ITEMS },
         ],
     },

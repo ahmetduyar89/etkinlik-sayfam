@@ -239,6 +239,7 @@ export type MathObjectKind =
     | 'area_perimeter_sim'
     | 'probability_sim'
     | 'transform_sim'
+    | 'quadrilateral_grid_sim'
     | 'data_stats_sim'
     | 'net_fold_sim'
     | 'fraction_add_sim'

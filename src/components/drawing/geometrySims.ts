@@ -942,6 +942,808 @@ export const pythagorasSpec: SimSpec = {
     ],
 };
 
+// ── Koordinat Düzleminde Dörtgenler Simülasyonu ───────────────────────
+//
+// Visnos "Quadrilaterals on a Coordinate Grid" etkinliğinin tahtaya gömülü
+// canlı nesne karşılığı. 4 bölge / 1. bölge koordinat ızgarası, A, B, C, D
+// köşelerinin sürüklenmesi, anlık geometrik sınıflandırma (kare, dikdörtgen,
+// eşkenar dörtgen, paralelkenar, deltoid, yamuk…), eşit kenar çentikleri,
+// paralel okları, köşegenler ve eksik köşe bulmaca (challenge) modu.
+
+const QUAD_CHALLENGES = [
+    {
+        targetName: 'Dikdörtgen',
+        targetType: 'rectangle',
+        a: [-4, 3],
+        b: [2, 3],
+        c: [2, -1],
+        targetD: [-4, -1],
+        hint: 'Karşılıklı kenarlar eşit ve paraleldir, açılar 90° olmalıdır.',
+    },
+    {
+        targetName: 'Paralelkenar',
+        targetType: 'parallelogram',
+        a: [-3, 2],
+        b: [3, 2],
+        c: [1, -2],
+        targetD: [-5, -2],
+        hint: 'AB kenarının uzunluğu ve eğimi DC kenarı için de geçerlidir.',
+    },
+    {
+        targetName: 'Kare',
+        targetType: 'square',
+        a: [-2, 2],
+        b: [2, 2],
+        c: [2, -2],
+        targetD: [-2, -2],
+        hint: 'Tüm kenarlar eşit (4 birim) ve köşeler 90° dik olmalıdır.',
+    },
+    {
+        targetName: 'Eşkenar Dörtgen',
+        targetType: 'rhombus',
+        a: [0, 3],
+        b: [4, 0],
+        c: [0, -3],
+        targetD: [-4, 0],
+        hint: '4 kenarı eşit uzunlukta ve köşegenleri dik kesişmelidir.',
+    },
+    {
+        targetName: 'İkizkenar Yamuk',
+        targetType: 'isosceles_trapezoid',
+        a: [-2, 3],
+        b: [2, 3],
+        c: [4, -2],
+        targetD: [-4, -2],
+        hint: 'Alt ve üst kenar paralel olmalı, yan kenar boyları eşit olmalıdır.',
+    },
+    {
+        targetName: 'Deltoid (Uçurtma)',
+        targetType: 'kite',
+        a: [0, 3],
+        b: [3, 1],
+        c: [0, -3],
+        targetD: [-3, 1],
+        hint: 'Ardışık kenar çiftleri eşit ve tepe noktası simetriktir.',
+    },
+];
+
+const QUAD_RANDOM_PRESETS = [
+    { a: [-3, 3], b: [3, 3], c: [3, -1], d: [-3, -1] }, // Dikdörtgen
+    { a: [-2, 2], b: [2, 2], c: [2, -2], d: [-2, -2] }, // Kare
+    { a: [-4, 2], b: [2, 2], c: [0, -2], d: [-6, -2] }, // Paralelkenar
+    { a: [0, 4], b: [3, 0], c: [0, -4], d: [-3, 0] }, // Eşkenar Dörtgen
+    { a: [-2, 3], b: [2, 3], c: [4, -2], d: [-4, -2] }, // İkizkenar Yamuk
+    { a: [-3, 3], b: [3, 3], c: [3, -2], d: [-5, -2] }, // Dik Yamuk
+    { a: [0, 4], b: [3, 1], c: [0, -3], d: [-3, 1] }, // Deltoid
+    { a: [0, 3], b: [3, -1], c: [0, 1], d: [-3, -1] }, // Dart
+    { a: [-4, 3], b: [3, 2], c: [2, -3], d: [-3, -1] }, // Çeşitkenar
+];
+
+interface QuadrilateralState {
+    ax: number;
+    ay: number;
+    bx: number;
+    by: number;
+    cx: number;
+    cy: number;
+    dx: number;
+    dy: number;
+    quadrant: number; // 0: 4 Bölge (-7..7, -5..5), 1: 1. Bölge (0..10, 0..8)
+    showName: number; // 0: ?, 1: açık
+    showCoords: number; // 0: ?, 1: açık
+    showEqualSides: number; // 0: kapalı, 1: açık
+    showParallel: number; // 0: kapalı, 1: açık
+    showDiagonals: number; // 0: kapalı, 1: açık
+    mode: number; // 0: Serbest Keşif, 1: Eksik Köşe Görevi
+    challengeIdx: number;
+}
+
+const quadState = (o: MathObject): QuadrilateralState => {
+    const quadrant = clampInt(simValue(o, 'quadrant', 0), 0, 1, 0);
+    const minX = quadrant === 0 ? -7 : 0;
+    const maxX = quadrant === 0 ? 7 : 10;
+    const minY = quadrant === 0 ? -5 : 0;
+    const maxY = quadrant === 0 ? 5 : 8;
+
+    return {
+        ax: clampInt(simValue(o, 'ax', quadrant === 0 ? -3 : 2), minX, maxX, -3),
+        ay: clampInt(simValue(o, 'ay', quadrant === 0 ? 3 : 6), minY, maxY, 3),
+        bx: clampInt(simValue(o, 'bx', quadrant === 0 ? 3 : 8), minX, maxX, 3),
+        by: clampInt(simValue(o, 'by', quadrant === 0 ? 3 : 6), minY, maxY, 3),
+        cx: clampInt(simValue(o, 'cx', quadrant === 0 ? 3 : 8), minX, maxX, 3),
+        cy: clampInt(simValue(o, 'cy', quadrant === 0 ? -2 : 2), minY, maxY, -2),
+        dx: clampInt(simValue(o, 'dx', quadrant === 0 ? -3 : 2), minX, maxX, -3),
+        dy: clampInt(simValue(o, 'dy', quadrant === 0 ? -2 : 2), minY, maxY, -2),
+        quadrant,
+        showName: clampInt(simValue(o, 'showName', 1), 0, 1, 1),
+        showCoords: clampInt(simValue(o, 'showCoords', 1), 0, 1, 1),
+        showEqualSides: clampInt(simValue(o, 'showEqualSides', 1), 0, 1, 1),
+        showParallel: clampInt(simValue(o, 'showParallel', 1), 0, 1, 1),
+        showDiagonals: clampInt(simValue(o, 'showDiagonals', 0), 0, 1, 0),
+        mode: clampInt(simValue(o, 'mode', 0), 0, 1, 0),
+        challengeIdx: clampInt(simValue(o, 'challengeIdx', 0), 0, QUAD_CHALLENGES.length - 1, 0),
+    };
+};
+
+function quadGeom(r: Rect, s: QuadrilateralState) {
+    const isQ1 = s.quadrant === 1;
+    const minX = isQ1 ? 0 : -7;
+    const maxX = isQ1 ? 10 : 7;
+    const minY = isQ1 ? 0 : -5;
+    const maxY = isQ1 ? 8 : 5;
+
+    const topBarH = 46;
+    const bottomBarH = 28;
+    const padX = 26;
+
+    const plotW = r.w - padX * 2;
+    const plotH = r.h - topBarH - bottomBarH;
+
+    const u = Math.min(plotW / (maxX - minX), plotH / (maxY - minY));
+
+    const totalGridW = (maxX - minX) * u;
+    const totalGridH = (maxY - minY) * u;
+
+    const ox = r.x + padX + (plotW - totalGridW) / 2 + (isQ1 ? 0 : 7 * u);
+    const oy = r.y + topBarH + (plotH - totalGridH) / 2 + (isQ1 ? 8 * u : 5 * u);
+
+    const p = (x: number, y: number) => ({
+        x: ox + x * u,
+        y: oy - y * u,
+    });
+
+    const toGrid = (sx: number, sy: number) => ({
+        x: clampInt(Math.round((sx - ox) / u), minX, maxX, 0),
+        y: clampInt(Math.round((oy - sy) / u), minY, maxY, 0),
+    });
+
+    return { ox, oy, u, minX, maxX, minY, maxY, topBarH, bottomBarH, p, toGrid };
+}
+
+function detectQuadrilateral(A: [number, number], B: [number, number], C: [number, number], D: [number, number]) {
+    const v1 = [B[0] - A[0], B[1] - A[1]];
+    const v2 = [C[0] - B[0], C[1] - B[1]];
+    const v3 = [D[0] - C[0], D[1] - C[1]];
+    const v4 = [A[0] - D[0], A[1] - D[1]];
+
+    const l1 = Math.hypot(v1[0], v1[1]);
+    const l2 = Math.hypot(v2[0], v2[1]);
+    const l3 = Math.hypot(v3[0], v3[1]);
+    const l4 = Math.hypot(v4[0], v4[1]);
+
+    const eq = (a: number, b: number) => Math.abs(a - b) < 0.05;
+
+    // Kesişim / Çapraz kontrolü (Segments intersection)
+    const ccw = (p1: [number, number], p2: [number, number], p3: [number, number]) =>
+        (p3[1] - p1[1]) * (p2[0] - p1[0]) > (p2[1] - p1[1]) * (p3[0] - p1[0]);
+    const intersect = (p1: [number, number], p2: [number, number], p3: [number, number], p4: [number, number]) =>
+        ccw(p1, p3, p4) !== ccw(p2, p3, p4) && ccw(p1, p2, p3) !== ccw(p1, p2, p4);
+
+    const isCrossed = intersect(A, B, C, D) || intersect(B, C, D, A);
+
+    // Paralellik kontrolü: AB || CD (v1 ve -v3), BC || DA (v2 ve -v4)
+    const cross13 = v1[0] * v3[1] - v1[1] * v3[0];
+    const cross24 = v2[0] * v4[1] - v2[1] * v4[0];
+    const par13 = Math.abs(cross13) < 0.001 && l1 > 0 && l3 > 0;
+    const par24 = Math.abs(cross24) < 0.001 && l2 > 0 && l4 > 0;
+
+    // Diklik / Açılar kontrolü (Köşelerdeki iç çarpımlar)
+    // A açısı: AB (v1) ile AD (-v4)
+    const dpA = v1[0] * -v4[0] + v1[1] * -v4[1];
+    // B açısı: BA (-v1) ile BC (v2)
+    const dpB = -v1[0] * v2[0] + -v1[1] * v2[1];
+    // C açısı: CB (-v2) ile CD (v3)
+    const dpC = -v2[0] * v3[0] + -v2[1] * v3[1];
+    // D açısı: DC (-v3) ile DA (v4)
+    const dpD = -v3[0] * v4[0] + -v3[1] * v4[1];
+
+    const isRightA = Math.abs(dpA) < 0.001;
+    const isRightB = Math.abs(dpB) < 0.001;
+    const isRightC = Math.abs(dpC) < 0.001;
+    const isRightD = Math.abs(dpD) < 0.001;
+    const allRight = isRightA && isRightB && isRightC && isRightD;
+
+    // Dışbükeylik / İçbükeylik (Cross products)
+    const cp1 = v1[0] * v2[1] - v1[1] * v2[0];
+    const cp2 = v2[0] * v3[1] - v2[1] * v3[0];
+    const cp3 = v3[0] * v4[1] - v3[1] * v4[0];
+    const cp4 = v4[0] * v1[1] - v4[1] * v1[0];
+    const signs = [cp1, cp2, cp3, cp4].map((s) => (s > 0.001 ? 1 : s < -0.001 ? -1 : 0));
+    const posCount = signs.filter((s) => s === 1).length;
+    const negCount = signs.filter((s) => s === -1).length;
+    const isConvex = posCount === 4 || negCount === 4;
+    const isConcave = (posCount === 3 && negCount === 1) || (posCount === 1 && negCount === 3);
+
+    // Alan (Shoelace formülü)
+    const area =
+        Math.abs(
+            A[0] * B[1] -
+                A[1] * B[0] +
+                (B[0] * C[1] - B[1] * C[0]) +
+                (C[0] * D[1] - C[1] * D[0]) +
+                (D[0] * A[1] - D[1] * A[0])
+        ) / 2;
+    const perimeter = l1 + l2 + l3 + l4;
+
+    // Köşegenler: AC ve BD
+    const ac = [C[0] - A[0], C[1] - A[1]];
+    const bd = [D[0] - B[0], D[1] - B[1]];
+    const diagPerp = Math.abs(ac[0] * bd[0] + ac[1] * bd[1]) < 0.001;
+
+    let type = 'general';
+    let name = 'Çeşitkenar Dörtgen';
+
+    if (l1 === 0 || l2 === 0 || l3 === 0 || l4 === 0 || area < 0.01) {
+        type = 'degenerate';
+        name = 'Geçersiz / Doğrusal';
+    } else if (isCrossed) {
+        type = 'crossed';
+        name = 'Kendini Kesen (Çapraz)';
+    } else if (par13 && par24) {
+        const allSidesEq = eq(l1, l2) && eq(l2, l3) && eq(l3, l4);
+        if (allSidesEq) {
+            if (allRight) {
+                type = 'square';
+                name = 'Kare';
+            } else {
+                type = 'rhombus';
+                name = 'Eşkenar Dörtgen';
+            }
+        } else if (allRight) {
+            type = 'rectangle';
+            name = 'Dikdörtgen';
+        } else {
+            type = 'parallelogram';
+            name = 'Paralelkenar';
+        }
+    } else if (par13 || par24) {
+        const nonParSidesEq = par13 ? eq(l2, l4) : eq(l1, l3);
+        const rightAnglesCount = [isRightA, isRightB, isRightC, isRightD].filter(Boolean).length;
+        if (rightAnglesCount >= 2) {
+            type = 'right_trapezoid';
+            name = 'Dik Yamuk';
+        } else if (nonParSidesEq) {
+            type = 'isosceles_trapezoid';
+            name = 'İkizkenar Yamuk';
+        } else {
+            type = 'trapezoid';
+            name = 'Yamuk';
+        }
+    } else {
+        const adjPair1 = eq(l1, l2) && eq(l3, l4);
+        const adjPair2 = eq(l2, l3) && eq(l4, l1);
+        if (adjPair1 || adjPair2) {
+            if (isConcave) {
+                type = 'dart';
+                name = 'Dart (İçbükey Deltoid)';
+            } else {
+                type = 'kite';
+                name = 'Deltoid (Uçurtma)';
+            }
+        }
+    }
+
+    return {
+        type,
+        name,
+        l1,
+        l2,
+        l3,
+        l4,
+        area,
+        perimeter,
+        par13,
+        par24,
+        isRightA,
+        isRightB,
+        isRightC,
+        isRightD,
+        isCrossed,
+        diagPerp,
+    };
+}
+
+export const quadrilateralGridRender: Renderer = (k) => {
+    const { r } = k;
+    const s = quadState(k.o);
+    const g = quadGeom(r, s);
+
+    k.c.save();
+
+    // ── 1. Arka Plan & Çerçeve ───────────────────────────────────────
+    k.c.fillStyle = '#0f1422';
+    k.c.beginPath();
+    k.c.roundRect(r.x, r.y, r.w, r.h, 12);
+    k.c.fill();
+    k.c.strokeStyle = '#2d3748';
+    k.c.lineWidth = 1.5;
+    k.c.stroke();
+
+    // ── 2. Koordinat Izgarası ─────────────────────────────────────────
+    k.c.strokeStyle = '#1a2236';
+    k.c.lineWidth = 1;
+
+    for (let x = g.minX; x <= g.maxX; x++) {
+        const top = g.p(x, g.maxY);
+        const bot = g.p(x, g.minY);
+        k.c.beginPath();
+        k.c.moveTo(top.x, top.y);
+        k.c.lineTo(bot.x, bot.y);
+        k.c.stroke();
+    }
+    for (let y = g.minY; y <= g.maxY; y++) {
+        const left = g.p(g.minX, y);
+        const right = g.p(g.maxX, y);
+        k.c.beginPath();
+        k.c.moveTo(left.x, left.y);
+        k.c.lineTo(right.x, right.y);
+        k.c.stroke();
+    }
+
+    // ── 3. Ana Eksenler (X ve Y) ─────────────────────────────────────
+    k.c.strokeStyle = '#4a5568';
+    k.c.lineWidth = 2;
+
+    // X Ekseni
+    const xStart = g.p(g.minX, 0);
+    const xEnd = g.p(g.maxX, 0);
+    line(k, xStart.x - 4, xStart.y, xEnd.x + 8, xEnd.y, 2);
+    arrow(k, xEnd.x, xEnd.y, xEnd.x + 8, xEnd.y, 6);
+
+    // Y Ekseni
+    const yStart = g.p(0, g.minY);
+    const yEnd = g.p(0, g.maxY);
+    line(k, yStart.x, yStart.y + 4, yEnd.x, yEnd.y - 8, 2);
+    arrow(k, yEnd.x, yEnd.y, yEnd.x, yEnd.y - 8, 6);
+
+    // Sayı etiketleri (x ve y eksenleri)
+    if (!isIconSize(r)) {
+        k.c.fillStyle = '#718096';
+        k.c.font = `9px sans-serif`;
+        k.c.textAlign = 'center';
+        k.c.textBaseline = 'top';
+        for (let x = g.minX; x <= g.maxX; x += 2) {
+            if (x === 0) continue;
+            const pt = g.p(x, 0);
+            k.c.fillText(String(x), pt.x, pt.y + 3);
+        }
+        k.c.textAlign = 'right';
+        k.c.textBaseline = 'middle';
+        for (let y = g.minY; y <= g.maxY; y += 2) {
+            if (y === 0) continue;
+            const pt = g.p(0, y);
+            k.c.fillText(String(y), pt.x - 4, pt.y);
+        }
+    }
+
+    // ── 4. Noktalar ve Geometri Tespiti ──────────────────────────────
+    const A: [number, number] = [s.ax, s.ay];
+    const B: [number, number] = [s.bx, s.by];
+    const C: [number, number] = [s.cx, s.cy];
+    const D: [number, number] = [s.dx, s.dy];
+
+    const pA = g.p(A[0], A[1]);
+    const pB = g.p(B[0], B[1]);
+    const pC = g.p(C[0], C[1]);
+    const pD = g.p(D[0], D[1]);
+
+    const quadInfo = detectQuadrilateral(A, B, C, D);
+
+    // Challenge (Görev) kontrolü
+    const challenge = QUAD_CHALLENGES[s.challengeIdx];
+    const isChallengeMode = s.mode === 1;
+    const isChallengeSuccess = isChallengeMode && quadInfo.type === challenge.targetType;
+
+    // ── 5. Köşegenler ────────────────────────────────────────────────
+    if (s.showDiagonals === 1 && !isIconSize(r)) {
+        k.c.save();
+        k.c.setLineDash([4, 4]);
+        k.c.strokeStyle = '#eab308';
+        k.c.lineWidth = 1.4;
+        k.c.beginPath();
+        k.c.moveTo(pA.x, pA.y);
+        k.c.lineTo(pC.x, pC.y);
+        k.c.moveTo(pB.x, pB.y);
+        k.c.lineTo(pD.x, pD.y);
+        k.c.stroke();
+        k.c.restore();
+    }
+
+    // ── 6. Dörtgen Gövdesi (Dolgu & Kenarlar) ─────────────────────────
+    k.c.save();
+    k.c.beginPath();
+    k.c.moveTo(pA.x, pA.y);
+    k.c.lineTo(pB.x, pB.y);
+    k.c.lineTo(pC.x, pC.y);
+    k.c.lineTo(pD.x, pD.y);
+    k.c.closePath();
+
+    if (isChallengeSuccess) {
+        k.c.fillStyle = 'rgba(16, 185, 129, 0.28)';
+        k.c.strokeStyle = '#10b981';
+        k.c.lineWidth = 3;
+    } else {
+        k.c.fillStyle = 'rgba(99, 102, 241, 0.22)';
+        k.c.strokeStyle = '#6366f1';
+        k.c.lineWidth = 2.5;
+    }
+    k.c.fill();
+    k.c.stroke();
+    k.c.restore();
+
+    // ── 7. Dik Açı Sembolleri ─────────────────────────────────────────
+    if (!isIconSize(r)) {
+        const drawSquareAngle = (p: { x: number; y: number }, v1: [number, number], v2: [number, number]) => {
+            const sz = 9;
+            const l1 = Math.hypot(v1[0], v1[1]);
+            const l2 = Math.hypot(v2[0], v2[1]);
+            if (l1 === 0 || l2 === 0) return;
+            const u1 = { x: (v1[0] / l1) * sz, y: (-v1[1] / l1) * sz };
+            const u2 = { x: (v2[0] / l2) * sz, y: (-v2[1] / l2) * sz };
+            k.c.strokeStyle = '#38bdf8';
+            k.c.lineWidth = 1.3;
+            k.c.beginPath();
+            k.c.moveTo(p.x + u1.x, p.y + u1.y);
+            k.c.lineTo(p.x + u1.x + u2.x, p.y + u1.y + u2.y);
+            k.c.lineTo(p.x + u2.x, p.y + u2.y);
+            k.c.stroke();
+        };
+
+        if (quadInfo.isRightA) drawSquareAngle(pA, [B[0] - A[0], B[1] - A[1]], [D[0] - A[0], D[1] - A[1]]);
+        if (quadInfo.isRightB) drawSquareAngle(pB, [A[0] - B[0], A[1] - B[1]], [C[0] - B[0], C[1] - B[1]]);
+        if (quadInfo.isRightC) drawSquareAngle(pC, [B[0] - C[0], B[1] - C[1]], [D[0] - C[0], D[1] - C[1]]);
+        if (quadInfo.isRightD) drawSquareAngle(pD, [C[0] - D[0], C[1] - D[1]], [A[0] - D[0], A[1] - D[1]]);
+    }
+
+    // ── 8. Eşit Kenar Çentikleri & Paralel Okları ─────────────────────
+    if (s.showEqualSides === 1 && !isIconSize(r)) {
+        const drawTick = (p1: { x: number; y: number }, p2: { x: number; y: number }, count = 1) => {
+            const mx = (p1.x + p2.x) / 2;
+            const my = (p1.y + p2.y) / 2;
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const len = Math.hypot(dx, dy);
+            if (len === 0) return;
+            const nx = (-dy / len) * 5;
+            const ny = (dx / len) * 5;
+            k.c.strokeStyle = '#f43f5e';
+            k.c.lineWidth = 2;
+            if (count === 1) {
+                k.c.beginPath();
+                k.c.moveTo(mx - nx, my - ny);
+                k.c.lineTo(mx + nx, my + ny);
+                k.c.stroke();
+            } else {
+                const offX = (dx / len) * 3;
+                const offY = (dy / len) * 3;
+                k.c.beginPath();
+                k.c.moveTo(mx - offX - nx, my - offY - ny);
+                k.c.lineTo(mx - offX + nx, my - offY + ny);
+                k.c.moveTo(mx + offX - nx, my + offY - ny);
+                k.c.lineTo(mx + offX + nx, my + offY + ny);
+                k.c.stroke();
+            }
+        };
+
+        const eq = (a: number, b: number) => Math.abs(a - b) < 0.05;
+        const allEq = eq(quadInfo.l1, quadInfo.l2) && eq(quadInfo.l2, quadInfo.l3) && eq(quadInfo.l3, quadInfo.l4);
+        if (allEq) {
+            drawTick(pA, pB, 1);
+            drawTick(pB, pC, 1);
+            drawTick(pC, pD, 1);
+            drawTick(pD, pA, 1);
+        } else {
+            if (eq(quadInfo.l1, quadInfo.l3)) {
+                drawTick(pA, pB, 1);
+                drawTick(pC, pD, 1);
+            }
+            if (eq(quadInfo.l2, quadInfo.l4)) {
+                drawTick(pB, pC, 2);
+                drawTick(pD, pA, 2);
+            }
+        }
+    }
+
+    if (s.showParallel === 1 && !isIconSize(r)) {
+        const drawArrowMark = (p1: { x: number; y: number }, p2: { x: number; y: number }, count = 1) => {
+            const mx = (p1.x + p2.x) / 2;
+            const my = (p1.y + p2.y) / 2;
+            const ang = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+            k.c.save();
+            k.c.translate(mx, my);
+            k.c.rotate(ang);
+            k.c.strokeStyle = '#f59e0b';
+            k.c.lineWidth = 2;
+            if (count === 1) {
+                k.c.beginPath();
+                k.c.moveTo(-4, -4);
+                k.c.lineTo(2, 0);
+                k.c.lineTo(-4, 4);
+                k.c.stroke();
+            } else {
+                k.c.beginPath();
+                k.c.moveTo(-7, -4);
+                k.c.lineTo(-1, 0);
+                k.c.lineTo(-7, 4);
+                k.c.moveTo(-1, -4);
+                k.c.lineTo(5, 0);
+                k.c.lineTo(-1, 4);
+                k.c.stroke();
+            }
+            k.c.restore();
+        };
+
+        if (quadInfo.par13) {
+            drawArrowMark(pA, pB, 1);
+            drawArrowMark(pD, pC, 1);
+        }
+        if (quadInfo.par24) {
+            drawArrowMark(pB, pC, 2);
+            drawArrowMark(pA, pD, 2);
+        }
+    }
+
+    // ── 9. Köşe Noktaları & Etiketleri ───────────────────────────────
+    const pointsData = [
+        { pt: pA, name: 'A', coord: A, color: '#38bdf8' },
+        { pt: pB, name: 'B', coord: B, color: '#10b981' },
+        { pt: pC, name: 'C', coord: C, color: '#f59e0b' },
+        { pt: pD, name: 'D', coord: D, color: '#ec4899' },
+    ];
+
+    pointsData.forEach(({ pt, name, coord, color }) => {
+        k.c.fillStyle = color;
+        k.c.beginPath();
+        k.c.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.strokeStyle = '#ffffff';
+        k.c.lineWidth = 1.5;
+        k.c.stroke();
+
+        if (!isIconSize(r)) {
+            const coordStr = s.showCoords === 1 ? `(${coord[0]}, ${coord[1]})` : `(?, ?)`;
+            const labelStr = `${name} ${coordStr}`;
+            k.c.fillStyle = '#ffffff';
+            k.c.font = 'bold 11px sans-serif';
+            k.c.textAlign = 'center';
+            k.c.textBaseline = 'bottom';
+            k.c.fillText(labelStr, pt.x, pt.y - 8);
+        }
+    });
+
+    // ── 10. Üst Bilgi Başlığı (Header) ────────────────────────────────
+    if (!isIconSize(r)) {
+        k.c.fillStyle = 'rgba(15, 20, 34, 0.9)';
+        k.c.beginPath();
+        k.c.roundRect(r.x + 6, r.y + 6, r.w - 12, 34, 8);
+        k.c.fill();
+        k.c.strokeStyle = '#2d3748';
+        k.c.lineWidth = 1;
+        k.c.stroke();
+
+        // Sol Rozet: Mod
+        const modeLabel = isChallengeMode ? '🎯 GÖREV MODU' : '📍 SERBEST KEŞİF';
+        k.c.fillStyle = isChallengeMode ? '#f59e0b' : '#38bdf8';
+        k.c.font = 'bold 11px sans-serif';
+        k.c.textAlign = 'left';
+        k.c.textBaseline = 'middle';
+        k.c.fillText(modeLabel, r.x + 16, r.y + 23);
+
+        // Orta: Şekil Tanımı / Görev Hedefi
+        if (isChallengeMode) {
+            const targetStr = `Hedef: ${challenge.targetName}`;
+            k.c.fillStyle = isChallengeSuccess ? '#10b981' : '#ffffff';
+            k.c.font = 'bold 12px sans-serif';
+            k.c.textAlign = 'center';
+            k.c.fillText(
+                isChallengeSuccess ? `🎉 Harika! ${targetStr} Tamamlandı!` : `${targetStr} (D Köşesini Taşı)`,
+                r.x + r.w / 2,
+                r.y + 23
+            );
+        } else {
+            const shapeStr = s.showName === 1 ? quadInfo.name : 'Şekil: ? (Gizli)';
+            k.c.fillStyle = s.showName === 1 ? '#a78bfa' : '#94a3b8';
+            k.c.font = 'bold 13px sans-serif';
+            k.c.textAlign = 'center';
+            k.c.fillText(shapeStr, r.x + r.w / 2, r.y + 23);
+        }
+
+        // Sağ: Alan & Çevre
+        k.c.fillStyle = '#94a3b8';
+        k.c.font = '11px sans-serif';
+        k.c.textAlign = 'right';
+        const areaStr = `Alan: ${fmtNum(quadInfo.area, 1)} br² · Çevre: ${fmtNum(quadInfo.perimeter, 1)} br`;
+        k.c.fillText(areaStr, r.x + r.w - 16, r.y + 23);
+    }
+
+    k.c.restore();
+};
+
+export const quadrilateralGridSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = quadState(o);
+        const g = quadGeom(r, s);
+        const isChallenge = s.mode === 1;
+
+        const pA = g.p(s.ax, s.ay);
+        const pB = g.p(s.bx, s.by);
+        const pC = g.p(s.cx, s.cy);
+        const pD = g.p(s.dx, s.dy);
+
+        const out: SimControl[] = [];
+
+        // Sürüklenebilir Köşe Kontrolleri
+        if (!isChallenge) {
+            out.push(
+                { id: 'pt_a', x: pA.x, y: pA.y, type: 'drag', label: 'A Köşesi' },
+                { id: 'pt_b', x: pB.x, y: pB.y, type: 'drag', label: 'B Köşesi' },
+                { id: 'pt_c', x: pC.x, y: pC.y, type: 'drag', label: 'C Köşesi' }
+            );
+        }
+        // D noktası her iki modda da sürüklenebilir (görevde aranacak nokta)
+        out.push({ id: 'pt_d', x: pD.x, y: pD.y, type: 'drag', label: isChallenge ? 'D (Eksik Köşe)' : 'D Köşesi' });
+
+        // Alt Araç Çubuğu Butonları
+        const by = r.y + r.h - 14;
+        let bx = r.x + 16;
+        const gap = 34;
+
+        out.push(
+            {
+                id: 'toggle_mode',
+                x: bx,
+                y: by,
+                type: 'toggle',
+                label: s.mode === 0 ? 'Görev Modu' : 'Serbest Mod',
+                on: s.mode === 1,
+            },
+            {
+                id: 'toggle_name',
+                x: (bx += gap),
+                y: by,
+                type: 'toggle',
+                label: s.showName === 1 ? 'Şekil Adı: Açık' : 'Şekil Adı: ?',
+                on: s.showName === 1,
+            },
+            {
+                id: 'toggle_coords',
+                x: (bx += gap),
+                y: by,
+                type: 'toggle',
+                label: s.showCoords === 1 ? 'Koordinatlar: Açık' : 'Koordinatlar: ?',
+                on: s.showCoords === 1,
+            },
+            {
+                id: 'toggle_equal',
+                x: (bx += gap),
+                y: by,
+                type: 'toggle',
+                label: 'Eşit Kenarlar',
+                on: s.showEqualSides === 1,
+            },
+            {
+                id: 'toggle_parallel',
+                x: (bx += gap),
+                y: by,
+                type: 'toggle',
+                label: 'Paralel Okları',
+                on: s.showParallel === 1,
+            },
+            {
+                id: 'toggle_diag',
+                x: (bx += gap),
+                y: by,
+                type: 'toggle',
+                label: 'Köşegenler',
+                on: s.showDiagonals === 1,
+            },
+            {
+                id: 'toggle_quadrant',
+                x: (bx += gap),
+                y: by,
+                type: 'toggle',
+                label: s.quadrant === 0 ? '4 Bölge' : '1. Bölge',
+                on: s.quadrant === 1,
+            },
+            {
+                id: 'btn_action',
+                x: (bx += gap + 10),
+                y: by,
+                type: 'toggle',
+                label: isChallenge ? 'Sonraki Görev ➔' : 'Rastgele Şekil 🎲',
+                on: false,
+            }
+        );
+
+        return out;
+    },
+
+    onControl: (r, o, id, p): Record<string, number> => {
+        const s = quadState(o);
+        const g = quadGeom(r, s);
+
+        if (id.startsWith('pt_')) {
+            const grid = g.toGrid(p.x, p.y);
+            if (id === 'pt_a') return { ax: grid.x, ay: grid.y };
+            if (id === 'pt_b') return { bx: grid.x, by: grid.y };
+            if (id === 'pt_c') return { cx: grid.x, cy: grid.y };
+            if (id === 'pt_d') return { dx: grid.x, dy: grid.y };
+        }
+
+        if (id === 'toggle_mode') {
+            const nextMode = s.mode === 0 ? 1 : 0;
+            if (nextMode === 1) {
+                // Göreve geçerken o görevin başlangıç koordinatlarını yükle
+                const ch = QUAD_CHALLENGES[s.challengeIdx];
+                return {
+                    mode: 1,
+                    ax: ch.a[0],
+                    ay: ch.a[1],
+                    bx: ch.b[0],
+                    by: ch.b[1],
+                    cx: ch.c[0],
+                    cy: ch.c[1],
+                    dx: 0,
+                    dy: 0, // D başlangıçta ortada dursun
+                    showName: 1,
+                };
+            }
+            return { mode: 0 };
+        }
+
+        if (id === 'toggle_name') return { showName: s.showName === 1 ? 0 : 1 };
+        if (id === 'toggle_coords') return { showCoords: s.showCoords === 1 ? 0 : 1 };
+        if (id === 'toggle_equal') return { showEqualSides: s.showEqualSides === 1 ? 0 : 1 };
+        if (id === 'toggle_parallel') return { showParallel: s.showParallel === 1 ? 0 : 1 };
+        if (id === 'toggle_diag') return { showDiagonals: s.showDiagonals === 1 ? 0 : 1 };
+        if (id === 'toggle_quadrant') return { quadrant: s.quadrant === 0 ? 1 : 0 };
+
+        if (id === 'btn_action') {
+            if (s.mode === 1) {
+                // Sonraki göreve geç
+                const nextIdx = (s.challengeIdx + 1) % QUAD_CHALLENGES.length;
+                const ch = QUAD_CHALLENGES[nextIdx];
+                return {
+                    challengeIdx: nextIdx,
+                    ax: ch.a[0],
+                    ay: ch.a[1],
+                    bx: ch.b[0],
+                    by: ch.b[1],
+                    cx: ch.c[0],
+                    cy: ch.c[1],
+                    dx: 0,
+                    dy: 0,
+                };
+            } else {
+                // Serbest modda rastgele şekil üret
+                const rand = QUAD_RANDOM_PRESETS[Math.floor(Math.random() * QUAD_RANDOM_PRESETS.length)];
+                return {
+                    ax: rand.a[0],
+                    ay: rand.a[1],
+                    bx: rand.b[0],
+                    by: rand.b[1],
+                    cx: rand.c[0],
+                    cy: rand.c[1],
+                    dx: rand.d[0],
+                    dy: rand.d[1],
+                    showName: 0, // Tahmin etsinler diye gizle
+                };
+            }
+        }
+
+        return {};
+    },
+
+    params: [
+        { key: 'quadrant', label: 'Bölge (0: 4 Bölge, 1: 1. Bölge)', min: 0, max: 1, step: 1 },
+        { key: 'showName', label: 'Şekil Adı (0: Gizli, 1: Açık)', min: 0, max: 1, step: 1 },
+        { key: 'showCoords', label: 'Koordinatlar (0: Gizli, 1: Açık)', min: 0, max: 1, step: 1 },
+        { key: 'showEqualSides', label: 'Eşit Kenar Çentikleri', min: 0, max: 1, step: 1 },
+        { key: 'showParallel', label: 'Paralel Okları', min: 0, max: 1, step: 1 },
+        { key: 'showDiagonals', label: 'Köşegenler', min: 0, max: 1, step: 1 },
+    ],
+};
+
 // ── Kayıt ────────────────────────────────────────────────────────────
 
 export const GEOMETRY_SIM_RENDERERS: Record<string, Renderer> = {
@@ -949,6 +1751,7 @@ export const GEOMETRY_SIM_RENDERERS: Record<string, Renderer> = {
     net_fold_sim: netFoldRender,
     angles_sim: anglesRender,
     pythagoras_sim: pythagorasRender,
+    quadrilateral_grid_sim: quadrilateralGridRender,
 };
 
 export const GEOMETRY_SIM_SPECS: Record<string, SimSpec> = {
@@ -956,9 +1759,37 @@ export const GEOMETRY_SIM_SPECS: Record<string, SimSpec> = {
     net_fold_sim: netFoldSpec,
     angles_sim: anglesSpec,
     pythagoras_sim: pythagorasSpec,
+    quadrilateral_grid_sim: quadrilateralGridSpec,
 };
 
 export const GEOMETRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
+    {
+        kind: 'quadrilateral_grid_sim',
+        label: 'Koordinat Düzleminde Dörtgenler',
+        hint: 'Köşeleri sürükle, dörtgen türünü tanı ve eksik köşe görevlerini çöz',
+        size: { w: 580, h: 440 },
+        defaults: {
+            labels: true,
+            sim: {
+                ax: -3,
+                ay: 3,
+                bx: 3,
+                by: 3,
+                cx: 3,
+                cy: -2,
+                dx: -3,
+                dy: -2,
+                quadrant: 0,
+                showName: 1,
+                showCoords: 1,
+                showEqualSides: 1,
+                showParallel: 1,
+                showDiagonals: 0,
+                mode: 0,
+                challengeIdx: 0,
+            },
+        },
+    },
     {
         kind: 'transform_sim',
         label: 'Dönüşüm Geometrisi',

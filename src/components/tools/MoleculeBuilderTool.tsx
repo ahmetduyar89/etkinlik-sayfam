@@ -1036,9 +1036,9 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
             )}
 
             {/* ── Ana Çalışma Alanı (Orta Grid) ──────────────────────────── */}
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+            <div className="flex-1 flex flex-row overflow-hidden relative min-h-[320px]">
                 {/* Sol / Tezgah Alanı: SVG Interactive Canvas */}
-                <div className="flex-1 flex flex-col bg-[#0b0c14] relative select-none">
+                <div className="flex-1 min-w-0 flex flex-col bg-[#0b0c14] relative select-none">
                     <div className="absolute top-2 left-3 z-10 pointer-events-none flex items-center gap-2 text-xs text-slate-200 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-md">
                         <span>💡 İki atomu birbirine yaklaştırarak kovalent bağ kurun.</span>
                     </div>
@@ -1294,7 +1294,7 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                 </div>
 
                 {/* Sağ / Hedef & Koleksiyon Paneli (Game Mode) VEYA Bilgi Paneli (Sandbox) */}
-                <div className="w-full md:w-68 bg-[#121526] border-t md:border-t-0 md:border-l border-white/10 p-3.5 flex flex-col justify-between overflow-y-auto">
+                <div className="w-56 sm:w-64 shrink-0 bg-[#121526] border-l border-white/10 p-3 flex flex-col justify-between overflow-y-auto">
                     {mode === 'game' ? (
                         <div className="flex flex-col gap-3">
                             <div className="flex items-center justify-between">
