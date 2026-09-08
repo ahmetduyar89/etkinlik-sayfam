@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+import AppShell from './AppShell';
 import './index.css';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ToastProvider } from './components/common/ToastProvider';
@@ -25,7 +25,7 @@ ReactDOM.createRoot(rootElement).render(
                 <ConfirmDialogProvider>
                     <PromptDialogProvider>
                         <PasswordGate>
-                            <App />
+                            <AppShell />
                         </PasswordGate>
                     </PromptDialogProvider>
                 </ConfirmDialogProvider>

@@ -158,7 +158,12 @@ interface Shelf {
     items: Activity[];
 }
 
-export default function App() {
+interface AppProps {
+    /** Atölye ana sayfasına dönüş; kabuk dışından açıldığında verilmez. */
+    onExitToPortal?: () => void;
+}
+
+export default function App({ onExitToPortal }: AppProps = {}) {
     const params = new URLSearchParams(window.location.search);
     const isStudentView = params.get('view') === 'student' && !!params.get('id');
     const studentId = params.get('id');
@@ -568,6 +573,7 @@ export default function App() {
                 isLessonMode={isLessonMode}
                 onToggleLessonMode={() => setIsLessonMode((v) => !v)}
                 onOpenTree={() => setIsTreeOpen(true)}
+                onExitToPortal={onExitToPortal}
             />
 
             {mainView === 'notebooks' ? (
