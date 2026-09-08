@@ -161,16 +161,32 @@ interface Shelf {
 interface AppProps {
     /** Atölye ana sayfasına dönüş; kabuk dışından açıldığında verilmez. */
     onExitToPortal?: () => void;
+    /**
+     * Açık bölüm, atölye kabuğundan gelir (İçerikler ↔ Defterlerim). Verilmezse
+     * uygulama bölümü kendi içinde tutar; böylece kabuk dışında da çalışır.
+     */
+    view?: MainView;
+    /** Sekme değiştiğinde kabuğa haber verir; adres çubuğu buna göre güncellenir. */
+    onViewChange?: (v: MainView) => void;
 }
 
-export default function App({ onExitToPortal }: AppProps = {}) {
+export default function App({ onExitToPortal, view: viewProp, onViewChange }: AppProps = {}) {
     const params = new URLSearchParams(window.location.search);
     const isStudentView = params.get('view') === 'student' && !!params.get('id');
     const studentId = params.get('id');
     // Öğrenciye gönderilen defter bağlantısı: salt-okunur görüntüleyici.
     const sharedNotebookId = params.get('view') === 'notebook' ? params.get('id') : null;
 
-    const [mainView, setMainView] = useState<MainView>('content');
+    // Bölüm kabuktan geliyorsa onu izleriz; gelmiyorsa kendi state'imizi kullanırız.
+    const [ownView, setOwnView] = useState<MainView>('content');
+    const mainView = viewProp ?? ownView;
+    const setMainView = useCallback(
+        (v: MainView) => {
+            setOwnView(v);
+            onViewChange?.(v);
+        },
+        [onViewChange]
+    );
     const [activities, setActivities] = useState<Activity[]>([]);
     const [units, setUnits] = useState<Unit[]>([]);
     const [folders, setFolders] = useState<DriveFolder[]>([]);
@@ -266,7 +282,7 @@ export default function App({ onExitToPortal }: AppProps = {}) {
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, []);
+    }, [setMainView]);
 
     // ── Türetilmiş listeler ───────────────────────────────────────────
     const allTags = useMemo(() => {

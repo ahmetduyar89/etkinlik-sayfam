@@ -14,10 +14,13 @@
 //       ve yine buraya bir kayıt ekle.
 //
 //   • Bu React uygulamasının içinde yaşayan bir bölüm ekleyeceksen:
-//       `kind: 'internal'` kullan ve AppShell içinde karşılığını tanımla.
+//       `kind: 'internal'` kullan ve `view` alanına uygulamanın hangi
+//       görünümle açılacağını yaz (İçerikler → 'content',
+//       Defterlerim → 'notebooks'). Kabuk gerisini halleder.
 // ─────────────────────────────────────────────────────────────────────
 import type { LucideIcon } from 'lucide-react';
-import { Crown, FlaskConical, LayoutGrid } from 'lucide-react';
+import { Crown, FlaskConical, LayoutGrid, NotebookPen } from 'lucide-react';
+import type { MainView } from '../types';
 
 export type ModuleKind = 'internal' | 'static';
 export type ModuleStatus = 'ready' | 'soon';
@@ -35,6 +38,11 @@ export interface PortalModule {
     kind: ModuleKind;
     /** static için hedef yol (ör. '/satranc/'), internal için '/etkinlikler'. */
     href: string;
+    /**
+     * Yalnızca `kind: 'internal'` için: kart açıldığında uygulamanın hangi
+     * görünümle başlayacağı. Kabuk bu değeri App'e geçirir.
+     */
+    view?: MainView;
     status: ModuleStatus;
 }
 
@@ -43,12 +51,26 @@ export const PORTAL_MODULES: PortalModule[] = [
         id: 'etkinlikler',
         title: 'Etkinlikler',
         description:
-            'İçerik merkezi: sınıf ve üniteye göre etkinlikler, testler, ders defterleri ve QR ile öğrenci paylaşımı.',
-        meta: 'İçerik Merkezi · Defterlerim',
+            'İçerik merkezi: sınıf ve üniteye göre etkinlikler, testler, simülasyonlar ve QR ile öğrenci paylaşımı.',
+        meta: 'Ünite rafı · Ders modu',
         icon: LayoutGrid,
         accent: { bg: 'bg-primary/10', text: 'text-primary', ring: 'hover:ring-primary/30' },
         kind: 'internal',
         href: '/etkinlikler',
+        view: 'content',
+        status: 'ready',
+    },
+    {
+        id: 'defterlerim',
+        title: 'Defterlerim',
+        description:
+            'Ders defterleri: sayfa sayfa not alın, çizim ve simülasyon ekleyin, öğrencilerle salt-okunur bağlantı olarak paylaşın.',
+        meta: 'Ders defteri · Çizim',
+        icon: NotebookPen,
+        accent: { bg: 'bg-violet-500/10', text: 'text-violet-600', ring: 'hover:ring-violet-400/40' },
+        kind: 'internal',
+        href: '/defterlerim',
+        view: 'notebooks',
         status: 'ready',
     },
     {
@@ -80,4 +102,9 @@ export const PORTAL_MODULES: PortalModule[] = [
 /** Kayıtlı bir bölümü kimliğinden bul. */
 export function findModule(id: string): PortalModule | undefined {
     return PORTAL_MODULES.find((m) => m.id === id);
+}
+
+/** Uygulama içi bir görünümün hangi bölüme karşılık geldiğini bul. */
+export function findModuleByView(view: MainView): PortalModule | undefined {
+    return PORTAL_MODULES.find((m) => m.kind === 'internal' && m.view === view);
 }

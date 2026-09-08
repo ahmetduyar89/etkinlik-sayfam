@@ -7,8 +7,9 @@ import { cn } from '../../utils/cn';
 import { FullscreenToggle } from './FullscreenToggle';
 import { InstallAppButton } from './InstallAppButton';
 import { lockApp } from '../../utils/auth';
+import type { MainView } from '../../types';
 
-export type MainView = 'content' | 'notebooks';
+export type { MainView };
 
 interface NavbarProps {
     search: string;
