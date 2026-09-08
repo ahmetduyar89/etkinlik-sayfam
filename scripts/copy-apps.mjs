@@ -47,6 +47,16 @@ for (const folder of folders) {
     console.log(`[copy-apps] apps/${folder.name} → dist/${folder.name}${warn}`);
 }
 
+// GitHub Pages tek sayfalık uygulamalar için yönlendirme yapmaz: /etkinlikler
+// gibi bir adres doğrudan açıldığında 404 döner. 404 sayfasını uygulama
+// kabuğunun kopyası yaparak bu adresler de çalışır hâle gelir. Netlify'da
+// yönlendirmeyi netlify.toml hallettiği için bu dosya orada kullanılmaz.
+const indexPath = path.join(distDir, 'index.html');
+if (existsSync(indexPath)) {
+    await cp(indexPath, path.join(distDir, '404.html'));
+    console.log('[copy-apps] 404.html oluşturuldu (GitHub Pages yönlendirmesi)');
+}
+
 // Service worker'a hangi yolların bağımsız proje olduğunu bildir; böylece bu
 // sayfalar önbelleğe alınmaz ve atölye kabuğuyla karışmaz.
 const swPath = path.join(distDir, 'sw.js');

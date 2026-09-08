@@ -247,7 +247,6 @@ export function MathFormulaTool({ onClose, onInsertImage }: MathFormulaToolProps
         <div className="fixed inset-0 z-[5100] pointer-events-none flex items-center justify-center p-3 sm:p-6 overflow-hidden">
             <motion.div
                 key={isMaximized ? 'maximized' : 'normal'}
-                ref={containerRef}
                 drag={!isMaximized}
                 dragControls={dragControls}
                 dragListener={false}

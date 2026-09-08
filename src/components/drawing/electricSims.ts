@@ -659,7 +659,7 @@ function circuitLabState(o: MathObject): CircuitLabState {
         }
     } else {
         // Paralel: L1 || (s1 + L2) || (s2 + L3)
-        let count = 1 + (s1 ? 1 : 0) + (s2 ? 1 : 0);
+        const count = 1 + (s1 ? 1 : 0) + (s2 ? 1 : 0);
         rEq = R / count;
         i1 = v / R;
         v1 = v;
