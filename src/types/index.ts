@@ -1,3 +1,9 @@
+/**
+ * Uygulama kabuğunun içindeki bölümler: içerik merkezi ve defterler.
+ * Atölye ana sayfasındaki kartlar da bu değerleri kullanır.
+ */
+export type MainView = 'content' | 'notebooks';
+
 export interface Activity {
     id: string;
     title: string;

@@ -31,3 +31,24 @@
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# ─────────────────────────────────────────────────────────────────────
+# Atölye yönlendirmeleri
+# `apps/` altındaki projeler yayında gerçek klasör olarak durur
+# (/satranc/, /deneyler/ …); Netlify bu dosyaları aşağıdaki kuraldan
+# ÖNCE servis eder. Geriye kalan her yol tek sayfalık React uygulamasına
+# gider — /etkinlikler gibi bölüm adresleri böylece yenilendiğinde de
+# çalışır. Öğrenci bağlantıları (?view=student&id=…) kökte olduğu için
+# hiçbir değişiklikten etkilenmez.
+# ─────────────────────────────────────────────────────────────────────
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Bağımsız projelerin sayfaları uygulama kabuğuyla karışmasın diye
+# önbelleğe alınmaz; her yayında güncel sürüm gelir.
+[[headers]]
+  for = "/*/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

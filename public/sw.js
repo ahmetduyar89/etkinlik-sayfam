@@ -13,13 +13,24 @@
  *   • Firebase/Firestore istekleri hiçbir zaman ele geçirilmez.
  */
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const HTML_CACHE = `ad-html-${VERSION}`;
 const ASSET_CACHE = `ad-assets-${VERSION}`;
 const FONT_CACHE = `ad-fonts-${VERSION}`;
 const KEEP = [HTML_CACHE, ASSET_CACHE, FONT_CACHE];
 
 const APP_SHELL = '/index.html';
+
+/* `apps/` altındaki statik projelerin yol adları (ör. 'satranc', 'deneyler').
+ * Liste yayın sırasında scripts/copy-apps.mjs tarafından otomatik doldurulur;
+ * elle güncellemek gerekmez. Bu yollar service worker'a hiç uğramaz: her biri
+ * kendi index.html'iyle açılır, atölye kabuğunun önbelleğine karışmaz. */
+const APP_PATHS = [/*__APP_PATHS__*/];
+
+/** İstek, apps/ altındaki bağımsız bir projeye mi ait? */
+function isStandaloneApp(pathname) {
+    return APP_PATHS.some((name) => pathname === '/' + name || pathname.startsWith('/' + name + '/'));
+}
 const NETWORK_TIMEOUT = 8000; // ms — ağ bu sürede yanıt vermezse önbelleğe düş
 
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
@@ -64,6 +75,11 @@ self.addEventListener('fetch', (event) => {
 
     const sameOrigin = url.origin === self.location.origin;
     const isFont = FONT_HOSTS.includes(url.hostname);
+
+    // Bağımsız projeler (satranç, deneyler…) doğrudan ağdan servis edilir.
+    // Aksi halde bu sayfalar atölye kabuğunun önbelleğine yazılır ve
+    // çevrimdışıyken yanlış uygulama açılırdı.
+    if (sameOrigin && isStandaloneApp(url.pathname)) return;
 
     // Firebase, Firestore, analiz vb. üçüncü taraf istekleri dokunulmadan geçer.
     if (!sameOrigin && !isFont) return;
