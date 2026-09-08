@@ -33,8 +33,20 @@ export interface PortalModule {
     /** Kartın altındaki küçük etiket (ör. "12 simülasyon"). */
     meta?: string;
     icon: LucideIcon;
-    /** Kartın vurgu rengi — Tailwind sınıfları. */
-    accent: { bg: string; text: string; ring: string };
+    /**
+     * Kartın renk kimliği. İki parçadır: ikon kutusunun gradyanı ve karta
+     * hover'da düşen renkli gölge. Gradyan sınıfları Tailwind tarafından
+     * taranabilmesi için tam sınıf adı olarak yazılır (parçalardan
+     * birleştirilen string'ler derlemede kaybolur).
+     */
+    accent: {
+        /** İkon kutusunun gradyanı, ör. 'from-indigo-500 to-blue-500'. */
+        icon: string;
+        /** Kartın üstündeki ince şerit — aynı gradyanın açık tonu. */
+        strip: string;
+        /** Hover gölgesinin rengi (rgba). */
+        glow: string;
+    };
     kind: ModuleKind;
     /** static için hedef yol (ör. '/satranc/'), internal için '/etkinlikler'. */
     href: string;
@@ -54,7 +66,11 @@ export const PORTAL_MODULES: PortalModule[] = [
             'İçerik merkezi: sınıf ve üniteye göre etkinlikler, testler, simülasyonlar ve QR ile öğrenci paylaşımı.',
         meta: 'Ünite rafı · Ders modu',
         icon: LayoutGrid,
-        accent: { bg: 'bg-primary/10', text: 'text-primary', ring: 'hover:ring-primary/30' },
+        accent: {
+            icon: 'from-indigo-500 to-blue-500',
+            strip: 'from-indigo-400 via-blue-400 to-sky-300',
+            glow: 'rgba(99, 102, 241, 0.28)',
+        },
         kind: 'internal',
         href: '/etkinlikler',
         view: 'content',
@@ -67,7 +83,11 @@ export const PORTAL_MODULES: PortalModule[] = [
             'Ders defterleri: sayfa sayfa not alın, çizim ve simülasyon ekleyin, öğrencilerle salt-okunur bağlantı olarak paylaşın.',
         meta: 'Ders defteri · Çizim',
         icon: NotebookPen,
-        accent: { bg: 'bg-violet-500/10', text: 'text-violet-600', ring: 'hover:ring-violet-400/40' },
+        accent: {
+            icon: 'from-violet-500 to-fuchsia-500',
+            strip: 'from-violet-400 via-fuchsia-400 to-pink-300',
+            glow: 'rgba(139, 92, 246, 0.28)',
+        },
         kind: 'internal',
         href: '/defterlerim',
         view: 'notebooks',
@@ -80,7 +100,11 @@ export const PORTAL_MODULES: PortalModule[] = [
             'İlkokul için çevrimdışı satranç platformu: taş dersleri, bulmacalar, yapay zekâya karşı oyun ve 36 haftalık ders planı.',
         meta: '36 haftalık plan · Çevrimdışı',
         icon: Crown,
-        accent: { bg: 'bg-amber-500/10', text: 'text-amber-600', ring: 'hover:ring-amber-400/40' },
+        accent: {
+            icon: 'from-amber-400 to-orange-500',
+            strip: 'from-amber-300 via-orange-300 to-yellow-200',
+            glow: 'rgba(245, 158, 11, 0.28)',
+        },
         kind: 'static',
         href: '/satranc/',
         status: 'ready',
@@ -92,7 +116,11 @@ export const PORTAL_MODULES: PortalModule[] = [
             'Çocuklar için interaktif fen deneyleri: pusuladan termometreye, gölge oyunundan ışıldayan devreye 14 etkileşimli düzenek.',
         meta: '14 deney · İnteraktif',
         icon: FlaskConical,
-        accent: { bg: 'bg-emerald-500/10', text: 'text-emerald-600', ring: 'hover:ring-emerald-400/40' },
+        accent: {
+            icon: 'from-emerald-400 to-teal-500',
+            strip: 'from-emerald-300 via-teal-300 to-cyan-200',
+            glow: 'rgba(16, 185, 129, 0.28)',
+        },
         kind: 'static',
         href: '/deneyler/',
         status: 'ready',
