@@ -1072,9 +1072,11 @@ function quadGeom(r: Rect, s: QuadrilateralState) {
     const minY = isQ1 ? 0 : -5;
     const maxY = isQ1 ? 8 : 5;
 
-    const topBarH = 46;
-    const bottomBarH = 28;
-    const padX = 26;
+    // Üstte renk paleti araç çubuğunun (color picker) başlığı kapatmaması için
+    // yeterli boşluk (topBarH) ve altta 2 sıra buton için boşluk (bottomBarH).
+    const topBarH = 74;
+    const bottomBarH = 68;
+    const padX = 28;
 
     const plotW = r.w - padX * 2;
     const plotH = r.h - topBarH - bottomBarH;
@@ -1491,6 +1493,9 @@ export const quadrilateralGridRender: Renderer = (k) => {
         { pt: pD, name: 'D', coord: D, color: '#ec4899' },
     ];
 
+    const cX = (pA.x + pB.x + pC.x + pD.x) / 4;
+    const cY = (pA.y + pB.y + pC.y + pD.y) / 4;
+
     pointsData.forEach(({ pt, name, coord, color }) => {
         k.c.fillStyle = color;
         k.c.beginPath();
@@ -1503,19 +1508,40 @@ export const quadrilateralGridRender: Renderer = (k) => {
         if (!isIconSize(r)) {
             const coordStr = s.showCoords === 1 ? `(${coord[0]}, ${coord[1]})` : `(?, ?)`;
             const labelStr = `${name} ${coordStr}`;
+
+            // Köşeden dışarı doğru yön vektörü (sürükleme tutamağının üstüne binmesin)
+            const vX = pt.x - cX;
+            const vY = pt.y - cY;
+            const dist = Math.hypot(vX, vY) || 1;
+            const labelX = pt.x + (vX / dist) * 26;
+            const labelY = pt.y + (vY / dist) * 26;
+
+            k.c.font = 'bold 10px sans-serif';
+            const tw = k.c.measureText(labelStr).width;
+            const th = 14;
+
+            // Koyu mini rozet arka planı
+            k.c.fillStyle = 'rgba(15, 20, 34, 0.88)';
+            k.c.beginPath();
+            k.c.roundRect(labelX - tw / 2 - 4, labelY - th / 2, tw + 8, th, 4);
+            k.c.fill();
+            k.c.strokeStyle = color;
+            k.c.lineWidth = 1;
+            k.c.stroke();
+
             k.c.fillStyle = '#ffffff';
-            k.c.font = 'bold 11px sans-serif';
             k.c.textAlign = 'center';
-            k.c.textBaseline = 'bottom';
-            k.c.fillText(labelStr, pt.x, pt.y - 8);
+            k.c.textBaseline = 'middle';
+            k.c.fillText(labelStr, labelX, labelY);
         }
     });
 
     // ── 10. Üst Bilgi Başlığı (Header) ────────────────────────────────
+    // Renk paleti araç çubuğunun başlığın üstünü kapatmaması için y + 34'ten başlar.
     if (!isIconSize(r)) {
-        k.c.fillStyle = 'rgba(15, 20, 34, 0.9)';
+        k.c.fillStyle = 'rgba(15, 20, 34, 0.92)';
         k.c.beginPath();
-        k.c.roundRect(r.x + 6, r.y + 6, r.w - 12, 34, 8);
+        k.c.roundRect(r.x + 8, r.y + 34, r.w - 16, 32, 8);
         k.c.fill();
         k.c.strokeStyle = '#2d3748';
         k.c.lineWidth = 1;
@@ -1527,7 +1553,7 @@ export const quadrilateralGridRender: Renderer = (k) => {
         k.c.font = 'bold 11px sans-serif';
         k.c.textAlign = 'left';
         k.c.textBaseline = 'middle';
-        k.c.fillText(modeLabel, r.x + 16, r.y + 23);
+        k.c.fillText(modeLabel, r.x + 18, r.y + 50);
 
         // Orta: Şekil Tanımı / Görev Hedefi
         if (isChallengeMode) {
@@ -1538,14 +1564,14 @@ export const quadrilateralGridRender: Renderer = (k) => {
             k.c.fillText(
                 isChallengeSuccess ? `🎉 Harika! ${targetStr} Tamamlandı!` : `${targetStr} (D Köşesini Taşı)`,
                 r.x + r.w / 2,
-                r.y + 23
+                r.y + 50
             );
         } else {
             const shapeStr = s.showName === 1 ? quadInfo.name : 'Şekil: ? (Gizli)';
             k.c.fillStyle = s.showName === 1 ? '#a78bfa' : '#94a3b8';
-            k.c.font = 'bold 13px sans-serif';
+            k.c.font = 'bold 12px sans-serif';
             k.c.textAlign = 'center';
-            k.c.fillText(shapeStr, r.x + r.w / 2, r.y + 23);
+            k.c.fillText(shapeStr, r.x + r.w / 2, r.y + 50);
         }
 
         // Sağ: Alan & Çevre
@@ -1553,7 +1579,7 @@ export const quadrilateralGridRender: Renderer = (k) => {
         k.c.font = '11px sans-serif';
         k.c.textAlign = 'right';
         const areaStr = `Alan: ${fmtNum(quadInfo.area, 1)} br² · Çevre: ${fmtNum(quadInfo.perimeter, 1)} br`;
-        k.c.fillText(areaStr, r.x + r.w - 16, r.y + 23);
+        k.c.fillText(areaStr, r.x + r.w - 18, r.y + 50);
     }
 
     k.c.restore();
@@ -1575,83 +1601,88 @@ export const quadrilateralGridSpec: SimSpec = {
         // Sürüklenebilir Köşe Kontrolleri
         if (!isChallenge) {
             out.push(
-                { id: 'pt_a', x: pA.x, y: pA.y, type: 'drag', label: 'A Köşesi' },
-                { id: 'pt_b', x: pB.x, y: pB.y, type: 'drag', label: 'B Köşesi' },
-                { id: 'pt_c', x: pC.x, y: pC.y, type: 'drag', label: 'C Köşesi' }
+                { id: 'pt_a', x: pA.x, y: pA.y, type: 'drag', label: 'A' },
+                { id: 'pt_b', x: pB.x, y: pB.y, type: 'drag', label: 'B' },
+                { id: 'pt_c', x: pC.x, y: pC.y, type: 'drag', label: 'C' }
             );
         }
         // D noktası her iki modda da sürüklenebilir (görevde aranacak nokta)
-        out.push({ id: 'pt_d', x: pD.x, y: pD.y, type: 'drag', label: isChallenge ? 'D (Eksik Köşe)' : 'D Köşesi' });
+        out.push({ id: 'pt_d', x: pD.x, y: pD.y, type: 'drag', label: 'D' });
 
-        // Alt Araç Çubuğu Butonları
-        const by = r.y + r.h - 14;
-        let bx = r.x + 16;
-        const gap = 34;
+        // Alt Araç Çubuğu Butonları — İki muntazam satıra bölünür, üst üste binmez
+        const colW = (r.w - 28) / 4;
+        const colX = (idx: number) => r.x + 14 + colW * (idx + 0.5);
+
+        const by1 = r.y + r.h - 44; // 1. Satır
+        const by2 = r.y + r.h - 16; // 2. Satır
 
         out.push(
+            // ── 1. Satır: Temel Mod & Bilgi Kontrolleri ──
             {
                 id: 'toggle_mode',
-                x: bx,
-                y: by,
+                x: colX(0),
+                y: by1,
                 type: 'toggle',
-                label: s.mode === 0 ? 'Görev Modu' : 'Serbest Mod',
+                label: s.mode === 0 ? '📍 Serbest' : '🎯 Görev',
                 on: s.mode === 1,
             },
             {
                 id: 'toggle_name',
-                x: (bx += gap),
-                y: by,
+                x: colX(1),
+                y: by1,
                 type: 'toggle',
-                label: s.showName === 1 ? 'Şekil Adı: Açık' : 'Şekil Adı: ?',
+                label: s.showName === 1 ? 'Şekil: Açık' : 'Şekil: ?',
                 on: s.showName === 1,
             },
             {
                 id: 'toggle_coords',
-                x: (bx += gap),
-                y: by,
+                x: colX(2),
+                y: by1,
                 type: 'toggle',
-                label: s.showCoords === 1 ? 'Koordinatlar: Açık' : 'Koordinatlar: ?',
+                label: s.showCoords === 1 ? 'Koord: Açık' : 'Koord: ?',
                 on: s.showCoords === 1,
             },
             {
-                id: 'toggle_equal',
-                x: (bx += gap),
-                y: by,
+                id: 'btn_action',
+                x: colX(3),
+                y: by1,
                 type: 'toggle',
-                label: 'Eşit Kenarlar',
+                label: isChallenge ? 'Sonraki ➔' : '🎲 Rastgele',
+                on: false,
+            },
+
+            // ── 2. Satır: Geometrik Özellik İşaretleri ──
+            {
+                id: 'toggle_equal',
+                x: colX(0),
+                y: by2,
+                type: 'toggle',
+                label: 'Eşit Kenar',
                 on: s.showEqualSides === 1,
             },
             {
                 id: 'toggle_parallel',
-                x: (bx += gap),
-                y: by,
+                x: colX(1),
+                y: by2,
                 type: 'toggle',
-                label: 'Paralel Okları',
+                label: 'Paralel Ok',
                 on: s.showParallel === 1,
             },
             {
                 id: 'toggle_diag',
-                x: (bx += gap),
-                y: by,
+                x: colX(2),
+                y: by2,
                 type: 'toggle',
-                label: 'Köşegenler',
+                label: 'Köşegen',
                 on: s.showDiagonals === 1,
             },
             {
                 id: 'toggle_quadrant',
-                x: (bx += gap),
-                y: by,
+                x: colX(3),
+                y: by2,
                 type: 'toggle',
                 label: s.quadrant === 0 ? '4 Bölge' : '1. Bölge',
                 on: s.quadrant === 1,
-            },
-            {
-                id: 'btn_action',
-                x: (bx += gap + 10),
-                y: by,
-                type: 'toggle',
-                label: isChallenge ? 'Sonraki Görev ➔' : 'Rastgele Şekil 🎲',
-                on: false,
             }
         );
 
@@ -1684,7 +1715,7 @@ export const quadrilateralGridSpec: SimSpec = {
                     cx: ch.c[0],
                     cy: ch.c[1],
                     dx: 0,
-                    dy: 0, // D başlangıçta ortada dursun
+                    dy: 0,
                     showName: 1,
                 };
             }
@@ -1700,7 +1731,6 @@ export const quadrilateralGridSpec: SimSpec = {
 
         if (id === 'btn_action') {
             if (s.mode === 1) {
-                // Sonraki göreve geç
                 const nextIdx = (s.challengeIdx + 1) % QUAD_CHALLENGES.length;
                 const ch = QUAD_CHALLENGES[nextIdx];
                 return {
@@ -1715,7 +1745,6 @@ export const quadrilateralGridSpec: SimSpec = {
                     dy: 0,
                 };
             } else {
-                // Serbest modda rastgele şekil üret
                 const rand = QUAD_RANDOM_PRESETS[Math.floor(Math.random() * QUAD_RANDOM_PRESETS.length)];
                 return {
                     ax: rand.a[0],
@@ -1726,22 +1755,13 @@ export const quadrilateralGridSpec: SimSpec = {
                     cy: rand.c[1],
                     dx: rand.d[0],
                     dy: rand.d[1],
-                    showName: 0, // Tahmin etsinler diye gizle
+                    showName: 0,
                 };
             }
         }
 
         return {};
     },
-
-    params: [
-        { key: 'quadrant', label: 'Bölge (0: 4 Bölge, 1: 1. Bölge)', min: 0, max: 1, step: 1 },
-        { key: 'showName', label: 'Şekil Adı (0: Gizli, 1: Açık)', min: 0, max: 1, step: 1 },
-        { key: 'showCoords', label: 'Koordinatlar (0: Gizli, 1: Açık)', min: 0, max: 1, step: 1 },
-        { key: 'showEqualSides', label: 'Eşit Kenar Çentikleri', min: 0, max: 1, step: 1 },
-        { key: 'showParallel', label: 'Paralel Okları', min: 0, max: 1, step: 1 },
-        { key: 'showDiagonals', label: 'Köşegenler', min: 0, max: 1, step: 1 },
-    ],
 };
 
 // ── Kayıt ────────────────────────────────────────────────────────────
@@ -1767,7 +1787,7 @@ export const GEOMETRY_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
         kind: 'quadrilateral_grid_sim',
         label: 'Koordinat Düzleminde Dörtgenler',
         hint: 'Köşeleri sürükle, dörtgen türünü tanı ve eksik köşe görevlerini çöz',
-        size: { w: 580, h: 440 },
+        size: { w: 640, h: 480 },
         defaults: {
             labels: true,
             sim: {
