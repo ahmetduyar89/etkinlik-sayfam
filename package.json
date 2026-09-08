@@ -9,7 +9,10 @@
     "build:check": "tsc && vite build && node scripts/copy-apps.mjs",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "fetch-apps": "node scripts/fetch-apps.mjs",
+    "predev": "node scripts/fetch-apps.mjs",
+    "prebuild": "node scripts/fetch-apps.mjs"
   },
   "dependencies": {
     "@types/three": "^0.185.4",

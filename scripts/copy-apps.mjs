@@ -33,7 +33,14 @@ if (folders.length === 0) {
 for (const folder of folders) {
     const from = path.join(appsDir, folder.name);
     const to = path.join(distDir, folder.name);
-    await cp(from, to, { recursive: true });
+
+    // Yayına yalnızca sitenin ihtiyaç duyduğu dosyalar gider: sürüm geçmişi,
+    // editör ayarları ve işletim sistemi artıkları dışarıda kalır.
+    const SKIP = new Set(['.git', '.github', '.claude', '.vscode', '.idea', 'node_modules', '.DS_Store']);
+    await cp(from, to, {
+        recursive: true,
+        filter: (src) => !SKIP.has(path.basename(src)),
+    });
 
     const hasIndex = existsSync(path.join(from, 'index.html'));
     const warn = hasIndex ? '' : '  ⚠ index.html yok — /' + folder.name + '/ açılmayacak';

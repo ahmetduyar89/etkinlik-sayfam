@@ -4,10 +4,14 @@
 // İleride yeni bir çalışma eklemek için tek yapman gereken, aşağıdaki
 // listeye bir satır daha yazmak:
 //
-//   • Statik (HTML/CSS/JS) bir proje ekleyeceksen:
-//       1) Klasörü `apps/<isim>/` altına kopyala (içinde index.html olsun).
+//   • Kendi GitHub deposu olan bir proje ekleyeceksen:
+//       1) `apps/apps.json` dosyasına depo adresini yaz.
 //       2) Buraya `kind: 'static', href: '/<isim>/'` olan bir kayıt ekle.
-//     Build sırasında `apps/<isim>/` olduğu gibi `dist/<isim>/` içine kopyalanır.
+//     Yayın sırasında depo çekilir ve `dist/<isim>/` içine kopyalanır.
+//
+//   • Kendi deposu olmayan statik bir proje ekleyeceksen:
+//       Klasörü doğrudan `apps/<isim>/` altına koy (içinde index.html olsun)
+//       ve yine buraya bir kayıt ekle.
 //
 //   • Bu React uygulamasının içinde yaşayan bir bölüm ekleyeceksen:
 //       `kind: 'internal'` kullan ve AppShell içinde karşılığını tanımla.
@@ -49,27 +53,27 @@ export const PORTAL_MODULES: PortalModule[] = [
     },
     {
         id: 'satranc',
-        title: 'Satranç',
+        title: 'Satranç Eğitimi',
         description:
-            'Satranç çalışmaları: taş hareketleri, açılışlar, mat problemleri ve etkileşimli tahta alıştırmaları.',
-        meta: 'Etkileşimli tahta',
+            'İlkokul için çevrimdışı satranç platformu: taş dersleri, bulmacalar, yapay zekâya karşı oyun ve 36 haftalık ders planı.',
+        meta: '36 haftalık plan · Çevrimdışı',
         icon: Crown,
         accent: { bg: 'bg-amber-500/10', text: 'text-amber-600', ring: 'hover:ring-amber-400/40' },
         kind: 'static',
         href: '/satranc/',
-        status: 'soon',
+        status: 'ready',
     },
     {
         id: 'deneyler',
-        title: 'Deneyler & Simülasyon',
+        title: 'Küçük Mucitler Laboratuvarı',
         description:
-            'Fen deneyleri ve simülasyonlar: laboratuvar düzenekleri, fizik-kimya-biyoloji canlandırmaları.',
-        meta: 'Laboratuvar',
+            'Çocuklar için interaktif fen deneyleri: pusuladan termometreye, gölge oyunundan ışıldayan devreye 14 etkileşimli düzenek.',
+        meta: '14 deney · İnteraktif',
         icon: FlaskConical,
         accent: { bg: 'bg-emerald-500/10', text: 'text-emerald-600', ring: 'hover:ring-emerald-400/40' },
         kind: 'static',
         href: '/deneyler/',
-        status: 'soon',
+        status: 'ready',
     },
 ];
 

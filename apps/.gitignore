@@ -1,0 +1,6 @@
+# Bu dosya scripts/fetch-apps.mjs tarafından üretilir — elle düzenlemeyin.
+# apps/apps.json içindeki depolar buraya klonlanır, ana depoya işlenmez.
+# Kendi depoları olmayan projeleri apps/ altına elle koyabilirsiniz;
+# onlar normal şekilde takip edilmeye devam eder.
+/satranc/
+/deneyler/

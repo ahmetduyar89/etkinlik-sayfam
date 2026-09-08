@@ -52,8 +52,8 @@ export function PortalHome({ onOpenInternal }: PortalHomeProps) {
                 </div>
 
                 <p className="mt-10 text-[12.5px] text-on-surface-variant">
-                    Yeni bir çalışma eklemek için: klasörü <code className="px-1 py-0.5 rounded bg-surface-container-high">apps/</code> altına
-                    kopyalayın ve <code className="px-1 py-0.5 rounded bg-surface-container-high">src/constants/portal.ts</code> dosyasına bir kayıt ekleyin.
+                    Yeni bir çalışma eklemek için: deposunu <code className="px-1 py-0.5 rounded bg-surface-container-high">apps/apps.json</code> dosyasına,
+                    kartını <code className="px-1 py-0.5 rounded bg-surface-container-high">src/constants/portal.ts</code> dosyasına ekleyin.
                 </p>
             </main>
         </div>
