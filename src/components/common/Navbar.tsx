@@ -2,7 +2,7 @@
 // Üst başlık = marka + sekmeler + GENİŞ ARAMA (Ctrl+K) + Ders Modu + "Yeni İçerik".
 // Arama state'i App.tsx'te yaşar; buraya props ile gelir.
 import { forwardRef } from 'react';
-import { LayoutGrid, LogOut, Menu, MonitorPlay, NotebookPen, Plus, Search } from 'lucide-react';
+import { ArrowLeft, LayoutGrid, LogOut, Menu, MonitorPlay, NotebookPen, Plus, Search } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { FullscreenToggle } from './FullscreenToggle';
 import { InstallAppButton } from './InstallAppButton';
@@ -20,10 +20,12 @@ interface NavbarProps {
     onToggleLessonMode: () => void;
     /** Ağaç çekmecesini açar (yalnızca <1024px'te görünür). */
     onOpenTree: () => void;
+    /** Atölye ana sayfasına döner; kabuk dışında açıldığında verilmez. */
+    onExitToPortal?: () => void;
 }
 
 export const Navbar = forwardRef<HTMLInputElement, NavbarProps>(function Navbar(
-    { search, onSearchChange, onAdd, view, onViewChange, isLessonMode, onToggleLessonMode, onOpenTree },
+    { search, onSearchChange, onAdd, view, onViewChange, isLessonMode, onToggleLessonMode, onOpenTree, onExitToPortal },
     searchRef
 ) {
     const isContent = view === 'content';
@@ -43,10 +45,28 @@ export const Navbar = forwardRef<HTMLInputElement, NavbarProps>(function Navbar(
                     <Menu className="w-5 h-5" />
                 </button>
 
+                {/* Atölye ana sayfasına dön */}
+                {onExitToPortal && (
+                    <button
+                        type="button"
+                        onClick={onExitToPortal}
+                        title="Atölye'ye dön"
+                        aria-label="Atölye ana sayfasına dön"
+                        className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                    >
+                        <ArrowLeft className="w-5 h-5" />
+                    </button>
+                )}
+
                 {/* Marka */}
-                <span className="text-[19px] font-extrabold tracking-[-0.02em] text-on-surface font-headline-lg flex-shrink-0 hidden xl:inline">
+                <button
+                    type="button"
+                    onClick={onExitToPortal}
+                    disabled={!onExitToPortal}
+                    className="text-[19px] font-extrabold tracking-[-0.02em] text-on-surface font-headline-lg flex-shrink-0 hidden xl:inline disabled:cursor-default"
+                >
                     Ahmet <span className="text-primary">DUYAR</span>
-                </span>
+                </button>
 
                 {/* Bölüm değiştirici: İçerikler ↔ Defterlerim */}
                 <nav className="flex items-center gap-1 bg-surface-container-high rounded-[14px] p-1 flex-shrink-0">

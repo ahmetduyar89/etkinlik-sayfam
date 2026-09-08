@@ -1,0 +1,12 @@
+[
+    {
+        "dir": "satranc",
+        "repo": "https://github.com/ahmetduyar89/satranc.git",
+        "branch": "main"
+    },
+    {
+        "dir": "deneyler",
+        "repo": "https://github.com/ahmetduyar89/deneyler.git",
+        "branch": "main"
+    }
+]
