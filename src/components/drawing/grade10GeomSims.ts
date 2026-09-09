@@ -127,11 +127,13 @@ function drawBadge(
 interface TrigRatioState {
     angle: number; // 15..75 derece
     scale: number; // 0.7..1.4
+    showIdentities: number; // 0: kapalı, 1: açık
 }
 
 const trigRatioState = (o: MathObject): TrigRatioState => ({
     angle: clamp(simValue(o, 'angle', 37), 15, 75),
     scale: clamp(simValue(o, 'scale', 1.0), 0.7, 1.4),
+    showIdentities: clampInt(simValue(o, 'showIdentities', 1), 0, 1, 1),
 });
 
 export const trigRatioRender: Renderer = (k: Ctx) => {
@@ -142,6 +144,7 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
     const cosV = Math.cos(rad);
     const tanV = Math.tan(rad);
     const cotV = 1 / tanV;
+    const betaDeg = 90 - s.angle;
 
     const fs = Math.max(9, Math.min(18, Math.min(r.w, r.h) / 14));
     const icon = isIconSize(r);
@@ -151,25 +154,27 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
     c.rect(r.x, r.y, r.w, r.h);
     c.clip();
 
-    // Sağdaki Kart Boyutları (Kompakt ve taşmasız)
-    const cardW = Math.min(215, Math.max(165, r.w * 0.38));
-    const cardH = Math.min(195, r.h * 0.62);
+    // Sağdaki Kart Boyutları (Geniş, ferah ve asla metin çakışması yapmaz)
+    const cardW = icon ? 0 : Math.min(270, Math.max(225, r.w * 0.44));
+    const cardH = Math.min(r.h - 22, 310);
     const cardX = r.x + r.w - cardW - 12;
-    const cardY = r.y + 14;
+    const cardY = r.y + 11;
 
     // Üçgen koordinatları:
-    // C köşesi ile kart arasında EN AZ 80 piksel emniyet mesafesi bırakıyoruz!
-    // Böylece "Karşı: ..." etiketi kartın altında ASLA kalmaz.
-    const padX = icon ? 8 : r.w * 0.07;
-    const ox = r.x + padX;
-    const oy = r.y + r.h - (icon ? 8 : r.h * 0.16);
+    // C köşesi ve "Karşı" etiketi ile kart arasında güvenli boşluk
+    const padLeft = icon ? 10 : Math.max(28, r.w * 0.08);
+    const padBottom = icon ? 10 : Math.max(34, r.h * 0.14);
+    const ox = r.x + padLeft;
+    const oy = r.y + r.h - padBottom;
 
-    const maxBaseAllowed = icon ? r.w * 0.75 : cardX - ox - 80;
-    let baseLen = Math.max(70, Math.min(maxBaseAllowed, (r.w * 0.40) * s.scale * (cosV / 0.82)));
+    const safeRightGap = icon ? 10 : 72;
+    const maxBaseAllowed = icon ? r.w * 0.75 : Math.max(65, cardX - ox - safeRightGap);
+    const maxH = oy - r.y - 32;
+
+    let baseLen = Math.max(65, Math.min(maxBaseAllowed, (r.w * 0.38) * s.scale * (cosV / 0.82)));
     let heightLen = baseLen * Math.tan(rad);
 
-    // Üst sınırdan taşmayı önlemek için tavan kontrolü
-    const maxH = oy - r.y - 20;
+    // Tavan kontrolü
     if (heightLen > maxH) {
         const factor = maxH / heightLen;
         heightLen = maxH;
@@ -180,11 +185,20 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
     const C = { x: ox + baseLen, y: oy };
     const A = { x: ox + baseLen, y: oy - heightLen };
 
-    // 1. ÖNCE SAĞDAKİ KARTI ÇİZELİM
+    // Kenar uzunlukları (anlaşılır, temiz sayılar)
+    const unitDiv = 26;
+    const hyp = Math.hypot(baseLen, heightLen) / unitDiv;
+    const opp = heightLen / unitDiv; // b (Karşı)
+    const adj = baseLen / unitDiv;   // a (Komşu)
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 1. SAĞDAKİ DETAYLI FORMÜL VE BİLGİ KARTI
+    // ─────────────────────────────────────────────────────────────────────────
     if (!icon) {
         c.save();
-        c.fillStyle = '#1e293b';
-        c.strokeStyle = '#475569';
+        // Kart Ana Gövdesi
+        c.fillStyle = '#0f172a';
+        c.strokeStyle = '#334155';
         c.lineWidth = 1.5;
         c.beginPath();
         if (typeof c.roundRect === 'function') {
@@ -195,76 +209,199 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
         c.fill();
         c.stroke();
 
-        // Kart Başlığı
-        drawText(k, 'TRİGONOMETRİK ORANLAR', cardX + cardW / 2, cardY + fs * 1.2, {
+        // Kart Üst Başlık Şeridi
+        const headH = fs * 2.1;
+        c.fillStyle = '#1e293b';
+        c.beginPath();
+        if (typeof c.roundRect === 'function') {
+            c.roundRect(cardX, cardY, cardW, headH, [12, 12, 0, 0]);
+        } else {
+            c.rect(cardX, cardY, cardW, headH);
+        }
+        c.fill();
+
+        // Başlık Metni
+        drawText(k, `TRİGONOMETRİK ORANLAR (α = ${s.angle.toFixed(0)}°)`, cardX + cardW / 2, cardY + headH / 2, {
             align: 'center',
-            color: '#f8fafc',
+            color: '#38bdf8',
             halo: false,
-            scale: 0.8,
+            scale: 0.82,
         });
 
-        // Oran Satırları (Her satır kart içine tam sığacak ve taşmayacak şekilde)
-        const startY = cardY + fs * 2.5;
-        const lineSpacing = Math.min(fs * 1.35, (cardH - fs * 4.2) / 4);
-
-        const rows = [
-            { label: 'sin α', formula: 'Karşı/Hip', val: sinV.toFixed(3), col: '#38bdf8' },
-            { label: 'cos α', formula: 'Komşu/Hip', val: cosV.toFixed(3), col: '#fb7185' },
-            { label: 'tan α', formula: 'Karşı/Komşu', val: tanV.toFixed(3), col: '#fbbf24' },
-            { label: 'cot α', formula: 'Komşu/Karşı', val: cotV.toFixed(3), col: '#34d399' },
+        // 4 Temel Oran Veri Yapısı
+        const ratioRows = [
+            {
+                name: 'sin α',
+                def: 'Karşı / Hip',
+                formula: `b / c = ${opp.toFixed(1)} / ${hyp.toFixed(1)}`,
+                val: sinV.toFixed(3),
+                col: '#38bdf8', // Mavi
+                bg: 'rgba(56, 189, 248, 0.08)',
+                bdr: 'rgba(56, 189, 248, 0.22)',
+            },
+            {
+                name: 'cos α',
+                def: 'Komşu / Hip',
+                formula: `a / c = ${adj.toFixed(1)} / ${hyp.toFixed(1)}`,
+                val: cosV.toFixed(3),
+                col: '#fb7185', // Gül/Pembe
+                bg: 'rgba(251, 113, 133, 0.08)',
+                bdr: 'rgba(251, 113, 133, 0.22)',
+            },
+            {
+                name: 'tan α',
+                def: 'Karşı / Komşu',
+                formula: `b / a = ${opp.toFixed(1)} / ${adj.toFixed(1)}`,
+                val: tanV.toFixed(3),
+                col: '#fbbf24', // Kehribar/Sarı
+                bg: 'rgba(251, 191, 36, 0.08)',
+                bdr: 'rgba(251, 191, 36, 0.22)',
+            },
+            {
+                name: 'cot α',
+                def: 'Komşu / Karşı',
+                formula: `a / b = ${adj.toFixed(1)} / ${opp.toFixed(1)}`,
+                val: cotV.toFixed(3),
+                col: '#34d399', // Zümrüt Yeşil
+                bg: 'rgba(52, 211, 153, 0.08)',
+                bdr: 'rgba(52, 211, 153, 0.22)',
+            },
         ];
 
-        rows.forEach((row, idx) => {
-            const yPos = startY + idx * lineSpacing;
-            drawText(k, `${row.label} = ${row.formula}`, cardX + fs * 0.7, yPos, {
+        // 2 Satırlı, asla çakışmayan ferah oran satırları
+        const startY = cardY + headH + 8;
+        const identitiesSpace = s.showIdentities ? Math.min(84, cardH * 0.31) : 0;
+        const availableRatiosH = cardH - headH - identitiesSpace - 16;
+        const itemH = Math.min(44, Math.max(34, availableRatiosH / 4));
+        const itemPadX = 8;
+        const innerW = cardW - itemPadX * 2;
+
+        ratioRows.forEach((item, idx) => {
+            const itemY = startY + idx * (itemH + 3);
+            const itemX = cardX + itemPadX;
+
+            // Mini satır kutucuğu
+            c.fillStyle = item.bg;
+            c.strokeStyle = item.bdr;
+            c.lineWidth = 1;
+            c.beginPath();
+            if (typeof c.roundRect === 'function') {
+                c.roundRect(itemX, itemY, innerW, itemH, 6);
+            } else {
+                c.rect(itemX, itemY, innerW, itemH);
+            }
+            c.fill();
+            c.stroke();
+
+            // 1. Satır: Fonksiyon Adı & Tanım (Solda), Sonuç Değeri (Sağda)
+            const row1Y = itemY + itemH * 0.32;
+            drawText(k, `${item.name} = ${item.def}`, itemX + 8, row1Y, {
                 align: 'left',
-                color: row.col,
-                halo: false,
-                scale: 0.74,
-            });
-            drawText(k, `= ${row.val}`, cardX + cardW - fs * 0.7, yPos, {
-                align: 'right',
-                color: '#ffffff',
+                color: item.col,
                 halo: false,
                 scale: 0.76,
             });
+            drawText(k, `= ${item.val}`, itemX + innerW - 8, row1Y, {
+                align: 'right',
+                color: '#ffffff',
+                halo: false,
+                scale: 0.80,
+            });
+
+            // 2. Satır: Sembolik & Sayısal Kesir Gösterimi (Solda, hafif soluk)
+            const row2Y = itemY + itemH * 0.74;
+            drawText(k, `(${item.formula})`, itemX + 8, row2Y, {
+                align: 'left',
+                color: '#94a3b8',
+                halo: false,
+                bold: false,
+                scale: 0.68,
+            });
         });
 
-        // Ayırıcı çizgi
-        const sepY = startY + 4 * lineSpacing + fs * 0.1;
-        c.strokeStyle = '#334155';
-        c.lineWidth = 1;
-        c.beginPath();
-        c.moveTo(cardX + fs * 0.7, sepY);
-        c.lineTo(cardX + cardW - fs * 0.7, sepY);
-        c.stroke();
+        // Özdeşlikler ve Tümler Açı Bölümü
+        if (s.showIdentities && cardH >= 240) {
+            const sepY = startY + 4 * (itemH + 3) + 4;
+            c.strokeStyle = '#334155';
+            c.lineWidth = 1;
+            c.beginPath();
+            c.moveTo(cardX + 10, sepY);
+            c.lineTo(cardX + cardW - 10, sepY);
+            c.stroke();
 
-        // Özdeşlik satırı
-        drawText(k, 'sin²α + cos²α = 1.000 ✓', cardX + cardW / 2, sepY + fs * 1.05, {
-            align: 'center',
-            color: '#a7f3d0',
-            halo: false,
-            scale: 0.8,
-        });
+            // Alt Bölüm Başlığı
+            const idTitleY = sepY + fs * 0.9;
+            drawText(k, 'TEMEL ÖZDEŞLİKLER (Maarif Modeli)', cardX + cardW / 2, idTitleY, {
+                align: 'center',
+                color: '#94a3b8',
+                halo: false,
+                scale: 0.68,
+            });
+
+            // Özdeşlik 1 & 2 (Piramit/Pill)
+            const id1Y = idTitleY + fs * 1.15;
+            drawText(k, 'sin²α + cos²α = 1.000 ✓    |    tan α · cot α = 1.000 ✓', cardX + cardW / 2, id1Y, {
+                align: 'center',
+                color: '#a7f3d0',
+                halo: false,
+                scale: 0.72,
+            });
+
+            // Tümler Açı Bağıntısı (sin α = cos β)
+            const id2Y = id1Y + fs * 1.05;
+            if (id2Y < cardY + cardH - 8) {
+                drawText(k, `β = ${betaDeg.toFixed(0)}° (Tümler)  ⇒  sin(α) = cos(β) = ${sinV.toFixed(3)}`, cardX + cardW / 2, id2Y, {
+                    align: 'center',
+                    color: '#c084fc',
+                    halo: false,
+                    scale: 0.70,
+                });
+            }
+        }
         c.restore();
     }
 
-    // 2. DİK ÜÇGEN GÖVDESİ
-    c.fillStyle = withAlpha(k.color, 0.09);
-    c.strokeStyle = k.color;
-    c.lineWidth = Math.max(2, k.lw);
+    // ─────────────────────────────────────────────────────────────────────────
+    // 2. DİK ÜÇGENİN ÇİZİMİ (Pedagojik Renk Kodlu ve Estetik)
+    // ─────────────────────────────────────────────────────────────────────────
+    // Üçgen iç dolgusu (Yumuşak mavi ton)
+    c.fillStyle = 'rgba(56, 189, 248, 0.08)';
     c.beginPath();
     c.moveTo(B.x, B.y);
     c.lineTo(C.x, C.y);
     c.lineTo(A.x, A.y);
     c.closePath();
     c.fill();
+
+    // Kenarları renk kodlu çizelim:
+    // Komşu Dik Kenar (BC): Zümrüt Yeşili (#10b981)
+    c.strokeStyle = '#10b981';
+    c.lineWidth = Math.max(3, k.lw + 1);
+    c.beginPath();
+    c.moveTo(B.x, B.y);
+    c.lineTo(C.x, C.y);
+    c.stroke();
+
+    // Karşı Dik Kenar (CA): Gül / Mercan Pembe (#f43f5e)
+    c.strokeStyle = '#f43f5e';
+    c.lineWidth = Math.max(3, k.lw + 1);
+    c.beginPath();
+    c.moveTo(C.x, C.y);
+    c.lineTo(A.x, A.y);
+    c.stroke();
+
+    // Hipotenüs (AB): Parlak Mavi (#2563eb / #38bdf8)
+    c.strokeStyle = '#2563eb';
+    c.lineWidth = Math.max(3.5, k.lw + 1.5);
+    c.beginPath();
+    c.moveTo(B.x, B.y);
+    c.lineTo(A.x, A.y);
     c.stroke();
 
     // Dik açı sembolü (C köşesinde)
-    const sq = Math.min(14, baseLen * 0.14);
-    c.strokeStyle = k.color;
-    c.lineWidth = 1.6;
+    const sq = Math.min(14, baseLen * 0.13);
+    c.strokeStyle = '#64748b';
+    c.lineWidth = 1.8;
     c.beginPath();
     c.moveTo(C.x - sq, C.y);
     c.lineTo(C.x - sq, C.y - sq);
@@ -272,50 +409,80 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
     c.stroke();
     // Dik açı iç noktası
     c.beginPath();
-    c.arc(C.x - sq / 2, C.y - sq / 2, 1.8, 0, Math.PI * 2);
-    c.fillStyle = k.color;
+    c.arc(C.x - sq / 2, C.y - sq / 2, 2, 0, Math.PI * 2);
+    c.fillStyle = '#64748b';
     c.fill();
 
-    // Açı yayı (B köşesinde α)
-    const arcR = Math.min(32, baseLen * 0.35);
+    // Açı yayı ve dolgusu (B köşesinde α)
+    const arcR = Math.min(36, baseLen * 0.35);
+    c.beginPath();
+    c.moveTo(B.x, B.y);
+    c.arc(B.x, B.y, arcR, -rad, 0);
+    c.closePath();
+    c.fillStyle = 'rgba(245, 158, 11, 0.16)';
+    c.fill();
+
     c.beginPath();
     c.arc(B.x, B.y, arcR, -rad, 0);
     c.strokeStyle = '#d97706';
-    c.lineWidth = 2.2;
+    c.lineWidth = 2.4;
     c.stroke();
+
+    // Tümler Açı yayı (A köşesinde β = 90 - α)
+    const betaRad = (betaDeg * Math.PI) / 180;
+    const arcRb = Math.min(30, Math.min(baseLen, heightLen) * 0.36);
+    if (arcRb >= 14 && !icon) {
+        c.beginPath();
+        c.moveTo(A.x, A.y);
+        c.arc(A.x, A.y, arcRb, Math.PI / 2, Math.PI / 2 + betaRad);
+        c.closePath();
+        c.fillStyle = 'rgba(168, 85, 247, 0.15)';
+        c.fill();
+
+        c.beginPath();
+        c.arc(A.x, A.y, arcRb, Math.PI / 2, Math.PI / 2 + betaRad);
+        c.strokeStyle = '#9333ea';
+        c.lineWidth = 2.2;
+        c.stroke();
+
+        drawText(k, `β = ${betaDeg.toFixed(0)}°`, A.x - arcRb - fs * 0.4, A.y + arcRb * 0.8, {
+            align: 'right',
+            color: '#9333ea',
+            halo: true,
+            scale: 0.84,
+        });
+    }
 
     if (!icon) {
         // Köşe ve açı etiketleri
         drawText(k, `α = ${s.angle.toFixed(0)}°`, B.x + arcR + fs * 0.6, B.y - fs * 0.55, {
             align: 'left',
             color: '#d97706',
-            scale: 0.9,
+            scale: 0.92,
         });
         drawText(k, 'B', B.x - fs * 0.7, B.y + fs * 0.4, { align: 'right', halo: true, scale: 0.95 });
-        drawText(k, 'C (90°)', C.x, C.y + fs * 0.9, { align: 'center', halo: true, scale: 0.85 });
-        drawText(k, 'A', A.x, A.y - fs * 0.7, { align: 'center', halo: true, scale: 1.0 });
+        drawText(k, 'C (90°)', C.x, C.y + fs * 0.95, { align: 'center', halo: true, scale: 0.85 });
+        drawText(k, 'A', A.x, A.y - fs * 0.8, { align: 'center', halo: true, scale: 1.0 });
 
-        // Kenar etiketleri
-        const hyp = Math.hypot(baseLen, heightLen) / 28;
-        const opp = heightLen / 28;
-        const adj = baseLen / 28;
-
-        // "Karşı" etiketi C.x'in hemen sağında, karttan EN AZ 25px önce biter!
-        drawText(k, `Karşı: ${opp.toFixed(1)}`, C.x + fs * 0.5, (A.y + C.y) / 2, {
+        // Kenar etiketleri (Renk kodlu ve açıkça formüle referans veren)
+        // Karşı Dik Kenar etiketi
+        drawText(k, `Karşı (b): ${opp.toFixed(1)}`, C.x + fs * 0.5, (A.y + C.y) / 2, {
             align: 'left',
-            color: '#334155',
+            color: '#e11d48',
             halo: true,
-            scale: 0.85,
+            scale: 0.86,
         });
-        drawText(k, `Komşu: ${adj.toFixed(1)}`, (B.x + C.x) / 2, B.y + fs * 1.1, {
+        // Komşu Dik Kenar etiketi
+        drawText(k, `Komşu (a): ${adj.toFixed(1)}`, (B.x + C.x) / 2, B.y + fs * 1.15, {
             align: 'center',
-            color: '#334155',
+            color: '#059669',
             halo: true,
-            scale: 0.85,
+            scale: 0.86,
         });
-        drawText(k, `Hipotenüs: ${hyp.toFixed(1)}`, (B.x + A.x) / 2 - fs * 0.8, (B.y + A.y) / 2 - fs * 0.5, {
+        // Hipotenüs etiketi
+        drawText(k, `Hipotenüs (c): ${hyp.toFixed(1)}`, (B.x + A.x) / 2 - fs * 0.8, (B.y + A.y) / 2 - fs * 0.55, {
             align: 'right',
-            color: '#2563eb',
+            color: '#1d4ed8',
             halo: true,
             scale: 0.88,
         });
@@ -330,18 +497,20 @@ export const trigRatioSpec: SimSpec = {
         const rad = (s.angle * Math.PI) / 180;
         const cosV = Math.cos(rad);
 
-        const cardW = Math.min(215, Math.max(165, r.w * 0.38));
+        const cardW = isIconSize(r) ? 0 : Math.min(270, Math.max(225, r.w * 0.44));
         const cardX = r.x + r.w - cardW - 12;
 
-        const padX = isIconSize(r) ? 8 : r.w * 0.07;
-        const ox = r.x + padX;
-        const oy = r.y + r.h - (isIconSize(r) ? 8 : r.h * 0.16);
+        const padLeft = isIconSize(r) ? 10 : Math.max(28, r.w * 0.08);
+        const padBottom = isIconSize(r) ? 10 : Math.max(34, r.h * 0.14);
+        const ox = r.x + padLeft;
+        const oy = r.y + r.h - padBottom;
 
-        const maxBaseAllowed = isIconSize(r) ? r.w * 0.75 : cardX - ox - 80;
-        let baseLen = Math.max(70, Math.min(maxBaseAllowed, (r.w * 0.40) * s.scale * (cosV / 0.82)));
+        const safeRightGap = isIconSize(r) ? 10 : 72;
+        const maxBaseAllowed = isIconSize(r) ? r.w * 0.75 : Math.max(65, cardX - ox - safeRightGap);
+        let baseLen = Math.max(65, Math.min(maxBaseAllowed, (r.w * 0.38) * s.scale * (cosV / 0.82)));
         let heightLen = baseLen * Math.tan(rad);
 
-        const maxH = oy - r.y - 20;
+        const maxH = oy - r.y - 32;
         if (heightLen > maxH) {
             const factor = maxH / heightLen;
             heightLen = maxH;
@@ -360,11 +529,12 @@ export const trigRatioSpec: SimSpec = {
     },
     onControl: (r: Rect, o: MathObject, id: string, p: { x: number; y: number }): Record<string, number> => {
         if (id === 'apex') {
-            const padX = isIconSize(r) ? 8 : r.w * 0.07;
-            const ox = r.x + padX;
-            const oy = r.y + r.h - (isIconSize(r) ? 8 : r.h * 0.16);
-            const dx = Math.max(30, p.x - ox);
-            const dy = Math.max(25, oy - p.y);
+            const padLeft = isIconSize(r) ? 10 : Math.max(28, r.w * 0.08);
+            const padBottom = isIconSize(r) ? 10 : Math.max(34, r.h * 0.14);
+            const ox = r.x + padLeft;
+            const oy = r.y + r.h - padBottom;
+            const dx = Math.max(25, p.x - ox);
+            const dy = Math.max(20, oy - p.y);
             const deg = Math.round(clamp((Math.atan2(dy, dx) * 180) / Math.PI, 15, 75));
             return { angle: deg };
         }
@@ -373,6 +543,7 @@ export const trigRatioSpec: SimSpec = {
     params: [
         { key: 'angle', label: 'Dar Açı (α)', min: 15, max: 75, step: 1, unit: '°' },
         { key: 'scale', label: 'Ölçek', min: 0.7, max: 1.4, step: 0.1, unit: 'x' },
+        { key: 'showIdentities', label: 'Özdeşlikler & Tümler Açı', min: 0, max: 1, step: 1 },
     ],
 };
 
