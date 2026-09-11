@@ -1,32 +1,39 @@
 {
   "name": "etkinlik-sitem",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build && node scripts/copy-apps.mjs",
+    "build:check": "tsc && vite build && node scripts/copy-apps.mjs",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "fetch-apps": "node scripts/fetch-apps.mjs",
+    "predev": "node scripts/fetch-apps.mjs",
+    "prebuild": "node scripts/fetch-apps.mjs"
   },
   "dependencies": {
+    "@types/three": "^0.185.4",
     "clsx": "^2.1.0",
     "firebase": "^10.8.0",
     "framer-motion": "^11.0.8",
     "lucide-react": "^0.344.0",
+    "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "tailwind-merge": "^2.2.1"
+    "tailwind-merge": "^2.2.1",
+    "three": "^0.185.1"
   },
   "devDependencies": {
+    "@tailwindcss/forms": "^0.5.7",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
     "@typescript-eslint/eslint-plugin": "^7.2.0",
     "@typescript-eslint/parser": "^7.2.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.18",
-    "@tailwindcss/forms": "^0.5.7",
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
