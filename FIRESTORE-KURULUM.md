@@ -28,6 +28,23 @@ Firestore güvenlik kuralları bu koleksiyonlara izin vermezse ekranda
 **"Firestore güvenlik kuralları bu bölüme izin vermiyor … (permission-denied)"**
 uyarısı çıkar ve defter oluşturulamaz.
 
+## Canlı Satranç
+
+Canlı Satranç (`…/?view=satranc`) tek bir koleksiyon kullanır:
+
+| Koleksiyon    | İçerik                                                     |
+| ------------- | ---------------------------------------------------------- |
+| `chess_rooms` | Masalar: `chess_rooms/{dörtHaneliKod}` — oyuncular, hamleler, saat |
+
+Her masa TEK bir dokümandır; iki cihaz da onu canlı dinler, biri hamle
+yazdığında diğerinin tahtası anında güncellenir. Masada kişisel veri tutulmaz —
+yalnızca oyuncunun kendi yazdığı ad ve oynanan hamleler. Terk edilen masalar
+salon açıldığında temizlenir.
+
+**`chess_rooms` yeni bir koleksiyondur: Canlı Satranç'ın çalışması için aşağıdaki
+kuralları yeniden yayınlamanız gerekir.** Yayınlanmazsa salon boş görünür ve masa
+kurulamaz; bilgisayara karşı oyun bundan etkilenmez, o ağa hiç bağlanmaz.
+
 ## Kuralları güncelleme
 
 ### Yol 1 — Firebase Konsolu (en pratik)
