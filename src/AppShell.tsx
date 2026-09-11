@@ -11,14 +11,16 @@
 // çubuğu da güncellenir, böylece geri tuşu ve yer imleri doğru çalışır.
 //
 // Öğrenci bağlantıları (?view=student&id=… / ?view=notebook&id=…) hiç
-// değişmedi: bu kabuk onları doğrudan içerik uygulamasına geçirir.
+// değişmedi: bu kabuk onları doğrudan içerik uygulamasına geçirir. Canlı
+// Satranç (?view=satranc) da aynı şekilde kabuğu atlar ve kendi ekranını açar.
 // ─────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
 import App from './App';
+import { ChessArena } from './components/chess/ChessArena';
 import { PortalHome } from './components/portal/PortalHome';
 import { findModule, findModuleByView } from './constants/portal';
 import { goToSection, sectionFromLocation, type Section } from './lib/navigation';
-import { isStudentLink } from './utils/auth';
+import { isChessLink, isStudentLink } from './utils/auth';
 import type { MainView } from './types';
 
 export default function AppShell() {
@@ -39,6 +41,10 @@ export default function AppShell() {
 
     // Öğrenciye gönderilen bağlantılar atölye ekranını atlar.
     if (isStudentLink()) return <App />;
+
+    // Canlı Satranç kendi başına bir sayfadır: kabuk, menü ve içerik merkezi
+    // yoktur — çocuk bağlantıya dokunur, adını yazar ve oynar.
+    if (isChessLink()) return <ChessArena />;
 
     if (section === 'portal') {
         return <PortalHome onOpenInternal={goToSection} />;

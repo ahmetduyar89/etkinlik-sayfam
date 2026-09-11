@@ -19,7 +19,7 @@
 //       Defterlerim → 'notebooks'). Kabuk gerisini halleder.
 // ─────────────────────────────────────────────────────────────────────
 import type { LucideIcon } from 'lucide-react';
-import { Crown, FlaskConical, LayoutGrid, NotebookPen } from 'lucide-react';
+import { Crown, FlaskConical, LayoutGrid, NotebookPen, Swords } from 'lucide-react';
 import type { MainView } from '../types';
 
 export type ModuleKind = 'internal' | 'static';
@@ -107,6 +107,22 @@ export const PORTAL_MODULES: PortalModule[] = [
         },
         kind: 'static',
         href: '/satranc/',
+        status: 'ready',
+    },
+    {
+        id: 'canli-satranc',
+        title: 'Canlı Satranç',
+        description:
+            'Bağlantıyı alan çocuk adını yazar ve oynar: arkadaşıyla canlı maç, masa kodu ile katılım, rakip yoksa bilgisayara karşı oyun.',
+        meta: 'Canlı maç · Şifresiz bağlantı',
+        icon: Swords,
+        accent: {
+            icon: 'from-rose-500 to-orange-500',
+            strip: 'from-rose-300 via-orange-300 to-amber-200',
+            glow: 'rgba(244, 63, 94, 0.26)',
+        },
+        kind: 'static',
+        href: '/?view=satranc',
         status: 'ready',
     },
     {
