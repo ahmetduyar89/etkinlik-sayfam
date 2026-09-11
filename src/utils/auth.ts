@@ -48,3 +48,14 @@ export function isStudentLink(): boolean {
     const view = params.get('view');
     return (view === 'student' || view === 'notebook') && !!params.get('id');
 }
+
+/**
+ * Canlı Satranç bağlantısı (?view=satranc[&oda=1234]).
+ *
+ * Bu sayfa da şifre istemez: çocuk bağlantıya dokunur, adını yazar ve oynar.
+ * Öğretmen panosuna açılan bir kapı DEĞİLDİR — yalnızca satranç masalarını
+ * gösterir, içerik merkezine geçiş vermez.
+ */
+export function isChessLink(): boolean {
+    return new URLSearchParams(window.location.search).get('view') === 'satranc';
+}

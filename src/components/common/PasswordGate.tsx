@@ -1,7 +1,8 @@
 // src/components/common/PasswordGate.tsx — Basit şifre ile giriş ekranı
 // Doğru şifre girilene kadar site açılmaz. Giriş tarayıcıda hatırlanır.
 // Öğrenci bağlantıları şifre istemez; öğrenciler doğrudan girer:
-// etkinlik (?view=student&id=…) ve salt-okunur defter (?view=notebook&id=…).
+// etkinlik (?view=student&id=…), salt-okunur defter (?view=notebook&id=…) ve
+// Canlı Satranç (?view=satranc).
 //
 // NOT: Bu, tamamen tarayıcıda çalışan basit bir kilittir — meraklı bir kullanıcı
 // sayfa kaynağından şifreyi görebilir. Gerçek koruma için ileride sunucu tarafı
@@ -13,6 +14,7 @@ import {
     APP_PASSWORD,
     AUTH_STORAGE_KEY,
     isAuthenticated,
+    isChessLink,
     isStudentLink,
     saveAuth,
 } from '../../utils/auth';
@@ -51,7 +53,7 @@ export function PasswordGate({ children }: PasswordGateProps) {
         [value]
     );
 
-    if (isUnlocked || isStudentLink()) return <>{children}</>;
+    if (isUnlocked || isStudentLink() || isChessLink()) return <>{children}</>;
 
     return (
         <div className="min-h-screen bg-background flex items-center justify-center p-6 font-sans">

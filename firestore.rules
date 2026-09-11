@@ -34,5 +34,13 @@ service cloud.firestore {
         match /notebook_ops/{document=**} {
             allow read, write: if true;
         }
+
+        // Canlı Satranç masaları: her masa dört haneli koduyla tek bir
+        // dokümandır. Oyuncular giriş yapmaz, adlarını yazıp oynar; bu yüzden
+        // diğer koleksiyonlar gibi açıktır. Masada kişisel veri tutulmaz —
+        // yalnızca oyuncunun yazdığı ad ve hamleler.
+        match /chess_rooms/{document=**} {
+            allow read, write: if true;
+        }
     }
 }
