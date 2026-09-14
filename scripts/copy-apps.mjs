@@ -5,6 +5,10 @@
 // gibi HTML tabanlı çalışmalar atölye ile aynı adreste yayınlanır:
 //   apps/satranc/index.html  →  https://atölye.tedrisedu.com/satranc/
 //
+// Kopyalama sırasında her uygulamanın giriş sayfasına küçük bir "Atölye'ye
+// dön" bağlantısı eklenir: bu projeler ayrı depolarda yaşadığı için portala
+// dönüş yolunu bilmezler, o yüzden yolu yayın anında biz iliştiriyoruz.
+//
 // Yeni bir statik proje eklemek için klasörü `apps/` altına koymak yeterli;
 // bu dosyayı değiştirmeye gerek yoktur.
 import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
@@ -30,6 +34,68 @@ if (folders.length === 0) {
     console.log('[copy-apps] apps/ boş, kopyalanacak bir şey yok.');
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// "Atölye'ye dön" bağlantısı
+// ─────────────────────────────────────────────────────────────────────
+// Statik projelerin her biri kendi deposunda yaşar ve atölyenin varlığından
+// habersizdir; açıldıklarında çıkış yolu yalnızca tarayıcının geri tuşudur.
+// Bu yüzden giriş sayfalarına köşede duran küçük bir bağlantı iliştiriyoruz.
+//
+// Uygulamaların kendi stilleriyle çakışmasın diye seçici `a[data-atolye-geri]`
+// üzerinden yazılır ve konumu belirleyen özellikler !important taşır. Satranç
+// dar ekranda alt gezinme çubuğu kullandığı için buton orada yukarı çekilir.
+const GERI_MARKER = 'data-atolye-geri';
+
+const GERI_BAGLANTISI = `
+<!-- Atölye'ye dön — yayın sırasında scripts/copy-apps.mjs tarafından eklendi. -->
+<a href="/" ${GERI_MARKER} title="Atölye'ye dön" aria-label="Atölye ana sayfasına dön">
+  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+  <span>Atölye</span>
+</a>
+<style>
+a[${GERI_MARKER}] {
+  position: fixed !important;
+  right: 14px !important;
+  bottom: 14px !important;
+  z-index: 2147483000 !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px 9px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff !important;
+  color: #334155 !important;
+  font: 600 13px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  text-decoration: none !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08), 0 12px 28px -14px rgba(15, 23, 42, 0.45);
+  transition: transform 160ms ease, color 160ms ease;
+}
+a[${GERI_MARKER}]:hover { color: #4f46e5 !important; transform: translateY(-1px); }
+a[${GERI_MARKER}]:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
+/* Dar ekranda satrancın alt gezinme çubuğunun üstünde kalsın. */
+@media (max-width: 940px) { a[${GERI_MARKER}] { bottom: 84px !important; } }
+@media print { a[${GERI_MARKER}] { display: none !important; } }
+</style>
+`;
+
+/** Giriş sayfasına "Atölye'ye dön" bağlantısını iliştirir. */
+async function geriBaglantisiEkle(indexFile, appName) {
+    const html = await readFile(indexFile, 'utf8');
+    if (html.includes(GERI_MARKER)) {
+        console.log(`[copy-apps] ${appName}: geri bağlantısı zaten var, atlandı`);
+        return;
+    }
+    // </body> yoksa (tarayıcı etiketi kendi tamamlar) sona ekleriz.
+    const kapanis = html.lastIndexOf('</body>');
+    const next =
+        kapanis === -1
+            ? html + GERI_BAGLANTISI
+            : html.slice(0, kapanis) + GERI_BAGLANTISI + html.slice(kapanis);
+    await writeFile(indexFile, next);
+    console.log(`[copy-apps] ${appName}: "Atölye'ye dön" bağlantısı eklendi`);
+}
+
 for (const folder of folders) {
     const from = path.join(appsDir, folder.name);
     const to = path.join(distDir, folder.name);
@@ -45,6 +111,10 @@ for (const folder of folders) {
     const hasIndex = existsSync(path.join(from, 'index.html'));
     const warn = hasIndex ? '' : '  ⚠ index.html yok — /' + folder.name + '/ açılmayacak';
     console.log(`[copy-apps] apps/${folder.name} → dist/${folder.name}${warn}`);
+
+    // Portala dönüş yolu yalnızca yayındaki kopyaya yazılır; apps/ altındaki
+    // depo çalışma kopyası (ve o projenin kendi yayını) el değmemiş kalır.
+    if (hasIndex) await geriBaglantisiEkle(path.join(to, 'index.html'), folder.name);
 }
 
 // GitHub Pages tek sayfalık uygulamalar için yönlendirme yapmaz: /etkinlikler
