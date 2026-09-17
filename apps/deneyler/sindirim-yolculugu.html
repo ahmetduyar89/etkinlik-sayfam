@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sindirim Yolculuğu Denizaltısı | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .pushable:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+    .chunk { cursor: pointer; transition: transform 0.08s; touch-action: manipulation; }
+    .chunk:active { transform: scale(0.9); }
+    .organ { cursor: pointer; }
+    .organ:hover { filter: brightness(1.1); }
+    .particle { position: absolute; cursor: pointer; touch-action: manipulation; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-sm font-black flex items-center gap-1"><span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span></a>
+      <div>
+        <div class="flex items-center gap-2"><span class="text-2xl sm:text-3xl">🍎</span><h1 class="display text-lg sm:text-2xl font-black tracking-wide">Sindirim Yolculuğu Denizaltısı</h1></div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Minik denizaltıyla besinin ağızdan bağırsaklara yolculuğuna katıl! Her organda görevi tamamla. 🚤</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab">🚤 1. Yolculuk</button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white">🗺️ 2. Organ Haritası</button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">YOLCULUK 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">Bir Elma Dilimi</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <!-- İstasyon çubuğu -->
+        <div id="stationBar" class="grid grid-cols-5 gap-1.5"></div>
+
+        <div class="flex items-center justify-between gap-2 p-2.5 bg-rose-50 rounded-xl border-2 border-ink">
+          <p id="taskText" class="text-xs sm:text-sm font-black">🎯 Görev</p>
+          <div class="text-right shrink-0">
+            <p class="text-[10px] font-black text-gray-500">SÜRE</p>
+            <p id="timeText" class="display text-xl font-black leading-none">—</p>
+          </div>
+        </div>
+
+        <!-- İSTASYON SAHNESİ -->
+        <div id="stage" class="relative w-full rounded-2xl border-3 border-ink overflow-hidden bg-gradient-to-b from-pink-100 to-rose-200" style="height: 320px;"></div>
+        <div id="controls" class="flex flex-wrap items-center justify-center gap-2"></div>
+
+        <!-- ORGAN HARİTASI MODU -->
+        <div id="mapMode" class="hidden flex-col sm:flex-row gap-3">
+          <div class="sm:w-1/2 rounded-2xl border-3 border-ink bg-orange-50 p-2"><svg id="bigMap" viewBox="0 0 200 300" class="w-full h-auto max-h-80 mx-auto"></svg></div>
+          <div id="organCard" class="sm:w-1/2 p-3 bg-white rounded-2xl border-3 border-ink text-sm"></div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-xs font-black">🔄 Yolculuğu Baştan Başlat</button>
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black">💡 İpucu</button>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-rose-50 to-amber-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">Yediğimiz besinler vücudumuzun kullanabileceği kadar küçük parçalara ayrılmalıdır. Buna <b>sindirim</b> denir. Sindirim ağızda başlar!</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">Kaptan Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">🧭</span><h3 class="display text-base font-black">Neredeyiz?</h3></div>
+        <svg id="miniMap" viewBox="0 0 200 300" class="w-full h-auto max-h-64 mx-auto"></svg>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Fen Bilgisi Rehberi</h3></div>
+        <div class="space-y-2 text-xs">
+          <div class="p-2 bg-amber-50 rounded-lg border border-amber-300"><p class="font-extrabold text-amber-900">⚙️ Mekanik Sindirim</p><p class="text-[11px] text-amber-800 font-semibold mt-0.5">Besinlerin dişlerle çiğnenmesi, midede karıştırılması gibi <b>fiziksel</b> olarak küçültülmesi.</p></div>
+          <div class="p-2 bg-lime-50 rounded-lg border border-lime-300"><p class="font-extrabold text-lime-900">🧪 Kimyasal Sindirim</p><p class="text-[11px] text-lime-800 font-semibold mt-0.5">Tükürük ve sindirim öz sularının besinleri gözle göremeyeceğimiz kadar küçük parçalara ayırması.</p></div>
+          <div class="p-2 bg-rose-50 rounded-lg border border-rose-300"><p class="font-extrabold text-rose-900">🦷 Sağlıklı Sindirim</p><p class="text-[11px] text-rose-800 font-semibold mt-0.5">Yavaş ye ve iyi çiğne, lifli besinler tüket, bol su iç ve yemekten önce ellerini yıka!</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Yolculuk Tamam!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-rose-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-rose-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      crunch() { tone('square', 300 + Math.random() * 200, 120, 0.06, 0.12); },
+      squeeze() { tone('sine', 200, 120, 0.2, 0.2); },
+      blub() { tone('sine', 300 + Math.random() * 300, 700, 0.08, 0.1); },
+      pop() { tone('triangle', 800, 1400, 0.06, 0.15); },
+      wrong() { tone('sawtooth', 220, 110, 0.25, 0.15); },
+      station() { tone('triangle', 523, 784, 0.15, 0.2); tone('triangle', 784, 1047, 0.2, 0.2, 0.12); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. ORGANLAR ---
+    const ORGANS = {
+      agiz: { n: 'Ağız', e: '👄', info: 'Dişler besinleri parçalar, dil karıştırır. <b>Tükürük</b> besinleri ıslatır ve sindirimi başlatır.', time: 'Birkaç saniye – 1 dakika' },
+      yemekborusu: { n: 'Yemek Borusu', e: '🟠', info: 'Ağızdan mideye uzanan kaslı bir borudur. Kaslar dalga gibi kasılarak lokmayı aşağı iter. Burada sindirim olmaz.', time: 'Yaklaşık 5–10 saniye' },
+      mide: { n: 'Mide', e: '🫃', info: 'Kaslı bir torbadır. Besinleri <b>mide öz suyu</b> ile karıştırır ve proteinlerin sindirimini başlatır.', time: 'Yaklaşık 2–4 saat' },
+      karaciger: { n: 'Karaciğer', e: '🟤', info: 'Yağların sindirimine yardım eden <b>safra</b> sıvısını üretir. Besinler karaciğerin içinden geçmez, yardımcı organdır.', time: 'Yardımcı organ' },
+      pankreas: { n: 'Pankreas', e: '🟡', info: 'Ürettiği <b>öz suyu</b> ince bağırsağa göndererek sindirime yardım eder. Yardımcı organdır.', time: 'Yardımcı organ' },
+      incebagirsak: { n: 'İnce Bağırsak', e: '🪱', info: 'Sindirim burada <b>tamamlanır</b>. Minik parçalara ayrılan besinler bağırsak duvarındaki çıkıntılardan <b>kana geçer</b>.', time: 'Yaklaşık 3–6 saat' },
+      kalinbagirsak: { n: 'Kalın Bağırsak', e: '🟫', info: 'Sindirilemeyen artıklardan <b>su ve bazı mineraller</b> geri emilir. Kalan artıklar vücuttan atılır.', time: 'Yaklaşık 1 gün' }
+    };
+
+    function mapSvg(active, clickable) {
+      const cls = k => `class="${clickable ? 'organ' : ''}" data-o="${k}" opacity="${!active || active === k ? 1 : 0.45}"`;
+      const glow = k => active === k ? 'stroke="#facc15" stroke-width="5"' : 'stroke="#0f172a" stroke-width="2.5"';
+      return `
+        <path d="M60 300 L60 110 Q60 90 80 86 L120 86 Q140 90 140 110 L140 300 Z" fill="#fde68a" stroke="#0f172a" stroke-width="2" opacity="0.4" />
+        <circle cx="100" cy="42" r="34" fill="#fde68a" stroke="#0f172a" stroke-width="2" opacity="0.5" />
+        <g ${cls('agiz')}><ellipse cx="100" cy="56" rx="14" ry="7" fill="#fb7185" ${glow('agiz')} /></g>
+        <g ${cls('yemekborusu')}><path d="M100 64 L104 122" ${glow('yemekborusu')} stroke-linecap="round" /><path d="M100 64 L104 122" stroke="#fdba74" stroke-width="6" stroke-linecap="round" /></g>
+        <g ${cls('karaciger')}><path d="M64 118 Q70 104 104 110 Q108 128 90 136 Q70 140 64 118 Z" fill="#92400e" ${glow('karaciger')} /></g>
+        <g ${cls('mide')}><path d="M104 120 Q132 112 136 134 Q138 158 116 160 Q102 160 104 146 Q112 140 104 132 Z" fill="#f472b6" ${glow('mide')} /></g>
+        <g ${cls('pankreas')}><path d="M92 162 Q110 156 128 164 Q110 172 92 168 Z" fill="#facc15" ${glow('pankreas')} /></g>
+        <g ${cls('kalinbagirsak')}><path d="M76 250 L76 186 Q76 176 88 176 L118 176 Q130 176 130 186 L130 250 Q130 262 116 262 L104 262 L104 284" fill="none" ${active === 'kalinbagirsak' ? 'stroke="#facc15" stroke-width="18"' : 'stroke="#0f172a" stroke-width="16"'} stroke-linejoin="round" /><path d="M76 250 L76 186 Q76 176 88 176 L118 176 Q130 176 130 186 L130 250 Q130 262 116 262 L104 262 L104 284" fill="none" stroke="#a16207" stroke-width="11" stroke-linejoin="round" /></g>
+        <g ${cls('incebagirsak')}><path d="M90 192 q10 -8 22 0 q10 8 0 14 q-12 6 -22 0 q-10 8 0 14 q12 6 22 0 q10 8 0 14 q-12 6 -22 0" fill="none" ${active === 'incebagirsak' ? 'stroke="#facc15" stroke-width="11"' : 'stroke="#0f172a" stroke-width="9"'} stroke-linecap="round" /><path d="M90 192 q10 -8 22 0 q10 8 0 14 q-12 6 -22 0 q-10 8 0 14 q12 6 22 0 q10 8 0 14 q-12 6 -22 0" fill="none" stroke="#fda4af" stroke-width="5" stroke-linecap="round" /></g>`;
+    }
+
+    // --- 3. YOLCULUKLAR ---
+    const STATIONS = ['agiz', 'yemekborusu', 'mide', 'incebagirsak', 'kalinbagirsak'];
+    const LEVELS = [
+      { title: 'Bir Elma Dilimi', food: '🍎', chunks: 4, chewTime: 14, pushNeed: 4, ringSpeed: 1.4, mixTime: 10, catchNeed: 8, catchTime: 18, fact: 'Elma liflidir. Lifler sindirilemez ama bağırsakların düzenli çalışmasına yardım eder!' },
+      { title: 'Tam Buğday Ekmeği', food: '🍞', chunks: 5, chewTime: 13, pushNeed: 5, ringSpeed: 1.2, mixTime: 9, catchNeed: 10, catchTime: 18, fact: 'Ekmekteki karbonhidratların sindirimi ağızda başlar. Ekmeği uzun süre çiğnersen tatlılaştığını hissedebilirsin!' },
+      { title: 'Yumurtalı Sandviç', food: '🥪', chunks: 6, chewTime: 13, pushNeed: 6, ringSpeed: 1.0, mixTime: 8, catchNeed: 12, catchTime: 18, fact: 'Sandviçteki yumurtanın proteinleri midede, peynirin yağları ise ince bağırsakta safra yardımıyla sindirilir.' }
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: İlk Yolculuk', text: 'Elma dilimini bağırsaklara kadar ulaştır.' },
+      { id: 'm2', title: '2. Görev: Mükemmel Çiğneme', text: 'Ağız istasyonunu 3 yıldızla geç.' },
+      { id: 'm3', title: '3. Görev: Harita Uzmanı', text: 'Organ Haritasında 7 organın kartını oku.', progress: true },
+      { id: 'm4', title: '4. Görev: Kaptan', text: '3 yolculuğun hepsini tamamla.' }
+    ];
+
+    // --- 4. DURUM ---
+    const $ = id => document.getElementById(id);
+    let mode = 'levels';
+    let levelIndex = 0;
+    let stationIdx = 0;
+    let stationStars = [];
+    let st = {};
+    let running = false;
+    let finished = false;
+    let score = 0;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    const organsRead = new Set();
+    let modalTimer = null;
+
+    function L() { return LEVELS[levelIndex]; }
+    function note(html) { $('scienceNote').innerHTML = html; }
+
+    function renderStationBar() {
+      $('stationBar').innerHTML = STATIONS.map((k, i) => {
+        const o = ORGANS[k];
+        const done = i < stationIdx || (finished && i <= stationIdx);
+        const cur = i === stationIdx && !finished;
+        return `<div class="rounded-lg border-2 border-ink p-1 text-center ${cur ? 'bg-yellow-300' : done ? 'bg-emerald-200' : 'bg-gray-100'}">
+          <p class="text-lg leading-none">${done ? '⭐'.repeat(stationStars[i] || 0) || '✅' : o.e}</p><p class="text-[9px] font-black leading-tight">${o.n}</p></div>`;
+      }).join('');
+      $('miniMap').innerHTML = mapSvg(finished ? null : STATIONS[stationIdx], false);
+    }
+
+    // --- 5. İSTASYONLAR ---
+    function startStation() {
+      const k = STATIONS[stationIdx];
+      renderStationBar();
+      $('controls').innerHTML = '';
+      st = { t: 0 };
+      running = true;
+      ({ agiz: startMouth, yemekborusu: startEso, mide: startStomach, incebagirsak: startSmall, kalinbagirsak: startLarge })[k]();
+      note(`📍 <b>${ORGANS[k].n}</b>: ${ORGANS[k].info}`);
+    }
+
+    function finishStation(s, msg) {
+      running = false;
+      stationStars[stationIdx] = s;
+      Sound.station();
+      if (STATIONS[stationIdx] === 'agiz' && s === 3) completeMission('m2');
+      note(`${'⭐'.repeat(s)} ${msg}`);
+      $('controls').innerHTML = `<button id="btnNext" class="pushable px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">🚤 ${stationIdx < STATIONS.length - 1 ? `${ORGANS[STATIONS[stationIdx + 1]].n}'a İlerle` : 'Yolculuğu Bitir'} ➔</button>`;
+      $('btnNext').addEventListener('click', () => {
+        Sound.click();
+        if (stationIdx < STATIONS.length - 1) { stationIdx++; startStation(); } else winLevel();
+      });
+      renderStationBar();
+    }
+
+    // 1) Ağız: çiğneme
+    function startMouth() {
+      $('taskText').textContent = '🦷 Besine dokunarak çiğne! Bütün parçaları küçült ve tükürük ekle.';
+      st.pieces = Array.from({ length: L().chunks }, (_, i) => ({ id: i, size: 3 }));
+      st.saliva = false;
+      st.limit = L().chewTime;
+      renderMouth();
+      $('controls').innerHTML = '<button id="btnSaliva" class="pushable px-4 py-2 bg-sky-200 text-sm font-black">💧 Tükürük Ekle</button>';
+      $('btnSaliva').addEventListener('click', () => { if (!running) return; st.saliva = true; Sound.blub(); $('btnSaliva').disabled = true; renderMouth(); checkMouth(); });
+    }
+    function renderMouth() {
+      const sizes = { 3: 'text-6xl', 2: 'text-4xl', 1: 'text-xl' };
+      $('stage').innerHTML = `
+        <div class="absolute inset-x-0 top-0 h-10 bg-white border-b-3 border-ink flex justify-around items-end">${'<span class="w-8 h-7 bg-white border-2 border-ink border-t-0 rounded-b-lg"></span>'.repeat(8)}</div>
+        <div class="absolute inset-x-0 bottom-0 h-10 bg-white border-t-3 border-ink flex justify-around items-start">${'<span class="w-8 h-7 bg-white border-2 border-ink border-b-0 rounded-t-lg"></span>'.repeat(8)}</div>
+        <div class="absolute inset-x-8 bottom-10 h-16 bg-rose-400 rounded-t-full border-3 border-ink border-b-0"></div>
+        ${st.saliva ? '<div class="absolute inset-0 bg-sky-200/30 pointer-events-none"></div>' : ''}
+        <div id="mouthPieces" class="absolute inset-x-6 top-14 bottom-14 flex flex-wrap items-center justify-center gap-2 content-center"></div>`;
+      $('mouthPieces').innerHTML = st.pieces.map(p => `<span data-id="${p.id}" class="chunk ${sizes[p.size]} leading-none">${p.size === 1 ? '🟤' : L().food}</span>`).join('');
+      $('mouthPieces').querySelectorAll('.chunk').forEach(el => el.addEventListener('pointerdown', () => chew(+el.dataset.id)));
+    }
+    let pieceSeq = 1000;
+    function chew(id) {
+      if (!running) return;
+      initAudio();
+      const p = st.pieces.find(x => x.id === id);
+      if (!p || p.size === 1) return;
+      Sound.crunch();
+      st.pieces = st.pieces.filter(x => x !== p);
+      const n = p.size === 3 ? 2 : 3;
+      for (let i = 0; i < n; i++) st.pieces.push({ id: pieceSeq++, size: p.size - 1 });
+      renderMouth();
+      checkMouth();
+    }
+    function checkMouth() {
+      if (!running) return;
+      if (st.pieces.every(p => p.size === 1) && st.saliva) {
+        const s = st.t <= st.limit * 0.6 ? 3 : st.t <= st.limit ? 2 : 1;
+        $('stage').insertAdjacentHTML('beforeend', '<div class="absolute inset-0 flex items-center justify-center text-6xl">🟤</div>');
+        finishStation(s, 'Besin çiğnendi ve tükürükle ıslanıp yumuşak bir <b>lokma</b> oldu. Dişler <b>mekanik</b>, tükürük <b>kimyasal</b> sindirim yaptı!');
+      }
+    }
+
+    // 2) Yemek borusu: kas dalgası zamanlaması
+    function startEso() {
+      $('taskText').textContent = '🌊 Kas halkası lokmanın üstüne geldiğinde "Kasıl!" düğmesine bas ve lokmayı mideye it!';
+      st.pos = 0; st.ring = 0; st.hits = 0; st.misses = 0;
+      $('controls').innerHTML = '<button id="btnSqueeze" class="pushable px-8 py-3 bg-orange-400 text-base font-black">💪 Kasıl!</button>';
+      $('btnSqueeze').addEventListener('click', squeeze);
+      renderEso();
+    }
+    function renderEso() {
+      const need = L().pushNeed;
+      const tubeTop = 20, tubeH = 270;
+      const lokmaY = tubeTop + 20 + (st.pos / need) * (tubeH - 40);
+      const ringY = tubeTop + st.ring * tubeH;
+      const aligned = Math.abs(ringY - lokmaY) < 28;
+      $('stage').innerHTML = `
+        <div class="absolute left-1/2 -translate-x-1/2 bg-orange-200 border-x-4 border-ink" style="top:${tubeTop}px;height:${tubeH}px;width:90px"></div>
+        <div class="absolute left-1/2 -translate-x-1/2 rounded-full border-4 ${aligned ? 'border-emerald-500 bg-emerald-300/40' : 'border-rose-500 bg-rose-300/30'}" style="top:${ringY - 14}px;height:28px;width:130px"></div>
+        <div class="absolute left-1/2 -translate-x-1/2 text-4xl" style="top:${lokmaY - 20}px">🟤</div>
+        <div class="absolute bottom-1 left-1/2 -translate-x-1/2 text-xs font-black bg-white px-2 rounded border-2 border-ink">⬇️ MİDE</div>
+        <div class="absolute left-2 top-2 bg-white px-2 py-1 rounded-lg border-2 border-ink text-xs font-black">İtiş: ${st.hits}/${need}</div>`;
+      st.aligned = aligned;
+    }
+    function squeeze() {
+      if (!running) return;
+      initAudio();
+      if (st.aligned) {
+        st.hits++; st.pos++; Sound.squeeze();
+        if (st.pos >= L().pushNeed) {
+          const s = st.misses === 0 ? 3 : st.misses <= 2 ? 2 : 1;
+          finishStation(s, 'Yemek borusunun kasları dalga gibi kasılarak lokmayı mideye itti. Bu yüzden baş aşağı dururken bile yutkunabiliriz!');
+        }
+      } else { st.misses++; Sound.wrong(); }
+    }
+
+    // 3) Mide: doğru öz su + karıştırma
+    function startStomach() {
+      $('taskText').textContent = '🧪 Önce doğru sıvıyı ekle, sonra hızlı hızlı karıştır!';
+      st.juice = false; st.mix = 0; st.wrong = 0; st.limit = L().mixTime;
+      const opts = [['oz', '🧪 Mide Öz Suyu'], ['safra', '🟢 Safra'], ['gazoz', '🥤 Gazlı İçecek']].sort(() => Math.random() - 0.5);
+      $('controls').innerHTML = opts.map(([k, n]) => `<button data-j="${k}" class="juice pushable px-3 py-2 bg-white text-xs font-black">${n}</button>`).join('') + '<button id="btnMix" disabled class="pushable px-6 py-2.5 bg-pink-400 text-sm font-black">🌀 Karıştır!</button>';
+      document.querySelectorAll('.juice').forEach(b => b.addEventListener('click', () => {
+        if (!running || st.juice) return;
+        if (b.dataset.j === 'oz') { st.juice = true; Sound.blub(); b.classList.add('bg-emerald-300'); $('btnMix').disabled = false; note('✅ <b>Mide öz suyu</b> eklendi. İçindeki maddeler proteinleri parçalamaya başlar. Şimdi karıştır!'); }
+        else { st.wrong++; Sound.wrong(); b.disabled = true; note(b.dataset.j === 'safra' ? '❌ Safra mideye değil, <b>ince bağırsağa</b> gelir ve yağların sindirimine yardım eder.' : '❌ Gazlı içecek sindirime yardım etmez!'); }
+      }));
+      $('btnMix').addEventListener('click', () => { if (!running || !st.juice) return; st.mix = Math.min(100, st.mix + 7); Sound.blub(); if (st.mix >= 100) { const s = st.wrong === 0 && st.t <= st.limit ? 3 : st.t <= st.limit * 1.5 ? 2 : 1; finishStation(s, 'Mide kaslı duvarlarıyla besinleri öz suyla karıştırıp <b>lapa</b> hâline getirdi.'); } });
+      renderStomach();
+    }
+    function renderStomach() {
+      $('stage').innerHTML = `
+        <svg viewBox="0 0 400 320" class="absolute inset-0 w-full h-full">
+          <path d="M150 20 L160 80 Q300 40 330 140 Q350 250 230 280 Q140 300 120 220 Q170 200 150 150 Q130 110 160 80" fill="#f9a8d4" stroke="#0f172a" stroke-width="5" />
+          <path d="M200 110 Q300 90 305 160 Q310 240 230 255 Q170 262 160 220 Q200 200 185 150 Z" fill="${st.juice ? '#bef264' : '#fbcfe8'}" opacity="0.7" />
+          ${Array.from({ length: 10 }, (_, i) => `<circle cx="${210 + ((i * 37 + st.mix * 3) % 90)}" cy="${150 + ((i * 53 + st.mix * 2) % 90)}" r="${10 - st.mix / 14}" fill="#92400e" />`).join('')}
+        </svg>
+        <div class="absolute left-3 top-3 w-40 bg-white rounded-xl border-2 border-ink p-1.5 text-[11px] font-black">Karışım: ${Math.round(st.mix)}%<div class="h-3 mt-1 bg-gray-100 rounded-full border-2 border-ink overflow-hidden"><div class="h-full bg-pink-500" style="width:${st.mix}%"></div></div></div>`;
+    }
+
+    // 4) İnce bağırsak: besin yakalama
+    function startSmall() {
+      $('taskText').textContent = `🩸 Besin parçalarına (🟢) dokunarak kana gönder! ${L().catchNeed} tane topla. Lifleri (🟫) bırak, onlar kalın bağırsağa gidecek.`;
+      st.caught = 0; st.bad = 0; st.parts = []; st.spawn = 0; st.limit = L().catchTime;
+      $('stage').innerHTML = `
+        <div class="absolute inset-x-0 top-0 h-12 flex">${Array.from({ length: 12 }, () => '<div class="flex-1 mx-0.5 bg-rose-300 border-2 border-ink border-t-0 rounded-b-full"></div>').join('')}</div>
+        <div class="absolute inset-x-0 top-0 h-2 bg-red-500"></div>
+        <div class="absolute inset-x-0 bottom-0 h-12 flex items-end">${Array.from({ length: 12 }, () => '<div class="flex-1 mx-0.5 h-10 bg-rose-300 border-2 border-ink border-b-0 rounded-t-full"></div>').join('')}</div>
+        <div class="absolute right-2 top-14 bg-white px-2 py-1 rounded-lg border-2 border-ink text-xs font-black">🩸 Kana geçen: <span id="caughtText">0</span>/${L().catchNeed}</div>
+        <div id="parts" class="absolute inset-0"></div>`;
+    }
+    function tickSmall(dt) {
+      st.spawn -= dt;
+      const W = $('stage').clientWidth;
+      if (st.spawn <= 0) {
+        st.spawn = 0.55;
+        const fiber = Math.random() < 0.3;
+        const el = document.createElement('div');
+        el.className = 'particle text-3xl leading-none';
+        el.textContent = fiber ? '🟫' : '🟢';
+        const p = { el, x: -40, y: 70 + Math.random() * 170, fiber, v: 70 + Math.random() * 50 };
+        el.addEventListener('pointerdown', () => catchPart(p));
+        $('parts').appendChild(el);
+        st.parts.push(p);
+      }
+      st.parts.forEach(p => { p.x += p.v * dt; p.el.style.transform = `translate(${p.x}px,${p.y}px)`; });
+      st.parts = st.parts.filter(p => { if (p.x > W + 10) { p.el.remove(); return false; } return true; });
+    }
+    function catchPart(p) {
+      if (!running || p.done) return;
+      initAudio();
+      p.done = true;
+      if (p.fiber) { st.bad++; Sound.wrong(); note('❌ Lif sindirilemez, kana geçmez! Onu kalın bağırsağa bırakmalıyız.'); }
+      else { st.caught++; Sound.pop(); $('caughtText').textContent = st.caught; }
+      if (typeof gsap !== 'undefined') gsap.to(p.el, { y: -80, opacity: 0, duration: 0.3, onComplete: () => p.el.remove() });
+      else p.el.remove();
+      st.parts = st.parts.filter(x => x !== p);
+      if (st.caught >= L().catchNeed) {
+        const s = st.bad === 0 && st.t <= st.limit ? 3 : st.bad <= 2 ? 2 : 1;
+        st.parts.forEach(x => x.el.remove());
+        finishStation(s, 'Sindirim ince bağırsakta tamamlandı. Minik besin parçaları bağırsak duvarındaki çıkıntılardan <b>kana geçti</b> ve vücuda dağıldı!');
+      }
+    }
+
+    // 5) Kalın bağırsak: su emilimi
+    function startLarge() {
+      $('taskText').textContent = '💧 "Suyu Emilt" düğmesini basılı tut. Göstergeyi yeşil bölgede (60–80) bırak!';
+      st.water = 0; st.holding = false; st.tries = 0;
+      $('controls').innerHTML = '<button id="btnAbsorb" class="pushable px-6 py-3 bg-sky-400 text-base font-black touch-none">💧 Suyu Emilt (basılı tut)</button><button id="btnDone" class="pushable px-4 py-3 bg-emerald-400 text-sm font-black">✅ Tamam</button>';
+      const b = $('btnAbsorb');
+      const on = e => { e.preventDefault(); st.holding = true; initAudio(); };
+      const off = () => { st.holding = false; };
+      b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
+      $('btnDone').addEventListener('click', () => {
+        if (!running) return;
+        st.tries++;
+        if (st.water >= 60 && st.water <= 80) {
+          const s = st.tries === 1 ? 3 : st.tries === 2 ? 2 : 1;
+          finishStation(s, 'Kalın bağırsak artıklardaki suyun büyük kısmını geri emdi. Sindirilemeyen artıklar vücuttan atılmaya hazır!');
+        } else if (st.water < 60) { Sound.wrong(); note('❌ Çok az su emildi. Vücudumuz suyu boşa harcar! Biraz daha emilt.'); }
+        else { Sound.wrong(); note('❌ Çok fazla su emildi, artıklar kurudu. Bu kabızlığa yol açar! Bol su içmek ve lifli beslenmek önemlidir.'); st.water = 50; }
+      });
+      renderLarge();
+    }
+    function renderLarge() {
+      const w = st.water;
+      $('stage').innerHTML = `
+        <div class="absolute inset-x-8 top-10 bottom-16 rounded-3xl border-[14px] border-amber-700 bg-amber-100"></div>
+        <div class="absolute inset-x-16 top-20 bottom-24 flex flex-wrap gap-1 content-center justify-center">${Array.from({ length: 14 }, (_, i) => `<span class="text-2xl" style="opacity:${i / 14 < 1 - w / 100 ? 1 : 0.2}">💧</span>`).join('')}</div>
+        <div class="absolute inset-x-8 bottom-3 h-8 bg-white rounded-xl border-3 border-ink overflow-hidden">
+          <div class="absolute top-0 bottom-0 bg-emerald-300" style="left:60%;width:20%"></div>
+          <div class="absolute top-0 bottom-0 bg-sky-500" style="left:0;width:${w}%;opacity:0.75"></div>
+          <div class="absolute inset-0 flex items-center justify-center text-xs font-black">Emilen su: ${Math.round(w)}</div>
+        </div>`;
+    }
+
+    // --- 6. DÖNGÜ ---
+    let last = performance.now();
+    let renderAcc = 0;
+    function loop(now) {
+      const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+      last = now;
+      if (mode === 'levels' && running) {
+        st.t += dt;
+        $('timeText').textContent = `${st.t.toFixed(1)} sn`;
+        const k = STATIONS[stationIdx];
+        if (k === 'yemekborusu') { st.ring = (st.ring + dt / L().ringSpeed) % 1; renderEso(); }
+        if (k === 'mide') { if (st.juice && st.mix < 100) st.mix = Math.max(0, st.mix - dt * 6); renderAcc += dt; if (renderAcc > 0.08) { renderAcc = 0; renderStomach(); } }
+        if (k === 'incebagirsak') tickSmall(dt);
+        if (k === 'kalinbagirsak') { if (st.holding) st.water = Math.min(100, st.water + dt * 35); renderLarge(); }
+      }
+      requestAnimationFrame(loop);
+    }
+
+    // --- 7. AKIŞ ---
+    function winLevel() {
+      finished = true;
+      const avg = stationStars.reduce((a, b) => a + b, 0) / STATIONS.length;
+      const s = avg >= 2.6 ? 3 : avg >= 1.8 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20 + stationStars.reduce((a, b) => a + b, 0) * 10;
+      if (levelIndex === 0) completeMission('m1');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      updateScore(); renderLevelDots(); renderStationBar();
+      $('controls').innerHTML = '';
+      $('stage').innerHTML = `<div class="absolute inset-0 flex flex-col items-center justify-center gap-2"><p class="text-6xl">${L().food}➔🩸</p><p class="display text-2xl font-black">Yolculuk tamamlandı!</p></div>`;
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+      showModal({ emoji: '🚤', title: 'Yolculuk Tamam!', stars: '⭐'.repeat(s) + '☆'.repeat(3 - s), info: `İstasyon yıldızları: ${stationStars.map(x => '⭐'.repeat(x)).join(' | ')}`, fact: L().fact, next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Organ Haritası 🗺️' });
+    }
+
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info; $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next); if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 800);
+    }
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    function renderMap(sel) {
+      $('bigMap').innerHTML = mapSvg(sel, true);
+      $('bigMap').querySelectorAll('.organ').forEach(g => g.addEventListener('click', () => {
+        const k = g.dataset.o;
+        organsRead.add(k); Sound.click();
+        renderMissions();
+        if (organsRead.size >= 7) completeMission('m3');
+        renderMap(k);
+      }));
+      const o = sel ? ORGANS[sel] : null;
+      $('organCard').innerHTML = o ? `<p class="text-3xl">${o.e}</p><p class="display text-xl font-black">${o.n}</p><p class="font-semibold text-gray-700 mt-1 leading-relaxed">${o.info}</p><p class="mt-2 text-xs font-black bg-amber-100 border-2 border-ink rounded-lg px-2 py-1 inline-block">⏱️ ${o.time}</p>`
+        : '<p class="font-black">👈 Haritadaki bir organa dokun!</p><p class="text-xs font-semibold text-gray-600 mt-1">Besinler sırasıyla ağız ➔ yemek borusu ➔ mide ➔ ince bağırsak ➔ kalın bağırsaktan geçer. Karaciğer ve pankreas yardımcı organlardır.</p>';
+    }
+
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        const extra = m.progress && !done ? ` <b class="text-sky-700">(${organsRead.size}/7)</b>` : '';
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5"><span class="text-lg">${done ? '✅' : '⬜'}</span><div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}${extra}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Yolculuklar:</span>' + LEVELS.map((lv, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} text-sm">${lv.food}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function loadLevel(i) {
+      closeModal();
+      mode = 'levels'; levelIndex = i; stationIdx = 0; stationStars = []; finished = false;
+      $('levelBadge').textContent = `YOLCULUK ${i + 1}`;
+      $('levelTitle').textContent = L().title;
+      renderLevelDots();
+      startStation();
+    }
+
+    function switchMode(m) {
+      const isM = m === 'map';
+      $('tabLevels').classList.toggle('active-tab', !isM); $('tabLevels').classList.toggle('bg-white', isM);
+      $('tabSandbox').classList.toggle('active-tab', isM); $('tabSandbox').classList.toggle('bg-white', !isM);
+      ['levelDots', 'stationBar', 'stage', 'controls'].forEach(id => $(id).classList.toggle('hidden', isM));
+      $('mapMode').classList.toggle('hidden', !isM); $('mapMode').classList.toggle('flex', isM);
+      if (isM) {
+        closeModal();
+        mode = 'map'; running = false;
+        $('levelBadge').textContent = 'HARİTA';
+        $('levelTitle').textContent = 'Sindirim Sistemi Organları';
+        $('taskText').textContent = '🎯 Organlara dokun ve görevlerini öğren!';
+        $('timeText').textContent = '—';
+        renderMap(null);
+      } else loadLevel(levelIndex);
+    }
+
+    $('btnReset').addEventListener('click', () => { Sound.click(); if (mode === 'levels') loadLevel(levelIndex); else renderMap(null); });
+    $('btnHint').addEventListener('click', () => {
+      Sound.click();
+      if (mode !== 'levels') { note('<b>Keşif:</b> Besinler karaciğerin ve pankreasın içinden geçmez. Bu organlar sindirim sıvılarını üretip gönderirler.'); return; }
+      note(`<b>İpucu:</b> ${{
+        agiz: 'Büyük parçalara birkaç kez dokunarak küçült. Tükürük eklemeyi unutma!',
+        yemekborusu: 'Halka yeşil olduğunda bas. Acele etme, halka tekrar gelecek.',
+        mide: 'Mideye mide öz suyu gelir. Sonra düğmeye hızlı hızlı bas.',
+        incebagirsak: 'Sadece yeşil besin parçalarına dokun. Kahverengi lifler sindirilmez.',
+        kalinbagirsak: 'Düğmeyi basılı tut, gösterge yeşil bölgeye gelince bırak ve Tamam de.'
+      }[STATIONS[stationIdx]]}`);
+    });
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('map'); });
+    $('btnModalRetry').addEventListener('click', () => loadLevel(levelIndex));
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('map'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; Sound.click(); });
+
+    renderMissions(); updateScore(); loadLevel(0);
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

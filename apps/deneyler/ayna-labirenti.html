@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ayna Labirenti: Işığı Hazineye Ulaştır! | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'sans-serif'],
+            display: ['Baloo 2', 'cursive'],
+          },
+          colors: {
+            bgMain: '#fffbeb',
+            ink: '#0f172a',
+            laserYellow: '#facc15',
+            caveBlue: '#1e1b4b',
+            crystalCyan: '#22d3ee',
+          },
+          borderWidth: {
+            '3': '3px',
+          },
+          boxShadow: {
+            'hard': '4px 4px 0px #0f172a',
+            'hard-lg': '6px 6px 0px #0f172a',
+            'hard-sm': '2px 2px 0px #0f172a',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky {
+      border: 3.5px solid #0f172a;
+      border-radius: 1.25rem;
+      box-shadow: 4px 4px 0px #0f172a;
+    }
+    .pushable {
+      border: 3px solid #0f172a;
+      border-radius: 0.85rem;
+      box-shadow: 3px 3px 0px #0f172a;
+      transition: all 0.12s ease;
+      cursor: pointer;
+    }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .active-tab {
+      background-color: #facc15 !important;
+      color: #0f172a !important;
+      border-color: #0f172a !important;
+    }
+    .tool-active {
+      background-color: #facc15 !important;
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #0f172a !important;
+    }
+
+    /* Işık huzmesi akış efekti */
+    @keyframes beamFlow {
+      from { stroke-dashoffset: 40; }
+      to { stroke-dashoffset: 0; }
+    }
+    .beam-flow {
+      stroke-dasharray: 6 14;
+      animation: beamFlow 0.6s linear infinite;
+    }
+    @keyframes crystalPulse {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 1; }
+    }
+    .crystal-glow { animation: crystalPulse 1.2s ease-in-out infinite; }
+    .cell-hit { cursor: pointer; }
+    .cell-hit:hover { fill: rgba(250, 204, 21, 0.18); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <!-- Üst Başlık & Navigasyon Çubuğu -->
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-ink text-sm font-black flex items-center gap-1">
+        <span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span>
+      </a>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">🪞</span>
+          <h1 class="display text-lg sm:text-2xl font-black text-ink tracking-wide">
+            Ayna Labirenti: Işığı Hazineye Ulaştır!
+          </h1>
+        </div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">
+          Aynaları yerleştir ve çevir, fenerin ışığını yansıtarak karanlık mağaradaki hazineyi bul! 🔦💎
+        </p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1">
+          <span>🎯</span> <span>1. Seviyeler</span>
+        </button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1">
+          <span>🔬</span> <span>2. Test Masası</span>
+        </button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1" title="Sesi Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Ana Çalışma Alanı -->
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <!-- SOL PANEL: MAĞARA SAHNESİ (7 SÜTUN) -->
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3 relative">
+
+        <!-- Seviye Çubuğu -->
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black text-ink shadow-sm">
+              SEVİYE 1
+            </span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black text-ink">İlk Yansıma</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5">
+            <!-- JavaScript ile doldurulur -->
+          </div>
+        </div>
+
+        <p id="levelDesc" class="text-xs sm:text-sm font-bold text-gray-700 -mt-1">
+          Fenerin ışığı dümdüz ilerler. Bir ayna koyarak ışığı hazineye çevir!
+        </p>
+
+        <!-- Durum Rozetleri -->
+        <div class="flex flex-wrap items-center justify-between gap-2 -mb-1">
+          <div class="bg-white px-2.5 py-1 rounded-xl border-2 border-ink text-[11px] sm:text-xs font-black shadow-sm flex items-center gap-1.5">
+            <span id="statusDot" class="w-3 h-3 rounded-full bg-gray-400 border border-ink"></span>
+            <span id="statusText">Fener kapalı 🔦</span>
+          </div>
+          <div id="invBadge" class="bg-white px-2.5 py-1 rounded-xl border-2 border-ink text-[11px] sm:text-xs font-black shadow-sm flex items-center gap-1.5">
+            <span>🪞 Kalan Ayna:</span>
+            <span id="invCount" class="text-sky-700">1</span>
+          </div>
+        </div>
+
+        <!-- SVG MAĞARA SAHNESİ -->
+        <div id="stageContainer" class="relative w-full rounded-2xl border-3 border-ink overflow-hidden bg-caveBlue select-none shadow-inner">
+          <svg id="caveSvg" viewBox="0 0 540 360" class="w-full h-auto block"></svg>
+        </div>
+
+        <!-- TEST MASASI ARAÇ TEPSİSİ (Yalnızca Test Masası modunda) -->
+        <div id="toolTray" class="hidden">
+          <label class="text-xs font-black text-gray-700 flex items-center gap-1.5 mb-2">
+            <span>🧰</span> <span>Bir araç seç ve mağarada bir kareye dokun:</span>
+          </label>
+          <div id="toolGrid" class="grid grid-cols-4 sm:grid-cols-7 gap-2"></div>
+          <p class="text-[11px] font-bold text-gray-500 mt-2">💡 Fenere dokunursan yönünü değiştirebilirsin. Aynaya tekrar dokunursan döner.</p>
+        </div>
+
+        <!-- NASIL OYNANIR (Seviye modunda) -->
+        <div id="howTo" class="grid grid-cols-3 gap-2 text-center">
+          <div class="p-2 bg-sky-50 rounded-xl border-2 border-ink">
+            <p class="text-lg">👆</p>
+            <p class="text-[11px] font-black text-ink">Boş kareye dokun</p>
+            <p class="text-[10px] font-bold text-gray-500">Ayna yerleşir</p>
+          </div>
+          <div class="p-2 bg-amber-50 rounded-xl border-2 border-ink">
+            <p class="text-lg">🔄</p>
+            <p class="text-[11px] font-black text-ink">Aynaya dokun</p>
+            <p class="text-[10px] font-bold text-gray-500">Yönü değişir</p>
+          </div>
+          <div class="p-2 bg-rose-50 rounded-xl border-2 border-ink">
+            <p class="text-lg">✖️</p>
+            <p class="text-[11px] font-black text-ink">Bir daha dokun</p>
+            <p class="text-[10px] font-bold text-gray-500">Ayna kalkar</p>
+          </div>
+        </div>
+
+        <!-- KONTROL BUTONLARI -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <div class="flex items-center gap-2">
+            <button id="btnLight" class="pushable px-5 py-2.5 bg-yellow-400 hover:bg-yellow-300 text-ink font-black text-sm flex items-center gap-2">
+              <span>🔦</span> <span id="lightBtnText">Feneri Yak</span>
+            </button>
+            <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-ink text-xs font-black flex items-center gap-1">
+              <span>🔄</span> <span>Temizle</span>
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btnAngles" class="pushable px-3 py-2 bg-white hover:bg-gray-100 text-ink text-xs font-black flex items-center gap-1">
+              <span>📐</span> <span id="anglesBtnText">Açıları Göster</span>
+            </button>
+            <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black flex items-center gap-1">
+              <span>💡</span> <span>İpucu</span>
+            </button>
+            <button id="btnNextLevel" class="pushable px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black hidden items-center gap-1">
+              <span>Sonraki Seviye</span> <span>➔</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- BİLİM İNSANI NOTU -->
+        <div class="p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border-2 border-ink flex items-start gap-2.5 mt-1">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shadow-sm shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black text-ink">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">
+              Işık bir engelle karşılaşana kadar <b>dümdüz</b> yol alır. Ayna gibi parlak ve pürüzsüz yüzeyler ışığı geri sektirir. Buna <b>yansıma</b> denir.
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- SAĞ PANEL (5 SÜTUN) -->
+    <div class="lg:col-span-5 flex flex-col gap-3">
+
+      <!-- GÖREVLER -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🎯</span>
+            <h3 class="display text-base font-black text-ink">Işık Kâşifi Görevleri</h3>
+          </div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <!-- GÖSTERGELER -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">📊</span>
+            <h3 class="display text-base font-black text-ink">Işık Yolu Göstergeleri</h3>
+          </div>
+          <span class="text-xs font-bold text-gray-500" id="starTotal">⭐ 0 / 18</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-center">
+          <div class="p-2 bg-amber-50 rounded-xl border-2 border-ink">
+            <p class="text-[10px] font-bold text-gray-500">Yansıma</p>
+            <p id="statReflections" class="text-lg font-black text-amber-800">0</p>
+          </div>
+          <div class="p-2 bg-cyan-50 rounded-xl border-2 border-ink">
+            <p class="text-[10px] font-bold text-gray-500">Kristal</p>
+            <p id="statCrystals" class="text-lg font-black text-cyan-800">0/0</p>
+          </div>
+          <div class="p-2 bg-emerald-50 rounded-xl border-2 border-ink">
+            <p class="text-[10px] font-bold text-gray-500">Işık Yolu</p>
+            <p id="statLength" class="text-lg font-black text-emerald-800">0 kare</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- FEN BİLGİSİ REHBERİ -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <span class="text-xl">📚</span>
+          <h3 class="display text-base font-black text-ink">Fen Bilgisi Rehberi</h3>
+        </div>
+        <div class="space-y-2 text-xs font-bold">
+          <div class="p-2 bg-yellow-50 rounded-lg border border-yellow-300">
+            <p class="text-yellow-900 font-extrabold">➡️ Işık Doğrusal Yayılır</p>
+            <p class="text-[11px] text-yellow-800 font-semibold mt-0.5">Işık, önüne bir şey çıkmadıkça düz bir çizgide ilerler.</p>
+          </div>
+          <div class="p-2 bg-sky-50 rounded-lg border border-sky-300">
+            <p class="text-sky-900 font-extrabold">🪞 Yansıma Kuralı</p>
+            <p class="text-[11px] text-sky-800 font-semibold mt-0.5">Işığın aynaya <b>gelme açısı</b>, aynadan <b>yansıma açısına</b> her zaman eşittir. Mağaradaki aynalar ışığı hep 45°'lik açılarla çevirir.</p>
+          </div>
+          <div class="p-2 bg-emerald-50 rounded-lg border border-emerald-300">
+            <p class="text-emerald-900 font-extrabold">🔍 Saydam, Yarı Saydam, Opak</p>
+            <p class="text-[11px] text-emerald-800 font-semibold mt-0.5"><b>Cam</b> saydamdır, ışığı geçirir. <b>Buzlu cam</b> yarı saydamdır, ışığın bir kısmını geçirir. <b>Taş duvar</b> opaktır, ışığı hiç geçirmez.</p>
+          </div>
+          <div class="p-2 bg-rose-50 rounded-lg border border-rose-300">
+            <p class="text-rose-900 font-extrabold">🛡️ Güvenlik Sırrı</p>
+            <p class="text-[11px] text-rose-800 font-semibold mt-0.5">Gerçek aynayla güneş ışığını kimsenin gözüne tutma. Güneşe asla doğrudan bakma!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- SONUÇ PENCERESİ -->
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center relative">
+      <div class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black text-ink">Hazine Bulundu!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-sky-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-sky-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-ink text-sm font-black">🔄 Tekrar Dene</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. WEB AUDIO API SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) audioCtx = new AudioCtx();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(f1, t);
+        osc.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        gain.gain.setValueAtTime(vol, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + dur);
+      } catch (e) {}
+    }
+
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      place() { tone('triangle', 300, 600, 0.1, 0.25); },
+      rotate() { tone('square', 700, 900, 0.05, 0.08); },
+      remove() { tone('sine', 500, 200, 0.12, 0.18); },
+      deny() { tone('sawtooth', 180, 120, 0.15, 0.12); },
+      light() { tone('sine', 300, 1200, 0.35, 0.15); },
+      crystal() { tone('sine', 1320, 1760, 0.18, 0.12); },
+      win() {
+        [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12));
+      }
+    };
+
+    // --- 2. SEVİYE VERİLERİ ---
+    // Harita: '.' boş, '#' taş duvar (opak), 'g' cam (saydam), 'f' buzlu cam (yarı saydam),
+    // 'c' kristal, 'T' hazine, 'A' sabit ayna '/', 'B' sabit ayna '\', '>' '<' '^' 'v' fener yönü
+    const COLS = 9, ROWS = 6, CELL = 60;
+
+    const LEVELS = [
+      {
+        title: 'İlk Yansıma',
+        desc: 'Fenerin ışığı dümdüz ilerler. Bir ayna koyarak ışığı hazineye çevir!',
+        map: [
+          '.........',
+          '>........',
+          '.........',
+          '###......',
+          '....T....',
+          '.........'
+        ],
+        inv: 1, best: 1,
+        hint: 'Işığın geçtiği satırda, hazinenin tam üstündeki kareye bir ayna koy. Işık aşağı dönmezse aynaya dokunup çevir.',
+        fact: 'Işık dümdüz ilerlediği için köşeleri kendiliğinden dönemez. Aynalar ışığın yönünü değiştirmemizi sağlar. Periskoplar da bu yüzden iki ayna kullanır!'
+      },
+      {
+        title: 'Taş Duvarı Aş',
+        desc: 'Taş duvar opaktır, ışığı geçirmez! Aynalarla ışığı duvarın etrafından dolaştır.',
+        map: [
+          '>...#...T',
+          '....#....',
+          '....#....',
+          '....#....',
+          '.........',
+          '.........'
+        ],
+        inv: 4, best: 4,
+        hint: 'Işığı önce aşağı indir, duvarın altından sağa geçir, sonra yukarı çıkarıp hazineye yolla. Bunun için 4 ayna gerekir.',
+        fact: 'Taş, tahta ve metal gibi ışığı hiç geçirmeyen maddelere <b>opak</b> madde denir. Opak cisimlerin arkasında gölge oluşur.'
+      },
+      {
+        title: 'Saydam Cam',
+        desc: 'Işık camın içinden geçebilir mi? Mor kristali parlatıp ışığı hazineye ulaştır!',
+        map: [
+          '.........',
+          '..#......',
+          '>.g.c...#',
+          '.....#...',
+          '.....#...',
+          '.T.g.....'
+        ],
+        inv: 2, best: 2,
+        hint: 'Cam ışığı geçirir, ona dokunmana gerek yok. Kristali geçtikten sonra ışığı aşağı indir, en alt satırda da sola çevir.',
+        fact: 'Pencere camı ve su gibi ışığı geçiren maddelere <b>saydam</b> madde denir. Saydam maddelerin arkası net görünür.'
+      },
+      {
+        title: 'Kristal Avcısı',
+        desc: 'İki kristalin ikisi de parlamalı! Kilitli aynaları kaldıramazsın ama çevirebilirsin.',
+        map: [
+          '.cT.v....',
+          '.........',
+          '.........',
+          '.c..B..#.',
+          '###......',
+          '.........'
+        ],
+        inv: 2, best: 2,
+        hint: 'Önce kilitli aynayı çevirip ışığı sola yolla. Işık sol kenara varınca yukarı, sonra da tekrar sağa dönmeli.',
+        fact: 'Işık bir aynadan diğerine defalarca yansıyabilir. Kuaförlerdeki karşılıklı aynalarda kendini sonsuza kadar tekrar ediyormuş gibi görmenin sırrı budur!'
+      },
+      {
+        title: 'Zikzak Mağara',
+        desc: 'Fener yukarıya bakıyor! Işığı zikzak çizdirerek kristalden geçir ve hazineyi bul.',
+        map: [
+          '........#',
+          '#..#c....',
+          '......#..',
+          '..g..#...',
+          '.......T.',
+          '^........'
+        ],
+        inv: 4, best: 4,
+        hint: 'Işığı cam satırında sağa çevir, kristalin sütununda yukarı çıkar, en üst satırda sağa ve en sonda hazineye doğru aşağı indir.',
+        fact: 'Denizaltılardaki <b>periskop</b>, iki aynayla ışığı iki kez yansıtır. Bu sayede su altındaki denizciler su üstünü görebilir.'
+      },
+      {
+        title: 'Büyük Hazine',
+        desc: 'Son görev! Buzlu cam ışığı azaltır ama geçirir. Kilitli aynaları doğru çevir, iki kristali de parlat!',
+        map: [
+          '.B......<',
+          '...#.B.T.',
+          '.c.#.c...',
+          '......#..',
+          '...f.....',
+          '#.......#'
+        ],
+        inv: 2, best: 2,
+        hint: 'İki kilitli aynayı da çevirmen gerekiyor. Işık sol sütunda aşağı inip alt kısımda sağa dönmeli, sonra sağdaki kristalin sütununda yukarı çıkmalı.',
+        fact: 'Buzlu cam ve aydınger kâğıdı gibi maddeler ışığın sadece bir kısmını geçirir. Bunlara <b>yarı saydam</b> madde denir. Arkaları bulanık görünür.'
+      }
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: İlk Yansıma', text: '1. seviyede tek aynayla hazineyi bul.' },
+      { id: 'm2', title: '2. Görev: Saydam Maddeyi Keşfet', text: '3. seviyede ışığı camın içinden geçirerek kazan.' },
+      { id: 'm3', title: '3. Görev: Ayna Ustası', text: '6 seviyenin hepsini tamamla.' },
+      { id: 'm4', title: '4. Görev: Mucit Işık Yolu', text: 'Test Masasında ışığı en az 3 kez yansıt.' }
+    ];
+
+    // --- 3. OYUN DURUMU ---
+    let mode = 'levels';
+    let levelIndex = 0;
+    let grid = [];
+    let inventory = 0;
+    let lightOn = false;
+    let showAngles = false;
+    let levelWon = false;
+    let score = 0;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    let sandboxTool = 'mirror';
+    let lastTrace = null;
+    let prevLitCount = 0;
+
+    const TOOLS = [
+      { id: 'mirror', icon: '🪞', label: 'Ayna' },
+      { id: 'wall', icon: '🧱', label: 'Taş Duvar' },
+      { id: 'glass', icon: '🪟', label: 'Cam' },
+      { id: 'frosted', icon: '🌫️', label: 'Buzlu Cam' },
+      { id: 'crystal', icon: '💎', label: 'Kristal' },
+      { id: 'treasure', icon: '🧰', label: 'Hazine' },
+      { id: 'erase', icon: '🧽', label: 'Sil' }
+    ];
+
+    const DIRS = { '>': [1, 0], '<': [-1, 0], '^': [0, -1], 'v': [0, 1] };
+
+    function parseMap(map) {
+      return map.map(row => row.split('').map(ch => {
+        switch (ch) {
+          case '#': return { type: 'wall' };
+          case 'g': return { type: 'glass' };
+          case 'f': return { type: 'frosted' };
+          case 'c': return { type: 'crystal' };
+          case 'T': return { type: 'treasure' };
+          case 'A': return { type: 'mirror', orient: '/', fixed: true };
+          case 'B': return { type: 'mirror', orient: '\\', fixed: true };
+          case '>': case '<': case '^': case 'v':
+            return { type: 'source', dir: DIRS[ch] };
+          default: return { type: 'empty' };
+        }
+      }));
+    }
+
+    // --- 4. IŞIK İZLEME MOTORU ---
+    function center(x, y) { return [x * CELL + CELL / 2, y * CELL + CELL / 2]; }
+
+    function traceLight() {
+      let sx = -1, sy = -1;
+      for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+        if (grid[y][x].type === 'source') { sx = x; sy = y; }
+      }
+      const result = { points: [], litCrystals: new Set(), reflections: [], hitTreasure: false, cells: 0, end: 'none', frosted: 0 };
+      if (sx < 0) return result;
+
+      let x = sx, y = sy;
+      let [dx, dy] = grid[sy][sx].dir;
+      result.points.push(center(x, y));
+      const seen = new Set();
+
+      for (let step = 0; step < 400; step++) {
+        const nx = x + dx, ny = y + dy;
+        const [cx, cy] = center(x, y);
+        if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) {
+          result.points.push([cx + dx * CELL / 2, cy + dy * CELL / 2]);
+          result.end = 'edge';
+          break;
+        }
+        const cell = grid[ny][nx];
+        result.cells++;
+        if (cell.type === 'wall' || cell.type === 'source') {
+          result.points.push([cx + dx * CELL / 2, cy + dy * CELL / 2]);
+          result.end = 'wall';
+          result.blocked = [nx, ny];
+          break;
+        }
+        if (cell.type === 'mirror') {
+          const inDir = [dx, dy];
+          result.points.push(center(nx, ny));
+          if (cell.orient === '/') { [dx, dy] = [-dy, -dx]; }
+          else { [dx, dy] = [dy, dx]; }
+          result.reflections.push({ x: nx, y: ny, inDir, outDir: [dx, dy], orient: cell.orient });
+        } else if (cell.type === 'treasure') {
+          result.points.push(center(nx, ny));
+          result.hitTreasure = true;
+          result.end = 'treasure';
+          break;
+        } else if (cell.type === 'crystal') {
+          result.litCrystals.add(nx + ',' + ny);
+        } else if (cell.type === 'frosted') {
+          result.frosted++;
+        }
+        x = nx; y = ny;
+        const key = x + ',' + y + ',' + dx + ',' + dy;
+        if (seen.has(key)) {
+          result.points.push(center(x, y));
+          result.end = 'loop';
+          break;
+        }
+        seen.add(key);
+      }
+      return result;
+    }
+
+    function countCrystals() {
+      let n = 0;
+      grid.forEach(row => row.forEach(c => { if (c.type === 'crystal') n++; }));
+      return n;
+    }
+
+    // --- 5. SVG ÇİZİM MOTORU ---
+    const svg = document.getElementById('caveSvg');
+
+    function drawDefs() {
+      return `
+        <defs>
+          <linearGradient id="caveGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1e1b4b" />
+            <stop offset="100%" stop-color="#0f172a" />
+          </linearGradient>
+          <linearGradient id="mirrorGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#f8fafc" />
+            <stop offset="45%" stop-color="#bae6fd" />
+            <stop offset="55%" stop-color="#e0f2fe" />
+            <stop offset="100%" stop-color="#7dd3fc" />
+          </linearGradient>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="b" />
+            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+          <radialGradient id="treasureGlow">
+            <stop offset="0%" stop-color="#fde047" stop-opacity="0.9" />
+            <stop offset="100%" stop-color="#fde047" stop-opacity="0" />
+          </radialGradient>
+        </defs>`;
+    }
+
+    function drawCell(cell, x, y, lit) {
+      const [cx, cy] = center(x, y);
+      switch (cell.type) {
+        case 'wall':
+          return `<g transform="translate(${x * CELL},${y * CELL})">
+            <rect x="3" y="3" width="54" height="54" rx="6" fill="#78716c" stroke="#0f172a" stroke-width="2.5" />
+            <path d="M3 21 H57 M3 39 H57 M22 3 V21 M40 21 V39 M22 39 V57" stroke="#44403c" stroke-width="2" />
+            <rect x="6" y="6" width="12" height="4" rx="2" fill="#a8a29e" opacity="0.7" />
+          </g>`;
+        case 'glass':
+          return `<g transform="translate(${x * CELL},${y * CELL})">
+            <rect x="8" y="4" width="44" height="52" rx="5" fill="#bae6fd" fill-opacity="0.35" stroke="#e0f2fe" stroke-width="2.5" />
+            <path d="M16 14 L26 10 M16 22 L34 14" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.9" />
+            <text x="30" y="52" font-size="9" font-weight="900" fill="#e0f2fe" text-anchor="middle">CAM</text>
+          </g>`;
+        case 'frosted':
+          return `<g transform="translate(${x * CELL},${y * CELL})">
+            <rect x="8" y="4" width="44" height="52" rx="5" fill="#e2e8f0" fill-opacity="0.55" stroke="#f1f5f9" stroke-width="2.5" stroke-dasharray="4 3" />
+            <circle cx="20" cy="18" r="3" fill="#fff" opacity="0.6" /><circle cx="36" cy="28" r="4" fill="#fff" opacity="0.5" />
+            <circle cx="24" cy="38" r="3" fill="#fff" opacity="0.6" />
+            <text x="30" y="52" font-size="8" font-weight="900" fill="#0f172a" text-anchor="middle">BUZLU</text>
+          </g>`;
+        case 'crystal':
+          return `<g transform="translate(${cx},${cy})">
+            ${lit ? `<circle r="26" fill="#22d3ee" opacity="0.35" class="crystal-glow" filter="url(#glow)" />` : ''}
+            <polygon points="0,-22 16,-6 0,22 -16,-6" fill="${lit ? '#67e8f9' : '#6d28d9'}" stroke="#0f172a" stroke-width="2.5" />
+            <polygon points="0,-22 6,-6 0,22 -6,-6" fill="${lit ? '#cffafe' : '#8b5cf6'}" opacity="0.8" />
+            <line x1="-16" y1="-6" x2="16" y2="-6" stroke="#0f172a" stroke-width="1.5" />
+          </g>`;
+        case 'treasure':
+          return `<g transform="translate(${cx},${cy})">
+            ${lit ? `<circle r="30" fill="url(#treasureGlow)" />` : ''}
+            ${lit
+              ? `<path d="M-20 -4 L-20 -20 Q0 -30 20 -20 L20 -4 Z" fill="#b45309" stroke="#0f172a" stroke-width="2.5" transform="rotate(-18 -20 -4)" />
+                 <circle cx="-6" cy="-6" r="5" fill="#fde047" stroke="#0f172a" stroke-width="1.5" />
+                 <circle cx="6" cy="-7" r="5" fill="#fde047" stroke="#0f172a" stroke-width="1.5" />
+                 <polygon points="0,-18 4,-10 -4,-10" fill="#67e8f9" stroke="#0f172a" stroke-width="1.2" />`
+              : `<path d="M-20 -4 L-20 -14 Q0 -24 20 -14 L20 -4 Z" fill="#b45309" stroke="#0f172a" stroke-width="2.5" />`}
+            <rect x="-20" y="-4" width="40" height="22" rx="3" fill="#d97706" stroke="#0f172a" stroke-width="2.5" />
+            <rect x="-4" y="-6" width="8" height="10" rx="2" fill="#fde047" stroke="#0f172a" stroke-width="1.5" />
+            <line x1="-20" y1="8" x2="20" y2="8" stroke="#92400e" stroke-width="2" />
+          </g>`;
+        case 'mirror': {
+          const rot = cell.orient === '/' ? -45 : 45;
+          return `<g transform="translate(${cx},${cy})">
+            <circle r="9" fill="${cell.fixed ? '#64748b' : '#a16207'}" stroke="#0f172a" stroke-width="2" />
+            <g transform="rotate(${rot})">
+              <rect x="-26" y="-5" width="52" height="10" rx="3" fill="url(#mirrorGrad)" stroke="#0f172a" stroke-width="2.5" />
+              <line x1="-18" y1="-1.5" x2="-6" y2="-1.5" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+            </g>
+            ${cell.fixed ? `<g transform="translate(18,18)"><rect x="-7" y="-5" width="14" height="11" rx="2" fill="#facc15" stroke="#0f172a" stroke-width="1.8" /><path d="M-4 -5 V-8 A4 4 0 0 1 4 -8 V-5" fill="none" stroke="#0f172a" stroke-width="1.8" /></g>` : ''}
+          </g>`;
+        }
+        case 'source': {
+          const [dx, dy] = cell.dir;
+          const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+          return `<g transform="translate(${cx},${cy}) rotate(${ang})">
+            <rect x="-22" y="-9" width="26" height="18" rx="4" fill="#ef4444" stroke="#0f172a" stroke-width="2.5" />
+            <polygon points="4,-9 20,-15 20,15 4,9" fill="#fbbf24" stroke="#0f172a" stroke-width="2.5" />
+            <ellipse cx="20" cy="0" rx="3" ry="14" fill="${lightOn ? '#fef9c3' : '#94a3b8'}" stroke="#0f172a" stroke-width="2" />
+            <rect x="-14" y="-4" width="8" height="8" rx="2" fill="#fde047" stroke="#0f172a" stroke-width="1.5" />
+          </g>`;
+        }
+        default:
+          return '';
+      }
+    }
+
+    function drawAngleMarks(r) {
+      const [cx, cy] = center(r.x, r.y);
+      // Aynanın normali: '/' için (1,1), '\' için (1,-1)
+      let n = r.orient === '/' ? [1, 1] : [1, -1];
+      const back = [-r.inDir[0], -r.inDir[1]];
+      if (back[0] * n[0] + back[1] * n[1] < 0) n = [-n[0], -n[1]];
+      const len = Math.SQRT2;
+      const nx = n[0] / len, ny = n[1] / len;
+      const b1 = [(nx + back[0]), (ny + back[1])];
+      const b2 = [(nx + r.outDir[0]), (ny + r.outDir[1])];
+      const norm = v => { const l = Math.hypot(v[0], v[1]); return [v[0] / l, v[1] / l]; };
+      const p1 = norm(b1), p2 = norm(b2);
+      return `<g pointer-events="none">
+        <line x1="${cx}" y1="${cy}" x2="${cx + nx * 30}" y2="${cy + ny * 30}" stroke="#f472b6" stroke-width="2" stroke-dasharray="4 3" />
+        <g transform="translate(${cx + p1[0] * 22},${cy + p1[1] * 22})"><rect x="-12" y="-7" width="24" height="13" rx="4" fill="#fdf2f8" stroke="#0f172a" stroke-width="1.2" /><text y="3.5" font-size="8.5" font-weight="900" text-anchor="middle" fill="#be185d">45°</text></g>
+        <g transform="translate(${cx + p2[0] * 22},${cy + p2[1] * 22})"><rect x="-12" y="-7" width="24" height="13" rx="4" fill="#fdf2f8" stroke="#0f172a" stroke-width="1.2" /><text y="3.5" font-size="8.5" font-weight="900" text-anchor="middle" fill="#be185d">45°</text></g>
+      </g>`;
+    }
+
+    function render(animateBeam = false) {
+      const trace = lightOn ? traceLight() : null;
+      lastTrace = trace;
+      const lit = trace ? trace.litCrystals : new Set();
+
+      let html = drawDefs();
+      html += `<rect width="540" height="360" fill="url(#caveGrad)" />`;
+
+      // Zemin karoları
+      for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+        html += `<rect x="${x * CELL + 2}" y="${y * CELL + 2}" width="${CELL - 4}" height="${CELL - 4}" rx="8" fill="${(x + y) % 2 ? '#312e81' : '#2e2a6e'}" opacity="0.55" />`;
+      }
+      // Mağara süsleri
+      html += `<g opacity="0.35" pointer-events="none"><circle cx="30" cy="12" r="2" fill="#fff" /><circle cx="505" cy="340" r="2" fill="#fff" /><circle cx="270" cy="8" r="1.5" fill="#fff" /></g>`;
+
+      // Nesneler (ışıktan önce)
+      for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+        const c = grid[y][x];
+        if (c.type !== 'empty' && c.type !== 'glass' && c.type !== 'frosted') {
+          const isLit = (c.type === 'crystal' && lit.has(x + ',' + y)) || (c.type === 'treasure' && trace && trace.hitTreasure && trace.points.length && isEndAt(trace, x, y));
+          html += drawCell(c, x, y, isLit);
+        }
+      }
+
+      // Işık huzmesi
+      if (trace && trace.points.length > 1) {
+        const pts = trace.points.map(p => p.join(',')).join(' ');
+        html += `<g pointer-events="none">
+          <polyline id="beamGlow" points="${pts}" fill="none" stroke="#fde047" stroke-width="12" stroke-linejoin="round" stroke-linecap="round" opacity="0.35" filter="url(#glow)" />
+          <polyline id="beamCore" points="${pts}" fill="none" stroke="#fef08a" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" />
+          <polyline points="${pts}" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" class="beam-flow" />
+        </g>`;
+        if (trace.end === 'wall' && trace.blocked) {
+          const last = trace.points[trace.points.length - 1];
+          html += `<circle cx="${last[0]}" cy="${last[1]}" r="7" fill="#fde047" opacity="0.8" filter="url(#glow)" pointer-events="none" />`;
+        }
+      }
+
+      // Cam hücreleri ışığın üstünde (saydamlık etkisi)
+      for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+        const c = grid[y][x];
+        if (c.type === 'glass' || c.type === 'frosted') html += drawCell(c, x, y, false);
+      }
+
+      if (trace && showAngles) trace.reflections.forEach(r => { html += drawAngleMarks(r); });
+
+      // Tıklama katmanı
+      for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+        html += `<rect class="cell-hit" data-x="${x}" data-y="${y}" x="${x * CELL}" y="${y * CELL}" width="${CELL}" height="${CELL}" fill="transparent" />`;
+      }
+
+      svg.innerHTML = html;
+
+      if (animateBeam && trace && typeof gsap !== 'undefined') {
+        ['beamGlow', 'beamCore'].forEach(id => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          const L = el.getTotalLength();
+          el.style.strokeDasharray = L;
+          el.style.strokeDashoffset = L;
+          gsap.to(el, { strokeDashoffset: 0, duration: Math.min(1.2, 0.15 + L / 900), ease: 'power1.out', onComplete: () => { el.style.strokeDasharray = ''; } });
+        });
+      }
+
+      updateHud(trace);
+    }
+
+    function isEndAt(trace, x, y) {
+      const last = trace.points[trace.points.length - 1];
+      const [cx, cy] = center(x, y);
+      return last[0] === cx && last[1] === cy;
+    }
+
+    // --- 6. GÖSTERGE VE DURUM ---
+    function updateHud(trace) {
+      const total = countCrystals();
+      const litN = trace ? trace.litCrystals.size : 0;
+      document.getElementById('statReflections').textContent = trace ? trace.reflections.length : 0;
+      document.getElementById('statCrystals').textContent = `${litN}/${total}`;
+      document.getElementById('statLength').textContent = `${trace ? trace.cells : 0} kare`;
+      document.getElementById('invCount').textContent = mode === 'levels' ? inventory : '∞';
+
+      const dot = document.getElementById('statusDot');
+      const txt = document.getElementById('statusText');
+      if (!trace) {
+        dot.className = 'w-3 h-3 rounded-full bg-gray-400 border border-ink';
+        txt.textContent = 'Fener kapalı 🔦';
+      } else if (trace.hitTreasure && litN === total) {
+        dot.className = 'w-3 h-3 rounded-full bg-emerald-500 border border-ink';
+        txt.textContent = 'Hazine parlıyor! ✨';
+      } else if (trace.hitTreasure) {
+        dot.className = 'w-3 h-3 rounded-full bg-amber-400 border border-ink';
+        txt.textContent = `Kristaller eksik (${litN}/${total}) 💎`;
+      } else if (trace.end === 'wall') {
+        dot.className = 'w-3 h-3 rounded-full bg-red-500 border border-ink';
+        txt.textContent = 'Işık opak engele çarptı 🧱';
+      } else if (trace.end === 'loop') {
+        dot.className = 'w-3 h-3 rounded-full bg-purple-500 border border-ink';
+        txt.textContent = 'Işık aynalar arasında dönüyor 🔁';
+      } else {
+        dot.className = 'w-3 h-3 rounded-full bg-sky-400 border border-ink';
+        txt.textContent = 'Işık mağaradan çıkıp gitti 💨';
+      }
+
+      if (trace && litN > prevLitCount) Sound.crystal();
+      prevLitCount = litN;
+
+      if (mode === 'levels' && trace && !levelWon && trace.hitTreasure && litN === total) {
+        winLevel();
+      }
+      if (mode === 'sandbox' && trace && trace.reflections.length >= 3) completeMission('m4');
+    }
+
+    function renderMissions() {
+      const ul = document.getElementById('missionList');
+      ul.innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5">
+          <span class="text-lg">${done ? '✅' : '⬜'}</span>
+          <div class="flex-1 text-xs">
+            <p class="font-extrabold text-ink">${m.title}</p>
+            <p class="text-gray-600 font-semibold text-[11px]">${m.text}</p>
+          </div>
+        </li>`;
+      }).join('');
+    }
+
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true;
+      score += 50;
+      updateScore();
+      renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+
+    function updateScore() {
+      document.getElementById('scoreBadge').textContent = `${score} Puan`;
+      const total = stars.reduce((a, b) => a + b, 0);
+      document.getElementById('starTotal').textContent = `⭐ ${total} / ${LEVELS.length * 3}`;
+    }
+
+    function renderLevelDots() {
+      const wrap = document.getElementById('levelDots');
+      wrap.innerHTML = '<span class="text-xs font-bold text-gray-500">Seviyeler:</span>' + LEVELS.map((_, i) => {
+        const active = i === levelIndex;
+        const done = stars[i] > 0;
+        const bg = active ? 'bg-yellow-400' : done ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      wrap.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    // --- 7. SEVİYE YÖNETİMİ ---
+    function loadLevel(i) {
+      mode = 'levels';
+      levelIndex = i;
+      const L = LEVELS[i];
+      grid = parseMap(L.map);
+      inventory = L.inv;
+      lightOn = false;
+      levelWon = false;
+      prevLitCount = 0;
+      document.getElementById('levelBadge').textContent = `SEVİYE ${i + 1}`;
+      document.getElementById('levelTitle').textContent = L.title;
+      document.getElementById('levelDesc').textContent = L.desc;
+      const nb = document.getElementById('btnNextLevel');
+      nb.classList.add('hidden'); nb.classList.remove('flex');
+      updateLightBtn();
+      renderLevelDots();
+      render();
+    }
+
+    function winLevel() {
+      levelWon = true;
+      const L = LEVELS[levelIndex];
+      const used = L.inv - inventory;
+      const s = used <= L.best ? 3 : used <= L.best + 1 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20;
+      updateScore();
+      renderLevelDots();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+
+      if (levelIndex === 0) completeMission('m1');
+      if (levelIndex === 2) completeMission('m2');
+      if (stars.every(v => v > 0)) completeMission('m3');
+
+      const nb = document.getElementById('btnNextLevel');
+      if (levelIndex < LEVELS.length - 1) { nb.classList.remove('hidden'); nb.classList.add('flex'); }
+
+      setTimeout(() => {
+        document.getElementById('resultTitle').textContent = levelIndex === LEVELS.length - 1 ? 'Büyük Hazine Senin!' : 'Hazine Bulundu!';
+        document.getElementById('resultStars').textContent = '⭐'.repeat(s) + '☆'.repeat(3 - s);
+        document.getElementById('resultInfo').textContent = `${used} ayna kullandın, ışık ${lastTrace.reflections.length} kez yansıdı.`;
+        document.getElementById('resultFact').innerHTML = L.fact;
+        document.getElementById('btnModalNext').textContent = levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Test Masası 🔬';
+        const m = document.getElementById('resultModal');
+        m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 900);
+    }
+
+    function closeModal() {
+      const m = document.getElementById('resultModal');
+      m.classList.add('hidden'); m.classList.remove('flex');
+    }
+
+    // --- 8. ETKİLEŞİM ---
+    svg.addEventListener('click', e => {
+      const t = e.target.closest('.cell-hit');
+      if (!t) return;
+      const x = +t.dataset.x, y = +t.dataset.y;
+      if (mode === 'levels') handleLevelClick(x, y); else handleSandboxClick(x, y);
+    });
+
+    function handleLevelClick(x, y) {
+      if (levelWon) return;
+      const c = grid[y][x];
+      if (c.type === 'empty') {
+        if (inventory <= 0) { Sound.deny(); flashInventory(); return; }
+        grid[y][x] = { type: 'mirror', orient: '/', fixed: false };
+        inventory--;
+        Sound.place();
+      } else if (c.type === 'mirror') {
+        if (c.fixed) { c.orient = c.orient === '/' ? '\\' : '/'; Sound.rotate(); }
+        else if (c.orient === '/') { c.orient = '\\'; Sound.rotate(); }
+        else { grid[y][x] = { type: 'empty' }; inventory++; Sound.remove(); }
+      } else {
+        Sound.deny();
+        return;
+      }
+      render();
+    }
+
+    function handleSandboxClick(x, y) {
+      const c = grid[y][x];
+      if (c.type === 'source') {
+        const order = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+        const idx = order.findIndex(d => d[0] === c.dir[0] && d[1] === c.dir[1]);
+        c.dir = order[(idx + 1) % 4];
+        Sound.rotate();
+        render();
+        return;
+      }
+      if (sandboxTool === 'erase') {
+        if (c.type === 'empty') return;
+        grid[y][x] = { type: 'empty' };
+        Sound.remove();
+      } else if (sandboxTool === 'mirror') {
+        if (c.type === 'mirror') { c.orient = c.orient === '/' ? '\\' : '/'; Sound.rotate(); }
+        else { grid[y][x] = { type: 'mirror', orient: '/', fixed: false }; Sound.place(); }
+      } else {
+        grid[y][x] = { type: sandboxTool };
+        Sound.place();
+      }
+      render();
+    }
+
+    function flashInventory() {
+      if (typeof gsap !== 'undefined') gsap.fromTo('#invBadge', { scale: 1.25, backgroundColor: '#fecaca' }, { scale: 1, backgroundColor: '#ffffff', duration: 0.5 });
+    }
+
+    function updateLightBtn() {
+      document.getElementById('lightBtnText').textContent = lightOn ? 'Feneri Söndür' : 'Feneri Yak';
+    }
+
+    document.getElementById('btnLight').addEventListener('click', () => {
+      lightOn = !lightOn;
+      prevLitCount = 0;
+      if (lightOn) Sound.light(); else Sound.click();
+      updateLightBtn();
+      render(lightOn);
+    });
+
+    document.getElementById('btnReset').addEventListener('click', () => {
+      Sound.click();
+      if (mode === 'levels') loadLevel(levelIndex); else loadSandbox();
+    });
+
+    document.getElementById('btnAngles').addEventListener('click', () => {
+      showAngles = !showAngles;
+      Sound.click();
+      document.getElementById('anglesBtnText').textContent = showAngles ? 'Açıları Gizle' : 'Açıları Göster';
+      document.getElementById('btnAngles').classList.toggle('tool-active', showAngles);
+      render();
+    });
+
+    document.getElementById('btnHint').addEventListener('click', () => {
+      Sound.click();
+      const note = document.getElementById('scienceNote');
+      note.innerHTML = mode === 'levels'
+        ? `<b>İpucu:</b> ${LEVELS[levelIndex].hint}`
+        : '<b>Deney fikri:</b> Işığı bir kare çizecek şekilde 4 aynayla döndürmeyi dene. Sonra yoluna cam ve buzlu cam koy. Işık geçiyor mu? Taş duvar koyunca ne oluyor?';
+      if (typeof gsap !== 'undefined') gsap.fromTo(note.parentElement.parentElement, { scale: 1.03 }, { scale: 1, duration: 0.4 });
+    });
+
+    document.getElementById('btnNextLevel').addEventListener('click', () => {
+      Sound.click();
+      if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1);
+    });
+
+    document.getElementById('btnModalRetry').addEventListener('click', () => { closeModal(); loadLevel(levelIndex); });
+    document.getElementById('btnModalNext').addEventListener('click', () => {
+      closeModal();
+      if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('sandbox');
+    });
+
+    document.getElementById('soundToggle').addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+      Sound.click();
+    });
+
+    // --- 9. TEST MASASI ---
+    function renderTools() {
+      const g = document.getElementById('toolGrid');
+      g.innerHTML = TOOLS.map(t => `
+        <button data-tool="${t.id}" class="tool-btn pushable px-2 py-2 bg-white hover:bg-amber-50 text-ink text-[11px] font-black flex flex-col items-center gap-0.5 ${t.id === sandboxTool ? 'tool-active' : ''}">
+          <span class="text-xl">${t.icon}</span><span>${t.label}</span>
+        </button>`).join('');
+      g.querySelectorAll('.tool-btn').forEach(b => b.addEventListener('click', () => {
+        sandboxTool = b.dataset.tool;
+        Sound.click();
+        renderTools();
+      }));
+    }
+
+    function loadSandbox() {
+      mode = 'sandbox';
+      const map = Array.from({ length: ROWS }, () => '.'.repeat(COLS).split(''));
+      map[2][0] = '>';
+      grid = parseMap(map.map(r => r.join('')));
+      lightOn = true;
+      levelWon = false;
+      prevLitCount = 0;
+      updateLightBtn();
+      render(true);
+    }
+
+    function switchMode(m) {
+      const levelsTab = document.getElementById('tabLevels');
+      const sandTab = document.getElementById('tabSandbox');
+      const isSand = m === 'sandbox';
+      levelsTab.classList.toggle('active-tab', !isSand);
+      levelsTab.classList.toggle('bg-white', isSand);
+      sandTab.classList.toggle('active-tab', isSand);
+      sandTab.classList.toggle('bg-white', !isSand);
+      document.getElementById('toolTray').classList.toggle('hidden', !isSand);
+      document.getElementById('howTo').classList.toggle('hidden', isSand);
+      document.getElementById('levelDots').classList.toggle('hidden', isSand);
+      if (isSand) {
+        document.getElementById('levelBadge').textContent = 'TEST MASASI';
+        document.getElementById('levelTitle').textContent = 'Kendi Işık Labirentini Kur';
+        document.getElementById('levelDesc').textContent = 'Sınır yok! Ayna, cam ve duvar yerleştir. Işığın nasıl yansıdığını ve hangi maddelerden geçtiğini keşfet.';
+        document.getElementById('btnNextLevel').classList.add('hidden');
+        if (!showAngles) document.getElementById('btnAngles').click();
+        renderTools();
+        loadSandbox();
+      } else {
+        loadLevel(levelIndex);
+      }
+    }
+
+    document.getElementById('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    document.getElementById('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('sandbox'); });
+
+    // --- 10. BAŞLAT ---
+    renderMissions();
+    updateScore();
+    loadLevel(0);
+  </script>
+</body>
+</html>
