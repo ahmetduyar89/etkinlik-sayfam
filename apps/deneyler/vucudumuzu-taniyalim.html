@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vücudumuzu Tanıyalım: İç Organlar Modeli - Küçük Mucitler</title>
+
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- GSAP Animation Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            paper: '#fffdfa',
+            ink: '#182b4d',
+            sun: '#facc15',
+            sky: '#38bdf8',
+            mint: '#34d399',
+            coral: '#fb7185',
+            cardboard: '#fef3c7',
+            craft: '#d97706'
+          },
+          fontFamily: {
+            display: ['"Baloo 2"', 'cursive'],
+            body: ['Nunito', 'sans-serif']
+          },
+          borderWidth: {
+            '3': '3px'
+          },
+          boxShadow: {
+            card: '0 8px 0 #182b4d',
+            'card-sm': '0 4px 0 #182b4d',
+            'card-lg': '0 12px 0 #182b4d',
+            'card-pressed': '0 2px 0 #182b4d'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #f8fafc;
+      color: #182b4d;
+    }
+    .display {
+      font-family: 'Baloo 2', cursive;
+      font-weight: 800;
+    }
+    .chunky {
+      border: 3px solid #182b4d;
+      border-radius: 1.25rem;
+      box-shadow: 0 6px 0 #182b4d;
+    }
+    .pushable {
+      border: 3px solid #182b4d;
+      border-radius: 1rem;
+      box-shadow: 0 4px 0 #182b4d;
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+      cursor: pointer;
+    }
+    .pushable:active:not(:disabled) {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #182b4d;
+    }
+    .pushable:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    .organ-slot {
+      cursor: pointer;
+      transition: filter 0.15s ease, opacity 0.15s ease;
+    }
+    .organ-slot:hover {
+      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.8));
+    }
+    .organ-slot.highlight {
+      filter: drop-shadow(0 0 12px rgba(34, 197, 94, 0.9));
+    }
+    .organ-card {
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+    .organ-card:active {
+      cursor: grabbing;
+    }
+    .organ-card.selected {
+      border-color: #2563eb !important;
+      background-color: #eff6ff !important;
+      transform: scale(1.03);
+      box-shadow: 0 8px 0 #1d4ed8 !important;
+    }
+    .organ-card.placed {
+      opacity: 0.55;
+      background-color: #f1f5f9 !important;
+      cursor: pointer;
+    }
+    .organ-card.placed:hover {
+      opacity: 0.85;
+    }
+
+    /* Kalp Atışı Animasyonu */
+    @keyframes heartbeat {
+      0%, 100% { transform: scale(1); }
+      14% { transform: scale(1.2); }
+      28% { transform: scale(1.04); }
+      42% { transform: scale(1.16); }
+      56% { transform: scale(1); }
+    }
+    .pulse-heart {
+      transform-origin: center;
+      animation: heartbeat 1.2s ease-in-out infinite;
+    }
+
+    /* Akciğer Nefes Alma Animasyonu */
+    @keyframes breathing {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+    .breathe-lungs {
+      transform-origin: center;
+      animation: breathing 3.2s ease-in-out infinite;
+    }
+
+    /* Mide Çalkalanma Animasyonu */
+    @keyframes churn {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-3deg); }
+      75% { transform: rotate(3deg); }
+    }
+    .churn-stomach {
+      transform-origin: center;
+      animation: churn 2.5s ease-in-out infinite;
+    }
+
+    /* Nöron Işıldama */
+    @keyframes glow {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+    .brain-glow {
+      animation: glow 1.8s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-3 sm:p-6 select-none">
+
+  <!-- Üst Başlık ve Gezinme Çubuğu -->
+  <header class="max-w-6xl mx-auto w-full mb-4 flex flex-wrap items-center justify-between gap-3 bg-white p-3 sm:p-4 chunky">
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="pushable px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-ink text-xs sm:text-sm font-black flex items-center gap-1.5" title="Portala Dön">
+        <span>🔙</span> <span>Portala Dön</span>
+      </a>
+      <div>
+        <h1 class="display text-lg sm:text-2xl text-ink leading-tight flex items-center gap-2">
+          <span>✂️</span> <span>Vücudumuzu Tanıyalım: İç Organlar Modeli</span>
+        </h1>
+        <p class="text-xs text-gray-500 font-bold hidden sm:block">
+          İnsan silüeti üzerine organ şablonlarını yerleştir, organların yerlerini ve görevlerini keşfet! 🫀🧠
+        </p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <!-- Mod Değiştirme Butonları -->
+      <div class="flex bg-gray-100 p-1 rounded-xl border-2 border-ink text-xs font-black">
+        <button id="btnTabWorkshop" class="px-2.5 sm:px-3 py-1 rounded-lg bg-sun text-ink border-2 border-ink shadow-sm flex items-center gap-1">
+          <span>🧩</span> <span>İnsan Modeli</span>
+        </button>
+        <button id="btnTabXray" class="px-2.5 sm:px-3 py-1 rounded-lg hover:bg-white text-gray-700 flex items-center gap-1">
+          <span>🩻</span> <span>Canlı Röntgen</span>
+        </button>
+        <button id="btnTabMission" class="px-2.5 sm:px-3 py-1 rounded-lg hover:bg-white text-gray-700 flex items-center gap-1">
+          <span>🎯</span> <span>Dedektif</span>
+        </button>
+        <button id="btnTabQuiz" class="px-2.5 sm:px-3 py-1 rounded-lg hover:bg-white text-gray-700 flex items-center gap-1">
+          <span>🧠</span> <span>Quiz</span>
+        </button>
+      </div>
+
+      <!-- Ses Aç/Kapat Butonu -->
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1" title="Sesi Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Ana İçerik Bölgesi -->
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <!-- SOL VE ORTA: GERÇEKÇİ İNSAN FİGÜRÜ SAHNESİ (7 Sütun) -->
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      
+      <!-- 1. GÖRÜNÜM: KARTON İNSAN MAKETİ -->
+      <section id="viewWorkshop" class="chunky bg-cardboard/40 p-4 sm:p-5 flex flex-col items-center relative overflow-hidden border-dashed">
+        
+        <!-- Üst Kontrol & Sayaç Şeridi -->
+        <div class="w-full flex items-center justify-between border-b-2 border-dashed border-amber-300 pb-2 mb-2 min-h-[44px]">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🧍</span>
+            <div>
+              <h2 class="display text-base sm:text-lg font-black text-ink">İnsan Gövdesi Modeli</h2>
+              <span class="text-[11px] font-bold text-gray-600 block">Organları sürükle-bırak veya karta tıkla, vücuttaki yuvasına yerleştir!</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="px-3 py-1 bg-amber-100 border-2 border-ink rounded-xl text-xs font-black text-ink flex items-center gap-1">
+              <span>📌 Yerleşen:</span>
+              <span id="placedCount" class="text-amber-800 text-sm font-black">0</span> / <span>7</span>
+            </div>
+            <button id="btnAutoPlace" class="pushable px-2.5 py-1 bg-white hover:bg-gray-100 text-[11px] font-black text-ink" title="Tüm organları yerine koy">
+              ⚡ Hızlı Çöz
+            </button>
+            <button id="btnResetAll" class="pushable px-2.5 py-1 bg-rose-100 hover:bg-rose-200 text-[11px] font-black text-rose-900" title="Her şeyi sıfırla">
+              🔄 Sıfırla
+            </button>
+          </div>
+        </div>
+
+        <!-- İpucu & Yönerge Rozeti -->
+        <div id="instructionBanner" class="w-full bg-white/95 px-3 py-1.5 rounded-xl border-2 border-ink text-xs font-black text-ink flex items-center justify-between mb-2 shadow-sm">
+          <div class="flex items-center gap-1.5 truncate">
+            <span id="bannerIcon">👇</span>
+            <span id="bannerText">Sağdaki tepsiden bir organ kartına tıkla veya sürükleyip vücuttaki yerine bırak!</span>
+          </div>
+          <span class="hidden sm:inline px-2 py-0.5 bg-yellow-200 text-yellow-900 text-[10px] rounded border border-ink/40 font-mono">
+            📐 1:1 MODEL
+          </span>
+        </div>
+
+        <!-- GERÇEKÇİ İNSAN FİGÜRÜ ÇALIŞMA ALANI -->
+        <div id="bodyDropZone" class="relative w-full max-w-[420px] aspect-[360/530] bg-[#fffbeb] rounded-2xl border-3 border-ink shadow-inner overflow-hidden p-1 flex items-center justify-center">
+          
+          <!-- Arka Plan Karton Doku ve Çizim Kareleri -->
+          <div class="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(#d97706_1px,transparent_1px)] [background-size:16px_16px]"></div>
+
+          <!-- Dekoratif Köşe Bantları -->
+          <div class="absolute top-2 left-2 w-12 h-4 bg-amber-200/80 border border-ink/30 rotate-[-35deg] pointer-events-none"></div>
+          <div class="absolute top-2 right-2 w-12 h-4 bg-amber-200/80 border border-ink/30 rotate-[35deg] pointer-events-none"></div>
+          <div class="absolute bottom-2 left-2 w-12 h-4 bg-amber-200/80 border border-ink/30 rotate-[35deg] pointer-events-none"></div>
+          <div class="absolute bottom-2 right-2 w-12 h-4 bg-amber-200/80 border border-ink/30 rotate-[-35deg] pointer-events-none"></div>
+
+          <!-- BÜYÜK İNSAN SİLÜETİ SVG (Gerçekçi Çocuk Anatomisi, Omuzlar, Kollar, Bacaklar) -->
+          <svg id="bodySvg" viewBox="0 0 360 530" class="w-full h-full overflow-visible">
+            
+            <defs>
+              <filter id="humanShadow" x="-10%" y="-10%" width="120%" height="120%">
+                <feDropShadow dx="2" dy="5" stdDeviation="4" flood-opacity="0.25" />
+              </filter>
+            </defs>
+
+            <!-- 1. GERÇEKÇİ İNSAN VÜCUDU SİLÜETİ (Kafa, Boyun, Omuzlar, Göğüs, Kollar, Bacaklar, Ayaklar) -->
+            <g id="humanBodySilhouette" filter="url(#humanShadow)">
+              <!-- Ten / Karton Gövde Tabanı -->
+              <path d="
+                M 180 20
+                C 158 20, 142 28, 140 52
+                C 132 54, 132 72, 140 76
+                C 142 94, 154 104, 166 108
+                L 166 120
+                C 146 124, 122 132, 106 142
+                C 92 152, 84 182, 80 225
+                C 76 265, 72 290, 68 318
+                C 64 340, 84 342, 90 326
+                C 96 305, 100 270, 104 230
+                C 112 192, 118 184, 122 180
+                L 122 250
+                C 118 280, 112 318, 112 342
+                C 112 370, 124 405, 132 440
+                C 136 460, 134 492, 132 508
+                C 130 522, 156 526, 158 510
+                C 162 485, 162 452, 160 425
+                C 158 402, 168 375, 178 362
+                L 182 362
+                C 192 375, 202 402, 200 425
+                C 198 452, 198 485, 202 510
+                C 204 526, 230 522, 228 508
+                C 226 492, 224 460, 228 440
+                C 236 405, 248 370, 248 342
+                C 248 318, 242 280, 238 250
+                L 238 180
+                C 242 184, 248 192, 256 230
+                C 260 270, 264 305, 270 326
+                C 276 342, 296 340, 292 318
+                C 288 290, 284 265, 280 225
+                C 276 182, 268 152, 254 142
+                C 238 132, 214 124, 194 120
+                L 194 108
+                C 206 104, 218 94, 220 76
+                C 228 72, 228 54, 220 52
+                C 218 28, 202 20, 180 20
+                Z"
+                fill="#fed7aa" stroke="#182b4d" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" />
+
+              <!-- Tişört / Kıyafet Hatları (Çocuk figürü olduğunu belirten sevimli dikiş çizgileri) -->
+              <!-- Yaka Çizgisi -->
+              <path d="M 166 120 Q 180 132 194 120" stroke="#182b4d" stroke-width="2.5" fill="none" opacity="0.6" />
+              <!-- Köprücük Kemikleri Kılavuzu -->
+              <path d="M 148 132 Q 162 136 172 130 M 188 130 Q 198 136 212 132" stroke="#ea580c" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.4" />
+              <!-- Göğüs Kafesi / Kaburga Hatları (Hafif kılavuz) -->
+              <path d="M 145 160 Q 180 170 215 160 M 142 180 Q 180 192 218 180 M 146 200 Q 180 212 214 200" 
+                    stroke="#ea580c" stroke-width="1.8" stroke-dasharray="4 4" fill="none" opacity="0.3" />
+
+              <!-- Sevimli Çocuk Yüzü ve Saçları -->
+              <!-- Saçlar -->
+              <path d="M 144 50 C 146 30 162 22 180 22 C 198 22 214 30 216 50 C 210 44 200 46 194 42 C 188 38 182 42 176 38 C 170 44 158 42 144 50 Z" 
+                    fill="#78350f" stroke="#182b4d" stroke-width="2.5" />
+              <!-- Gözler -->
+              <circle cx="168" cy="68" r="3.5" fill="#182b4d" />
+              <circle cx="192" cy="68" r="3.5" fill="#182b4d" />
+              <circle cx="169" cy="67" r="1.2" fill="#ffffff" />
+              <circle cx="193" cy="67" r="1.2" fill="#ffffff" />
+              <!-- Burun & Gülen Ağız -->
+              <path d="M 179 74 L 181 77 L 179 78" stroke="#ea580c" stroke-width="2" fill="none" stroke-linecap="round" />
+              <path d="M 172 84 Q 180 92 188 84" stroke="#182b4d" stroke-width="2.5" fill="none" stroke-linecap="round" />
+              <!-- Yanak Pembeliği -->
+              <ellipse cx="160" cy="78" rx="4" ry="2.5" fill="#fb7185" opacity="0.6" />
+              <ellipse cx="200" cy="78" rx="4" ry="2.5" fill="#fb7185" opacity="0.6" />
+
+              <!-- Göbek Deliği -->
+              <circle cx="180" cy="285" r="2.5" fill="#ea580c" opacity="0.5" />
+            </g>
+
+
+            <!-- 2. ANATOMİK HEDEF YUVALAR (Dashed Slot Guidelines & Clickable Hotspots) -->
+            <!-- Geniş şeffaf tıklama alanlarıyla %100 kusursuz tıklama ve bırakma! -->
+
+            <!-- A. BEYİN YUVASI (Kafatasında: 180, 48) -->
+            <g id="slot-brain" class="organ-slot" data-organ="brain" transform="translate(180, 48)">
+              <rect x="-35" y="-28" width="70" height="56" fill="transparent" />
+              <ellipse cx="0" cy="0" rx="28" ry="22" fill="#fbcfe8" fill-opacity="0.3" stroke="#db2777" stroke-width="2.5" stroke-dasharray="4 3" />
+              <text y="3" text-anchor="middle" font-size="10" font-weight="900" fill="#be185d" font-family="'Baloo 2'">🧠 BEYİN</text>
+            </g>
+
+            <!-- B. AKCİĞERLER YUVASI (Göğüs Kafesi Sağ ve Sol: 180, 160) -->
+            <g id="slot-lungs" class="organ-slot" data-organ="lungs" transform="translate(180, 160)">
+              <rect x="-56" y="-35" width="112" height="70" fill="transparent" />
+              <!-- Sağ ve Sol Akciğer Yuvası -->
+              <path d="M -44 -26 C -24 -30 -12 -16 -10 24 C -22 30 -42 24 -46 -2 C -48 -18 -46 -24 -44 -26 Z 
+                       M 44 -26 C 24 -30 12 -16 10 24 C 22 30 42 24 46 -2 C 48 -18 46 -24 44 -26 Z" 
+                    fill="#fda4af" fill-opacity="0.25" stroke="#e11d48" stroke-width="2.5" stroke-dasharray="4 3" />
+              <text y="4" text-anchor="middle" font-size="10" font-weight="900" fill="#e11d48" font-family="'Baloo 2'">🫁 AKCİĞERLER</text>
+            </g>
+
+            <!-- C. KALP YUVASI (Göğüste Sol-Ortada: 172, 164) -->
+            <g id="slot-heart" class="organ-slot" data-organ="heart" transform="translate(172, 164)">
+              <rect x="-24" y="-24" width="48" height="48" fill="transparent" />
+              <path d="M 0 -10 C -8 -22 -20 -15 -17 0 C -14 12 0 20 0 24 C 0 20 14 12 17 0 C 20 -15 8 -22 0 -10 Z" 
+                    fill="#f43f5e" fill-opacity="0.35" stroke="#be123c" stroke-width="2.5" stroke-dasharray="4 3" />
+              <text y="4" text-anchor="middle" font-size="9" font-weight="900" fill="#9f1239" font-family="'Baloo 2'">❤️ KALP</text>
+            </g>
+
+            <!-- D. KARACİĞER YUVASI (Karın Sağ Üst: 148, 220) -->
+            <g id="slot-liver" class="organ-slot" data-organ="liver" transform="translate(148, 220)">
+              <rect x="-30" y="-20" width="60" height="40" fill="transparent" />
+              <path d="M -24 -12 C 10 -18 26 -6 22 10 C 18 20 -6 18 -22 14 C -28 10 -28 -6 -24 -12 Z" 
+                    fill="#fca5a5" fill-opacity="0.3" stroke="#b91c1c" stroke-width="2.5" stroke-dasharray="4 3" />
+              <text y="4" text-anchor="middle" font-size="9" font-weight="900" fill="#b91c1c" font-family="'Baloo 2'">KARACİĞER</text>
+            </g>
+
+            <!-- E. MİDE YUVASI (Karın Sol Üst: 212, 224) -->
+            <g id="slot-stomach" class="organ-slot" data-organ="stomach" transform="translate(212, 224)">
+              <rect x="-22" y="-24" width="44" height="48" fill="transparent" />
+              <path d="M -10 -16 C 10 -20 20 -4 16 14 C 12 24 -4 26 -14 16 C -20 4 -16 -6 -10 -16 Z" 
+                    fill="#fed7aa" fill-opacity="0.35" stroke="#c2410c" stroke-width="2.5" stroke-dasharray="4 3" />
+              <text y="4" text-anchor="middle" font-size="9" font-weight="900" fill="#c2410c" font-family="'Baloo 2'">🥣 MİDE</text>
+            </g>
+
+            <!-- F. BÖBREKLER YUVASI (Bel Arkasında Çift: 180, 268) -->
+            <g id="slot-kidneys" class="organ-slot" data-organ="kidneys" transform="translate(180, 268)">
+              <rect x="-44" y="-20" width="88" height="40" fill="transparent" />
+              <!-- Sol Böbrek -->
+              <ellipse cx="-28" cy="0" rx="9" ry="14" fill="#f5d0fe" fill-opacity="0.3" stroke="#a21caf" stroke-width="2" stroke-dasharray="4 3" />
+              <!-- Sağ Böbrek -->
+              <ellipse cx="28" cy="0" rx="9" ry="14" fill="#f5d0fe" fill-opacity="0.3" stroke="#a21caf" stroke-width="2" stroke-dasharray="4 3" />
+              <text y="4" text-anchor="middle" font-size="8.5" font-weight="900" fill="#86198f" font-family="'Baloo 2'">🫘 BÖBREKLER</text>
+            </g>
+
+            <!-- G. BAĞIRSAKLAR YUVASI (Karın Alt Bölgesi: 180, 308) -->
+            <g id="slot-intestines" class="organ-slot" data-organ="intestines" transform="translate(180, 308)">
+              <rect x="-34" y="-22" width="68" height="44" fill="transparent" />
+              <rect x="-30" y="-18" width="60" height="36" rx="12" fill="#fef08a" fill-opacity="0.3" stroke="#ca8a04" stroke-width="2.5" stroke-dasharray="4 3" />
+              <text y="4" text-anchor="middle" font-size="9" font-weight="900" fill="#a16207" font-family="'Baloo 2'">BAĞIRSAKLAR</text>
+            </g>
+
+
+            <!-- 3. YERLEŞTİRİLMİŞ GERÇEK ORGANLAR (pointer-events="none" ile başlar, görünce tıklanabilir olur) -->
+
+            <!-- YERLEŞİK BEYİN -->
+            <g id="placed-brain" class="cursor-pointer" opacity="0" pointer-events="none" transform="translate(180, 48)">
+              <ellipse cx="0" cy="0" rx="29" ry="23" fill="#fda4af" stroke="#182b4d" stroke-width="3" />
+              <path d="M 0 -23 Q -4 0 0 23" stroke="#e11d48" stroke-width="2.5" fill="none" />
+              <path d="M -20 -8 Q -10 -16 -4 -4 Q -12 6 -18 2" stroke="#be123c" stroke-width="2" fill="none" />
+              <path d="M -16 10 Q -6 18 2 8" stroke="#be123c" stroke-width="2" fill="none" />
+              <path d="M 20 -8 Q 10 -16 4 -4 Q 12 6 18 2" stroke="#be123c" stroke-width="2" fill="none" />
+              <path d="M 16 10 Q 6 18 -2 8" stroke="#be123c" stroke-width="2" fill="none" />
+              <circle cx="-10" cy="-10" r="12" fill="#ffffff" opacity="0.35" />
+            </g>
+
+            <!-- YERLEŞİK AKCİĞERLER -->
+            <g id="placed-lungs" class="cursor-pointer" opacity="0" pointer-events="none" transform="translate(180, 160)">
+              <!-- Nefes Borusu (Trakea) -->
+              <path d="M 0 -38 L 0 -16 L -12 -4 M 0 -16 L 12 -4" stroke="#94a3b8" stroke-width="5" stroke-linecap="round" fill="none" />
+              <path d="M -5 -32 L 5 -32 M -5 -25 L 5 -25 M -5 -18 L 5 -18" stroke="#475569" stroke-width="2" />
+              <!-- Sağ Akciğer Lobu -->
+              <path id="lungRightLobe" d="M -8 -16 C -18 -32 -42 -26 -46 -4 C -50 18 -36 32 -18 30 C -8 28 -6 8 -8 -16 Z" 
+                    fill="#fb7185" stroke="#182b4d" stroke-width="3" />
+              <!-- Sol Akciğer Lobu -->
+              <path id="lungLeftLobe" d="M 8 -16 C 18 -32 42 -26 46 -4 C 50 18 36 32 18 30 C 10 28 6 12 8 -16 Z" 
+                    fill="#fb7185" stroke="#182b4d" stroke-width="3" />
+              <path d="M -12 -4 Q -26 6 -30 18 M 12 -4 Q 26 6 30 18" stroke="#ffffff" stroke-width="2" fill="none" opacity="0.6" />
+            </g>
+
+            <!-- YERLEŞİK KALP -->
+            <g id="placed-heart" class="cursor-pointer" opacity="0" pointer-events="none" transform="translate(172, 164)">
+              <!-- Damarlar -->
+              <path d="M -6 -16 C -6 -26 6 -28 8 -14" stroke="#3b82f6" stroke-width="5" fill="none" stroke-linecap="round" />
+              <path d="M 2 -16 C 2 -30 16 -28 14 -12" stroke="#ef4444" stroke-width="5" fill="none" stroke-linecap="round" />
+              <!-- Kalp Kası -->
+              <path id="heartMuscle" d="M 0 -8 C -8 -22 -20 -15 -17 0 C -14 14 0 22 0 26 C 0 22 14 14 17 0 C 20 -15 8 -22 0 -8 Z" 
+                    fill="#e11d48" stroke="#182b4d" stroke-width="3" />
+              <path d="M -5 0 Q 0 8 7 16" stroke="#be123c" stroke-width="2" fill="none" />
+              <circle cx="-5" cy="-5" r="5" fill="#ffffff" opacity="0.45" />
+            </g>
+
+            <!-- YERLEŞİK KARACİĞER -->
+            <g id="placed-liver" class="cursor-pointer" opacity="0" pointer-events="none" transform="translate(148, 220)">
+              <path d="M -26 -14 C 12 -22 30 -6 26 12 C 22 24 -8 22 -24 16 C -32 10 -32 -6 -26 -14 Z" 
+                    fill="#b91c1c" stroke="#182b4d" stroke-width="3" />
+              <ellipse cx="-10" cy="0" rx="12" ry="6" fill="#dc2626" opacity="0.7" />
+              <circle cx="-14" cy="-5" r="3.5" fill="#ffffff" opacity="0.35" />
+            </g>
+
+            <!-- YERLEŞİK MİDE -->
+            <g id="placed-stomach" class="cursor-pointer" opacity="0" pointer-events="none" transform="translate(212, 224)">
+              <!-- Yemek Borusu -->
+              <path d="M -6 -26 L -4 -14" stroke="#fb923c" stroke-width="5" stroke-linecap="round" />
+              <!-- Mide Kesesi -->
+              <path id="stomachPouch" d="M -6 -14 C 12 -18 24 -4 18 16 C 14 26 -6 28 -16 16 C -24 4 -16 -6 -6 -14 Z" 
+                    fill="#f97316" stroke="#182b4d" stroke-width="3" />
+              <path d="M -8 2 Q 0 14 10 10" stroke="#ea580c" stroke-width="2" fill="none" />
+              <circle cx="5" cy="4" r="4.5" fill="#ffffff" opacity="0.4" />
+            </g>
+
+            <!-- YERLEŞİK BÖBREKLER -->
+            <g id="placed-kidneys" class="cursor-pointer" opacity="0" pointer-events="none" transform="translate(180, 268)">
+              <!-- Sol Böbrek -->
+              <path d="M -22 -14 C -36 -12 -36 12 -22 14 C -16 10 -16 -10 -22 -14 Z" fill="#9333ea" stroke="#182b4d" stroke-width="3" />
+              <!-- Sağ Böbrek -->
+              <path d="M 22 -14 C 36 -12 36 12 22 14 C 16 10 16 -10 22 -14 Z" fill="#9333ea" stroke="#182b4d" stroke-width="3" />
+              <path d="M -20 8 Q -10 22 -4 34 M 20 8 Q 10 22 4 34" stroke="#c084fc" stroke-width="2.5" fill="none" stroke-dasharray="3 2" />
+            </g>
+
+            <!-- YERLEŞİK BAĞIRSAKLAR -->
+            <g id="placed-intestines" class="cursor-pointer" opacity="0" pointer-events="none" transform="translate(180, 308)">
+              <!-- Kalın Bağırsak -->
+              <path d="M -26 16 L -26 -12 C -26 -18 -20 -18 -12 -18 L 12 -18 C 20 -18 26 -18 26 -12 L 26 16" 
+                    stroke="#b45309" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+              <path d="M -26 16 L -26 -12 C -26 -18 -20 -18 -12 -18 L 12 -18 C 20 -18 26 -18 26 -12 L 26 16" 
+                    stroke="#d97706" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+              <!-- İnce Bağırsak -->
+              <path d="M -14 -6 Q 0 -12 14 -6 Q 0 0 -14 6 Q 0 12 14 6 Q 0 18 -10 16" 
+                    stroke="#f59e0b" stroke-width="5" stroke-linecap="round" fill="none" />
+              <path d="M -8 -4 Q 4 -8 10 -4" stroke="#fef08a" stroke-width="2" fill="none" />
+            </g>
+
+          </svg>
+
+        </div>
+
+      </section>
+
+      <!-- 2. GÖRÜNÜM: CANLI RÖNTGEN / ANATOMİ DETAYI -->
+      <section id="viewXray" class="chunky bg-slate-900 p-4 sm:p-5 flex flex-col items-center relative overflow-hidden hidden text-white">
+        <div class="w-full flex items-center justify-between border-b-2 border-dashed border-cyan-800 pb-2 mb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">🩻</span>
+            <div>
+              <h2 class="display text-base sm:text-lg font-black text-cyan-300">Canlı Röntgen Laboratuvarı</h2>
+              <span class="text-[11px] text-cyan-200/80 font-bold">Organlara tıkla, nasıl çalıştıklarını canlı izle ve seslerini dinle!</span>
+            </div>
+          </div>
+          <span class="px-2.5 py-0.5 bg-cyan-950 border border-cyan-400 rounded-full text-[10px] font-black text-cyan-400 animate-pulse">
+            ● CANLI SİNYAL
+          </span>
+        </div>
+
+        <!-- Röntgen Konsolu: Hızlı Organ Butonları -->
+        <div class="w-full grid grid-cols-4 sm:grid-cols-7 gap-1.5 mb-3 text-center text-xs font-black">
+          <button class="xray-btn p-1.5 rounded-lg bg-slate-800 border border-cyan-500/50 hover:bg-cyan-950 text-pink-300" data-organ="brain">🧠 Beyin</button>
+          <button class="xray-btn p-1.5 rounded-lg bg-slate-800 border border-cyan-500/50 hover:bg-cyan-950 text-rose-400" data-organ="heart">❤️ Kalp</button>
+          <button class="xray-btn p-1.5 rounded-lg bg-slate-800 border border-cyan-500/50 hover:bg-cyan-950 text-pink-400" data-organ="lungs">🫁 Akciğer</button>
+          <button class="xray-btn p-1.5 rounded-lg bg-slate-800 border border-cyan-500/50 hover:bg-cyan-950 text-red-400" data-organ="liver">🩸 Karaciğer</button>
+          <button class="xray-btn p-1.5 rounded-lg bg-slate-800 border border-cyan-500/50 hover:bg-cyan-950 text-amber-400" data-organ="stomach">🥣 Mide</button>
+          <button class="xray-btn p-1.5 rounded-lg bg-slate-800 border border-cyan-500/50 hover:bg-cyan-950 text-purple-400" data-organ="kidneys">🫘 Böbrek</button>
+          <button class="xray-btn p-1.5 rounded-lg bg-slate-800 border border-cyan-500/50 hover:bg-cyan-950 text-yellow-400 col-span-2 sm:col-span-1" data-organ="intestines">➰ Bağırsak</button>
+        </div>
+
+        <!-- Röntgen Göstergesi Ekranı -->
+        <div class="w-full bg-slate-950/80 rounded-xl border-2 border-cyan-500/60 p-4 flex flex-col sm:flex-row items-center gap-4 min-h-[160px]">
+          <div id="xrayLiveVisual" class="w-28 h-28 rounded-xl bg-slate-900 border-2 border-cyan-400 flex items-center justify-center text-5xl shadow-[0_0_15px_rgba(6,182,212,0.4)] shrink-0">
+            🫀
+          </div>
+          <div class="flex-1 space-y-1 text-center sm:text-left">
+            <div class="flex items-center justify-center sm:justify-start gap-2">
+              <span id="xrayOrganTitle" class="display text-xl text-cyan-300">Kalp (Dolaşım Sistemi)</span>
+              <span id="xrayOrganBadge" class="px-2 py-0.5 bg-rose-900 text-rose-200 rounded text-[10px] font-bold">Hayati Pompa</span>
+            </div>
+            <p id="xrayOrganDesc" class="text-xs text-gray-300 leading-relaxed font-semibold">
+              Kalp, göğüs kafesinde sol tarafımıza daha yakındır. Güçlü kaslarıyla gece gündüz hiç durmadan kasılarak kanı damarlar yoluyla tüm vücuda pompalar!
+            </p>
+            <div class="pt-2 flex flex-wrap gap-2 text-[11px] font-bold text-cyan-400">
+              <span id="xrayStat1" class="px-2 py-0.5 bg-slate-800 rounded border border-cyan-900">💓 Dakikada: ~80-100 Atış</span>
+              <span id="xrayStat2" class="px-2 py-0.5 bg-slate-800 rounded border border-cyan-900">🩸 Günlük: ~7.500 Litre Kan</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. GÖRÜNÜM: DEDEKTİF GÖREVLERİ -->
+      <section id="viewMission" class="chunky bg-emerald-50 p-4 sm:p-5 flex flex-col gap-3 relative hidden">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-emerald-300 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">🕵️‍♂️</span>
+            <h2 class="display text-lg font-black text-ink">Organ Dedektifi Görevleri</h2>
+          </div>
+          <span id="missionScoreBadge" class="px-3 py-1 bg-emerald-200 border-2 border-ink rounded-full text-xs font-black">
+            Görev: 1 / 3
+          </span>
+        </div>
+
+        <div id="missionBox" class="bg-white p-4 rounded-xl border-2 border-ink shadow-sm space-y-3">
+          <div class="flex items-center gap-3">
+            <span class="text-3xl p-2 bg-emerald-100 rounded-xl border border-ink">❓</span>
+            <div>
+              <span class="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">GİZEMLİ GÖREV</span>
+              <h3 id="missionQuestion" class="display text-base sm:text-lg text-ink">
+                "Vücudumuzu bir bilgisayar gibi yöneten, tüm hislerimizi ve düşüncelerimizi kontrol eden organımız hangisidir?"
+              </h3>
+            </div>
+          </div>
+
+          <div id="missionOptions" class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2">
+            <!-- Dinamik doldurulur -->
+          </div>
+
+          <div id="missionFeedback" class="hidden p-2.5 rounded-lg border text-xs font-black text-center">
+            <!-- Geri bildirim -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. GÖRÜNÜM: DEĞERLENDİRME TESTİ -->
+      <section id="viewQuiz" class="chunky bg-purple-50 p-4 sm:p-5 flex flex-col gap-3 relative hidden">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-purple-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">📝</span>
+            <h2 class="display text-lg font-black text-ink">İç Organlar Bilgi Sınavı</h2>
+          </div>
+          <span id="quizScoreBadge" class="px-3 py-1 bg-purple-200 border-2 border-ink rounded-full text-xs font-black">
+            Skor: 0 / 5
+          </span>
+        </div>
+
+        <div id="quizContainer" class="bg-white p-4 rounded-xl border-2 border-ink shadow-sm space-y-3">
+          <div class="flex items-start justify-between gap-2">
+            <h3 id="quizQuestion" class="display text-sm sm:text-base text-ink">
+              1. Kanı temizleyen ve atıkları idrar şeklinde vücuttan uzaklaştıran fasulye biçimli organ hangisidir?
+            </h3>
+            <span id="quizNum" class="shrink-0 px-2 py-0.5 bg-purple-100 text-purple-900 border border-ink rounded-md text-xs font-bold">1/5</span>
+          </div>
+
+          <div id="quizAnswers" class="flex flex-col gap-2 pt-1">
+            <!-- Seçenekler JS ile yüklenir -->
+          </div>
+
+          <div id="quizFeedback" class="hidden p-2.5 rounded-lg border text-xs font-black text-center">
+            <!-- Cevap açıklaması -->
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+
+    <!-- SAĞ PANEL: ORGAN ŞABLONLARI VE ETKİLEŞİMLİ BİLGİ KARTLARI (5 Sütun) -->
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      
+      <!-- ORGAN ŞABLONLARI MASASI (Crafting Tray) -->
+      <div class="chunky bg-white p-4 flex flex-col gap-3">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xl">✂️</span>
+            <h3 class="display text-base font-black text-ink">Karton Şablon Tepsisi</h3>
+          </div>
+          <span class="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded border border-blue-300">
+            🖱️ Sürükle VEYA Tıkla
+          </span>
+        </div>
+
+        <!-- 7 Organ Kartı Listesi -->
+        <div id="organTray" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 max-h-[360px] overflow-y-auto pr-1">
+          
+          <!-- BEYİN KARTI -->
+          <div class="organ-card chunky p-2.5 bg-pink-50 hover:bg-pink-100 flex items-center justify-between gap-2" draggable="true" data-organ="brain">
+            <div class="flex items-center gap-2.5 pointer-events-none">
+              <span class="text-2xl p-1.5 bg-white rounded-xl border border-ink shadow-sm">🧠</span>
+              <div>
+                <h4 class="display text-sm font-black text-ink leading-tight">Beyin</h4>
+                <span class="text-[10px] font-bold text-pink-700 block">Kafatasında · Vücudun Yöneticisi</span>
+              </div>
+            </div>
+            <span class="status-badge px-2 py-0.5 text-[10px] font-black rounded-md border border-ink bg-white text-gray-600 pointer-events-none">
+              Bekliyor ✂️
+            </span>
+          </div>
+
+          <!-- KALP KARTI -->
+          <div class="organ-card chunky p-2.5 bg-rose-50 hover:bg-rose-100 flex items-center justify-between gap-2" draggable="true" data-organ="heart">
+            <div class="flex items-center gap-2.5 pointer-events-none">
+              <span class="text-2xl p-1.5 bg-white rounded-xl border border-ink shadow-sm">❤️</span>
+              <div>
+                <h4 class="display text-sm font-black text-ink leading-tight">Kalp</h4>
+                <span class="text-[10px] font-bold text-rose-700 block">Göğüs Kafesinde · Kan Pompası</span>
+              </div>
+            </div>
+            <span class="status-badge px-2 py-0.5 text-[10px] font-black rounded-md border border-ink bg-white text-gray-600 pointer-events-none">
+              Bekliyor ✂️
+            </span>
+          </div>
+
+          <!-- AKCİĞER KARTI -->
+          <div class="organ-card chunky p-2.5 bg-pink-50 hover:bg-pink-100 flex items-center justify-between gap-2" draggable="true" data-organ="lungs">
+            <div class="flex items-center gap-2.5 pointer-events-none">
+              <span class="text-2xl p-1.5 bg-white rounded-xl border border-ink shadow-sm">🫁</span>
+              <div>
+                <h4 class="display text-sm font-black text-ink leading-tight">Akciğerler</h4>
+                <span class="text-[10px] font-bold text-rose-800 block">Göğüs Kafesinde · Solunum Merkezi</span>
+              </div>
+            </div>
+            <span class="status-badge px-2 py-0.5 text-[10px] font-black rounded-md border border-ink bg-white text-gray-600 pointer-events-none">
+              Bekliyor ✂️
+            </span>
+          </div>
+
+          <!-- KARACİĞER KARTI -->
+          <div class="organ-card chunky p-2.5 bg-red-50 hover:bg-red-100 flex items-center justify-between gap-2" draggable="true" data-organ="liver">
+            <div class="flex items-center gap-2.5 pointer-events-none">
+              <span class="text-2xl p-1.5 bg-white rounded-xl border border-ink shadow-sm">🩸</span>
+              <div>
+                <h4 class="display text-sm font-black text-ink leading-tight">Karaciğer</h4>
+                <span class="text-[10px] font-bold text-red-800 block">Karın Sağ Üst · Kimya Fabrikası</span>
+              </div>
+            </div>
+            <span class="status-badge px-2 py-0.5 text-[10px] font-black rounded-md border border-ink bg-white text-gray-600 pointer-events-none">
+              Bekliyor ✂️
+            </span>
+          </div>
+
+          <!-- MİDE KARTI -->
+          <div class="organ-card chunky p-2.5 bg-amber-50 hover:bg-amber-100 flex items-center justify-between gap-2" draggable="true" data-organ="stomach">
+            <div class="flex items-center gap-2.5 pointer-events-none">
+              <span class="text-2xl p-1.5 bg-white rounded-xl border border-ink shadow-sm">🥣</span>
+              <div>
+                <h4 class="display text-sm font-black text-ink leading-tight">Mide</h4>
+                <span class="text-[10px] font-bold text-amber-800 block">Karın Sol Üst · Sindirim Torbası</span>
+              </div>
+            </div>
+            <span class="status-badge px-2 py-0.5 text-[10px] font-black rounded-md border border-ink bg-white text-gray-600 pointer-events-none">
+              Bekliyor ✂️
+            </span>
+          </div>
+
+          <!-- BÖBREKLER KARTI -->
+          <div class="organ-card chunky p-2.5 bg-purple-50 hover:bg-purple-100 flex items-center justify-between gap-2" draggable="true" data-organ="kidneys">
+            <div class="flex items-center gap-2.5 pointer-events-none">
+              <span class="text-2xl p-1.5 bg-white rounded-xl border border-ink shadow-sm">🫘</span>
+              <div>
+                <h4 class="display text-sm font-black text-ink leading-tight">Böbrekler</h4>
+                <span class="text-[10px] font-bold text-purple-800 block">Bel Arkasında · Kan Süzgeci</span>
+              </div>
+            </div>
+            <span class="status-badge px-2 py-0.5 text-[10px] font-black rounded-md border border-ink bg-white text-gray-600 pointer-events-none">
+              Bekliyor ✂️
+            </span>
+          </div>
+
+          <!-- BAĞIRSAKLAR KARTI -->
+          <div class="organ-card chunky p-2.5 bg-yellow-50 hover:bg-yellow-100 flex items-center justify-between gap-2" draggable="true" data-organ="intestines">
+            <div class="flex items-center gap-2.5 pointer-events-none">
+              <span class="text-2xl p-1.5 bg-white rounded-xl border border-ink shadow-sm">➰</span>
+              <div>
+                <h4 class="display text-sm font-black text-ink leading-tight">Bağırsaklar</h4>
+                <span class="text-[10px] font-bold text-yellow-800 block">Karın Altında · Emilim ve Boşaltım</span>
+              </div>
+            </div>
+            <span class="status-badge px-2 py-0.5 text-[10px] font-black rounded-md border border-ink bg-white text-gray-600 pointer-events-none">
+              Bekliyor ✂️
+            </span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- SEÇİLİ ORGAN DETAY KARTI (Doktorun Notu) -->
+      <div id="organDetailBox" class="chunky bg-white p-4 flex flex-col gap-2">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🩺</span>
+            <h3 id="detailTitle" class="display text-base font-black text-ink">Küçük Doktorun Not Defteri</h3>
+          </div>
+          <span id="detailBadge" class="px-2 py-0.5 bg-blue-100 text-blue-900 rounded-full text-[10px] font-black border border-ink">
+            İpucu
+          </span>
+        </div>
+
+        <div id="detailContent" class="space-y-2 text-xs font-bold text-gray-700">
+          <p id="detailText">
+            Bir organ kartını sürükleyip vücuttaki yuvasına bırakabilir veya karta tıklayıp doğrudan vücuda yerleştirebilirsin!
+          </p>
+          <div id="detailFunFactBox" class="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-950 flex items-start gap-2">
+            <span class="text-lg">💡</span>
+            <span id="detailFunFact" class="leading-tight">
+              <b>Biliyor musun?</b> İnsan vücudundaki kan damarları uç uca eklenseydi dünyayı 2.5 kez turlayacak kadar uzun olurdu!
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- GERÇEK DÜNYA VE ETKİNLİK KILAVUZU -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-2 border-b-2 border-dashed border-gray-200 pb-2">
+          <span class="text-xl">🎒</span>
+          <h3 class="display text-base font-black text-ink">Sınıfta Nasıl Yapılır?</h3>
+        </div>
+        <ul class="text-xs text-gray-700 font-bold space-y-1.5 leading-snug">
+          <li class="flex items-start gap-1.5">
+            <span>1️⃣</span> <span>Büyük ambalaj kartonunun üzerine bir arkadaşın uzanır ve boya kalemiyle silüeti çizilir.</span>
+          </li>
+          <li class="flex items-start gap-1.5">
+            <span>2️⃣</span> <span>Kağıda basılı organ şablonları renkli kuru boyalarla boyanır ve makasla kesilir.</span>
+          </li>
+          <li class="flex items-start gap-1.5">
+            <span>3️⃣</span> <span>Öğrendiğin anatomik konumlara göre organlar yapıştırıcıyla kartona yapıştırılır!</span>
+          </li>
+        </ul>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- JAVASCRIPT: SES MOTORU, SÜRÜKLE-BIRAK, DOKUNMA VE ETKİLEŞİM MOTORU -->
+  <script>
+    // --- 1. WEB AUDIO API SES SENTEZLEYİCİ ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    let isSoundEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    const Sound = {
+      // Kalp Atışı (Güm-Güm!)
+      heartbeat: function() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const now = audioCtx.currentTime;
+
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(80, now);
+        osc1.frequency.exponentialRampToValueAtTime(30, now + 0.12);
+        gain1.gain.setValueAtTime(0.4, now);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.12);
+
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(100, now + 0.18);
+        osc2.frequency.exponentialRampToValueAtTime(35, now + 0.3);
+        gain2.gain.setValueAtTime(0.3, now + 0.18);
+        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        osc2.connect(gain2);
+        gain2.connect(audioCtx.destination);
+        osc2.start(now + 0.18);
+        osc2.stop(now + 0.3);
+      },
+
+      snip: function() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(900, now);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.08);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      },
+
+      snap: function() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(420, now);
+        osc.frequency.exponentialRampToValueAtTime(850, now + 0.1);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.12);
+      },
+
+      error: function() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(140, now + 0.2);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.2);
+      },
+
+      fanfare: function() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const notes = [261.63, 329.63, 392.00, 523.25];
+        notes.forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          const t = audioCtx.currentTime + (idx * 0.1);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.2, t);
+          gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(t);
+          osc.stop(t + 0.25);
+        });
+      }
+    };
+
+    // Ses Aç/Kapat Butonu
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    soundToggle.addEventListener('click', () => {
+      isSoundEnabled = !isSoundEnabled;
+      soundIcon.textContent = isSoundEnabled ? '🔊' : '🔇';
+      if (isSoundEnabled) Sound.snip();
+    });
+
+
+    // --- 2. ORGAN BİLGİ VERİTABANI ---
+    const OrganData = {
+      brain: {
+        name: 'Beyin',
+        emoji: '🧠',
+        location: 'Kafatasının içinde',
+        system: 'Sinir Sistemi',
+        task: 'Vücudumuzun komuta ve yönetim merkezidir. Düşünmemizi, öğrenmemizi, hissetmemizi, hareket etmemizi ve nefes almak gibi istemsiz eylemleri yönetir.',
+        fact: 'Beynimiz yaklaşık 86 milyar sinir hücresinden (nöron) oluşur ve vücudumuzun enerjisinin %20\'sini tek başına tüketir!'
+      },
+      heart: {
+        name: 'Kalp',
+        emoji: '❤️',
+        location: 'Göğüs kafesinde, hafif sol tarafta',
+        system: 'Dolaşım Sistemi',
+        task: 'Güçlü bir kas pompasıdır. Oksijen ve besin taşıyan kanı damarlarımız aracılığıyla vücudumuzun en ücra köşelerine kadar durmaksızın pompalar.',
+        fact: 'Kalbin yaklaşık bir yumruğun büyüklüğündedir ve bir günde yaklaşık 100.000 kez çarpar!'
+      },
+      lungs: {
+        name: 'Akciğerler',
+        emoji: '🫁',
+        location: 'Göğüs kafesinin içinde sağ ve solda',
+        system: 'Solunum Sistemi',
+        task: 'Soluduğumuz havadaki temiz oksijeni kana verir, vücutta oluşan atık karbondioksit gazını ise dışarı atmamızı sağlar.',
+        fact: 'Akciğerlerimizin içindeki hava keseciklerini (alveol) açsaydık neredeyse bir tenis kortu büyüklüğünde yer kaplardı!'
+      },
+      liver: {
+        name: 'Karaciğer',
+        emoji: '🩸',
+        location: 'Karın boşluğunun sağ üst kısmında',
+        system: 'Sindirim ve Boşaltım Sistemi',
+        task: 'Vücudumuzun kimya fabrikasıdır. Yağların sindirimi için safra salgılar, zararlı maddeleri zehirsiz hale getirir ve besin maddelerini depolar.',
+        fact: 'Karaciğer vücudumuzun en ağır iç organıdır (yaklaşık 1.5 kg) ve kendini yenileyebilen nadir organlardandır!'
+      },
+      stomach: {
+        name: 'Mide',
+        emoji: '🥣',
+        location: 'Karın boşluğunun sol üst kısmında',
+        system: 'Sindirim Sistemi',
+        task: 'Yediğimiz besinleri güçlü kas hareketleriyle çalkalar, mide asidi ve sindirim sıvılarıyla bulamaç (kimus) haline getirir.',
+        fact: 'Mide asidi o kadar güçlüdür ki metalleri bile eritebilir; midemiz kendi kendini sindirmemek için koruyucu bir mukus tabakası üretir!'
+      },
+      kidneys: {
+        name: 'Böbrekler',
+        emoji: '🫘',
+        location: 'Bel hizasında, omurganın iki yanında arkada',
+        system: 'Boşaltım Sistemi',
+        task: 'Fasulye biçimindeki iki süzgeç organımızdır. Kanı süzerek atık maddeleri ve fazla suyu idrar olarak vücuttan dışarı atar.',
+        fact: 'Böbreklerimiz her gün vücudumuzdaki kanı yaklaşık 40 kez baştan sona süzüp temizler!'
+      },
+      intestines: {
+        name: 'Bağırsaklar',
+        emoji: '➰',
+        location: 'Karın boşluğunun orta ve alt bölümünde',
+        system: 'Sindirim Sistemi',
+        task: 'İnce bağırsak besinlerin sindirimini tamamlayıp kana geçmesini sağlar; kalın bağırsak ise suyu emer ve posayı dışarı atar.',
+        fact: 'Bir insanın ince ve kalın bağırsağının toplam uzunluğu yaklaşık 7-8 metredir; bir zürafanın boyundan bile uzundur!'
+      }
+    };
+
+
+    // --- 3. MAKET ETKİLEŞİMİ & PUZZLE MOTORU ---
+    const State = {
+      selectedOrgan: null,
+      placedOrgans: new Set(),
+      currentTab: 'workshop'
+    };
+
+    const organCards = document.querySelectorAll('.organ-card');
+    const organSlots = document.querySelectorAll('.organ-slot');
+    const placedCountEl = document.getElementById('placedCount');
+    const instructionBanner = document.getElementById('instructionBanner');
+    const bannerIcon = document.getElementById('bannerIcon');
+    const bannerText = document.getElementById('bannerText');
+    const detailTitle = document.getElementById('detailTitle');
+    const detailBadge = document.getElementById('detailBadge');
+    const detailText = document.getElementById('detailText');
+    const detailFunFact = document.getElementById('detailFunFact');
+    const bodyDropZone = document.getElementById('bodyDropZone');
+
+    // Organ Kartı Seçimi (Tıklama)
+    organCards.forEach(card => {
+      card.addEventListener('click', () => {
+        const organId = card.getAttribute('data-organ');
+        if (State.placedOrgans.has(organId)) {
+          showOrganDetail(organId);
+          triggerOrganPulse(organId);
+          return;
+        }
+
+        // Seçim değiştirme
+        organCards.forEach(c => c.classList.remove('selected'));
+        if (State.selectedOrgan === organId) {
+          State.selectedOrgan = null;
+          bannerIcon.textContent = '👇';
+          bannerText.textContent = 'Karton tepsisinden bir organ seç veya doğrudan vücuttaki yerine sürükle!';
+        } else {
+          State.selectedOrgan = organId;
+          card.classList.add('selected');
+          Sound.snip();
+          const info = OrganData[organId];
+          bannerIcon.textContent = info.emoji;
+          bannerText.textContent = `Seçildi: "${info.name}". Şimdi vücuttaki kesik çizgili yuvasına tıkla!`;
+          showOrganDetail(organId);
+
+          // Eşleşen yuvayı parlat
+          organSlots.forEach(s => s.classList.remove('highlight'));
+          const targetSlot = document.getElementById(`slot-${organId}`);
+          if (targetSlot) targetSlot.classList.add('highlight');
+        }
+      });
+
+      // Çift Tıklamayla Hızlı Yerleştirme
+      card.addEventListener('dblclick', () => {
+        const organId = card.getAttribute('data-organ');
+        if (!State.placedOrgans.has(organId)) {
+          placeOrgan(organId);
+        }
+      });
+    });
+
+    // --- HTML5 DRAG & DROP DESTEĞİ ---
+    let draggedOrganId = null;
+
+    organCards.forEach(card => {
+      card.addEventListener('dragstart', (e) => {
+        const organId = card.getAttribute('data-organ');
+        if (State.placedOrgans.has(organId)) {
+          e.preventDefault();
+          return;
+        }
+        draggedOrganId = organId;
+        State.selectedOrgan = organId;
+        card.classList.add('selected');
+        e.dataTransfer.setData('text/plain', organId);
+        Sound.snip();
+
+        // Eşleşen yuvayı parlat
+        const targetSlot = document.getElementById(`slot-${organId}`);
+        if (targetSlot) targetSlot.classList.add('highlight');
+      });
+
+      card.addEventListener('dragend', () => {
+        organSlots.forEach(s => s.classList.remove('highlight'));
+      });
+    });
+
+    // Gövde Alanına Bırakma
+    bodyDropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    });
+
+    bodyDropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const organId = e.dataTransfer.getData('text/plain') || draggedOrganId || State.selectedOrgan;
+      if (organId && !State.placedOrgans.has(organId)) {
+        placeOrgan(organId);
+      }
+    });
+
+    // Vücuttaki Hedef Yuvalara Tıklama
+    organSlots.forEach(slot => {
+      slot.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const slotOrganId = slot.getAttribute('data-organ');
+
+        // Durum 1: Zaten yerleştiyse bilgi kartını aç ve parlat
+        if (State.placedOrgans.has(slotOrganId)) {
+          showOrganDetail(slotOrganId);
+          triggerOrganPulse(slotOrganId);
+          return;
+        }
+
+        // Durum 2: Kullanıcı bir kart seçmişse
+        if (State.selectedOrgan) {
+          if (State.selectedOrgan === slotOrganId) {
+            placeOrgan(slotOrganId);
+          } else {
+            // Yanlış yuva
+            Sound.error();
+            bannerIcon.textContent = '⚠️';
+            bannerText.textContent = `Burası ${OrganData[slotOrganId].name} yuvası. Seçtiğin: ${OrganData[State.selectedOrgan].name}!`;
+            gsap.fromTo(slot, { x: -6 }, { x: 6, duration: 0.08, repeat: 4, yoyo: true });
+          }
+        } else {
+          // Durum 3: Kart seçilmeden yuvaya tıklandıysa doğrudan o organı yerleştir!
+          placeOrgan(slotOrganId);
+        }
+      });
+    });
+
+    // Organı Yuvaya Yerleştirme Fonksiyonu
+    function placeOrgan(organId) {
+      if (State.placedOrgans.has(organId)) return;
+
+      State.placedOrgans.add(organId);
+      State.selectedOrgan = null;
+      organCards.forEach(c => c.classList.remove('selected'));
+      organSlots.forEach(s => s.classList.remove('highlight'));
+
+      // Kartın durumunu güncelle
+      const card = document.querySelector(`.organ-card[data-organ="${organId}"]`);
+      if (card) {
+        card.classList.add('placed');
+        const badge = card.querySelector('.status-badge');
+        if (badge) {
+          badge.textContent = 'Yapıştırıldı ✅';
+          badge.classList.remove('bg-white', 'text-gray-600');
+          badge.classList.add('bg-emerald-100', 'text-emerald-800');
+        }
+      }
+
+      // SVG içindeki yerleşik organı göster
+      const placedEl = document.getElementById(`placed-${organId}`);
+      if (placedEl) {
+        placedEl.setAttribute('opacity', '1');
+        placedEl.style.pointerEvents = 'all'; // Artık tıklanabilir
+        gsap.fromTo(placedEl, 
+          { scale: 1.35, transformOrigin: 'center' }, 
+          { scale: 1, duration: 0.35, ease: 'back.out(2)' }
+        );
+
+        // Tıklanınca ses ve detay aç
+        placedEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          showOrganDetail(organId);
+          triggerOrganPulse(organId);
+        });
+      }
+
+      // Yuva kesik çizgilerini hafiflet
+      const slotEl = document.getElementById(`slot-${organId}`);
+      if (slotEl) {
+        slotEl.style.opacity = '0.2';
+      }
+
+      Sound.snap();
+      if (organId === 'heart') Sound.heartbeat();
+
+      // Sayaç güncelle
+      placedCountEl.textContent = State.placedOrgans.size;
+
+      const info = OrganData[organId];
+      bannerIcon.textContent = '🎉';
+      bannerText.textContent = `Tebrikler! ${info.emoji} ${info.name} vücuttaki doğru yerine yerleşti!`;
+      showOrganDetail(organId);
+
+      // Tüm organlar bitti mi?
+      if (State.placedOrgans.size === 7) {
+        setTimeout(() => {
+          bannerIcon.textContent = '🏆';
+          bannerText.textContent = 'HARİKA İŞ! Tüm organları başarıyla yerleştirdin! Şimdi Röntgen Modu\'na geçebilirsin!';
+          Sound.fanfare();
+          if (window.confetti) {
+            confetti({
+              particleCount: 90,
+              spread: 85,
+              origin: { y: 0.6 }
+            });
+          }
+        }, 500);
+      }
+    }
+
+    // Organ Detay Bilgisini Gösterme
+    function showOrganDetail(organId) {
+      const info = OrganData[organId];
+      if (!info) return;
+
+      detailTitle.textContent = `${info.emoji} ${info.name} (${info.system})`;
+      detailBadge.textContent = info.location;
+      detailText.textContent = info.task;
+      detailFunFact.innerHTML = `<b>Biliyor musun?</b> ${info.fact}`;
+    }
+
+    // Organa tıklanınca görsel darbe animasyonu
+    function triggerOrganPulse(organId) {
+      const el = document.getElementById(`placed-${organId}`);
+      if (el) {
+        gsap.fromTo(el, { scale: 1.2, transformOrigin: 'center' }, { scale: 1, duration: 0.35, ease: 'elastic.out(1, 0.5)' });
+      }
+      if (organId === 'heart') Sound.heartbeat();
+      else Sound.snap();
+    }
+
+    // Sıfırla Butonu
+    document.getElementById('btnResetAll').addEventListener('click', () => {
+      State.placedOrgans.clear();
+      State.selectedOrgan = null;
+      placedCountEl.textContent = '0';
+
+      organCards.forEach(c => {
+        c.classList.remove('selected', 'placed');
+        const badge = c.querySelector('.status-badge');
+        if (badge) {
+          badge.textContent = 'Bekliyor ✂️';
+          badge.classList.add('bg-white', 'text-gray-600');
+          badge.classList.remove('bg-emerald-100', 'text-emerald-800');
+        }
+      });
+
+      organSlots.forEach(s => {
+        s.style.opacity = '1';
+        s.classList.remove('highlight');
+      });
+
+      Object.keys(OrganData).forEach(id => {
+        const el = document.getElementById(`placed-${id}`);
+        if (el) {
+          el.setAttribute('opacity', '0');
+          el.style.pointerEvents = 'none';
+        }
+      });
+
+      bannerIcon.textContent = '🔄';
+      bannerText.textContent = 'Model sıfırlandı! Şablonları yeniden yerleştirmeye başlayabilirsin.';
+      Sound.snip();
+    });
+
+    // Otomatik Hızlı Çöz Butonu
+    document.getElementById('btnAutoPlace').addEventListener('click', () => {
+      Object.keys(OrganData).forEach((id, idx) => {
+        setTimeout(() => {
+          placeOrgan(id);
+        }, idx * 120);
+      });
+    });
+
+
+    // --- 4. RÖNTGEN / X-RAY MODU MOTORU ---
+    const xrayButtons = document.querySelectorAll('.xray-btn');
+    const xrayLiveVisual = document.getElementById('xrayLiveVisual');
+    const xrayOrganTitle = document.getElementById('xrayOrganTitle');
+    const xrayOrganBadge = document.getElementById('xrayOrganBadge');
+    const xrayOrganDesc = document.getElementById('xrayOrganDesc');
+    const xrayStat1 = document.getElementById('xrayStat1');
+    const xrayStat2 = document.getElementById('xrayStat2');
+
+    const XrayStats = {
+      brain: { badge: 'Yönetim Üssü', stat1: '⚡ Hız: ~400 km/s İleti Hızı', stat2: '🧠 Ağırlık: ~1.400 Gram' },
+      heart: { badge: 'Hayati Pompa', stat1: '💓 Dakikada: ~80-100 Atış', stat2: '🩸 Günlük: ~7.500 Litre Kan' },
+      lungs: { badge: 'Oksijen İstasyonu', stat1: '🌬️ Dakikada: ~16-20 Nefes', stat2: '🫁 Hacim: ~5-6 Litre Hava' },
+      liver: { badge: 'Kimya Fabrikası', stat1: '🧪 Fonksiyon: 500+ Farklı Görev', stat2: '♻️ Rejenerasyon: Kendini Yeniler' },
+      stomach: { badge: 'Sindirim Kazanı', stat1: '🔥 Asit pH: 1.5 - 2.0 (Çok Güçlü)', stat2: '⏳ Sindirim Süresi: ~2-4 Saat' },
+      kidneys: { badge: 'Kan Süzgeci', stat1: '💧 Günlük Süzme: ~180 Litre Sıvı', stat2: '🫘 Çift Filtre: 2 Milyon Nefron' },
+      intestines: { badge: 'Besin Koridoru', stat1: '📏 Toplam Boy: ~7-8 Metre', stat2: '🍞 Emilim Alanı: ~30 m² Yüzey' }
+    };
+
+    function updateXrayView(organId) {
+      const info = OrganData[organId];
+      const stats = XrayStats[organId];
+      if (!info || !stats) return;
+
+      xrayLiveVisual.textContent = info.emoji;
+      xrayOrganTitle.textContent = `${info.name} (${info.system})`;
+      xrayOrganBadge.textContent = stats.badge;
+      xrayOrganDesc.textContent = info.task + ' ' + info.fact;
+      xrayStat1.textContent = stats.stat1;
+      xrayStat2.textContent = stats.stat2;
+
+      // Özel Animasyon
+      xrayLiveVisual.className = 'w-28 h-28 rounded-xl bg-slate-900 border-2 border-cyan-400 flex items-center justify-center text-5xl shrink-0 shadow-[0_0_15px_rgba(6,182,212,0.4)]';
+      if (organId === 'heart') {
+        xrayLiveVisual.classList.add('pulse-heart');
+        Sound.heartbeat();
+      } else if (organId === 'lungs') {
+        xrayLiveVisual.classList.add('breathe-lungs');
+        Sound.snip();
+      } else if (organId === 'stomach') {
+        xrayLiveVisual.classList.add('churn-stomach');
+        Sound.snap();
+      } else if (organId === 'brain') {
+        xrayLiveVisual.classList.add('brain-glow');
+        Sound.snap();
+      } else {
+        Sound.snap();
+      }
+    }
+
+    xrayButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-organ');
+        xrayButtons.forEach(b => b.classList.remove('bg-cyan-950', 'ring-2', 'ring-cyan-400'));
+        btn.classList.add('bg-cyan-950', 'ring-2', 'ring-cyan-400');
+        updateXrayView(id);
+      });
+    });
+
+
+    // --- 5. DEDEKTİF GÖREVLERİ MOTORU ---
+    const Missions = [
+      {
+        q: '"Vücudumuzu bir orkestra şefi gibi yöneten, düşünce ve hareketlerimizin merkezi olan organ hangisidir?"',
+        correct: 'brain',
+        options: [
+          { id: 'heart', label: '❤️ Kalp' },
+          { id: 'brain', label: '🧠 Beyin' },
+          { id: 'stomach', label: '🥣 Mide' }
+        ],
+        hint: 'Kafatasımızın içinde korunan bu organ, 86 milyar sinir hücresine sahiptir!'
+      },
+      {
+        q: '"Nefes aldığımızda oksijeni kana veren ve karbondioksiti dışarı atan göğüs kafesindeki çift organ hangisidir?"',
+        correct: 'lungs',
+        options: [
+          { id: 'lungs', label: '🫁 Akciğerler' },
+          { id: 'liver', label: '🩸 Karaciğer' },
+          { id: 'kidneys', label: '🫘 Böbrekler' }
+        ],
+        hint: 'Nefes aldığımızda balon gibi genişler, nefes verdiğimizde küçülür!'
+      },
+      {
+        q: '"Kanımızı süzerek zararlı atıkları ve fazla suyu idrar olarak uzaklaştıran fasulye biçimli organlarımız hangisidir?"',
+        correct: 'kidneys',
+        options: [
+          { id: 'intestines', label: '➰ Bağırsaklar' },
+          { id: 'kidneys', label: '🫘 Böbrekler' },
+          { id: 'heart', label: '❤️ Kalp' }
+        ],
+        hint: 'Belimizin iki yanında yer alır ve günde kanımızı defalarca süzer!'
+      }
+    ];
+
+    let currentMissionIdx = 0;
+    const missionQuestionEl = document.getElementById('missionQuestion');
+    const missionOptionsEl = document.getElementById('missionOptions');
+    const missionFeedbackEl = document.getElementById('missionFeedback');
+    const missionScoreBadge = document.getElementById('missionScoreBadge');
+
+    function loadMission(idx) {
+      if (idx >= Missions.length) {
+        missionQuestionEl.textContent = '🎉 TEBRİKLER! Bütün gizemli dedektif görevlerini başarıyla tamamladın!';
+        missionOptionsEl.innerHTML = `
+          <div class="col-span-full text-center py-4">
+            <span class="text-4xl block mb-2">🥇</span>
+            <p class="font-black text-emerald-800 text-sm">Harika bir anatomi dedektifisin!</p>
+            <button onclick="currentMissionIdx = 0; loadMission(0);" class="pushable mt-3 px-4 py-1.5 bg-emerald-400 text-ink text-xs font-black">
+              Yeniden Başla 🔄
+            </button>
+          </div>
+        `;
+        missionFeedbackEl.classList.add('hidden');
+        Sound.fanfare();
+        return;
+      }
+
+      const m = Missions[idx];
+      missionScoreBadge.textContent = `Görev: ${idx + 1} / ${Missions.length}`;
+      missionQuestionEl.textContent = m.q;
+      missionFeedbackEl.classList.add('hidden');
+
+      missionOptionsEl.innerHTML = '';
+      m.options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = 'pushable p-3 bg-white hover:bg-emerald-100 text-ink font-black text-sm flex items-center justify-center gap-2';
+        btn.textContent = opt.label;
+        btn.addEventListener('click', () => checkMissionAnswer(opt.id, m.correct, m.hint));
+        missionOptionsEl.appendChild(btn);
+      });
+    }
+
+    function checkMissionAnswer(selectedId, correctId, hint) {
+      missionFeedbackEl.classList.remove('hidden', 'bg-rose-100', 'border-rose-400', 'text-rose-900', 'bg-emerald-100', 'border-emerald-400', 'text-emerald-900');
+      
+      if (selectedId === correctId) {
+        Sound.snap();
+        missionFeedbackEl.classList.add('bg-emerald-100', 'border-emerald-400', 'text-emerald-900');
+        missionFeedbackEl.textContent = `✅ Doğru Teşhis! ${OrganData[correctId].name} görevini başarıyla buldun!`;
+        
+        triggerOrganPulse(correctId);
+
+        setTimeout(() => {
+          currentMissionIdx++;
+          loadMission(currentMissionIdx);
+        }, 1200);
+      } else {
+        Sound.error();
+        missionFeedbackEl.classList.add('bg-rose-100', 'border-rose-400', 'text-rose-900');
+        missionFeedbackEl.textContent = `❌ Yanlış organ! İpucu: ${hint}`;
+      }
+    }
+
+
+    // --- 6. BİLGİ QUIZ'İ MOTORU ---
+    const QuizList = [
+      {
+        q: '1. Vücudumuzda kanı gece gündüz durmaksızın pompalayan hayati organ hangisidir?',
+        opts: ['Beyin', 'Kalp', 'Mide', 'Akciğer'],
+        correct: 1,
+        exp: 'Kalp, güçlü kaslarıyla kanı tüm damarlarımıza pompalayan motorumuzdur.'
+      },
+      {
+        q: '2. Yediğimiz besinleri asit ve kas hareketleriyle çalkalayıp bulamaç haline getiren organ hangisidir?',
+        opts: ['Mide', 'Karaciğer', 'Akciğer', 'Böbrek'],
+        correct: 0,
+        exp: 'Mide, karın boşluğumuzun sol üstünde yer alan ve besinleri sindiren organdır.'
+      },
+      {
+        q: '3. Soluduğumuz havadaki oksijeni kana veren organımız hangisidir?',
+        opts: ['Beyin', 'Böbrek', 'Akciğerler', 'Bağırsaklar'],
+        correct: 2,
+        exp: 'Akciğerlerimiz göğüs kafesinde bulunur ve kanımıza oksijen kazandırır.'
+      },
+      {
+        q: '4. Kanı süzerek zararlı atıkları idrar olarak dışarı atan çift organımız hangisidir?',
+        opts: ['Böbrekler', 'Karaciğer', 'Kalp', 'Mide'],
+        correct: 0,
+        exp: 'Böbrekler fasulye şeklinde iki süzgeç organdır ve kanı atıklardan arındırır.'
+      },
+      {
+        q: '5. Vücudumuzun en ağır iç organı olan ve safra üreterek kimyasal temizlik yapan organ hangisidir?',
+        opts: ['Beyin', 'İnce Bağırsak', 'Karaciğer', 'Akciğer'],
+        correct: 2,
+        exp: 'Karaciğer, vücudun kimya laboratuvarı gibi çalışan en büyük iç organıdır.'
+      }
+    ];
+
+    let quizIndex = 0;
+    let quizScore = 0;
+    const quizQuestionEl = document.getElementById('quizQuestion');
+    const quizNumEl = document.getElementById('quizNum');
+    const quizAnswersEl = document.getElementById('quizAnswers');
+    const quizFeedbackEl = document.getElementById('quizFeedback');
+    const quizScoreBadge = document.getElementById('quizScoreBadge');
+
+    function loadQuiz(idx) {
+      if (idx >= QuizList.length) {
+        quizQuestionEl.textContent = '🎉 Sınav Bitti!';
+        quizAnswersEl.innerHTML = `
+          <div class="text-center py-4">
+            <span class="text-4xl block mb-2">🏅</span>
+            <p class="font-black text-ink text-base">Tebrikler! 5 soruda ${quizScore} doğru yaptın!</p>
+            <p class="text-xs text-gray-600 font-bold mt-1">İç organlar konusunu süper öğrendin!</p>
+            <button onclick="quizIndex=0; quizScore=0; loadQuiz(0);" class="pushable mt-4 px-4 py-2 bg-purple-400 text-ink text-xs font-black">
+              Testi Tekrar Çöz 🔄
+            </button>
+          </div>
+        `;
+        quizFeedbackEl.classList.add('hidden');
+        Sound.fanfare();
+        if (window.confetti) confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
+        return;
+      }
+
+      const q = QuizList[idx];
+      quizNumEl.textContent = `${idx + 1}/${QuizList.length}`;
+      quizQuestionEl.textContent = q.q;
+      quizScoreBadge.textContent = `Skor: ${quizScore} / ${QuizList.length}`;
+      quizFeedbackEl.classList.add('hidden');
+
+      quizAnswersEl.innerHTML = '';
+      q.opts.forEach((opt, optIdx) => {
+        const btn = document.createElement('button');
+        btn.className = 'pushable p-2.5 bg-white hover:bg-purple-100 text-ink font-bold text-xs text-left flex items-center gap-2';
+        btn.innerHTML = `<span class="w-6 h-6 rounded-full bg-purple-100 border border-ink flex items-center justify-center font-black text-[11px]">${String.fromCharCode(65 + optIdx)}</span> <span>${opt}</span>`;
+        btn.addEventListener('click', () => checkQuiz(optIdx, q.correct, q.exp));
+        quizAnswersEl.appendChild(btn);
+      });
+    }
+
+    function checkQuiz(selectedIdx, correctIdx, exp) {
+      const btns = quizAnswersEl.querySelectorAll('button');
+      btns.forEach(b => b.disabled = true);
+
+      quizFeedbackEl.classList.remove('hidden', 'bg-emerald-100', 'border-emerald-400', 'text-emerald-900', 'bg-rose-100', 'border-rose-400', 'text-rose-900');
+
+      if (selectedIdx === correctIdx) {
+        quizScore++;
+        Sound.snap();
+        quizFeedbackEl.classList.add('bg-emerald-100', 'border-emerald-400', 'text-emerald-900');
+        quizFeedbackEl.textContent = `✅ Harika! ${exp}`;
+      } else {
+        Sound.error();
+        quizFeedbackEl.classList.add('bg-rose-100', 'border-rose-400', 'text-rose-900');
+        quizFeedbackEl.textContent = `❌ Yanlış! ${exp}`;
+      }
+
+      quizScoreBadge.textContent = `Skor: ${quizScore} / ${QuizList.length}`;
+
+      setTimeout(() => {
+        quizIndex++;
+        loadQuiz(quizIndex);
+      }, 1800);
+    }
+
+
+    // --- 7. SEKME YÖNETİMİ ---
+    const btnTabWorkshop = document.getElementById('btnTabWorkshop');
+    const btnTabXray = document.getElementById('btnTabXray');
+    const btnTabMission = document.getElementById('btnTabMission');
+    const btnTabQuiz = document.getElementById('btnTabQuiz');
+
+    const viewWorkshop = document.getElementById('viewWorkshop');
+    const viewXray = document.getElementById('viewXray');
+    const viewMission = document.getElementById('viewMission');
+    const viewQuiz = document.getElementById('viewQuiz');
+
+    function switchTab(tab) {
+      State.currentTab = tab;
+
+      [btnTabWorkshop, btnTabXray, btnTabMission, btnTabQuiz].forEach(b => {
+        b.classList.remove('bg-sun', 'border-2', 'border-ink', 'shadow-sm');
+        b.classList.add('hover:bg-white', 'text-gray-700');
+      });
+
+      [viewWorkshop, viewXray, viewMission, viewQuiz].forEach(v => v.classList.add('hidden'));
+
+      if (tab === 'workshop') {
+        btnTabWorkshop.classList.add('bg-sun', 'border-2', 'border-ink', 'shadow-sm');
+        btnTabWorkshop.classList.remove('hover:bg-white', 'text-gray-700');
+        viewWorkshop.classList.remove('hidden');
+      } else if (tab === 'xray') {
+        btnTabXray.classList.add('bg-sun', 'border-2', 'border-ink', 'shadow-sm');
+        btnTabXray.classList.remove('hover:bg-white', 'text-gray-700');
+        viewXray.classList.remove('hidden');
+        updateXrayView('heart');
+      } else if (tab === 'mission') {
+        btnTabMission.classList.add('bg-sun', 'border-2', 'border-ink', 'shadow-sm');
+        btnTabMission.classList.remove('hover:bg-white', 'text-gray-700');
+        viewMission.classList.remove('hidden');
+        loadMission(currentMissionIdx);
+      } else if (tab === 'quiz') {
+        btnTabQuiz.classList.add('bg-sun', 'border-2', 'border-ink', 'shadow-sm');
+        btnTabQuiz.classList.remove('hover:bg-white', 'text-gray-700');
+        viewQuiz.classList.remove('hidden');
+        loadQuiz(quizIndex);
+      }
+      Sound.snip();
+    }
+
+    btnTabWorkshop.addEventListener('click', () => switchTab('workshop'));
+    btnTabXray.addEventListener('click', () => switchTab('xray'));
+    btnTabMission.addEventListener('click', () => switchTab('mission'));
+    btnTabQuiz.addEventListener('click', () => switchTab('quiz'));
+
+    // Başlangıç yüklemeleri
+    loadMission(0);
+    loadQuiz(0);
+  </script>
+</body>
+</html>

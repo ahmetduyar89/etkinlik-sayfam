@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Balonlu İtme Aracı: Etki–Tepki Kuvvetini Keşfet! | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'sans-serif'],
+            display: ['Baloo 2', 'cursive'],
+          },
+          colors: {
+            bgMain: '#fffbeb',
+            ink: '#0f172a',
+            rocketRed: '#ef4444',
+            thrustGreen: '#10b981',
+            speedYellow: '#facc15',
+            skyBlue: '#0284c7',
+          },
+          borderWidth: {
+            '3': '3px',
+            '3.5': '3.5px',
+          },
+          boxShadow: {
+            'hard': '4px 4px 0px #0f172a',
+            'hard-lg': '6px 6px 0px #0f172a',
+            'hard-sm': '2px 2px 0px #0f172a',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    html {
+      overflow-y: scroll;
+      scrollbar-gutter: stable;
+    }
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #trackContainer {
+      contain: layout paint;
+    }
+    #trackSvg {
+      overflow: hidden;
+    }
+    .display {
+      font-family: 'Baloo 2', cursive;
+    }
+    .chunky {
+      border: 3.5px solid #0f172a;
+      border-radius: 1.25rem;
+      box-shadow: 4px 4px 0px #0f172a;
+    }
+    .pushable {
+      border: 3px solid #0f172a;
+      border-radius: 0.85rem;
+      box-shadow: 3px 3px 0px #0f172a;
+      transition: all 0.12s ease;
+      cursor: pointer;
+    }
+    .pushable:hover {
+      transform: translate(-1.5px, -1.5px);
+      box-shadow: 4.5px 4.5px 0px #0f172a;
+    }
+    .pushable:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #0f172a;
+    }
+    .active-tab {
+      background-color: #ef4444 !important;
+      color: #ffffff !important;
+      border-color: #0f172a !important;
+    }
+
+    /* Pist Çizgileri Deseni */
+    .track-stripes {
+      background-image: repeating-linear-gradient(
+        90deg,
+        #cbd5e1 0px,
+        #cbd5e1 20px,
+        transparent 20px,
+        transparent 40px
+      );
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <!-- Üst Başlık & Navigasyon Çubuğu -->
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-ink text-sm font-black flex items-center gap-1">
+        <span>⬅️</span> <span class="hidden sm:inline">Portala Dön</span>
+      </a>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">🚀</span>
+          <h1 class="display text-lg sm:text-2xl font-black text-ink tracking-wide">
+            Balonlu İtme Aracı: Etki–Tepki Kuvveti
+          </h1>
+        </div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">
+          Balonun havası arkaya fışkırırken araba neden ileri fırlar? Newton'un 3. Hareket Yasası! 💨🏎️
+        </p>
+      </div>
+    </div>
+
+    <!-- Mod Değiştirme Butonları & Ses -->
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabDesign" class="pushable px-3.5 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1">
+          <span>🛠️</span> <span>1. Aracı Tasarla</span>
+        </button>
+        <button id="tabLaunch" class="pushable px-3.5 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1">
+          <span>🏁</span> <span>2. Fırlatma Pisti</span>
+        </button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1" title="Sesi Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Ana Çalışma Alanı -->
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+    
+    <!-- SOL PANEL: İNTERAKTİF SİMÜLASYON SAHNESİ (7 SÜTUN) -->
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      
+      <!-- 1. MOD: ATÖLYE / TASARIM SAHNESİ -->
+      <section id="viewDesign" class="chunky bg-white p-4 sm:p-5 flex flex-col gap-4 relative">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🎨</span>
+            <h2 class="display text-lg font-black text-ink">Atölye Masası: Roket Aracını Hazırla</h2>
+          </div>
+          <span class="px-2.5 py-0.5 bg-red-100 border-2 border-ink rounded-full text-[11px] font-black text-red-900">
+            Kendin Yap (DIY)
+          </span>
+        </div>
+
+        <!-- Görsel Montaj Alanı (SVG) -->
+        <div class="bg-gradient-to-b from-amber-50 to-orange-100 rounded-2xl border-2 border-ink p-4 flex flex-col items-center justify-center relative min-h-[240px]">
+          <svg id="assemblySvg" width="340" height="170" viewBox="0 0 340 170" class="overflow-visible">
+            <!-- Arka Plan Kılavuz Çizgisi (Zip-line seçiliyse) -->
+            <line id="zipLineWire" x1="10" y1="50" x2="330" y2="50" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="4 4" class="hidden" />
+
+            <!-- Araç Grubu -->
+            <g id="vehicleAssemblyGroup" transform="translate(140, 85)">
+              
+              <!-- Tekerlekli Araba Gövdesi -->
+              <g id="carBodyGroup">
+                <!-- Araba Şasisi -->
+                <rect x="-45" y="10" width="90" height="20" rx="6" fill="#3b82f6" stroke="#0f172a" stroke-width="2.5" />
+                <!-- Tekerlekler -->
+                <circle cx="-30" cy="30" r="10" fill="#1e293b" stroke="#0f172a" stroke-width="2.5" />
+                <circle cx="-30" cy="30" r="3.5" fill="#e2e8f0" />
+                <circle cx="30" cy="30" r="10" fill="#1e293b" stroke="#0f172a" stroke-width="2.5" />
+                <circle cx="30" cy="30" r="3.5" fill="#e2e8f0" />
+              </g>
+
+              <!-- Pipet (Hava Kanalı / Nozul) -->
+              <g id="strawGroup">
+                <rect id="strawRect" x="-50" y="-4" width="75" height="8" rx="2" fill="#f59e0b" stroke="#0f172a" stroke-width="2" />
+                <!-- Bant Parçaları -->
+                <rect x="-25" y="-8" width="14" height="16" rx="2" fill="#fef08a" stroke="#0f172a" stroke-width="1.5" opacity="0.9" />
+                <rect x="10" y="-8" width="14" height="16" rx="2" fill="#fef08a" stroke="#0f172a" stroke-width="1.5" opacity="0.9" />
+              </g>
+
+              <!-- Balon Şekli (Şişme Boyutuna Göre Değişir) -->
+              <g id="balloonGroup" transform="translate(25, -2)">
+                <!-- Balon Boğazı ve Düğümü -->
+                <polygon points="-12,-4 -2,-1 -2,1 -12,4" fill="#ef4444" stroke="#0f172a" stroke-width="1.5" />
+                <!-- Balon Gövdesi -->
+                <ellipse id="balloonEllipse" cx="20" cy="0" rx="35" ry="24" fill="#ef4444" stroke="#0f172a" stroke-width="2.5" />
+                <!-- Işık Yansıması -->
+                <ellipse id="balloonGloss" cx="15" cy="-8" rx="14" ry="7" fill="#ffffff" opacity="0.4" transform="rotate(-15 15 -8)" />
+              </g>
+
+              <!-- Ekstra Ağırlık / Yük (Açık ise) -->
+              <g id="weightBlockGroup" transform="translate(0, 5)" class="hidden">
+                <rect x="-14" y="-2" width="28" height="12" rx="2" fill="#64748b" stroke="#0f172a" stroke-width="2" />
+                <text x="0" y="7" text-anchor="middle" font-size="8" font-weight="900" fill="#ffffff">+50g</text>
+              </g>
+            </g>
+          </svg>
+
+          <!-- Canlı Durum Bilgi Rozeti -->
+          <div class="mt-2 bg-white/95 px-3 py-1 rounded-xl border-2 border-ink text-xs font-bold text-ink shadow-sm flex flex-wrap items-center justify-center gap-2">
+            <span id="vehicleLabel">🏎️ Tekerlekli Araba Modu</span>
+            <span class="text-gray-300">|</span>
+            <span id="balloonAirLabel" class="text-red-700 font-black">Hava: Orta (2X)</span>
+            <span class="text-gray-300">|</span>
+            <span id="strawLabel" class="text-amber-800 font-bold">Pipet: Standart (Orta Hız)</span>
+          </div>
+        </div>
+
+        <!-- Ayar Kontrolleri -->
+        <div class="space-y-3">
+          
+          <!-- 1. Araç Tipi Seçimi -->
+          <div>
+            <label class="block text-xs font-black text-gray-700 mb-1.5 flex items-center justify-between">
+              <span>🚗 Araç Tipini Seç:</span>
+              <span class="text-[11px] text-gray-500 font-normal">Pist veya Zip-Line</span>
+            </label>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="btnSelectCar" class="pushable p-2 bg-red-100 ring-2 ring-ink text-left flex items-center gap-2">
+                <span class="text-2xl">🏎️</span>
+                <div>
+                  <p class="text-xs font-black text-ink">Balonlu Araba</p>
+                  <p class="text-[10px] text-gray-600 font-bold">Yatay pistte tekerleklerle gider</p>
+                </div>
+              </button>
+
+              <button id="btnSelectZipline" class="pushable p-2 bg-white text-left flex items-center gap-2">
+                <span class="text-2xl">🎈</span>
+                <div>
+                  <p class="text-xs font-black text-ink">İpli Zip-Line Roket</p>
+                  <p class="text-[10px] text-gray-600 font-bold">Havada gergin ip boyunca uçar</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. Balon Şişirme Seviyesi (Pompa) -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="text-xs font-black text-gray-700">🎈 Balon Şişirme Hacmi (Potansiyel Enerji):</label>
+              <button id="btnPumpAir" class="pushable px-2.5 py-1 bg-amber-300 hover:bg-amber-400 text-ink text-xs font-black flex items-center gap-1">
+                <span>💨</span> <span>Pompala / Şişir</span>
+              </button>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <button id="btnAirLow" class="pushable p-2 bg-white text-center">
+                <p class="text-xs font-black text-ink">Az (1X)</p>
+                <p class="text-[10px] text-gray-500 font-bold">Kısa mesafe</p>
+              </button>
+              <button id="btnAirMed" class="pushable p-2 bg-red-100 ring-2 ring-ink text-center">
+                <p class="text-xs font-black text-ink">Orta (2X)</p>
+                <p class="text-[10px] text-gray-500 font-bold">Dengeli itiş</p>
+              </button>
+              <button id="btnAirMax" class="pushable p-2 bg-white text-center">
+                <p class="text-xs font-black text-ink">Maksimum (3X) 🔥</p>
+                <p class="text-[10px] text-gray-500 font-bold">Süper hızlı fırlayış</p>
+              </button>
+            </div>
+          </div>
+
+          <!-- 3. Pipet Nozul Çapı & Ekstra Ağırlık -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t-2 border-dashed border-gray-200">
+            <!-- Nozul Çapı -->
+            <div>
+              <label class="block text-xs font-black text-gray-700 mb-1">🥤 Pipet Çapı (Nozul):</label>
+              <select id="selectNozzle" class="w-full text-xs font-bold bg-gray-50 border-2 border-ink rounded-lg p-1.5 cursor-pointer">
+                <option value="narrow">İnce Pipet (Uzun süreli dengeli itiş)</option>
+                <option value="standard" selected>Standart Pipet (İdeal hız ve süre)</option>
+                <option value="wide">Geniş Pipet (Ani yüksek jet hızı!)</option>
+              </select>
+            </div>
+
+            <!-- Ekstra Yük / Ağırlık -->
+            <div>
+              <label class="block text-xs font-black text-gray-700 mb-1">⚖️ Araç Kütlesi (Ağırlık):</label>
+              <select id="selectWeight" class="w-full text-xs font-bold bg-gray-50 border-2 border-ink rounded-lg p-1.5 cursor-pointer">
+                <option value="light" selected>Hafif Araç (Maksimum İvme - Hızlı)</option>
+                <option value="heavy">Ağır Araç (+50g Yük - Daha Yavaş)</option>
+              </select>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Fırlatma Pistine Geç Butonu -->
+        <button id="btnGoToLaunch" class="pushable w-full py-3 bg-red-500 hover:bg-red-600 text-white font-black text-base flex items-center justify-center gap-2 shadow-hard mt-2">
+          <span>🏁</span> <span>Aracı Piste Yerleştir & Fırlat!</span> <span>🚀</span>
+        </button>
+      </section>
+
+      <!-- 2. MOD: FIRLATMA PİSTİ & ETKİ-TEPKİ LABORATUVARI -->
+      <section id="viewLaunch" class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3 relative hidden">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2 min-h-[46px]">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-xl shrink-0">🏁</span>
+            <h2 class="display text-base sm:text-lg font-black text-ink truncate">Fırlatma Pisti & Laboratuvar</h2>
+          </div>
+          <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <!-- Anlık Hız Göstergesi -->
+            <div class="w-[88px] sm:w-[98px] px-2 py-1 bg-amber-100 border-2 border-ink rounded-lg text-xs font-black text-ink flex items-center justify-between">
+              <span>⚡ Hız:</span>
+              <span class="tabular-nums font-black text-red-600"><span id="speedDisplay">0</span> <span class="text-[10px] text-gray-600 font-bold">cm/s</span></span>
+            </div>
+            <!-- Kat Edilen Mesafe -->
+            <div class="w-[98px] sm:w-[108px] px-2 py-1 bg-emerald-100 border-2 border-ink rounded-lg text-xs font-black text-ink flex items-center justify-between">
+              <span>📏 Yol:</span>
+              <span class="tabular-nums font-black text-emerald-800"><span id="distanceDisplay">0</span> <span class="text-[10px] text-gray-600 font-bold">cm</span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pist / Simülasyon Sahnesi (Canvas + SVG) -->
+        <div id="trackContainer" class="relative w-full h-[340px] rounded-2xl border-3 border-ink overflow-hidden bg-gradient-to-b from-sky-100 via-sky-50 to-slate-200 select-none">
+          
+          <!-- Gökyüzü ve Bulutlar -->
+          <div class="absolute top-2 left-6 text-2xl opacity-70 pointer-events-none">☁️</div>
+          <div class="absolute top-6 right-16 text-3xl opacity-60 pointer-events-none">☁️</div>
+          <div class="absolute top-3 right-1/2 text-xl opacity-50 pointer-events-none">☁️</div>
+
+          <!-- Zip-line İpi (Zip-line modu aktifse) -->
+          <div id="trackZiplineWire" class="absolute left-0 right-0 top-[140px] h-[3px] bg-slate-500 border-dashed border-t border-slate-700 hidden"></div>
+
+          <!-- Mesafe Cetveli (Alt Kısımda) -->
+          <div class="absolute bottom-16 left-0 right-0 h-8 border-t-2 border-b-2 border-ink bg-amber-50 flex items-center justify-between px-3 text-[10px] font-black text-ink">
+            <span>🏁 0 cm</span>
+            <span>100 cm</span>
+            <span>200 cm</span>
+            <span>300 cm</span>
+            <span>400 cm</span>
+            <span>🏆 500 cm (Hedef)</span>
+          </div>
+
+          <!-- Pist Yolu Zemin (Araba modu aktifse) -->
+          <div id="roadTrack" class="absolute bottom-0 left-0 right-0 h-16 bg-slate-700 border-t-3 border-ink">
+            <!-- Yol Şeritleri -->
+            <div class="w-full h-2 mt-7 track-stripes opacity-90"></div>
+          </div>
+
+          <!-- Fırlatma Parçacık Animasyon Canvas'ı -->
+          <canvas id="particleCanvas" class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
+
+          <!-- SVG Araç ve Canlı Kuvvet Vektörleri -->
+          <svg id="trackSvg" class="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-hidden" style="overflow: hidden;">
+            
+            <!-- Hareket Eden Araç Grubu -->
+            <g id="trackVehicleGroup" transform="translate(60, 215)">
+              
+              <!-- Arka Havadan Çıkan İtiş Püskürmesi İllüstrasyonu (Gaz Akımı) -->
+              <g id="thrustGasVisual" opacity="0">
+                <path d="M-60 0 Q-85 -15 -110 0 Q-85 15 -60 0" fill="#38bdf8" opacity="0.6" />
+                <path d="M-60 0 Q-75 -8 -90 0 Q-75 8 -60 0" fill="#ffffff" opacity="0.9" />
+              </g>
+
+              <!-- ETKİ KUVVETİ OKU (Geriye Doğru Kırmızı Ok: F_etki) -->
+              <g id="arrowAction" opacity="0">
+                <line x1="-50" y1="-30" x2="-110" y2="-30" stroke="#dc2626" stroke-width="4" stroke-linecap="round" />
+                <polygon points="-110,-35 -122,-30 -110,-25" fill="#dc2626" />
+                <rect x="-115" y="-50" width="70" height="16" rx="4" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5" />
+                <text x="-80" y="-38" text-anchor="middle" font-size="9" font-weight="900" fill="#991b1b">💨 ETKİ (Hava)</text>
+              </g>
+
+              <!-- TEPKİ KUVVETİ OKU (İleriye Doğru Yeşil Ok: F_tepki) -->
+              <g id="arrowReaction" opacity="0">
+                <line x1="50" y1="-30" x2="110" y2="-30" stroke="#16a34a" stroke-width="4" stroke-linecap="round" />
+                <polygon points="110,-35 122,-30 110,-25" fill="#16a34a" />
+                <rect x="55" y="-50" width="70" height="16" rx="4" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5" />
+                <text x="90" y="-38" text-anchor="middle" font-size="9" font-weight="900" fill="#166534">🏎️ TEPKİ (İtiş)</text>
+              </g>
+
+              <!-- Araç Gövdesi -->
+              <g id="trackCarBody">
+                <rect x="-40" y="5" width="80" height="18" rx="5" fill="#3b82f6" stroke="#0f172a" stroke-width="2.5" />
+                <circle cx="-25" cy="22" r="9" fill="#1e293b" stroke="#0f172a" stroke-width="2" />
+                <circle cx="-25" cy="22" r="3" fill="#ffffff" />
+                <circle cx="25" cy="22" r="9" fill="#1e293b" stroke="#0f172a" stroke-width="2" />
+                <circle cx="25" cy="22" r="3" fill="#ffffff" />
+              </g>
+
+              <!-- Pipet -->
+              <rect id="trackStraw" x="-45" y="-6" width="65" height="7" rx="2" fill="#f59e0b" stroke="#0f172a" stroke-width="2" />
+
+              <!-- Balon -->
+              <g id="trackBalloonGroup" transform="translate(20, -4)">
+                <ellipse id="trackBalloon" cx="15" cy="0" rx="30" ry="22" fill="#ef4444" stroke="#0f172a" stroke-width="2.5" />
+                <polygon points="-12,-4 -2,-1 -2,1 -12,4" fill="#ef4444" stroke="#0f172a" stroke-width="1.5" />
+              </g>
+
+              <!-- Ağırlık Bloğu (varsa) -->
+              <g id="trackWeightBlock" class="hidden" transform="translate(0, 2)">
+                <rect x="-12" y="-2" width="24" height="10" rx="2" fill="#64748b" stroke="#0f172a" stroke-width="2" />
+                <text x="0" y="6" text-anchor="middle" font-size="7" font-weight="900" fill="#ffffff">+50g</text>
+              </g>
+            </g>
+
+          </svg>
+
+          <!-- Bitiş Çizgisi Bayrağı -->
+          <div class="absolute bottom-16 right-4 text-2xl z-10 pointer-events-none">🏁</div>
+
+          <!-- Yavaş Çekim (Slow-Mo) Aktif Göstergesi -->
+          <div id="slowMoBadge" class="absolute top-3 left-3 bg-purple-600 text-white px-2.5 py-1 rounded-full text-[11px] font-black tracking-wider border-2 border-ink shadow-sm hidden">
+            🐢 Yavaş Çekim Aktif
+          </div>
+        </div>
+
+        <!-- Fırlatma & Kontrol Butonları -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <div class="flex items-center gap-2">
+            <!-- 3, 2, 1, FIRLAT BUTONU -->
+            <button id="btnLaunch" class="pushable px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white font-black text-sm sm:text-base flex items-center gap-2 shadow-hard">
+              <span>🚀</span> <span>FIRLAT! (Ağzını Aç)</span>
+            </button>
+
+            <!-- Sıfırla / Başa Al -->
+            <button id="btnResetTrack" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-ink text-xs font-black flex items-center gap-1">
+              <span>🔄</span> <span>Yeniden Kur</span>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <!-- Yavaş Çekim Modu -->
+            <button id="btnToggleSlowMo" class="pushable px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-900 text-xs font-black flex items-center gap-1 border-2 border-ink">
+              <span>🐢</span> <span>Yavaş Çekim: <b id="slowMoText">Kapalı</b></span>
+            </button>
+
+            <!-- Tasarıma Geri Dön -->
+            <button id="btnBackToDesign" class="pushable px-3 py-2 bg-amber-100 hover:bg-amber-200 text-ink text-xs font-black flex items-center gap-1">
+              <span>🛠️</span> <span>Ayarları Değiştir</span>
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Canlı Bilimsel Sonuç & Newton'un Kanunu Kartı -->
+      <section class="chunky bg-gradient-to-r from-red-50 via-amber-50 to-emerald-50 p-3.5 sm:p-4">
+        <div class="flex items-start gap-3">
+          <span class="text-3xl sm:text-4xl p-1 bg-white border-2 border-ink rounded-xl shadow-sm">💡</span>
+          <div class="flex-1">
+            <h3 class="display text-sm sm:text-base font-black text-ink flex items-center justify-between">
+              <span>Bilim İnsanı Notu: Newton'un 3. Yasası</span>
+              <span class="text-[10px] px-2 py-0.5 bg-red-200 text-red-900 border border-ink rounded-full font-bold">
+                Etki = Tepki
+              </span>
+            </h3>
+            <p id="scienceNoteText" class="text-xs text-gray-800 font-bold leading-relaxed mt-1">
+              <b>"Her etkiye karşı eşit büyüklükte ve zıt yönlü bir tepki kuvveti vardır."</b> Balonun gergin lastiği içindeki havayı arkaya doğru iter (ETKİ). Dışarı fışkıran hava ise aracı tam tersi yönde, eşit kuvvetle ileri doğru fırlatır (TEPKİ). Uzay roketleri de uzay boşluğunda tam olarak bu ilkeyle uçar!
+            </p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- SAĞ PANEL: BİLİMSEL KAZANIMLAR & GÖREVLER (5 SÜTUN) -->
+    <div class="lg:col-span-5 flex flex-col gap-3">
+
+      <!-- 1. GÖREVLER KARTI -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🎯</span>
+            <h3 class="display text-base font-black text-ink">Küçük Mucit Görevleri</h3>
+          </div>
+          <span class="text-xs font-black text-red-700 bg-red-50 px-2 py-0.5 rounded-lg border border-red-300">
+            3 Görev
+          </span>
+        </div>
+
+        <ul class="space-y-2.5" id="missionList">
+          <!-- Görev 1 -->
+          <li id="mission1" class="p-2.5 rounded-xl border-2 border-ink bg-amber-50 flex items-start gap-2.5">
+            <span id="m1Check" class="text-lg">⬜</span>
+            <div class="flex-1 text-xs">
+              <p class="font-extrabold text-ink">1. Görev: İlk Roketini Fırlat</p>
+              <p class="text-gray-600 font-semibold text-[11px]">Balonu şişir ve aracı fırlatarak etki-tepki kuvvetini gözlemle.</p>
+            </div>
+          </li>
+
+          <!-- Görev 2 -->
+          <li id="mission2" class="p-2.5 rounded-xl border-2 border-ink bg-gray-50 flex items-start gap-2.5">
+            <span id="m2Check" class="text-lg">⬜</span>
+            <div class="flex-1 text-xs">
+              <p class="font-extrabold text-ink">2. Görev: 400 cm Hedefini Aş!</p>
+              <p class="text-gray-600 font-semibold text-[11px]">Balonu maksimum (3X) şişirip hafif araçla 400 cm'yi geç.</p>
+            </div>
+          </li>
+
+          <!-- Görev 3 -->
+          <li id="mission3" class="p-2.5 rounded-xl border-2 border-ink bg-gray-50 flex items-start gap-2.5">
+            <span id="m3Check" class="text-lg">⬜</span>
+            <div class="flex-1 text-xs">
+              <p class="font-extrabold text-ink">3. Görev: İpli Zip-Line Roketi Dene</p>
+              <p class="text-gray-600 font-semibold text-[11px]">Aracı "İpli Zip-Line" moduna alıp havada uçuş rekoru kır!</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- 2. FIRLATMA TEST VERİLERİ (GÖSTERGE PANELİ) -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">📊</span>
+            <h3 class="display text-base font-black text-ink">Test Verileri & Skor</h3>
+          </div>
+          <span class="text-xs font-bold text-gray-500" id="launchCountBadge">0 Fırlatma</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-center">
+          <div class="p-2.5 bg-sky-50 rounded-xl border-2 border-ink">
+            <p class="text-[10px] font-bold text-gray-500">Maksimum Hız</p>
+            <p id="statMaxSpeed" class="text-lg font-black text-sky-800">0 cm/s</p>
+          </div>
+          <div class="p-2.5 bg-emerald-50 rounded-xl border-2 border-ink">
+            <p class="text-[10px] font-bold text-gray-500">En Uzak Mesafe</p>
+            <p id="statMaxDistance" class="text-lg font-black text-emerald-800">0 cm</p>
+          </div>
+        </div>
+
+        <div class="mt-3 p-2 bg-amber-50 rounded-xl border border-amber-300 text-[11px] font-bold text-amber-900 flex items-center justify-between">
+          <span>💨 Havanın İtiş Süresi:</span>
+          <span id="statThrustDuration">0.0 saniye</span>
+        </div>
+      </div>
+
+      <!-- 3. MEB KAZANIM REHBERİ -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <span class="text-xl">📚</span>
+          <h3 class="display text-base font-black text-ink">Deneyin Bilimsel Sırrı</h3>
+        </div>
+
+        <div class="space-y-2 text-xs font-bold text-gray-800">
+          <div class="p-2 bg-red-50 rounded-lg border border-red-300 flex items-start gap-2">
+            <span class="text-base">💨</span>
+            <div>
+              <p class="font-extrabold text-red-900">Etki Kuvveti:</p>
+              <p class="text-[11px] text-red-800 font-semibold">Balonun içindeki sıkışmış hava yüksek hızla geriye doğru fışkırır.</p>
+            </div>
+          </div>
+
+          <div class="p-2 bg-emerald-50 rounded-lg border border-emerald-300 flex items-start gap-2">
+            <span class="text-base">🏎️</span>
+            <div>
+              <p class="font-extrabold text-emerald-900">Tepki Kuvveti:</p>
+              <p class="text-[11px] text-emerald-800 font-semibold">Geriye giden havaya tepki olarak araba aynı kuvvetle ileri itilir.</p>
+            </div>
+          </div>
+
+          <div class="p-2 bg-purple-50 rounded-lg border border-purple-300 flex items-start gap-2">
+            <span class="text-base">🚀</span>
+            <div>
+              <p class="font-extrabold text-purple-900">Gerçek Dünyada Nerede Var?</p>
+              <p class="text-[11px] text-purple-800 font-semibold">NASA roketleri, savaş jetleri ve denizde fırlayan ahtapotlar aynı etki-tepki prensibini kullanır!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- JAVASCRIPT: SES SENTEZLEYİCİ, ETKİ-TEPKİ FİZİK MOTORU & PARÇACIKLAR -->
+  <script>
+    // --- 1. WEB AUDIO API SES SENTEZLEYİCİSİ ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new AudioCtx();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    const Sound = {
+      // Balon Şişirme Sesi (Puff / Pump)
+      pump() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+          osc.frequency.linearRampToValueAtTime(320, audioCtx.currentTime + 0.12);
+          gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.12);
+        } catch (e) {}
+      },
+
+      // Fışkırma Havası Sesi (Whoosh / Hiss)
+      whoosh(duration = 1.5) {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          // White noise buffer
+          const bufferSize = audioCtx.sampleRate * duration;
+          const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+          const noise = audioCtx.createBufferSource();
+          noise.buffer = buffer;
+
+          // Bandpass filter (hava kaçış efekti)
+          const filter = audioCtx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(800, audioCtx.currentTime);
+          filter.frequency.exponentialRampToValueAtTime(250, audioCtx.currentTime + duration);
+          filter.Q.value = 3;
+
+          const gain = audioCtx.createGain();
+          gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          noise.start();
+          noise.stop(audioCtx.currentTime + duration);
+        } catch (e) {}
+      },
+
+      // Bitiş / Hedefe Ulaşma Zili
+      ding() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.6);
+        } catch (e) {}
+      },
+
+      // Zafer Fanfarı
+      fanfare() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.12);
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime + idx * 0.12);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + idx * 0.12 + 0.28);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime + idx * 0.12);
+            osc.stop(audioCtx.currentTime + idx * 0.12 + 0.3);
+          });
+        } catch (e) {}
+      }
+    };
+
+    // Ses Aç/Kapat Butonu
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    soundToggle.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundIcon.textContent = soundEnabled ? '🔊' : '🔇';
+      soundToggle.className = soundEnabled 
+        ? 'pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1'
+        : 'pushable p-2 bg-gray-200 hover:bg-gray-300 text-xs font-black flex items-center gap-1';
+    });
+
+
+    // --- 2. SİMÜLASYON DURUMU (STATE) ---
+    const State = {
+      activeTab: 'design', // 'design' | 'launch'
+      vehicleType: 'car', // 'car' | 'zipline'
+      airLevel: 'med', // 'low' (1X) | 'med' (2X) | 'max' (3X)
+      nozzleType: 'standard', // 'narrow' | 'standard' | 'wide'
+      weightType: 'light', // 'light' | 'heavy'
+      isSlowMo: false,
+
+      // Fizik Değişkenleri
+      isLaunching: false,
+      carX: 60, // piksel
+      velocityX: 0,
+      thrustTimeRemaining: 0,
+      totalDistanceCm: 0,
+      maxSpeedCmS: 0,
+      highestRecordedDist: 0,
+      highestRecordedSpeed: 0,
+      launchCount: 0,
+      hasCelebratedThisRun: false,
+
+      // Görev Durumları
+      missions: {
+        m1: false,
+        m2: false,
+        m3: false
+      }
+    };
+
+    // İtme Katsayıları Tablosu
+    const PhysicsConfig = {
+      air: {
+        low: { thrustForce: 85, duration: 1.2, balloonScale: 0.65, label: 'Az (1X)' },
+        med: { thrustForce: 140, duration: 1.8, balloonScale: 1.0, label: 'Orta (2X)' },
+        max: { thrustForce: 230, duration: 2.5, balloonScale: 1.45, label: 'Maksimum (3X)' }
+      },
+      nozzle: {
+        narrow: { forceMultiplier: 0.8, durationMultiplier: 1.4, strawWidth: 4, label: 'İnce Pipet' },
+        standard: { forceMultiplier: 1.0, durationMultiplier: 1.0, strawWidth: 7, label: 'Standart Pipet' },
+        wide: { forceMultiplier: 1.35, durationMultiplier: 0.65, strawWidth: 12, label: 'Geniş Pipet' }
+      },
+      weight: {
+        light: { mass: 1.0, friction: 0.985 },
+        heavy: { mass: 1.7, friction: 0.970 }
+      }
+    };
+
+
+    // --- 3. ATÖLYE & AYAR KONTROLLERİ ---
+    const btnSelectCar = document.getElementById('btnSelectCar');
+    const btnSelectZipline = document.getElementById('btnSelectZipline');
+    const btnAirLow = document.getElementById('btnAirLow');
+    const btnAirMed = document.getElementById('btnAirMed');
+    const btnAirMax = document.getElementById('btnAirMax');
+    const btnPumpAir = document.getElementById('btnPumpAir');
+    const selectNozzle = document.getElementById('selectNozzle');
+    const selectWeight = document.getElementById('selectWeight');
+
+    const vehicleLabel = document.getElementById('vehicleLabel');
+    const balloonAirLabel = document.getElementById('balloonAirLabel');
+    const strawLabel = document.getElementById('strawLabel');
+
+    const carBodyGroup = document.getElementById('carBodyGroup');
+    const zipLineWire = document.getElementById('zipLineWire');
+    const weightBlockGroup = document.getElementById('weightBlockGroup');
+    const balloonEllipse = document.getElementById('balloonEllipse');
+    const balloonGloss = document.getElementById('balloonGloss');
+    const strawRect = document.getElementById('strawRect');
+
+    // Araç Tipi Seçimi
+    btnSelectCar.addEventListener('click', () => {
+      State.vehicleType = 'car';
+      updateVehicleTypeUI();
+      Sound.pump();
+    });
+
+    btnSelectZipline.addEventListener('click', () => {
+      State.vehicleType = 'zipline';
+      updateVehicleTypeUI();
+      Sound.pump();
+      // Görev 3'ü tetikle
+      if (!State.missions.m3) {
+        State.missions.m3 = true;
+        checkMissions();
+      }
+    });
+
+    function updateVehicleTypeUI() {
+      if (State.vehicleType === 'car') {
+        btnSelectCar.className = 'pushable p-2 bg-red-100 ring-2 ring-ink text-left flex items-center gap-2';
+        btnSelectZipline.className = 'pushable p-2 bg-white text-left flex items-center gap-2';
+        vehicleLabel.textContent = '🏎️ Tekerlekli Araba Modu';
+        carBodyGroup.classList.remove('hidden');
+        zipLineWire.classList.add('hidden');
+
+        // Pist ekranındaki değişiklikler
+        document.getElementById('trackCarBody').classList.remove('hidden');
+        document.getElementById('roadTrack').classList.remove('hidden');
+        document.getElementById('trackZiplineWire').classList.add('hidden');
+        document.getElementById('trackVehicleGroup').setAttribute('transform', 'translate(60, 215)');
+      } else {
+        btnSelectZipline.className = 'pushable p-2 bg-red-100 ring-2 ring-ink text-left flex items-center gap-2';
+        btnSelectCar.className = 'pushable p-2 bg-white text-left flex items-center gap-2';
+        vehicleLabel.textContent = '🎈 İpli Zip-Line Roket Modu';
+        carBodyGroup.classList.add('hidden');
+        zipLineWire.classList.remove('hidden');
+
+        // Pist ekranındaki değişiklikler
+        document.getElementById('trackCarBody').classList.add('hidden');
+        document.getElementById('roadTrack').classList.add('hidden');
+        document.getElementById('trackZiplineWire').classList.remove('hidden');
+        document.getElementById('trackVehicleGroup').setAttribute('transform', 'translate(60, 140)');
+      }
+      resetTrackState();
+    }
+
+    // Balon Şişirme Seviyesi
+    function setAirLevel(level) {
+      State.airLevel = level;
+      [btnAirLow, btnAirMed, btnAirMax].forEach(b => {
+        b.classList.remove('bg-red-100', 'ring-2', 'ring-ink');
+        b.classList.add('bg-white');
+      });
+
+      if (level === 'low') btnAirLow.classList.add('bg-red-100', 'ring-2', 'ring-ink');
+      if (level === 'med') btnAirMed.classList.add('bg-red-100', 'ring-2', 'ring-ink');
+      if (level === 'max') btnAirMax.classList.add('bg-red-100', 'ring-2', 'ring-ink');
+
+      const conf = PhysicsConfig.air[level];
+      balloonAirLabel.textContent = `Hava: ${conf.label}`;
+
+      // Balon SVG Boyutlandırma
+      const rx = 35 * conf.balloonScale;
+      const ry = 24 * conf.balloonScale;
+      balloonEllipse.setAttribute('rx', rx);
+      balloonEllipse.setAttribute('ry', ry);
+      balloonEllipse.setAttribute('cx', 10 + (rx * 0.3));
+
+      // Pistteki balonu da güncelle
+      const trackBalloon = document.getElementById('trackBalloon');
+      trackBalloon.setAttribute('rx', rx);
+      trackBalloon.setAttribute('ry', ry);
+
+      Sound.pump();
+      gsap.fromTo(balloonEllipse, { scale: 0.9 }, { scale: 1, duration: 0.2, ease: 'back.out(2)' });
+    }
+
+    btnAirLow.addEventListener('click', () => setAirLevel('low'));
+    btnAirMed.addEventListener('click', () => setAirLevel('med'));
+    btnAirMax.addEventListener('click', () => setAirLevel('max'));
+
+    btnPumpAir.addEventListener('click', () => {
+      if (State.airLevel === 'low') setAirLevel('med');
+      else if (State.airLevel === 'med') setAirLevel('max');
+      else setAirLevel('low');
+    });
+
+    // Nozul Seçimi
+    selectNozzle.addEventListener('change', (e) => {
+      State.nozzleType = e.target.value;
+      const conf = PhysicsConfig.nozzle[State.nozzleType];
+      strawLabel.textContent = `Pipet: ${conf.label}`;
+      strawRect.setAttribute('height', conf.strawWidth);
+      document.getElementById('trackStraw').setAttribute('height', conf.strawWidth);
+      Sound.pump();
+    });
+
+    // Ağırlık Seçimi
+    selectWeight.addEventListener('change', (e) => {
+      State.weightType = e.target.value;
+      if (State.weightType === 'heavy') {
+        weightBlockGroup.classList.remove('hidden');
+        document.getElementById('trackWeightBlock').classList.remove('hidden');
+      } else {
+        weightBlockGroup.classList.add('hidden');
+        document.getElementById('trackWeightBlock').classList.add('hidden');
+      }
+      Sound.pump();
+    });
+
+
+    // --- 4. MOD GEÇİŞLERİ (SEKMELER) ---
+    const tabDesign = document.getElementById('tabDesign');
+    const tabLaunch = document.getElementById('tabLaunch');
+    const viewDesign = document.getElementById('viewDesign');
+    const viewLaunch = document.getElementById('viewLaunch');
+    const btnGoToLaunch = document.getElementById('btnGoToLaunch');
+    const btnBackToDesign = document.getElementById('btnBackToDesign');
+
+    function switchTab(tab) {
+      State.activeTab = tab;
+      if (tab === 'design') {
+        tabDesign.classList.add('active-tab');
+        tabLaunch.classList.remove('active-tab');
+        viewDesign.classList.remove('hidden');
+        viewLaunch.classList.add('hidden');
+      } else {
+        tabLaunch.classList.add('active-tab');
+        tabDesign.classList.remove('active-tab');
+        viewLaunch.classList.remove('hidden');
+        viewDesign.classList.add('hidden');
+        Sound.pump();
+        resetTrackState();
+      }
+    }
+
+    tabDesign.addEventListener('click', () => switchTab('design'));
+    tabLaunch.addEventListener('click', () => switchTab('launch'));
+    btnGoToLaunch.addEventListener('click', () => switchTab('launch'));
+    btnBackToDesign.addEventListener('click', () => switchTab('design'));
+
+
+    // --- 5. PARÇACIK MOTORU (FIŞKIRAN HAVA ETKİSİ) ---
+    const particleCanvas = document.getElementById('particleCanvas');
+    const pctx = particleCanvas.getContext('2d');
+    let particles = [];
+
+    function resizeCanvas() {
+      const w = trackContainer.clientWidth;
+      const h = trackContainer.clientHeight;
+      if (w && h && (particleCanvas.width !== w || particleCanvas.height !== h)) {
+        particleCanvas.width = w;
+        particleCanvas.height = h;
+      }
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function createExhaustParticles(x, y, count = 5) {
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: x - 45,
+          y: y + (Math.random() * 12 - 6),
+          vx: -(Math.random() * 8 + 6), // Geriye doğru hızla fışkırır!
+          vy: (Math.random() * 4 - 2),
+          size: Math.random() * 6 + 3,
+          alpha: 0.9,
+          color: Math.random() > 0.4 ? '#38bdf8' : '#ffffff'
+        });
+      }
+    }
+
+    function updateParticles(dt) {
+      pctx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * dt * 60;
+        p.y += p.vy * dt * 60;
+        p.size += 0.2;
+        p.alpha -= 0.035;
+
+        if (p.alpha <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        pctx.save();
+        pctx.globalAlpha = p.alpha;
+        pctx.fillStyle = p.color;
+        pctx.beginPath();
+        pctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        pctx.fill();
+        pctx.restore();
+      }
+    }
+
+
+    // --- 6. ETKİ-TEPKİ FİZİK MOTORU & HAREKET DÖNGÜSÜ ---
+    const trackVehicleGroup = document.getElementById('trackVehicleGroup');
+    const thrustGasVisual = document.getElementById('thrustGasVisual');
+    const arrowAction = document.getElementById('arrowAction');
+    const arrowReaction = document.getElementById('arrowReaction');
+    const speedDisplay = document.getElementById('speedDisplay');
+    const distanceDisplay = document.getElementById('distanceDisplay');
+
+    const btnLaunch = document.getElementById('btnLaunch');
+    const btnResetTrack = document.getElementById('btnResetTrack');
+    const btnToggleSlowMo = document.getElementById('btnToggleSlowMo');
+    const slowMoText = document.getElementById('slowMoText');
+    const slowMoBadge = document.getElementById('slowMoBadge');
+
+    const statMaxSpeed = document.getElementById('statMaxSpeed');
+    const statMaxDistance = document.getElementById('statMaxDistance');
+    const statThrustDuration = document.getElementById('statThrustDuration');
+    const launchCountBadge = document.getElementById('launchCountBadge');
+
+    // Yavaş Çekim Modu Aç/Kapat
+    btnToggleSlowMo.addEventListener('click', () => {
+      State.isSlowMo = !State.isSlowMo;
+      slowMoText.textContent = State.isSlowMo ? 'Açık (0.3X)' : 'Kapalı';
+      slowMoBadge.classList.toggle('hidden', !State.isSlowMo);
+      Sound.pump();
+    });
+
+    // Pisti Başa Al / Sıfırla
+    function resetTrackState() {
+      State.isLaunching = false;
+      State.hasCelebratedThisRun = false;
+      State.carX = 60;
+      State.velocityX = 0;
+      State.thrustTimeRemaining = 0;
+      State.totalDistanceCm = 0;
+      State.maxSpeedCmS = 0;
+
+      const yPos = State.vehicleType === 'car' ? 215 : 140;
+      trackVehicleGroup.setAttribute('transform', `translate(${State.carX}, ${yPos})`);
+
+      thrustGasVisual.style.opacity = '0';
+      arrowAction.style.opacity = '0';
+      arrowReaction.style.opacity = '0';
+
+      speedDisplay.textContent = '0';
+      distanceDisplay.textContent = '0';
+
+      // Balonu tekrar tam boyutuna şişir
+      const conf = PhysicsConfig.air[State.airLevel];
+      const trackBalloon = document.getElementById('trackBalloon');
+      const rx = 35 * conf.balloonScale;
+      const ry = 24 * conf.balloonScale;
+      trackBalloon.setAttribute('rx', rx);
+      trackBalloon.setAttribute('ry', ry);
+
+      btnLaunch.disabled = false;
+      btnLaunch.classList.remove('opacity-50', 'cursor-not-allowed');
+      btnResetTrack.classList.remove('animate-pulse');
+    }
+
+    // Fırlatmayı Güvenle Durdur ve Sonuçları Değerlendir
+    function stopLaunch() {
+      State.isLaunching = false;
+      State.velocityX = 0;
+      thrustGasVisual.style.opacity = '0';
+      arrowAction.style.opacity = '0';
+      arrowReaction.style.opacity = '0';
+      speedDisplay.textContent = '0';
+
+      btnLaunch.disabled = true;
+      btnLaunch.classList.add('opacity-50', 'cursor-not-allowed');
+      btnResetTrack.classList.add('animate-pulse');
+
+      // Görev 2 kontrolü: 400 cm'yi geçti mi?
+      if (State.totalDistanceCm >= 400 && !State.missions.m2) {
+        State.missions.m2 = true;
+        checkMissions();
+      }
+
+      // 480+ cm (Bitiş çizgisi / Rekor) Kutlaması (tek seferlik)
+      if (!State.hasCelebratedThisRun && State.totalDistanceCm >= 480) {
+        State.hasCelebratedThisRun = true;
+        Sound.ding();
+        Sound.fanfare();
+        if (window.confetti) {
+          confetti({
+            particleCount: 55,
+            spread: 65,
+            origin: { y: 0.6 },
+            disableForReducedMotion: true
+          });
+        }
+      } else {
+        Sound.ding();
+      }
+    }
+
+    btnResetTrack.addEventListener('click', () => {
+      resetTrackState();
+      Sound.pump();
+    });
+
+    // 3, 2, 1, FIRLAT!
+    btnLaunch.addEventListener('click', () => {
+      if (State.isLaunching) return;
+
+      resetTrackState();
+      resizeCanvas();
+
+      const airConf = PhysicsConfig.air[State.airLevel];
+      const nozzleConf = PhysicsConfig.nozzle[State.nozzleType];
+      const weightConf = PhysicsConfig.weight[State.weightType];
+
+      // İtme Kuvveti ve Süresi Hesabı
+      const totalThrust = (airConf.thrustForce * nozzleConf.forceMultiplier) / weightConf.mass;
+      const totalDuration = airConf.duration * nozzleConf.durationMultiplier;
+
+      State.thrustTimeRemaining = totalDuration;
+      State.isLaunching = true;
+      State.hasCelebratedThisRun = false;
+      State.launchCount++;
+      launchCountBadge.textContent = `${State.launchCount} Fırlatma`;
+
+      statThrustDuration.textContent = `${totalDuration.toFixed(1)} saniye`;
+
+      // Kuvvet Oklarını Göster (Etki ve Tepki)
+      arrowAction.style.opacity = '1';
+      arrowReaction.style.opacity = '1';
+      thrustGasVisual.style.opacity = '0.9';
+
+      btnLaunch.disabled = true;
+      btnLaunch.classList.add('opacity-50', 'cursor-not-allowed');
+
+      Sound.whoosh(totalDuration);
+
+      // Görev 1 kontrolü
+      if (!State.missions.m1) {
+        State.missions.m1 = true;
+        checkMissions();
+      }
+    });
+
+    // Ana Fizik Döngüsü
+    let lastPhysicsTime = performance.now();
+
+    function physicsLoop(now) {
+      let dt = (now - lastPhysicsTime) / 1000;
+      lastPhysicsTime = now;
+
+      // Zaman adımı sınırlandırması
+      if (dt > 0.1) dt = 0.1;
+
+      // Yavaş Çekim Modu (Zaman çarpanı)
+      const timeScale = State.isSlowMo ? 0.3 : 1.0;
+      const effectiveDt = dt * timeScale;
+
+      if (State.activeTab === 'launch') {
+        updateParticles(effectiveDt);
+
+        if (State.isLaunching) {
+          const airConf = PhysicsConfig.air[State.airLevel];
+          const nozzleConf = PhysicsConfig.nozzle[State.nozzleType];
+          const weightConf = PhysicsConfig.weight[State.weightType];
+
+          const trackWidth = trackContainer.clientWidth || 550;
+          const yPos = State.vehicleType === 'car' ? 215 : 140;
+          const startX = 60;
+          const maxX = Math.max(200, trackWidth - 75);
+
+          // 1. İtme Aşaması (Hava Fışkırırken)
+          if (State.thrustTimeRemaining > 0) {
+            State.thrustTimeRemaining -= effectiveDt;
+
+            // İvme (a = F / m)
+            const thrustForce = (airConf.thrustForce * nozzleConf.forceMultiplier) / weightConf.mass;
+            State.velocityX += thrustForce * effectiveDt * 2.2;
+
+            // Fışkıran hava parçacıkları üret
+            createExhaustParticles(State.carX, yPos, 4);
+
+            // Balonun büzülmesi (Hava azaldıkça küçülür)
+            const fraction = Math.max(0.15, State.thrustTimeRemaining / (airConf.duration * nozzleConf.durationMultiplier));
+            const trackBalloon = document.getElementById('trackBalloon');
+            trackBalloon.setAttribute('rx', Math.max(8, 35 * airConf.balloonScale * fraction));
+            trackBalloon.setAttribute('ry', Math.max(6, 24 * airConf.balloonScale * fraction));
+          } else {
+            // İtme bitti (Hava tükendi)
+            thrustGasVisual.style.opacity = '0';
+            arrowAction.style.opacity = '0';
+            arrowReaction.style.opacity = '0';
+
+            // Sürtünme ile yavaşlama
+            State.velocityX *= Math.pow(weightConf.friction, effectiveDt * 60);
+
+            // Neredeyse durduysa durdur
+            if (State.velocityX < 2) {
+              stopLaunch();
+            }
+          }
+
+          // 2. Konum Güncellemesi
+          if (State.isLaunching) {
+            State.carX += State.velocityX * effectiveDt;
+
+            // Pist Sonu Sınırı (Pistten dışarı uçmasın)
+            if (State.carX >= maxX) {
+              State.carX = maxX;
+              stopLaunch();
+            }
+          }
+
+          trackVehicleGroup.setAttribute('transform', `translate(${State.carX}, ${yPos})`);
+
+          // 3. Göstergeler (cm cinsine ölçekleme: pist pikseli -> cm)
+          const scalePxToCm = 500 / (maxX - startX);
+          State.totalDistanceCm = Math.min(500, Math.max(0, Math.round((State.carX - startX) * scalePxToCm)));
+          const currentSpeedCmS = State.isLaunching ? Math.round(State.velocityX * scalePxToCm) : 0;
+
+          distanceDisplay.textContent = State.totalDistanceCm;
+          speedDisplay.textContent = currentSpeedCmS;
+
+          // İstatistikler
+          if (currentSpeedCmS > State.highestRecordedSpeed) {
+            State.highestRecordedSpeed = currentSpeedCmS;
+            statMaxSpeed.textContent = `${State.highestRecordedSpeed} cm/s`;
+          }
+          if (State.totalDistanceCm > State.highestRecordedDist) {
+            State.highestRecordedDist = State.totalDistanceCm;
+            statMaxDistance.textContent = `${State.highestRecordedDist} cm`;
+          }
+        }
+      }
+
+      requestAnimationFrame(physicsLoop);
+    }
+
+    requestAnimationFrame(physicsLoop);
+
+
+    // --- 7. GÖREVLER KONTROLÜ ---
+    const m1Check = document.getElementById('m1Check');
+    const m2Check = document.getElementById('m2Check');
+    const m3Check = document.getElementById('m3Check');
+    const mission1 = document.getElementById('mission1');
+    const mission2 = document.getElementById('mission2');
+    const mission3 = document.getElementById('mission3');
+
+    function checkMissions() {
+      if (State.missions.m1) {
+        m1Check.textContent = '✅';
+        mission1.classList.replace('bg-amber-50', 'bg-emerald-100');
+      }
+      if (State.missions.m2) {
+        m2Check.textContent = '✅';
+        mission2.classList.replace('bg-gray-50', 'bg-emerald-100');
+        if (!State.hasCelebratedThisRun) {
+          State.hasCelebratedThisRun = true;
+          Sound.fanfare();
+          if (window.confetti) {
+            confetti({
+              particleCount: 60,
+              spread: 65,
+              origin: { y: 0.5 },
+              disableForReducedMotion: true
+            });
+          }
+        }
+      }
+      if (State.missions.m3) {
+        m3Check.textContent = '✅';
+        mission3.classList.replace('bg-gray-50', 'bg-emerald-100');
+      }
+    }
+
+
+    // --- 8. SAYFA AÇILIŞ BAŞLATMA ---
+    window.addEventListener('DOMContentLoaded', () => {
+      resizeCanvas();
+      setAirLevel('med');
+      updateVehicleTypeUI();
+    });
+  </script>
+</body>
+</html>

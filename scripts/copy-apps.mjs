@@ -6,8 +6,9 @@
 //   apps/satranc/index.html  →  https://atölye.tedrisedu.com/satranc/
 //
 // Kopyalama sırasında her uygulamanın giriş sayfasına küçük bir "Atölye'ye
-// dön" bağlantısı eklenir: bu projeler ayrı depolarda yaşadığı için portala
-// dönüş yolunu bilmezler, o yüzden yolu yayın anında biz iliştiriyoruz.
+// dön" bağlantısı eklenir: bu projeler kendi başına açılabilen bağımsız
+// sayfalardır ve portalı tanımazlar, o yüzden dönüş yolunu yayın anında biz
+// iliştiriyoruz.
 //
 // Yeni bir statik proje eklemek için klasörü `apps/` altına koymak yeterli;
 // bu dosyayı değiştirmeye gerek yoktur.
@@ -37,7 +38,7 @@ if (folders.length === 0) {
 // ─────────────────────────────────────────────────────────────────────
 // "Atölye'ye dön" bağlantısı
 // ─────────────────────────────────────────────────────────────────────
-// Statik projelerin her biri kendi deposunda yaşar ve atölyenin varlığından
+// Statik projelerin her biri kendi başına bir sayfadır ve atölyenin varlığından
 // habersizdir; açıldıklarında çıkış yolu yalnızca tarayıcının geri tuşudur.
 // Bu yüzden giriş sayfalarına köşede duran küçük bir bağlantı iliştiriyoruz.
 //
@@ -113,7 +114,7 @@ for (const folder of folders) {
     console.log(`[copy-apps] apps/${folder.name} → dist/${folder.name}${warn}`);
 
     // Portala dönüş yolu yalnızca yayındaki kopyaya yazılır; apps/ altındaki
-    // depo çalışma kopyası (ve o projenin kendi yayını) el değmemiş kalır.
+    // kaynak klasör el değmemiş kalır.
     if (hasIndex) await geriBaglantisiEkle(path.join(to, 'index.html'), folder.name);
 }
 

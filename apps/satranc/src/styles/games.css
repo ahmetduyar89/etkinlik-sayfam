@@ -1,0 +1,406 @@
+/**
+ * games.css — Mini oyunların görünümü.
+ * Oyun seçme ızgarası, ortak oyun kabuğu ve her oyuna özel sahne stilleri.
+ */
+
+/* --- Oyun seçme ızgarası --- */
+
+.mini-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+
+.mini-card {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: start;
+  text-align: left;
+  padding: 1.1rem;
+  border-radius: 1.3rem;
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 200ms ease;
+}
+
+.mini-card:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 26px 50px rgba(43, 71, 98, 0.22);
+}
+
+.mini-card-icon {
+  display: grid;
+  place-items: center;
+  width: 2.7rem;
+  height: 2.7rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(140deg, var(--primary), #3aa89a);
+  color: #fff;
+  margin-bottom: 0.2rem;
+}
+
+.mini-card-icon .icon { width: 1.4rem; height: 1.4rem; }
+
+.mini-card-title { font-size: 1rem; font-weight: 800; color: var(--ink); }
+.mini-card-desc { font-size: 0.8rem; color: var(--muted); line-height: 1.45; }
+
+.mini-card-meta {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--primary);
+  background: rgba(47, 143, 131, 0.12);
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+}
+
+.mini-card-best { font-size: 0.72rem; font-weight: 700; color: var(--muted); }
+.mini-card-best.new { opacity: 0.65; }
+
+/* --- Ortak oyun kabuğu --- */
+
+.mini-game {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.1rem;
+  border-radius: 1.4rem;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  animation: report-in 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mini-top { display: flex; align-items: flex-start; gap: 0.8rem; }
+
+.mini-top .ghost.small {
+  padding: 0.35rem 0.7rem;
+  border-radius: 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.mini-title h2 { margin: 0; font-size: 1.15rem; }
+.mini-title p { margin: 0.15rem 0 0; font-size: 0.82rem; color: var(--muted); }
+
+.mini-header { display: flex; gap: 0.6rem; }
+
+.mini-stat {
+  flex: 1;
+  display: grid;
+  justify-items: center;
+  gap: 0.05rem;
+  padding: 0.55rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--line);
+}
+
+.mini-stat strong {
+  font-size: 1.45rem;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-stat span { font-size: 0.72rem; font-weight: 800; color: var(--muted); text-transform: uppercase; }
+
+.mini-feedback {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.9rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.45;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--line);
+  min-height: 2.6em;
+}
+
+.mini-feedback.correct {
+  background: rgba(74, 169, 108, 0.16);
+  border-color: rgba(74, 169, 108, 0.4);
+  animation: cb-pop 260ms ease-out;
+}
+
+.mini-feedback.wrong {
+  background: rgba(214, 69, 69, 0.12);
+  border-color: rgba(214, 69, 69, 0.35);
+  animation: cb-shake-key 240ms ease-in-out 2;
+}
+
+.mini-feedback.partial {
+  background: rgba(61, 124, 255, 0.12);
+  border-color: rgba(61, 124, 255, 0.32);
+}
+
+.mini-stage { min-height: 4rem; }
+
+/* --- Bitiş ekranı --- */
+
+.mini-end {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 1.4rem 1rem;
+  border-radius: 1.2rem;
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.92), rgba(238, 248, 244, 0.92));
+  border: 1px solid var(--line);
+  text-align: center;
+  animation: report-in 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mini-end[hidden] { display: none; }
+.mini-end h3 { margin: 0; font-size: 1.35rem; }
+
+.mini-final-score { display: grid; justify-items: center; }
+.mini-final-score strong { font-size: 3rem; line-height: 1; color: var(--primary); }
+.mini-final-score span { font-size: 0.75rem; font-weight: 800; color: var(--muted); text-transform: uppercase; }
+
+.mini-xp { margin: 0; font-weight: 800; color: var(--primary-2); filter: brightness(0.75); }
+.mini-best { margin: 0; font-size: 0.82rem; color: var(--muted); }
+
+.mini-end-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; margin-top: 0.4rem; }
+.mini-end-actions button { padding: 0.55rem 1.1rem; border-radius: 0.85rem; font-weight: 700; }
+
+/* --- Doğru Kareyi Bul --- */
+
+.square-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.7rem;
+  border-radius: 1rem;
+  background: rgba(61, 124, 255, 0.1);
+  border: 1px solid rgba(61, 124, 255, 0.24);
+  margin-bottom: 0.5rem;
+}
+
+.square-prompt-label { font-size: 0.85rem; font-weight: 700; color: var(--muted); }
+
+.square-prompt-value {
+  font-size: 2rem;
+  line-height: 1;
+  font-weight: 900;
+  color: var(--blue);
+  letter-spacing: 0.05em;
+  animation: cb-pop 260ms ease-out;
+}
+
+/* Zor turlarda koordinatlar gizlenir. */
+.hide-coords .cb-rank, .hide-coords .cb-file { opacity: 0; }
+
+/* Kalıcı hedef kare işareti */
+.cb-square.goal {
+  box-shadow: inset 0 0 0 0.3rem rgba(255, 184, 77, 0.95);
+  animation: goal-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes goal-pulse {
+  50% { box-shadow: inset 0 0 0 0.5rem rgba(255, 184, 77, 0.55); }
+}
+
+/* --- Taşı Tanı --- */
+
+.piece-quiz { display: grid; justify-items: center; gap: 0.8rem; }
+
+.quiz-symbol {
+  font-size: 5.5rem;
+  line-height: 1;
+  filter: drop-shadow(0 0.5rem 0.4rem rgba(0, 0, 0, 0.22));
+  animation: cb-drop-in 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Renkler artık ortak .pc / .pc-b sınıflarından gelir (components.css);
+   bu iki satır yalnızca eski işaretleme için yedekte durur. */
+.quiz-symbol.light-piece { color: #fff8e8; }
+.quiz-symbol.dark-piece { color: #3b3168; }
+
+.quiz-question { margin: 0; font-size: 1rem; font-weight: 700; text-align: center; }
+
+.quiz-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.quiz-option, .guess-option, .match-card {
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.82);
+  border: 2px solid var(--line);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.quiz-option:hover, .guess-option:hover, .match-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+}
+
+.quiz-option.correct, .guess-option.correct, .match-card.matched {
+  background: rgba(74, 169, 108, 0.2);
+  border-color: rgba(74, 169, 108, 0.65);
+}
+
+.quiz-option.wrong, .guess-option.wrong {
+  background: rgba(214, 69, 69, 0.16);
+  border-color: rgba(214, 69, 69, 0.6);
+  animation: cb-shake-key 240ms ease-in-out 2;
+}
+
+/* --- Taşı Yerine Sürükle / Hafıza --- */
+
+.target-prompt, .memory-prompt, .army-prompt, .state-prompt, .free-prompt {
+  margin: 0 0 0.4rem;
+  text-align: center;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* --- Hamleyi Tahmin Et --- */
+
+.guess-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.guess-option { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+
+/* --- Eşleştirme --- */
+
+.match-board {
+  display: grid;
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+  gap: 0.6rem;
+}
+
+.match-column { display: grid; gap: 0.45rem; align-content: start; }
+
+.match-card { text-align: left; font-size: 0.82rem; }
+.match-card.term { font-weight: 800; }
+.match-card.description { font-weight: 600; line-height: 1.35; }
+
+.match-card.selected {
+  border-color: var(--primary-2);
+  background: rgba(255, 184, 77, 0.2);
+  transform: translateY(-2px);
+}
+
+.match-card.matched { opacity: 0.75; cursor: default; transform: none; }
+.match-card.shake { animation: cb-shake-key 240ms ease-in-out 2; }
+
+/* --- Kaşif At --- */
+
+.quest-bar {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.quest-chip {
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(47, 143, 131, 0.12);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.quest-chip.moves.low {
+  background: rgba(214, 69, 69, 0.14);
+  border-color: rgba(214, 69, 69, 0.4);
+  animation: cb-pop 260ms ease-out;
+}
+
+/* Toplanacak yıldızlar: hedef karenin halkasının ortasına konur. */
+.knight-quest .cb-square.goal::after {
+  content: "⭐";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1.3rem;
+  pointer-events: none;
+  animation: cb-pop 320ms ease-out;
+}
+
+/* --- Şah mı, Mat mı, Pat mı? --- */
+
+.state-quiz .quiz-options { margin-top: 0.7rem; }
+.state-quiz .quiz-option { font-size: 1rem; font-weight: 800; padding: 0.7rem 0.5rem; }
+
+/* --- Ordunu Diz --- */
+
+.army-tray {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding: 0.5rem;
+  border-radius: 1rem;
+  background: rgba(47, 143, 131, 0.08);
+  border: 1px solid var(--line);
+  min-height: 4.6rem;
+}
+
+.army-piece {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.8rem;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  cursor: pointer;
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), border-color 160ms ease;
+}
+
+.army-piece:hover { transform: translateY(-3px); }
+
+.army-piece.selected {
+  border-color: var(--primary);
+  background: rgba(255, 184, 77, 0.22);
+  transform: translateY(-4px) scale(1.04);
+}
+
+.army-piece-glyph { display: block; width: 2.4rem; height: 2.4rem; }
+.army-piece-glyph svg { width: 100%; height: 100%; }
+
+.army-piece-name { font-size: 0.68rem; font-weight: 800; color: var(--muted); }
+
+.army-piece-count {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  font-size: 0.62rem;
+  font-weight: 900;
+  color: #fff;
+  background: var(--primary);
+  border-radius: 999px;
+  padding: 0.05rem 0.35rem;
+}
+
+@media (max-width: 560px) {
+  .mini-game { padding: 0.8rem; }
+  .mini-stat strong { font-size: 1.2rem; }
+  .match-board { grid-template-columns: 1fr; }
+  .quiz-symbol { font-size: 4rem; }
+  .army-piece-glyph { width: 1.9rem; height: 1.9rem; }
+  .army-piece { padding: 0.25rem 0.35rem; }
+}

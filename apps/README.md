@@ -8,54 +8,35 @@ apps/satranc/index.html   →   https://atölye.tedrisedu.com/satranc/
 apps/deneyler/index.html  →   https://atölye.tedrisedu.com/deneyler/
 ```
 
-İki yol vardır: proje **kendi GitHub deposunda** yaşayabilir (önerilen), ya da
-klasör **doğrudan bu depoda** durabilir.
+Hepsi **bu depoda** durur. Satranç ve deneyler eskiden kendi depolarında yaşıyor,
+yayın sırasında klonlanıyordu; artık öyle değil. Bir çalışmayı değiştirmek için
+tek yapman gereken buradaki dosyayı düzenleyip commit etmek — ayrı depo, ayrı
+yayın adımı yok.
 
 ---
 
-## Yol 1 — Kendi deposu olan proje (önerilen)
+## Yeni bir çalışma eklemek
 
-Şu an satranç ve deneyler böyle çalışıyor:
-
-| Bölüm      | Depo                                          |
-| ---------- | --------------------------------------------- |
-| `satranc`  | https://github.com/ahmetduyar89/satranc        |
-| `deneyler` | https://github.com/ahmetduyar89/deneyler       |
-
-Depolar `apps/apps.json` dosyasında listelidir. `npm run dev` ve `npm run build`
-her çalıştığında bu depolar otomatik çekilir; klasörler bu depoya işlenmez.
-
-**Avantajı:** satranç ve deneyler kendi depolarında gelişmeye devam eder.
-Oraya yaptığın push, atölyenin bir sonraki yayınında otomatik yansır.
-
-### Yeni bir depo eklemek
-
-1. `apps/apps.json` dosyasına bir satır ekle:
-
-   ```json
-   {
-       "dir": "yeni-calisma",
-       "repo": "https://github.com/ahmetduyar89/yeni-calisma.git",
-       "branch": "main"
-   }
-   ```
-
+1. Klasörü `apps/` altına koy; içinde `index.html` bulunsun.
 2. `src/constants/portal.ts` dosyasındaki `PORTAL_MODULES` listesine kartını ekle
    (aşağıdaki örneğe bak).
 
-3. `npm run fetch-apps` — depo `apps/yeni-calisma/` içine iner.
-
-### Bir bölümü güncellemek
-
-Kendi deposuna push etmen yeterli. Atölyeyi yeniden yayınladığında (ana depoya
-herhangi bir push, ya da Netlify panelinden **Trigger deploy**) yeni sürüm gelir.
+Hepsi bu. Bir sonraki yayında `/yeni-calisma/` adresinde açılır.
 
 ---
 
-## Yol 2 — Kendi deposu olmayan proje
+## Bir çalışmayı güncellemek
 
-Klasörü doğrudan `apps/` altına koy; içinde `index.html` bulunsun. Bu klasör
-normal şekilde bu depoya işlenir. `apps/apps.json` dosyasına eklemeye gerek yok.
+`apps/satranc/` (ya da `apps/deneyler/`) içindeki dosyayı düzenle, commit et,
+push et. Yayın otomatik gider.
+
+Yerelde denemek için:
+
+```bash
+npm run dev
+```
+
+`http://localhost:5173/satranc/` — yayındaki davranışın aynısı.
 
 ---
 
@@ -68,7 +49,11 @@ normal şekilde bu depoya işlenir. `apps/apps.json` dosyasına eklemeye gerek y
     description: 'Kısa açıklama.',
     meta: 'Alt etiket',                // isteğe bağlı
     icon: Beaker,                      // lucide-react ikonu
-    accent: { bg: 'bg-sky-500/10', text: 'text-sky-600', ring: 'hover:ring-sky-400/40' },
+    accent: {
+        icon: 'from-sky-500 to-blue-500',
+        strip: 'from-sky-300 via-blue-300 to-indigo-200',
+        glow: 'rgba(14, 165, 233, 0.28)',
+    },
     kind: 'static',
     href: '/yeni-calisma/',            // klasör adıyla aynı olmalı
     status: 'ready',                   // hazır değilse 'soon' → kart "Yakında" görünür
@@ -85,16 +70,10 @@ normal şekilde bu depoya işlenir. `apps/apps.json` dosyasına eklemeye gerek y
   (`satranc` ✅, `satranç` ❌).
 - **Yayına gitmeyenler:** `.git`, `.github`, `.claude`, `.vscode`, `.idea`,
   `node_modules`, `.DS_Store` kopyalanmaz.
+- **Bu klasör derlenmez.** ESLint ve TypeScript `apps/` altına bakmaz; buradaki
+  kod atölyenin kurallarına tabi değildir.
 - **Service worker:** bu projeler atölyenin service worker'ına uğramaz. Kendi
   service worker'ı olan projeler (satranç gibi) kendi klasörlerinde sorunsuz
   çalışır.
 - **Şifre koruması yok:** atölye şifresi bu sayfaları korumaz; bağlantıyı bilen
   doğrudan açabilir.
-
-## Yerelde denemek
-
-```bash
-npm run dev
-```
-
-`http://localhost:5173/satranc/` — yayındaki davranışın aynısı.

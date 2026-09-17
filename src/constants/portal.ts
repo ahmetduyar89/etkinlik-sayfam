@@ -4,14 +4,11 @@
 // İleride yeni bir çalışma eklemek için tek yapman gereken, aşağıdaki
 // listeye bir satır daha yazmak:
 //
-//   • Kendi GitHub deposu olan bir proje ekleyeceksen:
-//       1) `apps/apps.json` dosyasına depo adresini yaz.
-//       2) Buraya `kind: 'static', href: '/<isim>/'` olan bir kayıt ekle.
-//     Yayın sırasında depo çekilir ve `dist/<isim>/` içine kopyalanır.
-//
-//   • Kendi deposu olmayan statik bir proje ekleyeceksen:
-//       Klasörü doğrudan `apps/<isim>/` altına koy (içinde index.html olsun)
-//       ve yine buraya bir kayıt ekle.
+//   • Statik bir proje ekleyeceksen (satranç ve deneyler gibi):
+//       Klasörü `apps/<isim>/` altına koy (içinde index.html olsun) ve buraya
+//       `kind: 'static', href: '/<isim>/'` olan bir kayıt ekle. Yayın sırasında
+//       klasör olduğu gibi `dist/<isim>/` içine kopyalanır; ayrı bir depo, ayrı
+//       bir yayın adımı yoktur.
 //
 //   • Bu React uygulamasının içinde yaşayan bir bölüm ekleyeceksen:
 //       `kind: 'internal'` kullan ve `view` alanına uygulamanın hangi

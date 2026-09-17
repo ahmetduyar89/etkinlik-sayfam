@@ -91,11 +91,11 @@ export function PortalHome({ onOpenInternal }: PortalHomeProps) {
                     </motion.div>
 
                     <p className="mt-12 text-[12.5px] leading-relaxed text-slate-400">
-                        Yeni bir çalışma eklemek için: deposunu{' '}
+                        Yeni bir çalışma eklemek için: klasörünü{' '}
                         <code className="rounded bg-slate-900/[0.05] px-1.5 py-0.5 font-mono text-[11.5px] text-slate-500">
-                            apps/apps.json
+                            apps/
                         </code>{' '}
-                        dosyasına, kartını{' '}
+                        altına, kartını{' '}
                         <code className="rounded bg-slate-900/[0.05] px-1.5 py-0.5 font-mono text-[11.5px] text-slate-500">
                             src/constants/portal.ts
                         </code>{' '}
