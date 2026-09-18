@@ -463,6 +463,8 @@ export interface DrawingCanvasHandle {
     zoomBy: (factor: number) => void;
     /** Yakınlaştırmayı %100'e döndürür ve kaydırmayı sıfırlar. */
     resetView: () => void;
+    /** Görünümü sayfanın tamamı görünecek şekilde ayarlar. */
+    fitPage: () => void;
     getView: () => Viewport;
     deleteSelected: () => void;
     setSelectedColor: (color: string) => void;
@@ -489,7 +491,13 @@ export interface DrawingCanvasHandle {
      * Sayfayı PNG olarak indirir. `paper` verilirse kağıt deseni de çizilir —
      * desen ekranda CSS arka planı olduğundan aksi hâlde çıktıda görünmez.
      */
-    screenshot: (wbMode: boolean, color: string, paper?: PaperStyle) => void;
+    screenshot: (
+        wbMode: boolean,
+        color: string,
+        paper?: PaperStyle,
+        /** Sayfanın altına çizilecek arka plan (bağlı PDF sayfası). */
+        background?: HTMLCanvasElement | null
+    ) => void;
 }
 
 // ── Ortak çizim (canlı operasyon akışı) ─────────────────────────────────
@@ -532,6 +540,15 @@ export interface ToastMessage {
 // ── Defter / Klasör (Not Defteri modülü) ────────────────────────────────
 export type NotebookKind = 'notebook' | 'whiteboard';
 
+/**
+ * Sayfa boyutu.
+ *
+ * `free` eski davranıştır: sayfanın sınırı yoktur, çizim her yere yayılır.
+ * Diğerleri gerçek kağıt ölçüleridir; dışa aktarma ve şablon bölmeleri bu
+ * dikdörtgene göre hizalanır.
+ */
+export type PageSize = 'free' | 'a4p' | 'a4l' | 'a3p' | 'a3l' | 'wide169';
+
 export type PaperStyle =
     | 'grid'
     | 'lined'
@@ -565,6 +582,8 @@ export interface Notebook {
     kind: NotebookKind;
     parent_id: string | null;
     paper: PaperStyle;
+    /** Sayfa boyutu (A4, A3…). Verilmezse sınırsız çalışma alanı. */
+    page_size?: PageSize;
     bg_color?: string;
     page_count?: number;
     subject?: string;
@@ -576,6 +595,13 @@ export interface Notebook {
     pdf_name?: string;
     /** PDF'in toplam sayfa sayısı */
     pdf_total_pages?: number;
+    /**
+     * PDF sayfasının dünya ölçüsü (birim). Defter oluşturulurken PDF'in kendi
+     * punto ölçüsünden hesaplanır ve bir daha değişmez: sayfa her cihazda aynı
+     * boyutta durur, üstüne alınan notlar kaymaz. Eski defterlerde yoktur;
+     * onlar eski yerleşimle açılır.
+     */
+    pdf_box?: { w: number; h: number };
     /**
      * Sayfa içeriğinin sürüm numarası. Her kayıtta artar; editör ve
      * görüntüleyici bu küçük üst veri dokümanını dinleyerek içeriğin başka

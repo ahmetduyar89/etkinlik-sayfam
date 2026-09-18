@@ -76,6 +76,11 @@ interface DrawingCanvasProps {
      */
     panMode?: 'passthrough' | 'viewport';
     /**
+     * Sayfanın dünya ölçüsü; verilmezse çalışma alanı sınırsızdır. Kağıt
+     * ölçüsünden ya da bağlı PDF sayfasından gelir.
+     */
+    pageBox?: { w: number; h: number } | null;
+    /**
      * Yakınlaştırma/kaydırma ya da tuval boyutu değiştiğinde tetiklenir.
      * `size`, kağıt deseninin çizimle aynı hizada durması için gerekir.
      */
@@ -106,6 +111,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             onLocalOp,
             onHistoryChange,
             panMode = 'passthrough',
+            pageBox,
             onViewChange,
         },
         ref
@@ -282,6 +288,19 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const simTimeRef = React.useRef(0);
         const simFrameRef = React.useRef<number | null>(null);
         const simStartRef = React.useRef(0);
+
+        /**
+         * Sayfanın dünya koordinatındaki dikdörtgeni.
+         *
+         * Sol üst köşe orijindedir: yeni bir defter açıldığında görünüm de
+         * orijinde olduğu için çizim doğal olarak sayfanın içinde başlar.
+         */
+        const pageRect = React.useMemo(
+            () => (pageBox ? { x: 0, y: 0, w: pageBox.w, h: pageBox.h } : null),
+            [pageBox]
+        );
+        const pageRectRef = React.useRef(pageRect);
+        pageRectRef.current = pageRect;
 
         const getCanvasSize = () => {
             const c = canvasRef.current;
@@ -472,6 +491,27 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 applyView(mainCtx);
                 live.forEach((s) => drawStroke(mainCtx, s, simTimeRef.current));
                 applyIdentity(mainCtx);
+            }
+
+            // Sayfa dışı: mürekkep silinmez ama soluklaşır ve dışa aktarmaya
+            // girmez; öğretmen kağıdın nerede bittiğini görür.
+            const page = pageRectRef.current;
+            if (page) {
+                const pv = viewRef.current;
+                const px = page.x * pv.scale + pv.tx;
+                const py = page.y * pv.scale + pv.ty;
+                const pw = page.w * pv.scale;
+                const ph = page.h * pv.scale;
+                mainCtx.save();
+                mainCtx.fillStyle = 'rgba(226, 232, 240, 0.78)';
+                mainCtx.fillRect(0, 0, w, Math.max(0, py));
+                mainCtx.fillRect(0, py + ph, w, Math.max(0, h - py - ph));
+                mainCtx.fillRect(0, py, Math.max(0, px), ph);
+                mainCtx.fillRect(px + pw, py, Math.max(0, w - px - pw), ph);
+                mainCtx.strokeStyle = 'rgba(15, 23, 42, 0.28)';
+                mainCtx.lineWidth = 1;
+                mainCtx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
+                mainCtx.restore();
             }
 
             // Seçim çerçevesi ekran uzayında çizilir ki kalınlığı sabit kalsın.
@@ -785,6 +825,25 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     zoomAt(factor, w / 2, h / 2);
                 },
                 resetView: () => applyViewChange({ ...IDENTITY_VIEW }),
+                fitPage: () => {
+                    const page = pageRectRef.current;
+                    const { w, h } = getCanvasSize();
+                    if (!page || w <= 0 || h <= 0) {
+                        applyViewChange({ ...IDENTITY_VIEW });
+                        return;
+                    }
+                    // Kenarlarda biraz boşluk bırakarak sayfayı ekrana oturt.
+                    const margin = 24;
+                    const scale = Math.min(
+                        (w - margin * 2) / page.w,
+                        (h - margin * 2) / page.h
+                    );
+                    applyViewChange({
+                        scale,
+                        tx: (w - page.w * scale) / 2 - page.x * scale,
+                        ty: (h - page.h * scale) / 2 - page.y * scale,
+                    });
+                },
                 getView: () => ({ ...viewRef.current }),
                 deleteSelected: () => {
                     const idxs = new Set(selectedIdxsRef.current);
@@ -935,30 +994,69 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     window.setTimeout(redraw, 0);
                     notifyPageChange();
                 },
-                screenshot: (wbMode: boolean, color: string, paper?: PaperStyle) => {
+                screenshot: (
+                    wbMode: boolean,
+                    color: string,
+                    paper?: PaperStyle,
+                    background?: HTMLCanvasElement | null
+                ) => {
                     const canvas = canvasRef.current;
                     const buffer = bufferCanvasRef.current;
                     if (!canvas || !buffer) return;
+                    const dpr = window.devicePixelRatio || 1;
+                    const page = pageRectRef.current;
                     const exp = document.createElement('canvas');
-                    exp.width = canvas.width;
-                    exp.height = canvas.height;
+
+                    // Sayfa boyutu tanımlıysa çıktı EKRANIN değil SAYFANIN
+                    // tamamıdır; aynı defter her cihazda aynı kadrajla çıkar.
+                    const w = page ? page.w : canvas.width / dpr;
+                    const h = page ? page.h : canvas.height / dpr;
+                    // Kağıt ölçüsünde çıktı için iki kat çözünürlük yeterli.
+                    const outScale = page ? 2 : dpr;
+                    exp.width = Math.round(w * outScale);
+                    exp.height = Math.round(h * outScale);
                     const ctx = exp.getContext('2d');
                     if (!ctx) return;
-                    const dpr = window.devicePixelRatio || 1;
-                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-                    const w = canvas.width / dpr;
-                    const h = canvas.height / dpr;
-                    if (wbMode) {
+                    ctx.setTransform(outScale, 0, 0, outScale, 0, 0);
+
+                    if (wbMode || page) {
                         ctx.fillStyle = color || '#ffffff';
                         ctx.fillRect(0, 0, w, h);
                     }
                     // Kağıt deseni ekranda CSS arka planıdır; çıktıda da
-                    // görünsün diye aynı desen tuvale çizilir.
+                    // görünsün diye aynı desen tuvale çizilir. Sayfa varken
+                    // desen sayfanın kendi kutusuna oturur.
                     if (paper && paper !== 'blank') {
-                        drawPaper(ctx, paper, wbMode ? color || '#ffffff' : 'transparent', w, h, viewRef.current);
+                        drawPaper(
+                            ctx,
+                            paper,
+                            wbMode || page ? color || '#ffffff' : 'transparent',
+                            w,
+                            h,
+                            page ? { scale: 1, tx: 0, ty: 0 } : viewRef.current
+                        );
                     }
-                    // Seçim çerçevesi görüntüye girmesin diye tampon kullanılır.
-                    ctx.drawImage(buffer, 0, 0, w, h);
+
+                    // Bağlı PDF sayfası çizimlerin altına girer; aksi hâlde
+                    // çıktıda yalnızca notlar görünürdü.
+                    if (page && background && background.width > 0) {
+                        ctx.drawImage(background, 0, 0, w, h);
+                    }
+
+                    if (page) {
+                        // Çizimler dünya koordinatında; sayfanın sol üst köşesi
+                        // çıktının başlangıcı olacak şekilde kaydırılır.
+                        ctx.save();
+                        ctx.translate(-page.x, -page.y);
+                        strokesRef.current.forEach((st) =>
+                            drawStroke(ctx, st, simTimeRef.current)
+                        );
+                        ctx.restore();
+                    } else {
+                        // Seçim çerçevesi görüntüye girmesin diye tampon kullanılır.
+                        ctx.drawImage(buffer, 0, 0, w, h);
+                    }
+
                     const link = document.createElement('a');
                     link.download = `cizim-sayfa${currentPageRef.current + 1}.png`;
                     link.href = exp.toDataURL('image/png');

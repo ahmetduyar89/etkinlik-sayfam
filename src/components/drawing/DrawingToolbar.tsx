@@ -27,6 +27,7 @@ import {
     Ruler,
     Compass,
     Triangle,
+    Scan,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, MathObject, RulerKind } from '../../types';
@@ -74,6 +75,8 @@ interface DrawingToolbarProps {
     onZoomIn?: () => void;
     onZoomOut?: () => void;
     onZoomReset?: () => void;
+    /** Görünümü sayfaya sığdırır (yalnızca sayfa ölçüsü tanımlıysa). */
+    onZoomFit?: () => void;
     onSelectTool?: (toolId: string) => void;
 }
 
@@ -117,6 +120,7 @@ export function DrawingToolbar({
     onZoomIn,
     onZoomOut,
     onZoomReset,
+    onZoomFit,
     onSelectTool,
 }: DrawingToolbarProps) {
     const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -814,6 +818,17 @@ export function DrawingToolbar({
                     >
                         <Minus className="w-4 h-4" />
                     </button>
+                    {onZoomFit && (
+                        <button
+                            type="button"
+                            onClick={onZoomFit}
+                            aria-label="Sayfaya sığdır"
+                            title="Sayfaya sığdır"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                        >
+                            <Scan className="w-4 h-4" />
+                        </button>
+                    )}
                     <button
                         type="button"
                         onClick={onZoomReset}
