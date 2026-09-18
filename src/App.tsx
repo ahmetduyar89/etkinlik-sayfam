@@ -150,6 +150,21 @@ const MOCK_ACTIVITIES: Activity[] = [
     ...GEOMETRI_10_ACTIVITIES,
 ];
 
+const GUNES_SISTEMI_ACTIVITY: Activity = {
+    id: 'planetaryum-3d',
+    title: '3D Güneş Sistemi Planetaryumu',
+    description: '8 gezegen, yörüngeler, 23.5° eksen eğikliğiyle mevsimler, tutulmalar ve yerçekimi laboratuvarı.',
+    category: 'Simülasyon',
+    subject: 'Fen Bilimleri',
+    grade_level: '7',
+    unit: 'Güneş Sistemi ve Ötesi',
+    tags: 'uzay, gezegenler, güneş sistemi, 3d, mevsimler, tutulmalar, yerçekimi, planetaryum',
+    is_test: false,
+    html_code: '<iframe src="/gunes-sistemi/" style="width:100%;height:100%;border:none;min-height:720px;border-radius:16px;" allowfullscreen></iframe>',
+    content_mode: 'raw_html',
+    created_at: '2026-09-18T14:40:00Z',
+};
+
 interface Shelf {
     key: string;
     title: string;
@@ -231,6 +246,9 @@ export default function App({ onExitToPortal, view: viewProp, onViewChange }: Ap
                     list.unshift(ga);
                 }
             }
+            if (!list.some((a) => a.id === GUNES_SISTEMI_ACTIVITY.id || a.title === GUNES_SISTEMI_ACTIVITY.title)) {
+                list.unshift(GUNES_SISTEMI_ACTIVITY);
+            }
             setActivities(list);
             setIsLoading(false);
         });
@@ -246,6 +264,14 @@ export default function App({ onExitToPortal, view: viewProp, onViewChange }: Ap
                     grade_level: '10',
                     subject: 'Matematik',
                     name: 'Geometrik Şekiller',
+                });
+            }
+            if (!list.some((u) => u.grade_level === '7' && u.name === 'Güneş Sistemi ve Ötesi')) {
+                list.push({
+                    id: 'unit-7-gunes-sistemi',
+                    grade_level: '7',
+                    subject: 'Fen Bilimleri',
+                    name: 'Güneş Sistemi ve Ötesi',
                 });
             }
             setUnits(list);

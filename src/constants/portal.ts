@@ -16,7 +16,7 @@
 //       Defterlerim → 'notebooks'). Kabuk gerisini halleder.
 // ─────────────────────────────────────────────────────────────────────
 import type { LucideIcon } from 'lucide-react';
-import { Crown, FlaskConical, LayoutGrid, NotebookPen, Swords } from 'lucide-react';
+import { Crown, FlaskConical, LayoutGrid, NotebookPen, Orbit, Swords } from 'lucide-react';
 import type { MainView } from '../types';
 
 export type ModuleKind = 'internal' | 'static';
@@ -136,6 +136,22 @@ export const PORTAL_MODULES: PortalModule[] = [
         },
         kind: 'static',
         href: '/deneyler/',
+        status: 'ready',
+    },
+    {
+        id: 'gunes-sistemi',
+        title: '3D Güneş Sistemi Planetaryumu',
+        description:
+            'İnteraktif 3D uzay laboratuvarı: 8 gezegen, yörüngeler, mevsimler, tutulmalar, Kepler yasaları ve gezegen karşılaştırıcı.',
+        meta: '8 Gezegen · 3D Yörünge · Fen Laboratuvarı',
+        icon: Orbit,
+        accent: {
+            icon: 'from-sky-500 to-indigo-600',
+            strip: 'from-sky-400 via-indigo-400 to-purple-400',
+            glow: 'rgba(56, 189, 248, 0.32)',
+        },
+        kind: 'static',
+        href: '/gunes-sistemi/',
         status: 'ready',
     },
 ];
