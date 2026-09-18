@@ -165,6 +165,21 @@ const GUNES_SISTEMI_ACTIVITY: Activity = {
     created_at: '2026-09-18T14:40:00Z',
 };
 
+const AKIL_OYUNLARI_ACTIVITY: Activity = {
+    id: 'akil-oyunlari-atolyem',
+    title: 'Matematiksel Akıl Oyunları Atölyesi',
+    description: 'Hanoi Kuleleri, KenKen, Nim Stratejisi, Euler Köprüleri, 24 Oyunu ve Sihirli Piramit zeka oyunları.',
+    category: 'Oyun',
+    subject: 'Matematik',
+    grade_level: '8',
+    unit: 'Mantık ve Akıl Yürütme',
+    tags: 'zeka oyunları, akıl oyunları, hanoi, kenken, nim, euler, matematik, algoritma',
+    is_test: false,
+    html_code: '<iframe src="/akil-oyunlari/" style="width:100%;height:100%;border:none;min-height:720px;border-radius:16px;" allowfullscreen></iframe>',
+    content_mode: 'raw_html',
+    created_at: '2026-09-18T21:20:00Z',
+};
+
 interface Shelf {
     key: string;
     title: string;
@@ -249,6 +264,9 @@ export default function App({ onExitToPortal, view: viewProp, onViewChange }: Ap
             if (!list.some((a) => a.id === GUNES_SISTEMI_ACTIVITY.id || a.title === GUNES_SISTEMI_ACTIVITY.title)) {
                 list.unshift(GUNES_SISTEMI_ACTIVITY);
             }
+            if (!list.some((a) => a.id === AKIL_OYUNLARI_ACTIVITY.id || a.title === AKIL_OYUNLARI_ACTIVITY.title)) {
+                list.unshift(AKIL_OYUNLARI_ACTIVITY);
+            }
             setActivities(list);
             setIsLoading(false);
         });
@@ -272,6 +290,14 @@ export default function App({ onExitToPortal, view: viewProp, onViewChange }: Ap
                     grade_level: '7',
                     subject: 'Fen Bilimleri',
                     name: 'Güneş Sistemi ve Ötesi',
+                });
+            }
+            if (!list.some((u) => u.grade_level === '8' && u.name === 'Mantık ve Akıl Yürütme')) {
+                list.push({
+                    id: 'unit-8-akil-oyunlari',
+                    grade_level: '8',
+                    subject: 'Matematik',
+                    name: 'Mantık ve Akıl Yürütme',
                 });
             }
             setUnits(list);

@@ -16,7 +16,7 @@
 //       Defterlerim → 'notebooks'). Kabuk gerisini halleder.
 // ─────────────────────────────────────────────────────────────────────
 import type { LucideIcon } from 'lucide-react';
-import { Crown, FlaskConical, LayoutGrid, NotebookPen, Orbit, Swords } from 'lucide-react';
+import { Crown, FlaskConical, LayoutGrid, NotebookPen, Orbit, Puzzle, Swords } from 'lucide-react';
 import type { MainView } from '../types';
 
 export type ModuleKind = 'internal' | 'static';
@@ -152,6 +152,22 @@ export const PORTAL_MODULES: PortalModule[] = [
         },
         kind: 'static',
         href: '/gunes-sistemi/',
+        status: 'ready',
+    },
+    {
+        id: 'akil-oyunlari',
+        title: 'Matematiksel Akıl Oyunları',
+        description:
+            'Mantıksal akıl yürütme ve problem çözme atölyesi: Hanoi Kuleleri, KenKen, Nim Stratejisi, Euler Köprüleri, 24 Oyunu ve Sihirli Piramit.',
+        meta: '6 Zeka Oyunu · Algoritma · Strateji',
+        icon: Puzzle,
+        accent: {
+            icon: 'from-violet-500 to-fuchsia-600',
+            strip: 'from-violet-400 via-fuchsia-400 to-pink-300',
+            glow: 'rgba(168, 85, 247, 0.3)',
+        },
+        kind: 'static',
+        href: '/akil-oyunlari/',
         status: 'ready',
     },
 ];
