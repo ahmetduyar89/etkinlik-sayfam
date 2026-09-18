@@ -103,11 +103,21 @@ export function PdfPageBackground({
                 const baseW = unscaledViewport.width;
                 const baseH = unscaledViewport.height;
 
-                // Sayfanın dünya ölçüsü. Eskiden pencere genişliğine bağlıydı;
-                // aynı defter dar bir pencerede açılınca PDF küçülüyor, üstüne
-                // alınmış notlar kayıyordu. Artık ölçü ya defterle birlikte
-                // saklanır ya da sabit bir tabana (1000 birim) oturur.
-                const targetWorldW = box ? box.w : Math.max(baseW, 1000);
+                // Sayfanın dünya ölçüsü.
+                //
+                // Yeni defterlerde ölçü PDF'in kendi punto boyutundan bir kez
+                // hesaplanıp defterle saklanır; pencereyle değişmez.
+                //
+                // Eski defterlerde (kutu yok) ESKİ FORMÜL aynen korunur. Bu
+                // formül pencere genişliğine bağlıdır ve doğru değildir, ama
+                // mevcut notlar ona göre konmuştur: değiştirmek, dar pencerede
+                // çalışan öğretmenin notlarını kağıttan kaydırırdı.
+                const targetWorldW = box
+                    ? box.w
+                    : Math.max(
+                          baseW,
+                          Math.min(1000, canvasSize.w > 200 ? canvasSize.w - 80 : 900)
+                      );
                 const fitScale = targetWorldW / baseW;
                 const worldW = box ? box.w : baseW * fitScale;
                 const worldH = box ? box.h : baseH * fitScale;
@@ -153,7 +163,7 @@ export function PdfPageBackground({
                 setRendering(false);
             }
         },
-        [box, view.scale, onPageDimensions]
+        [box, canvasSize.w, view.scale, onPageDimensions]
     );
 
     // Sayfa numarası veya doküman değiştiğinde çiz
