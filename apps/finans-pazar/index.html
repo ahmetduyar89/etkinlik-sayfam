@@ -753,7 +753,7 @@
         feedback.className = 'text-xs font-bold text-center text-emerald-400';
         feedback.innerText = '🎉 MÜKEMMEL! Kuruşu kuruşuna doğru para üstü verdiniz. +25 ₺ Bahşiş!';
         playSuccessSound();
-        confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
+        triggerConfetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
 
         setTimeout(() => {
           newKasaCustomer();
@@ -769,16 +769,20 @@
       }
     }
 
+    function triggerConfetti(opts = {}) {
+      if (typeof confetti === 'function') confetti(opts);
+    }
+
     /* ================= TAB 2: DENGE TERAZİSİ LOGIC ================= */
     const SCALE_LEVELS = [
-      { equation: 'X + 4 = 10', targetX: 6, leftConstant: 4, rightTotal: 10, xCount: 1 },
-      { equation: 'X + 7 = 15', targetX: 8, leftConstant: 7, rightTotal: 15, xCount: 1 },
-      { equation: '2X = 16', targetX: 8, leftConstant: 0, rightTotal: 16, xCount: 2 },
-      { equation: '2X + 3 = 15', targetX: 6, leftConstant: 3, rightTotal: 15, xCount: 2 },
-      { equation: '3X + 5 = 26', targetX: 7, leftConstant: 5, rightTotal: 26, xCount: 3 },
-      { equation: '2X + 8 = X + 15', targetX: 7, leftConstant: 8, rightTotal: 15, xCount: 1, hint: 'İki taraftan da 1 adet X çıkarırsak: X + 8 = 15' },
-      { equation: '3X + 2 = 2X + 9', targetX: 7, leftConstant: 2, rightTotal: 9, xCount: 1, hint: 'İki taraftan da 2 adet X çıkarırsak: X + 2 = 9' },
-      { equation: '4X + 6 = 2X + 20', targetX: 7, leftConstant: 6, rightTotal: 20, xCount: 2, hint: 'İki taraftan da 2X çıkar: 2X + 6 = 20 -> 2X = 14' }
+      { equation: 'X + 4 = 10', targetX: 6, leftXCount: 1, leftConstant: 4, rightXCount: 0, rightConstant: 10 },
+      { equation: 'X + 7 = 15', targetX: 8, leftXCount: 1, leftConstant: 7, rightXCount: 0, rightConstant: 15 },
+      { equation: '2X = 16', targetX: 8, leftXCount: 2, leftConstant: 0, rightXCount: 0, rightConstant: 16 },
+      { equation: '2X + 3 = 15', targetX: 6, leftXCount: 2, leftConstant: 3, rightXCount: 0, rightConstant: 15 },
+      { equation: '3X + 5 = 26', targetX: 7, leftXCount: 3, leftConstant: 5, rightXCount: 0, rightConstant: 26 },
+      { equation: '2X + 8 = X + 15', targetX: 7, leftXCount: 2, leftConstant: 8, rightXCount: 1, rightConstant: 15, hint: 'İki kefeden de 1 adet X sandığını kaldırırsanız: X + 8 = 15 kalır!' },
+      { equation: '3X + 2 = 2X + 9', targetX: 7, leftXCount: 3, leftConstant: 2, rightXCount: 2, rightConstant: 9, hint: 'İki kefeden de 2 adet X sandığını kaldırırsanız: X + 2 = 9 kalır!' },
+      { equation: '4X + 6 = 2X + 20', targetX: 7, leftXCount: 4, leftConstant: 6, rightXCount: 2, rightConstant: 20, hint: 'İki kefeden 2X çıkarın: 2X + 6 = 20 -> 2X = 14 kalır!' }
     ];
 
     let currentScaleLevel = 0;
@@ -803,8 +807,8 @@
 
     function updateScaleWeights() {
       const lvl = SCALE_LEVELS[currentScaleLevel];
-      const leftWeight = (lvl.xCount * (currentXGuess || 0)) + lvl.leftConstant;
-      const rightWeight = lvl.rightTotal;
+      const leftWeight = (lvl.leftXCount * (currentXGuess || 0)) + lvl.leftConstant;
+      const rightWeight = (lvl.rightXCount * (currentXGuess || 0)) + lvl.rightConstant;
 
       document.getElementById('left-scale-weight').innerText = leftWeight + ' kg';
       document.getElementById('right-scale-weight').innerText = rightWeight + ' kg';
@@ -813,7 +817,7 @@
       if (currentXGuess === 0) {
         badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-300 border border-white/10';
         badge.innerText = 'X Değeri Bekleniyor';
-        scaleTiltAngle = 0.25; // Sol boş olduğu için sağ kefe ağır basar
+        scaleTiltAngle = 0.25; // Sağ kefe ağır basar
       } else if (leftWeight === rightWeight) {
         badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
         badge.innerText = 'DENGEDE! Eşitlik Sağlandı (L = R)';
@@ -850,7 +854,7 @@
         feedback.className = 'text-xs font-bold text-emerald-400';
         feedback.innerText = '🎯 TEBRİKLER! Terazi dengelendi: X = ' + val + ' kg.';
         playSuccessSound();
-        confetti({ particleCount: 50, spread: 70, origin: { y: 0.6 } });
+        triggerConfetti({ particleCount: 50, spread: 70, origin: { y: 0.6 } });
         addGlobalScore(30);
       } else {
         playErrorSound();
@@ -988,10 +992,13 @@
 
       // Sol Kefe Nesneleri (X Sandıkları ve Ağırlıklar)
       const lvl = SCALE_LEVELS[currentScaleLevel];
-      // X Kutusu
-      for (let i = 0; i < lvl.xCount; i++) {
-        const boxX = leftPanAnchorX - 25 + (i * 24);
-        const boxY = leftPanY - 32;
+      // Sol X Kutuları
+      const leftTotalItems = lvl.leftXCount + (lvl.leftConstant > 0 ? 1 : 0);
+      const leftStartOffset = -(leftTotalItems * 24) / 2;
+
+      for (let i = 0; i < lvl.leftXCount; i++) {
+        const boxX = leftPanAnchorX + leftStartOffset + (i * 24);
+        const boxY = leftPanY - 30;
         ctx.fillStyle = '#f59e0b';
         ctx.fillRect(boxX, boxY, 22, 26);
         ctx.strokeStyle = '#fef08a';
@@ -1002,20 +1009,20 @@
         ctx.textAlign = 'center';
         ctx.fillText('X', boxX + 11, boxY + 18);
       }
-      // Sabit Ağırlık
+      // Sol Sabit Ağırlık
       if (lvl.leftConstant > 0) {
-        const weightX = leftPanAnchorX + 14;
+        const weightX = leftPanAnchorX + leftStartOffset + (lvl.leftXCount * 24);
         const weightY = leftPanY - 22;
         ctx.fillStyle = '#0284c7';
         ctx.beginPath();
-        ctx.roundRect(weightX, weightY, 24, 20, 4);
+        ctx.roundRect(weightX, weightY, 26, 20, 4);
         ctx.fill();
         ctx.strokeStyle = '#38bdf8';
         ctx.stroke();
         ctx.fillStyle = 'white';
         ctx.font = 'bold 10px JetBrains Mono';
         ctx.textAlign = 'center';
-        ctx.fillText('+' + lvl.leftConstant, weightX + 12, weightY + 14);
+        ctx.fillText('+' + lvl.leftConstant, weightX + 13, weightY + 14);
       }
 
       // 4. SAĞ KEFE (Çiz & Askılar)
@@ -1039,20 +1046,39 @@
       ctx.lineWidth = 3;
       ctx.stroke();
 
-      // Sağ Kefe Nesneleri (Hedef Ağırlık)
-      const rWeightX = rightPanAnchorX - 22;
-      const rWeightY = rightPanY - 34;
-      ctx.fillStyle = '#334155';
-      ctx.beginPath();
-      ctx.roundRect(rWeightX, rWeightY, 44, 30, 6);
-      ctx.fill();
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.fillStyle = '#fef08a';
-      ctx.font = 'bold 13px JetBrains Mono';
-      ctx.textAlign = 'center';
-      ctx.fillText(lvl.rightTotal + ' kg', rightPanAnchorX, rWeightY + 20);
+      // Sağ Kefe Nesneleri (X sandıkları ve sabit ağırlık)
+      const rightTotalItems = (lvl.rightXCount || 0) + (lvl.rightConstant > 0 ? 1 : 0);
+      const rightStartOffset = -(rightTotalItems * 24) / 2;
+
+      for (let i = 0; i < (lvl.rightXCount || 0); i++) {
+        const boxX = rightPanAnchorX + rightStartOffset + (i * 24);
+        const boxY = rightPanY - 30;
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(boxX, boxY, 22, 26);
+        ctx.strokeStyle = '#fef08a';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(boxX, boxY, 22, 26);
+        ctx.fillStyle = '#451a03';
+        ctx.font = 'bold 12px JetBrains Mono';
+        ctx.textAlign = 'center';
+        ctx.fillText('X', boxX + 11, boxY + 18);
+      }
+
+      if (lvl.rightConstant > 0) {
+        const rWeightX = rightPanAnchorX + rightStartOffset + ((lvl.rightXCount || 0) * 24);
+        const rWeightY = rightPanY - 26;
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.roundRect(rWeightX, rWeightY, 32, 24, 4);
+        ctx.fill();
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = '#fef08a';
+        ctx.font = 'bold 11px JetBrains Mono';
+        ctx.textAlign = 'center';
+        ctx.fillText(lvl.rightConstant + ' kg', rWeightX + 16, rWeightY + 16);
+      }
     }
 
     /* ================= TAB 3: LİMONATA STANDI SİMÜLASYONU ================= */
@@ -1135,7 +1161,9 @@
       const dailyCost = (simLemons * 3) + (simSugar * 10) + (simCups * 0.5);
 
       if (dailyCost > simCash) {
-        alert('Kasanızda yeterli nakit yok!');
+        const reportBox = document.getElementById('sim-report-box');
+        reportBox.innerHTML = '<span class="text-xs text-rose-400 font-bold">⚠️ Kasanızda yeterli nakit yok! Lütfen sabah tedarik adetlerini düşürün.</span>';
+        playErrorSound();
         return;
       }
 
@@ -1197,7 +1225,7 @@
       // 7 gün bittiğinde büyük ödül
       if (simCurrentDay === 7) {
         setTimeout(() => {
-          confetti({ particleCount: 100, spread: 80, origin: { y: 0.5 } });
+          triggerConfetti({ particleCount: 100, spread: 80, origin: { y: 0.5 } });
           let badgeTitle = 'Girişimci Çırağı';
           if (simTotalProfit > 250) badgeTitle = 'Efsane Girişimci Lideri (Altın)';
           else if (simTotalProfit > 150) badgeTitle = 'Başarılı Şirket Kurucusu (Gümüş)';

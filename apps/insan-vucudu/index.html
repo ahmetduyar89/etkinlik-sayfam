@@ -448,8 +448,8 @@
     let scene, camera, renderer, controls;
     let skeletonGroup, organsGroup, musclesGroup;
     let interactiveObjects = [];
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
+    let raycaster = null;
+    let mouse = null;
 
     const organData = {
       brain: {
@@ -499,25 +499,35 @@
     function init3DAnatomy() {
       const container = document.getElementById('three-container');
       if (!container) return;
+      if (typeof THREE === 'undefined') {
+        container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2"><span class="text-3xl">🦴</span><span>3D Anatomi motoru yükleniyor veya tarayıcınız WebGL desteklemiyor. Lütfen Kalp veya Mikroskop moduna geçin.</span></div>';
+        return;
+      }
 
-      scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x030712);
-      scene.fog = new THREE.FogExp2(0x030712, 0.04);
+      try {
+        raycaster = new THREE.Raycaster();
+        mouse = new THREE.Vector2();
 
-      camera = new THREE.PerspectiveCamera(45, window.innerWidth / (window.innerHeight - 60), 0.1, 100);
-      camera.position.set(0, 1.2, 5.5);
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x030712);
+        scene.fog = new THREE.FogExp2(0x030712, 0.04);
 
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setSize(window.innerWidth, window.innerHeight - 60);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      container.appendChild(renderer.domElement);
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / (window.innerHeight - 60), 0.1, 100);
+        camera.position.set(0, 1.2, 5.5);
 
-      controls = new THREE.OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
-      controls.maxDistance = 9;
-      controls.minDistance = 1.5;
-      controls.target.set(0, 0.5, 0);
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight - 60);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        if (THREE.OrbitControls) {
+          controls = new THREE.OrbitControls(camera, renderer.domElement);
+          controls.enableDamping = true;
+          controls.dampingFactor = 0.05;
+          controls.maxDistance = 9;
+          controls.minDistance = 1.5;
+          controls.target.set(0, 0.5, 0);
+        }
 
       // Lighting
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -558,6 +568,10 @@
       });
 
       animate3D();
+      } catch (err) {
+        console.error('Three.js başlatma hatası:', err);
+        container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2"><span class="text-3xl">⚠️</span><span>3D Anatomi motoru başlatılamadı. Lütfen Kalp Simülasyonu veya Mikroskop modlarını deneyin.</span></div>';
+      }
     }
 
     function buildSkeleton() {
@@ -677,6 +691,7 @@
     }
 
     function onPointerDown(event) {
+      if (!renderer || !raycaster || !mouse || !camera) return;
       const rect = renderer.domElement.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -710,7 +725,7 @@
     function animate3D() {
       requestAnimationFrame(animate3D);
       if (currentVucutMode === '3d') {
-        controls.update();
+        if (controls) controls.update();
         // Subtle idle breathing
         const time = Date.now() * 0.002;
         if (organsGroup) {
@@ -720,7 +735,7 @@
             heart.scale.set(scale, scale, scale);
           }
         }
-        renderer.render(scene, camera);
+        if (renderer && scene && camera) renderer.render(scene, camera);
       }
     }
 

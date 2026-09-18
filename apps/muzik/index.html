@@ -474,21 +474,13 @@
       const container = document.getElementById('keyboard-container');
       container.innerHTML = '';
 
-      NOTES.forEach(n => {
+      // 1. Render white keys first
+      NOTES.filter(n => !n.isBlack).forEach(n => {
         const btn = document.createElement('button');
         btn.id = `key-${n.note}`;
-
-        if (!n.isBlack) {
-          btn.className = 'white-key relative w-12 sm:w-14 h-48 rounded-b-xl flex flex-col justify-end items-center pb-3 text-slate-800 font-bold text-xs select-none';
-          btn.innerHTML = `<span class="text-xs text-slate-500 font-mono">${n.key}</span><span class="text-sm font-bold text-slate-900">${n.name}</span>`;
-        } else {
-          btn.className = 'black-key absolute z-10 w-8 sm:w-9 h-30 rounded-b-lg flex flex-col justify-end items-center pb-2 text-white font-bold text-[10px] select-none';
-          // Calculate offset position based on key
-          const offsetMap = { 'C#4': 38, 'D#4': 92, 'F#4': 200, 'G#4': 254, 'A#4': 308 };
-          btn.style.left = `${offsetMap[n.note] || 0}px`;
-          btn.innerHTML = `<span class="text-[9px] text-slate-400 font-mono">${n.key}</span><span class="text-xs font-bold text-white">${n.name}</span>`;
-        }
-
+        btn.className = 'white-key relative w-12 sm:w-14 h-48 rounded-b-xl flex flex-col justify-end items-center pb-3 text-slate-800 font-bold text-xs select-none shadow-md transition-all active:scale-[0.98]';
+        btn.innerHTML = `<span class="text-xs text-slate-500 font-mono">${n.key}</span><span class="text-sm font-bold text-slate-900">${n.name}</span>`;
+        
         btn.onmousedown = () => {
           btn.classList.add('active-key');
           playNote(n.freq, n.note);
@@ -496,8 +488,62 @@
         btn.onmouseup = () => btn.classList.remove('active-key');
         btn.onmouseleave = () => btn.classList.remove('active-key');
 
+        btn.ontouchstart = (e) => {
+          btn.classList.add('active-key');
+          playNote(n.freq, n.note);
+          e.preventDefault();
+        };
+        btn.ontouchend = () => btn.classList.remove('active-key');
+
         container.appendChild(btn);
       });
+
+      // 2. Render black keys positioned dynamically relative to white keys
+      const blackMap = {
+        'C#4': 'C4',
+        'D#4': 'D4',
+        'F#4': 'F4',
+        'G#4': 'G4',
+        'A#4': 'A4'
+      };
+
+      function updateBlackKeyPositions() {
+        NOTES.filter(n => n.isBlack).forEach(n => {
+          let btn = document.getElementById(`key-${n.note}`);
+          if (!btn) {
+            btn = document.createElement('button');
+            btn.id = `key-${n.note}`;
+            btn.className = 'black-key absolute z-10 w-7 sm:w-9 h-30 rounded-b-lg flex flex-col justify-end items-center pb-2 text-white font-bold text-[10px] select-none shadow-xl';
+            btn.innerHTML = `<span class="text-[9px] text-slate-400 font-mono">${n.key}</span><span class="text-xs font-bold text-white">${n.name}</span>`;
+
+            btn.onmousedown = () => {
+              btn.classList.add('active-key');
+              playNote(n.freq, n.note);
+            };
+            btn.onmouseup = () => btn.classList.remove('active-key');
+            btn.onmouseleave = () => btn.classList.remove('active-key');
+
+            btn.ontouchstart = (e) => {
+              btn.classList.add('active-key');
+              playNote(n.freq, n.note);
+              e.preventDefault();
+            };
+            btn.ontouchend = () => btn.classList.remove('active-key');
+
+            container.appendChild(btn);
+          }
+
+          const baseWhiteId = blackMap[n.note];
+          const baseWhite = document.getElementById(`key-${baseWhiteId}`);
+          if (baseWhite) {
+            const leftPos = baseWhite.offsetLeft + baseWhite.offsetWidth - (btn.offsetWidth || 34) / 2;
+            btn.style.left = `${leftPos}px`;
+          }
+        });
+      }
+
+      setTimeout(updateBlackKeyPositions, 20);
+      window.addEventListener('resize', updateBlackKeyPositions);
     }
 
     // Keyboard support

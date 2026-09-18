@@ -557,28 +557,39 @@
       }
     }
 
-    // Geoboard click listener
+    // Geoboard click & touch listener
     window.addEventListener('DOMContentLoaded', () => {
       const cvs = document.getElementById('geoboard-canvas');
       if (cvs) {
-        cvs.addEventListener('click', (e) => {
+        function triggerPinAt(clientX, clientY) {
           const rect = cvs.getBoundingClientRect();
           const scale = cvs.width / rect.width;
-          const x = (e.clientX - rect.left) * scale;
-          const y = (e.clientY - rect.top) * scale;
+          const x = (clientX - rect.left) * scale;
+          const y = (clientY - rect.top) * scale;
           const step = cvs.width / (boardPins + 1);
 
           for (let r = 0; r < boardPins; r++) {
             for (let c = 0; c < boardPins; c++) {
               const px = (c + 1) * step;
               const py = (r + 1) * step;
-              if (Math.hypot(x - px, y - py) < 18) {
+              if (Math.hypot(x - px, y - py) < 22) {
                 handlePinClick(r, c);
                 return;
               }
             }
           }
+        }
+
+        cvs.addEventListener('click', (e) => {
+          triggerPinAt(e.clientX, e.clientY);
         });
+
+        cvs.addEventListener('touchstart', (e) => {
+          if (e.touches && e.touches[0]) {
+            triggerPinAt(e.touches[0].clientX, e.touches[0].clientY);
+            e.preventDefault();
+          }
+        }, { passive: false });
       }
     });
 
@@ -708,16 +719,16 @@
       }
     }
 
-    // Protractor drag
+    // Protractor drag & touch support
     window.addEventListener('DOMContentLoaded', () => {
       const cvs = document.getElementById('protractor-canvas');
       if (cvs) {
         let isDragging = false;
-        function updateAngleFromMouse(e) {
+        function updateAngleFromCoords(clientX, clientY) {
           const rect = cvs.getBoundingClientRect();
           const scale = cvs.width / rect.width;
-          const x = (e.clientX - rect.left) * scale;
-          const y = (e.clientY - rect.top) * scale;
+          const x = (clientX - rect.left) * scale;
+          const y = (clientY - rect.top) * scale;
           const cx = cvs.width / 2;
           const cy = cvs.height - 50;
           let rad = Math.atan2(cy - y, x - cx);
@@ -728,9 +739,26 @@
           drawProtractor();
         }
 
-        cvs.addEventListener('mousedown', (e) => { isDragging = true; updateAngleFromMouse(e); });
-        window.addEventListener('mousemove', (e) => { if (isDragging) updateAngleFromMouse(e); });
+        cvs.addEventListener('mousedown', (e) => { isDragging = true; updateAngleFromCoords(e.clientX, e.clientY); });
+        window.addEventListener('mousemove', (e) => { if (isDragging) updateAngleFromCoords(e.clientX, e.clientY); });
         window.addEventListener('mouseup', () => { isDragging = false; });
+
+        cvs.addEventListener('touchstart', (e) => {
+          isDragging = true;
+          if (e.touches && e.touches[0]) {
+            updateAngleFromCoords(e.touches[0].clientX, e.touches[0].clientY);
+            e.preventDefault();
+          }
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => {
+          if (isDragging && e.touches && e.touches[0]) {
+            updateAngleFromCoords(e.touches[0].clientX, e.touches[0].clientY);
+            e.preventDefault();
+          }
+        }, { passive: false });
+
+        window.addEventListener('touchend', () => { isDragging = false; });
       }
     });
 

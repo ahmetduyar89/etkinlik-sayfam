@@ -211,7 +211,7 @@
             <button onclick="selectPunctMark('!')" class="w-11 h-11 rounded-xl glass-card text-lg font-black text-white hover:bg-sky-500/30">!</button>
             <button onclick="selectPunctMark(':')" class="w-11 h-11 rounded-xl glass-card text-lg font-black text-white hover:bg-sky-500/30">:</button>
             <button onclick="selectPunctMark(';')" class="w-11 h-11 rounded-xl glass-card text-lg font-black text-white hover:bg-sky-500/30">;</button>
-            <button onclick="selectPunctMark('"')" class="w-11 h-11 rounded-xl glass-card text-lg font-black text-white hover:bg-sky-500/30">"</button>
+            <button onclick="selectPunctMark('&quot;')" class="w-11 h-11 rounded-xl glass-card text-lg font-black text-white hover:bg-sky-500/30">"</button>
           </div>
         </div>
 
@@ -231,6 +231,9 @@
           <p class="text-xs text-slate-400 mt-0.5">Görsel ipuçları ve anlamdan yola çıkarak deyimi bulun.</p>
         </div>
         <div class="flex items-center gap-2">
+          <button onclick="resetCurrentIdiom()" class="h-9 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">
+            🔄 Sıfırla
+          </button>
           <button onclick="nextIdiom()" class="h-9 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition">
             Sonraki Deyim ➔
           </button>
@@ -723,7 +726,7 @@
         meaning: "Eski değerini, saygınlığını veya sevgisini yitirmek."
       },
       {
-        idiom: "ETAKLERİ ZİL ÇALMAK",
+        idiom: "ETEKLERİ ZİL ÇALMAK",
         visual: "👗🔔",
         meaning: "Çok sevinmek, büyük bir mutluluk ve neşe içinde olmak."
       },
@@ -735,17 +738,39 @@
     ];
 
     let currentIdiomIdx = 0;
-    let idiomAnswer = [];
+    let idiomAnswer = []; // [{char, btnIdx}]
 
     function loadIdiom() {
       const cur = idioms[currentIdiomIdx % idioms.length];
       document.getElementById('idiom-visual').innerText = cur.visual;
       document.getElementById('idiom-meaning').innerText = cur.meaning;
       idiomAnswer = [];
-      document.getElementById('idiom-status').innerText = 'Harfleri seçerek deyimi tamamlayın.';
+      document.getElementById('idiom-status').innerText = 'Harfleri seçerek deyimi tamamlayın (Kaldırmak için harfe tıklayın).';
 
       renderIdiomSlots();
       renderIdiomLetters();
+    }
+
+    function resetCurrentIdiom() {
+      idiomAnswer = [];
+      document.getElementById('idiom-status').innerText = 'Harfleri seçerek deyimi tamamlayın.';
+      renderIdiomSlots();
+      renderIdiomLetters();
+      playTone(350, 0.08);
+    }
+
+    function removeIdiomLetter(slotIdx) {
+      if (!idiomAnswer[slotIdx]) return;
+      const { btnIdx } = idiomAnswer[slotIdx];
+      const bankBtn = document.getElementById(`idiom-bank-btn-${btnIdx}`);
+      if (bankBtn) {
+        bankBtn.disabled = false;
+        bankBtn.classList.remove('opacity-25', 'pointer-events-none');
+      }
+      idiomAnswer[slotIdx] = null;
+      playTone(300, 0.05);
+      renderIdiomSlots();
+      checkIdiomWin();
     }
 
     function renderIdiomSlots() {
@@ -760,9 +785,18 @@
           space.className = 'w-4';
           container.appendChild(space);
         } else {
-          const slot = document.createElement('div');
-          slot.className = 'w-9 h-11 rounded-xl bg-slate-900 border-2 border-white/20 flex items-center justify-center text-white font-bold text-sm';
-          slot.innerText = idiomAnswer[i] || '';
+          const slot = document.createElement('button');
+          const hasChar = !!idiomAnswer[i];
+          slot.className = `w-9 h-11 rounded-xl flex items-center justify-center font-bold text-sm transition-all shadow-md ${
+            hasChar
+              ? 'bg-sky-500 text-white border-2 border-sky-300 hover:bg-rose-600 hover:border-rose-400 cursor-pointer'
+              : 'bg-slate-900 border-2 border-white/20 text-slate-500 cursor-default'
+          }`;
+          slot.innerText = hasChar ? idiomAnswer[i].char : '';
+          if (hasChar) {
+            slot.title = 'Kaldırmak için tıkla';
+            slot.onclick = () => removeIdiomLetter(i);
+          }
           container.appendChild(slot);
         }
       }
@@ -774,18 +808,19 @@
       const cur = idioms[currentIdiomIdx % idioms.length];
       const letters = cur.idiom.replace(/\s/g, '').split('').sort(() => Math.random() - 0.5);
 
-      letters.forEach((char, idx) => {
+      letters.forEach((char, btnIdx) => {
         const btn = document.createElement('button');
-        btn.className = 'w-9 h-10 rounded-xl bg-sky-600/30 hover:bg-sky-600/60 border border-sky-400/40 text-white font-bold text-sm';
+        btn.id = `idiom-bank-btn-${btnIdx}`;
+        btn.className = 'w-9 h-10 rounded-xl bg-sky-600/40 hover:bg-sky-600/70 border border-sky-400/40 text-white font-bold text-sm transition active:scale-95';
         btn.innerText = char;
         btn.onclick = () => {
           // Put in next empty non-space slot
           const target = cur.idiom;
           for (let s = 0; s < target.length; s++) {
             if (target[s] !== ' ' && !idiomAnswer[s]) {
-              idiomAnswer[s] = char;
+              idiomAnswer[s] = { char, btnIdx };
               btn.disabled = true;
-              btn.classList.add('opacity-30');
+              btn.classList.add('opacity-25', 'pointer-events-none');
               playTone(500, 0.05);
               renderIdiomSlots();
               checkIdiomWin();
@@ -801,7 +836,7 @@
       const cur = idioms[currentIdiomIdx % idioms.length];
       let assembled = '';
       for (let i = 0; i < cur.idiom.length; i++) {
-        assembled += cur.idiom[i] === ' ' ? ' ' : (idiomAnswer[i] || '');
+        assembled += cur.idiom[i] === ' ' ? ' ' : (idiomAnswer[i] ? idiomAnswer[i].char : '');
       }
 
       if (assembled === cur.idiom) {

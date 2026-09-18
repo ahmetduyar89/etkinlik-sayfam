@@ -575,8 +575,15 @@
       resetExecution();
     }
 
+    let executionTimer = null;
+    let debugTimer = null;
+
     function resetExecution() {
       isRunning = false;
+      if (executionTimer) {
+        clearTimeout(executionTimer);
+        executionTimer = null;
+      }
       const lvl = mazeLevels[currentMazeLevelIdx];
       robotState = { ...lvl.start };
       collectedStars.clear();
@@ -780,7 +787,7 @@
       }
 
       if (!singleStep && isRunning) {
-        setTimeout(executeNextAction, 350);
+        executionTimer = setTimeout(() => executeNextAction(false), 350);
       }
     }
 
@@ -1162,6 +1169,10 @@
     }
 
     function runDebugCode() {
+      if (debugTimer) {
+        clearTimeout(debugTimer);
+        debugTimer = null;
+      }
       const c = debugCases[currentDebugIdx];
       debugRobot = { ...c.start };
 
@@ -1217,7 +1228,7 @@
 
         step++;
         drawDebug();
-        setTimeout(exec, 350);
+        debugTimer = setTimeout(exec, 350);
       }
 
       exec();

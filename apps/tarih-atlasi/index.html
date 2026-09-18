@@ -528,6 +528,7 @@
 
       regions.forEach(r => {
         const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        poly.id = `reg-poly-${r.id}`;
         poly.setAttribute('points', r.points);
         poly.setAttribute('fill', r.fill);
         poly.setAttribute('fill-opacity', '0.45');
@@ -550,9 +551,27 @@
       });
     }
 
+    let activeRegionId = null;
+
     function selectCultureRegion(regId) {
       const data = turkeyRegionsData[regId];
       if (!data) return;
+
+      activeRegionId = regId;
+
+      // Update polygon active states
+      document.querySelectorAll('#turkey-culture-svg polygon').forEach(p => {
+        p.setAttribute('stroke', '#ffffff');
+        p.setAttribute('stroke-width', '2');
+        p.setAttribute('fill-opacity', '0.45');
+      });
+
+      const activePoly = document.getElementById(`reg-poly-${regId}`);
+      if (activePoly) {
+        activePoly.setAttribute('stroke', '#fbbf24');
+        activePoly.setAttribute('stroke-width', '4');
+        activePoly.setAttribute('fill-opacity', '0.85');
+      }
 
       document.getElementById('reg-title').innerText = data.name;
       document.getElementById('reg-center').innerText = data.cities;
@@ -619,6 +638,7 @@
     window.addEventListener('DOMContentLoaded', () => {
       selectTimelineEra(0);
       renderTurkeyCultureMap();
+      selectCultureRegion('marmara');
     });
   </script>
 </body>
