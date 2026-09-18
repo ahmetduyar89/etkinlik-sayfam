@@ -30,6 +30,19 @@ export const SHAPE_TOOLS = [
     'double_arrow',
 ];
 
+/**
+ * Çizginin ekranda kapladığı azami yarı kalınlık.
+ *
+ * Kalem uçları baskıya göre taban kalınlığın katlarına çıkabilir (fırça 3x);
+ * kutuyu yalnızca `width`e göre hesaplamak fırça izinin kutunun dışına
+ * taşmasına, dolayısıyla canlı çizimde artık ize yol açıyordu.
+ */
+export const maxHalfWidth = (s: Stroke): number => {
+    const base = s.width || 2;
+    if (s.tool !== 'pencil') return base / 2;
+    return (base * getPenProfile(s.penType).max) / 2;
+};
+
 export const getBB = (s: Stroke): BoundingBox => {
     let x1 = Math.min(...s.points.map((p) => p.x));
     let y1 = Math.min(...s.points.map((p) => p.y));
@@ -48,7 +61,7 @@ export const getBB = (s: Stroke): BoundingBox => {
 
     // Matematik nesneleri ve fotoğraflar kutularına birebir oturur; serbest
     // çizimde ise parmakla seçimi kolaylaştırmak için bol boşluk bırakılır.
-    const pad = TIGHT_TOOLS.includes(s.tool) ? 6 : Math.max((s.width || 2) / 2 + 6, 24);
+    const pad = TIGHT_TOOLS.includes(s.tool) ? 6 : Math.max(maxHalfWidth(s) + 6, 24);
     return { x1: x1 - pad, y1: y1 - pad, x2: x2 + pad, y2: y2 + pad };
 };
 
@@ -569,20 +582,91 @@ const distanceToSegment = (p: Point, a: Point, b: Point): number => {
     return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 };
 
+/** İki doğru parçası arasındaki en kısa mesafe. */
+const distanceSegmentToSegment = (a1: Point, a2: Point, b1: Point, b2: Point): number => {
+    // Kesişiyorlarsa mesafe sıfırdır.
+    const d = (p: Point, q: Point, r: Point) =>
+        (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+    const d1 = d(b1, b2, a1);
+    const d2 = d(b1, b2, a2);
+    const d3 = d(a1, a2, b1);
+    const d4 = d(a1, a2, b2);
+    if (((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0))) return 0;
+    return Math.min(
+        distanceToSegment(a1, b1, b2),
+        distanceToSegment(a2, b1, b2),
+        distanceToSegment(b1, a1, a2),
+        distanceToSegment(b2, a1, a2)
+    );
+};
+
+/** Dikdörtgenin dört kenarı (köşegen iki noktadan). */
+const rectEdges = (p1: Point, p2: Point): [Point, Point][] => {
+    const a = { x: p1.x, y: p1.y };
+    const b = { x: p2.x, y: p1.y };
+    const c = { x: p2.x, y: p2.y };
+    const dd = { x: p1.x, y: p2.y };
+    return [
+        [a, b],
+        [b, c],
+        [c, dd],
+        [dd, a],
+    ];
+};
+
+/** Üçgenin üç kenarı (`drawShape` ile aynı yerleşim). */
+const triangleEdges = (p1: Point, p2: Point): [Point, Point][] => {
+    const apex = { x: (p1.x + p2.x) / 2, y: p1.y };
+    const left = { x: p1.x, y: p2.y };
+    const right = { x: p2.x, y: p2.y };
+    return [
+        [apex, right],
+        [right, left],
+        [left, apex],
+    ];
+};
+
 /**
- * Çizgi silgisi için gerçek yola göre isabet testi. Serbest çizim ve
- * doğru parçalarında segmentlere, diğerlerinde sınırlayıcı kutuya bakar.
+ * Çizgi silgisi ve seçim için gerçek yola göre isabet testi.
+ *
+ * Serbest çizim, doğru parçaları ve çokgenlerde segmentlere; daire, kare ve
+ * üçgende kenarlara (dolu ise iç alana) bakar. Yalnızca sınırlayıcı kutuya
+ * bakmak, köşegen bir çizginin kutusundaki boş köşeye tıklayınca o çizginin
+ * seçilmesi gibi yanlışlara yol açıyordu.
  */
 export const strokeNearPoint = (s: Stroke, x: number, y: number, radius: number): boolean => {
     const p = { x, y };
-    const tolerance = radius + (s.width || 2) / 2;
+    const tolerance = radius + maxHalfWidth(s);
+
+    if (s.tool === 'circle' && s.points.length >= 2) {
+        const c = s.points[0];
+        const edge = s.points[s.points.length - 1];
+        const r = Math.hypot(edge.x - c.x, edge.y - c.y);
+        const dist = Math.hypot(x - c.x, y - c.y);
+        return s.fillEnabled ? dist <= r + tolerance : Math.abs(dist - r) <= tolerance;
+    }
+
+    if ((s.tool === 'rect' || s.tool === 'triangle') && s.points.length >= 2) {
+        const p1 = s.points[0];
+        const p2 = s.points[s.points.length - 1];
+        const edges = s.tool === 'rect' ? rectEdges(p1, p2) : triangleEdges(p1, p2);
+        if (edges.some(([a, b]) => distanceToSegment(p, a, b) <= tolerance)) return true;
+        if (!s.fillEnabled) return false;
+        return (
+            x >= Math.min(p1.x, p2.x) &&
+            x <= Math.max(p1.x, p2.x) &&
+            y >= Math.min(p1.y, p2.y) &&
+            y <= Math.max(p1.y, p2.y)
+        );
+    }
     if (s.tool === 'polygon' && s.points.length >= 2) {
         for (let i = 0; i < s.points.length; i++) {
             const pA = s.points[i];
             const pB = s.points[(i + 1) % s.points.length];
             if (distanceToSegment(p, pA, pB) <= tolerance) return true;
         }
-        return false;
+        // Dolu çokgende iç alan da hedeftir.
+        return s.fillEnabled ? pointInPolygon(p, s.points) : false;
     }
     if (['pencil', 'highlighter', 'eraser', 'line', 'dashed', 'arrow', 'double_arrow'].includes(s.tool)) {
         if (s.points.length === 1) return Math.hypot(x - s.points[0].x, y - s.points[0].y) <= tolerance;
@@ -595,6 +679,72 @@ export const strokeNearPoint = (s: Stroke, x: number, y: number, radius: number)
         return false;
     }
     return hitTest(s, x, y);
+};
+
+/**
+ * Silginin iki olay arasında kat ettiği YOL boyunca isabet testi.
+ *
+ * İşaretçi olayları seyrek geldiğinde (hızlı el hareketi) yalnızca olayın
+ * geldiği noktaya bakmak, aradaki bölümü atlayıp mürekkebi yerinde bırakır.
+ */
+export const strokeNearSegment = (
+    s: Stroke,
+    a: Point,
+    b: Point,
+    radius: number
+): boolean => {
+    if (Math.hypot(b.x - a.x, b.y - a.y) < 0.01) return strokeNearPoint(s, b.x, b.y, radius);
+    const tolerance = radius + maxHalfWidth(s);
+
+    const segments: [Point, Point][] = [];
+    if (s.tool === 'polygon' && s.points.length >= 2) {
+        for (let i = 0; i < s.points.length; i++) {
+            segments.push([s.points[i], s.points[(i + 1) % s.points.length]]);
+        }
+    } else if (s.tool === 'circle' || s.tool === 'rect' || s.tool === 'triangle') {
+        if (s.points.length < 2) return strokeNearPoint(s, b.x, b.y, radius);
+        const p1 = s.points[0];
+        const p2 = s.points[s.points.length - 1];
+        if (s.tool === 'rect') segments.push(...rectEdges(p1, p2));
+        else if (s.tool === 'triangle') segments.push(...triangleEdges(p1, p2));
+        else {
+            // Daire: yol üzerinde birkaç örnek nokta yeterli.
+            const steps = Math.max(2, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / radius));
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                if (strokeNearPoint(s, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, radius)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    } else if (
+        ['pencil', 'highlighter', 'eraser', 'line', 'dashed', 'arrow', 'double_arrow'].includes(
+            s.tool
+        )
+    ) {
+        const pts = ['line', 'dashed', 'arrow', 'double_arrow'].includes(s.tool)
+            ? [s.points[0], s.points[s.points.length - 1]]
+            : s.points;
+        if (pts.length === 1) return distanceToSegment(pts[0], a, b) <= tolerance;
+        for (let i = 1; i < pts.length; i++) segments.push([pts[i - 1], pts[i]]);
+    } else {
+        // Metin, damga, nesne ve fotoğraflar: kutunun kenarlarına bak.
+        const bb = getBB(s);
+        segments.push(
+            ...rectEdges({ x: bb.x1, y: bb.y1 }, { x: bb.x2, y: bb.y2 })
+        );
+        if (
+            b.x >= bb.x1 &&
+            b.x <= bb.x2 &&
+            b.y >= bb.y1 &&
+            b.y <= bb.y2
+        ) {
+            return true;
+        }
+    }
+
+    return segments.some(([p1, p2]) => distanceSegmentToSegment(a, b, p1, p2) <= tolerance);
 };
 
 /** Tek bir çizimi verilen bağlama çizer. Küçük resimlerde de kullanılır. */
@@ -708,10 +858,18 @@ const lerp = (a: number | undefined, b: number | undefined, t: number): number |
  * Noktalar arasındaki boşlukları doldurur. Hızlı çizilen bir çizgide noktalar
  * seyrek olur; silgi iki nokta arasından geçtiğinde kesme yapılabilmesi için
  * ara noktalar gerekir.
+ *
+ * `synthetic` dizisi hangi noktaların sonradan üretildiğini söyler: kesme
+ * bittikten sonra bunların gereksiz olanları atılır, aksi halde silgiye
+ * değen her çizim kalıcı olarak yüzlerce fazladan nokta taşırdı.
  */
-function densify(points: Point[], maxGap: number): Point[] {
-    if (points.length < 2) return points;
+function densify(
+    points: Point[],
+    maxGap: number
+): { points: Point[]; synthetic: boolean[] } {
+    if (points.length < 2) return { points, synthetic: points.map(() => false) };
     const out: Point[] = [points[0]];
+    const synthetic: boolean[] = [false];
     for (let i = 1; i < points.length; i++) {
         const a = points[i - 1];
         const b = points[i];
@@ -724,63 +882,81 @@ function densify(points: Point[], maxGap: number): Point[] {
                 y: a.y + (b.y - a.y) * t,
                 p: lerp(a.p, b.p, t),
             });
+            synthetic.push(true);
         }
         out.push(b);
+        synthetic.push(false);
     }
-    return out;
+    return { points: out, synthetic };
 }
 
-/**
- * Piksel silgisi: verilen daireye giren serbest çizim parçalarını keser.
- * Kalan parçalar ayrı çizimler olarak döner; hiçbir şey değişmediyse `null`.
- *
- * Şekil, metin, damga, matematik nesnesi ve fotoğraflar parça parça
- * silinemediği için bu silgiden etkilenmez — onları kaldırmak için
- * çizgi silgisi ya da seçip silme kullanılır.
- */
 export function erasePixels(
     strokes: Stroke[],
-    x: number,
-    y: number,
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number,
     radius: number
 ): Stroke[] | null {
     let changed = false;
     const result: Stroke[] = [];
+    const a = { x: ax, y: ay };
+    const b = { x: bx, y: by };
+    const minX = Math.min(ax, bx);
+    const maxX = Math.max(ax, bx);
+    const minY = Math.min(ay, by);
+    const maxY = Math.max(ay, by);
 
     for (const stroke of strokes) {
         if (!TRIMMABLE_TOOLS.includes(stroke.tool)) {
             result.push(stroke);
             continue;
         }
-        // Ucuz eleme: silgi dairesi çizimin kutusuna değmiyorsa dokunma.
+        // Ucuz eleme: silginin süpürdüğü kutu çizimin kutusuna değmiyorsa dokunma.
         const bb = getBB(stroke);
-        if (x < bb.x1 - radius || x > bb.x2 + radius || y < bb.y1 - radius || y > bb.y2 + radius) {
+        if (
+            maxX < bb.x1 - radius ||
+            minX > bb.x2 + radius ||
+            maxY < bb.y1 - radius ||
+            minY > bb.y2 + radius
+        ) {
             result.push(stroke);
             continue;
         }
 
-        const reach = radius + (stroke.width || 2) / 2;
-        const points = densify(stroke.points, Math.max(2, radius / 2));
+        const reach = radius + maxHalfWidth(stroke);
+        const dense = densify(stroke.points, Math.max(2, radius / 2));
+        const points = dense.points;
 
-        const runs: Point[][] = [];
+        const runs: { pts: Point[]; synthetic: boolean[] }[] = [];
         let run: Point[] = [];
-        for (const point of points) {
-            if (Math.hypot(point.x - x, point.y - y) <= reach) {
-                if (run.length >= 2) runs.push(run);
+        let runSynthetic: boolean[] = [];
+        points.forEach((point, i) => {
+            if (distanceToSegment(point, a, b) <= reach) {
+                if (run.length >= 2) runs.push({ pts: run, synthetic: runSynthetic });
                 run = [];
+                runSynthetic = [];
             } else {
                 run.push(point);
+                runSynthetic.push(dense.synthetic[i]);
             }
-        }
-        if (run.length >= 2) runs.push(run);
+        });
+        if (run.length >= 2) runs.push({ pts: run, synthetic: runSynthetic });
 
         // Hiç nokta silinmediyse çizimi olduğu gibi bırak (densify'ı da atma).
-        if (runs.length === 1 && runs[0].length === points.length) {
+        if (runs.length === 1 && runs[0].pts.length === points.length) {
             result.push(stroke);
             continue;
         }
         changed = true;
-        for (const segment of runs) result.push({ ...stroke, points: segment });
+        for (const segment of runs) {
+            // Ara noktalar yalnızca kesim uçlarında gerekli; kalanları at ki
+            // çizim silgiye her değdiğinde şişmesin.
+            const kept = segment.pts.filter(
+                (_, i) => !segment.synthetic[i] || i === 0 || i === segment.pts.length - 1
+            );
+            result.push({ ...stroke, points: kept.length >= 2 ? kept : segment.pts });
+        }
     }
 
     return changed ? result : null;
