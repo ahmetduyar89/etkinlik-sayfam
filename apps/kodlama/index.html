@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
+  <title>Kodlama Parkı | Algoritma & Blok Kodlama Atölyesi</title>
+  <meta name="description" content="Çocuklar için görsel blok kodlama, 12 seviyeli labirent görevleri, kaplumbağa geometrisi çizim robotu ve hata ayıklama atölyesi.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%2310b981'/><path d='M30 40 L50 20 L70 40 M50 20 L50 80' stroke='white' stroke-width='10' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+    
+    * {
+      box-sizing: border-box;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      background-color: #030712;
+      color: #f3f4f6;
+    }
+
+    /* Glassmorphism */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+    }
+
+    .glass-card {
+      background: rgba(17, 27, 49, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+    }
+
+    /* Code Block Styles with Interlocking aesthetics */
+    .code-block {
+      cursor: grab;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      position: relative;
+    }
+    .code-block:active {
+      cursor: grabbing;
+      transform: scale(0.98);
+    }
+    .code-block.executing {
+      box-shadow: 0 0 16px #34d399 !important;
+      border-color: #34d399 !important;
+      transform: scale(1.02);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+    ::-webkit-scrollbar-thumb { background: rgba(16, 185, 129, 0.3); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.6); }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen text-slate-100">
+
+  <!-- TOP HEADER / NAV BAR -->
+  <header class="sticky top-0 z-30 flex items-center justify-between px-4 py-3 sm:px-6 glass-panel border-b border-white/10">
+    <!-- Left: Brand & Return -->
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2 h-9 px-3.5 rounded-xl glass-card text-xs sm:text-sm font-semibold text-slate-300 hover:text-white hover:border-emerald-400/50 transition-all active:scale-95 shadow-md">
+        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        <span class="hidden sm:inline">Atölye'ye Dön</span>
+      </a>
+      
+      <div class="flex items-center gap-2.5 h-9 px-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-white font-bold text-xs sm:text-sm tracking-wide">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-300 to-cyan-300">
+          🤖 Kodlama Parkı
+        </span>
+        <span class="hidden md:inline-block text-[11px] font-medium text-slate-400 border-l border-slate-700 pl-2">
+          Algoritma & Blok Kodlama
+        </span>
+      </div>
+    </div>
+
+    <!-- Center: Mode Switcher Tabs -->
+    <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-900/80 border border-white/10">
+      <button onclick="setAppMode('maze')" id="mode-maze" class="mode-btn active px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all text-emerald-300 bg-emerald-500/20 border border-emerald-400/40">
+        🚩 Labirent Görevleri
+      </button>
+      <button onclick="setAppMode('turtle')" id="mode-turtle" class="mode-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5">
+        🐢 Çizim Robotu (Turtle)
+      </button>
+      <button onclick="setAppMode('debug')" id="mode-debug" class="mode-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5">
+        🐞 Hata Ayıklama (Debug)
+      </button>
+    </div>
+
+    <!-- Right: Quick Tools -->
+    <div class="flex items-center gap-2">
+      <button id="sound-btn" onclick="toggleAudio()" title="Ses Efektleri" class="h-9 w-9 rounded-xl glass-card flex items-center justify-center text-slate-300 hover:text-emerald-400 transition">
+        <span id="sound-icon">🔊</span>
+      </button>
+      <button onclick="toggleFullscreen()" title="Tam Ekran" class="h-9 w-9 rounded-xl glass-card flex items-center justify-center text-slate-300 hover:text-emerald-400 transition">
+        ⛶
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 flex flex-col gap-4">
+
+    <!-- ─────────────────────────────────────────────────────────────
+         SECTION 1: LABİRENT GÖREVLERİ
+         ───────────────────────────────────────────────────────────── -->
+    <section id="section-maze" class="w-full flex flex-col gap-4">
+      <!-- Subheader: Level selection & description -->
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-3 sm:p-4 rounded-2xl">
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1.5 bg-slate-900/80 p-1.5 rounded-xl border border-white/10 text-xs">
+            <span class="text-slate-400 pl-1 font-bold">Seviye:</span>
+            <select id="maze-level-select" onchange="changeMazeLevel()" class="bg-transparent text-emerald-300 font-bold pr-2 focus:outline-none cursor-pointer">
+              <!-- 12 Levels -->
+            </select>
+          </div>
+          <span id="maze-level-title" class="text-xs font-bold text-slate-200">1. Adım: Düz İlerleme</span>
+        </div>
+
+        <!-- Controls: Run, Step, Reset, Speed -->
+        <div class="flex items-center gap-2">
+          <button onclick="runCode()" id="btn-run" class="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/30">
+            <span>▶</span> <span>Çalıştır</span>
+          </button>
+          <button onclick="stepCode()" id="btn-step" class="h-9 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1 shadow-md">
+            <span>⏯</span> <span>Adım Adım</span>
+          </button>
+          <button onclick="resetExecution()" class="h-9 px-3 rounded-xl glass-card hover:bg-white/10 text-slate-300 text-xs font-bold transition flex items-center gap-1">
+            <span>🔄</span> <span>Sıfırla</span>
+          </button>
+          <button onclick="clearWorkspace()" class="h-9 px-3 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition">
+            🗑️ Temizle
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Workspace Grid: (Palette | Script Workspace | Live Game Canvas) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        
+        <!-- Column 1: BLOCK PALETTE (3 cols) -->
+        <div class="lg:col-span-3 glass-panel p-4 rounded-3xl flex flex-col gap-3">
+          <div class="flex items-center justify-between border-b border-white/10 pb-2">
+            <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Komut Blokları</span>
+            <span class="text-[10px] text-slate-400">Tıkla veya Ekle</span>
+          </div>
+
+          <div class="flex flex-col gap-2" id="block-palette">
+            <button onclick="addBlockToWorkspace({ type: 'move' })" class="code-block flex items-center justify-between p-2.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-400/40 text-left text-xs font-bold text-emerald-200">
+              <span class="flex items-center gap-2"><span>🚶</span> <span>1 Adım İlerle</span></span>
+              <span class="text-emerald-400 text-sm font-black">+</span>
+            </button>
+            <button onclick="addBlockToWorkspace({ type: 'turnRight' })" class="code-block flex items-center justify-between p-2.5 rounded-xl bg-sky-600/30 hover:bg-sky-600/50 border border-sky-400/40 text-left text-xs font-bold text-sky-200">
+              <span class="flex items-center gap-2"><span>↻</span> <span>Sağa Dön (90°)</span></span>
+              <span class="text-sky-400 text-sm font-black">+</span>
+            </button>
+            <button onclick="addBlockToWorkspace({ type: 'turnLeft' })" class="code-block flex items-center justify-between p-2.5 rounded-xl bg-sky-600/30 hover:bg-sky-600/50 border border-sky-400/40 text-left text-xs font-bold text-sky-200">
+              <span class="flex items-center gap-2"><span>↺</span> <span>Sola Dön (90°)</span></span>
+              <span class="text-sky-400 text-sm font-black">+</span>
+            </button>
+            <button onclick="addBlockToWorkspace({ type: 'collect' })" class="code-block flex items-center justify-between p-2.5 rounded-xl bg-amber-600/30 hover:bg-amber-600/50 border border-amber-400/40 text-left text-xs font-bold text-amber-200">
+              <span class="flex items-center gap-2"><span>⭐</span> <span>Yıldızı Topla</span></span>
+              <span class="text-amber-400 text-sm font-black">+</span>
+            </button>
+            <button onclick="addBlockToWorkspace({ type: 'repeat', count: 3 })" class="code-block flex items-center justify-between p-2.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-400/40 text-left text-xs font-bold text-purple-200">
+              <span class="flex items-center gap-2"><span>🔁</span> <span>[N] Kez Tekrarla</span></span>
+              <span class="text-purple-400 text-sm font-black">+</span>
+            </button>
+          </div>
+
+          <div class="mt-2 p-3 rounded-2xl bg-slate-900/60 border border-white/5 text-[11px] text-slate-400 leading-relaxed">
+            💡 <strong>İpucu:</strong> Soldaki komutlara tıklayarak çalışma alanına ekleyin. Kodunuzu çalıştırmak için yeşil <strong>Çalıştır</strong> düğmesine basın.
+          </div>
+        </div>
+
+        <!-- Column 2: CODING WORKSPACE (4 cols) -->
+        <div class="lg:col-span-4 glass-panel p-4 rounded-3xl flex flex-col gap-3 min-h-[460px]">
+          <div class="flex items-center justify-between border-b border-white/10 pb-2">
+            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <span>📜</span> <span>Çalışma Alanı</span>
+              <span id="block-count-badge" class="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px]">0 blok</span>
+            </span>
+            <span class="text-[10px] text-slate-400">Sırayla yürütülür</span>
+          </div>
+
+          <!-- Active Blocks List -->
+          <div id="workspace-blocks" class="flex-1 flex flex-col gap-2 overflow-y-auto max-h-[420px] p-2 rounded-2xl bg-slate-950/60 border border-white/5">
+            <div id="workspace-empty-msg" class="h-48 flex flex-col items-center justify-center text-slate-500 text-xs italic gap-2">
+              <span class="text-2xl">🧩</span>
+              <span>Henüz blok eklenmedi. Soldaki bloklara tıklayın!</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Column 3: INTERACTIVE MAZE CANVAS (5 cols) -->
+        <div class="lg:col-span-5 glass-panel p-4 rounded-3xl flex flex-col items-center gap-4">
+          <div class="w-full flex items-center justify-between border-b border-white/10 pb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Labirent Simülasyonu</span>
+            </div>
+            <div class="flex items-center gap-3 text-xs font-mono font-bold">
+              <span class="text-amber-400 flex items-center gap-1">⭐ <span id="stars-status">0 / 1</span></span>
+              <span class="text-slate-400">Hamle: <span id="moves-status" class="text-white">0</span></span>
+            </div>
+          </div>
+
+          <!-- Canvas -->
+          <div class="relative bg-slate-950/90 rounded-2xl p-2 border border-white/10 shadow-2xl flex items-center justify-center">
+            <canvas id="maze-canvas" width="400" height="400" class="rounded-xl select-none touch-none"></canvas>
+          </div>
+
+          <!-- Execution Status Banner -->
+          <div id="maze-status-banner" class="w-full p-2.5 rounded-xl bg-slate-900 border border-white/10 text-center text-xs font-bold text-slate-300">
+            Hedefe ulaşmak için algoritmanı hazırla ve Çalıştır'a bas!
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────
+         SECTION 2: TURTLE ÇİZİM ROBOTU
+         ───────────────────────────────────────────────────────────── -->
+    <section id="section-turtle" class="w-full hidden flex-col gap-4">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🐢</span> Kaplumbağa Geometrisi (Turtle Çizim)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Açıları ve döngüleri kullanarak harika geometrik şekiller ve desenler çizdirin.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1.5 bg-slate-900/80 p-1.5 rounded-xl border border-white/10 text-xs">
+            <span class="text-slate-400 pl-1 font-bold">Hazır Desenler:</span>
+            <select id="turtle-preset-select" onchange="loadTurtlePreset()" class="bg-transparent text-emerald-300 font-bold pr-2 focus:outline-none cursor-pointer">
+              <option value="square" class="bg-slate-900">Kare (4x90°)</option>
+              <option value="triangle" class="bg-slate-900">Eşkenar Üçgen (3x120°)</option>
+              <option value="pentagon" class="bg-slate-900">Düzgün Beşgen (5x72°)</option>
+              <option value="star" class="bg-slate-900">5 Köşeli Yıldız (5x144°)</option>
+              <option value="flower" class="bg-slate-900">Güneş Çiçeği (36x10°)</option>
+            </select>
+          </div>
+          <button onclick="runTurtle()" class="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1 shadow-lg shadow-emerald-600/30">
+            <span>▶</span> <span>Çiz</span>
+          </button>
+          <button onclick="clearTurtle()" class="h-9 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">
+            🔄 Temizle
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        <div class="lg:col-span-5 glass-panel p-4 rounded-3xl flex flex-col gap-3 min-h-[460px]">
+          <div class="flex items-center justify-between border-b border-white/10 pb-2">
+            <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Çizim Komutları</span>
+            <div class="flex items-center gap-1.5">
+              <button onclick="addTurtleBlock('forward')" class="px-2 py-1 rounded bg-emerald-600/40 text-xs font-bold hover:bg-emerald-600/60">+ İlerle</button>
+              <button onclick="addTurtleBlock('turnRight')" class="px-2 py-1 rounded bg-sky-600/40 text-xs font-bold hover:bg-sky-600/60">+ Sağa</button>
+              <button onclick="addTurtleBlock('repeat')" class="px-2 py-1 rounded bg-purple-600/40 text-xs font-bold hover:bg-purple-600/60">+ Tekrarla</button>
+            </div>
+          </div>
+
+          <div id="turtle-blocks-list" class="flex-1 flex flex-col gap-2 overflow-y-auto max-h-[400px] p-2 rounded-2xl bg-slate-950/60 border border-white/5">
+            <!-- Dynamic turtle commands -->
+          </div>
+        </div>
+
+        <div class="lg:col-span-7 glass-panel p-4 rounded-3xl flex flex-col items-center justify-center gap-3">
+          <div class="relative bg-slate-950/90 rounded-2xl p-2 border border-white/10 shadow-2xl flex items-center justify-center">
+            <canvas id="turtle-canvas" width="460" height="420" class="rounded-xl select-none"></canvas>
+          </div>
+          <div class="text-xs text-slate-400 text-center">Kaplumbağa robot yönünü takip eder ve arkasında renkli geometrik çizgiler bırakır.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────
+         SECTION 3: HATA AYIKLAMA (DEBUG)
+         ───────────────────────────────────────────────────────────── -->
+    <section id="section-debug" class="w-full hidden flex-col gap-4">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🐞</span> Hata Ayıklama (Debug Dedektifi)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Hazır yazılmış kodda bir hata var ve robot hedefe varamıyor! Hatayı bul ve düzelt.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1.5 bg-slate-900/80 p-1.5 rounded-xl border border-white/10 text-xs">
+            <span class="text-slate-400 pl-1 font-bold">Vaka:</span>
+            <select id="debug-case-select" onchange="loadDebugCase()" class="bg-transparent text-emerald-300 font-bold pr-2 focus:outline-none cursor-pointer">
+              <option value="0" class="bg-slate-900">Vaka 1: Ters Yöne Dönüş</option>
+              <option value="1" class="bg-slate-900">Vaka 2: Eksik Adım Sayısı</option>
+              <option value="2" class="bg-slate-900">Vaka 3: Hatalı Döngü Tekrarı</option>
+            </select>
+          </div>
+          <button onclick="runDebugCode()" class="h-9 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1 shadow-lg shadow-rose-600/30">
+            <span>🔍</span> <span>Kodu Test Et</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        <div class="lg:col-span-5 glass-panel p-4 rounded-3xl flex flex-col gap-3 min-h-[440px]">
+          <div class="flex items-center justify-between border-b border-white/10 pb-2">
+            <span class="text-xs font-bold text-rose-400 uppercase tracking-wider">Hatalı Algoritma</span>
+            <span class="text-[10px] text-slate-400">Blokları düzelt ve test et</span>
+          </div>
+
+          <div id="debug-blocks-list" class="flex-1 flex flex-col gap-2 overflow-y-auto max-h-[380px] p-2 rounded-2xl bg-slate-950/60 border border-white/5">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <div class="lg:col-span-7 glass-panel p-4 rounded-3xl flex flex-col items-center gap-4">
+          <div class="relative bg-slate-950/90 rounded-2xl p-2 border border-white/10 shadow-2xl flex items-center justify-center">
+            <canvas id="debug-canvas" width="400" height="400" class="rounded-xl select-none"></canvas>
+          </div>
+          <div id="debug-status-banner" class="w-full p-2.5 rounded-xl bg-slate-900 border border-white/10 text-center text-xs font-bold text-amber-300">
+            Kodun mantığını inceleyin, hatalı bloğu tespit edin ve test edin!
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- EDUCATIONAL NOTE CARD -->
+    <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3 mt-2">
+      <span class="text-xl">💡</span>
+      <div>
+        <strong class="text-white">Bilişim & Matematik Kazanımı (Algoritmik Düşünme):</strong> Bir algoritma, belirli bir problemi çözmek veya hedefe ulaşmak için tanımlanmış <strong>adım adım kesin kurallar dizisidir</strong>. Bilgisayarlar ve robotlar insani sezgilerle değil, yalnızca sizin verdiğiniz sıralı komutları harfiyen yürüterek çalışır. Döngüler ise tekrarlayan adımları kısaltarak kodun verimliliğini artırır.
+      </div>
+    </div>
+
+  </main>
+
+  <!-- JAVASCRIPT ENGINE -->
+  <script>
+    let audioCtx = null;
+    let isSoundOn = true;
+
+    function getAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    function playTone(freq, duration = 0.1, type = 'sine') {
+      if (!isSoundOn) return;
+      try {
+        const ctx = getAudio();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function playSuccessFanfare() {
+      if (!isSoundOn) return;
+      const notes = [440, 554.37, 659.25, 880];
+      notes.forEach((freq, idx) => {
+        setTimeout(() => playTone(freq, 0.2, 'triangle'), idx * 90);
+      });
+    }
+
+    function toggleAudio() {
+      isSoundOn = !isSoundOn;
+      document.getElementById('sound-icon').innerText = isSoundOn ? '🔊' : '🔇';
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    function triggerConfetti() {
+      if (typeof confetti === 'function') {
+        confetti({ particleCount: 75, spread: 70, origin: { y: 0.65 } });
+      }
+    }
+
+    /* APP MODE NAVIGATION */
+    let currentAppMode = 'maze';
+
+    function setAppMode(mode) {
+      currentAppMode = mode;
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.remove('active', 'text-emerald-300', 'bg-emerald-500/20', 'border', 'border-emerald-400/40');
+        btn.classList.add('text-slate-300');
+      });
+      const activeBtn = document.getElementById(`mode-${mode}`);
+      if (activeBtn) {
+        activeBtn.classList.add('active', 'text-emerald-300', 'bg-emerald-500/20', 'border', 'border-emerald-400/40');
+        activeBtn.classList.remove('text-slate-300');
+      }
+
+      document.getElementById('section-maze').classList.add('hidden');
+      document.getElementById('section-turtle').classList.add('hidden');
+      document.getElementById('section-debug').classList.add('hidden');
+
+      const targetSec = document.getElementById(`section-${mode}`);
+      if (targetSec) targetSec.classList.remove('hidden');
+
+      playTone(400, 0.08);
+
+      if (mode === 'maze') drawMaze();
+      if (mode === 'turtle') drawTurtle();
+      if (mode === 'debug') drawDebug();
+    }
+
+    /* 1. MAZE ENGINE (12 LEVELS) */
+    const mazeLevels = [
+      {
+        id: 1,
+        title: "1. Adım: Düz İlerleme",
+        gridSize: 5,
+        start: { r: 4, c: 2, dir: 'N' },
+        goal: { r: 1, c: 2 },
+        stars: [{ r: 2, c: 2 }],
+        walls: [{ r: 4, c: 1 }, { r: 4, c: 3 }, { r: 3, c: 1 }, { r: 3, c: 3 }, { r: 2, c: 1 }, { r: 2, c: 3 }]
+      },
+      {
+        id: 2,
+        title: "2. Adım: İlk Viraj (Sağa Dönüş)",
+        gridSize: 5,
+        start: { r: 3, c: 1, dir: 'N' },
+        goal: { r: 1, c: 3 },
+        stars: [{ r: 1, c: 2 }],
+        walls: [{ r: 2, c: 2 }, { r: 3, c: 2 }]
+      },
+      {
+        id: 3,
+        title: "3. Adım: S Virajı (Zikzak Yolu)",
+        gridSize: 5,
+        start: { r: 4, c: 0, dir: 'E' },
+        goal: { r: 0, c: 4 },
+        stars: [{ r: 2, c: 2 }],
+        walls: [{ r: 3, c: 0 }, { r: 3, c: 1 }, { r: 1, c: 3 }, { r: 1, c: 4 }]
+      },
+      {
+        id: 4,
+        title: "4. Adım: Döngülere Giriş (3 Kez Tekrarla)",
+        gridSize: 6,
+        start: { r: 5, c: 1, dir: 'N' },
+        goal: { r: 1, c: 1 },
+        stars: [{ r: 4, c: 1 }, { r: 2, c: 1 }],
+        walls: [{ r: 5, c: 0 }, { r: 4, c: 0 }, { r: 3, c: 0 }, { r: 2, c: 0 }, { r: 1, c: 0 }, { r: 5, c: 2 }, { r: 4, c: 2 }, { r: 3, c: 2 }, { r: 2, c: 2 }, { r: 1, c: 2 }]
+      },
+      {
+        id: 5,
+        title: "5. Adım: Merdiven Deseni (Tekrarla)",
+        gridSize: 6,
+        start: { r: 5, c: 0, dir: 'E' },
+        goal: { r: 1, c: 4 },
+        stars: [{ r: 3, c: 2 }],
+        walls: [{ r: 4, c: 0 }, { r: 5, c: 2 }, { r: 2, c: 2 }, { r: 3, c: 4 }]
+      },
+      {
+        id: 6,
+        title: "6. Adım: Kare Yolu (4 Kez Döngü)",
+        gridSize: 6,
+        start: { r: 4, c: 1, dir: 'N' },
+        goal: { r: 4, c: 2 },
+        stars: [{ r: 1, c: 1 }, { r: 1, c: 4 }, { r: 4, c: 4 }],
+        walls: [{ r: 2, c: 2 }, { r: 2, c: 3 }, { r: 3, c: 2 }, { r: 3, c: 3 }]
+      },
+      {
+        id: 7,
+        title: "7. Adım: Köşeler & Yıldızlar",
+        gridSize: 6,
+        start: { r: 4, c: 4, dir: 'W' },
+        goal: { r: 1, c: 1 },
+        stars: [{ r: 4, c: 2 }],
+        walls: [{ r: 4, c: 0 }, { r: 3, c: 2 }, { r: 2, c: 4 }]
+      },
+      {
+        id: 8,
+        title: "8. Adım: Spiral Tünel",
+        gridSize: 6,
+        start: { r: 0, c: 0, dir: 'E' },
+        goal: { r: 2, c: 2 },
+        stars: [{ r: 0, c: 5 }, { r: 5, c: 5 }, { r: 5, c: 1 }],
+        walls: [{ r: 1, c: 1 }, { r: 1, c: 2 }, { r: 1, c: 3 }, { r: 1, c: 4 }, { r: 2, c: 4 }, { r: 3, c: 4 }, { r: 4, c: 4 }, { r: 4, c: 3 }, { r: 4, c: 2 }, { r: 4, c: 1 }, { r: 3, c: 1 }]
+      },
+      {
+        id: 9,
+        title: "9. Adım: Çift Yıldız Avı",
+        gridSize: 6,
+        start: { r: 5, c: 2, dir: 'N' },
+        goal: { r: 0, c: 2 },
+        stars: [{ r: 3, c: 1 }, { r: 3, c: 3 }],
+        walls: [{ r: 4, c: 0 }, { r: 2, c: 0 }, { r: 4, c: 4 }, { r: 2, c: 4 }]
+      },
+      {
+        id: 10,
+        title: "10. Adım: Labirent Şampiyonası",
+        gridSize: 6,
+        start: { r: 5, c: 0, dir: 'N' },
+        goal: { r: 0, c: 5 },
+        stars: [{ r: 2, c: 2 }, { r: 4, c: 3 }],
+        walls: [{ r: 4, c: 1 }, { r: 3, c: 1 }, { r: 2, c: 1 }, { r: 3, c: 3 }, { r: 2, c: 3 }, { r: 1, c: 3 }, { r: 1, c: 4 }]
+      },
+      {
+        id: 11,
+        title: "11. Adım: Usta Döngü & Labirent",
+        gridSize: 7,
+        start: { r: 6, c: 1, dir: 'N' },
+        goal: { r: 1, c: 5 },
+        stars: [{ r: 4, c: 1 }, { r: 4, c: 5 }],
+        walls: [{ r: 3, c: 2 }, { r: 3, c: 3 }, { r: 3, c: 4 }, { r: 2, c: 3 }, { r: 5, c: 3 }]
+      },
+      {
+        id: 12,
+        title: "12. Adım: Büyük Final: Algoritma Şatosu",
+        gridSize: 7,
+        start: { r: 6, c: 3, dir: 'N' },
+        goal: { r: 0, c: 3 },
+        stars: [{ r: 4, c: 1 }, { r: 4, c: 5 }, { r: 2, c: 3 }],
+        walls: [{ r: 5, c: 2 }, { r: 5, c: 4 }, { r: 3, c: 1 }, { r: 3, c: 2 }, { r: 3, c: 4 }, { r: 3, c: 5 }, { r: 1, c: 2 }, { r: 1, c: 4 }]
+      }
+    ];
+
+    let currentMazeLevelIdx = 0;
+    let robotState = { r: 0, c: 0, dir: 'N' };
+    let collectedStars = new Set();
+    let isRunning = false;
+    let executionQueue = [];
+    let currentStepIdx = 0;
+    let workspaceBlocks = [];
+
+    function initMazeLevels() {
+      const select = document.getElementById('maze-level-select');
+      select.innerHTML = '';
+      mazeLevels.forEach((lvl, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.className = 'bg-slate-900';
+        opt.innerText = `${idx + 1}. Seviye`;
+        select.appendChild(opt);
+      });
+      loadMazeLevel(0);
+    }
+
+    function changeMazeLevel() {
+      const idx = parseInt(document.getElementById('maze-level-select').value) || 0;
+      loadMazeLevel(idx);
+    }
+
+    function loadMazeLevel(idx) {
+      currentMazeLevelIdx = idx;
+      const lvl = mazeLevels[idx];
+      document.getElementById('maze-level-title').innerText = lvl.title;
+      resetExecution();
+    }
+
+    function resetExecution() {
+      isRunning = false;
+      const lvl = mazeLevels[currentMazeLevelIdx];
+      robotState = { ...lvl.start };
+      collectedStars.clear();
+      currentStepIdx = 0;
+      document.getElementById('stars-status').innerText = `0 / ${lvl.stars.length}`;
+      document.getElementById('moves-status').innerText = '0';
+      document.getElementById('maze-status-banner').innerHTML = 'Algoritmanızı hazırlayın ve <strong>Çalıştır</strong> düğmesine basın.';
+      document.getElementById('maze-status-banner').className = 'w-full p-2.5 rounded-xl bg-slate-900 border border-white/10 text-center text-xs font-bold text-slate-300';
+      clearBlockHighlight();
+      drawMaze();
+    }
+
+    function addBlockToWorkspace(block) {
+      if (isRunning) return;
+      workspaceBlocks.push(block);
+      playTone(480, 0.05);
+      renderWorkspaceBlocks();
+    }
+
+    function removeBlockFromWorkspace(idx) {
+      if (isRunning) return;
+      workspaceBlocks.splice(idx, 1);
+      playTone(320, 0.05);
+      renderWorkspaceBlocks();
+    }
+
+    function clearWorkspace() {
+      if (isRunning) return;
+      workspaceBlocks = [];
+      renderWorkspaceBlocks();
+    }
+
+    function renderWorkspaceBlocks() {
+      const container = document.getElementById('workspace-blocks');
+      container.innerHTML = '';
+
+      document.getElementById('block-count-badge').innerText = `${workspaceBlocks.length} blok`;
+
+      if (workspaceBlocks.length === 0) {
+        container.innerHTML = `
+          <div id="workspace-empty-msg" class="h-48 flex flex-col items-center justify-center text-slate-500 text-xs italic gap-2">
+            <span class="text-2xl">🧩</span>
+            <span>Henüz blok eklenmedi. Soldaki bloklara tıklayın!</span>
+          </div>`;
+        return;
+      }
+
+      workspaceBlocks.forEach((block, idx) => {
+        const card = document.createElement('div');
+        card.id = `ws-block-${idx}`;
+        card.className = 'code-block flex items-center justify-between p-2.5 rounded-xl border text-xs font-bold shadow-sm';
+
+        if (block.type === 'move') {
+          card.className += ' bg-emerald-600/25 border-emerald-400/40 text-emerald-200';
+          card.innerHTML = `<span>🚶 1 Adım İlerle</span>`;
+        } else if (block.type === 'turnRight') {
+          card.className += ' bg-sky-600/25 border-sky-400/40 text-sky-200';
+          card.innerHTML = `<span>↻ Sağa Dön (90°)</span>`;
+        } else if (block.type === 'turnLeft') {
+          card.className += ' bg-sky-600/25 border-sky-400/40 text-sky-200';
+          card.innerHTML = `<span>↺ Sola Dön (90°)</span>`;
+        } else if (block.type === 'collect') {
+          card.className += ' bg-amber-600/25 border-amber-400/40 text-amber-200';
+          card.innerHTML = `<span>⭐ Yıldızı Topla</span>`;
+        } else if (block.type === 'repeat') {
+          card.className += ' bg-purple-600/25 border-purple-400/40 text-purple-200 flex flex-col items-start gap-1.5';
+          card.innerHTML = `
+            <div class="flex items-center justify-between w-full">
+              <span class="flex items-center gap-1.5">
+                <span>🔁 Tekrarla:</span>
+                <input type="number" min="1" max="9" value="${block.count}" onchange="updateRepeatCount(${idx}, this.value)" class="w-10 bg-black/40 text-white font-mono px-1 rounded border border-white/20 text-center" />
+                <span>kez</span>
+              </span>
+              <button onclick="removeBlockFromWorkspace(${idx})" class="text-slate-400 hover:text-rose-400 text-sm">✕</button>
+            </div>
+            <div class="w-full text-[10px] text-purple-300/70 italic pl-4 border-l-2 border-purple-500/40">
+              (Sonraki komut döngüye dahildir)
+            </div>
+          `;
+          container.appendChild(card);
+          return;
+        }
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'text-slate-400 hover:text-rose-400 text-sm px-1';
+        delBtn.innerText = '✕';
+        delBtn.onclick = () => removeBlockFromWorkspace(idx);
+        card.appendChild(delBtn);
+
+        container.appendChild(card);
+      });
+    }
+
+    function updateRepeatCount(idx, val) {
+      if (workspaceBlocks[idx] && workspaceBlocks[idx].type === 'repeat') {
+        workspaceBlocks[idx].count = Math.max(1, Math.min(9, parseInt(val) || 1));
+      }
+    }
+
+    function compileBlocks() {
+      const actions = [];
+      let i = 0;
+      while (i < workspaceBlocks.length) {
+        const b = workspaceBlocks[i];
+        if (b.type === 'repeat') {
+          const repeatCount = b.count || 2;
+          const nextBlock = workspaceBlocks[i + 1];
+          if (nextBlock) {
+            for (let r = 0; r < repeatCount; r++) {
+              actions.push({ blockIdx: i + 1, ...nextBlock });
+            }
+            i += 2;
+            continue;
+          }
+        } else {
+          actions.push({ blockIdx: i, ...b });
+        }
+        i++;
+      }
+      return actions;
+    }
+
+    function runCode() {
+      if (isRunning) return;
+      resetExecution();
+      executionQueue = compileBlocks();
+      if (executionQueue.length === 0) {
+        document.getElementById('maze-status-banner').innerText = 'Lütfen önce en az bir komut bloğu ekleyin!';
+        return;
+      }
+      isRunning = true;
+      executeNextAction();
+    }
+
+    function stepCode() {
+      if (!isRunning) {
+        resetExecution();
+        executionQueue = compileBlocks();
+        if (executionQueue.length === 0) return;
+        isRunning = true;
+      }
+      executeNextAction(true);
+    }
+
+    function executeNextAction(singleStep = false) {
+      if (!isRunning || currentStepIdx >= executionQueue.length) {
+        finishExecution();
+        return;
+      }
+
+      const action = executionQueue[currentStepIdx];
+      highlightBlock(action.blockIdx);
+
+      const lvl = mazeLevels[currentMazeLevelIdx];
+
+      if (action.type === 'move') {
+        const deltas = { N: [-1, 0], E: [0, 1], S: [1, 0], W: [0, -1] };
+        const [dr, dc] = deltas[robotState.dir];
+        const nr = robotState.r + dr;
+        const nc = robotState.c + dc;
+
+        if (nr < 0 || nr >= lvl.gridSize || nc < 0 || nc >= lvl.gridSize || lvl.walls.some(w => w.r === nr && w.c === nc)) {
+          playTone(180, 0.2, 'sawtooth');
+          document.getElementById('maze-status-banner').innerHTML = '⚠️ <strong>DİKKAT: Engele veya duvara çarptınız!</strong>';
+          document.getElementById('maze-status-banner').className = 'w-full p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-center text-xs font-bold text-rose-300';
+          isRunning = false;
+          return;
+        } else {
+          robotState.r = nr;
+          robotState.c = nc;
+          playTone(400, 0.08);
+        }
+      } else if (action.type === 'turnRight') {
+        const dirs = ['N', 'E', 'S', 'W'];
+        robotState.dir = dirs[(dirs.indexOf(robotState.dir) + 1) % 4];
+        playTone(500, 0.06);
+      } else if (action.type === 'turnLeft') {
+        const dirs = ['N', 'E', 'S', 'W'];
+        robotState.dir = dirs[(dirs.indexOf(robotState.dir) + 3) % 4];
+        playTone(500, 0.06);
+      } else if (action.type === 'collect') {
+        const key = `${robotState.r}-${robotState.c}`;
+        if (lvl.stars.some(s => s.r === robotState.r && s.c === robotState.c)) {
+          collectedStars.add(key);
+          playTone(880, 0.12);
+        }
+      }
+
+      currentStepIdx++;
+      document.getElementById('moves-status').innerText = currentStepIdx;
+      document.getElementById('stars-status').innerText = `${collectedStars.size} / ${lvl.stars.length}`;
+      drawMaze();
+
+      if (robotState.r === lvl.goal.r && robotState.c === lvl.goal.c && collectedStars.size === lvl.stars.length) {
+        isRunning = false;
+        document.getElementById('maze-status-banner').innerHTML = '🎉 <strong>TEBRİKLER! Görevi Başarıyla Tamamladınız!</strong>';
+        document.getElementById('maze-status-banner').className = 'w-full p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-center text-xs font-bold text-emerald-300';
+        playSuccessFanfare();
+        triggerConfetti();
+        return;
+      }
+
+      if (!singleStep && isRunning) {
+        setTimeout(executeNextAction, 350);
+      }
+    }
+
+    function finishExecution() {
+      isRunning = false;
+      clearBlockHighlight();
+      const lvl = mazeLevels[currentMazeLevelIdx];
+      if (!(robotState.r === lvl.goal.r && robotState.c === lvl.goal.c && collectedStars.size === lvl.stars.length)) {
+        document.getElementById('maze-status-banner').innerHTML = 'Kod tamamlandı fakat hedefe henüz ulaşılamadı. Algoritmanızı gözden geçirin!';
+      }
+    }
+
+    function highlightBlock(blockIdx) {
+      clearBlockHighlight();
+      const el = document.getElementById(`ws-block-${blockIdx}`);
+      if (el) el.classList.add('executing');
+    }
+
+    function clearBlockHighlight() {
+      document.querySelectorAll('.code-block').forEach(b => b.classList.remove('executing'));
+    }
+
+    function drawMaze() {
+      const canvas = document.getElementById('maze-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const lvl = mazeLevels[currentMazeLevelIdx];
+      const sz = lvl.gridSize;
+      const cellSize = canvas.width / sz;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let r = 0; r < sz; r++) {
+        for (let c = 0; c < sz; c++) {
+          const x = c * cellSize;
+          const y = r * cellSize;
+          ctx.fillStyle = (r + c) % 2 === 0 ? '#0f172a' : '#1e293b';
+          ctx.fillRect(x, y, cellSize, cellSize);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x, y, cellSize, cellSize);
+        }
+      }
+
+      lvl.walls.forEach(w => {
+        const x = w.c * cellSize;
+        const y = w.r * cellSize;
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(x + 8, y + cellSize / 2 - 2, cellSize - 16, 4);
+      });
+
+      const gx = lvl.goal.c * cellSize + cellSize / 2;
+      const gy = lvl.goal.r * cellSize + cellSize / 2;
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+      ctx.beginPath();
+      ctx.arc(gx, gy, cellSize * 0.38, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = `${Math.floor(cellSize * 0.55)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🏁', gx, gy);
+
+      lvl.stars.forEach(s => {
+        const key = `${s.r}-${s.c}`;
+        if (!collectedStars.has(key)) {
+          const sx = s.c * cellSize + cellSize / 2;
+          const sy = s.r * cellSize + cellSize / 2;
+          ctx.font = `${Math.floor(cellSize * 0.5)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('⭐', sx, sy);
+        }
+      });
+
+      const rx = robotState.c * cellSize + cellSize / 2;
+      const ry = robotState.r * cellSize + cellSize / 2;
+
+      ctx.save();
+      ctx.translate(rx, ry);
+      const angles = { N: 0, E: Math.PI / 2, S: Math.PI, W: -Math.PI / 2 };
+      ctx.rotate(angles[robotState.dir]);
+
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.arc(0, 0, cellSize * 0.34, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#a7f3d0';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, -cellSize * 0.12, cellSize * 0.12, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#34d399';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, -cellSize * 0.24);
+      ctx.lineTo(0, -cellSize * 0.42);
+      ctx.stroke();
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(0, -cellSize * 0.44, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    /* 2. TURTLE DRAWING ENGINE */
+    let turtleCommands = [];
+
+    function loadTurtlePreset() {
+      const preset = document.getElementById('turtle-preset-select').value;
+      turtleCommands = [];
+
+      if (preset === 'square') {
+        turtleCommands = [
+          { type: 'repeat', count: 4, commands: [
+            { type: 'forward', dist: 120 },
+            { type: 'turnRight', angle: 90 }
+          ]}
+        ];
+      } else if (preset === 'triangle') {
+        turtleCommands = [
+          { type: 'repeat', count: 3, commands: [
+            { type: 'forward', dist: 140 },
+            { type: 'turnRight', angle: 120 }
+          ]}
+        ];
+      } else if (preset === 'pentagon') {
+        turtleCommands = [
+          { type: 'repeat', count: 5, commands: [
+            { type: 'forward', dist: 100 },
+            { type: 'turnRight', angle: 72 }
+          ]}
+        ];
+      } else if (preset === 'star') {
+        turtleCommands = [
+          { type: 'repeat', count: 5, commands: [
+            { type: 'forward', dist: 150 },
+            { type: 'turnRight', angle: 144 }
+          ]}
+        ];
+      } else if (preset === 'flower') {
+        turtleCommands = [
+          { type: 'repeat', count: 36, commands: [
+            { type: 'forward', dist: 80 },
+            { type: 'turnRight', angle: 90 },
+            { type: 'forward', dist: 80 },
+            { type: 'turnRight', angle: 100 }
+          ]}
+        ];
+      }
+
+      renderTurtleCommands();
+      drawTurtle();
+    }
+
+    function addTurtleBlock(type) {
+      if (type === 'forward') {
+        turtleCommands.push({ type: 'forward', dist: 80 });
+      } else if (type === 'turnRight') {
+        turtleCommands.push({ type: 'turnRight', angle: 90 });
+      } else if (type === 'repeat') {
+        turtleCommands.push({ type: 'repeat', count: 4, commands: [{ type: 'forward', dist: 60 }, { type: 'turnRight', angle: 90 }] });
+      }
+      renderTurtleCommands();
+    }
+
+    function renderTurtleCommands() {
+      const container = document.getElementById('turtle-blocks-list');
+      container.innerHTML = '';
+
+      turtleCommands.forEach((cmd, idx) => {
+        const div = document.createElement('div');
+        div.className = 'p-3 rounded-xl bg-slate-900 border border-white/10 text-xs font-bold flex items-center justify-between';
+
+        if (cmd.type === 'forward') {
+          div.innerHTML = `
+            <span class="text-emerald-300">İlerle: <input type="number" value="${cmd.dist}" onchange="turtleCommands[${idx}].dist = Number(this.value)" class="w-14 bg-black/50 px-1 rounded text-white" /> px</span>
+            <button onclick="turtleCommands.splice(${idx},1); renderTurtleCommands();" class="text-slate-500 hover:text-rose-400">✕</button>
+          `;
+        } else if (cmd.type === 'turnRight') {
+          div.innerHTML = `
+            <span class="text-sky-300">Sağa Dön: <input type="number" value="${cmd.angle}" onchange="turtleCommands[${idx}].angle = Number(this.value)" class="w-14 bg-black/50 px-1 rounded text-white" /> derece</span>
+            <button onclick="turtleCommands.splice(${idx},1); renderTurtleCommands();" class="text-slate-500 hover:text-rose-400">✕</button>
+          `;
+        } else if (cmd.type === 'repeat') {
+          div.innerHTML = `
+            <div class="flex flex-col gap-1 w-full">
+              <div class="flex justify-between items-center text-purple-300">
+                <span>Tekrarla: <input type="number" value="${cmd.count}" onchange="turtleCommands[${idx}].count = Number(this.value)" class="w-12 bg-black/50 px-1 rounded text-white" /> kez</span>
+                <button onclick="turtleCommands.splice(${idx},1); renderTurtleCommands();" class="text-slate-500 hover:text-rose-400">✕</button>
+              </div>
+              <span class="text-[10px] text-slate-400 italic">İç komutlar hazır desen olarak çizilir</span>
+            </div>
+          `;
+        }
+
+        container.appendChild(div);
+      });
+    }
+
+    function clearTurtle() {
+      const cvs = document.getElementById('turtle-canvas');
+      const ctx = cvs.getContext('2d');
+      ctx.clearRect(0, 0, cvs.width, cvs.height);
+      drawTurtleGrid();
+    }
+
+    function drawTurtleGrid() {
+      const cvs = document.getElementById('turtle-canvas');
+      const ctx = cvs.getContext('2d');
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < cvs.width; i += 40) {
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, cvs.height); ctx.stroke();
+      }
+      for (let i = 0; i < cvs.height; i += 40) {
+        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(cvs.width, i); ctx.stroke();
+      }
+    }
+
+    function runTurtle() {
+      clearTurtle();
+      const cvs = document.getElementById('turtle-canvas');
+      const ctx = cvs.getContext('2d');
+
+      let x = cvs.width / 2;
+      let y = cvs.height / 2;
+      let angle = -90;
+
+      ctx.strokeStyle = '#34d399';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+
+      function execCmd(c) {
+        if (c.type === 'forward') {
+          const rad = (angle * Math.PI) / 180;
+          x += Math.cos(rad) * c.dist;
+          y += Math.sin(rad) * c.dist;
+          ctx.lineTo(x, y);
+        } else if (c.type === 'turnRight') {
+          angle += c.angle;
+        } else if (c.type === 'repeat') {
+          for (let r = 0; r < c.count; r++) {
+            c.commands.forEach(sub => execCmd(sub));
+          }
+        }
+      }
+
+      turtleCommands.forEach(cmd => execCmd(cmd));
+      ctx.stroke();
+
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      playTone(600, 0.15);
+      triggerConfetti();
+    }
+
+    function drawTurtle() {
+      drawTurtleGrid();
+      runTurtle();
+    }
+
+    /* 3. DEBUG ENGINE */
+    const debugCases = [
+      {
+        title: "Vaka 1: Ters Yöne Dönüş",
+        description: "Robot sağa dönmesi gerekirken sola dönüyor ve duvara çarpıyor!",
+        gridSize: 5,
+        start: { r: 4, c: 1, dir: 'N' },
+        goal: { r: 2, c: 3 },
+        walls: [{ r: 2, c: 0 }, { r: 2, c: 1 }],
+        buggyBlocks: [
+          { type: 'move' },
+          { type: 'move' },
+          { type: 'turnLeft' },
+          { type: 'move' },
+          { type: 'move' }
+        ]
+      },
+      {
+        title: "Vaka 2: Eksik Adım Sayısı",
+        description: "Robot hedefin bir kare gerisinde kalıyor!",
+        gridSize: 5,
+        start: { r: 4, c: 2, dir: 'N' },
+        goal: { r: 1, c: 2 },
+        walls: [],
+        buggyBlocks: [
+          { type: 'move' },
+          { type: 'move' }
+        ]
+      },
+      {
+        title: "Vaka 3: Hatalı Döngü Tekrarı",
+        description: "Robot döngüyü 5 yerine 2 kez çalıştırıp duruyor!",
+        gridSize: 6,
+        start: { r: 5, c: 1, dir: 'N' },
+        goal: { r: 1, c: 1 },
+        walls: [{ r: 5, c: 2 }, { r: 4, c: 2 }, { r: 3, c: 2 }, { r: 2, c: 2 }, { r: 1, c: 2 }],
+        buggyBlocks: [
+          { type: 'repeat', count: 2 },
+          { type: 'move' }
+        ]
+      }
+    ];
+
+    let currentDebugIdx = 0;
+    let debugBlocks = [];
+    let debugRobot = { r: 0, c: 0, dir: 'N' };
+
+    function loadDebugCase() {
+      currentDebugIdx = parseInt(document.getElementById('debug-case-select').value) || 0;
+      const c = debugCases[currentDebugIdx];
+      debugRobot = { ...c.start };
+      debugBlocks = JSON.parse(JSON.stringify(c.buggyBlocks));
+      document.getElementById('debug-status-banner').innerHTML = `<strong>${c.title}:</strong> ${c.description}`;
+      renderDebugBlocks();
+      drawDebug();
+    }
+
+    function renderDebugBlocks() {
+      const container = document.getElementById('debug-blocks-list');
+      container.innerHTML = '';
+
+      debugBlocks.forEach((b, idx) => {
+        const div = document.createElement('div');
+        div.className = 'p-3 rounded-xl bg-slate-900 border border-white/10 text-xs font-bold flex items-center justify-between';
+
+        if (b.type === 'move') {
+          div.innerHTML = `<span class="text-emerald-300">🚶 1 Adım İlerle</span>`;
+        } else if (b.type === 'turnRight') {
+          div.innerHTML = `<span class="text-sky-300">↻ Sağa Dön</span>`;
+        } else if (b.type === 'turnLeft') {
+          div.innerHTML = `<span class="text-sky-300">↺ Sola Dön</span>`;
+        } else if (b.type === 'repeat') {
+          div.innerHTML = `<span class="text-purple-300">🔁 Tekrar Sayısı: <input type="number" min="1" max="6" value="${b.count}" onchange="debugBlocks[${idx}].count = Number(this.value)" class="w-12 bg-black/50 px-1 rounded text-white" /></span>`;
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'flex items-center gap-1';
+
+        if (b.type === 'turnLeft' || b.type === 'turnRight') {
+          const tog = document.createElement('button');
+          tog.className = 'px-2 py-0.5 rounded bg-sky-500/30 text-sky-200 text-[10px] hover:bg-sky-500/50';
+          tog.innerText = 'Yönü Değiştir';
+          tog.onclick = () => {
+            b.type = b.type === 'turnLeft' ? 'turnRight' : 'turnLeft';
+            renderDebugBlocks();
+          };
+          actions.appendChild(tog);
+        }
+
+        const addStep = document.createElement('button');
+        addStep.className = 'px-2 py-0.5 rounded bg-emerald-500/30 text-emerald-200 text-[10px] hover:bg-emerald-500/50';
+        addStep.innerText = '+ Adım';
+        addStep.onclick = () => {
+          debugBlocks.splice(idx + 1, 0, { type: 'move' });
+          renderDebugBlocks();
+        };
+        actions.appendChild(addStep);
+
+        div.appendChild(actions);
+        container.appendChild(div);
+      });
+    }
+
+    function runDebugCode() {
+      const c = debugCases[currentDebugIdx];
+      debugRobot = { ...c.start };
+
+      let step = 0;
+      let crash = false;
+
+      const actions = [];
+      debugBlocks.forEach(b => {
+        if (b.type === 'repeat') {
+          for (let r = 0; r < b.count; r++) actions.push({ type: 'move' });
+        } else {
+          actions.push(b);
+        }
+      });
+
+      function exec() {
+        if (step >= actions.length || crash) {
+          if (debugRobot.r === c.goal.r && debugRobot.c === c.goal.c) {
+            document.getElementById('debug-status-banner').innerHTML = '🎉 <strong>TEBRİKLER! Hatayı Başarıyla Düzeltip Hedefe Ulaştınız!</strong>';
+            document.getElementById('debug-status-banner').className = 'w-full p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-center text-xs font-bold text-emerald-300';
+            playSuccessFanfare();
+            triggerConfetti();
+          } else if (!crash) {
+            document.getElementById('debug-status-banner').innerHTML = 'Kod çalıştı fakat hedefe tam ulaşılamadı. Tekrar deneyin!';
+          }
+          return;
+        }
+
+        const act = actions[step];
+        if (act.type === 'move') {
+          const deltas = { N: [-1, 0], E: [0, 1], S: [1, 0], W: [0, -1] };
+          const [dr, dc] = deltas[debugRobot.dir];
+          const nr = debugRobot.r + dr;
+          const nc = debugRobot.c + dc;
+          if (nr < 0 || nr >= c.gridSize || nc < 0 || nc >= c.gridSize || c.walls.some(w => w.r === nr && w.c === nc)) {
+            crash = true;
+            document.getElementById('debug-status-banner').innerHTML = '⚠️ <strong>DİKKAT: Hatalı yön nedeniyle duvara çarptınız!</strong>';
+            playTone(180, 0.2, 'sawtooth');
+            return;
+          }
+          debugRobot.r = nr;
+          debugRobot.c = nc;
+          playTone(400, 0.08);
+        } else if (act.type === 'turnRight') {
+          const dirs = ['N', 'E', 'S', 'W'];
+          debugRobot.dir = dirs[(dirs.indexOf(debugRobot.dir) + 1) % 4];
+          playTone(500, 0.06);
+        } else if (act.type === 'turnLeft') {
+          const dirs = ['N', 'E', 'S', 'W'];
+          debugRobot.dir = dirs[(dirs.indexOf(debugRobot.dir) + 3) % 4];
+          playTone(500, 0.06);
+        }
+
+        step++;
+        drawDebug();
+        setTimeout(exec, 350);
+      }
+
+      exec();
+    }
+
+    function drawDebug() {
+      const canvas = document.getElementById('debug-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const c = debugCases[currentDebugIdx];
+      const sz = c.gridSize;
+      const cellSize = canvas.width / sz;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let r = 0; r < sz; r++) {
+        for (let col = 0; col < sz; col++) {
+          ctx.fillStyle = (r + col) % 2 === 0 ? '#0f172a' : '#1e293b';
+          ctx.fillRect(col * cellSize, r * cellSize, cellSize, cellSize);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+          ctx.strokeRect(col * cellSize, r * cellSize, cellSize, cellSize);
+        }
+      }
+
+      c.walls.forEach(w => {
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(w.c * cellSize + 2, w.r * cellSize + 2, cellSize - 4, cellSize - 4);
+      });
+
+      ctx.font = `${Math.floor(cellSize * 0.55)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🏁', c.goal.c * cellSize + cellSize / 2, c.goal.r * cellSize + cellSize / 2);
+
+      const rx = debugRobot.c * cellSize + cellSize / 2;
+      const ry = debugRobot.r * cellSize + cellSize / 2;
+      ctx.save();
+      ctx.translate(rx, ry);
+      const angles = { N: 0, E: Math.PI / 2, S: Math.PI, W: -Math.PI / 2 };
+      ctx.rotate(angles[debugRobot.dir]);
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.arc(0, 0, cellSize * 0.34, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    /* INITIALIZE */
+    window.addEventListener('DOMContentLoaded', () => {
+      initMazeLevels();
+      loadTurtlePreset();
+      loadDebugCase();
+      setAppMode('maze');
+    });
+  </script>
+</body>
+</html>

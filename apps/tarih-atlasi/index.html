@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
+  <title>Zaman Kapsülü & Tarih Atlası | İnteraktif Tarih & Coğrafya</title>
+  <meta name="description" content="İnteraktif tarihsel zaman çizelgesi, Türkiye kültür ve coğrafya haritası, tarihi İpek ve Baharat Yolu kervan simülasyonu.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%23d97706'/><path d='M50 15 L50 85 M15 50 L85 50' stroke='white' stroke-width='6'/></svg>">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+    
+    * {
+      box-sizing: border-box;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      background-color: #030712;
+      color: #f3f4f6;
+    }
+
+    /* Glassmorphism */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(217, 119, 6, 0.2);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+    }
+
+    .glass-card {
+      background: rgba(17, 27, 49, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+    }
+
+    /* Timeline marker active */
+    .timeline-node.active {
+      background-color: #f59e0b !important;
+      transform: scale(1.3);
+      box-shadow: 0 0 16px rgba(245, 158, 11, 0.6);
+    }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen text-slate-100">
+
+  <!-- TOP HEADER / NAV BAR -->
+  <header class="sticky top-0 z-30 flex items-center justify-between px-4 py-3 sm:px-6 glass-panel border-b border-white/10">
+    <!-- Left: Brand & Return -->
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2 h-9 px-3.5 rounded-xl glass-card text-xs sm:text-sm font-semibold text-slate-300 hover:text-white hover:border-amber-400/50 transition-all active:scale-95 shadow-md">
+        <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        <span class="hidden sm:inline">Atölye'ye Dön</span>
+      </a>
+      
+      <div class="flex items-center gap-2.5 h-9 px-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-white font-bold text-xs sm:text-sm tracking-wide">
+        <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+        <span class="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-300 to-yellow-200">
+          ⏳ Zaman Kapsülü
+        </span>
+        <span class="hidden md:inline-block text-[11px] font-medium text-slate-400 border-l border-slate-700 pl-2">
+          İnteraktif Tarih & Coğrafya
+        </span>
+      </div>
+    </div>
+
+    <!-- Center: View Mode Tabs -->
+    <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-900/80 border border-white/10">
+      <button onclick="setTarihMode('timeline')" id="hmode-timeline" class="hmode-btn active px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all text-amber-300 bg-amber-500/20 border border-amber-400/40">
+        ⏳ Zaman Çizelgesi
+      </button>
+      <button onclick="setTarihMode('map')" id="hmode-map" class="hmode-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5">
+        🗺️ Türkiye Kültür Atlası
+      </button>
+      <button onclick="setTarihMode('trade')" id="hmode-trade" class="hmode-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5">
+        🧭 Ticaret Yolları Simülasyonu
+      </button>
+    </div>
+
+    <!-- Right: Quick Tools -->
+    <div class="flex items-center gap-2">
+      <button id="sound-btn" onclick="toggleAudio()" title="Ses Efektleri" class="h-9 w-9 rounded-xl glass-card flex items-center justify-center text-slate-300 hover:text-amber-400 transition">
+        <span id="sound-icon">🔊</span>
+      </button>
+      <button onclick="toggleFullscreen()" title="Tam Ekran" class="h-9 w-9 rounded-xl glass-card flex items-center justify-center text-slate-300 hover:text-amber-400 transition">
+        ⛶
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 flex flex-col gap-4">
+
+    <!-- ─────────────────────────────────────────────────────────────
+         MODE 1: ZAMAN ÇİZELGESİ (TIMELINE)
+         ───────────────────────────────────────────────────────────── -->
+    <section id="hsec-timeline" class="w-full flex flex-col gap-4">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2"><span>⏳</span> Tarihsel Zaman Tüneli (M.Ö. 10.000 — Günümüz)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Dönemler arasında gezinin, medeniyetlerin yükselişini ve dönüm noktası olayları keşfedin.</p>
+        </div>
+      </div>
+
+      <!-- Horizontal Timeline Slider Bar -->
+      <div class="glass-panel p-6 rounded-3xl flex flex-col gap-6">
+        <div class="relative flex items-center justify-between px-4 sm:px-8 py-4">
+          <!-- Background connector line -->
+          <div class="absolute left-8 right-8 h-1 bg-slate-800 -z-0"></div>
+          <div id="timeline-progress-bar" class="absolute left-8 h-1 bg-amber-500 transition-all duration-300 -z-0" style="width: 0%;"></div>
+
+          <!-- Timeline Period Nodes -->
+          <button onclick="selectTimelineEra(0)" id="era-node-0" class="timeline-node active relative z-10 w-9 h-9 rounded-full bg-slate-900 border-2 border-amber-400 flex items-center justify-center text-xs font-bold text-white transition-all shadow-lg">1</button>
+          <button onclick="selectTimelineEra(1)" id="era-node-1" class="timeline-node relative z-10 w-9 h-9 rounded-full bg-slate-900 border-2 border-white/20 flex items-center justify-center text-xs font-bold text-white transition-all shadow-lg">2</button>
+          <button onclick="selectTimelineEra(2)" id="era-node-2" class="timeline-node relative z-10 w-9 h-9 rounded-full bg-slate-900 border-2 border-white/20 flex items-center justify-center text-xs font-bold text-white transition-all shadow-lg">3</button>
+          <button onclick="selectTimelineEra(3)" id="era-node-3" class="timeline-node relative z-10 w-9 h-9 rounded-full bg-slate-900 border-2 border-white/20 flex items-center justify-center text-xs font-bold text-white transition-all shadow-lg">4</button>
+          <button onclick="selectTimelineEra(4)" id="era-node-4" class="timeline-node relative z-10 w-9 h-9 rounded-full bg-slate-900 border-2 border-white/20 flex items-center justify-center text-xs font-bold text-white transition-all shadow-lg">5</button>
+          <button onclick="selectTimelineEra(5)" id="era-node-5" class="timeline-node relative z-10 w-9 h-9 rounded-full bg-slate-900 border-2 border-white/20 flex items-center justify-center text-xs font-bold text-white transition-all shadow-lg">6</button>
+        </div>
+
+        <!-- Period Presentation Dossier -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start bg-slate-950/60 p-6 rounded-2xl border border-white/5">
+          <div class="lg:col-span-8 flex flex-col gap-3">
+            <div class="flex items-center gap-3">
+              <span id="era-date-badge" class="px-3 py-1 rounded-xl bg-amber-500/20 text-amber-300 font-mono text-xs font-bold border border-amber-500/30">M.Ö. 10.000 — 8.000</span>
+              <span class="text-xs text-slate-400" id="era-subtitle">Tarihin Sıfır Noktası</span>
+            </div>
+            <h3 id="era-title" class="text-xl font-extrabold text-white">Göbeklitepe & Neolitik Çağ</h3>
+            <p id="era-desc" class="text-sm text-slate-300 leading-relaxed">
+              Şanlıurfa yakınlarındaki Göbeklitepe, insanlık tarihinin bilinen en eski anıtsal tapınak kompleksidir. Avcı-toplayıcı insanların yerleşik tarım hayatına geçmeden önce dahi dini ve sosyal amaçlarla devasa 'T' biçimli dikilitaşları inşa edebildiklerini kanıtlayarak arkeoloji dünyasını baştan aşağı değiştirmiştir.
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
+              <div class="p-3 rounded-xl bg-slate-900 border border-white/5 flex flex-col">
+                <span class="text-[10px] text-slate-400 uppercase font-bold">Önemli Miras / Eser</span>
+                <span id="era-artifact" class="text-xs font-bold text-amber-300 mt-0.5">T Biçimli Dikilitaşlar</span>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-900 border border-white/5 flex flex-col">
+                <span class="text-[10px] text-slate-400 uppercase font-bold">Dönüm Noktası</span>
+                <span id="era-milestone" class="text-xs font-bold text-sky-300 mt-0.5">İnanç ve Sosyal Örgütlenme</span>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-900 border border-white/5 flex flex-col">
+                <span class="text-[10px] text-slate-400 uppercase font-bold">Coğrafya</span>
+                <span id="era-location" class="text-xs font-bold text-emerald-300 mt-0.5">Bereketli Hilal (Güneydoğu Anadolu)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Visual / Icon Box -->
+          <div class="lg:col-span-4 flex flex-col items-center justify-center p-6 rounded-2xl bg-slate-900/80 border border-white/10 gap-3 text-center">
+            <span id="era-icon" class="text-6xl">🏛️</span>
+            <span id="era-highlight" class="text-xs font-bold text-amber-400">Tarihin Bilinen En Eski Tapınağı</span>
+            <div class="text-[11px] text-slate-400 leading-snug" id="era-extra">
+              Göbeklitepe, Stonehenge'den 6.000 yıl, Mısır Piramitleri'nden ise 7.000 yıl daha eskidir!
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────
+         MODE 2: TÜRKİYE KÜLTÜR & COĞRAFYA ATLASI
+         ───────────────────────────────────────────────────────────── -->
+    <section id="hsec-map" class="w-full hidden flex-col gap-4">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2"><span>🗺️</span> Türkiye Kültür & Coğrafya Keşif Atlası</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Haritadaki 7 coğrafi bölgeye tıklayarak iklimini, doğal güzelliklerini ve tarihi eserlerini inceleyin.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        <!-- SVG Map Container (7 cols) -->
+        <div class="lg:col-span-7 glass-panel p-4 rounded-3xl flex flex-col items-center justify-center">
+          <svg id="turkey-culture-svg" viewBox="0 0 600 360" class="w-full max-h-[380px] drop-shadow-lg cursor-pointer select-none">
+            <!-- 7 Regions rendered dynamically -->
+          </svg>
+          <div class="text-xs text-slate-400 mt-2">Detayları görmek için harita üzerindeki bir bölgeye tıklayın.</div>
+        </div>
+
+        <!-- Region Dossier (5 cols) -->
+        <div class="lg:col-span-5 glass-panel p-5 rounded-3xl flex flex-col gap-3">
+          <div class="flex items-center justify-between border-b border-white/10 pb-2">
+            <div>
+              <h3 id="reg-title" class="text-lg font-extrabold text-white">Marmara Bölgesi</h3>
+              <span id="reg-center" class="text-xs text-amber-400 font-bold">İstanbul, Bursa, Edirne, Çanakkale</span>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2.5 text-xs text-slate-300">
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-white/5">
+              <strong class="text-white block mb-0.5">🌦️ İklim & Bitki Örtüsü:</strong>
+              <span id="reg-climate">Geçiş iklimi hakimdir (Akdeniz, Karadeniz ve Karasal karışımı). Bitki örtüsü maki ve ormandır.</span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-white/5">
+              <strong class="text-white block mb-0.5">🏛️ UNESCO & Tarihi Miraslar:</strong>
+              <span id="reg-heritage">Ayasofya-i Kebir Camii, Sultanahmet, Topkapı Sarayı, Selimiye Camii, Truva Antik Kenti, Çanakkale Şehitliği.</span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-white/5">
+              <strong class="text-white block mb-0.5">🌾 Ekonomi & Doğal Kaynaklar:</strong>
+              <span id="reg-economy">Türkiye'nin sanayi, ticaret ve finans kalbidir. Zeytin, ayçiçeği, pirinç ve bağcılık gelişmiştir.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────
+         MODE 3: TİCARET YOLLARI SİMÜLASYONU
+         ───────────────────────────────────────────────────────────── -->
+    <section id="hsec-trade" class="w-full hidden flex-col gap-4">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2"><span>🧭</span> Tarihi İpek Yolu Kervan Seferi</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Doğu ile Batı arasındaki ticaret kervanını yönetin, kervansaraylarda dinlenin ve ticareti tamamlayın.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-bold text-amber-400">Kasa: <span id="caravan-gold" class="font-mono text-base text-white">500</span> Altın Akçe</span>
+          <button onclick="resetCaravan()" class="h-9 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">🔄 Yeni Sefer</button>
+        </div>
+      </div>
+
+      <div class="glass-panel p-6 rounded-3xl flex flex-col gap-5">
+        <!-- Caravan Route Steps -->
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div id="route-step-0" class="p-4 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex flex-col gap-1">
+            <span class="text-[10px] text-amber-300 uppercase font-bold">1. Durak (Başlangıç)</span>
+            <strong class="text-sm text-white">Xi'an (Çin)</strong>
+            <span class="text-xs text-slate-300">İpek kumaş ve porselen satın al.</span>
+          </div>
+          <div id="route-step-1" class="p-4 rounded-2xl bg-slate-900 border border-white/5 flex flex-col gap-1">
+            <span class="text-[10px] text-slate-400 uppercase font-bold">2. Durak</span>
+            <strong class="text-sm text-white">Semerkant (Özbekistan)</strong>
+            <span class="text-xs text-slate-300">Kervansarayda mola ver, kervanı dinlendir.</span>
+          </div>
+          <div id="route-step-2" class="p-4 rounded-2xl bg-slate-900 border border-white/5 flex flex-col gap-1">
+            <span class="text-[10px] text-slate-400 uppercase font-bold">3. Durak</span>
+            <strong class="text-sm text-white">Tebriz & Erzurum</strong>
+            <span class="text-xs text-slate-300">Anadolu kapısı; deri ve halı takası yap.</span>
+          </div>
+          <div id="route-step-3" class="p-4 rounded-2xl bg-slate-900 border border-white/5 flex flex-col gap-1">
+            <span class="text-[10px] text-slate-400 uppercase font-bold">4. Durak (Varış)</span>
+            <strong class="text-sm text-white">İstanbul / Kapalıçarşı</strong>
+            <span class="text-xs text-slate-300">Malları Avrupa tüccarlarına sat ve kazanç sağla!</span>
+          </div>
+        </div>
+
+        <!-- Action Button & Log -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-950/80 border border-white/10">
+          <div id="caravan-status-text" class="text-xs font-bold text-slate-300">
+            Kervanınız Xi'an şehrinde hazır bekliyor. İlerlemek için butona tıklayın.
+          </div>
+          <button onclick="advanceCaravan()" id="btn-advance-caravan" class="h-10 px-6 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-md transition flex items-center gap-2">
+            <span>🐪</span> <span>Kervanı İlerlet</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- EDUCATIONAL NOTE CARD -->
+    <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3 mt-2">
+      <span class="text-xl">💡</span>
+      <div>
+        <strong class="text-white">Tarih & Coğrafya Kazanımı:</strong> Tarih, toplumların geçmişte bıraktığı izleri ve dönüm noktalarını incelerken; coğrafya insanların çevreyle, iklimle ve ticaret yollarıyla kurduğu bağı açıklar. İpek ve Baharat Yolları yalnızca mal değil; bilim, felsefe, kağıt, pusula ve kültürlerin doğudan batıya taşınmasını sağlamıştır.
+      </div>
+    </div>
+
+  </main>
+
+  <!-- JAVASCRIPT ENGINE -->
+  <script>
+    let audioCtx = null;
+    let isSoundOn = true;
+
+    function getAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    function playTone(freq, duration = 0.1, type = 'sine') {
+      if (!isSoundOn) return;
+      try {
+        const ctx = getAudio();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function toggleAudio() {
+      isSoundOn = !isSoundOn;
+      document.getElementById('sound-icon').innerText = isSoundOn ? '🔊' : '🔇';
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    /* MODE NAVIGATION */
+    let currentTarihMode = 'timeline';
+
+    function setTarihMode(mode) {
+      currentTarihMode = mode;
+      document.querySelectorAll('.hmode-btn').forEach(btn => {
+        btn.classList.remove('active', 'text-amber-300', 'bg-amber-500/20', 'border', 'border-amber-400/40');
+        btn.classList.add('text-slate-300');
+      });
+      const activeBtn = document.getElementById(`hmode-${mode}`);
+      if (activeBtn) {
+        activeBtn.classList.add('active', 'text-amber-300', 'bg-amber-500/20', 'border', 'border-amber-400/40');
+        activeBtn.classList.remove('text-slate-300');
+      }
+
+      document.getElementById('hsec-timeline').classList.add('hidden');
+      document.getElementById('hsec-map').classList.add('hidden');
+      document.getElementById('hsec-trade').classList.add('hidden');
+
+      const targetSec = document.getElementById(`hsec-${mode}`);
+      if (targetSec) targetSec.classList.remove('hidden');
+
+      playTone(450, 0.08);
+
+      if (mode === 'map') renderTurkeyCultureMap();
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       1. TIMELINE ENGINE
+       ───────────────────────────────────────────────────────────── */
+    const timelineEras = [
+      {
+        date: "M.Ö. 10.000 — 8.000",
+        subtitle: "Tarihin Sıfır Noktası",
+        title: "Göbeklitepe & Neolitik Çağ",
+        desc: "Şanlıurfa yakınlarındaki Göbeklitepe, insanlık tarihinin bilinen en eski anıtsal tapınak kompleksidir. İnsanların tarım hayatına geçmeden önce dahi dini ve sosyal amaçlarla devasa 'T' biçimli dikilitaşları inşa edebildiklerini kanıtlamıştır.",
+        artifact: "T Biçimli Dikilitaşlar",
+        milestone: "İnanç ve Sosyal Örgütlenme",
+        location: "Güneydoğu Anadolu",
+        icon: "🏛️",
+        highlight: "Tarihin En Eski Tapınağı",
+        extra: "Göbeklitepe, Mısır Piramitleri'nden 7.000 yıl daha eskidir!"
+      },
+      {
+        date: "M.Ö. 2000 — 600",
+        subtitle: "Medeniyetlerin Beşiği",
+        title: "İlkçağ Anadolu Medeniyetleri",
+        desc: "Hititler (Hattuşaş), Frigler (Midas & Gordion), Lidyalılar (Sardes & Paranın İcadı) ve Urartular (Van Kalesi & Su Kanalları). Anadolu, hukuk, madencilik, ticaret ve yazılı antlaşmaların (Kadeş) öncüsü olmuştur.",
+        artifact: "Kadeş Barış Antlaşması & Lidya Parası",
+        milestone: "Paranın ve Yazılı Hukukun Gelişimi",
+        location: "İç, Ege ve Doğu Anadolu",
+        icon: "🏺",
+        highlight: "Tarihte İlk Madeni Para (Lidya)",
+        extra: "Kadeş Antlaşması (M.Ö. 1258) tarihte kaydedilen ilk barış antlaşmasıdır."
+      },
+      {
+        date: "M.Ö. 220 — M.S. 840",
+        subtitle: "Bozkırın Efendileri",
+        title: "Orta Asya İlk Türk Devletleri",
+        desc: "Büyük Hun Devleti (Mete Han & Onlu Ordu Sistemi), I. ve II. Göktürk Devletleri (Kutluk Kağan, Bilge Kağan & Orhun Abideleri) ve Uygurlar (Yerleşik hayata geçiş, matbaa ve şehirleşme).",
+        artifact: "Orhun Yazıtları (Bengü Taşlar)",
+        milestone: "İlk Türk Alfabesi & Türk Adının Geçtiği İlk Metin",
+        location: "Ötüken / Orta Asya",
+        icon: "🐎",
+        highlight: "Onlu Ordu Teşkilatı (Mete Han)",
+        extra: "Orhun Abideleri, Türk dilinin ve devlet felsefesinin en eski yazılı belgeleridir."
+      },
+      {
+        date: "1071 — 1308",
+        subtitle: "Anadolu'nun Fethi & İmarı",
+        title: "Büyük Selçuklu & Anadolu Selçuklu Devleti",
+        desc: "1071 Malazgirt Zaferi ile Sultan Alparslan Anadolu'nun kapılarını açtı. Anadolu Selçukluları ticareti canlandırmak için kervansaraylar, hastaneler (Darüşşifalar) ve medreseler inşa etti. Mevlana, Yunus Emre ve Hacı Bektaş-ı Veli hoşgörü iklimini yeşertti.",
+        artifact: "Divriği Ulu Camii & Kervansaraylar",
+        milestone: "Sigortacılık Sistemi & Ticaret Güvenliği",
+        location: "Konya, Kayseri, Sivas, Erzurum",
+        icon: "🕌",
+        highlight: "Mevlana & Yunus Emre İrfan Geleneği",
+        extra: "Selçuklular tüccarların zararını devlet hazinesinden karşılayan ilk devlet sigortasını uygulamıştır."
+      },
+      {
+        date: "1299 — 1922",
+        subtitle: "Cihan Devleti",
+        title: "Osmanlı İmparatorluğu & Fatih",
+        desc: "Söğüt'te kurulan beylik, adalet ve hoşgörü politikasıyla 3 kıtaya yayıldı. 1453'te Fatih Sultan Mehmet İstanbul'u fethederek Orta Çağ'ı kapattı. Mimar Sinan'ın şaheserleri ve Kanuni Sultan Süleyman'ın adalet kanunları çağa damgasını vurdu.",
+        artifact: "Süleymaniye Camii & Topkapı Sarayı",
+        milestone: "İstanbul'un Fethi (1453) & Çağ Açılması",
+        location: "İstanbul, Rumeli, Orta Doğu, Kuzey Afrika",
+        icon: "👑",
+        highlight: "Mimar Sinan & Selimiye Şaheseri",
+        extra: "İstanbul'un fethiyle ticaret yollarının Osmanlı'ya geçmesi, Avrupa'da Coğrafi Keşifleri başlattı."
+      },
+      {
+        date: "1919 — 1923",
+        subtitle: "Milli İrade & Bağımsızlık",
+        title: "Kurtuluş Savaşı & Türkiye Cumhuriyeti",
+        desc: "Gazi Mustafa Kemal Atatürk'ün 19 Mayıs 1919'da Samsun'a çıkışıyla başlayan Milli Mücadele, 23 Nisan 1920'de TBMM'nin açılması ve 29 Ekim 1923'te Cumhuriyet'in ilanı ile taçlandı. 'Egemenlik kayıtsız şartsız milletindir.'",
+        artifact: "İstiklal Madalyası & Nutuk",
+        milestone: "29 Ekim 1923 Cumhuriyetin İlanı",
+        location: "Ankara & Tüm Türkiye",
+        icon: "🇹🇷",
+        highlight: "Mustafa Kemal Atatürk & Devrimler",
+        extra: "Cumhuriyet ile halk kendi yöneticilerini seçme hürriyetine ve çağdaş haklara kavuştu."
+      }
+    ];
+
+    let currentEraIdx = 0;
+
+    function selectTimelineEra(idx) {
+      currentEraIdx = idx;
+      document.querySelectorAll('.timeline-node').forEach((node, i) => {
+        if (i === idx) {
+          node.className = 'timeline-node active relative z-10 w-9 h-9 rounded-full bg-amber-500 border-2 border-amber-300 flex items-center justify-center text-xs font-bold text-slate-950 transition-all shadow-lg scale-125';
+        } else {
+          node.className = 'timeline-node relative z-10 w-9 h-9 rounded-full bg-slate-900 border-2 border-white/20 flex items-center justify-center text-xs font-bold text-white transition-all shadow-lg';
+        }
+      });
+
+      // Progress line
+      const pct = (idx / (timelineEras.length - 1)) * 100;
+      document.getElementById('timeline-progress-bar').style.width = `${pct}%`;
+
+      const era = timelineEras[idx];
+      document.getElementById('era-date-badge').innerText = era.date;
+      document.getElementById('era-subtitle').innerText = era.subtitle;
+      document.getElementById('era-title').innerText = era.title;
+      document.getElementById('era-desc').innerText = era.desc;
+      document.getElementById('era-artifact').innerText = era.artifact;
+      document.getElementById('era-milestone').innerText = era.milestone;
+      document.getElementById('era-location').innerText = era.location;
+      document.getElementById('era-icon').innerText = era.icon;
+      document.getElementById('era-highlight').innerText = era.highlight;
+      document.getElementById('era-extra').innerText = era.extra;
+
+      playTone(500 + idx * 50, 0.08);
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       2. TURKEY CULTURE MAP ENGINE
+       ───────────────────────────────────────────────────────────── */
+    const turkeyRegionsData = {
+      marmara: {
+        name: "Marmara Bölgesi",
+        cities: "İstanbul, Bursa, Edirne, Çanakkale",
+        climate: "Geçiş iklimi hakimdir (Akdeniz, Karadeniz ve Karasal karışımı). Bitki örtüsü maki ve ormandır.",
+        heritage: "Ayasofya-i Kebir Camii, Sultanahmet, Topkapı Sarayı, Selimiye Camii, Truva Antik Kenti, Çanakkale Şehitliği.",
+        economy: "Türkiye'nin sanayi, ticaret ve finans kalbidir. Zeytin, ayçiçeği, pirinç ve bağcılık gelişmiştir."
+      },
+      ege: {
+        name: "Ege Bölgesi",
+        cities: "İzmir, Muğla, Aydın, Denizli, Manisa",
+        climate: "Akdeniz iklimi görülür. Dağlar denize dik uzandığı için ılıman hava iç kesimlere kadar sokulur.",
+        heritage: "Efes Antik Kenti, Meryem Ana Evi, Pamukkale Travertenleri ve Hierapolis, Bergama Krallığı.",
+        economy: "Zeytinyağı, incir, üzüm, tütün ve pamuk üretimi. Turizm ve yat limanları son derece gelişmiştir."
+      },
+      akdeniz: {
+        name: "Akdeniz Bölgesi",
+        cities: "Antalya, Adana, Mersin, Hatay",
+        climate: "Sıcak ve kurak yazlar, ılık ve yağışlı kışlar. Karakteristik bitki örtüsü her mevsim yeşil kalan makidir.",
+        heritage: "Aspendos Tiyatrosu, Likya Kaya Mezarları, Alanya Kalesi, Antakya Mozaik Müzesi.",
+        economy: "Turizmin başkenti Antalya; Çukurova'da narenciye, pamuk, muz ve sera tarımı."
+      },
+      icanadolu: {
+        name: "İç Anadolu Bölgesi",
+        cities: "Ankara, Konya, Eskişehir, Nevşehir, Kayseri",
+        climate: "Step (Yarı Kurak Karasal) iklimi görülür. Yazlar sıcak ve kurak, kışlar soğuk ve kar yağışlıdır.",
+        heritage: "Anıtkabir, Kapadokya Peri Bacaları ve Yeraltı Şehirleri, Mevlana Müzesi, Gordion.",
+        economy: "Türkiye'nin tahıl ambarıdır (Buğday, arpa, şeker pancarı). Başkent Ankara bürokrasi ve eğitim merkezidir."
+      },
+      karadeniz: {
+        name: "Karadeniz Bölgesi",
+        cities: "Trabzon, Rize, Samsun, Sinop, Amasya",
+        climate: "Her mevsim yağışlı, ılıman Karadeniz iklimi. Türkiye'nin en gür ve zengin ormanlarına sahiptir.",
+        heritage: "Sümela Manastırı, Safranbolu Evleri, Bandırma Vapuru (Samsun), Amasya Kralları Mezarları.",
+        economy: "Çay, fındık, kivi ve mısır tarımı. Balıkçılık (hamsi) ve yayla turizmi."
+      },
+      dogu: {
+        name: "Doğu Anadolu Bölgesi",
+        cities: "Erzurum, Van, Kars, Malatya, Ağrı",
+        climate: "Sert karasal iklim. Yükseltisi en fazla olan bölgemizdir, kışlar çok sert ve uzun geçer.",
+        heritage: "İshak Paşa Sarayı, Ani Harabeleri (Kars), Akdamar Kilisesi (Van Gölü), Erzurum Çifte Minareli Medrese.",
+        economy: "Büyükbaş hayvancılık, Malatya kayısısı, kış turizmi (Palandöken, Sarıkamış)."
+      },
+      guneydogu: {
+        name: "Güneydoğu Anadolu Bölgesi",
+        cities: "Gaziantep, Şanlıurfa, Diyarbakır, Mardin",
+        climate: "Yazları Türkiye'nin en sıcak ve kurak bölgesidir. Kışlar ılık geçer.",
+        heritage: "Göbeklitepe, Nemrut Dağı Heykelleri, Zeugma Mozaikleri, Mardin Taş Evleri, Diyarbakır Surları.",
+        economy: "Gaziantep sanayi ve gastronomi merkezi. Antep fıstığı, kırmızı mercimek ve pamuk tarımı."
+      }
+    };
+
+    function renderTurkeyCultureMap() {
+      const svg = document.getElementById('turkey-culture-svg');
+      svg.innerHTML = '';
+
+      const regions = [
+        { id: 'marmara', name: 'Marmara', points: '120,60 210,50 220,110 180,140 100,120', fill: '#38bdf8', label: [155, 90] },
+        { id: 'ege', name: 'Ege', points: '100,120 180,140 170,240 90,230', fill: '#10b981', label: [135, 180] },
+        { id: 'akdeniz', name: 'Akdeniz', points: '170,240 180,140 280,160 380,240 370,280 180,270', fill: '#f43f5e', label: [260, 230] },
+        { id: 'icanadolu', name: 'İç Anadolu', points: '180,140 220,110 320,100 370,160 280,160', fill: '#f59e0b', label: [255, 135] },
+        { id: 'karadeniz', name: 'Karadeniz', points: '210,50 480,60 460,110 320,100 220,110', fill: '#059669', label: [340, 75] },
+        { id: 'dogu', name: 'Doğu Anadolu', points: '320,100 460,110 540,140 520,240 430,220 370,160', fill: '#8b5cf6', label: [440, 160] },
+        { id: 'guneydogu', name: 'Güneydoğu Anadolu', points: '380,240 430,220 520,240 490,280 370,280', fill: '#d97706', label: [445, 255] }
+      ];
+
+      regions.forEach(r => {
+        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        poly.setAttribute('points', r.points);
+        poly.setAttribute('fill', r.fill);
+        poly.setAttribute('fill-opacity', '0.45');
+        poly.setAttribute('stroke', '#ffffff');
+        poly.setAttribute('stroke-width', '2');
+        poly.setAttribute('class', 'hover:fill-opacity-80 transition-all cursor-pointer');
+        poly.onclick = () => selectCultureRegion(r.id);
+        svg.appendChild(poly);
+
+        const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        txt.setAttribute('x', r.label[0]);
+        txt.setAttribute('y', r.label[1]);
+        txt.setAttribute('fill', '#ffffff');
+        txt.setAttribute('font-size', '11');
+        txt.setAttribute('font-weight', 'bold');
+        txt.setAttribute('text-anchor', 'middle');
+        txt.setAttribute('pointer-events', 'none');
+        txt.textContent = r.name;
+        svg.appendChild(txt);
+      });
+    }
+
+    function selectCultureRegion(regId) {
+      const data = turkeyRegionsData[regId];
+      if (!data) return;
+
+      document.getElementById('reg-title').innerText = data.name;
+      document.getElementById('reg-center').innerText = data.cities;
+      document.getElementById('reg-climate').innerText = data.climate;
+      document.getElementById('reg-heritage').innerText = data.heritage;
+      document.getElementById('reg-economy').innerText = data.economy;
+
+      playTone(550, 0.1);
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       3. CARAVAN TRADE ROUTE SIMULATION
+       ───────────────────────────────────────────────────────────── */
+    let caravanStep = 0;
+    let caravanGold = 500;
+
+    function advanceCaravan() {
+      if (caravanStep === 0) {
+        caravanGold -= 100; // Bought silk & porcelain
+        document.getElementById('caravan-gold').innerText = caravanGold;
+        document.getElementById('route-step-0').className = 'p-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex flex-col gap-1';
+        document.getElementById('route-step-1').className = 'p-4 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex flex-col gap-1';
+        document.getElementById('caravan-status-text').innerText = '100 Altına ipek aldınız. Kervan Semerkant kervansarayına ulaştı!';
+        playTone(500, 0.1);
+        caravanStep = 1;
+      } else if (caravanStep === 1) {
+        document.getElementById('route-step-1').className = 'p-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex flex-col gap-1';
+        document.getElementById('route-step-2').className = 'p-4 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex flex-col gap-1';
+        document.getElementById('caravan-status-text').innerText = 'Kervan develeri dinlendi. Tebriz üzerinden Erzurum Anadolu kapısına vardınız!';
+        playTone(550, 0.1);
+        caravanStep = 2;
+      } else if (caravanStep === 2) {
+        document.getElementById('route-step-2').className = 'p-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex flex-col gap-1';
+        document.getElementById('route-step-3').className = 'p-4 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex flex-col gap-1';
+        document.getElementById('caravan-status-text').innerText = "İstanbul Kapalıçarşı'ya ulaştınız! Malları satmak için tıklayın.";
+        playTone(600, 0.1);
+        caravanStep = 3;
+      } else if (caravanStep === 3) {
+        caravanGold += 350; // Profit!
+        document.getElementById('caravan-gold').innerText = caravanGold;
+        document.getElementById('route-step-3').className = 'p-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex flex-col gap-1';
+        document.getElementById('caravan-status-text').innerHTML = '🎉 <strong>TEBRİKLER! Sefer Tamamlandı!</strong> Malları 350 Altın kârla Avrupa tüccarlarına sattınız.';
+        document.getElementById('btn-advance-caravan').disabled = true;
+        document.getElementById('btn-advance-caravan').classList.add('opacity-40');
+        if (typeof confetti === 'function') confetti({ particleCount: 75, spread: 60 });
+        playTone(660, 0.15);
+      }
+    }
+
+    function resetCaravan() {
+      caravanStep = 0;
+      caravanGold = 500;
+      document.getElementById('caravan-gold').innerText = caravanGold;
+      document.getElementById('btn-advance-caravan').disabled = false;
+      document.getElementById('btn-advance-caravan').classList.remove('opacity-40');
+      document.getElementById('route-step-0').className = 'p-4 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex flex-col gap-1';
+      document.getElementById('route-step-1').className = 'p-4 rounded-2xl bg-slate-900 border border-white/5 flex flex-col gap-1';
+      document.getElementById('route-step-2').className = 'p-4 rounded-2xl bg-slate-900 border border-white/5 flex flex-col gap-1';
+      document.getElementById('route-step-3').className = 'p-4 rounded-2xl bg-slate-900 border border-white/5 flex flex-col gap-1';
+      document.getElementById('caravan-status-text').innerText = "Kervanınız Xi'an şehrinde hazır bekliyor. İlerlemek için butona tıklayın.";
+    }
+
+    /* INITIALIZE */
+    window.addEventListener('DOMContentLoaded', () => {
+      selectTimelineEra(0);
+      renderTurkeyCultureMap();
+    });
+  </script>
+</body>
+</html>

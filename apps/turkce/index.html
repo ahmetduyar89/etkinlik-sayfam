@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
+  <title>Sözcük Avcıları & Dil Parkı | Türkçe Kelime & Dil Bilgisi</title>
+  <meta name="description" content="Türkçe kelime bulmacaları, yazım kılavuzu arenası, noktalama işaretleri tamamlama ve deyimler atölyesi.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230284c7'/><text x='50' y='68' font-size='50' font-weight='bold' fill='white' text-anchor='middle'>A</text></svg>">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+    
+    * {
+      box-sizing: border-box;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      background-color: #030712;
+      color: #f3f4f6;
+    }
+
+    /* Glassmorphism */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+    }
+
+    .glass-card {
+      background: rgba(17, 27, 49, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+    }
+
+    /* Wordle Key and Tile Animations */
+    .wordle-tile {
+      transition: transform 0.2s ease, background-color 0.3s ease;
+    }
+    .wordle-tile.flip {
+      transform: rotateX(180deg);
+    }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen text-slate-100">
+
+  <!-- TOP HEADER / NAV BAR -->
+  <header class="sticky top-0 z-30 flex items-center justify-between px-4 py-3 sm:px-6 glass-panel border-b border-white/10">
+    <!-- Left: Brand & Return -->
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2 h-9 px-3.5 rounded-xl glass-card text-xs sm:text-sm font-semibold text-slate-300 hover:text-white hover:border-sky-400/50 transition-all active:scale-95 shadow-md">
+        <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        <span class="hidden sm:inline">Atölye'ye Dön</span>
+      </a>
+      
+      <div class="flex items-center gap-2.5 h-9 px-3.5 rounded-xl bg-sky-500/10 border border-sky-500/30 text-white font-bold text-xs sm:text-sm tracking-wide">
+        <span class="w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse"></span>
+        <span class="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-blue-300 to-indigo-300">
+          ✍️ Sözcük Avcıları
+        </span>
+        <span class="hidden md:inline-block text-[11px] font-medium text-slate-400 border-l border-slate-700 pl-2">
+          Türkçe & Dil Parkı
+        </span>
+      </div>
+    </div>
+
+    <!-- Center: View Mode Tabs -->
+    <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-900/80 border border-white/10">
+      <button onclick="setTurkceMode('wordle')" id="tmode-wordle" class="tmode-btn active px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all text-sky-300 bg-sky-500/20 border border-sky-400/40">
+        🎯 Kelime Avcısı
+      </button>
+      <button onclick="setTurkceMode('spelling')" id="tmode-spelling" class="tmode-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5">
+        ⚖️ Yazım Arenası
+      </button>
+      <button onclick="setTurkceMode('punct')" id="tmode-punct" class="tmode-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5">
+        📍 Noktalama
+      </button>
+      <button onclick="setTurkceMode('idiom')" id="tmode-idiom" class="tmode-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5">
+        🎭 Deyim Dedektifi
+      </button>
+    </div>
+
+    <!-- Right: Quick Tools -->
+    <div class="flex items-center gap-2">
+      <button id="sound-btn" onclick="toggleAudio()" title="Ses Efektleri" class="h-9 w-9 rounded-xl glass-card flex items-center justify-center text-slate-300 hover:text-sky-400 transition">
+        <span id="sound-icon">🔊</span>
+      </button>
+      <button onclick="toggleFullscreen()" title="Tam Ekran" class="h-9 w-9 rounded-xl glass-card flex items-center justify-center text-slate-300 hover:text-sky-400 transition">
+        ⛶
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 flex flex-col gap-4">
+
+    <!-- ─────────────────────────────────────────────────────────────
+         MODE 1: KELİME AVCISI (WORDLE TÜRKÇE)
+         ───────────────────────────────────────────────────────────── -->
+    <section id="tsec-wordle" class="w-full flex flex-col gap-4 items-center">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-3 sm:p-4 rounded-2xl max-w-2xl">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2"><span>🎯</span> Kelime Avcısı (5 Harfli Gizli Kelime)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Gizli Türkçe kelimeyi 6 denemede bulun. Yeşil: Doğru harf ve yer, Sarı: Yanlış yer.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="resetWordleGame()" class="h-9 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">
+            🔄 Yeni Kelime
+          </button>
+        </div>
+      </div>
+
+      <!-- Wordle Grid -->
+      <div id="wordle-board" class="grid grid-rows-6 gap-2 p-4 rounded-3xl glass-panel select-none">
+        <!-- 6 rows x 5 cols generated by JS -->
+      </div>
+
+      <!-- Status banner -->
+      <div id="wordle-status" class="text-xs font-bold text-sky-400 text-center">
+        Klavyeden veya aşağıdaki sanal tuşlardan harf yazarak Enter'a basın.
+      </div>
+
+      <!-- Virtual Keyboard -->
+      <div id="wordle-keyboard" class="flex flex-col gap-1.5 w-full max-w-lg select-none px-2">
+        <!-- Rows 1, 2, 3 of Turkish QWERTY keys -->
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────
+         MODE 2: YAZIM KILAVUZU ARENASI
+         ───────────────────────────────────────────────────────────── -->
+    <section id="tsec-spelling" class="w-full hidden flex-col gap-4 items-center">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-3 sm:p-4 rounded-2xl max-w-2xl">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2"><span>⚖️</span> Yazım Kılavuzu Arenası (TDK Doğruları)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Sıkça karıştırılan kelimelerden doğru yazılanını seçin ve puanınızı yükseltin.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-bold text-amber-400">Puan: <span id="spell-score" class="font-mono text-base text-white">0</span></span>
+          <span class="text-xs font-bold text-emerald-400">Seri: <span id="spell-streak" class="font-mono text-base text-white">0</span> 🔥</span>
+        </div>
+      </div>
+
+      <div class="glass-panel p-8 rounded-3xl max-w-2xl w-full flex flex-col items-center gap-6">
+        <div class="text-sm font-bold text-slate-400 uppercase tracking-wider" id="spell-question-count">Soru 1 / 15</div>
+        <div class="text-lg font-bold text-white text-center">Aşağıdaki kelimelerden hangisinin yazımı doğrudur?</div>
+
+        <!-- 2 Choice Buttons -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full" id="spell-choices-container">
+          <button onclick="answerSpelling(0)" id="spell-btn-0" class="h-20 rounded-2xl glass-card hover:bg-sky-600/20 text-white font-mono text-xl font-bold border border-white/10 hover:border-sky-400 active:scale-95 transition shadow-lg">
+            Herkes
+          </button>
+          <button onclick="answerSpelling(1)" id="spell-btn-1" class="h-20 rounded-2xl glass-card hover:bg-sky-600/20 text-white font-mono text-xl font-bold border border-white/10 hover:border-sky-400 active:scale-95 transition shadow-lg">
+            Herkez
+          </button>
+        </div>
+
+        <!-- Explanation card -->
+        <div id="spell-explanation" class="w-full p-4 rounded-2xl bg-slate-900/80 border border-white/10 text-xs text-slate-300 leading-relaxed hidden">
+          <!-- TDK Rule details -->
+        </div>
+
+        <button onclick="nextSpellingQuestion()" id="btn-next-spell" class="hidden px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-md transition">
+          Sonraki Soru ➔
+        </button>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────
+         MODE 3: NOKTALAMA TAMAMLAMA
+         ───────────────────────────────────────────────────────────── -->
+    <section id="tsec-punct" class="w-full hidden flex-col gap-4 items-center">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-3 sm:p-4 rounded-2xl max-w-2xl">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2"><span>📍</span> Noktalama İşaretleri Tamamlama</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Metindeki boş kutulara doğru noktalama işaretlerini tıklayarak yerleştirin.</p>
+        </div>
+        <button onclick="resetPunctuationGame()" class="h-9 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">
+          🔄 Sıfırla
+        </button>
+      </div>
+
+      <div class="glass-panel p-6 sm:p-8 rounded-3xl max-w-2xl w-full flex flex-col gap-6">
+        <!-- Story text with interactive punctuation slots -->
+        <div id="punct-story-box" class="p-5 rounded-2xl bg-slate-900/80 border border-white/10 text-base leading-loose text-slate-200">
+          <!-- Rendered dynamically -->
+        </div>
+
+        <!-- Punctuation Marks Palette -->
+        <div class="flex flex-col items-center gap-2">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">İşaret Seçin:</span>
+          <div class="flex flex-wrap items-center justify-center gap-2" id="punct-palette">
+            <button onclick="selectPunctMark('.')" class="w-11 h-11 rounded-xl glass-card text-lg font-black text-white hover:bg-sky-500/30">.</button>
+            <button onclick="selectPunctMark(',')" class="w-11 h-11 rounded-xl glass-card text-lg font-black text-white hover:bg-sky-500/30">,</button>
+            <button onclick="selectPunctMark('?')" class="w-11 h-11 rounded-xl glass-card text-lg font-black text-white hover:bg-sky-500/30">?</button>
+            <button onclick="selectPunctMark('!')" class="w-11 h-11 rounded-xl glass-card text-lg font-black text-white hover:bg-sky-500/30">!</button>
+            <button onclick="selectPunctMark(':')" class="w-11 h-11 rounded-xl glass-card text-lg font-black text-white hover:bg-sky-500/30">:</button>
+            <button onclick="selectPunctMark(';')" class="w-11 h-11 rounded-xl glass-card text-lg font-black text-white hover:bg-sky-500/30">;</button>
+            <button onclick="selectPunctMark('"')" class="w-11 h-11 rounded-xl glass-card text-lg font-black text-white hover:bg-sky-500/30">"</button>
+          </div>
+        </div>
+
+        <div id="punct-feedback" class="text-xs font-bold text-center text-slate-400">
+          Metindeki [ ? ] kutularına tıklayın ve alttan doğru noktalama işaretini seçin.
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────
+         MODE 4: DEYİM & ATASÖZÜ DEDEKTİFİ
+         ───────────────────────────────────────────────────────────── -->
+    <section id="tsec-idiom" class="w-full hidden flex-col gap-4 items-center">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-3 sm:p-4 rounded-2xl max-w-2xl">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2"><span>🎭</span> Deyim & Atasözü Dedektifi</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Görsel ipuçları ve anlamdan yola çıkarak deyimi bulun.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="nextIdiom()" class="h-9 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition">
+            Sonraki Deyim ➔
+          </button>
+        </div>
+      </div>
+
+      <div class="glass-panel p-6 sm:p-8 rounded-3xl max-w-2xl w-full flex flex-col items-center gap-6">
+        <!-- Emojis / Visual Clue -->
+        <div class="w-32 h-32 rounded-3xl bg-slate-900 border border-white/10 flex items-center justify-center text-5xl shadow-2xl" id="idiom-visual">
+          🔥👄
+        </div>
+
+        <!-- Clue description -->
+        <div class="text-center">
+          <span class="text-xs font-bold text-amber-400 uppercase tracking-wider block mb-1">Deyimin Anlamı:</span>
+          <p id="idiom-meaning" class="text-sm font-semibold text-slate-200">Çok fazla öfkelenmek, aşırı derecede kızgınlıkla konuşmak.</p>
+        </div>
+
+        <!-- Target letter slots -->
+        <div id="idiom-slots" class="flex flex-wrap items-center justify-center gap-1.5 font-mono text-xl font-bold">
+          <!-- Letter boxes -->
+        </div>
+
+        <!-- Scrambled Letter Bank -->
+        <div class="flex flex-col items-center gap-2">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Harfler:</span>
+          <div id="idiom-letter-bank" class="flex flex-wrap items-center justify-center gap-2 max-w-md">
+            <!-- Dynamic letters -->
+          </div>
+        </div>
+
+        <div id="idiom-status" class="text-xs font-bold text-sky-400 text-center">Harfleri seçerek deyimi tamamlayın.</div>
+      </div>
+    </section>
+
+    <!-- EDUCATIONAL NOTE CARD -->
+    <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3 mt-2">
+      <span class="text-xl">💡</span>
+      <div>
+        <strong class="text-white">Türkçe & Dil Bilgisi Kazanımı:</strong> Dilimizi zengin kılan en önemli unsurlar; kelimelerin doğru hecelenip yazılması, duygu ve düşüncelerin noktalama işaretleriyle netleştirilmesi ve mecaz anlam içeren deyim ve atasözlerimizin doğru bağlamda kullanılmasıdır.
+      </div>
+    </div>
+
+  </main>
+
+  <!-- JAVASCRIPT ENGINE -->
+  <script>
+    let audioCtx = null;
+    let isSoundOn = true;
+
+    function getAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    function playTone(freq, duration = 0.1, type = 'sine') {
+      if (!isSoundOn) return;
+      try {
+        const ctx = getAudio();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function toggleAudio() {
+      isSoundOn = !isSoundOn;
+      document.getElementById('sound-icon').innerText = isSoundOn ? '🔊' : '🔇';
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    /* MODE NAVIGATION */
+    let currentTurkceMode = 'wordle';
+
+    function setTurkceMode(mode) {
+      currentTurkceMode = mode;
+      document.querySelectorAll('.tmode-btn').forEach(btn => {
+        btn.classList.remove('active', 'text-sky-300', 'bg-sky-500/20', 'border', 'border-sky-400/40');
+        btn.classList.add('text-slate-300');
+      });
+      const activeBtn = document.getElementById(`tmode-${mode}`);
+      if (activeBtn) {
+        activeBtn.classList.add('active', 'text-sky-300', 'bg-sky-500/20', 'border', 'border-sky-400/40');
+        activeBtn.classList.remove('text-slate-300');
+      }
+
+      document.getElementById('tsec-wordle').classList.add('hidden');
+      document.getElementById('tsec-spelling').classList.add('hidden');
+      document.getElementById('tsec-punct').classList.add('hidden');
+      document.getElementById('tsec-idiom').classList.add('hidden');
+
+      const targetSec = document.getElementById(`tsec-${mode}`);
+      if (targetSec) targetSec.classList.remove('hidden');
+
+      playTone(450, 0.08);
+
+      if (mode === 'spelling') loadSpellingQuestion();
+      if (mode === 'punct') renderPunctuationStory();
+      if (mode === 'idiom') loadIdiom();
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       1. WORDLE TÜRKÇE ENGINE
+       ───────────────────────────────────────────────────────────── */
+    const TURKISH_WORDS_5 = [
+      'GÜNEŞ', 'KİTAP', 'KALEM', 'ÇİÇEK', 'DENİZ', 'ORMAN', 'BAHAR',
+      'DÜNYA', 'YILDIZ', 'BULUT', 'MELEK', 'SEVGİ', 'GÜVEN', 'BARIŞ',
+      'MASAL', 'NEHİR', 'DOĞAL', 'HAYAT', 'IŞIMA', 'ÇOCUK'
+    ];
+
+    let targetWord = 'GÜNEŞ';
+    let wordleRow = 0;
+    let wordleCol = 0;
+    let wordleGrid = Array(6).fill(null).map(() => Array(5).fill(''));
+    let wordleColors = Array(6).fill(null).map(() => Array(5).fill(''));
+    let wordleGameOver = false;
+
+    function resetWordleGame() {
+      targetWord = TURKISH_WORDS_5[Math.floor(Math.random() * TURKISH_WORDS_5.length)];
+      wordleRow = 0;
+      wordleCol = 0;
+      wordleGrid = Array(6).fill(null).map(() => Array(5).fill(''));
+      wordleColors = Array(6).fill(null).map(() => Array(5).fill(''));
+      wordleGameOver = false;
+      document.getElementById('wordle-status').innerText = 'Yeni gizli kelime seçildi. Tahmininizi yapın!';
+      renderWordleBoard();
+      renderWordleKeyboard();
+    }
+
+    function renderWordleBoard() {
+      const container = document.getElementById('wordle-board');
+      container.innerHTML = '';
+
+      for (let r = 0; r < 6; r++) {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'flex gap-2 justify-center';
+
+        for (let c = 0; c < 5; c++) {
+          const char = wordleGrid[r][c];
+          const colState = wordleColors[r][c];
+
+          const tile = document.createElement('div');
+          tile.className = 'w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center font-mono text-xl sm:text-2xl font-black transition-all';
+
+          if (colState === 'green') {
+            tile.className += ' bg-emerald-600 text-white border-2 border-emerald-400';
+          } else if (colState === 'yellow') {
+            tile.className += ' bg-amber-600 text-white border-2 border-amber-400';
+          } else if (colState === 'gray') {
+            tile.className += ' bg-slate-800 text-slate-500 border border-white/5';
+          } else if (char) {
+            tile.className += ' bg-slate-800/80 border-2 border-sky-400 text-white';
+          } else {
+            tile.className += ' bg-slate-900/60 border border-white/10 text-white';
+          }
+
+          tile.innerText = char;
+          rowDiv.appendChild(tile);
+        }
+
+        container.appendChild(rowDiv);
+      }
+    }
+
+    function renderWordleKeyboard() {
+      const container = document.getElementById('wordle-keyboard');
+      container.innerHTML = '';
+
+      const keyboardRows = [
+        ['E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Ğ', 'Ü'],
+        ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ş', 'İ'],
+        ['ENTER', 'Z', 'C', 'V', 'B', 'N', 'M', 'Ö', 'Ç', '⌫']
+      ];
+
+      keyboardRows.forEach(row => {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'flex gap-1 justify-center';
+
+        row.forEach(key => {
+          const btn = document.createElement('button');
+          btn.className = `h-11 rounded-xl text-xs font-bold transition-all flex items-center justify-center ${
+            key.length > 1 ? 'px-3 bg-sky-700 text-white' : 'w-8 sm:w-10 bg-slate-800 text-slate-200 hover:bg-slate-700'
+          }`;
+          btn.innerText = key;
+          btn.onclick = () => handleWordleKey(key);
+          rowDiv.appendChild(btn);
+        });
+
+        container.appendChild(rowDiv);
+      });
+    }
+
+    function handleWordleKey(key) {
+      if (wordleGameOver) return;
+
+      if (key === 'ENTER') {
+        if (wordleCol === 5) {
+          submitWordleGuess();
+        } else {
+          playTone(200, 0.1, 'sawtooth');
+          document.getElementById('wordle-status').innerText = 'Lütfen 5 harfi tamamlayın!';
+        }
+      } else if (key === '⌫' || key === 'BACKSPACE') {
+        if (wordleCol > 0) {
+          wordleCol--;
+          wordleGrid[wordleRow][wordleCol] = '';
+          playTone(300, 0.05);
+          renderWordleBoard();
+        }
+      } else if (key.length === 1 && wordleCol < 5) {
+        wordleGrid[wordleRow][wordleCol] = key.toLocaleUpperCase('tr-TR');
+        wordleCol++;
+        playTone(450, 0.05);
+        renderWordleBoard();
+      }
+    }
+
+    function submitWordleGuess() {
+      const guess = wordleGrid[wordleRow].join('');
+      const target = targetWord;
+
+      const targetLetters = target.split('');
+      const guessLetters = guess.split('');
+
+      // Mark green first
+      for (let i = 0; i < 5; i++) {
+        if (guessLetters[i] === targetLetters[i]) {
+          wordleColors[wordleRow][i] = 'green';
+          targetLetters[i] = null;
+        }
+      }
+
+      // Mark yellow and gray
+      for (let i = 0; i < 5; i++) {
+        if (wordleColors[wordleRow][i] === 'green') continue;
+        const foundIdx = targetLetters.indexOf(guessLetters[i]);
+        if (foundIdx !== -1) {
+          wordleColors[wordleRow][i] = 'yellow';
+          targetLetters[foundIdx] = null;
+        } else {
+          wordleColors[wordleRow][i] = 'gray';
+        }
+      }
+
+      playTone(550, 0.1);
+      renderWordleBoard();
+
+      if (guess === target) {
+        wordleGameOver = true;
+        document.getElementById('wordle-status').innerHTML = '🎉 <strong>TEBRİKLER! Gizli Kelimeyi Buldunuz!</strong>';
+        if (typeof confetti === 'function') confetti({ particleCount: 80, spread: 70 });
+        return;
+      }
+
+      wordleRow++;
+      wordleCol = 0;
+
+      if (wordleRow === 6) {
+        wordleGameOver = true;
+        document.getElementById('wordle-status').innerHTML = `😢 <strong>Haklarınız bitti!</strong> Gizli kelime: <strong>${targetWord}</strong>`;
+      }
+    }
+
+    // Keyboard support
+    window.addEventListener('keydown', (e) => {
+      if (currentTurkceMode !== 'wordle') return;
+      if (e.key === 'Enter') handleWordleKey('ENTER');
+      else if (e.key === 'Backspace') handleWordleKey('⌫');
+      else if (/^[a-zA-ZçÇğĞıIİiöÖşŞüÜ]$/.test(e.key)) {
+        handleWordleKey(e.key.toLocaleUpperCase('tr-TR'));
+      }
+    });
+
+    /* ─────────────────────────────────────────────────────────────
+       2. SPELLING ARENA ENGINE
+       ───────────────────────────────────────────────────────────── */
+    const spellingQuestions = [
+      {
+        correct: "Herkes",
+        wrong: "Herkez",
+        rule: "Farsça 'her' (bütün) ve 'kes' (kişi) sözcüklerinin birleşimidir. 'S' harfi ile biter."
+      },
+      {
+        correct: "Yalnız",
+        wrong: "Yalınız",
+        rule: "'Yalın' (tek başına) kökünden türemiştir: yalın-ız → yalnız."
+      },
+      {
+        correct: "Yanlış",
+        wrong: "Yalnış",
+        rule: "'Yanılmak' fiilinden türemiştir: yanıl-ış → yanlış."
+      },
+      {
+        correct: "Şoför",
+        wrong: "Şöför",
+        rule: "Fransızca 'chauffeur' sözcüğünden Türkçeye 'şoför' olarak geçmiştir."
+      },
+      {
+        correct: "Laboratuvar",
+        wrong: "Labaratuar",
+        rule: "TDK kılavuzuna göre doğru yazımı 'Laboratuvar' şeklindedir (v harfi içerir)."
+      },
+      {
+        correct: "Orijinal",
+        wrong: "Orjinal",
+        rule: "Fransızca kökenli kelimede 'i' harfi yer alır: Orijinal."
+      },
+      {
+        correct: "Kılavuz",
+        wrong: "Klavuz",
+        rule: "Türkçe kökenli sözcükte ilk hecede 'ı' harfi bulunur: Kılavuz."
+      },
+      {
+        correct: "Kibrit",
+        wrong: "Kirbit",
+        rule: "Arapça kökenli sözcüğün doğru hecelenmesi 'kib-rit' şeklindedir."
+      },
+      {
+        correct: "Sürpriz",
+        wrong: "Süpriz",
+        rule: "Fransızca 'surprise' kelimesinden dilimize 'r' harfi korunarak geçmiştir."
+      },
+      {
+        correct: "Egzoz",
+        wrong: "Eksoz",
+        rule: "İngilizce 'exhaust' kelimesinin TDK'deki resmi karşılığı 'Egzoz'dur."
+      }
+    ];
+
+    let spellIdx = 0;
+    let spellScore = 0;
+    let spellStreak = 0;
+
+    function loadSpellingQuestion() {
+      const q = spellingQuestions[spellIdx % spellingQuestions.length];
+      document.getElementById('spell-question-count').innerText = `Soru ${spellIdx + 1} / ${spellingQuestions.length}`;
+
+      // Randomize choice button order
+      const isFirstCorrect = Math.random() < 0.5;
+      const btn0 = document.getElementById('spell-btn-0');
+      const btn1 = document.getElementById('spell-btn-1');
+
+      btn0.innerText = isFirstCorrect ? q.correct : q.wrong;
+      btn0.dataset.isCorrect = isFirstCorrect;
+      btn0.className = 'h-20 rounded-2xl glass-card hover:bg-sky-600/20 text-white font-mono text-xl font-bold border border-white/10 hover:border-sky-400 active:scale-95 transition shadow-lg';
+
+      btn1.innerText = isFirstCorrect ? q.wrong : q.correct;
+      btn1.dataset.isCorrect = !isFirstCorrect;
+      btn1.className = 'h-20 rounded-2xl glass-card hover:bg-sky-600/20 text-white font-mono text-xl font-bold border border-white/10 hover:border-sky-400 active:scale-95 transition shadow-lg';
+
+      document.getElementById('spell-explanation').classList.add('hidden');
+      document.getElementById('btn-next-spell').classList.add('hidden');
+    }
+
+    function answerSpelling(btnIdx) {
+      const btn = document.getElementById(`spell-btn-${btnIdx}`);
+      const isCorrect = btn.dataset.isCorrect === 'true';
+      const q = spellingQuestions[spellIdx % spellingQuestions.length];
+
+      if (isCorrect) {
+        btn.className = 'h-20 rounded-2xl bg-emerald-600 text-white font-mono text-xl font-bold border-2 border-emerald-400 shadow-xl';
+        spellScore += 10;
+        spellStreak++;
+        playTone(600, 0.12);
+      } else {
+        btn.className = 'h-20 rounded-2xl bg-rose-600 text-white font-mono text-xl font-bold border-2 border-rose-400 shadow-xl';
+        spellStreak = 0;
+        playTone(200, 0.2, 'sawtooth');
+      }
+
+      document.getElementById('spell-score').innerText = spellScore;
+      document.getElementById('spell-streak').innerText = spellStreak;
+
+      const expl = document.getElementById('spell-explanation');
+      expl.innerHTML = `<strong>TDK Kuralı:</strong> Doğru yazım: <span class="text-emerald-400 font-bold">${q.correct}</span>. ${q.rule}`;
+      expl.classList.remove('hidden');
+      document.getElementById('btn-next-spell').classList.remove('hidden');
+    }
+
+    function nextSpellingQuestion() {
+      spellIdx++;
+      loadSpellingQuestion();
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       3. PUNCTUATION ENGINE
+       ───────────────────────────────────────────────────────────── */
+    const punctStory = [
+      { text: "Ali sabah erkenden uyandı", correct: "." },
+      { text: " Pencereden dışarı baktığında gökyüzü masmaviydi", correct: "." },
+      { text: " Çantasını hazırladı", correct: ":" },
+      { text: " Defter", correct: "," },
+      { text: " kalem", correct: "," },
+      { text: " silgi ve cetvelini özenle yerleştirdi", correct: "." },
+      { text: " Annesi seslendi", correct: ":" },
+      { text: " Kahvaltını yapmayacak mısın", correct: "?" }
+    ];
+
+    let userPunctAnswers = Array(punctStory.length).fill(null);
+    let activeSlotIdx = 0;
+
+    function renderPunctuationStory() {
+      const box = document.getElementById('punct-story-box');
+      box.innerHTML = '';
+
+      punctStory.forEach((item, idx) => {
+        const spanText = document.createElement('span');
+        spanText.innerText = item.text;
+        box.appendChild(spanText);
+
+        const slot = document.createElement('button');
+        slot.className = `inline-flex items-center justify-center w-7 h-7 mx-1 rounded-lg font-mono font-bold text-sm border transition-all ${
+          activeSlotIdx === idx
+            ? 'bg-sky-500/30 border-sky-400 text-white shadow-lg'
+            : userPunctAnswers[idx]
+            ? 'bg-slate-800 text-emerald-300 border-emerald-500/40'
+            : 'bg-slate-950 border-white/20 text-slate-500'
+        }`;
+        slot.innerText = userPunctAnswers[idx] || '?';
+        slot.onclick = () => {
+          activeSlotIdx = idx;
+          playTone(450, 0.05);
+          renderPunctuationStory();
+        };
+        box.appendChild(slot);
+      });
+
+      checkPunctuationProgress();
+    }
+
+    function selectPunctMark(mark) {
+      if (activeSlotIdx !== null && activeSlotIdx < punctStory.length) {
+        userPunctAnswers[activeSlotIdx] = mark;
+        playTone(550, 0.08);
+        // Advance to next unassigned slot
+        const nextSlot = userPunctAnswers.findIndex(a => a === null);
+        activeSlotIdx = nextSlot !== -1 ? nextSlot : null;
+        renderPunctuationStory();
+      }
+    }
+
+    function checkPunctuationProgress() {
+      const allFilled = userPunctAnswers.every(a => a !== null);
+      if (!allFilled) return;
+
+      const allCorrect = userPunctAnswers.every((a, idx) => a === punctStory[idx].correct);
+      const fb = document.getElementById('punct-feedback');
+      if (allCorrect) {
+        fb.innerHTML = '🎉 <strong>TEBRİKLER! Tüm Noktalama İşaretlerini Doğru Yerleştirdiniz!</strong>';
+        fb.className = 'text-xs font-bold text-center text-emerald-400';
+        if (typeof confetti === 'function') confetti({ particleCount: 70, spread: 60 });
+      } else {
+        fb.innerHTML = 'Bazı işaretler hatalı yerleştirilmiş. Cümle sonlarına ve listelemelere dikkat edin!';
+        fb.className = 'text-xs font-bold text-center text-amber-400';
+      }
+    }
+
+    function resetPunctuationGame() {
+      userPunctAnswers = Array(punctStory.length).fill(null);
+      activeSlotIdx = 0;
+      renderPunctuationStory();
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       4. IDIOM DETECTIVE ENGINE
+       ───────────────────────────────────────────────────────────── */
+    const idioms = [
+      {
+        idiom: "ATEŞ PÜSKÜRMEK",
+        visual: "🔥👄",
+        meaning: "Çok fazla öfkelenmek, aşırı derecede kızgınlıkla sert sözler söylemek."
+      },
+      {
+        idiom: "GÖZDEN DÜŞMEK",
+        visual: "👀⬇️",
+        meaning: "Eski değerini, saygınlığını veya sevgisini yitirmek."
+      },
+      {
+        idiom: "ETAKLERİ ZİL ÇALMAK",
+        visual: "👗🔔",
+        meaning: "Çok sevinmek, büyük bir mutluluk ve neşe içinde olmak."
+      },
+      {
+        idiom: "KULAK KABARTMAK",
+        visual: "👂🤫",
+        meaning: "Belli etmemeye çalışarak gizlice dinlemek."
+      }
+    ];
+
+    let currentIdiomIdx = 0;
+    let idiomAnswer = [];
+
+    function loadIdiom() {
+      const cur = idioms[currentIdiomIdx % idioms.length];
+      document.getElementById('idiom-visual').innerText = cur.visual;
+      document.getElementById('idiom-meaning').innerText = cur.meaning;
+      idiomAnswer = [];
+      document.getElementById('idiom-status').innerText = 'Harfleri seçerek deyimi tamamlayın.';
+
+      renderIdiomSlots();
+      renderIdiomLetters();
+    }
+
+    function renderIdiomSlots() {
+      const container = document.getElementById('idiom-slots');
+      container.innerHTML = '';
+      const cur = idioms[currentIdiomIdx % idioms.length];
+
+      for (let i = 0; i < cur.idiom.length; i++) {
+        const char = cur.idiom[i];
+        if (char === ' ') {
+          const space = document.createElement('div');
+          space.className = 'w-4';
+          container.appendChild(space);
+        } else {
+          const slot = document.createElement('div');
+          slot.className = 'w-9 h-11 rounded-xl bg-slate-900 border-2 border-white/20 flex items-center justify-center text-white font-bold text-sm';
+          slot.innerText = idiomAnswer[i] || '';
+          container.appendChild(slot);
+        }
+      }
+    }
+
+    function renderIdiomLetters() {
+      const container = document.getElementById('idiom-letter-bank');
+      container.innerHTML = '';
+      const cur = idioms[currentIdiomIdx % idioms.length];
+      const letters = cur.idiom.replace(/\s/g, '').split('').sort(() => Math.random() - 0.5);
+
+      letters.forEach((char, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'w-9 h-10 rounded-xl bg-sky-600/30 hover:bg-sky-600/60 border border-sky-400/40 text-white font-bold text-sm';
+        btn.innerText = char;
+        btn.onclick = () => {
+          // Put in next empty non-space slot
+          const target = cur.idiom;
+          for (let s = 0; s < target.length; s++) {
+            if (target[s] !== ' ' && !idiomAnswer[s]) {
+              idiomAnswer[s] = char;
+              btn.disabled = true;
+              btn.classList.add('opacity-30');
+              playTone(500, 0.05);
+              renderIdiomSlots();
+              checkIdiomWin();
+              return;
+            }
+          }
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    function checkIdiomWin() {
+      const cur = idioms[currentIdiomIdx % idioms.length];
+      let assembled = '';
+      for (let i = 0; i < cur.idiom.length; i++) {
+        assembled += cur.idiom[i] === ' ' ? ' ' : (idiomAnswer[i] || '');
+      }
+
+      if (assembled === cur.idiom) {
+        document.getElementById('idiom-status').innerHTML = '🎉 <strong>TEBRİKLER! Deyimi Doğru Buldunuz!</strong>';
+        if (typeof confetti === 'function') confetti({ particleCount: 70, spread: 60 });
+        playTone(660, 0.15);
+      }
+    }
+
+    function nextIdiom() {
+      currentIdiomIdx++;
+      loadIdiom();
+    }
+
+    /* INITIALIZE */
+    window.addEventListener('DOMContentLoaded', () => {
+      resetWordleGame();
+    });
+  </script>
+</body>
+</html>

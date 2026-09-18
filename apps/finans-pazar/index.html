@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
+  <title>Küçük Girişimciler Pazarı & Finans Laboratuvarı | Tedris Atölye</title>
+  <meta name="description" content="Eğlenceli market kasası para üstü hesaplama, denge terazisi ile cebirsel mantık ve haftalık limonata standı girişimcilik simülasyonu.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%2310b981'/><text x='50' y='65' font-size='42' text-anchor='middle' fill='white' font-weight='bold'>₺</text></svg>">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+    
+    * {
+      box-sizing: border-box;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    
+    .glass-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-panel {
+      background: rgba(30, 41, 59, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .bill-200 { background: linear-gradient(135deg, #701a75, #a21caf); border: 2px solid #f472b6; color: white; }
+    .bill-100 { background: linear-gradient(135deg, #0e7490, #0284c7); border: 2px solid #38bdf8; color: white; }
+    .bill-50 { background: linear-gradient(135deg, #c2410c, #ea580c); border: 2px solid #fb923c; color: white; }
+    .bill-20 { background: linear-gradient(135deg, #047857, #059669); border: 2px solid #34d399; color: white; }
+    .bill-10 { background: linear-gradient(135deg, #b91c1c, #dc2626); border: 2px solid #f87171; color: white; }
+    .bill-5 { background: linear-gradient(135deg, #854d0e, #a16207); border: 2px solid #facc15; color: white; }
+
+    .coin-tl {
+      background: radial-gradient(circle at 35% 35%, #fef08a, #ca8a04, #854d0e);
+      border: 2px solid #fef08a;
+      box-shadow: 0 4px 10px rgba(202, 138, 4, 0.35);
+      color: #422006;
+      font-weight: 800;
+    }
+
+    .coin-kr {
+      background: radial-gradient(circle at 35% 35%, #f1f5f9, #94a3b8, #475569);
+      border: 2px solid #cbd5e1;
+      box-shadow: 0 4px 10px rgba(148, 163, 184, 0.3);
+      color: #0f172a;
+      font-weight: 800;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-emerald-500 selection:text-white">
+
+  <!-- HEADER NAVBAR -->
+  <header class="sticky top-0 z-50 glass-card border-b border-white/10 px-4 lg:px-8 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-all">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+      </a>
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-white tracking-wide flex items-center gap-2">
+            Küçük Girişimciler Pazarı
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase tracking-wider">Finans & Cebir</span>
+          </h1>
+          <p class="text-[11px] text-slate-400 font-medium">Para Üstü Kasası, Cebir Terazisi ve Girişimcilik Simülatörü</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <nav class="flex items-center p-1 rounded-xl bg-slate-900/80 border border-white/5 max-w-md w-full justify-between">
+      <button onclick="switchTab('kasa')" id="tab-btn-kasa" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-white bg-emerald-600 shadow-md">
+        <span>🛒</span> Market Kasası
+      </button>
+      <button onclick="switchTab('terazi')" id="tab-btn-terazi" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-slate-400 hover:text-white">
+        <span>⚖️</span> Denge Terazisi
+      </button>
+      <button onclick="switchTab('girisim')" id="tab-btn-girisim" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-slate-400 hover:text-white">
+        <span>🍋</span> Limonata Standı
+      </button>
+    </nav>
+
+    <!-- RIGHT STATS -->
+    <div class="flex items-center gap-3">
+      <div class="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+        <span class="text-xs text-slate-400 font-medium">Toplam Kazanç:</span>
+        <span id="global-score" class="font-mono text-sm font-bold text-emerald-400">0 ₺</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 p-4 lg:p-6 max-w-7xl mx-auto w-full flex flex-col gap-6">
+
+    <!-- ==================== TAB 1: MARKET KASASI ==================== -->
+    <section id="tab-kasa" class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+      <!-- SOL: MÜŞTERİ & ALIŞVERİŞ FİŞİ -->
+      <div class="lg:col-span-5 flex flex-col gap-4">
+        <div class="glass-card rounded-2xl p-5 flex flex-col gap-4 border border-emerald-500/20">
+          <div class="flex items-center justify-between border-b border-white/10 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">🧾</span>
+              <div>
+                <h3 class="text-sm font-bold text-white">Süpermarket Alışveriş Fişi</h3>
+                <span id="kasa-customer-name" class="text-xs text-slate-400">Müşteri: Zeynep Öğretmen</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="text-xs text-slate-400">Zorluk:</span>
+              <select id="kasa-diff" onchange="changeKasaDiff(this.value)" class="bg-slate-900 border border-white/10 rounded-lg text-xs px-2 py-1 text-emerald-300 font-bold focus:outline-none focus:border-emerald-500">
+                <option value="easy">Kolay (Tam TL)</option>
+                <option value="medium" selected>Orta (5-10 Katı)</option>
+                <option value="hard">İleri (Kuruşlu)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Sepet Ürünleri Listesi -->
+          <div id="receipt-items" class="flex flex-col gap-2 min-h-[140px]">
+            <!-- Dinamik doldurulacak -->
+          </div>
+
+          <!-- Toplam Tutar ve Verilen Para -->
+          <div class="border-t border-dashed border-white/10 pt-3 flex flex-col gap-2">
+            <div class="flex justify-between items-center text-sm font-semibold text-slate-300">
+              <span>Sepet Toplamı:</span>
+              <span id="receipt-total" class="font-mono text-lg font-bold text-white">0.00 ₺</span>
+            </div>
+            <div class="flex justify-between items-center text-sm font-semibold text-amber-400">
+              <span>Müşterinin Verdiği:</span>
+              <span id="customer-paid" class="font-mono text-lg font-bold">0.00 ₺</span>
+            </div>
+            <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex justify-between items-center text-sm font-bold text-emerald-300">
+              <span>Gereken Para Üstü:</span>
+              <span id="target-change" class="font-mono text-xl font-black">? ₺</span>
+            </div>
+          </div>
+
+          <!-- Yeni Müşteri Butonu -->
+          <button onclick="newKasaCustomer()" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition-all flex items-center justify-center gap-2 border border-white/10">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            Yeni Müşteri & Sepet Çağır
+          </button>
+        </div>
+
+        <!-- Başarı & Kasa İstatistiği -->
+        <div class="glass-card rounded-2xl p-4 flex items-center justify-around text-center">
+          <div>
+            <div class="text-xs text-slate-400 font-medium">Hatasız Kasa</div>
+            <div id="kasa-streak" class="font-mono text-xl font-bold text-emerald-400">0 🔥</div>
+          </div>
+          <div class="w-px h-8 bg-white/10"></div>
+          <div>
+            <div class="text-xs text-slate-400 font-medium">Toplam Bahşiş</div>
+            <div id="kasa-tips" class="font-mono text-xl font-bold text-amber-400">0 ₺</div>
+          </div>
+          <div class="w-px h-8 bg-white/10"></div>
+          <div>
+            <div class="text-xs text-slate-400 font-medium">Hizmet Puanı</div>
+            <div id="kasa-rating" class="font-mono text-xl font-bold text-cyan-400">5.0 ⭐</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SAĞ: PARA ÇEKMECESİ VE SEÇİLEN PARA ÜSTÜ -->
+      <div class="lg:col-span-7 flex flex-col gap-4">
+        <!-- Verilen Para Üstü Tablası -->
+        <div class="glass-card rounded-2xl p-5 flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-lg">💶</span>
+              <h3 class="text-sm font-bold text-white">Müşteriye Verilen Para Üstü</h3>
+            </div>
+            <button onclick="clearGivenMoney()" class="text-xs text-rose-400 hover:text-rose-300 font-semibold px-2 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-all">
+              Temizle / Sıfırla
+            </button>
+          </div>
+
+          <!-- Seçilen Paraların Tepsi Görünümü -->
+          <div id="given-tray" class="min-h-[70px] max-h-[110px] overflow-y-auto p-3 rounded-xl bg-slate-900/90 border border-white/10 flex flex-wrap gap-2 items-center">
+            <span id="tray-empty-hint" class="text-xs text-slate-500 italic">Aşağıdaki banknot veya madeni paralara tıklayarak tepsiyi doldurun...</span>
+          </div>
+
+          <!-- Toplam Verilen & Onaylama -->
+          <div class="flex items-center justify-between pt-2">
+            <div>
+              <span class="text-xs text-slate-400">Verdiğiniz Tutar:</span>
+              <div id="given-total" class="font-mono text-2xl font-black text-amber-300">0.00 ₺</div>
+            </div>
+            <button onclick="submitChange()" id="btn-submit-change" class="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/25 transition-all flex items-center gap-2">
+              <span>Para Üstünü Teslim Et</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+            </button>
+          </div>
+          <!-- Geri bildirim mesajı -->
+          <div id="kasa-feedback" class="text-xs font-semibold text-center min-h-[20px] transition-all"></div>
+        </div>
+
+        <!-- PARA ÇEKMECESİ (BANKNOTLAR & MADENİ PARALAR) -->
+        <div class="glass-card rounded-2xl p-5 flex flex-col gap-4">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <span>Kasa Çekmecesi</span>
+            <span class="text-[10px] lowercase text-slate-500">(Eklemek için paraya tıklayın)</span>
+          </div>
+
+          <!-- Banknotlar -->
+          <div>
+            <div class="text-[11px] font-semibold text-slate-400 mb-2">Kağıt Banknotlar (TL)</div>
+            <div class="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
+              <button onclick="addMoney(200)" class="bill-200 p-2.5 rounded-xl flex flex-col items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-md">
+                <span class="text-[10px] font-bold opacity-80">TÜRKİYE</span>
+                <span class="text-base font-black tracking-tight">200 ₺</span>
+              </button>
+              <button onclick="addMoney(100)" class="bill-100 p-2.5 rounded-xl flex flex-col items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-md">
+                <span class="text-[10px] font-bold opacity-80">TÜRKİYE</span>
+                <span class="text-base font-black tracking-tight">100 ₺</span>
+              </button>
+              <button onclick="addMoney(50)" class="bill-50 p-2.5 rounded-xl flex flex-col items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-md">
+                <span class="text-[10px] font-bold opacity-80">TÜRKİYE</span>
+                <span class="text-base font-black tracking-tight">50 ₺</span>
+              </button>
+              <button onclick="addMoney(20)" class="bill-20 p-2.5 rounded-xl flex flex-col items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-md">
+                <span class="text-[10px] font-bold opacity-80">TÜRKİYE</span>
+                <span class="text-base font-black tracking-tight">20 ₺</span>
+              </button>
+              <button onclick="addMoney(10)" class="bill-10 p-2.5 rounded-xl flex flex-col items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-md">
+                <span class="text-[10px] font-bold opacity-80">TÜRKİYE</span>
+                <span class="text-base font-black tracking-tight">10 ₺</span>
+              </button>
+              <button onclick="addMoney(5)" class="bill-5 p-2.5 rounded-xl flex flex-col items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-md">
+                <span class="text-[10px] font-bold opacity-80">TÜRKİYE</span>
+                <span class="text-base font-black tracking-tight">5 ₺</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Madeni Paralar -->
+          <div>
+            <div class="text-[11px] font-semibold text-slate-400 mb-2">Madeni Paralar (TL & Kuruş)</div>
+            <div class="grid grid-cols-4 sm:grid-cols-4 gap-3">
+              <button onclick="addMoney(1.0)" class="coin-tl p-3 rounded-2xl flex flex-col items-center justify-center hover:scale-105 active:scale-95 transition-all">
+                <span class="text-sm font-black">1 ₺</span>
+                <span class="text-[9px] uppercase tracking-wider">Lira</span>
+              </button>
+              <button onclick="addMoney(0.50)" class="coin-kr p-3 rounded-2xl flex flex-col items-center justify-center hover:scale-105 active:scale-95 transition-all">
+                <span class="text-sm font-black">50 Kr</span>
+                <span class="text-[9px] uppercase tracking-wider">0.50 ₺</span>
+              </button>
+              <button onclick="addMoney(0.25)" class="coin-kr p-3 rounded-2xl flex flex-col items-center justify-center hover:scale-105 active:scale-95 transition-all">
+                <span class="text-sm font-black">25 Kr</span>
+                <span class="text-[9px] uppercase tracking-wider">0.25 ₺</span>
+              </button>
+              <button onclick="addMoney(0.10)" class="coin-kr p-3 rounded-2xl flex flex-col items-center justify-center hover:scale-105 active:scale-95 transition-all">
+                <span class="text-sm font-black">10 Kr</span>
+                <span class="text-[9px] uppercase tracking-wider">0.10 ₺</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: DENGE TERAZİSİ ==================== -->
+    <section id="tab-terazi" class="hidden grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+      <!-- SOL: GÖREV SEVİYESİ VE CEBİR AÇIKLAMASI -->
+      <div class="lg:col-span-4 flex flex-col gap-4">
+        <div class="glass-card rounded-2xl p-5 flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <span>⚖️</span> Cebirsel Denge Seviyeleri
+            </h3>
+            <span id="terazi-level-indicator" class="text-xs px-2.5 py-1 rounded-full font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Seviye 1 / 8</span>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Terazinin iki kefesi dengede olduğunda eşitlik (<span class="font-mono text-emerald-400">=</span>) sağlanır. Gizemli sandık <strong class="text-amber-300 font-mono">X</strong>'in ağırlığını bulup teraziyi dengeye getirin!
+          </p>
+
+          <!-- Denklem Göstergesi -->
+          <div class="p-4 rounded-xl bg-slate-900 border border-white/10 flex flex-col items-center justify-center gap-1.5 text-center">
+            <div class="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">Mevcut Denklem</div>
+            <div id="equation-display" class="font-mono text-xl font-black text-white tracking-widest">X + 4 = 10</div>
+          </div>
+
+          <!-- X Değeri Tahmini ve Çözüm Butonları -->
+          <div class="flex flex-col gap-2">
+            <label class="text-xs font-semibold text-slate-300">X Sandığının Ağırlığı (kg):</label>
+            <div class="flex gap-2">
+              <input type="number" id="x-guess-input" min="1" max="50" placeholder="Örn: 6" class="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-white/20 text-white font-mono text-base font-bold text-center focus:outline-none focus:border-amber-400">
+              <button onclick="testScaleBalance()" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-amber-500/20 flex items-center gap-1">
+                <span>Dene</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Geri bildirim -->
+          <div id="terazi-feedback" class="text-xs font-semibold text-center min-h-[24px]"></div>
+
+          <div class="flex gap-2 pt-2 border-t border-white/10">
+            <button onclick="prevScaleLevel()" class="flex-1 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300 transition-all">← Önceki</button>
+            <button onclick="nextScaleLevel()" class="flex-1 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300 transition-all">Sonraki →</button>
+          </div>
+        </div>
+
+        <!-- Matematiksel Püf Noktası -->
+        <div class="glass-panel rounded-2xl p-4 flex gap-3 text-xs text-slate-300">
+          <span class="text-xl">💡</span>
+          <div>
+            <strong class="text-white block mb-1">Cebirsel İpucu:</strong>
+            Eşitliğin her iki tarafından aynı ağırlığı eksiltirseniz veya eklerseniz terazi dengesi bozulmaz!
+          </div>
+        </div>
+      </div>
+
+      <!-- SAĞ: İNTERAKTİF CANVAS TERAZİ -->
+      <div class="lg:col-span-8 glass-card rounded-2xl p-5 flex flex-col items-center justify-between min-h-[460px]">
+        <!-- Terazi Üst Gösterge Tablosu -->
+        <div class="w-full flex items-center justify-between px-4 pb-2 border-b border-white/10">
+          <div class="flex items-center gap-2">
+            <div class="w-3 h-3 rounded-full bg-cyan-400"></div>
+            <span class="text-xs text-slate-400">Sol Kefe Toplam:</span>
+            <span id="left-scale-weight" class="font-mono text-sm font-bold text-cyan-300">0 kg</span>
+          </div>
+          <div id="scale-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-300 border border-white/10">
+            Dengesiz
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400">Sağ Kefe Toplam:</span>
+            <span id="right-scale-weight" class="font-mono text-sm font-bold text-amber-300">0 kg</span>
+            <div class="w-3 h-3 rounded-full bg-amber-400"></div>
+          </div>
+        </div>
+
+        <!-- Canvas Terazi -->
+        <div class="w-full flex-1 flex items-center justify-center p-2 relative">
+          <canvas id="balanceCanvas" width="600" height="340" class="max-w-full h-auto rounded-xl"></canvas>
+        </div>
+
+        <!-- Hızlı Ağırlık Seçimi / İpuçları -->
+        <div class="w-full flex flex-wrap items-center justify-center gap-2 pt-2 border-t border-white/10 text-xs text-slate-400">
+          <span>Hızlı Deneme:</span>
+          <button onclick="setGuess(2)" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-mono">2</button>
+          <button onclick="setGuess(4)" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-mono">4</button>
+          <button onclick="setGuess(6)" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-mono">6</button>
+          <button onclick="setGuess(7)" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-mono">7</button>
+          <button onclick="setGuess(8)" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-mono">8</button>
+          <button onclick="setGuess(10)" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-mono">10</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: LİMONATA STANDI GİRİŞİMCİLİK SİMÜLATÖRÜ ==================== -->
+    <section id="tab-girisim" class="hidden grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+      <!-- SOL: 7 GÜNLÜK YOLCULUK & GÜNLÜK KARARLAR -->
+      <div class="lg:col-span-6 flex flex-col gap-4">
+        <!-- Stand Durum Kartı -->
+        <div class="glass-card rounded-2xl p-5 flex flex-col gap-4 border border-yellow-500/20">
+          <div class="flex items-center justify-between border-b border-white/10 pb-3">
+            <div class="flex items-center gap-2.5">
+              <span class="text-2xl">🍋</span>
+              <div>
+                <h3 class="text-sm font-bold text-white">Limonata Standı Yöneticisi</h3>
+                <span id="sim-day-title" class="text-xs text-amber-300 font-semibold">1. Gün / Pazartesi</span>
+              </div>
+            </div>
+            <!-- Kasa / Nakit -->
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 uppercase font-semibold">Nakit Sermaye</span>
+              <div id="sim-cash" class="font-mono text-xl font-black text-emerald-400">100.00 ₺</div>
+            </div>
+          </div>
+
+          <!-- Hava Durumu ve Tahmin -->
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-white/10 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span id="sim-weather-icon" class="text-3xl">☀️</span>
+              <div>
+                <div id="sim-weather-title" class="text-xs font-bold text-white">Çok Sıcak & Güneşli (32°C)</div>
+                <div id="sim-weather-desc" class="text-[11px] text-slate-400">Mükemmel limonata havası! İnsanlar serinlemek için sıraya girecek.</div>
+              </div>
+            </div>
+            <span id="sim-weather-multiplier" class="text-xs font-bold text-amber-400 font-mono bg-amber-400/10 px-2 py-1 rounded-lg">Talep: Yüksek (1.5x)</span>
+          </div>
+
+          <!-- Günlük Tedarik Alışverişi -->
+          <div class="flex flex-col gap-3">
+            <div class="text-xs font-bold text-slate-300 uppercase tracking-wider">Sabah Tedarik Alışverişi:</div>
+            
+            <div class="grid grid-cols-3 gap-3 text-xs">
+              <!-- Limon -->
+              <div class="p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-2">
+                <div class="flex justify-between items-center">
+                  <span class="font-semibold text-slate-300">🍋 Limon</span>
+                  <span class="text-[10px] text-slate-400 font-mono">3 ₺ / ad</span>
+                </div>
+                <div class="flex items-center justify-between gap-1">
+                  <button onclick="changeSupply('lemons', -5)" class="w-6 h-6 rounded-lg bg-white/10 text-white font-bold hover:bg-white/20">-</button>
+                  <span id="qty-lemons" class="font-mono font-bold text-amber-300">10</span>
+                  <button onclick="changeSupply('lemons', 5)" class="w-6 h-6 rounded-lg bg-white/10 text-white font-bold hover:bg-white/20">+</button>
+                </div>
+              </div>
+
+              <!-- Şeker -->
+              <div class="p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-2">
+                <div class="flex justify-between items-center">
+                  <span class="font-semibold text-slate-300">🍬 Şeker (kg)</span>
+                  <span class="text-[10px] text-slate-400 font-mono">10 ₺ / kg</span>
+                </div>
+                <div class="flex items-center justify-between gap-1">
+                  <button onclick="changeSupply('sugar', -1)" class="w-6 h-6 rounded-lg bg-white/10 text-white font-bold hover:bg-white/20">-</button>
+                  <span id="qty-sugar" class="font-mono font-bold text-amber-300">2</span>
+                  <button onclick="changeSupply('sugar', 1)" class="w-6 h-6 rounded-lg bg-white/10 text-white font-bold hover:bg-white/20">+</button>
+                </div>
+              </div>
+
+              <!-- Bardak -->
+              <div class="p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-2">
+                <div class="flex justify-between items-center">
+                  <span class="font-semibold text-slate-300">🥤 Bardak (10'lu)</span>
+                  <span class="text-[10px] text-slate-400 font-mono">5 ₺ / pkt</span>
+                </div>
+                <div class="flex items-center justify-between gap-1">
+                  <button onclick="changeSupply('cups', -10)" class="w-6 h-6 rounded-lg bg-white/10 text-white font-bold hover:bg-white/20">-</button>
+                  <span id="qty-cups" class="font-mono font-bold text-amber-300">20</span>
+                  <button onclick="changeSupply('cups', 10)" class="w-6 h-6 rounded-lg bg-white/10 text-white font-bold hover:bg-white/20">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Satış Fiyatı Belirleme -->
+          <div class="p-3 rounded-xl bg-slate-900/90 border border-white/10 flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold text-white">Bardak Başı Satış Fiyatı:</div>
+              <div class="text-[10px] text-slate-400">Çok pahalı yaparsanız müşteri kaçabilir!</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="changeCupPrice(-1)" class="w-7 h-7 rounded-lg bg-white/10 text-white font-bold hover:bg-white/20">-</button>
+              <span id="sim-cup-price" class="font-mono text-base font-bold text-emerald-400 min-w-[50px] text-center">10 ₺</span>
+              <button onclick="changeCupPrice(1)" class="w-7 h-7 rounded-lg bg-white/10 text-white font-bold hover:bg-white/20">+</button>
+            </div>
+          </div>
+
+          <!-- Toplam Maliyet & Satışa Başla Butonu -->
+          <div class="flex items-center justify-between pt-1">
+            <div>
+              <span class="text-[10px] text-slate-400">Günün Tedarik Masrafı:</span>
+              <div id="sim-daily-cost" class="font-mono text-base font-bold text-rose-400">60.00 ₺</div>
+            </div>
+            <button onclick="runBusinessDay()" id="btn-run-day" class="px-6 py-3 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-slate-950 font-bold text-sm shadow-lg shadow-yellow-500/20 transition-all flex items-center gap-2">
+              <span>Günü Başlat & Satış Yap 🚀</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SAĞ: GÜNLÜK SONUÇ & GELİR-GİDER GRAFİK / LOG TABLOSU -->
+      <div class="lg:col-span-6 flex flex-col gap-4">
+        <!-- Gün Sonu Özeti & Finansal Rapor -->
+        <div class="glass-card rounded-2xl p-5 flex flex-col gap-4">
+          <div class="flex items-center justify-between border-b border-white/10 pb-2">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <span>📊</span> Haftalık Finans Defteri
+            </h3>
+            <button onclick="restartBusinessSimulation()" class="text-xs text-slate-400 hover:text-white transition-all">Yeniden Başlat</button>
+          </div>
+
+          <!-- Canlı Gün Raporu Bildirimi -->
+          <div id="sim-report-box" class="p-4 rounded-xl bg-slate-900 border border-white/10 min-h-[90px] flex flex-col justify-center text-center">
+            <span class="text-xs text-slate-400">Günü başlatmak için soldaki butona tıklayın. Satış sonuçları burada görünecektir.</span>
+          </div>
+
+          <!-- Gün Gün Geçmiş Tablosu -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="text-[10px] uppercase text-slate-400 border-b border-white/10">
+                <tr>
+                  <th class="pb-2">Gün</th>
+                  <th class="pb-2">Hava</th>
+                  <th class="pb-2 text-right">Satılan</th>
+                  <th class="pb-2 text-right">Ciro</th>
+                  <th class="pb-2 text-right">Gider</th>
+                  <th class="pb-2 text-right">Net Kâr</th>
+                </tr>
+              </thead>
+              <tbody id="sim-history-tbody" class="divide-y divide-white/5 font-mono">
+                <!-- Günler dinamik olarak eklenecek -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Haftalık Toplam Kâr Özeti -->
+          <div class="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex justify-between items-center">
+            <span class="text-xs font-bold text-emerald-300">Toplam Girişimcilik Kârı:</span>
+            <span id="sim-total-profit" class="font-mono text-lg font-black text-emerald-400">+0.00 ₺</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="glass-card border-t border-white/10 py-3 px-6 text-center text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-2">
+    <div>Tedris Atölye | Küçük Girişimciler & Finansal Okuryazarlık Laboratuvarı</div>
+    <div class="text-[11px] text-slate-400">Girişimcilik, Bütçe Yönetimi ve Cebir Becerileri Geliştirme Projesi</div>
+  </footer>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    /* ================= AUDIO SYNTHESIZER ================= */
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playTone(freq, duration = 0.1, type = 'sine') {
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function playCoinSound() {
+      playTone(987.77, 0.08, 'triangle');
+      setTimeout(() => playTone(1318.51, 0.15, 'sine'), 50);
+    }
+
+    function playSuccessSound() {
+      playTone(523.25, 0.1);
+      setTimeout(() => playTone(659.25, 0.1), 80);
+      setTimeout(() => playTone(783.99, 0.1), 160);
+      setTimeout(() => playTone(1046.50, 0.25), 240);
+    }
+
+    function playErrorSound() {
+      playTone(220, 0.15, 'sawtooth');
+      setTimeout(() => playTone(164.81, 0.2, 'sawtooth'), 120);
+    }
+
+    /* ================= TAB NAVIGATION ================= */
+    function switchTab(tabId) {
+      document.getElementById('tab-kasa').classList.add('hidden');
+      document.getElementById('tab-terazi').classList.add('hidden');
+      document.getElementById('tab-girisim').classList.add('hidden');
+      document.getElementById('tab-kasa').classList.remove('grid');
+      document.getElementById('tab-terazi').classList.remove('grid');
+      document.getElementById('tab-girisim').classList.remove('grid');
+
+      document.getElementById('tab-btn-kasa').className = 'flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-slate-400 hover:text-white';
+      document.getElementById('tab-btn-terazi').className = 'flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-slate-400 hover:text-white';
+      document.getElementById('tab-btn-girisim').className = 'flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-slate-400 hover:text-white';
+
+      const activeSection = document.getElementById('tab-' + tabId);
+      activeSection.classList.remove('hidden');
+      activeSection.classList.add('grid');
+
+      const activeBtn = document.getElementById('tab-btn-' + tabId);
+      activeBtn.className = 'flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-white bg-emerald-600 shadow-md';
+
+      if (tabId === 'terazi') {
+        renderScale();
+      }
+    }
+
+    /* ================= GLOBAL SCORE ================= */
+    let globalEarned = 0;
+    function addGlobalScore(amount) {
+      globalEarned += Math.round(amount);
+      document.getElementById('global-score').innerText = globalEarned + ' ₺';
+    }
+
+    /* ================= TAB 1: MARKET KASASI LOGIC ================= */
+    const PRODUCT_CATALOG = [
+      { name: 'Süt (1L)', icon: '🥛', priceEasy: 25, priceMedium: 27.5, priceHard: 28.75 },
+      { name: 'Tam Buğday Ekmeği', icon: '🍞', priceEasy: 10, priceMedium: 12.5, priceHard: 13.50 },
+      { name: 'Elma (1 kg)', icon: '🍎', priceEasy: 30, priceMedium: 35.0, priceHard: 34.25 },
+      { name: 'Peynir (500g)', icon: '🧀', priceEasy: 80, priceMedium: 85.0, priceHard: 89.50 },
+      { name: 'Zeytin (kavanoz)', icon: '🫒', priceEasy: 55, priceMedium: 60.0, priceHard: 62.75 },
+      { name: 'Bal (küçük)', icon: '🍯', priceEasy: 90, priceMedium: 95.0, priceHard: 98.25 },
+      { name: "Yumurta (10'lu)", icon: '🥚', priceEasy: 45, priceMedium: 47.5, priceHard: 46.50 },
+      { name: 'Portakal Suyu', icon: '🧃', priceEasy: 20, priceMedium: 22.5, priceHard: 23.25 }
+    ];
+
+    const CUSTOMER_NAMES = [
+      'Zeynep Öğretmen', 'Mimar Selim Bey', 'Doktor Defne Hanım',
+      'Ali & Ayşe Kardeşler', 'Kemal Amca', 'Mühendis Melis', 'Kütüphaneci Burak Bey'
+    ];
+
+    let currentDifficulty = 'medium';
+    let currentBasket = [];
+    let currentTotal = 0;
+    let customerGiven = 0;
+    let requiredChange = 0;
+    let cashierGivenMoney = [];
+    let cashierStreak = 0;
+    let totalTips = 0;
+
+    function changeKasaDiff(diff) {
+      currentDifficulty = diff;
+      newKasaCustomer();
+    }
+
+    function newKasaCustomer() {
+      clearGivenMoney();
+      const customerName = CUSTOMER_NAMES[Math.floor(Math.random() * CUSTOMER_NAMES.length)];
+      document.getElementById('kasa-customer-name').innerText = 'Müşteri: ' + customerName;
+
+      // Sepet oluştur (2 veya 3 ürün)
+      const itemCount = Math.floor(Math.random() * 2) + 2;
+      const shuffled = [...PRODUCT_CATALOG].sort(() => 0.5 - Math.random());
+      currentBasket = shuffled.slice(0, itemCount);
+
+      const itemsDiv = document.getElementById('receipt-items');
+      itemsDiv.innerHTML = '';
+      currentTotal = 0;
+
+      currentBasket.forEach(p => {
+        let price = currentDifficulty === 'easy' ? p.priceEasy : (currentDifficulty === 'medium' ? p.priceMedium : p.priceHard);
+        currentTotal += price;
+
+        const row = document.createElement('div');
+        row.className = 'flex justify-between items-center text-xs py-1 px-2 rounded-lg bg-white/5';
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span>${p.icon}</span>
+            <span class="text-slate-300 font-medium">${p.name}</span>
+          </div>
+          <span class="font-mono font-bold text-slate-200">${price.toFixed(2)} ₺</span>
+        `;
+        itemsDiv.appendChild(row);
+      });
+
+      currentTotal = Math.round(currentTotal * 100) / 100;
+      document.getElementById('receipt-total').innerText = currentTotal.toFixed(2) + ' ₺';
+
+      // Müşteri para verir (üst yuvarlak banknot)
+      const possibleBills = [20, 50, 100, 200];
+      customerGiven = possibleBills.find(b => b > currentTotal) || 200;
+      if (currentTotal > 200) customerGiven = 300;
+
+      document.getElementById('customer-paid').innerText = customerGiven.toFixed(2) + ' ₺';
+
+      requiredChange = Math.round((customerGiven - currentTotal) * 100) / 100;
+      document.getElementById('target-change').innerText = requiredChange.toFixed(2) + ' ₺';
+
+      document.getElementById('kasa-feedback').innerText = '';
+    }
+
+    function addMoney(value) {
+      cashierGivenMoney.push(value);
+      playCoinSound();
+      renderCashierTray();
+    }
+
+    function clearGivenMoney() {
+      cashierGivenMoney = [];
+      renderCashierTray();
+      document.getElementById('kasa-feedback').innerText = '';
+    }
+
+    function renderCashierTray() {
+      const tray = document.getElementById('given-tray');
+      const emptyHint = document.getElementById('tray-empty-hint');
+      tray.innerHTML = '';
+
+      if (cashierGivenMoney.length === 0) {
+        if (emptyHint) tray.appendChild(emptyHint);
+        document.getElementById('given-total').innerText = '0.00 ₺';
+        return;
+      }
+
+      let sum = 0;
+      cashierGivenMoney.forEach((val, idx) => {
+        sum += val;
+        const item = document.createElement('div');
+        item.className = 'px-2 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1 cursor-pointer select-none';
+
+        if (val >= 5) {
+          item.className += ' bg-amber-500/20 text-amber-300 border border-amber-500/30';
+          item.innerText = val + ' ₺';
+        } else {
+          item.className += ' bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
+          item.innerText = (val < 1 ? Math.round(val * 100) + ' Kr' : val + ' ₺');
+        }
+
+        item.title = 'Kaldırmak için tıkla';
+        item.onclick = () => {
+          cashierGivenMoney.splice(idx, 1);
+          renderCashierTray();
+          playTone(300, 0.05);
+        };
+        tray.appendChild(item);
+      });
+
+      sum = Math.round(sum * 100) / 100;
+      document.getElementById('given-total').innerText = sum.toFixed(2) + ' ₺';
+    }
+
+    function submitChange() {
+      const totalGiven = Math.round(cashierGivenMoney.reduce((a, b) => a + b, 0) * 100) / 100;
+      const feedback = document.getElementById('kasa-feedback');
+
+      if (cashierGivenMoney.length === 0) {
+        feedback.className = 'text-xs font-semibold text-center text-amber-400';
+        feedback.innerText = 'Henüz para üstü tepsisine hiç para eklemediniz!';
+        playErrorSound();
+        return;
+      }
+
+      const diff = Math.round((totalGiven - requiredChange) * 100) / 100;
+
+      if (diff === 0) {
+        cashierStreak++;
+        totalTips += 15;
+        document.getElementById('kasa-streak').innerText = cashierStreak + ' 🔥';
+        document.getElementById('kasa-tips').innerText = totalTips + ' ₺';
+        addGlobalScore(25);
+
+        feedback.className = 'text-xs font-bold text-center text-emerald-400';
+        feedback.innerText = '🎉 MÜKEMMEL! Kuruşu kuruşuna doğru para üstü verdiniz. +25 ₺ Bahşiş!';
+        playSuccessSound();
+        confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
+
+        setTimeout(() => {
+          newKasaCustomer();
+        }, 1600);
+      } else if (diff > 0) {
+        feedback.className = 'text-xs font-bold text-center text-rose-400';
+        feedback.innerText = '⚠️ Müşteriye ' + diff.toFixed(2) + ' ₺ FAZLA para verdiniz! Kontrol edin.';
+        playErrorSound();
+      } else {
+        feedback.className = 'text-xs font-bold text-center text-rose-400';
+        feedback.innerText = '⚠️ Müşteriye ' + Math.abs(diff).toFixed(2) + ' ₺ EKSİK para verdiniz!';
+        playErrorSound();
+      }
+    }
+
+    /* ================= TAB 2: DENGE TERAZİSİ LOGIC ================= */
+    const SCALE_LEVELS = [
+      { equation: 'X + 4 = 10', targetX: 6, leftConstant: 4, rightTotal: 10, xCount: 1 },
+      { equation: 'X + 7 = 15', targetX: 8, leftConstant: 7, rightTotal: 15, xCount: 1 },
+      { equation: '2X = 16', targetX: 8, leftConstant: 0, rightTotal: 16, xCount: 2 },
+      { equation: '2X + 3 = 15', targetX: 6, leftConstant: 3, rightTotal: 15, xCount: 2 },
+      { equation: '3X + 5 = 26', targetX: 7, leftConstant: 5, rightTotal: 26, xCount: 3 },
+      { equation: '2X + 8 = X + 15', targetX: 7, leftConstant: 8, rightTotal: 15, xCount: 1, hint: 'İki taraftan da 1 adet X çıkarırsak: X + 8 = 15' },
+      { equation: '3X + 2 = 2X + 9', targetX: 7, leftConstant: 2, rightTotal: 9, xCount: 1, hint: 'İki taraftan da 2 adet X çıkarırsak: X + 2 = 9' },
+      { equation: '4X + 6 = 2X + 20', targetX: 7, leftConstant: 6, rightTotal: 20, xCount: 2, hint: 'İki taraftan da 2X çıkar: 2X + 6 = 20 -> 2X = 14' }
+    ];
+
+    let currentScaleLevel = 0;
+    let currentXGuess = 0;
+    let scaleTiltAngle = 0;
+
+    function renderScaleLevelInfo() {
+      const lvl = SCALE_LEVELS[currentScaleLevel];
+      document.getElementById('terazi-level-indicator').innerText = 'Seviye ' + (currentScaleLevel + 1) + ' / ' + SCALE_LEVELS.length;
+      document.getElementById('equation-display').innerText = lvl.equation;
+      document.getElementById('terazi-feedback').innerText = '';
+      document.getElementById('x-guess-input').value = '';
+      currentXGuess = 0;
+      updateScaleWeights();
+      renderScale();
+    }
+
+    function setGuess(val) {
+      document.getElementById('x-guess-input').value = val;
+      testScaleBalance();
+    }
+
+    function updateScaleWeights() {
+      const lvl = SCALE_LEVELS[currentScaleLevel];
+      const leftWeight = (lvl.xCount * (currentXGuess || 0)) + lvl.leftConstant;
+      const rightWeight = lvl.rightTotal;
+
+      document.getElementById('left-scale-weight').innerText = leftWeight + ' kg';
+      document.getElementById('right-scale-weight').innerText = rightWeight + ' kg';
+
+      const badge = document.getElementById('scale-status-badge');
+      if (currentXGuess === 0) {
+        badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-300 border border-white/10';
+        badge.innerText = 'X Değeri Bekleniyor';
+        scaleTiltAngle = 0.25; // Sol boş olduğu için sağ kefe ağır basar
+      } else if (leftWeight === rightWeight) {
+        badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        badge.innerText = 'DENGEDE! Eşitlik Sağlandı (L = R)';
+        scaleTiltAngle = 0;
+      } else if (leftWeight > rightWeight) {
+        badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40';
+        badge.innerText = 'Sol Kefe Daha Ağır (X çok büyük)';
+        scaleTiltAngle = -0.2;
+      } else {
+        badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
+        badge.innerText = 'Sağ Kefe Daha Ağır (X yetersiz)';
+        scaleTiltAngle = 0.2;
+      }
+    }
+
+    function testScaleBalance() {
+      const input = document.getElementById('x-guess-input');
+      const val = parseInt(input.value);
+      const feedback = document.getElementById('terazi-feedback');
+
+      if (isNaN(val) || val <= 0) {
+        feedback.className = 'text-xs font-bold text-amber-400';
+        feedback.innerText = 'Lütfen pozitif bir tam sayı girin.';
+        playErrorSound();
+        return;
+      }
+
+      currentXGuess = val;
+      updateScaleWeights();
+      renderScale();
+
+      const lvl = SCALE_LEVELS[currentScaleLevel];
+      if (val === lvl.targetX) {
+        feedback.className = 'text-xs font-bold text-emerald-400';
+        feedback.innerText = '🎯 TEBRİKLER! Terazi dengelendi: X = ' + val + ' kg.';
+        playSuccessSound();
+        confetti({ particleCount: 50, spread: 70, origin: { y: 0.6 } });
+        addGlobalScore(30);
+      } else {
+        playErrorSound();
+        if (val < lvl.targetX) {
+          feedback.className = 'text-xs font-bold text-cyan-400';
+          feedback.innerText = 'Denge sağlanamadı: ' + val + ' yetersiz kaldı, sağ kefe daha ağır!';
+        } else {
+          feedback.className = 'text-xs font-bold text-amber-400';
+          feedback.innerText = 'Denge sağlanamadı: ' + val + ' fazla geldi, sol kefe aşağı çöktü!';
+        }
+      }
+    }
+
+    function prevScaleLevel() {
+      if (currentScaleLevel > 0) {
+        currentScaleLevel--;
+        renderScaleLevelInfo();
+      }
+    }
+
+    function nextScaleLevel() {
+      if (currentScaleLevel < SCALE_LEVELS.length - 1) {
+        currentScaleLevel++;
+        renderScaleLevelInfo();
+      }
+    }
+
+    function renderScale() {
+      const canvas = document.getElementById('balanceCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width;
+      const H = canvas.height;
+
+      ctx.clearRect(0, 0, W, H);
+
+      const centerX = W / 2;
+      const centerY = 130;
+      const beamHalfWidth = 190;
+
+      // 1. Zemin ve Destek Tabanı (Base & Fulcrum Pillar)
+      ctx.fillStyle = '#334155';
+      ctx.beginPath();
+      ctx.roundRect(centerX - 90, H - 35, 180, 20, 10);
+      ctx.fill();
+
+      // Dikey Gövde Kolonu
+      const pillarGrad = ctx.createLinearGradient(centerX - 15, centerY, centerX + 15, H - 35);
+      pillarGrad.addColorStop(0, '#64748b');
+      pillarGrad.addColorStop(1, '#1e293b');
+      ctx.fillStyle = pillarGrad;
+      ctx.beginPath();
+      ctx.moveTo(centerX - 12, centerY);
+      ctx.lineTo(centerX + 12, centerY);
+      ctx.lineTo(centerX + 24, H - 35);
+      ctx.lineTo(centerX - 24, H - 35);
+      ctx.closePath();
+      ctx.fill();
+
+      // Üçgen Destek Noktası (Pivot triangle)
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY - 6);
+      ctx.lineTo(centerX + 18, centerY + 22);
+      ctx.lineTo(centerX - 18, centerY + 22);
+      ctx.closePath();
+      ctx.fill();
+
+      // 2. Hareketli Terazi Kolu (Beam)
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.rotate(scaleTiltAngle);
+
+      // Ana Kol Çubuğu
+      const beamGrad = ctx.createLinearGradient(-beamHalfWidth, -6, beamHalfWidth, 6);
+      beamGrad.addColorStop(0, '#38bdf8');
+      beamGrad.addColorStop(0.5, '#f8fafc');
+      beamGrad.addColorStop(1, '#f59e0b');
+      ctx.strokeStyle = beamGrad;
+      ctx.lineWidth = 10;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-beamHalfWidth, 0);
+      ctx.lineTo(beamHalfWidth, 0);
+      ctx.stroke();
+
+      // Orta Merkez Rulmanı
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(0, 0, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Kefe Askı Noktaları
+      const leftHookX = -beamHalfWidth;
+      const rightHookX = beamHalfWidth;
+
+      ctx.restore();
+
+      // Askı Noktalarının Dünya Koordinatlarını Hesapla
+      const cosA = Math.cos(scaleTiltAngle);
+      const sinA = Math.sin(scaleTiltAngle);
+
+      const leftPanAnchorX = centerX - beamHalfWidth * cosA;
+      const leftPanAnchorY = centerY - beamHalfWidth * sinA;
+
+      const rightPanAnchorX = centerX + beamHalfWidth * cosA;
+      const rightPanAnchorY = centerY + beamHalfWidth * sinA;
+
+      const chainLength = 95;
+      const panWidth = 105;
+
+      // 3. SOL KEFE (Çiz & Askılar)
+      const leftPanY = leftPanAnchorY + chainLength;
+
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(leftPanAnchorX, leftPanAnchorY);
+      ctx.lineTo(leftPanAnchorX - (panWidth / 2) + 10, leftPanY);
+      ctx.moveTo(leftPanAnchorX, leftPanAnchorY);
+      ctx.lineTo(leftPanAnchorX + (panWidth / 2) - 10, leftPanY);
+      ctx.stroke();
+
+      // Sol Çanak
+      ctx.fillStyle = '#0284c7';
+      ctx.beginPath();
+      ctx.ellipse(leftPanAnchorX, leftPanY + 6, panWidth / 2, 10, 0, 0, Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Sol Kefe Nesneleri (X Sandıkları ve Ağırlıklar)
+      const lvl = SCALE_LEVELS[currentScaleLevel];
+      // X Kutusu
+      for (let i = 0; i < lvl.xCount; i++) {
+        const boxX = leftPanAnchorX - 25 + (i * 24);
+        const boxY = leftPanY - 32;
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(boxX, boxY, 22, 26);
+        ctx.strokeStyle = '#fef08a';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(boxX, boxY, 22, 26);
+        ctx.fillStyle = '#451a03';
+        ctx.font = 'bold 12px JetBrains Mono';
+        ctx.textAlign = 'center';
+        ctx.fillText('X', boxX + 11, boxY + 18);
+      }
+      // Sabit Ağırlık
+      if (lvl.leftConstant > 0) {
+        const weightX = leftPanAnchorX + 14;
+        const weightY = leftPanY - 22;
+        ctx.fillStyle = '#0284c7';
+        ctx.beginPath();
+        ctx.roundRect(weightX, weightY, 24, 20, 4);
+        ctx.fill();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.stroke();
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 10px JetBrains Mono';
+        ctx.textAlign = 'center';
+        ctx.fillText('+' + lvl.leftConstant, weightX + 12, weightY + 14);
+      }
+
+      // 4. SAĞ KEFE (Çiz & Askılar)
+      const rightPanY = rightPanAnchorY + chainLength;
+
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(rightPanAnchorX, rightPanAnchorY);
+      ctx.lineTo(rightPanAnchorX - (panWidth / 2) + 10, rightPanY);
+      ctx.moveTo(rightPanAnchorX, rightPanAnchorY);
+      ctx.lineTo(rightPanAnchorX + (panWidth / 2) - 10, rightPanY);
+      ctx.stroke();
+
+      // Sağ Çanak
+      ctx.fillStyle = '#d97706';
+      ctx.beginPath();
+      ctx.ellipse(rightPanAnchorX, rightPanY + 6, panWidth / 2, 10, 0, 0, Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Sağ Kefe Nesneleri (Hedef Ağırlık)
+      const rWeightX = rightPanAnchorX - 22;
+      const rWeightY = rightPanY - 34;
+      ctx.fillStyle = '#334155';
+      ctx.beginPath();
+      ctx.roundRect(rWeightX, rWeightY, 44, 30, 6);
+      ctx.fill();
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#fef08a';
+      ctx.font = 'bold 13px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.fillText(lvl.rightTotal + ' kg', rightPanAnchorX, rWeightY + 20);
+    }
+
+    /* ================= TAB 3: LİMONATA STANDI SİMÜLASYONU ================= */
+    const WEATHER_SCHEDULE = [
+      { day: '1. Gün / Pazartesi', icon: '☀️', title: 'Çok Sıcak & Güneşli (32°C)', desc: 'Mükemmel limonata havası! İnsanlar serinlemek için sıraya girecek.', mult: 1.5 },
+      { day: '2. Gün / Salı', icon: '⛅', title: 'Ilık & Parçalı Bulutlu (25°C)', desc: 'Normal park trafiği, orta seviye talep bekleniyor.', mult: 1.0 },
+      { day: '3. Gün / Çarşamba', icon: '🔥', title: 'Aşırı Sıcak Dalgası (36°C)', desc: 'Rekor sıcaklık! Herkes buz gibi içecek arıyor!', mult: 2.0 },
+      { day: '4. Gün / Perşembe', icon: '🌧️', title: 'Yağmurlu & Serin (19°C)', desc: 'Parkta az insan var, talep düşük olabilir, dikkatli tedarik yapın.', mult: 0.5 },
+      { day: '5. Gün / Cuma', icon: '🌤️', title: 'Güneşli Hafta Sonu Öncesi (28°C)', desc: 'Öğrenciler ve aileler sokakta, güzel satış potansiyeli.', mult: 1.3 },
+      { day: '6. Gün / Cumartesi', icon: '🎉', title: 'Hafta Sonu Festivali (30°C)', desc: 'Şehir parkında açık hava konseri var! Ziyaretçi akını!', mult: 2.2 },
+      { day: '7. Gün / Pazar', icon: '☀️', title: 'Pazar Pikniği Güneşi (31°C)', desc: 'Büyük final günü! Haftanın kâr rekorunu kırabilirsiniz.', mult: 1.8 }
+    ];
+
+    let simCurrentDay = 0;
+    let simCash = 100.0;
+    let simLemons = 10;
+    let simSugar = 2;
+    let simCups = 20;
+    let simCupPrice = 10;
+    let simHistory = [];
+    let simTotalProfit = 0;
+
+    function updateSimUI() {
+      const curWeather = WEATHER_SCHEDULE[simCurrentDay] || WEATHER_SCHEDULE[0];
+      document.getElementById('sim-day-title').innerText = curWeather.day;
+      document.getElementById('sim-cash').innerText = simCash.toFixed(2) + ' ₺';
+      document.getElementById('sim-weather-icon').innerText = curWeather.icon;
+      document.getElementById('sim-weather-title').innerText = curWeather.title;
+      document.getElementById('sim-weather-desc').innerText = curWeather.desc;
+      document.getElementById('sim-weather-multiplier').innerText = 'Talep: ' + curWeather.mult + 'x';
+
+      document.getElementById('qty-lemons').innerText = simLemons;
+      document.getElementById('qty-sugar').innerText = simSugar;
+      document.getElementById('qty-cups').innerText = simCups;
+      document.getElementById('sim-cup-price').innerText = simCupPrice + ' ₺';
+
+      // Günlük maliyet = (Limon * 3) + (Şeker * 10) + (Bardak * 0.5)
+      const dailyCost = (simLemons * 3) + (simSugar * 10) + (simCups * 0.5);
+      document.getElementById('sim-daily-cost').innerText = dailyCost.toFixed(2) + ' ₺';
+
+      // Buton durumu
+      const runBtn = document.getElementById('btn-run-day');
+      if (simCurrentDay >= 7) {
+        runBtn.disabled = true;
+        runBtn.className = 'px-6 py-3 rounded-xl bg-slate-800 text-slate-500 font-bold text-sm cursor-not-allowed';
+        runBtn.innerText = '7 Günlük Sezon Tamamlandı 🏆';
+      } else if (dailyCost > simCash) {
+        runBtn.disabled = true;
+        runBtn.className = 'px-6 py-3 rounded-xl bg-rose-900/50 text-rose-300 font-bold text-sm cursor-not-allowed';
+        runBtn.innerText = 'Yetersiz Bakiye! Tedariği Azaltın';
+      } else {
+        runBtn.disabled = false;
+        runBtn.className = 'px-6 py-3 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-slate-950 font-bold text-sm shadow-lg shadow-yellow-500/20 transition-all flex items-center gap-2';
+        runBtn.innerHTML = '<span>Günü Başlat & Satış Yap 🚀</span>';
+      }
+    }
+
+    function changeSupply(item, delta) {
+      if (item === 'lemons') {
+        simLemons = Math.max(0, simLemons + delta);
+      } else if (item === 'sugar') {
+        simSugar = Math.max(0, simSugar + delta);
+      } else if (item === 'cups') {
+        simCups = Math.max(0, simCups + delta);
+      }
+      playTone(500, 0.05);
+      updateSimUI();
+    }
+
+    function changeCupPrice(delta) {
+      simCupPrice = Math.max(5, Math.min(30, simCupPrice + delta));
+      playTone(600, 0.05);
+      updateSimUI();
+    }
+
+    function runBusinessDay() {
+      if (simCurrentDay >= 7) return;
+
+      const curWeather = WEATHER_SCHEDULE[simCurrentDay];
+      const dailyCost = (simLemons * 3) + (simSugar * 10) + (simCups * 0.5);
+
+      if (dailyCost > simCash) {
+        alert('Kasanızda yeterli nakit yok!');
+        return;
+      }
+
+      simCash -= dailyCost;
+
+      // Üretim kapasitesi: Her bardak için 0.5 limon, 0.1 kg şeker gerekir
+      const maxLemonCapacity = Math.floor(simLemons / 0.5);
+      const maxSugarCapacity = Math.floor(simSugar / 0.1);
+      const productionLimit = Math.min(maxLemonCapacity, maxSugarCapacity, simCups);
+
+      // Fiyat esnekliği: Normal fiyat 10 TL. Fiyat arttıkça talep düşer.
+      // Taban müşteri = 25 kişi
+      const priceFactor = Math.max(0.1, (20 - simCupPrice) / 10);
+      const expectedDemand = Math.round(20 * curWeather.mult * priceFactor);
+
+      const soldCups = Math.min(productionLimit, expectedDemand);
+      const revenue = soldCups * simCupPrice;
+      const netProfit = revenue - dailyCost;
+
+      simCash += revenue;
+      simTotalProfit += netProfit;
+
+      simHistory.push({
+        dayName: curWeather.day.split(' / ')[1],
+        weatherIcon: curWeather.icon,
+        sold: soldCups,
+        produced: productionLimit,
+        revenue: revenue,
+        cost: dailyCost,
+        profit: netProfit
+      });
+
+      // Rapor Metni
+      const reportBox = document.getElementById('sim-report-box');
+      let statusColor = netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400';
+      let statusMsg = netProfit >= 0 ? 'Harika bir kâr günü geçirdiniz!' : 'Maliyetler ciroyu aştı, zarar ettiniz.';
+
+      reportBox.innerHTML = `
+        <div class="text-xs font-bold text-white mb-1">${curWeather.day} Raporu (${curWeather.icon})</div>
+        <div class="text-xs text-slate-300">
+          Hazırlanan: <strong>${productionLimit}</strong> bardak | Satılan: <strong>${soldCups}</strong> bardak (${simCupPrice} ₺/ad)<br>
+          Ciro: <strong class="text-emerald-300">${revenue.toFixed(2)} ₺</strong> - Masraf: <strong class="text-rose-300">${dailyCost.toFixed(2)} ₺</strong>
+        </div>
+        <div class="text-sm font-black ${statusColor} mt-1">Net Günlük Sonuç: ${netProfit >= 0 ? '+' : ''}${netProfit.toFixed(2)} ₺ (${statusMsg})</div>
+      `;
+
+      if (netProfit >= 0) {
+        playSuccessSound();
+        addGlobalScore(netProfit);
+      } else {
+        playErrorSound();
+      }
+
+      // Tabloya ekle
+      renderSimHistoryTable();
+
+      simCurrentDay++;
+
+      // 7 gün bittiğinde büyük ödül
+      if (simCurrentDay === 7) {
+        setTimeout(() => {
+          confetti({ particleCount: 100, spread: 80, origin: { y: 0.5 } });
+          let badgeTitle = 'Girişimci Çırağı';
+          if (simTotalProfit > 250) badgeTitle = 'Efsane Girişimci Lideri (Altın)';
+          else if (simTotalProfit > 150) badgeTitle = 'Başarılı Şirket Kurucusu (Gümüş)';
+          else if (simTotalProfit > 50) badgeTitle = 'Kârlı Küçük Esnaf (Bronz)';
+
+          reportBox.innerHTML += `
+            <div class="mt-3 p-3 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-center">
+              🎉 7 GÜNLÜK SERÜVEN TAMAMLANDI! <br>
+              Toplam Kârınız: ${simTotalProfit.toFixed(2)} ₺ | Kazanılan Rozet: ${badgeTitle}
+            </div>
+          `;
+        }, 1000);
+      }
+
+      updateSimUI();
+    }
+
+    function renderSimHistoryTable() {
+      const tbody = document.getElementById('sim-history-tbody');
+      tbody.innerHTML = '';
+      simHistory.forEach(h => {
+        const tr = document.createElement('tr');
+        const profitClass = h.profit >= 0 ? 'text-emerald-400' : 'text-rose-400';
+        tr.innerHTML = `
+          <td class="py-2 text-white font-medium">${h.dayName}</td>
+          <td class="py-2">${h.weatherIcon}</td>
+          <td class="py-2 text-right">${h.sold} / ${h.produced}</td>
+          <td class="py-2 text-right text-slate-300">${h.revenue.toFixed(2)} ₺</td>
+          <td class="py-2 text-right text-slate-400">${h.cost.toFixed(2)} ₺</td>
+          <td class="py-2 text-right font-bold ${profitClass}">${h.profit >= 0 ? '+' : ''}${h.profit.toFixed(2)} ₺</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const totalProfitEl = document.getElementById('sim-total-profit');
+      totalProfitEl.innerText = (simTotalProfit >= 0 ? '+' : '') + simTotalProfit.toFixed(2) + ' ₺';
+      totalProfitEl.className = 'font-mono text-lg font-black ' + (simTotalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400');
+    }
+
+    function restartBusinessSimulation() {
+      simCurrentDay = 0;
+      simCash = 100.0;
+      simLemons = 10;
+      simSugar = 2;
+      simCups = 20;
+      simCupPrice = 10;
+      simHistory = [];
+      simTotalProfit = 0;
+      document.getElementById('sim-report-box').innerHTML = '<span class="text-xs text-slate-400">Günü başlatmak için soldaki butona tıklayın. Satış sonuçları burada görünecektir.</span>';
+      renderSimHistoryTable();
+      updateSimUI();
+    }
+
+    /* INITIALIZATION */
+    window.addEventListener('DOMContentLoaded', () => {
+      newKasaCustomer();
+      renderScaleLevelInfo();
+      updateSimUI();
+    });
+  </script>
+</body>
+</html>
