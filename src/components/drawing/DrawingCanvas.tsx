@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '../../utils/cn';
 import { Copy, Trash2 } from 'lucide-react';
 import { DRAWING_COLORS, HANDLE_CURSORS } from '../../constants/drawing';
-import { samplePressure } from './penEngine';
+import { samplePressure, smoothTowards } from './penEngine';
 import { adjustSnappedShape, recognizeShape, snapAngle } from './shapeRecognizer';
 import { findLibraryItem, getSimSpec, isAnimated, objectRect } from './libraryObjects';
 import { onImageReady } from './imageStore';
@@ -13,9 +13,10 @@ import {
     SHAPE_TOOLS,
     drawStroke,
     erasePixels,
+    maxHalfWidth,
+    strokeNearSegment,
     getBB,
     getHandlePositions,
-    hitTest,
     isSelectable,
     resizePoints,
     strokeInPolygon,
@@ -185,6 +186,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         /** Kalem baskısını gerçek hızdan üretmek için son nokta zamanı. */
         const lastPointTimeRef = React.useRef(0);
         const resizeFrameRef = React.useRef<number | null>(null);
+        /** Çizim sürerken gelen yeniden boyutlandırma isteği (sonra uygulanır). */
+        const pendingResizeRef = React.useRef(false);
+        const resizeRef = React.useRef<(() => void) | null>(null);
         /** Sürükleme sırasında geçmişe yalnızca bir kez kayıt düşmek için. */
         const gestureDirtyRef = React.useRef(false);
         /** Sürüklemede kare sıkıştırma ve statik katman önbelleği. */
@@ -229,6 +233,20 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const sy = (clientY - rect.top) * cssY;
             const v = viewRef.current;
             return { x: (sx - v.tx) / v.scale, y: (sy - v.ty) / v.scale };
+        };
+
+        /**
+         * İşaretçi olayını tuvalin EKRAN koordinatına çevirir (CSS ölçeği
+         * dahil). Yakınlaştırma çapasının `toWorld` ile aynı ölçüyü kullanması
+         * şart; aksi halde üst katmanda ölçek varken zoom kayıyordu.
+         */
+        const toCanvasPoint = (clientX: number, clientY: number): Point => {
+            const canvas = canvasRef.current;
+            const rect = canvas?.getBoundingClientRect();
+            if (!canvas || !rect) return { x: 0, y: 0 };
+            const cssX = rect.width ? canvas.offsetWidth / rect.width : 1;
+            const cssY = rect.height ? canvas.offsetHeight / rect.height : 1;
+            return { x: (clientX - rect.left) * cssX, y: (clientY - rect.top) * cssY };
         };
 
         const toScreenPoint = (p: Point, v: Viewport): Point => ({
@@ -875,7 +893,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         );
 
         const resize = React.useCallback(() => {
-            if (isDrawingRef.current) return;
+            // Çizim ortasında tuvali yeniden boyutlandırmak çizgiyi bozar;
+            // istek kaydedilir ve kalem kalkınca uygulanır.
+            if (isDrawingRef.current) {
+                pendingResizeRef.current = true;
+                return;
+            }
             const canvas = canvasRef.current;
             const buffer = bufferCanvasRef.current;
             const overlay = overlayCanvasRef.current;
@@ -913,6 +936,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             redraw();
         }, [redraw]);
 
+        React.useEffect(() => {
+            resizeRef.current = resize;
+        }, [resize]);
+
         // Açılışta mevcut sayfa bilgisini bir kez dışarıya bildir.
         React.useEffect(() => {
             notifyPageChange();
@@ -948,9 +975,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (!canvas || !viewportEnabled || !enabled) return;
             const onWheel = (e: WheelEvent) => {
                 e.preventDefault();
-                const rect = canvas.getBoundingClientRect();
-                const sx = e.clientX - rect.left;
-                const sy = e.clientY - rect.top;
+                const { x: sx, y: sy } = toCanvasPoint(e.clientX, e.clientY);
                 if (e.ctrlKey || e.metaKey) {
                     zoomAt(Math.exp(-e.deltaY / 320), sx, sy);
                 } else {
@@ -975,8 +1000,130 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             redraw();
         };
 
-        /** Silgi ucunun yarıçapı (dünya birimi). */
+        /** Silgi ucunun yarıçapı (dünya birimi). İmleç de bu daireyi çizer. */
         const eraserRadius = () => Math.max(6, config.width * 5);
+
+        /**
+         * İşaretçi olayının taşıdığı ARA örnekler.
+         *
+         * Tarayıcı, 120-240 Hz çalışan kalem ve dokunmatik tahtalarda kareye
+         * tek bir `pointermove` verir; aradaki gerçek örnekler
+         * `getCoalescedEvents()` içinde gelir. Okunmazsa hızlı hareketlerde
+         * köşeler kesilir.
+         */
+        const coalescedSamples = (
+            e: React.PointerEvent
+        ): { clientX: number; clientY: number; pressure: number; pointerType: string }[] => {
+            const native = e.nativeEvent as PointerEvent;
+            const list =
+                typeof native?.getCoalescedEvents === 'function'
+                    ? native.getCoalescedEvents()
+                    : [];
+            if (!list || list.length === 0) {
+                return [
+                    {
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        pressure: e.pressure,
+                        pointerType: e.pointerType,
+                    },
+                ];
+            }
+            return list.map((ev) => ({
+                clientX: ev.clientX,
+                clientY: ev.clientY,
+                pressure: ev.pressure,
+                pointerType: ev.pointerType || e.pointerType,
+            }));
+        };
+
+        /** Değişen bölgeye yalnızca son N nokta çiziliyorsa o kadarını çiz. */
+        const TAIL_POINTS = 16;
+
+        /**
+         * Uzun çizgilerde her işaretçi olayında bütün noktaları taramak
+         * gereksiz: değişen bölgeye yalnızca çizginin ucu giriyorsa sadece
+         * son birkaç nokta çizilir. Çizginin daha eski bir bölümü (kendi
+         * üstüne kıvrılan bir karalama gibi) bölgeye giriyorsa tamamı çizilir.
+         */
+        const paintableTail = (stroke: Stroke, region: BoundingBox, half: number): Stroke => {
+            const pts = stroke.points;
+            if (pts.length <= TAIL_POINTS) return stroke;
+            const cut = pts.length - TAIL_POINTS;
+            const x1 = region.x1 - half;
+            const y1 = region.y1 - half;
+            const x2 = region.x2 + half;
+            const y2 = region.y2 + half;
+            for (let i = 0; i < cut; i++) {
+                const a = pts[i];
+                const b = pts[i + 1];
+                if (
+                    Math.max(a.x, b.x) >= x1 &&
+                    Math.min(a.x, b.x) <= x2 &&
+                    Math.max(a.y, b.y) >= y1 &&
+                    Math.min(a.y, b.y) <= y2
+                ) {
+                    return stroke;
+                }
+            }
+            return { ...stroke, points: pts.slice(cut) };
+        };
+
+        /**
+         * Çizimin YALNIZCA değişen bölgesini tazeler.
+         *
+         * Bölge tampondan geri alınır, sonra çizim o bölgeye kırpılarak
+         * yeniden çizilir. Kırpma olmadan her işaretçi olayında çizginin
+         * tamamı yeniden taranıyordu; uzun çizgilerde olay başına maliyet
+         * sürekli büyüyordu.
+         */
+        const repaintStrokeRegion = (
+            stroke: Stroke,
+            region: BoundingBox | null,
+            // Yalnızca okunabilirlik için: bölgeye çizilen parçanın ait olduğu
+            // bütün çizim. Çizim mantığı parçayı kullanır.
+            _whole?: Stroke
+        ) => {
+            const mainCtx = ctxRef.current;
+            const buffer = bufferCanvasRef.current;
+            if (!mainCtx || !buffer || !region) return;
+            const v = viewRef.current;
+            const minX = region.x1 * v.scale + v.tx;
+            const minY = region.y1 * v.scale + v.ty;
+            const width = (region.x2 - region.x1) * v.scale;
+            const height = (region.y2 - region.y1) * v.scale;
+            const dpr = window.devicePixelRatio || 1;
+
+            let sx = Math.floor(minX * dpr);
+            let sy = Math.floor(minY * dpr);
+            let sw = Math.ceil(width * dpr) + 1;
+            let sh = Math.ceil(height * dpr) + 1;
+            if (sx < 0) {
+                sw += sx;
+                sx = 0;
+            }
+            if (sy < 0) {
+                sh += sy;
+                sy = 0;
+            }
+            if (sx + sw > buffer.width) sw = buffer.width - sx;
+            if (sy + sh > buffer.height) sh = buffer.height - sy;
+
+            applyIdentity(mainCtx);
+            mainCtx.clearRect(minX, minY, width, height);
+            if (sw > 0 && sh > 0) {
+                mainCtx.drawImage(buffer, sx, sy, sw, sh, sx / dpr, sy / dpr, sw / dpr, sh / dpr);
+            }
+
+            mainCtx.save();
+            mainCtx.beginPath();
+            mainCtx.rect(minX, minY, width, height);
+            mainCtx.clip();
+            applyView(mainCtx);
+            drawStroke(mainCtx, stroke);
+            mainCtx.restore();
+            applyIdentity(mainCtx);
+        };
 
         /**
          * Sürükleme başlarken seçili olmayan her şeyi tampona sabitler.
@@ -1029,11 +1176,27 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             gestureDirtyRef.current = true;
         };
 
-        /** Çizgi silgisi: dokunulan çizimin tamamını kaldırır. */
-        const eraseStrokesAt = (x: number, y: number) => {
-            const radius = Math.max(6, config.width * 3);
+        /**
+         * Silgi hareketi boyunca ekrana yeniden çizimi kareye sıkıştırır ve
+         * React durumunu hareket bitene kadar güncellemez: yüzlerce çizimli
+         * bir sayfada her işaretçi olayında tam yeniden çizim + yeniden
+         * render yapmak silgiyi takılmalı hâle getiriyordu.
+         */
+        const eraseDirtyRef = React.useRef(false);
+        const eraseFrameRef = React.useRef<number | null>(null);
+        const scheduleEraseRedraw = () => {
+            if (eraseFrameRef.current !== null) return;
+            eraseFrameRef.current = window.requestAnimationFrame(() => {
+                eraseFrameRef.current = null;
+                redraw();
+            });
+        };
+
+        /** Çizgi silgisi: silginin yolu boyunca dokunduğu çizimleri kaldırır. */
+        const eraseStrokesAlong = (a: Point, b: Point) => {
+            const radius = eraserRadius();
             const survivors = strokesRef.current.filter(
-                (st) => !isSelectable(st) || !strokeNearPoint(st, x, y, radius)
+                (st) => !isSelectable(st) || !strokeNearSegment(st, a, b, radius)
             );
             if (survivors.length === strokesRef.current.length) return;
             markGesture();
@@ -1042,9 +1205,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 if (!kept.has(st) && st.id) erasedIdsRef.current.push(st.id);
             }
             erasedRef.current = true;
+            eraseDirtyRef.current = true;
             strokesRef.current = survivors;
-            commitStrokes();
-            redraw();
+            scheduleEraseRedraw();
         };
 
         /**
@@ -1053,14 +1216,23 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
          * bir çizim olduğu için seçilip kenara çekilebiliyor ve altındaki
          * "silinmiş" içerik geri geliyordu.
          */
-        const erasePixelsAt = (x: number, y: number) => {
-            const next = erasePixels(strokesRef.current, x, y, eraserRadius());
+        const erasePixelsAlong = (a: Point, b: Point) => {
+            const next = erasePixels(strokesRef.current, a.x, a.y, b.x, b.y, eraserRadius());
             if (!next) return;
             markGesture();
             erasedRef.current = true;
+            eraseDirtyRef.current = true;
             strokesRef.current = next;
-            commitStrokes();
-            redraw();
+            scheduleEraseRedraw();
+        };
+
+        /** Silginin bir önceki konumu — yol boyunca silmek için. */
+        const lastErasePointRef = React.useRef<Point | null>(null);
+
+        /** Silgiyi `a → b` yolu boyunca uygular. */
+        const eraseAlong = (a: Point, b: Point) => {
+            if (config.eraserMode === 'stroke') eraseStrokesAlong(a, b);
+            else erasePixelsAlong(a, b);
         };
 
         /** Silgi ucunu üst katmanda daire olarak gösterir. */
@@ -1212,6 +1384,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
         const startDrawing = async (e: React.PointerEvent) => {
             if (!enabled) return;
+            // İşaretçiyi yakala: el tuvalin kenarından ya da üstteki araç
+            // çubuğunun üzerinden geçtiğinde çizgi ortadan kesilmesin.
+            try {
+                e.currentTarget.setPointerCapture(e.pointerId);
+            } catch {
+                /* bazı tarayıcılar reddedebilir; yakalamasız da çalışır */
+            }
             pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
             // Çift parmak: yakınlaştırma/kaydırma kipine geç.
@@ -1219,13 +1398,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 cancelCurrentStroke();
                 clearOverlay();
                 const [a, b] = [...pointersRef.current.values()];
-                const canvas = canvasRef.current;
-                const rect = canvas?.getBoundingClientRect();
+                const center = toCanvasPoint((a.x + b.x) / 2, (a.y + b.y) / 2);
                 pinchRef.current = {
                     dist: Math.hypot(b.x - a.x, b.y - a.y) || 1,
                     scale: viewRef.current.scale,
-                    centerX: (a.x + b.x) / 2 - (rect?.left ?? 0),
-                    centerY: (a.y + b.y) / 2 - (rect?.top ?? 0),
+                    centerX: center.x,
+                    centerY: center.y,
                     tx: viewRef.current.tx,
                     ty: viewRef.current.ty,
                 };
@@ -1263,8 +1441,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (config.tool === 'eraser') {
                 isDrawingRef.current = true;
                 gestureDirtyRef.current = false;
-                if (config.eraserMode === 'stroke') eraseStrokesAt(x, y);
-                else erasePixelsAt(x, y);
+                lastErasePointRef.current = { x, y };
+                eraseAlong({ x, y }, { x, y });
                 drawEraserCursor(x, y);
                 return;
             }
@@ -1308,9 +1486,14 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         return;
                     }
                 }
+                // Kutuya değil mürekkebe bak: köşegen bir çizginin kutusundaki
+                // boş köşeye tıklayınca o çizgi seçiliyordu. Tolerans ekran
+                // uzayında sabit tutulur ki yakınlaştırmada da parmakla
+                // isabet ettirilebilsin.
+                const pickTolerance = 10 / viewRef.current.scale;
                 for (let i = strokesRef.current.length - 1; i >= 0; i--) {
                     if (!isSelectable(strokesRef.current[i])) continue;
-                    if (hitTest(strokesRef.current[i], x, y)) {
+                    if (strokeNearPoint(strokesRef.current[i], x, y, pickTolerance)) {
                         // Shift ile tıklamak seçime ekler/çıkarır.
                         if (e.shiftKey) {
                             const current = selectedIdxsRef.current;
@@ -1505,8 +1688,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
             if (config.tool === 'eraser') {
                 if (isDrawingRef.current) {
-                    if (config.eraserMode === 'stroke') eraseStrokesAt(x, y);
-                    else erasePixelsAt(x, y);
+                    // Ara noktalar dahil: hızlı geçişte mürekkep atlanmasın.
+                    for (const sample of coalescedSamples(e)) {
+                        const pt = toWorld(sample.clientX, sample.clientY);
+                        eraseAlong(lastErasePointRef.current ?? pt, pt);
+                        lastErasePointRef.current = pt;
+                    }
                 }
                 drawEraserCursor(x, y);
                 return;
@@ -1552,19 +1739,49 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
 
-            const last = stroke.points[stroke.points.length - 1];
-            if (!last) return;
-            const step = Math.hypot(x - last.x, y - last.y);
-            if (step * viewRef.current.scale < 0.5) return;
+            if (!stroke.points.length) return;
 
-            const oldBB = getBB(stroke);
             if (SHAPE_TOOLS.includes(stroke.tool)) {
                 // Şekiller yalnızca başlangıç ve bitiş noktasıyla tanımlanır.
+                const oldBB = getBB(stroke);
                 const start = stroke.points[0];
                 const end = config.snapAngle ? snapAngle(start, { x, y }) : { x, y };
                 stroke.points = [start, end];
-            } else {
-                const point: Point = { x, y };
+                repaintStrokeRegion(stroke, unionBB([oldBB, getBB(stroke)]));
+                return;
+            }
+
+            // Serbest çizim: tarayıcının kareye sıkıştırdığı ARA noktalar da
+            // işlenir. Yalnızca son konumu almak, 120-240 Hz kalemlerde hızlı
+            // hareketlerde köşeleri kesiyordu.
+            const half = maxHalfWidth(stroke);
+            let dirty: BoundingBox | null = null;
+            const grow = (a: Point, b: Point) => {
+                const box = {
+                    x1: Math.min(a.x, b.x) - half - 2,
+                    y1: Math.min(a.y, b.y) - half - 2,
+                    x2: Math.max(a.x, b.x) + half + 2,
+                    y2: Math.max(a.y, b.y) + half + 2,
+                };
+                dirty = dirty ? unionBB([dirty, box]) : box;
+            };
+
+            for (const sample of coalescedSamples(e)) {
+                const raw = toWorld(sample.clientX, sample.clientY);
+                const last = stroke.points[stroke.points.length - 1];
+                if (!last) break;
+                const rawStep = Math.hypot(raw.x - last.x, raw.y - last.y);
+                if (rawStep * viewRef.current.scale < 0.5) continue;
+
+                // Dokunmatik tahtaların sinyal gürültüsünü süz: yavaş
+                // hareketlerde yumuşat, hızlı hareketlerde olduğu gibi bırak.
+                const point: Point = smoothTowards(
+                    last,
+                    raw,
+                    rawStep * viewRef.current.scale
+                );
+                const step = Math.hypot(point.x - last.x, point.y - last.y);
+
                 if (stroke.tool === 'pencil') {
                     // Hız = ekranda alınan yol / geçen süre. Sadece mesafeye
                     // bakmak işaretçi olay sıklığını hız sanmak olurdu.
@@ -1572,69 +1789,23 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     const elapsed = Math.max(1, now - lastPointTimeRef.current);
                     lastPointTimeRef.current = now;
                     point.p = samplePressure(
-                        e.pressure,
-                        e.pointerType,
+                        sample.pressure,
+                        sample.pointerType,
                         (step * viewRef.current.scale) / elapsed,
                         last.p,
                         stroke.penType
                     );
                 }
                 stroke.points.push(point);
-            }
-            const newBB = getBB(stroke);
-
-            // Yalnızca değişen bölgeyi tamponla tazeleyip üstüne çiz.
-            const mainCtx = ctxRef.current;
-            const buffer = bufferCanvasRef.current;
-            if (mainCtx && buffer) {
-                const v = viewRef.current;
-                const minX = Math.min(oldBB.x1, newBB.x1) * v.scale + v.tx;
-                const minY = Math.min(oldBB.y1, newBB.y1) * v.scale + v.ty;
-                const maxX = Math.max(oldBB.x2, newBB.x2) * v.scale + v.tx;
-                const maxY = Math.max(oldBB.y2, newBB.y2) * v.scale + v.ty;
-                const width = maxX - minX;
-                const height = maxY - minY;
-                const dpr = window.devicePixelRatio || 1;
-
-                let sx = Math.floor(minX * dpr);
-                let sy = Math.floor(minY * dpr);
-                let sw = Math.ceil(width * dpr);
-                let sh = Math.ceil(height * dpr);
-                const imgW = buffer.width;
-                const imgH = buffer.height;
-                if (sx < 0) {
-                    sw += sx;
-                    sx = 0;
-                }
-                if (sy < 0) {
-                    sh += sy;
-                    sy = 0;
-                }
-                if (sx + sw > imgW) sw = imgW - sx;
-                if (sy + sh > imgH) sh = imgH - sy;
-
-                applyIdentity(mainCtx);
-                mainCtx.clearRect(minX, minY, width, height);
-                if (sw > 0 && sh > 0) {
-                    mainCtx.drawImage(
-                        buffer,
-                        sx,
-                        sy,
-                        sw,
-                        sh,
-                        sx / dpr,
-                        sy / dpr,
-                        sw / dpr,
-                        sh / dpr
-                    );
-                }
-                applyView(mainCtx);
-                drawStroke(mainCtx, stroke);
-                applyIdentity(mainCtx);
+                grow(last, point);
             }
 
-            // Kalem modunda "Çiz ve Bekle" (Draw-and-Hold) zamanlayıcısı:
-            if (stroke.tool === 'pencil') {
+            if (dirty) repaintStrokeRegion(paintableTail(stroke, dirty, half), dirty, stroke);
+
+            // Kalem modunda "Çiz ve Bekle": yalnızca akıllı kalem açıkken.
+            // Her zaman açık olması, uzun bir eğri çizerken duraksayan
+            // öğretmenin çizimini habersizce şekle çeviriyordu.
+            if (stroke.tool === 'pencil' && config.snapShapes) {
                 cancelHoldTimer();
                 holdTimerRef.current = window.setTimeout(() => {
                     if (!isDrawingRef.current || !currentStrokeRef.current) return;
@@ -1676,7 +1847,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         };
 
         const stopDrawing = (e?: React.PointerEvent) => {
-            if (e) pointersRef.current.delete(e.pointerId);
+            if (e) {
+                pointersRef.current.delete(e.pointerId);
+                if (e.currentTarget?.hasPointerCapture?.(e.pointerId)) {
+                    e.currentTarget.releasePointerCapture(e.pointerId);
+                }
+            }
             if (pointersRef.current.size < 2) pinchRef.current = null;
             if (panRef.current) {
                 panRef.current = null;
@@ -1717,8 +1893,16 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
             if (config.tool === 'eraser') {
                 isDrawingRef.current = false;
+                lastErasePointRef.current = null;
                 window.setTimeout(flushPendingOps, 0);
                 gestureDirtyRef.current = false;
+                // Hareket boyunca React durumu güncellenmedi (her olayda
+                // yeniden render silgiyi takıyordu); sonunda bir kez yazılır.
+                if (eraseDirtyRef.current) {
+                    eraseDirtyRef.current = false;
+                    commitStrokes();
+                    redraw();
+                }
                 // Silgi hareketi boyunca değil, bitince tek yayın yapılır.
                 // Piksel silgisi çizgileri böldüğü için sayfanın tamamı gider.
                 if (erasedRef.current) {
@@ -1785,6 +1969,11 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             // Çizim biterken bekleyen uzak işlemler uygulanır.
             window.setTimeout(flushPendingOps, 0);
             if (config.tool === 'sun') clearOverlay();
+            // Çizim sürerken ertelenen yeniden boyutlandırma şimdi uygulanır.
+            if (pendingResizeRef.current) {
+                pendingResizeRef.current = false;
+                resizeRef.current?.();
+            }
         };
 
         const handleCursorStyle = (): string => {
@@ -1860,7 +2049,20 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     onPointerMove={draw}
                     onPointerUp={stopDrawing}
                     onPointerCancel={stopDrawing}
-                    onPointerLeave={stopDrawing}
+                    // Yakalama koptuğunda (sistem müdahalesi) çizim kapatılır.
+                    // Normal kalem kalkışında yakalama zaten stopDrawing
+                    // içinde bırakıldığı için burada iş kalmaz.
+                    onLostPointerCapture={(e) => {
+                        if (isDrawingRef.current || dragStateRef.current || panRef.current) {
+                            stopDrawing(e);
+                        }
+                    }}
+                    // Tuvalden çıkmak çizimi BİTİRMEZ; yalnızca silgi ucu
+                    // göstergesi temizlenir. Çizim, işaretçi yakalandığı için
+                    // dışarıda da sürer ve kalem kalkınca kapanır.
+                    onPointerLeave={() => {
+                        if (!isDrawingRef.current && config.tool === 'eraser') clearOverlay();
+                    }}
                     aria-label="Çizim alanı"
                     className={cn(
                         'absolute left-0 z-[4000] touch-none transition-opacity',
