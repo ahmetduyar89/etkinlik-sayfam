@@ -123,13 +123,20 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const polyPointsRef = React.useRef<Point[]>([]);
         const [polyCount, setPolyCount] = React.useState<number>(0);
 
+        // Araç değişince üst katmandaki geçici göstergeler silinir: lazer izi,
+        // silgi dairesi ve yarım kalmış çokgen ekranda asılı kalıyordu.
         React.useEffect(() => {
             if (config.tool !== 'polygon' && polyPointsRef.current.length > 0) {
                 polyPointsRef.current = [];
                 setPolyCount(0);
-                clearOverlay();
             }
+            clearOverlay();
         }, [config.tool]);
+
+        // Çizim kapatıldığında da (ör. sunum kipi) iz bırakmasın.
+        React.useEffect(() => {
+            if (!enabled) clearOverlay();
+        }, [enabled]);
 
         React.useEffect(() => {
             const handleKeyDown = (e: KeyboardEvent) => {
@@ -2061,7 +2068,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     // göstergesi temizlenir. Çizim, işaretçi yakalandığı için
                     // dışarıda da sürer ve kalem kalkınca kapanır.
                     onPointerLeave={() => {
-                        if (!isDrawingRef.current && config.tool === 'eraser') clearOverlay();
+                        // Silgi dairesi ve lazer noktası imleçle birlikte gider.
+                        if (!isDrawingRef.current) clearOverlay();
                     }}
                     aria-label="Çizim alanı"
                     className={cn(
