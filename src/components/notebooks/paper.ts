@@ -23,12 +23,15 @@ export const PAPER_STYLES: ReadonlyArray<PaperOption> = [
     { id: 'graph_mm', label: 'Milimetrik', group: 'Matematik & Fen', hint: 'Grafik çizimi için mm kağıdı' },
     { id: 'coordinate', label: 'Koordinat', group: 'Matematik & Fen', hint: 'Ortası eksenli kareli düzlem' },
     { id: 'isometric', label: 'İzometrik', group: 'Matematik & Fen', hint: 'Üç boyutlu cisim çizimi için' },
+    { id: 'number_line', label: 'Sayı Doğrusu', group: 'Matematik & Fen', hint: 'Bölmeli sayı doğrusu şeritleri' },
+    { id: 'lab_report', label: 'Deney Raporu', group: 'Matematik & Fen', hint: 'Amaç / Malzeme / Yöntem / Sonuç bölmeli' },
 
     { id: 'wide_lined', label: 'Geniş Çizgili', group: 'Yazı & Not', hint: 'İlkokul için geniş satır' },
     { id: 'handwriting', label: 'Güzel Yazı', group: 'Yazı & Not', hint: 'Dört çizgi üç aralık' },
     { id: 'cornell', label: 'Cornell', group: 'Yazı & Not', hint: 'Anahtar kelime / not / özet bölmeli' },
     { id: 'music', label: 'Nota', group: 'Yazı & Not', hint: 'Beş çizgili porte' },
     { id: 'todo', label: 'Kontrol Listesi', group: 'Yazı & Not', hint: 'Kutucuklu yapılacaklar satırı' },
+    { id: 'exam', label: 'Soru / Cevap', group: 'Yazı & Not', hint: 'Solda soru numarası, sağda cevap alanı' },
 ];
 
 const LINE = 'rgba(15, 23, 42, 0.10)';
@@ -257,6 +260,64 @@ export function paperBackground(
                 backgroundPosition: `${view.tx + 14 * k}px ${view.ty + 6 * k}px, ${view.tx}px ${view.ty + 6 * k}px`,
             };
 
+        // Sayı doğrusu: her şeritte bölmeli bir doğru.
+        case 'number_line':
+            return {
+                ...base,
+                backgroundImage: tile(
+                    130,
+                    120,
+                    `<g stroke="rgba(15,23,42,0.45)" stroke-width="1.2" fill="none">
+                        <line x1="0" y1="60" x2="130" y2="60" />
+                        <g stroke-width="1">
+                            <line x1="0" y1="52" x2="0" y2="68" />
+                            <line x1="26" y1="55" x2="26" y2="65" />
+                            <line x1="52" y1="55" x2="52" y2="65" />
+                            <line x1="78" y1="55" x2="78" y2="65" />
+                            <line x1="104" y1="55" x2="104" y2="65" />
+                        </g>
+                     </g>`
+                ),
+                backgroundSize: `${px(130)} ${px(120)}`,
+                backgroundPosition: origin,
+            };
+
+        // Deney raporu: dört başlıklı bölme.
+        case 'lab_report': {
+            const rule = 'rgba(13,148,136,0.45)';
+            return {
+                ...base,
+                backgroundImage: [
+                    `linear-gradient(to bottom, transparent calc(25% - 1px), ${rule} calc(25% - 1px),` +
+                        ` ${rule} calc(25% + 1px), transparent calc(25% + 1px))`,
+                    `linear-gradient(to bottom, transparent calc(50% - 1px), ${rule} calc(50% - 1px),` +
+                        ` ${rule} calc(50% + 1px), transparent calc(50% + 1px))`,
+                    `linear-gradient(to bottom, transparent calc(75% - 1px), ${rule} calc(75% - 1px),` +
+                        ` ${rule} calc(75% + 1px), transparent calc(75% + 1px))`,
+                    `linear-gradient(${LINE} 1px, transparent 1px)`,
+                ].join(', '),
+                backgroundSize: `100% 100%, 100% 100%, 100% 100%, 100% ${px(34)}`,
+                backgroundRepeat: 'no-repeat, no-repeat, no-repeat, repeat',
+                backgroundPosition: `left top, left top, left top, ${origin}`,
+            };
+        }
+
+        // Soru / cevap: solda dar numara sütunu.
+        case 'exam': {
+            const rule = 'rgba(79,70,229,0.4)';
+            return {
+                ...base,
+                backgroundImage: [
+                    `linear-gradient(to right, transparent calc(12% - 1px), ${rule} calc(12% - 1px),` +
+                        ` ${rule} calc(12% + 1px), transparent calc(12% + 1px))`,
+                    `linear-gradient(${LINE} 1px, transparent 1px)`,
+                ].join(', '),
+                backgroundSize: `100% 100%, 100% ${px(36)}`,
+                backgroundRepeat: 'no-repeat, repeat',
+                backgroundPosition: `left top, ${origin}`,
+            };
+        }
+
         case 'blank':
         default:
             return base;
@@ -480,6 +541,39 @@ export function drawPaper(
             ctx.fillStyle = rule;
             ctx.fillRect(w * 0.26 - 1, 0, 2, h * 0.82);
             ctx.fillRect(0, h * 0.82 - 1, w, 2);
+            break;
+        }
+
+        case 'number_line':
+            tiles(130 * k, 120 * k, (ox, oy) => {
+                stroke('rgba(15,23,42,0.45)', 1.2, () => {
+                    ctx.moveTo(ox, oy + 60 * k);
+                    ctx.lineTo(ox + 130 * k, oy + 60 * k);
+                });
+                stroke('rgba(15,23,42,0.45)', 1, () => {
+                    ctx.moveTo(ox, oy + 52 * k);
+                    ctx.lineTo(ox, oy + 68 * k);
+                    for (const x of [26, 52, 78, 104]) {
+                        ctx.moveTo(ox + x * k, oy + 55 * k);
+                        ctx.lineTo(ox + x * k, oy + 65 * k);
+                    }
+                });
+            });
+            break;
+
+        case 'lab_report': {
+            rows(34 * k, LINE, 1);
+            ctx.fillStyle = 'rgba(13,148,136,0.45)';
+            for (const part of [0.25, 0.5, 0.75]) {
+                ctx.fillRect(0, h * part - 1, w, 2);
+            }
+            break;
+        }
+
+        case 'exam': {
+            rows(36 * k, LINE, 1);
+            ctx.fillStyle = 'rgba(79,70,229,0.4)';
+            ctx.fillRect(w * 0.12 - 1, 0, 2, h);
             break;
         }
 
