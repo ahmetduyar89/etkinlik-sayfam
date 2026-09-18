@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
   <title>Matematiksel Akıl Oyunları | Atölye</title>
-  <meta name="description" content="Hanoi Kuleleri, KenKen, Nim, Euler Köprüleri, 24 Oyunu ve Sihirli Piramit gibi matematiksel zeka ve strateji oyunları.">
+  <meta name="description" content="10 Matematiksel zeka oyunu: Hanoi Kuleleri, KenKen, Nim, Euler Köprüleri, 24 Oyunu, Sihirli Piramit, Untangle, Sihirli Kareler, Chomp ve Monty Hall.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%238b5cf6'/><path d='M30 45 L50 25 L70 45 L50 65 Z' fill='%23fbbf24'/><circle cx='50' cy='50' r='8' fill='%23ffffff'/></svg>">
 
   <script src="https://cdn.tailwindcss.com"></script>
@@ -50,17 +50,20 @@
       border-color: rgba(139, 92, 246, 0.35);
     }
 
-    .glow-purple {
-      box-shadow: 0 0 25px -4px rgba(139, 92, 246, 0.4);
-    }
-
     /* Hanoi Disk Animasyonları */
     .hanoi-disk {
       transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
       cursor: pointer;
     }
-    .hanoi-disk:hover {
-      filter: brightness(1.15);
+    .hanoi-disk:hover { filter: brightness(1.15); }
+
+    /* Chomp Çikolata Hücreleri */
+    .chomp-cell {
+      transition: transform 0.15s, opacity 0.2s, background-color 0.2s;
+    }
+    .chomp-cell:hover:not(.eaten) {
+      transform: scale(1.04);
+      filter: brightness(1.12);
     }
 
     /* Custom Scrollbar */
@@ -73,7 +76,7 @@
 <body class="flex flex-col min-h-screen">
 
   <!-- TOP NAVIGATION / BRAND HEADER -->
-  <header class="sticky top-0 z-40 flex items-center justify-between px-4 py-3 sm:px-6 bg-[#090d16]/80 backdrop-blur-xl border-b border-white/10">
+  <header class="sticky top-0 z-40 flex items-center justify-between px-4 py-3 sm:px-6 bg-[#090d16]/85 backdrop-blur-xl border-b border-white/10">
     <div class="flex items-center gap-3">
       <a href="/" class="flex items-center gap-2 h-9 px-3.5 rounded-xl glass-card text-xs sm:text-sm font-semibold text-slate-300 hover:text-white hover:border-purple-400/50 transition-all active:scale-95 shadow-md">
         <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -86,7 +89,7 @@
           Matematiksel Akıl Oyunları
         </span>
         <span class="hidden md:inline-block text-[11px] font-medium text-slate-400 border-l border-slate-700 pl-2">
-          Strateji & Mantık Atölyesi
+          10 Zeka & Strateji Laboratuvarı
         </span>
       </div>
     </div>
@@ -104,32 +107,50 @@
     </div>
   </header>
 
-  <!-- GAME SELECTOR BAR (TABS) -->
-  <nav class="px-4 py-2.5 sm:px-6 bg-[#0d1424] border-b border-white/5 overflow-x-auto">
-    <div class="flex items-center gap-2 min-w-max mx-auto max-w-6xl">
-      <button onclick="switchGame('hanoi')" id="tab-hanoi" class="game-tab active flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all text-purple-300 bg-purple-500/20 border border-purple-400/40">
-        <span>🗼</span>
-        <span>Hanoi Kuleleri</span>
+  <!-- CATEGORY FILTER PILLS -->
+  <div class="px-4 py-2 bg-[#0c1220] border-b border-white/5 overflow-x-auto">
+    <div class="flex items-center gap-1.5 min-w-max mx-auto max-w-6xl">
+      <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Kategori:</span>
+      <button onclick="filterCategory('all')" id="cat-all" class="cat-pill active px-3 py-1 rounded-lg text-xs font-bold text-purple-300 bg-purple-500/20 border border-purple-400/40">🌟 Tümü (10)</button>
+      <button onclick="filterCategory('numbers')" id="cat-numbers" class="cat-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5">🔢 Sayılar & Aritmetik</button>
+      <button onclick="filterCategory('geometry')" id="cat-geometry" class="cat-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5">📐 Geometri & Çizgeler</button>
+      <button onclick="filterCategory('strategy')" id="cat-strategy" class="cat-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5">⚔️ Strateji & Zeka</button>
+      <button onclick="filterCategory('probability')" id="cat-probability" class="cat-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5">🎲 Olasılık & Mantık</button>
+    </div>
+  </div>
+
+  <!-- GAME SELECTOR TABS (10 GAMES) -->
+  <nav class="px-4 py-2.5 sm:px-6 bg-[#0f172a]/60 border-b border-white/5 overflow-x-auto">
+    <div class="flex items-center gap-2 min-w-max mx-auto max-w-6xl" id="games-tabs-container">
+      <button onclick="switchGame('hanoi')" id="tab-hanoi" data-category="strategy" class="game-tab active flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-purple-300 bg-purple-500/20 border border-purple-400/40">
+        <span>🗼</span><span>Hanoi Kuleleri</span>
       </button>
-      <button onclick="switchGame('kenken')" id="tab-kenken" class="game-tab flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
-        <span>🔢</span>
-        <span>KenKen Bulmacası</span>
+      <button onclick="switchGame('kenken')" id="tab-kenken" data-category="numbers" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>🔢</span><span>KenKen</span>
       </button>
-      <button onclick="switchGame('nim')" id="tab-nim" class="game-tab flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
-        <span>🪨</span>
-        <span>Nim Stratejisi</span>
+      <button onclick="switchGame('nim')" id="tab-nim" data-category="strategy" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>🪨</span><span>Nim Oyunu</span>
       </button>
-      <button onclick="switchGame('euler')" id="tab-euler" class="game-tab flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
-        <span>🌉</span>
-        <span>Euler Köprüleri</span>
+      <button onclick="switchGame('euler')" id="tab-euler" data-category="geometry" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>🌉</span><span>Euler Köprüleri</span>
       </button>
-      <button onclick="switchGame('game24')" id="tab-game24" class="game-tab flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
-        <span>🎯</span>
-        <span>24 Oyunu</span>
+      <button onclick="switchGame('game24')" id="tab-game24" data-category="numbers" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>🎯</span><span>24 Oyunu</span>
       </button>
-      <button onclick="switchGame('pyramid')" id="tab-pyramid" class="game-tab flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
-        <span>🔺</span>
-        <span>Sihirli Piramit</span>
+      <button onclick="switchGame('pyramid')" id="tab-pyramid" data-category="numbers" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>🔺</span><span>Sihirli Piramit</span>
+      </button>
+      <button onclick="switchGame('untangle')" id="tab-untangle" data-category="geometry" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>🕸️</span><span>Untangle (Düğümleri Çöz)</span>
+      </button>
+      <button onclick="switchGame('magicsquare')" id="tab-magicsquare" data-category="numbers" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>✨</span><span>Sihirli Kareler</span>
+      </button>
+      <button onclick="switchGame('chomp')" id="tab-chomp" data-category="strategy" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>🍫</span><span>Chomp (Çikolata)</span>
+      </button>
+      <button onclick="switchGame('montyhall')" id="tab-montyhall" data-category="probability" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>🚪</span><span>Monty Hall (3 Kapı)</span>
       </button>
     </div>
   </nav>
@@ -137,72 +158,45 @@
   <!-- MAIN GAME CONTAINER -->
   <main class="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 flex flex-col items-center">
 
-    <!-- ─────────────────────────────────────────────────────────────
-         1. HANOI KULELERİ (TOWERS OF HANOI)
-         ───────────────────────────────────────────────────────────── -->
+    <!-- 1. HANOI KULELERİ -->
     <section id="game-hanoi" class="game-section w-full flex flex-col items-center gap-5">
-      <!-- Info & Controls Top Row -->
       <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
         <div>
-          <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <span>🗼</span> Hanoi Kuleleri
-          </h2>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🗼</span> Hanoi Kuleleri</h2>
           <p class="text-xs text-slate-400 mt-0.5">Tüm diskleri kurallara uyarak en sağdaki C direğine taşıyın.</p>
         </div>
-
         <div class="flex items-center gap-3">
-          <!-- Disk selector -->
-          <div class="flex items-center gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
+          <div class="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
             <span class="text-slate-400 pl-2">Disk:</span>
             <button onclick="setHanoiDisks(3)" class="hanoi-disk-btn px-2.5 py-1 rounded-lg font-bold text-purple-300 bg-purple-500/20">3</button>
             <button onclick="setHanoiDisks(4)" class="hanoi-disk-btn px-2.5 py-1 rounded-lg font-bold text-slate-400">4</button>
             <button onclick="setHanoiDisks(5)" class="hanoi-disk-btn px-2.5 py-1 rounded-lg font-bold text-slate-400">5</button>
             <button onclick="setHanoiDisks(6)" class="hanoi-disk-btn px-2.5 py-1 rounded-lg font-bold text-slate-400">6</button>
           </div>
-
-          <!-- Stats -->
           <div class="flex items-center gap-3 font-mono text-xs">
-            <div class="glass-card px-3 py-1.5 rounded-xl">
-              <span class="text-slate-400">Hamle:</span>
-              <span id="hanoi-moves" class="text-white font-bold ml-1">0</span>
-            </div>
-            <div class="glass-card px-3 py-1.5 rounded-xl">
-              <span class="text-slate-400">Hedef (2ⁿ-1):</span>
-              <span id="hanoi-target" class="text-amber-300 font-bold ml-1">7</span>
-            </div>
+            <div class="glass-card px-3 py-1.5 rounded-xl"><span class="text-slate-400">Hamle:</span><span id="hanoi-moves" class="text-white font-bold ml-1">0</span></div>
+            <div class="glass-card px-3 py-1.5 rounded-xl"><span class="text-slate-400">Hedef:</span><span id="hanoi-target" class="text-amber-300 font-bold ml-1">7</span></div>
           </div>
-
-          <button onclick="resetHanoi()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">
-            Sıfırla
-          </button>
-          <button onclick="autoSolveHanoi()" id="hanoi-solve-btn" class="h-8 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition">
-            Çözümü İzle
-          </button>
+          <button onclick="resetHanoi()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">Sıfırla</button>
+          <button onclick="autoSolveHanoi()" id="hanoi-solve-btn" class="h-8 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition">Çözümü İzle</button>
         </div>
       </div>
 
-      <!-- Hanoi Pegs Arena -->
       <div class="w-full glass-panel p-6 sm:p-10 rounded-3xl flex flex-col items-center justify-center min-h-[360px] relative">
         <div id="hanoi-holding-indicator" class="h-8 flex items-center justify-center text-xs font-bold text-amber-300 mb-2 invisible">
           <span>Seçilen Disk: Taşımak istediğiniz direğe tıklayın</span>
         </div>
-
         <div class="w-full max-w-3xl grid grid-cols-3 gap-4 sm:gap-8 h-64 items-end pb-4 border-b-8 border-slate-700 rounded-b-xl relative">
-          <!-- Peg A -->
           <div onclick="handleHanoiPegClick(0)" class="hanoi-peg-col flex flex-col items-center justify-end h-full relative cursor-pointer group">
             <div class="w-3 bg-slate-600 group-hover:bg-purple-400 transition-colors h-48 rounded-t-full absolute bottom-0 z-0"></div>
             <div id="hanoi-peg-0" class="w-full flex flex-col-reverse items-center gap-1.5 z-10 min-h-[160px]"></div>
-            <div class="absolute -bottom-9 text-xs font-bold text-slate-400 font-mono group-hover:text-purple-300">DİREK A (Başlangıç)</div>
+            <div class="absolute -bottom-9 text-xs font-bold text-slate-400 font-mono group-hover:text-purple-300">DİREK A</div>
           </div>
-
-          <!-- Peg B -->
           <div onclick="handleHanoiPegClick(1)" class="hanoi-peg-col flex flex-col items-center justify-end h-full relative cursor-pointer group">
             <div class="w-3 bg-slate-600 group-hover:bg-purple-400 transition-colors h-48 rounded-t-full absolute bottom-0 z-0"></div>
             <div id="hanoi-peg-1" class="w-full flex flex-col-reverse items-center gap-1.5 z-10 min-h-[160px]"></div>
-            <div class="absolute -bottom-9 text-xs font-bold text-slate-400 font-mono group-hover:text-purple-300">DİREK B (Yardımcı)</div>
+            <div class="absolute -bottom-9 text-xs font-bold text-slate-400 font-mono group-hover:text-purple-300">DİREK B</div>
           </div>
-
-          <!-- Peg C -->
           <div onclick="handleHanoiPegClick(2)" class="hanoi-peg-col flex flex-col items-center justify-end h-full relative cursor-pointer group">
             <div class="w-3 bg-slate-600 group-hover:bg-purple-400 transition-colors h-48 rounded-t-full absolute bottom-0 z-0"></div>
             <div id="hanoi-peg-2" class="w-full flex flex-col-reverse items-center gap-1.5 z-10 min-h-[160px]"></div>
@@ -211,121 +205,73 @@
         </div>
       </div>
 
-      <!-- Educational Card -->
       <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
         <span class="text-xl">💡</span>
-        <div>
-          <strong class="text-white">Matematiksel Sırrı:</strong> Hanoi Kuleleri, bilgisayar bilimlerindeki <em>özyineleme (rekürsiyon)</em> ve <em>üslü sayılar</em> konusunun temelidir. <em>n</em> adet diski taşımak için gereken asgari hamle sayısı tam olarak <strong>2<sup>n</sup> − 1</strong> formülüyle bulunur. 64 altın diski taşımak için <strong>2<sup>64</sup> − 1</strong> hamle gerekir, bu da yaklaşık 585 milyar yıl sürer!
-        </div>
+        <div><strong class="text-white">Matematiksel Sırrı:</strong> Hanoi Kuleleri, bilgisayar bilimlerindeki <em>özyineleme (rekürsiyon)</em> ve <em>üslü sayılar</em> konusunun temelidir. <em>n</em> adet diski taşımak için gereken asgari hamle sayısı tam olarak <strong>2<sup>n</sup> − 1</strong> formülüyle bulunur.</div>
       </div>
     </section>
 
-    <!-- ─────────────────────────────────────────────────────────────
-         2. KENKEN (KENDOKU)
-         ───────────────────────────────────────────────────────────── -->
+    <!-- 2. KENKEN -->
     <section id="game-kenken" class="game-section w-full hidden flex-col items-center gap-5">
       <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
         <div>
-          <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <span>🔢</span> KenKen (Kendoku) Bulmacası
-          </h2>
-          <p class="text-xs text-slate-400 mt-0.5">Satır ve sütunlarda rakamlar tekrarlanamaz. Kafeslerin hedef işlemlerini tutturun.</p>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🔢</span> KenKen (Kendoku)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Satır ve sütunlarda rakamlar tekrarlanamaz. Kafes hedeflerini tutturun.</p>
         </div>
-
         <div class="flex items-center gap-3">
           <div class="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
             <button onclick="setKenkenSize(3)" id="kenken-btn-3" class="px-3 py-1 rounded-lg font-bold text-purple-300 bg-purple-500/20">3x3 Kolay</button>
             <button onclick="setKenkenSize(4)" id="kenken-btn-4" class="px-3 py-1 rounded-lg font-bold text-slate-400">4x4 Orta</button>
           </div>
-          <button onclick="checkKenkenSolution()" class="h-8 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition">
-            Kontrol Et
-          </button>
-          <button onclick="resetKenken()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">
-            Temizle
-          </button>
+          <button onclick="checkKenkenSolution()" class="h-8 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition">Kontrol Et</button>
+          <button onclick="resetKenken()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">Temizle</button>
         </div>
       </div>
-
-      <!-- Kenken Grid Area -->
       <div class="glass-panel p-6 rounded-3xl flex flex-col items-center justify-center">
         <div id="kenken-board" class="grid gap-1.5 p-3 rounded-2xl bg-slate-900/80 border border-white/10"></div>
-        
-        <!-- Virtual Numpad -->
-        <div class="flex items-center gap-2 mt-5" id="kenken-numpad">
-          <!-- Generated by JS based on size -->
-        </div>
+        <div class="flex items-center gap-2 mt-5" id="kenken-numpad"></div>
       </div>
-
       <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
         <span class="text-xl">💡</span>
-        <div>
-          <strong class="text-white">Matematiksel Sırrı:</strong> KenKen, Japon matematik öğretmeni Tetsuya Miyamoto tarafından "beyni zorlamadan eğiten" bir mantık oyunu olarak icat edilmiştir. Dört işlem ile kombinatorik olasılık eleme mantığını birleştirir.
-        </div>
+        <div><strong class="text-white">Matematiksel Sırrı:</strong> Dört işlem ile olasılık eleme mantığını birleştirir; sayıların çarpanlara ayrılmasını pekiştirir.</div>
       </div>
     </section>
 
-    <!-- ─────────────────────────────────────────────────────────────
-         3. NIM STRATEJİ OYUNU
-         ───────────────────────────────────────────────────────────── -->
+    <!-- 3. NIM STRATEJİ OYUNU -->
     <section id="game-nim" class="game-section w-full hidden flex-col items-center gap-5">
       <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
         <div>
-          <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <span>🪨</span> Nim Strateji Oyunu
-          </h2>
-          <p class="text-xs text-slate-400 mt-0.5">İstediğiniz bir sıradan dilediğiniz kadar taş alın. Son taşı alan oyunu kazanır!</p>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🪨</span> Nim Strateji Oyunu</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Bir sıradan istediğiniz kadar taş alın. Son taşı alan kazanır!</p>
         </div>
-
         <div class="flex items-center gap-3">
           <div class="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
             <button onclick="setNimMode('ai')" id="nim-mode-ai" class="px-3 py-1 rounded-lg font-bold text-purple-300 bg-purple-500/20">Yapay Zekaya Karşı</button>
             <button onclick="setNimMode('pvp')" id="nim-mode-pvp" class="px-3 py-1 rounded-lg font-bold text-slate-400">2 Kişilik</button>
           </div>
-          <button onclick="resetNim()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">
-            Yeniden Başlat
-          </button>
+          <button onclick="resetNim()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">Yeniden Başlat</button>
         </div>
       </div>
-
-      <!-- Nim Arena -->
       <div class="w-full glass-panel p-6 sm:p-10 rounded-3xl flex flex-col items-center justify-center min-h-[340px] relative">
-        <div id="nim-turn-badge" class="mb-6 px-4 py-1.5 rounded-full text-xs font-bold font-mono bg-purple-500/20 border border-purple-400/40 text-purple-300">
-          Sıra: Oyuncu 1
-        </div>
-
-        <!-- 3 Rows of Stones -->
-        <div class="flex flex-col gap-6 w-full max-w-md" id="nim-rows-container">
-          <!-- Row 0, 1, 2 -->
-        </div>
-
-        <!-- Action Row -->
+        <div id="nim-turn-badge" class="mb-6 px-4 py-1.5 rounded-full text-xs font-bold font-mono bg-purple-500/20 border border-purple-400/40 text-purple-300">Sıra: Oyuncu 1</div>
+        <div class="flex flex-col gap-6 w-full max-w-md" id="nim-rows-container"></div>
         <div class="mt-8 flex items-center gap-3">
-          <button onclick="confirmNimMove()" id="nim-confirm-btn" disabled class="h-10 px-6 rounded-xl bg-purple-600 disabled:opacity-30 hover:bg-purple-500 text-white text-xs font-bold transition shadow-lg">
-            Hamleyi Onayla & Sırayı Devret
-          </button>
+          <button onclick="confirmNimMove()" id="nim-confirm-btn" disabled class="h-10 px-6 rounded-xl bg-purple-600 disabled:opacity-30 hover:bg-purple-500 text-white text-xs font-bold transition shadow-lg">Hamleyi Onayla</button>
         </div>
       </div>
-
       <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
         <span class="text-xl">💡</span>
-        <div>
-          <strong class="text-white">Matematiksel Sırrı (XOR & Nim-Sum):</strong> Nim oyununda her durum, taş sayılarının ikili (binary) tabandaki XOR toplamıyla hesaplanır. Eğer taşların Nim-toplamı 0 değilse, hamle sırası kendisinde olan oyuncu her zaman kazanma garantisine sahiptir!
-        </div>
+        <div><strong class="text-white">Matematiksel Sırrı (XOR & Nim-Sum):</strong> Taş sayılarının ikili (binary) tabandaki XOR toplamı 0 değilse, hamle sırası olan oyuncunun matematiksel mutlak kazanma stratejisi vardır.</div>
       </div>
     </section>
 
-    <!-- ─────────────────────────────────────────────────────────────
-         4. EULER GRAF KÖPRÜLERİ
-         ───────────────────────────────────────────────────────────── -->
+    <!-- 4. EULER KÖPRÜLERİ -->
     <section id="game-euler" class="game-section w-full hidden flex-col items-center gap-5">
       <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
         <div>
-          <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <span>🌉</span> Euler Köprüleri (Tek Hamlede Çiz)
-          </h2>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🌉</span> Euler Köprüleri (Tek Hamlede Çiz)</h2>
           <p class="text-xs text-slate-400 mt-0.5">Kalemi kaldırmadan ve aynı çizgiden iki kez geçmeden şekli tamamlayın.</p>
         </div>
-
         <div class="flex items-center gap-3">
           <div class="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
             <span class="text-slate-400 pl-2">Bölüm:</span>
@@ -334,128 +280,227 @@
             <button onclick="setEulerLevel(2)" class="euler-lvl-btn px-2.5 py-1 rounded-lg font-bold text-slate-400">3</button>
             <button onclick="setEulerLevel(3)" class="euler-lvl-btn px-2.5 py-1 rounded-lg font-bold text-slate-400">4 (Königsberg)</button>
           </div>
-          <button onclick="resetEuler()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">
-            Sıfırla
-          </button>
+          <button onclick="resetEuler()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">Sıfırla</button>
         </div>
       </div>
-
-      <!-- Euler Canvas Area -->
       <div class="glass-panel p-4 rounded-3xl flex flex-col items-center justify-center relative w-full max-w-2xl">
         <canvas id="euler-canvas" width="560" height="380" class="rounded-2xl cursor-pointer touch-none bg-slate-900/80 border border-white/10"></canvas>
-        <div id="euler-msg" class="text-xs font-bold font-mono text-purple-300 mt-3">
-          Bir başlangıç noktasına (düğüme) tıklayın.
-        </div>
+        <div id="euler-msg" class="text-xs font-bold font-mono text-purple-300 mt-3">Bir başlangıç noktasına tıklayın.</div>
       </div>
-
       <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
         <span class="text-xl">💡</span>
-        <div>
-          <strong class="text-white">Euler Teoremi (Çizge Teorisi):</strong> Bir şeklin kalemi kaldırmadan tek hamlede çizilebilmesi (Euler Yolu) için, tek sayıda kenara bağlanan köşe (tek dereceli köşe) sayısının <strong>en fazla 2</strong> olması şarttır. Eğer tek dereceli köşe sayısı 0 ise başladığınız noktada bitirirsiniz; 2 ise birinden başlayıp diğerinde bitirmek zorundasınızdır!
-        </div>
+        <div><strong class="text-white">Euler Teoremi:</strong> Şeklin tek hamlede çizilebilmesi için tek dereceli köşe sayısının <strong>en fazla 2</strong> olması gerekir.</div>
       </div>
     </section>
 
-    <!-- ─────────────────────────────────────────────────────────────
-         5. 24 OYUNU
-         ───────────────────────────────────────────────────────────── -->
+    <!-- 5. 24 OYUNU -->
     <section id="game-game24" class="game-section w-full hidden flex-col items-center gap-5">
       <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
         <div>
-          <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <span>🎯</span> 24 Oyunu
-          </h2>
-          <p class="text-xs text-slate-400 mt-0.5">Verilen 4 sayıyı ve dört işlemi kullanarak tam olarak 24 sayısını elde edin.</p>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🎯</span> 24 Oyunu</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Verilen 4 sayıyı ve dört işlemi kullanarak 24 elde edin.</p>
         </div>
-
         <div class="flex items-center gap-3">
-          <button onclick="newGame24()" class="h-8 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition">
-            Yeni Kartlar
-          </button>
-          <button onclick="showGame24Hint()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-amber-300 hover:text-white transition">
-            İpucu / Çözüm
-          </button>
+          <button onclick="newGame24()" class="h-8 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition">Yeni Kartlar</button>
+          <button onclick="showGame24Hint()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-amber-300 hover:text-white transition">İpucu</button>
         </div>
       </div>
-
-      <!-- 24 Board Arena -->
       <div class="glass-panel p-6 sm:p-8 rounded-3xl flex flex-col items-center justify-center w-full max-w-xl">
-        <!-- 4 Cards -->
-        <div class="grid grid-cols-4 gap-3 sm:gap-4 mb-6" id="game24-cards-container">
-          <!-- 4 Cards via JS -->
-        </div>
-
-        <!-- Expression Display Screen -->
+        <div class="grid grid-cols-4 gap-3 sm:gap-4 mb-6" id="game24-cards-container"></div>
         <div class="w-full h-14 bg-slate-900/90 rounded-2xl border border-white/10 px-4 flex items-center justify-between font-mono text-lg font-bold text-sky-300 mb-5">
           <span id="game24-expr">İşleminizi oluşturun</span>
           <button onclick="clearGame24Expr()" class="text-xs text-slate-400 hover:text-rose-400 transition font-sans">Temizle</button>
         </div>
-
-        <!-- Operator Buttons -->
         <div class="flex flex-wrap items-center justify-center gap-2.5 mb-5">
-          <button onclick="appendGame24('+')" class="h-11 w-12 rounded-xl glass-card font-mono text-lg font-bold text-white hover:bg-purple-500/20 hover:border-purple-400/40">+</button>
-          <button onclick="appendGame24('-')" class="h-11 w-12 rounded-xl glass-card font-mono text-lg font-bold text-white hover:bg-purple-500/20 hover:border-purple-400/40">−</button>
-          <button onclick="appendGame24('×')" class="h-11 w-12 rounded-xl glass-card font-mono text-lg font-bold text-white hover:bg-purple-500/20 hover:border-purple-400/40">×</button>
-          <button onclick="appendGame24('÷')" class="h-11 w-12 rounded-xl glass-card font-mono text-lg font-bold text-white hover:bg-purple-500/20 hover:border-purple-400/40">÷</button>
-          <button onclick="appendGame24('(')" class="h-11 w-12 rounded-xl glass-card font-mono text-lg font-bold text-amber-300 hover:bg-amber-500/20">(</button>
-          <button onclick="appendGame24(')')" class="h-11 w-12 rounded-xl glass-card font-mono text-lg font-bold text-amber-300 hover:bg-amber-500/20">)</button>
+          <button onclick="appendGame24('+')" class="h-11 w-12 rounded-xl glass-card font-mono text-lg font-bold text-white">+</button>
+          <button onclick="appendGame24('-')" class="h-11 w-12 rounded-xl glass-card font-mono text-lg font-bold text-white">−</button>
+          <button onclick="appendGame24('×')" class="h-11 w-12 rounded-xl glass-card font-mono text-lg font-bold text-white">×</button>
+          <button onclick="appendGame24('÷')" class="h-11 w-12 rounded-xl glass-card font-mono text-lg font-bold text-white">÷</button>
+          <button onclick="appendGame24('(')" class="h-11 w-12 rounded-xl glass-card font-mono text-lg font-bold text-amber-300">(</button>
+          <button onclick="appendGame24(')')" class="h-11 w-12 rounded-xl glass-card font-mono text-lg font-bold text-amber-300">)</button>
           <button onclick="evaluateGame24()" class="h-11 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg active:scale-95">Hesapla (=)</button>
         </div>
-
-        <!-- Feedback Alert -->
         <div id="game24-feedback" class="text-xs font-bold font-mono text-slate-400 h-5"></div>
       </div>
-
       <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
         <span class="text-xl">💡</span>
-        <div>
-          <strong class="text-white">Matematiksel Sırrı:</strong> 24 oyunu, parantez kullanımı ve işlem önceliğini refleks haline getirir. 4 sayının kombinasyonları zihinde hızlı permütasyon ve çarpanlara ayırma sezgisi kazandırır.
-        </div>
+        <div><strong class="text-white">Matematiksel Sırrı:</strong> Parantez kullanımı ve işlem önceliğini zihinde refleks haline getirir.</div>
       </div>
     </section>
 
-    <!-- ─────────────────────────────────────────────────────────────
-         6. SİHİRLİ PİRAMİT (SAYI YOLU)
-         ───────────────────────────────────────────────────────────── -->
+    <!-- 6. SİHİRLİ PİRAMİT -->
     <section id="game-pyramid" class="game-section w-full hidden flex-col items-center gap-5">
       <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
         <div>
-          <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <span>🔺</span> Sihirli Sayı Piramidi
-          </h2>
-          <p class="text-xs text-slate-400 mt-0.5">Tepeden başlayıp tabana inin. Komşu basamakları takip ederek en yüksek toplamı bulun!</p>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🔺</span> Sihirli Sayı Piramidi</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Tepeden başlayıp tabana inin. Komşu basamakları takip ederek maksimum toplamı bulun!</p>
         </div>
-
         <div class="flex items-center gap-3">
-          <div class="font-mono text-xs glass-card px-3 py-1.5 rounded-xl">
-            <span class="text-slate-400">Toplamınız:</span>
-            <span id="pyramid-user-sum" class="text-amber-300 font-bold ml-1">0</span>
+          <div class="font-mono text-xs glass-card px-3 py-1.5 rounded-xl"><span class="text-slate-400">Toplamınız:</span><span id="pyramid-user-sum" class="text-amber-300 font-bold ml-1">0</span></div>
+          <button onclick="showPyramidMaxPath()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-purple-300 hover:text-white transition">Maksimum Rotayı Göster</button>
+          <button onclick="newPyramid()" class="h-8 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition">Yeni Piramit</button>
+        </div>
+      </div>
+      <div class="glass-panel p-6 sm:p-10 rounded-3xl flex flex-col items-center justify-center w-full max-w-xl" id="pyramid-container"></div>
+      <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
+        <span class="text-xl">💡</span>
+        <div><strong class="text-white">Dinamik Programlama:</strong> Açgözlü (greedy) seçim yerine tabandan yukarıya doğru en iyi yolları toplayarak gelme optimizasyonu.</div>
+      </div>
+    </section>
+
+    <!-- 7. UNTANGLE (DÜĞÜMLERİ ÇÖZ - DÜZLEMSEL GRAF) -->
+    <section id="game-untangle" class="game-section w-full hidden flex-col items-center gap-5">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🕸️</span> Untangle (Düğümleri Çöz)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Noktaları sürükleyin. Hiçbir çizgi birbiriyle kesişmediğinde tüm ağ yeşil yanar!</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
+            <span class="text-slate-400 pl-2">Zorluk:</span>
+            <button onclick="setUntangleDifficulty(5)" id="untangle-diff-5" class="px-2.5 py-1 rounded-lg font-bold text-purple-300 bg-purple-500/20">5 Düğüm</button>
+            <button onclick="setUntangleDifficulty(6)" id="untangle-diff-6" class="px-2.5 py-1 rounded-lg font-bold text-slate-400">6 Düğüm</button>
+            <button onclick="setUntangleDifficulty(8)" id="untangle-diff-8" class="px-2.5 py-1 rounded-lg font-bold text-slate-400">8 Düğüm</button>
           </div>
-          <button onclick="showPyramidMaxPath()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-purple-300 hover:text-white transition">
-            Maksimum Rotayı Göster
-          </button>
-          <button onclick="newPyramid()" class="h-8 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition">
-            Yeni Piramit
-          </button>
+          <div class="glass-card px-3 py-1.5 rounded-xl font-mono text-xs">
+            <span class="text-slate-400">Kesişimler:</span>
+            <span id="untangle-crossings" class="text-rose-400 font-bold ml-1">0</span>
+          </div>
+          <button onclick="resetUntangle()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">Yeniden Karıştır</button>
+        </div>
+      </div>
+      <div class="glass-panel p-4 rounded-3xl flex flex-col items-center justify-center relative w-full max-w-2xl">
+        <canvas id="untangle-canvas" width="560" height="380" class="rounded-2xl cursor-grab active:cursor-grabbing touch-none bg-slate-900/90 border border-white/10 shadow-2xl"></canvas>
+        <div id="untangle-status" class="text-xs font-bold font-mono text-rose-400 mt-3">Kesişen çizgiler var (Kırmızı). Düğümleri sürükleyerek açın.</div>
+      </div>
+      <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
+        <span class="text-xl">💡</span>
+        <div><strong class="text-white">Matematiksel Sırrı (Düzlemsel Çizgeler):</strong> Çizge teorisinde, kenarları kesişmeden bir düzleme çizilebilen çizgelere <em>Düzlemsel Graf (Planar Graph)</em> denir. Kuratowski Teoremi'ne göre içinde K₅ veya K₃,₃ alt çizgeleri barındırmayan her graf düğümler doğru yerleştirildiğinde kesişimsiz açılabilir!</div>
+      </div>
+    </section>
+
+    <!-- 8. SİHİRLİ KARELER (MAGIC SQUARES) -->
+    <section id="game-magicsquare" class="game-section w-full hidden flex-col items-center gap-5">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>✨</span> Sihirli Kareler (Magic Square)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Her satır, sütun ve köşegenin toplamını sihirli sayıya (3x3'te 15, 4x4'te 34) eşitleyin.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
+            <button onclick="setMagicSquareSize(3)" id="ms-size-3" class="px-3 py-1 rounded-lg font-bold text-purple-300 bg-purple-500/20">3x3 (Hedef: 15)</button>
+            <button onclick="setMagicSquareSize(4)" id="ms-size-4" class="px-3 py-1 rounded-lg font-bold text-slate-400">4x4 (Hedef: 34)</button>
+          </div>
+          <button onclick="solveMagicSquare()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-amber-300 hover:text-white transition">Çözümü Göster</button>
+          <button onclick="resetMagicSquare()" class="h-8 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition">Sıfırla</button>
+        </div>
+      </div>
+      <div class="glass-panel p-6 rounded-3xl flex flex-col items-center justify-center">
+        <!-- Magic Square Board & Sum Indicators -->
+        <div id="ms-board-wrap" class="relative p-6 rounded-2xl bg-slate-900/90 border border-white/10">
+          <div id="ms-grid" class="grid gap-2"></div>
+        </div>
+        <!-- Numbers Palette (Remaining) -->
+        <div class="flex flex-wrap items-center justify-center gap-2 mt-5 max-w-md" id="ms-palette"></div>
+      </div>
+      <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
+        <span class="text-xl">💡</span>
+        <div><strong class="text-white">Matematiksel Sırrı:</strong> 3x3 sihirli kare (Lo Shu), M.Ö. 650'de Çin'de sarı nehir kaplumbağasının kabuğunda keşfedilmiştir. Merkezdeki sayı daima 5 olmak zorundadır! 4x4 sihirli kare ise 1514'te Albrecht Dürer'in ünlü <em>Melencolia I</em> tablosunda ölümsüzleşmiştir.</div>
+      </div>
+    </section>
+
+    <!-- 9. CHOMP (ZEHİRLİ ÇİKOLATA) -->
+    <section id="game-chomp" class="game-section w-full hidden flex-col items-center gap-5">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🍫</span> Chomp (Zehirli Çikolata Oyunu)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Isırdığınız karenin sağı ve üstündeki tüm parçalar yenir. Sol alttaki ☠️ zehirli kareyi yiyen kaybeder!</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
+            <button onclick="setChompMode('ai')" id="chomp-mode-ai" class="px-3 py-1 rounded-lg font-bold text-purple-300 bg-purple-500/20">Yapay Zeka</button>
+            <button onclick="setChompMode('pvp')" id="chomp-mode-pvp" class="px-3 py-1 rounded-lg font-bold text-slate-400">2 Kişilik</button>
+          </div>
+          <button onclick="resetChomp()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">Yeniden Başlat</button>
+        </div>
+      </div>
+      <div class="glass-panel p-6 sm:p-10 rounded-3xl flex flex-col items-center justify-center w-full max-w-xl">
+        <div id="chomp-turn-badge" class="mb-5 px-4 py-1.5 rounded-full text-xs font-bold font-mono bg-purple-500/20 border border-purple-400/40 text-purple-300">
+          Sıra: Oyuncu 1
+        </div>
+        <div id="chomp-grid" class="grid grid-cols-5 gap-2 p-4 rounded-2xl bg-amber-950/40 border border-amber-900/40 shadow-inner">
+          <!-- 4x5 cells generated by JS -->
+        </div>
+      </div>
+      <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
+        <span class="text-xl">💡</span>
+        <div><strong class="text-white">Matematiksel Sırrı (Oyun Teorisi):</strong> Matematikçi David Gale tarafından 1971'de icat edilmiştir. "Strateji Çalma Argümanı" (Strategy Stealing) sayesinde birinci oyuncunun mutlaka kazanan bir stratejisi olduğu ispatlanmıştır; ancak bu stratejinin ne olduğunu tam olarak formüle etmek zordur!</div>
+      </div>
+    </section>
+
+    <!-- 10. MONTY HALL PARADOKSU -->
+    <section id="game-montyhall" class="game-section w-full hidden flex-col items-center gap-5">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🚪</span> Monty Hall Paradoksu (3 Kapı & Keçi)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Bir kapıda araba, ikisinde keçi var. Sunucu bir keçi açtıktan sonra: Kapını değiştirmeli misin?</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="runMontyFastSim(100)" class="h-8 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shadow-md">⚡ 100 Kez Simüle Et</button>
+          <button onclick="resetMontyStats()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">İstatistikleri Sıfırla</button>
         </div>
       </div>
 
-      <!-- Pyramid Arena -->
-      <div class="glass-panel p-6 sm:p-10 rounded-3xl flex flex-col items-center justify-center w-full max-w-xl" id="pyramid-container">
-        <!-- Generated by JS -->
+      <div class="glass-panel p-6 sm:p-10 rounded-3xl flex flex-col items-center justify-center w-full max-w-2xl">
+        <!-- 3 Doors -->
+        <div class="grid grid-cols-3 gap-4 sm:gap-6 w-full max-w-lg mb-6" id="monty-doors-container">
+          <!-- Door 0, 1, 2 -->
+        </div>
+
+        <!-- Host Message & Action Buttons -->
+        <div id="monty-msg-box" class="w-full p-4 rounded-2xl bg-slate-900/80 border border-white/10 text-center mb-6">
+          <div id="monty-prompt" class="text-sm font-bold text-sky-300">Bir kapı seçerek yarışmaya başlayın!</div>
+          <div id="monty-actions" class="hidden flex items-center justify-center gap-3 mt-3">
+            <button onclick="resolveMontyChoice(true)" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition active:scale-95">🔄 Kapımı Değiştiriyorum</button>
+            <button onclick="resolveMontyChoice(false)" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs transition active:scale-95">🔒 İlk Seçimimde Kalıyorum</button>
+          </div>
+        </div>
+
+        <!-- Live Probability Chart & Scoreboard -->
+        <div class="w-full grid grid-cols-2 gap-4">
+          <div class="glass-card p-4 rounded-2xl flex flex-col justify-between">
+            <div class="flex items-center justify-between text-xs font-bold text-emerald-400 mb-1">
+              <span>Kapı Değiştirenler:</span>
+              <span id="monty-switch-pct" class="font-mono text-sm">0%</span>
+            </div>
+            <div class="text-[11px] text-slate-400 font-mono mb-2">Kazanma: <span id="monty-switch-wins">0</span> / <span id="monty-switch-total">0</span></div>
+            <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+              <div id="monty-switch-bar" class="bg-emerald-500 h-full w-0 transition-all duration-300"></div>
+            </div>
+          </div>
+
+          <div class="glass-card p-4 rounded-2xl flex flex-col justify-between">
+            <div class="flex items-center justify-between text-xs font-bold text-sky-400 mb-1">
+              <span>Kapıda Kalanlar:</span>
+              <span id="monty-stay-pct" class="font-mono text-sm">0%</span>
+            </div>
+            <div class="text-[11px] text-slate-400 font-mono mb-2">Kazanma: <span id="monty-stay-wins">0</span> / <span id="monty-stay-total">0</span></div>
+            <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+              <div id="monty-stay-bar" class="bg-sky-500 h-full w-0 transition-all duration-300"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
         <span class="text-xl">💡</span>
-        <div>
-          <strong class="text-white">Matematiksel Sırrı (Dinamik Programlama):</strong> Bu bulmaca, bilgisayar bilimlerindeki en ünlü optimizasyon algoritmalarından biridir (Euler Problemi 18). Yukarıdan aşağıya açgözlü (greedy) seçim yapmak her zaman en büyük sonuca ulaştırmaz; tabandan yukarıya doğru en iyi yolları toplayarak gelmek gerekir!
-        </div>
+        <div><strong class="text-white">Matematiksel Sırrı (Koşullu Olasılık & Bayes):</strong> İlk kapı seçiminizde arabayı tutturma olasılığınız <strong>1/3 (%33.3)</strong>'tür. Diğer iki kapıda araba olma ihtimali ise toplam <strong>2/3 (%66.7)</strong>'dir. Sunucu bilerek bir keçiyi elediğinde o 2/3'lük devasa olasılık tek bir kapıya yoğunlaşır! Bu yüzden kapıyı değiştirmek kazanma şansınızı <strong>tam 2 katına</strong> çıkarır!</div>
       </div>
     </section>
 
   </main>
 
-  <!-- SOUND SYNTHESIZER (WEB AUDIO API) -->
+  <!-- SCRIPTS FOR SOUND, TABS & GAME LOGIC -->
   <script>
     let audioCtx = null;
     let isSoundOn = true;
@@ -507,9 +552,29 @@
       }
     }
 
-    /* ─────────────────────────────────────────────────────────────
-       GAME SWITCHER TABS
-       ───────────────────────────────────────────────────────────── */
+    /* CATEGORY FILTERING */
+    function filterCategory(cat) {
+      document.querySelectorAll('.cat-pill').forEach(p => {
+        p.classList.remove('active', 'text-purple-300', 'bg-purple-500/20', 'border', 'border-purple-400/40');
+        p.classList.add('text-slate-300');
+      });
+      const activePill = document.getElementById(`cat-${cat}`);
+      if (activePill) {
+        activePill.classList.add('active', 'text-purple-300', 'bg-purple-500/20', 'border', 'border-purple-400/40');
+        activePill.classList.remove('text-slate-300');
+      }
+
+      document.querySelectorAll('.game-tab').forEach(tab => {
+        const tabCat = tab.getAttribute('data-category');
+        if (cat === 'all' || tabCat === cat) {
+          tab.classList.remove('hidden');
+        } else {
+          tab.classList.add('hidden');
+        }
+      });
+    }
+
+    /* GAME TAB SWITCHER */
     function switchGame(gameId) {
       document.querySelectorAll('.game-tab').forEach(t => {
         t.classList.remove('active', 'text-purple-300', 'bg-purple-500/20', 'border', 'border-purple-400/40');
@@ -528,6 +593,7 @@
       playTone(400, 0.08);
 
       if (gameId === 'euler') drawEuler();
+      if (gameId === 'untangle') drawUntangle();
     }
 
     /* ─────────────────────────────────────────────────────────────
@@ -570,9 +636,7 @@
       document.getElementById('hanoi-target').innerText = Math.pow(2, hanoiDisks) - 1;
 
       hanoiPegs = [[], [], []];
-      for (let i = hanoiDisks; i >= 1; i--) {
-        hanoiPegs[0].push(i);
-      }
+      for (let i = hanoiDisks; i >= 1; i--) hanoiPegs[0].push(i);
       renderHanoi();
     }
 
@@ -583,7 +647,6 @@
         hanoiPegs[p].forEach((diskSize, idx) => {
           const isTop = idx === hanoiPegs[p].length - 1;
           const isSelected = hanoiSelectedPeg === p && isTop;
-
           const widthPercent = 30 + (diskSize / hanoiDisks) * 65;
           const disk = document.createElement('div');
           disk.className = `hanoi-disk h-7 rounded-xl bg-gradient-to-r ${DISK_COLORS[diskSize - 1]} shadow-md flex items-center justify-center text-[10px] font-bold text-white font-mono ${isSelected ? 'ring-4 ring-amber-400 -translate-y-2' : ''}`;
@@ -596,17 +659,13 @@
 
     function handleHanoiPegClick(pegIdx) {
       if (isAutoSolving) return;
-
       if (hanoiSelectedPeg === null) {
-        // Disk seçme
         if (hanoiPegs[pegIdx].length === 0) return;
         hanoiSelectedPeg = pegIdx;
         document.getElementById('hanoi-holding-indicator').classList.remove('invisible');
         playTone(520, 0.08);
       } else {
-        // Taşıma yapma
         if (hanoiSelectedPeg === pegIdx) {
-          // Aynı direğe basarsa iptal
           hanoiSelectedPeg = null;
           document.getElementById('hanoi-holding-indicator').classList.add('invisible');
         } else {
@@ -624,13 +683,8 @@
 
             hanoiSelectedPeg = null;
             document.getElementById('hanoi-holding-indicator').classList.add('invisible');
-
-            // Kazanma kontrolü (Tüm diskler C direğinde mi?)
-            if (hanoiPegs[2].length === hanoiDisks) {
-              playSuccessFanfare();
-            }
+            if (hanoiPegs[2].length === hanoiDisks) playSuccessFanfare();
           } else {
-            // Hatalı hamle (büyük disk küçüğün üstüne gelemez)
             playTone(180, 0.2, 'sawtooth');
             hanoiSelectedPeg = null;
             document.getElementById('hanoi-holding-indicator').classList.add('invisible');
@@ -648,10 +702,7 @@
 
       const moves = [];
       function solve(n, from, to, aux) {
-        if (n === 1) {
-          moves.push([from, to]);
-          return;
-        }
+        if (n === 1) { moves.push([from, to]); return; }
         solve(n - 1, from, aux, to);
         moves.push([from, to]);
         solve(n - 1, aux, to, from);
@@ -681,7 +732,6 @@
     let selectedCell = null;
     let kenkenBoardState = [];
 
-    // Örnek 3x3 ve 4x4 KenKen bulmacaları
     const KENKEN_PUZZLES = {
       3: {
         size: 3,
@@ -692,11 +742,7 @@
           { target: '5+', op: 'add', val: 5, cells: [[2,0], [2,1]], color: '#f59e0b' },
           { target: '1', val: 1, cells: [[2,2]], color: '#ef4444' }
         ],
-        solution: [
-          [2, 3, 1],
-          [1, 2, 3],
-          [3, 1, 2]
-        ]
+        solution: [[2, 3, 1], [1, 2, 3], [3, 1, 2]]
       },
       4: {
         size: 4,
@@ -710,12 +756,7 @@
           { target: '2÷', op: 'div', val: 2, cells: [[2,2], [3,2]], color: '#06b6d4' },
           { target: '1-', op: 'sub', val: 1, cells: [[3,0], [3,3]], color: '#eab308' }
         ],
-        solution: [
-          [3, 4, 2, 1],
-          [4, 2, 1, 3],
-          [1, 3, 4, 2],
-          [2, 1, 3, 4]
-        ]
+        solution: [[3, 4, 2, 1], [4, 2, 1, 3], [1, 3, 4, 2], [2, 1, 3, 4]]
       }
     };
 
@@ -732,12 +773,10 @@
       const p = KENKEN_PUZZLES[kenkenSize];
       kenkenBoardState = Array(kenkenSize).fill(null).map(() => Array(kenkenSize).fill(''));
       selectedCell = null;
-
       const boardEl = document.getElementById('kenken-board');
       boardEl.style.gridTemplateColumns = `repeat(${kenkenSize}, minmax(0, 1fr))`;
       boardEl.innerHTML = '';
 
-      // Hücreleri üret
       for (let r = 0; r < kenkenSize; r++) {
         for (let c = 0; c < kenkenSize; c++) {
           const cell = document.createElement('div');
@@ -745,7 +784,6 @@
           cell.id = `kenken-cell-${r}-${c}`;
           cell.onclick = () => selectKenkenCell(r, c);
 
-          // Kafes etiketi (eğer kafesin ilk hücresiyse)
           const cage = p.cages.find(cg => cg.cells[0][0] === r && cg.cells[0][1] === c);
           if (cage) {
             const label = document.createElement('span');
@@ -754,17 +792,12 @@
             cell.appendChild(label);
           }
 
-          // Kafes kenarlık rengi
           const memberCage = p.cages.find(cg => cg.cells.some(([cr, cc]) => cr === r && cc === c));
-          if (memberCage) {
-            cell.style.boxShadow = `inset 0 0 0 1.5px ${memberCage.color}55`;
-          }
-
+          if (memberCage) cell.style.boxShadow = `inset 0 0 0 1.5px ${memberCage.color}55`;
           boardEl.appendChild(cell);
         }
       }
 
-      // Numpad butonları
       const numpadEl = document.getElementById('kenken-numpad');
       numpadEl.innerHTML = '';
       for (let i = 1; i <= kenkenSize; i++) {
@@ -794,7 +827,6 @@
       const [r, c] = selectedCell;
       kenkenBoardState[r][c] = num;
       const el = document.getElementById(`kenken-cell-${r}-${c}`);
-      // Sadece sayıyı güncelle (label'ı koru)
       const existingText = el.childNodes;
       for (let i = 0; i < existingText.length; i++) {
         if (existingText[i].nodeType === 3) existingText[i].remove();
@@ -806,7 +838,6 @@
     function checkKenkenSolution() {
       const p = KENKEN_PUZZLES[kenkenSize];
       let isCorrect = true;
-
       for (let r = 0; r < kenkenSize; r++) {
         for (let c = 0; c < kenkenSize; c++) {
           const el = document.getElementById(`kenken-cell-${r}-${c}`);
@@ -818,12 +849,8 @@
           }
         }
       }
-
-      if (isCorrect) {
-        playSuccessFanfare();
-      } else {
-        playTone(200, 0.2, 'sawtooth');
-      }
+      if (isCorrect) playSuccessFanfare();
+      else playTone(200, 0.2, 'sawtooth');
     }
 
     /* ─────────────────────────────────────────────────────────────
@@ -832,8 +859,8 @@
     let nimPiles = [3, 4, 5];
     let nimSelectedRow = null;
     let nimSelectedCount = 0;
-    let nimCurrentTurn = 1; // 1: Oyuncu 1, 2: Oyuncu 2 / Yapay Zeka
-    let nimMode = 'ai'; // 'ai' veya 'pvp'
+    let nimCurrentTurn = 1;
+    let nimMode = 'ai';
 
     function setNimMode(m) {
       nimMode = m;
@@ -855,11 +882,9 @@
     function updateNimUI() {
       const container = document.getElementById('nim-rows-container');
       container.innerHTML = '';
-
       nimPiles.forEach((count, rowIdx) => {
         const rowEl = document.createElement('div');
         rowEl.className = 'flex items-center justify-between p-3 rounded-2xl glass-card';
-
         const label = document.createElement('div');
         label.className = 'text-xs font-bold font-mono text-slate-400';
         label.innerText = `Sıra ${rowIdx + 1} (${count})`;
@@ -867,7 +892,6 @@
 
         const stonesWrap = document.createElement('div');
         stonesWrap.className = 'flex items-center gap-2.5';
-
         for (let i = 0; i < count; i++) {
           const stone = document.createElement('button');
           const isSelected = nimSelectedRow === rowIdx && (count - i) <= nimSelectedCount;
@@ -875,7 +899,6 @@
           stone.onclick = () => selectNimStone(rowIdx, count - i);
           stonesWrap.appendChild(stone);
         }
-
         rowEl.appendChild(stonesWrap);
         container.appendChild(rowEl);
       });
@@ -888,14 +911,12 @@
         badge.innerText = nimMode === 'ai' ? 'Sıra: Bilgisayar Düşünüyor…' : 'Sıra: Oyuncu 2';
         badge.className = 'mb-6 px-4 py-1.5 rounded-full text-xs font-bold font-mono bg-amber-500/20 border border-amber-400/40 text-amber-300';
       }
-
       document.getElementById('nim-confirm-btn').disabled = nimSelectedCount === 0 || (nimMode === 'ai' && nimCurrentTurn === 2);
     }
 
     function selectNimStone(rowIdx, countToRemove) {
       if (nimMode === 'ai' && nimCurrentTurn === 2) return;
       if (nimSelectedRow !== null && nimSelectedRow !== rowIdx) {
-        // Farklı sıraya tıklarsa seçimi sıfırla
         nimSelectedRow = rowIdx;
         nimSelectedCount = countToRemove;
       } else if (nimSelectedRow === rowIdx && nimSelectedCount === countToRemove) {
@@ -911,13 +932,11 @@
 
     function confirmNimMove() {
       if (nimSelectedRow === null || nimSelectedCount === 0) return;
-
       nimPiles[nimSelectedRow] -= nimSelectedCount;
       nimSelectedRow = null;
       nimSelectedCount = 0;
       playTone(360, 0.1);
 
-      // Oyun Bitti mi?
       if (nimPiles.every(p => p === 0)) {
         const winner = nimCurrentTurn === 1 ? 'Oyuncu 1 Kazandı! 🎉' : (nimMode === 'ai' ? 'Bilgisayar Kazandı! 🤖' : 'Oyuncu 2 Kazandı! 🎉');
         alert(winner);
@@ -925,17 +944,12 @@
         resetNim();
         return;
       }
-
       nimCurrentTurn = nimCurrentTurn === 1 ? 2 : 1;
       updateNimUI();
-
-      if (nimMode === 'ai' && nimCurrentTurn === 2) {
-        setTimeout(playAIMove, 700);
-      }
+      if (nimMode === 'ai' && nimCurrentTurn === 2) setTimeout(playAIMove, 700);
     }
 
     function playAIMove() {
-      // Nim-Sum (XOR) optimal strateji
       const xorSum = nimPiles[0] ^ nimPiles[1] ^ nimPiles[2];
       let targetRow = -1;
       let removeCount = 1;
@@ -950,8 +964,6 @@
           }
         }
       }
-
-      // Rastgele geçerli hamle
       if (targetRow === -1) {
         const validRows = nimPiles.map((p, idx) => p > 0 ? idx : -1).filter(idx => idx !== -1);
         targetRow = validRows[Math.floor(Math.random() * validRows.length)];
@@ -966,76 +978,38 @@
         resetNim();
         return;
       }
-
       nimCurrentTurn = 1;
       updateNimUI();
     }
 
     /* ─────────────────────────────────────────────────────────────
-       4. EULER KÖPRÜLERİ (ÇİZGE TEORİSİ) LOGIC
+       4. EULER KÖPRÜLERİ LOGIC
        ───────────────────────────────────────────────────────────── */
     const eulerCanvas = document.getElementById('euler-canvas');
     const eulerCtx = eulerCanvas.getContext('2d');
     let eulerLevel = 0;
-    let eulerPath = []; // [nodeIdx, ...]
+    let eulerPath = [];
 
-    // Bölüm Graf Tanımları
     const EULER_LEVELS = [
       {
         name: 'Ev Şekli',
-        nodes: [
-          { x: 160, y: 300 }, // 0: Sol alt
-          { x: 400, y: 300 }, // 1: Sağ alt
-          { x: 400, y: 170 }, // 2: Sağ üst
-          { x: 160, y: 170 }, // 3: Sol üst
-          { x: 280, y: 70 }   // 4: Çatı tepe
-        ],
-        edges: [
-          [0, 1], [1, 2], [2, 3], [3, 0], // Kare
-          [0, 2], [1, 3],                 // Çaprazlar
-          [3, 4], [2, 4]                  // Çatı
-        ]
+        nodes: [{ x: 160, y: 300 }, { x: 400, y: 300 }, { x: 400, y: 170 }, { x: 160, y: 170 }, { x: 280, y: 70 }],
+        edges: [[0, 1], [1, 2], [2, 3], [3, 0], [0, 2], [1, 3], [3, 4], [2, 4]]
       },
       {
         name: 'Zarf Modeli',
-        nodes: [
-          { x: 180, y: 280 },
-          { x: 380, y: 280 },
-          { x: 380, y: 160 },
-          { x: 180, y: 160 },
-          { x: 280, y: 220 }
-        ],
-        edges: [
-          [0, 1], [1, 2], [2, 3], [3, 0],
-          [2, 4], [3, 4], [0, 4], [1, 4]
-        ]
+        nodes: [{ x: 180, y: 280 }, { x: 380, y: 280 }, { x: 380, y: 160 }, { x: 180, y: 160 }, { x: 280, y: 220 }],
+        edges: [[0, 1], [1, 2], [2, 3], [3, 0], [2, 4], [3, 4], [0, 4], [1, 4]]
       },
       {
         name: 'Yıldız Pentagram',
-        nodes: [
-          { x: 280, y: 60 },
-          { x: 380, y: 140 },
-          { x: 340, y: 270 },
-          { x: 220, y: 270 },
-          { x: 180, y: 140 }
-        ],
-        edges: [
-          [0, 2], [2, 4], [4, 1], [1, 3], [3, 0]
-        ]
+        nodes: [{ x: 280, y: 60 }, { x: 380, y: 140 }, { x: 340, y: 270 }, { x: 220, y: 270 }, { x: 180, y: 140 }],
+        edges: [[0, 2], [2, 4], [4, 1], [1, 3], [3, 0]]
       },
       {
         name: 'Königsberg Köprüleri (İmkânsız)',
-        nodes: [
-          { x: 280, y: 80 },  // Ada Kuzey
-          { x: 280, y: 300 }, // Ada Güney
-          { x: 140, y: 190 }, // Ada Batı
-          { x: 420, y: 190 }  // Ada Doğu
-        ],
-        edges: [
-          [0, 2], [0, 3],
-          [1, 2], [1, 3],
-          [2, 3]
-        ]
+        nodes: [{ x: 280, y: 80 }, { x: 280, y: 300 }, { x: 140, y: 190 }, { x: 420, y: 190 }],
+        edges: [[0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]
       }
     ];
 
@@ -1050,7 +1024,7 @@
 
     function resetEuler() {
       eulerPath = [];
-      document.getElementById('euler-msg').innerText = 'Bir başlangıç noktasına (düğüme) tıklayın.';
+      document.getElementById('euler-msg').innerText = 'Bir başlangıç noktasına tıklayın.';
       document.getElementById('euler-msg').className = 'text-xs font-bold font-mono text-purple-300 mt-3';
       drawEuler();
     }
@@ -1059,12 +1033,9 @@
       eulerCtx.clearRect(0, 0, eulerCanvas.width, eulerCanvas.height);
       const g = EULER_LEVELS[eulerLevel];
 
-      // Kenarları çiz
       g.edges.forEach(([u, v]) => {
         const p1 = g.nodes[u];
         const p2 = g.nodes[v];
-
-        // Bu kenar katedildi mi?
         let isTraversed = false;
         for (let i = 0; i < eulerPath.length - 1; i++) {
           if ((eulerPath[i] === u && eulerPath[i+1] === v) || (eulerPath[i] === v && eulerPath[i+1] === u)) {
@@ -1072,7 +1043,6 @@
             break;
           }
         }
-
         eulerCtx.beginPath();
         eulerCtx.moveTo(p1.x, p1.y);
         eulerCtx.lineTo(p2.x, p2.y);
@@ -1081,7 +1051,6 @@
         eulerCtx.stroke();
       });
 
-      // Düğümleri çiz
       g.nodes.forEach((node, idx) => {
         const isCurrent = eulerPath.length > 0 && eulerPath[eulerPath.length - 1] === idx;
         eulerCtx.beginPath();
@@ -1098,32 +1067,21 @@
       const rect = eulerCanvas.getBoundingClientRect();
       const clickX = (e.clientX - rect.left) * (eulerCanvas.width / rect.width);
       const clickY = (e.clientY - rect.top) * (eulerCanvas.height / rect.height);
-
       const g = EULER_LEVELS[eulerLevel];
-      const clickedNode = g.nodes.findIndex(n => {
-        const dist = Math.hypot(n.x - clickX, n.y - clickY);
-        return dist < 22;
-      });
+      const clickedNode = g.nodes.findIndex(n => Math.hypot(n.x - clickX, n.y - clickY) < 22);
 
       if (clickedNode === -1) return;
 
       if (eulerPath.length === 0) {
-        // Başlangıç düğümü seçildi
         eulerPath.push(clickedNode);
         playTone(450, 0.08);
         document.getElementById('euler-msg').innerText = `Düğüm ${clickedNode + 1}'den başlandı. Şimdi bağlı bir düğüme ilerleyin.`;
       } else {
         const lastNode = eulerPath[eulerPath.length - 1];
         if (lastNode === clickedNode) return;
-
-        // Kenar var mı?
         const edgeExists = g.edges.some(([u, v]) => (u === lastNode && v === clickedNode) || (v === lastNode && u === clickedNode));
-        if (!edgeExists) {
-          playTone(200, 0.15, 'sawtooth');
-          return;
-        }
+        if (!edgeExists) { playTone(200, 0.15, 'sawtooth'); return; }
 
-        // Bu kenar daha önce geçildi mi?
         let alreadyUsed = false;
         for (let i = 0; i < eulerPath.length - 1; i++) {
           if ((eulerPath[i] === lastNode && eulerPath[i+1] === clickedNode) || (eulerPath[i] === clickedNode && eulerPath[i+1] === lastNode)) {
@@ -1131,7 +1089,6 @@
             break;
           }
         }
-
         if (alreadyUsed) {
           playTone(200, 0.15, 'sawtooth');
           document.getElementById('euler-msg').innerText = 'Hata: Bu çizgiden daha önce geçtiniz!';
@@ -1141,14 +1098,12 @@
         eulerPath.push(clickedNode);
         playTone(400 + eulerPath.length * 30, 0.08);
 
-        // Tüm kenarlar bitti mi?
         if (eulerPath.length - 1 === g.edges.length) {
           playSuccessFanfare();
           document.getElementById('euler-msg').innerText = 'Tebrikler! Şekli tek hamlede tamamladınız! 🏆';
           document.getElementById('euler-msg').className = 'text-xs font-bold font-mono text-emerald-400 mt-3';
         }
       }
-
       drawEuler();
     });
 
@@ -1160,12 +1115,7 @@
     let game24CurrentExpr = '';
 
     const PRESET_24_SETS = [
-      [3, 8, 3, 8], // 8 / (3 - 8/3) = 24
-      [1, 3, 4, 6], // 6 / (1 - 3/4) = 24
-      [2, 3, 5, 8], // (5 + 3 - 2) * ?
-      [4, 4, 7, 7], // (7 - 4) * (4 + 4) = 24
-      [1, 5, 5, 5], // (5 - 1/5) * 5 = 24
-      [2, 4, 6, 8]  // (8 - 6 + 4) * 4
+      [3, 8, 3, 8], [1, 3, 4, 6], [2, 3, 5, 8], [4, 4, 7, 7], [1, 5, 5, 5], [2, 4, 6, 8]
     ];
 
     function newGame24() {
@@ -1175,7 +1125,6 @@
       game24CurrentExpr = '';
       document.getElementById('game24-expr').innerText = 'İşleminizi oluşturun';
       document.getElementById('game24-feedback').innerText = '';
-
       renderGame24Cards();
     }
 
@@ -1197,11 +1146,8 @@
     }
 
     function appendGame24(char) {
-      if (game24CurrentExpr === '') {
-        game24CurrentExpr = `${char}`;
-      } else {
-        game24CurrentExpr += ` ${char}`;
-      }
+      if (game24CurrentExpr === '') game24CurrentExpr = `${char}`;
+      else game24CurrentExpr += ` ${char}`;
       document.getElementById('game24-expr').innerText = game24CurrentExpr;
       playTone(500, 0.05);
     }
@@ -1221,11 +1167,9 @@
         playTone(220, 0.15, 'sawtooth');
         return;
       }
-
       try {
         const sanitized = game24CurrentExpr.replace(/×/g, '*').replace(/÷/g, '/');
         const res = Function(`"use strict"; return (${sanitized})`)();
-
         if (Math.abs(res - 24) < 0.0001) {
           document.getElementById('game24-feedback').innerText = 'Mükemmel! Sonuç 24! 🎉';
           document.getElementById('game24-feedback').className = 'text-xs font-bold font-mono text-emerald-400 h-5';
@@ -1242,26 +1186,24 @@
     }
 
     function showGame24Hint() {
-      alert("İpucu: Sayıları parantez ve çarpma/bölme işlem sırasıyla kombine edin! Bazen kesirli işlemler (örn: 8 / (3 - 8/3)) harikalar yaratır.");
+      alert("İpucu: Parantez kullanarak öncelik belirleyin. Örneğin: (8 / (3 - 8/3)) veya (a - b) * (c + d) kalıplarını deneyin.");
     }
 
     /* ─────────────────────────────────────────────────────────────
-       6. SİHİRLİ PİRAMİT (DYNAMIC PROGRAMMING) LOGIC
+       6. SİHİRLİ PİRAMİT LOGIC
        ───────────────────────────────────────────────────────────── */
     let pyramidData = [];
-    let pyramidSelectedPath = []; // [colIdx, ...] her satır için
+    let pyramidSelectedPath = [];
 
     function newPyramid() {
       pyramidData = [];
       const rows = 5;
       for (let r = 0; r < rows; r++) {
         const row = [];
-        for (let c = 0; c <= r; c++) {
-          row.push(Math.floor(1 + Math.random() * 9));
-        }
+        for (let c = 0; c <= r; c++) row.push(Math.floor(1 + Math.random() * 9));
         pyramidData.push(row);
       }
-      pyramidSelectedPath = [0]; // Tepe daima seçili
+      pyramidSelectedPath = [0];
       renderPyramid();
       calculatePyramidUserSum();
     }
@@ -1269,91 +1211,594 @@
     function renderPyramid(optimalPath = null) {
       const container = document.getElementById('pyramid-container');
       container.innerHTML = '';
-
       pyramidData.forEach((row, r) => {
         const rowEl = document.createElement('div');
         rowEl.className = 'flex items-center justify-center gap-3 sm:gap-4 my-1.5';
-
         row.forEach((val, c) => {
           const isUserPath = pyramidSelectedPath.length > r && pyramidSelectedPath[r] === c;
           const isOptimal = optimalPath && optimalPath[r] === c;
-
           const btn = document.createElement('button');
           btn.className = `w-12 h-12 sm:w-14 sm:h-14 rounded-2xl font-mono text-lg font-black transition-all flex items-center justify-center shadow-lg ${isOptimal ? 'bg-amber-400 text-slate-950 ring-4 ring-amber-300' : (isUserPath ? 'bg-purple-600 text-white ring-4 ring-purple-400/50' : 'glass-card text-slate-300 hover:border-purple-400')}`;
           btn.innerText = val;
           btn.onclick = () => selectPyramidCell(r, c);
           rowEl.appendChild(btn);
         });
-
         container.appendChild(rowEl);
       });
     }
 
     function selectPyramidCell(r, c) {
-      if (r === 0) return; // Tepe zaten sabit
-      const parentRow = r - 1;
-      const parentCol = pyramidSelectedPath[parentRow];
-
-      // Kural: Yalnızca üst basamaktaki seçili hücrenin sol veya sağ alt komşusu seçilebilir
+      if (r === 0) return;
+      const parentCol = pyramidSelectedPath[r - 1];
       if (c !== parentCol && c !== parentCol + 1) {
         playTone(200, 0.15, 'sawtooth');
         return;
       }
-
       pyramidSelectedPath[r] = c;
-      // Altındaki eski seçimleri sıfırla
       pyramidSelectedPath.length = r + 1;
       playTone(420 + r * 50, 0.08);
-
       renderPyramid();
       calculatePyramidUserSum();
-
-      if (pyramidSelectedPath.length === pyramidData.length) {
-        playSuccessFanfare();
-      }
+      if (pyramidSelectedPath.length === pyramidData.length) playSuccessFanfare();
     }
 
     function calculatePyramidUserSum() {
       let sum = 0;
-      pyramidSelectedPath.forEach((col, r) => {
-        sum += pyramidData[r][col];
-      });
+      pyramidSelectedPath.forEach((col, r) => sum += pyramidData[r][col]);
       document.getElementById('pyramid-user-sum').innerText = sum;
     }
 
     function showPyramidMaxPath() {
-      // Dinamik Programlama ile optimal yolu bul
       const n = pyramidData.length;
       const dp = pyramidData.map(row => [...row]);
-
       for (let r = n - 2; r >= 0; r--) {
-        for (let c = 0; c <= r; c++) {
-          dp[r][c] += Math.max(dp[r + 1][c], dp[r + 1][c + 1]);
-        }
+        for (let c = 0; c <= r; c++) dp[r][c] += Math.max(dp[r + 1][c], dp[r + 1][c + 1]);
       }
-
       const optimal = [0];
       let currCol = 0;
       for (let r = 0; r < n - 1; r++) {
-        if (dp[r + 1][currCol] >= dp[r + 1][currCol + 1]) {
-          optimal.push(currCol);
-        } else {
-          currCol = currCol + 1;
-          optimal.push(currCol);
-        }
+        if (dp[r + 1][currCol] >= dp[r + 1][currCol + 1]) optimal.push(currCol);
+        else { currCol = currCol + 1; optimal.push(currCol); }
       }
-
       renderPyramid(optimal);
       alert(`Piramitteki maksimum ulaşılabilir toplam: ${dp[0][0]}`);
     }
 
-    // İlk Başlatma
+    /* ─────────────────────────────────────────────────────────────
+       7. UNTANGLE (DÜĞÜMLERİ ÇÖZ - DÜZLEMSELLİK) LOGIC
+       ───────────────────────────────────────────────────────────── */
+    const untangleCanvas = document.getElementById('untangle-canvas');
+    const untangleCtx = untangleCanvas.getContext('2d');
+    let untangleNodes = [];
+    let untangleEdges = [];
+    let draggedNode = null;
+    let untangleNodeCount = 5;
+
+    function setUntangleDifficulty(count) {
+      untangleNodeCount = count;
+      document.getElementById('untangle-diff-5').classList.toggle('bg-purple-500/20', count === 5);
+      document.getElementById('untangle-diff-5').classList.toggle('text-purple-300', count === 5);
+      document.getElementById('untangle-diff-6').classList.toggle('bg-purple-500/20', count === 6);
+      document.getElementById('untangle-diff-6').classList.toggle('text-purple-300', count === 6);
+      document.getElementById('untangle-diff-8').classList.toggle('bg-purple-500/20', count === 8);
+      document.getElementById('untangle-diff-8').classList.toggle('text-purple-300', count === 8);
+      resetUntangle();
+    }
+
+    function resetUntangle() {
+      untangleNodes = [];
+      untangleEdges = [];
+      draggedNode = null;
+
+      const cx = untangleCanvas.width / 2;
+      const cy = untangleCanvas.height / 2;
+      const r = 130;
+
+      // Dairesel ama kasıtlı karıştırılmış pozisyonlar
+      for (let i = 0; i < untangleNodeCount; i++) {
+        const theta = (i / untangleNodeCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+        untangleNodes.push({
+          x: cx + Math.cos(theta) * (r + (Math.random() - 0.5) * 40),
+          y: cy + Math.sin(theta) * (r + (Math.random() - 0.5) * 40)
+        });
+      }
+
+      // Düzlemsel olan kenar listesi oluştur (Çözülebilir olması garantilensin)
+      for (let i = 0; i < untangleNodeCount; i++) {
+        untangleEdges.push([i, (i + 1) % untangleNodeCount]); // Çevre döngüsü
+        if (untangleNodeCount >= 6 && i % 2 === 0) {
+          untangleEdges.push([i, (i + 2) % untangleNodeCount]);
+        }
+      }
+
+      // Düğümlerin yerlerini rastgele takas et ki başta kesişim olsun
+      for (let i = 0; i < untangleNodeCount; i++) {
+        const swapWith = Math.floor(Math.random() * untangleNodeCount);
+        const tempX = untangleNodes[i].x;
+        const tempY = untangleNodes[i].y;
+        untangleNodes[i].x = untangleNodes[swapWith].x;
+        untangleNodes[i].y = untangleNodes[swapWith].y;
+        untangleNodes[swapWith].x = tempX;
+        untangleNodes[swapWith].y = tempY;
+      }
+
+      drawUntangle();
+    }
+
+    function checkLineIntersection(p1, p2, p3, p4) {
+      function ccw(a, b, c) {
+        return (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x);
+      }
+      return ccw(p1, p3, p4) !== ccw(p2, p3, p4) && ccw(p1, p2, p3) !== ccw(p1, p2, p4);
+    }
+
+    function drawUntangle() {
+      untangleCtx.clearRect(0, 0, untangleCanvas.width, untangleCanvas.height);
+
+      // Kesişen kenarları bul
+      const intersectingEdges = new Set();
+      let totalCrossings = 0;
+
+      for (let i = 0; i < untangleEdges.length; i++) {
+        for (let j = i + 1; j < untangleEdges.length; j++) {
+          const [u1, v1] = untangleEdges[i];
+          const [u2, v2] = untangleEdges[j];
+          // Ortak uç noktaları varsa kesişim sayılmaz
+          if (u1 === u2 || u1 === v2 || v1 === u2 || v1 === v2) continue;
+
+          if (checkLineIntersection(untangleNodes[u1], untangleNodes[v1], untangleNodes[u2], untangleNodes[v2])) {
+            intersectingEdges.add(i);
+            intersectingEdges.add(j);
+            totalCrossings++;
+          }
+        }
+      }
+
+      document.getElementById('untangle-crossings').innerText = totalCrossings;
+      const statusEl = document.getElementById('untangle-status');
+
+      if (totalCrossings === 0) {
+        statusEl.innerText = 'Harika! Tüm düğümler çözüldü, graf düzlemsel oldu! 🏆';
+        statusEl.className = 'text-xs font-bold font-mono text-emerald-400 mt-3';
+        playSuccessFanfare();
+      } else {
+        statusEl.innerText = `${totalCrossings} kesişim var. Noktaları sürükleyerek çizgileri açın.`;
+        statusEl.className = 'text-xs font-bold font-mono text-rose-400 mt-3';
+      }
+
+      // Kenarları çiz
+      untangleEdges.forEach(([u, v], idx) => {
+        const p1 = untangleNodes[u];
+        const p2 = untangleNodes[v];
+        const hasCross = intersectingEdges.has(idx);
+
+        untangleCtx.beginPath();
+        untangleCtx.moveTo(p1.x, p1.y);
+        untangleCtx.lineTo(p2.x, p2.y);
+        untangleCtx.lineWidth = hasCross ? 3 : 4;
+        untangleCtx.strokeStyle = hasCross ? '#ef4444' : '#10b981';
+        untangleCtx.stroke();
+      });
+
+      // Düğümleri çiz
+      untangleNodes.forEach((node, idx) => {
+        const isDragged = draggedNode === idx;
+        untangleCtx.beginPath();
+        untangleCtx.arc(node.x, node.y, isDragged ? 14 : 11, 0, Math.PI * 2);
+        untangleCtx.fillStyle = isDragged ? '#fbbf24' : '#8b5cf6';
+        untangleCtx.fill();
+        untangleCtx.lineWidth = 2.5;
+        untangleCtx.strokeStyle = '#ffffff';
+        untangleCtx.stroke();
+      });
+    }
+
+    untangleCanvas.addEventListener('mousedown', (e) => {
+      const rect = untangleCanvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (untangleCanvas.width / rect.width);
+      const y = (e.clientY - rect.top) * (untangleCanvas.height / rect.height);
+      draggedNode = untangleNodes.findIndex(n => Math.hypot(n.x - x, n.y - y) < 22);
+      if (draggedNode !== -1) playTone(450, 0.05);
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (draggedNode === null || draggedNode === -1) return;
+      const rect = untangleCanvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (untangleCanvas.width / rect.width);
+      const y = (e.clientY - rect.top) * (untangleCanvas.height / rect.height);
+      untangleNodes[draggedNode].x = Math.max(20, Math.min(untangleCanvas.width - 20, x));
+      untangleNodes[draggedNode].y = Math.max(20, Math.min(untangleCanvas.height - 20, y));
+      drawUntangle();
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (draggedNode !== null && draggedNode !== -1) {
+        draggedNode = null;
+        drawUntangle();
+      }
+    });
+
+    // Touch Desteği
+    untangleCanvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = untangleCanvas.getBoundingClientRect();
+      const x = (touch.clientX - rect.left) * (untangleCanvas.width / rect.width);
+      const y = (touch.clientY - rect.top) * (untangleCanvas.height / rect.height);
+      draggedNode = untangleNodes.findIndex(n => Math.hypot(n.x - x, n.y - y) < 28);
+    }, { passive: false });
+
+    untangleCanvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (draggedNode === null || draggedNode === -1) return;
+      const touch = e.touches[0];
+      const rect = untangleCanvas.getBoundingClientRect();
+      const x = (touch.clientX - rect.left) * (untangleCanvas.width / rect.width);
+      const y = (touch.clientY - rect.top) * (untangleCanvas.height / rect.height);
+      untangleNodes[draggedNode].x = Math.max(20, Math.min(untangleCanvas.width - 20, x));
+      untangleNodes[draggedNode].y = Math.max(20, Math.min(untangleCanvas.height - 20, y));
+      drawUntangle();
+    }, { passive: false });
+
+    untangleCanvas.addEventListener('touchend', () => { draggedNode = null; drawUntangle(); });
+
+    /* ─────────────────────────────────────────────────────────────
+       8. SİHİRLİ KARELER (MAGIC SQUARES) LOGIC
+       ───────────────────────────────────────────────────────────── */
+    let msSize = 3;
+    let msGrid = [];
+    let msTarget = 15;
+    let msSelectedNum = null;
+
+    const MS_SOLUTIONS = {
+      3: [[8, 1, 6], [3, 5, 7], [4, 9, 2]],
+      4: [[16, 2, 3, 13], [5, 11, 10, 8], [9, 7, 6, 12], [4, 14, 15, 1]]
+    };
+
+    function setMagicSquareSize(s) {
+      msSize = s;
+      msTarget = s === 3 ? 15 : 34;
+      document.getElementById('ms-size-3').classList.toggle('bg-purple-500/20', s === 3);
+      document.getElementById('ms-size-3').classList.toggle('text-purple-300', s === 3);
+      document.getElementById('ms-size-4').classList.toggle('bg-purple-500/20', s === 4);
+      document.getElementById('ms-size-4').classList.toggle('text-purple-300', s === 4);
+      resetMagicSquare();
+    }
+
+    function resetMagicSquare() {
+      msGrid = Array(msSize).fill(null).map(() => Array(msSize).fill(null));
+      msSelectedNum = null;
+      renderMagicSquare();
+      renderMagicPalette();
+    }
+
+    function renderMagicSquare() {
+      const gridEl = document.getElementById('ms-grid');
+      gridEl.style.gridTemplateColumns = `repeat(${msSize}, minmax(0, 1fr))`;
+      gridEl.innerHTML = '';
+
+      for (let r = 0; r < msSize; r++) {
+        for (let c = 0; c < msSize; c++) {
+          const val = msGrid[r][c];
+          const cell = document.createElement('button');
+          cell.className = `w-14 h-14 sm:w-16 sm:h-16 rounded-xl font-mono text-xl sm:text-2xl font-black transition-all flex items-center justify-center shadow-md ${val ? 'bg-purple-600 text-white border border-purple-400/40' : 'glass-card text-slate-500 hover:border-purple-400'}`;
+          cell.innerText = val || '';
+          cell.onclick = () => handleMagicCellClick(r, c);
+          gridEl.appendChild(cell);
+        }
+      }
+      checkMagicSquareSums();
+    }
+
+    function renderMagicPalette() {
+      const palEl = document.getElementById('ms-palette');
+      palEl.innerHTML = '';
+      const maxNum = msSize * msSize;
+      const usedNums = new Set(msGrid.flat().filter(Boolean));
+
+      for (let i = 1; i <= maxNum; i++) {
+        const btn = document.createElement('button');
+        const isUsed = usedNums.has(i);
+        const isSelected = msSelectedNum === i;
+        btn.disabled = isUsed;
+        btn.className = `w-10 h-10 rounded-xl font-mono font-bold text-sm transition-all shadow ${isUsed ? 'opacity-30 bg-slate-800 text-slate-600' : (isSelected ? 'bg-amber-400 text-slate-950 ring-4 ring-amber-300' : 'glass-card text-white hover:border-purple-400')}`;
+        btn.innerText = i;
+        btn.onclick = () => { msSelectedNum = i; renderMagicPalette(); playTone(500, 0.05); };
+        palEl.appendChild(btn);
+      }
+    }
+
+    function handleMagicCellClick(r, c) {
+      if (msSelectedNum !== null) {
+        msGrid[r][c] = msSelectedNum;
+        msSelectedNum = null;
+        playTone(550, 0.08);
+      } else {
+        // Hücreyi temizle
+        msGrid[r][c] = null;
+        playTone(350, 0.05);
+      }
+      renderMagicSquare();
+      renderMagicPalette();
+    }
+
+    function checkMagicSquareSums() {
+      let isAllCorrect = true;
+      const target = msTarget;
+
+      // Satır kontrolleri
+      for (let r = 0; r < msSize; r++) {
+        const sum = msGrid[r].reduce((a, b) => a + (b || 0), 0);
+        if (sum !== target || msGrid[r].some(x => !x)) isAllCorrect = false;
+      }
+      // Sütun kontrolleri
+      for (let c = 0; c < msSize; c++) {
+        let sum = 0;
+        for (let r = 0; r < msSize; r++) sum += (msGrid[r][c] || 0);
+        if (sum !== target) isAllCorrect = false;
+      }
+      // Köşegenler
+      let d1 = 0, d2 = 0;
+      for (let i = 0; i < msSize; i++) {
+        d1 += (msGrid[i][i] || 0);
+        d2 += (msGrid[i][msSize - 1 - i] || 0);
+      }
+      if (d1 !== target || d2 !== target) isAllCorrect = false;
+
+      if (isAllCorrect && msGrid.flat().every(Boolean)) {
+        playSuccessFanfare();
+      }
+    }
+
+    function solveMagicSquare() {
+      msGrid = MS_SOLUTIONS[msSize].map(r => [...r]);
+      renderMagicSquare();
+      renderMagicPalette();
+      playSuccessFanfare();
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       9. CHOMP (ZEHİRLİ ÇİKOLATA) LOGIC
+       ───────────────────────────────────────────────────────────── */
+    let chompRows = 4;
+    let chompCols = 5;
+    let chompGrid = []; // true: yenmedi, false: yendi
+    let chompTurn = 1;
+    let chompMode = 'ai';
+
+    function setChompMode(m) {
+      chompMode = m;
+      document.getElementById('chomp-mode-ai').classList.toggle('bg-purple-500/20', m === 'ai');
+      document.getElementById('chomp-mode-ai').classList.toggle('text-purple-300', m === 'ai');
+      document.getElementById('chomp-mode-pvp').classList.toggle('bg-purple-500/20', m === 'pvp');
+      document.getElementById('chomp-mode-pvp').classList.toggle('text-purple-300', m === 'pvp');
+      resetChomp();
+    }
+
+    function resetChomp() {
+      chompGrid = Array(chompRows).fill(null).map(() => Array(chompCols).fill(true));
+      chompTurn = 1;
+      renderChomp();
+    }
+
+    function renderChomp() {
+      const gridEl = document.getElementById('chomp-grid');
+      gridEl.innerHTML = '';
+
+      for (let r = 0; r < chompRows; r++) {
+        for (let c = 0; c < chompCols; c++) {
+          const isAlive = chompGrid[r][c];
+          const isPoison = (r === chompRows - 1 && c === 0);
+          const cell = document.createElement('button');
+          cell.disabled = !isAlive || (chompMode === 'ai' && chompTurn === 2);
+          cell.className = `chomp-cell w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center font-bold text-lg shadow ${!isAlive ? 'eaten opacity-10 bg-amber-950/20 border border-transparent' : (isPoison ? 'bg-rose-950 border-2 border-rose-500 text-rose-300' : 'bg-gradient-to-tr from-amber-800 to-amber-600 border border-amber-500/30 text-amber-200')}`;
+          cell.innerHTML = isPoison ? '☠️' : '🍫';
+          cell.onclick = () => handleChompMove(r, c);
+          gridEl.appendChild(cell);
+        }
+      }
+
+      const badge = document.getElementById('chomp-turn-badge');
+      if (chompTurn === 1) {
+        badge.innerText = 'Sıra: Oyuncu 1';
+        badge.className = 'mb-5 px-4 py-1.5 rounded-full text-xs font-bold font-mono bg-purple-500/20 border border-purple-400/40 text-purple-300';
+      } else {
+        badge.innerText = chompMode === 'ai' ? 'Sıra: Bilgisayar Isırıyor…' : 'Sıra: Oyuncu 2';
+        badge.className = 'mb-5 px-4 py-1.5 rounded-full text-xs font-bold font-mono bg-amber-500/20 border border-amber-400/40 text-amber-300';
+      }
+    }
+
+    function handleChompMove(clickR, clickC) {
+      // Zehirli kare mi ısırıldı?
+      if (clickR === chompRows - 1 && clickC === 0) {
+        playTone(160, 0.4, 'sawtooth');
+        const loser = chompTurn === 1 ? 'Oyuncu 1' : (chompMode === 'ai' ? 'Bilgisayar' : 'Oyuncu 2');
+        alert(`☠️ Zehirli çikolata ısırıldı! ${loser} kaybetti!`);
+        resetChomp();
+        return;
+      }
+
+      // Isırılan karenin sağı ve üstündeki tüm çikolatalar yenir (r <= clickR && c >= clickC)
+      for (let r = 0; r <= clickR; r++) {
+        for (let c = clickC; c < chompCols; c++) {
+          chompGrid[r][c] = false;
+        }
+      }
+
+      playTone(400, 0.09);
+      chompTurn = chompTurn === 1 ? 2 : 1;
+      renderChomp();
+
+      if (chompMode === 'ai' && chompTurn === 2) {
+        setTimeout(playChompAIMove, 650);
+      }
+    }
+
+    function playChompAIMove() {
+      // Yapay zeka geçerli bir kare seçer (zehirli olmayan)
+      const validMoves = [];
+      for (let r = 0; r < chompRows; r++) {
+        for (let c = 0; c < chompCols; c++) {
+          if (chompGrid[r][c] && !(r === chompRows - 1 && c === 0)) {
+            validMoves.push([r, c]);
+          }
+        }
+      }
+
+      if (validMoves.length > 0) {
+        const [r, c] = validMoves[Math.floor(Math.random() * validMoves.length)];
+        handleChompMove(r, c);
+      } else {
+        // Sadece zehir kaldı
+        handleChompMove(chompRows - 1, 0);
+      }
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       10. MONTY HALL PARADOKSU LOGIC
+       ───────────────────────────────────────────────────────────── */
+    let montyCarDoor = 0;
+    let montySelectedDoor = null;
+    let montyRevealedGoat = null;
+    let montyPhase = 'pick'; // 'pick', 'action', 'result'
+    let montyStats = { switchWins: 0, switchTotal: 0, stayWins: 0, stayTotal: 0 };
+
+    function resetMontyGame() {
+      montyCarDoor = Math.floor(Math.random() * 3);
+      montySelectedDoor = null;
+      montyRevealedGoat = null;
+      montyPhase = 'pick';
+
+      document.getElementById('monty-prompt').innerText = 'Bir kapı seçerek yarışmaya başlayın!';
+      document.getElementById('monty-actions').classList.add('hidden');
+      renderMontyDoors();
+    }
+
+    function renderMontyDoors() {
+      const container = document.getElementById('monty-doors-container');
+      container.innerHTML = '';
+
+      for (let i = 0; i < 3; i++) {
+        const door = document.createElement('div');
+        const isSelected = montySelectedDoor === i;
+        const isRevealed = montyRevealedGoat === i;
+        const isFinal = montyPhase === 'result';
+
+        door.onclick = () => handleMontyDoorClick(i);
+        door.className = `h-36 sm:h-44 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center p-3 shadow-xl ${isSelected ? 'border-amber-400 bg-amber-400/20 ring-4 ring-amber-400/30' : 'border-white/10 glass-card hover:border-purple-400'}`;
+
+        let content = `<div class="text-3xl sm:text-4xl mb-2">🚪</div><div class="font-bold text-xs text-slate-300">Kapı ${i + 1}</div>`;
+        if (isRevealed) {
+          content = `<div class="text-3xl sm:text-4xl mb-2">🐐</div><div class="font-bold text-xs text-rose-400">Keçi!</div>`;
+        } else if (isFinal) {
+          if (i === montyCarDoor) {
+            content = `<div class="text-3xl sm:text-4xl mb-2">🏎️</div><div class="font-bold text-xs text-emerald-400">Süper Araba!</div>`;
+          } else {
+            content = `<div class="text-3xl sm:text-4xl mb-2">🐐</div><div class="font-bold text-xs text-slate-500">Keçi</div>`;
+          }
+        }
+        door.innerHTML = content;
+        container.appendChild(door);
+      }
+    }
+
+    function handleMontyDoorClick(doorIdx) {
+      if (montyPhase !== 'pick') return;
+      montySelectedDoor = doorIdx;
+      montyPhase = 'action';
+      playTone(500, 0.08);
+
+      // Sunucu kalan kapılardan araba olmayan bir keçiyi açar
+      const goats = [0, 1, 2].filter(d => d !== montySelectedDoor && d !== montyCarDoor);
+      montyRevealedGoat = goats[Math.floor(Math.random() * goats.length)];
+
+      document.getElementById('monty-prompt').innerHTML = `Kapı ${doorIdx + 1}'i seçtiniz! Sunucu Kapı ${montyRevealedGoat + 1}'i açtı: 🐐 Keçi çıktı! <strong>Kapınızı değiştirmek ister misiniz?</strong>`;
+      document.getElementById('monty-actions').classList.remove('hidden');
+      renderMontyDoors();
+    }
+
+    function resolveMontyChoice(isSwitched) {
+      if (montyPhase !== 'action') return;
+      montyPhase = 'result';
+
+      let finalDoor = montySelectedDoor;
+      if (isSwitched) {
+        finalDoor = [0, 1, 2].find(d => d !== montySelectedDoor && d !== montyRevealedGoat);
+      }
+
+      const won = (finalDoor === montyCarDoor);
+      if (isSwitched) {
+        montyStats.switchTotal++;
+        if (won) montyStats.switchWins++;
+      } else {
+        montyStats.stayTotal++;
+        if (won) montyStats.stayWins++;
+      }
+
+      document.getElementById('monty-actions').classList.add('hidden');
+      if (won) {
+        document.getElementById('monty-prompt').innerHTML = `🎉 <strong>TEBRİKLER! Arabayı Kazandınız!</strong> (Seçiminiz: Kapı ${finalDoor + 1})`;
+        playSuccessFanfare();
+      } else {
+        document.getElementById('monty-prompt').innerHTML = `😢 <strong>Maalesef Keçi Çıktı!</strong> Araba Kapı ${montyCarDoor + 1}'deydi.`;
+        playTone(200, 0.25, 'sawtooth');
+      }
+
+      updateMontyUIStats();
+      renderMontyDoors();
+      setTimeout(resetMontyGame, 2600);
+    }
+
+    function updateMontyUIStats() {
+      const swPct = montyStats.switchTotal ? ((montyStats.switchWins / montyStats.switchTotal) * 100).toFixed(1) : 0;
+      const stPct = montyStats.stayTotal ? ((montyStats.stayWins / montyStats.stayTotal) * 100).toFixed(1) : 0;
+
+      document.getElementById('monty-switch-pct').innerText = `${swPct}%`;
+      document.getElementById('monty-switch-wins').innerText = montyStats.switchWins;
+      document.getElementById('monty-switch-total').innerText = montyStats.switchTotal;
+      document.getElementById('monty-switch-bar').style.width = `${swPct}%`;
+
+      document.getElementById('monty-stay-pct').innerText = `${stPct}%`;
+      document.getElementById('monty-stay-wins').innerText = montyStats.stayWins;
+      document.getElementById('monty-stay-total').innerText = montyStats.stayTotal;
+      document.getElementById('monty-stay-bar').style.width = `${stPct}%`;
+    }
+
+    function runMontyFastSim(iterations = 100) {
+      for (let i = 0; i < iterations; i++) {
+        const car = Math.floor(Math.random() * 3);
+        const pick = Math.floor(Math.random() * 3);
+        const goats = [0, 1, 2].filter(d => d !== pick && d !== car);
+        const revealed = goats[Math.floor(Math.random() * goats.length)];
+        const switchedPick = [0, 1, 2].find(d => d !== pick && d !== revealed);
+
+        montyStats.switchTotal++;
+        if (switchedPick === car) montyStats.switchWins++;
+
+        montyStats.stayTotal++;
+        if (pick === car) montyStats.stayWins++;
+      }
+      updateMontyUIStats();
+      playTone(600, 0.1);
+    }
+
+    function resetMontyStats() {
+      montyStats = { switchWins: 0, switchTotal: 0, stayWins: 0, stayTotal: 0 };
+      updateMontyUIStats();
+      resetMontyGame();
+    }
+
+    /* INITIALIZE */
     window.addEventListener('DOMContentLoaded', () => {
       resetHanoi();
       resetKenken();
       resetNim();
       newGame24();
       newPyramid();
+      resetUntangle();
+      resetMagicSquare();
+      resetChomp();
+      resetMontyGame();
     });
   </script>
 </body>
