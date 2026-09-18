@@ -229,3 +229,47 @@
   --pc-line: #1a1440;
   --pc-detail: rgba(255, 255, 255, 0.5);
 }
+
+/* Kalem kalınlığı kaydırıcısı — akıllı tahtada parmakla tutulabilsin diye
+   yerleşik kaydırıcıdan belirgin biçimde daha büyük bir tutamak kullanır. */
+.range-pen {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  background: transparent;
+}
+
+.range-pen::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.range-pen::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -7px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 3px solid #6366f1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+
+.range-pen::-moz-range-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.range-pen::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 3px solid #6366f1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}

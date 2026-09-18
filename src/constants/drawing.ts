@@ -36,7 +36,23 @@ export const DRAWING_COLORS = [
     '#000000',
 ] as const;
 
-export const DRAWING_WIDTHS = [2, 5, 10] as const;
+/**
+ * Kalem kalınlığı ön ayarları. Değerler çizim kaleminin piksel kalınlığıdır;
+ * fosforlu ve silgi bu değeri kendi katsayısıyla büyütür.
+ */
+export const PEN_SIZES: ReadonlyArray<{ value: number; label: string }> = [
+    { value: 1, label: 'Kıl' },
+    { value: 2, label: 'İnce' },
+    { value: 4, label: 'Normal' },
+    { value: 6, label: 'Orta' },
+    { value: 9, label: 'Kalın' },
+    { value: 14, label: 'Çok kalın' },
+    { value: 20, label: 'Dev' },
+];
+
+/** Kaydırıcının izin verdiği aralık. */
+export const PEN_SIZE_MIN = 1;
+export const PEN_SIZE_MAX = 40;
 
 export const BG_COLORS: ReadonlyArray<{ color: string; label: string }> = [
     { color: '#ffffff', label: 'Beyaz' },

@@ -4,13 +4,13 @@ import { PaintBucket, Pentagon } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, PenType } from '../../types';
 import {
-    DRAWING_WIDTHS,
     ERASER_MODES,
     STAMP_CATEGORIES,
     make2DShapeTools,
     make3DShapeTools,
 } from '../../constants/drawing';
 import { PEN_TYPES } from './penEngine';
+import { SizePicker } from './SizePicker';
 import { DashedLineIcon, SolidLineIcon } from './DrawingIcons';
 
 /** Seçili araca göre gösterilecek ayar grubu. */
@@ -135,33 +135,11 @@ export function ToolSettingsPanel({
                 {SECTION_TITLES[section]}
             </span>
 
-            <Row label={section === 'eraser' ? 'Silgi Ucu' : 'Kalınlık'}>
-                {DRAWING_WIDTHS.map((size) => (
-                    <button
-                        key={size}
-                        type="button"
-                        role="radio"
-                        aria-checked={config.width === size}
-                        aria-label={`${size} piksel`}
-                        onClick={() => setConfig({ ...config, width: size })}
-                        title={`${size}px`}
-                        className={cn(
-                            'w-9 h-9 rounded-xl flex items-center justify-center transition-all',
-                            config.width === size
-                                ? 'bg-[#2d3045] ring-1 ring-indigo-500/60'
-                                : 'hover:bg-white/10'
-                        )}
-                    >
-                        <span
-                            className={cn(
-                                'rounded-full transition-all',
-                                config.width === size ? 'bg-white' : 'bg-slate-400'
-                            )}
-                            style={{ width: size + 4 + 'px', height: size + 4 + 'px' }}
-                        />
-                    </button>
-                ))}
-            </Row>
+            <SizePicker
+                config={config}
+                setConfig={setConfig}
+                isEraser={section === 'eraser'}
+            />
 
             {section === 'pen' && (
                 <>
