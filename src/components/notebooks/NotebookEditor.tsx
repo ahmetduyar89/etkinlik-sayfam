@@ -33,6 +33,7 @@ import { useConfirm } from '../common/ConfirmDialog';
 import { cn } from '../../utils/cn';
 import { BG_COLORS } from '../../constants/drawing';
 import { PAPER_STYLES, paperBackground } from './paper';
+import { PAGE_SIZES, pageDims } from '../../constants/pageSizes';
 import { PageThumbnails } from './PageThumbnails';
 import { importImageFile } from '../drawing/imageStore';
 import { measurePages } from './pageCodec';
@@ -70,6 +71,7 @@ import type {
     Notebook,
     NotebookOp,
     NotebookPage,
+    PageSize,
     PaperStyle,
     Stroke,
     TextBoxData,
@@ -149,6 +151,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const boxTimerRef = React.useRef<number | null>(null);
 
     const [title, setTitle] = React.useState(notebook.title);
+    const [pageSize, setPageSize] = React.useState<PageSize>(notebook.page_size ?? 'free');
     const [paper, setPaper] = React.useState<PaperStyle>(
         notebook.paper || (notebook.kind === 'whiteboard' ? 'blank' : 'grid')
     );
@@ -246,6 +249,11 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             setBoxesByPage(pages.map((p) => p.boxes));
             setPageInfo({ current: 0, total: pages.length });
             setIsLoading(false);
+            // Sayfa ölçüsü tanımlıysa defter açılırken sayfanın tamamı
+            // görünsün; yakınlaştırma yine serbesttir.
+            window.setTimeout(() => {
+                if (pageDims(notebook.page_size)) canvasRef.current?.fitPage();
+            }, 80);
         })();
         return () => {
             alive = false;
@@ -795,10 +803,19 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     }, [showPages, isLoading, pageInfo, saveState, boxesByPage]);
 
     const currentPaper = PAPER_STYLES.find((p) => p.id === paper);
+    const currentPageSize = PAGE_SIZES.find((p) => p.id === pageSize);
+    const pageBox = pageDims(pageSize);
 
     const changePaper = (next: PaperStyle) => {
         setPaper(next);
         onMetaChange({ paper: next });
+    };
+
+    const changePageSize = (next: PageSize) => {
+        setPageSize(next);
+        onMetaChange({ page_size: next });
+        // Yeni ölçüde sayfanın tamamı görünsün.
+        window.setTimeout(() => canvasRef.current?.fitPage(), 60);
     };
 
     const changeBg = (next: string) => {
@@ -858,7 +875,12 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-xl px-2.5 py-1.5 text-[12.5px] font-semibold transition-colors"
                     >
                         <LayoutTemplate className="w-4 h-4" />
-                        <span className="hidden md:inline">{currentPaper?.label ?? 'Şablon'}</span>
+                        <span className="hidden md:inline">
+                            {currentPaper?.label ?? 'Şablon'}
+                            {pageSize !== 'free' && currentPageSize
+                                ? ` · ${currentPageSize.label}`
+                                : ''}
+                        </span>
                         <ChevronDown className="w-3.5 h-3.5 opacity-70" />
                     </button>
 
@@ -874,6 +896,39 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                                 aria-label="Sayfa şablonu"
                                 className="absolute left-0 top-[calc(100%+8px)] z-[9200] w-[268px] max-h-[70vh] overflow-y-auto bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2"
                             >
+                                {/* Sayfa ölçüsü: şablonla aynı menüde durur,
+                                    ikisi birlikte sayfanın görünümünü belirler. */}
+                                <div className="mb-2">
+                                    <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                                        Sayfa Boyutu
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-1">
+                                        {PAGE_SIZES.map((size) => (
+                                            <button
+                                                key={size.id}
+                                                role="menuitemradio"
+                                                aria-checked={pageSize === size.id}
+                                                title={size.hint}
+                                                onClick={() => {
+                                                    changePageSize(size.id);
+                                                    setShowPaperMenu(false);
+                                                }}
+                                                className={cn(
+                                                    'px-2 py-1.5 rounded-lg text-left transition-colors border',
+                                                    pageSize === size.id
+                                                        ? 'bg-primary/10 border-primary/40'
+                                                        : 'border-transparent hover:bg-surface-container-high'
+                                                )}
+                                            >
+                                                <span className="block text-[12px] font-bold leading-tight">
+                                                    {size.label}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="h-px bg-outline-variant my-2" />
+                                </div>
+
                                 {PAPER_GROUPS.map((group) => (
                                     <div key={group.label} className="mb-1.5 last:mb-0">
                                         <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
@@ -1124,7 +1179,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     boxesByPage={boxesByPage}
                     paper={paper}
                     bgColor={bgColor}
-                    canvasSize={canvasSize}
+                    canvasSize={pageBox ?? canvasSize}
                     current={pageInfo.current}
                     pdfId={notebook.pdf_id}
                     onSelect={(i) => canvasRef.current?.goToPage(i)}
@@ -1135,10 +1190,32 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 />
 
                 <div className="flex-1 min-w-0 relative overflow-hidden">
-                <div
-                    className="absolute inset-0"
-                    style={paperBackground(paper, bgColor, view, canvasSize)}
-                />
+                {/* Kağıt katmanı. Sayfa ölçüsü tanımlıysa desen ekranın değil
+                    SAYFANIN kutusuna oturur: Cornell, soru/cevap ve deney
+                    raporu gibi bölmeli şablonlar artık yakınlaştırınca da
+                    içerikle birlikte hareket eder. */}
+                {pageBox ? (
+                    <div
+                        className="absolute shadow-[0_8px_30px_rgba(15,23,42,0.18)] ring-1 ring-black/10"
+                        style={{
+                            left: view.tx,
+                            top: view.ty,
+                            width: pageBox.w * view.scale,
+                            height: pageBox.h * view.scale,
+                            ...paperBackground(
+                                paper,
+                                bgColor,
+                                { scale: view.scale, tx: 0, ty: 0 },
+                                pageBox
+                            ),
+                        }}
+                    />
+                ) : (
+                    <div
+                        className="absolute inset-0"
+                        style={paperBackground(paper, bgColor, view, canvasSize)}
+                    />
+                )}
 
                 {/* GoodNotes Tarzı Doğrudan PDF Sayfası */}
                 {notebook.pdf_id && (
@@ -1174,6 +1251,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             }
                             onPageChange={(current, total) => setPageInfo({ current, total })}
                             panMode="viewport"
+                            pageSize={pageSize}
                             onViewChange={handleViewChange}
                             onRequestText={() =>
                                 prompt({
@@ -1266,6 +1344,9 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 onZoomIn={() => canvasRef.current?.zoomBy(1.25)}
                 onZoomOut={() => canvasRef.current?.zoomBy(0.8)}
                 onZoomReset={() => canvasRef.current?.resetView()}
+                onZoomFit={
+                    pageBox ? () => canvasRef.current?.fitPage() : undefined
+                }
                 onSelectTool={handleSelectTool}
             />
             )}

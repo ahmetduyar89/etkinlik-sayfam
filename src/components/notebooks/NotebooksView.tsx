@@ -241,6 +241,9 @@ export function NotebooksView() {
                 kind,
                 parent_id: currentFolderId,
                 paper: isWb ? 'blank' : 'grid',
+                // Yeni defterler A4 yatay başlar: hem çıktıya hem tahtanın
+                // oranına yakın. Eski defterler sınırsız kalır.
+                page_size: 'a4l',
                 bg_color: '#ffffff',
                 page_count: 1,
                 updated_at: new Date().toISOString(),

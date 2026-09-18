@@ -463,6 +463,8 @@ export interface DrawingCanvasHandle {
     zoomBy: (factor: number) => void;
     /** Yakınlaştırmayı %100'e döndürür ve kaydırmayı sıfırlar. */
     resetView: () => void;
+    /** Görünümü sayfanın tamamı görünecek şekilde ayarlar. */
+    fitPage: () => void;
     getView: () => Viewport;
     deleteSelected: () => void;
     setSelectedColor: (color: string) => void;
@@ -532,6 +534,15 @@ export interface ToastMessage {
 // ── Defter / Klasör (Not Defteri modülü) ────────────────────────────────
 export type NotebookKind = 'notebook' | 'whiteboard';
 
+/**
+ * Sayfa boyutu.
+ *
+ * `free` eski davranıştır: sayfanın sınırı yoktur, çizim her yere yayılır.
+ * Diğerleri gerçek kağıt ölçüleridir; dışa aktarma ve şablon bölmeleri bu
+ * dikdörtgene göre hizalanır.
+ */
+export type PageSize = 'free' | 'a4p' | 'a4l' | 'a3p' | 'a3l' | 'wide169';
+
 export type PaperStyle =
     | 'grid'
     | 'lined'
@@ -565,6 +576,8 @@ export interface Notebook {
     kind: NotebookKind;
     parent_id: string | null;
     paper: PaperStyle;
+    /** Sayfa boyutu (A4, A3…). Verilmezse sınırsız çalışma alanı. */
+    page_size?: PageSize;
     bg_color?: string;
     page_count?: number;
     subject?: string;
