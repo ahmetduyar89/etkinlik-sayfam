@@ -354,6 +354,7 @@
 
     function getAudio() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
       return audioCtx;
     }
 
