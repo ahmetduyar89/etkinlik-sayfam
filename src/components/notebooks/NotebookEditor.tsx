@@ -255,9 +255,14 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             setPageInfo({ current: 0, total: pages.length });
             setIsLoading(false);
             // Sayfa ölçüsü tanımlıysa defter açılırken sayfanın tamamı
-            // görünsün; yakınlaştırma yine serbesttir.
+            // görünsün; yakınlaştırma yine serbesttir. PDF bağlı defterlerde
+            // ölçü PDF'ten gelir; kutusu olmayan eski defterlerde görünüme
+            // hiç dokunulmaz (eskiden olduğu gibi açılır).
+            const openBox = notebook.pdf_id
+                ? notebook.pdf_box ?? null
+                : pageDims(notebook.page_size);
             window.setTimeout(() => {
-                if (pageDims(notebook.page_size)) canvasRef.current?.fitPage();
+                if (openBox) canvasRef.current?.fitPage();
             }, 80);
         })();
         return () => {
@@ -810,8 +815,11 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const currentPaper = PAPER_STYLES.find((p) => p.id === paper);
     const currentPageSize = PAGE_SIZES.find((p) => p.id === pageSize);
     // Sayfa kutusu: PDF bağlıysa PDF sayfası, değilse seçilen kağıt ölçüsü.
-    const pdfBox = notebook.pdf_id ? notebook.pdf_box ?? null : null;
-    const pageBox = pdfBox ?? pageDims(pageSize);
+    const hasPdf = !!notebook.pdf_id;
+    const pdfBox = hasPdf ? notebook.pdf_box ?? null : null;
+    // PDF bağlı defterlerde sayfayı PDF belirler; kağıt ölçüsü uygulanmaz.
+    // Eski defterlerde PDF kutusu kayıtlı olmadığı için sayfa sınırı çizilmez.
+    const pageBox = hasPdf ? pdfBox : pageDims(pageSize);
 
     const changePaper = (next: PaperStyle) => {
         setPaper(next);
@@ -909,15 +917,17 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                                     <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
                                         Sayfa Boyutu
                                     </p>
-                                    {pdfBox && (
+                                    {hasPdf && (
                                         <p className="px-2 pb-1.5 text-[11px] text-on-surface-variant leading-tight">
-                                            Bu defterde sayfa, bağlı PDF sayfasının ölçüsündedir.
+                                            {pdfBox
+                                                ? 'Bu defterde sayfa, bağlı PDF sayfasının ölçüsündedir.'
+                                                : 'PDF bağlı eski defter: sayfa ölçüsü PDF yerleşiminden gelir.'}
                                         </p>
                                     )}
                                     <div
                                         className={cn(
                                             'grid grid-cols-2 gap-1',
-                                            pdfBox && 'opacity-40 pointer-events-none'
+                                            hasPdf && 'opacity-40 pointer-events-none'
                                         )}
                                     >
                                         {PAGE_SIZES.map((size) => (
