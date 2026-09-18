@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
   <title>Matematiksel Akıl Oyunları | Atölye</title>
-  <meta name="description" content="10 Matematiksel zeka oyunu: Hanoi Kuleleri, KenKen, Nim, Euler Köprüleri, 24 Oyunu, Sihirli Piramit, Untangle, Sihirli Kareler, Chomp ve Monty Hall.">
+  <meta name="description" content="17 Matematiksel akıl oyunu: Hanoi Kuleleri, KenKen, Nim, Euler Köprüleri, 24 Oyunu, Sihirli Piramit, Untangle, Sihirli Kareler, Chomp, Monty Hall, Kakuro, Kripto-Aritmetik, Dört Renk Harita, Lazer & Aynalar, Pentomino, Hex Oyunu ve Hashiwokakero.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%238b5cf6'/><path d='M30 45 L50 25 L70 45 L50 65 Z' fill='%23fbbf24'/><circle cx='50' cy='50' r='8' fill='%23ffffff'/></svg>">
 
   <script src="https://cdn.tailwindcss.com"></script>
@@ -111,15 +111,15 @@
   <div class="px-4 py-2 bg-[#0c1220] border-b border-white/5 overflow-x-auto">
     <div class="flex items-center gap-1.5 min-w-max mx-auto max-w-6xl">
       <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Kategori:</span>
-      <button onclick="filterCategory('all')" id="cat-all" class="cat-pill active px-3 py-1 rounded-lg text-xs font-bold text-purple-300 bg-purple-500/20 border border-purple-400/40">🌟 Tümü (10)</button>
-      <button onclick="filterCategory('numbers')" id="cat-numbers" class="cat-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5">🔢 Sayılar & Aritmetik</button>
-      <button onclick="filterCategory('geometry')" id="cat-geometry" class="cat-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5">📐 Geometri & Çizgeler</button>
-      <button onclick="filterCategory('strategy')" id="cat-strategy" class="cat-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5">⚔️ Strateji & Zeka</button>
-      <button onclick="filterCategory('probability')" id="cat-probability" class="cat-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5">🎲 Olasılık & Mantık</button>
+      <button onclick="filterCategory('all')" id="cat-all" class="cat-pill active px-3 py-1 rounded-lg text-xs font-bold text-purple-300 bg-purple-500/20 border border-purple-400/40">🌟 Tümü (17)</button>
+      <button onclick="filterCategory('numbers')" id="cat-numbers" class="cat-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5">🔢 Sayılar & Aritmetik (6)</button>
+      <button onclick="filterCategory('geometry')" id="cat-geometry" class="cat-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5">📐 Geometri & Çizgeler (6)</button>
+      <button onclick="filterCategory('strategy')" id="cat-strategy" class="cat-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5">⚔️ Strateji & Zeka (4)</button>
+      <button onclick="filterCategory('probability')" id="cat-probability" class="cat-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5">🎲 Olasılık & Mantık (1)</button>
     </div>
   </div>
 
-  <!-- GAME SELECTOR TABS (10 GAMES) -->
+  <!-- GAME SELECTOR TABS (17 GAMES) -->
   <nav class="px-4 py-2.5 sm:px-6 bg-[#0f172a]/60 border-b border-white/5 overflow-x-auto">
     <div class="flex items-center gap-2 min-w-max mx-auto max-w-6xl" id="games-tabs-container">
       <button onclick="switchGame('hanoi')" id="tab-hanoi" data-category="strategy" class="game-tab active flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-purple-300 bg-purple-500/20 border border-purple-400/40">
@@ -151,6 +151,27 @@
       </button>
       <button onclick="switchGame('montyhall')" id="tab-montyhall" data-category="probability" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
         <span>🚪</span><span>Monty Hall (3 Kapı)</span>
+      </button>
+      <button onclick="switchGame('kakuro')" id="tab-kakuro" data-category="numbers" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>🧩</span><span>Kakuro</span>
+      </button>
+      <button onclick="switchGame('cryptarithm')" id="tab-cryptarithm" data-category="numbers" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>🔤</span><span>Kripto-Aritmetik</span>
+      </button>
+      <button onclick="switchGame('fourcolor')" id="tab-fourcolor" data-category="geometry" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>🗺️</span><span>Dört Renk Harita</span>
+      </button>
+      <button onclick="switchGame('laser')" id="tab-laser" data-category="geometry" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>⚡</span><span>Lazer & Aynalar</span>
+      </button>
+      <button onclick="switchGame('pentomino')" id="tab-pentomino" data-category="geometry" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>📐</span><span>Pentomino</span>
+      </button>
+      <button onclick="switchGame('hex')" id="tab-hex" data-category="strategy" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>🔷</span><span>Hex Oyunu</span>
+      </button>
+      <button onclick="switchGame('hashi')" id="tab-hashi" data-category="geometry" class="game-tab flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+        <span>🏝️</span><span>Hashi (Köprüler)</span>
       </button>
     </div>
   </nav>
@@ -498,6 +519,367 @@
       </div>
     </section>
 
+  <!-- 11. KAKURO -->
+    <section id="game-kakuro" class="game-section w-full hidden flex-col items-center gap-5">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🧩</span> Kakuro (Çapraz Toplamlar)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Sayı bulmacasında ipucu hücrelerindeki toplamları 1-9 rakamlarını tekrarsız kullanarak sağlayın.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
+            <span class="text-slate-400 pl-2">Zorluk:</span>
+            <select id="kakuro-level" onchange="resetKakuro()" class="bg-transparent text-white font-semibold pr-2 focus:outline-none cursor-pointer">
+              <option value="0" class="bg-slate-900">Kolay (4x4)</option>
+              <option value="1" class="bg-slate-900">Orta (5x5)</option>
+              <option value="2" class="bg-slate-900">Zor (5x5)</option>
+            </select>
+          </div>
+          <button onclick="hintKakuro()" class="h-8 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shadow-md">💡 İpucu</button>
+          <button onclick="resetKakuro()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">🔄 Sıfırla</button>
+        </div>
+      </div>
+
+      <div class="glass-panel p-6 rounded-3xl flex flex-col items-center gap-5 w-full max-w-xl">
+        <!-- Kakuro Grid -->
+        <div id="kakuro-board" class="grid gap-1.5 p-3 rounded-2xl bg-slate-900/80 border border-white/10 select-none">
+          <!-- Rendered dynamically -->
+        </div>
+
+        <!-- Virtual Keypad -->
+        <div class="flex flex-wrap items-center justify-center gap-2 w-full max-w-md">
+          <button onclick="inputKakuroDigit(1)" class="w-10 h-10 rounded-xl glass-card text-sm font-bold text-white hover:bg-purple-500/30 active:scale-95 transition">1</button>
+          <button onclick="inputKakuroDigit(2)" class="w-10 h-10 rounded-xl glass-card text-sm font-bold text-white hover:bg-purple-500/30 active:scale-95 transition">2</button>
+          <button onclick="inputKakuroDigit(3)" class="w-10 h-10 rounded-xl glass-card text-sm font-bold text-white hover:bg-purple-500/30 active:scale-95 transition">3</button>
+          <button onclick="inputKakuroDigit(4)" class="w-10 h-10 rounded-xl glass-card text-sm font-bold text-white hover:bg-purple-500/30 active:scale-95 transition">4</button>
+          <button onclick="inputKakuroDigit(5)" class="w-10 h-10 rounded-xl glass-card text-sm font-bold text-white hover:bg-purple-500/30 active:scale-95 transition">5</button>
+          <button onclick="inputKakuroDigit(6)" class="w-10 h-10 rounded-xl glass-card text-sm font-bold text-white hover:bg-purple-500/30 active:scale-95 transition">6</button>
+          <button onclick="inputKakuroDigit(7)" class="w-10 h-10 rounded-xl glass-card text-sm font-bold text-white hover:bg-purple-500/30 active:scale-95 transition">7</button>
+          <button onclick="inputKakuroDigit(8)" class="w-10 h-10 rounded-xl glass-card text-sm font-bold text-white hover:bg-purple-500/30 active:scale-95 transition">8</button>
+          <button onclick="inputKakuroDigit(9)" class="w-10 h-10 rounded-xl glass-card text-sm font-bold text-white hover:bg-purple-500/30 active:scale-95 transition">9</button>
+          <button onclick="inputKakuroDigit(0)" class="px-3 h-10 rounded-xl bg-rose-500/20 border border-rose-400/30 text-rose-300 text-xs font-bold hover:bg-rose-500/30 active:scale-95 transition">⌫ Sil</button>
+        </div>
+
+        <div id="kakuro-status" class="text-xs font-semibold text-slate-400 text-center">Bir beyaz hücre seçin ve rakam girin.</div>
+      </div>
+
+      <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
+        <span class="text-xl">💡</span>
+        <div><strong class="text-white">Matematiksel Sırrı (Tam Sayı Parçalanışları & Kombinatorik):</strong> Kakuro, sayıların tekrarsız toplamları üzerine kuruludur. Örneğin 2 hücrede 16 toplamı yalnızca (7+9), 3 hücrede 24 toplamı ise yalnızca (7+8+9) kombinasyonuyla yazılabilir. Bu kural çözümü doğrudan kısıtlayarak mantıksal bir algoritma oluşturur.</div>
+      </div>
+    </section>
+
+    <!-- 12. KRİPTO-ARİTMETİK -->
+    <section id="game-cryptarithm" class="game-section w-full hidden flex-col items-center gap-5">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🔤</span> Kripto-Aritmetik (Alfamatik)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Her harf 0-9 arası farklı bir rakamı temsil eder. Baş harfler 0 olamaz. Eşitliği sağlayın!</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
+            <span class="text-slate-400 pl-2">Bulmaca:</span>
+            <select id="crypt-select" onchange="resetCryptarithm()" class="bg-transparent text-white font-semibold pr-2 focus:outline-none cursor-pointer">
+              <option value="0" class="bg-slate-900">SEND + MORE = MONEY</option>
+              <option value="1" class="bg-slate-900">TWO + TWO = FOUR</option>
+              <option value="2" class="bg-slate-900">BASE + BALL = GAMES</option>
+              <option value="3" class="bg-slate-900">KARA + TREN = DUMAN</option>
+            </select>
+          </div>
+          <button onclick="hintCryptarithm()" class="h-8 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shadow-md">💡 İpucu</button>
+          <button onclick="solveCryptarithm()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">Çözümü Göster</button>
+          <button onclick="resetCryptarithm()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">🔄 Sıfırla</button>
+        </div>
+      </div>
+
+      <div class="glass-panel p-6 rounded-3xl flex flex-col items-center gap-6 w-full max-w-xl">
+        <!-- Vertical equation board -->
+        <div id="crypt-equation-display" class="font-mono flex flex-col items-end gap-1.5 p-6 rounded-2xl bg-slate-900/80 border border-white/10 text-xl sm:text-2xl font-black tracking-widest text-white select-none">
+          <!-- Formatted addition lines -->
+        </div>
+
+        <!-- Live evaluation pill -->
+        <div id="crypt-eval-banner" class="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-slate-800 border border-white/10 text-slate-300">
+          Atanan harfler: 0 / 8
+        </div>
+
+        <!-- Letters and Assigned Digits Mapping Chips -->
+        <div class="w-full flex flex-col items-center gap-3">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Harf Atamaları (Tıkla ve Rakam Seç)</div>
+          <div id="crypt-letters-rack" class="flex flex-wrap items-center justify-center gap-2">
+            <!-- Dynamic chips for each letter -->
+          </div>
+        </div>
+
+        <!-- Digit picker palette -->
+        <div id="crypt-digit-picker" class="hidden flex flex-wrap items-center justify-center gap-1.5 p-3 rounded-2xl bg-slate-900/90 border border-purple-500/30">
+          <span class="text-xs font-bold text-purple-300 w-full text-center mb-1" id="crypt-picker-title">Harf için Rakam Seçin:</span>
+          <div class="flex flex-wrap items-center justify-center gap-1.5">
+            <button onclick="assignCryptDigit(0)" class="w-8 h-8 rounded-lg glass-card text-xs font-bold text-white hover:bg-purple-500/40">0</button>
+            <button onclick="assignCryptDigit(1)" class="w-8 h-8 rounded-lg glass-card text-xs font-bold text-white hover:bg-purple-500/40">1</button>
+            <button onclick="assignCryptDigit(2)" class="w-8 h-8 rounded-lg glass-card text-xs font-bold text-white hover:bg-purple-500/40">2</button>
+            <button onclick="assignCryptDigit(3)" class="w-8 h-8 rounded-lg glass-card text-xs font-bold text-white hover:bg-purple-500/40">3</button>
+            <button onclick="assignCryptDigit(4)" class="w-8 h-8 rounded-lg glass-card text-xs font-bold text-white hover:bg-purple-500/40">4</button>
+            <button onclick="assignCryptDigit(5)" class="w-8 h-8 rounded-lg glass-card text-xs font-bold text-white hover:bg-purple-500/40">5</button>
+            <button onclick="assignCryptDigit(6)" class="w-8 h-8 rounded-lg glass-card text-xs font-bold text-white hover:bg-purple-500/40">6</button>
+            <button onclick="assignCryptDigit(7)" class="w-8 h-8 rounded-lg glass-card text-xs font-bold text-white hover:bg-purple-500/40">7</button>
+            <button onclick="assignCryptDigit(8)" class="w-8 h-8 rounded-lg glass-card text-xs font-bold text-white hover:bg-purple-500/40">8</button>
+            <button onclick="assignCryptDigit(9)" class="w-8 h-8 rounded-lg glass-card text-xs font-bold text-white hover:bg-purple-500/40">9</button>
+            <button onclick="assignCryptDigit(null)" class="px-2.5 h-8 rounded-lg bg-rose-500/20 text-rose-300 text-xs font-bold hover:bg-rose-500/30">Kaldır</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
+        <span class="text-xl">💡</span>
+        <div><strong class="text-white">Matematiksel Sırrı (Basamak Değeri & Modüler Aritmetik):</strong> Örneğin <code>SEND + MORE = MONEY</code> bulmacasında iki 4 basamaklı sayının toplamı en fazla 19998 olabilir. Bu nedenle toplamın en solundaki <em>M</em> harfi <strong>kesinlikle 1</strong> olmalıdır! Bu dedüktif mantık adım adım diğer harfleri de çözer.</div>
+      </div>
+    </section>
+
+    <!-- 13. DÖRT RENK HARİTA -->
+    <section id="game-fourcolor" class="game-section w-full hidden flex-col items-center gap-5">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🗺️</span> Dört Renk Harita Boyama</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Sınır komşusu olan hiçbir iki bölge aynı renkte olamaz! En fazla 4 renkle haritayı tamamlayın.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
+            <span class="text-slate-400 pl-2">Harita:</span>
+            <select id="fourcolor-map-select" onchange="resetFourColor()" class="bg-transparent text-white font-semibold pr-2 focus:outline-none cursor-pointer">
+              <option value="turkey" class="bg-slate-900">Türkiye Coğrafi Bölgeleri (7 Bölge)</option>
+              <option value="island" class="bg-slate-900">Adalar & Eyaletler (8 Bölge)</option>
+              <option value="tessellation" class="bg-slate-900">Planar Çizge Ağı (10 Bölge)</option>
+            </select>
+          </div>
+          <button onclick="resetFourColor()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">🔄 Sıfırla</button>
+        </div>
+      </div>
+
+      <div class="glass-panel p-6 rounded-3xl flex flex-col items-center gap-4 w-full max-w-2xl">
+        <!-- Palette selector -->
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-bold text-slate-300">Boya Rengi:</span>
+          <div class="flex items-center gap-2" id="fourcolor-palette">
+            <button onclick="selectColor(1)" id="fcol-1" class="w-9 h-9 rounded-xl bg-rose-500 border-2 border-white shadow-lg flex items-center justify-center text-white text-sm font-black transition active:scale-95">✔</button>
+            <button onclick="selectColor(2)" id="fcol-2" class="w-9 h-9 rounded-xl bg-sky-500 border-2 border-transparent flex items-center justify-center text-white text-sm font-black transition active:scale-95"></button>
+            <button onclick="selectColor(3)" id="fcol-3" class="w-9 h-9 rounded-xl bg-emerald-500 border-2 border-transparent flex items-center justify-center text-white text-sm font-black transition active:scale-95"></button>
+            <button onclick="selectColor(4)" id="fcol-4" class="w-9 h-9 rounded-xl bg-amber-500 border-2 border-transparent flex items-center justify-center text-white text-sm font-black transition active:scale-95"></button>
+          </div>
+        </div>
+
+        <!-- Interactive SVG Map -->
+        <div class="w-full bg-slate-950/60 p-2 sm:p-4 rounded-2xl border border-white/10 flex items-center justify-center overflow-hidden">
+          <svg id="fourcolor-svg" viewBox="0 0 600 360" class="w-full max-h-[360px] drop-shadow-md cursor-pointer select-none">
+            <!-- Polygons/Paths generated by JS -->
+          </svg>
+        </div>
+
+        <!-- Status & Conflict Counter -->
+        <div class="flex flex-wrap items-center justify-between gap-4 w-full text-xs font-bold px-2">
+          <div class="text-slate-300">Boyanan: <span id="fc-painted-count" class="text-purple-400 font-mono text-sm">0/7</span></div>
+          <div id="fc-conflict-badge" class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            ✅ Çakışma Yok: 0
+          </div>
+          <div class="text-slate-300">Kullanılan Renk: <span id="fc-used-colors" class="text-amber-400 font-mono text-sm">0/4</span></div>
+        </div>
+      </div>
+
+      <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
+        <span class="text-xl">💡</span>
+        <div><strong class="text-white">Matematiksel Sırrı (Dört Renk Teoremi - Appel & Haken 1976):</strong> Düzlem üzerindeki herhangi bir haritada, ortak sınıra sahip hiçbir iki komşu bölge aynı renge boyanmayacak şekilde <strong>en fazla 4 renk</strong> yeterlidir! Bu teorem, matematik tarihinde bilgisayar desteğiyle ispatlanan ilk büyük teoremdir.</div>
+      </div>
+    </section>
+
+    <!-- 14. LAZER & AYNALAR -->
+    <section id="game-laser" class="game-section w-full hidden flex-col items-center gap-5">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>⚡</span> Lazer & Aynalar (Optik Bulmaca)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">45° aynaları döndürerek lazer ışınını yönlendirin ve tüm hedef kristalleri aydınlatın.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
+            <span class="text-slate-400 pl-2">Seviye:</span>
+            <select id="laser-level" onchange="resetLaser()" class="bg-transparent text-white font-semibold pr-2 focus:outline-none cursor-pointer">
+              <option value="0" class="bg-slate-900">Seviye 1 (Başlangıç)</option>
+              <option value="1" class="bg-slate-900">Seviye 2 (Çift Yansıma)</option>
+              <option value="2" class="bg-slate-900">Seviye 3 (Engeller & Kristaller)</option>
+            </select>
+          </div>
+          <button onclick="resetLaser()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">🔄 Sıfırla</button>
+        </div>
+      </div>
+
+      <div class="glass-panel p-6 rounded-3xl flex flex-col items-center gap-4 w-full max-w-xl">
+        <!-- Canvas board -->
+        <div class="relative bg-slate-950/80 rounded-2xl p-2 border border-white/10 shadow-2xl flex items-center justify-center">
+          <canvas id="laser-canvas" width="360" height="360" class="cursor-pointer select-none touch-none rounded-xl"></canvas>
+        </div>
+
+        <!-- Legend and mirror cycle hint -->
+        <div class="flex flex-wrap items-center justify-center gap-4 text-xs text-slate-300">
+          <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#38bdf8]"></span> <span>Lazer</span></div>
+          <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b]"></span> <span>Hedef Kristal</span></div>
+          <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-slate-700 border border-white/30 rounded"></span> <span>Engel</span></div>
+          <div class="flex items-center gap-1.5"><span class="text-purple-300 font-bold">Aynalar:</span> <span>Hücreye tıkla ( / veya \ )</span></div>
+        </div>
+
+        <div id="laser-status" class="text-xs font-bold text-sky-400">Hedefler: 0 / 1 Aydınlatıldı</div>
+      </div>
+
+      <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
+        <span class="text-xl">💡</span>
+        <div><strong class="text-white">Matematiksel Sırrı (Yansıma Kanunu & Koordinat Dönüşümleri):</strong> Gelen ışının normalle yaptığı açı, yansıyan ışının normalle yaptığı açıya eşittir (&theta;<sub>i</sub> = &theta;<sub>r</sub>). 45 derecelik bir ayna düzlemde &plusmn;90 derecelik dik dönüşüm matrisi uygular: Yatay gelen (1, 0) vektörü dikey (0, 1) vektörüne dönüşür!</div>
+      </div>
+    </section>
+
+    <!-- 15. PENTOMINO -->
+    <section id="game-pentomino" class="game-section w-full hidden flex-col items-center gap-5">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>📐</span> Pentomino Yerleştirme</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Her biri 5 birim kareden oluşan geometrik blokları tahtaya boşluksuz olarak yerleştirin.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
+            <span class="text-slate-400 pl-2">Bulmaca:</span>
+            <select id="pento-level" onchange="resetPentomino()" class="bg-transparent text-white font-semibold pr-2 focus:outline-none cursor-pointer">
+              <option value="5x5" class="bg-slate-900">5x5 Çerçeve (5 Parça)</option>
+              <option value="6x5" class="bg-slate-900">6x5 Dikdörtgen (6 Parça)</option>
+            </select>
+          </div>
+          <button onclick="solvePentominoHint()" class="h-8 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shadow-md">💡 İpucu</button>
+          <button onclick="resetPentomino()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">🔄 Temizle</button>
+        </div>
+      </div>
+
+      <div class="glass-panel p-6 rounded-3xl flex flex-col items-center gap-5 w-full max-w-2xl">
+        <!-- Active piece transformation bar -->
+        <div class="flex items-center justify-between w-full max-w-md px-2">
+          <div class="text-xs font-bold text-purple-300 flex items-center gap-2">
+            <span>Seçili Parça:</span>
+            <span id="pento-selected-name" class="font-mono text-sm px-2 py-0.5 rounded bg-purple-500/20 text-purple-200">Yok</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="rotatePentomino()" class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1 transition active:scale-95">🔄 Döndür (R)</button>
+            <button onclick="flipPentomino()" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1 transition active:scale-95">🪞 Çevir (F)</button>
+          </div>
+        </div>
+
+        <!-- Pentomino Board -->
+        <div id="pento-grid" class="grid gap-1 p-3 rounded-2xl bg-slate-900/80 border border-white/10 select-none">
+          <!-- Rendered dynamically -->
+        </div>
+
+        <!-- Inventory / Piece Rack -->
+        <div class="w-full flex flex-col items-center gap-2">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Kullanılabilir Parçalar (Seçmek için tıkla)</div>
+          <div id="pento-rack" class="flex flex-wrap items-center justify-center gap-3 p-3 rounded-2xl bg-slate-950/60 border border-white/5 w-full">
+            <!-- Dynamic piece SVG cards -->
+          </div>
+        </div>
+
+        <div id="pento-status" class="text-xs font-semibold text-slate-400 text-center">Bir parça seçin, döndürün ve tahtaya tıklayarak yerleştirin.</div>
+      </div>
+
+      <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
+        <span class="text-xl">💡</span>
+        <div><strong class="text-white">Matematiksel Sırrı (Polinomino Teoremi & Knuth Algoritması X):</strong> 5 eş kareden oluşan düzlemsel şekillere <strong>pentomino</strong> denir ve dönme/yansıma haricinde tam 12 farklı pentomino vardır. Pentominolarla bir alanı kaplamak NP-tam bir kombinatorik problemdir ve Donald Knuth'ın "Dancing Links" algoritmasıyla modellenir.</div>
+      </div>
+    </section>
+
+    <!-- 16. HEX OYUNU -->
+    <section id="game-hex" class="game-section w-full hidden flex-col items-center gap-5">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🔷</span> Hex Oyunu (John Nash)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Kırmızı üst-alt kenarları, Mavi sol-sağ kenarları birbirine bağlamaya çalışır. Beraberlik imkansızdır!</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
+            <span class="text-slate-400 pl-2">Mod:</span>
+            <select id="hex-mode" onchange="resetHex()" class="bg-transparent text-white font-semibold pr-2 focus:outline-none cursor-pointer">
+              <option value="ai" class="bg-slate-900">Oyuncu (Kırmızı) vs AI (Mavi)</option>
+              <option value="pvp" class="bg-slate-900">2 Kişilik (Yerel)</option>
+            </select>
+          </div>
+          <button onclick="resetHex()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">🔄 Yeni Oyun</button>
+        </div>
+      </div>
+
+      <div class="glass-panel p-6 rounded-3xl flex flex-col items-center gap-4 w-full max-w-2xl">
+        <!-- Turn indicator -->
+        <div class="flex items-center justify-between w-full max-w-md px-2">
+          <div id="hex-turn-indicator" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 font-bold text-xs">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+            <span>Sıra: Kırmızı (Kuzey ↕ Güney)</span>
+          </div>
+          <div class="text-xs text-slate-400">Tahta: 7x7 Eşkenar Dörtgen</div>
+        </div>
+
+        <!-- Hexagonal SVG Board -->
+        <div class="w-full flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 rounded-2xl border border-white/10 overflow-hidden">
+          <svg id="hex-svg" viewBox="0 0 540 380" class="w-full max-w-[520px] select-none cursor-pointer">
+            <!-- Hexagons rendered dynamically -->
+          </svg>
+        </div>
+
+        <div id="hex-status-msg" class="text-xs font-bold text-slate-300 text-center">
+          Kırmızı oyuncu yukarıdan aşağıya kesintisiz bir hat oluşturmalıdır.
+        </div>
+      </div>
+
+      <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
+        <span class="text-xl">💡</span>
+        <div><strong class="text-white">Matematiksel Sırrı (Brouwer Sabit Nokta Teoremi & Oyun Teorisi):</strong> Nobel ödüllü matematikçi John Nash tarafından bağımsız olarak keşfedilen Hex oyununda <strong>beraberlik asla mümkün değildir!</strong> Tahta tamamen dolduğunda oyunculardan kesinlikle biri iki kenarı bağlamış olur. Ayrıca Nash'in "Strateji Çalma" argümanı ilk başlayan oyuncunun her zaman bir kazanma stratejisi olduğunu kanıtlar.</div>
+      </div>
+    </section>
+
+    <!-- 17. HASHİWOKAKERO -->
+    <section id="game-hashi" class="game-section w-full hidden flex-col items-center gap-5">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-4 rounded-2xl">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🏝️</span> Hashiwokakero (Adalar & Köprüler)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Adaları yatay/dikey köprülerle birleştirin. Her adanın sayısı kadar köprüsü olmalı ve tüm ağ birbirine bağlanmalıdır.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-white/10 text-xs">
+            <span class="text-slate-400 pl-2">Seviye:</span>
+            <select id="hashi-level" onchange="resetHashi()" class="bg-transparent text-white font-semibold pr-2 focus:outline-none cursor-pointer">
+              <option value="0" class="bg-slate-900">Kolay (6 Ada)</option>
+              <option value="1" class="bg-slate-900">Orta (6 Ada / Çift Köprü)</option>
+              <option value="2" class="bg-slate-900">Zor (8 Ada)</option>
+            </select>
+          </div>
+          <button onclick="hintHashi()" class="h-8 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shadow-md">💡 İpucu</button>
+          <button onclick="resetHashi()" class="h-8 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">🔄 Sıfırla</button>
+        </div>
+      </div>
+
+      <div class="glass-panel p-6 rounded-3xl flex flex-col items-center gap-4 w-full max-w-xl">
+        <!-- Hashi Board (SVG for clean interactive lines and island nodes) -->
+        <div class="relative bg-slate-950/80 rounded-2xl p-2 border border-white/10 shadow-2xl flex items-center justify-center w-full">
+          <svg id="hashi-svg" viewBox="0 0 380 380" class="w-full max-w-[360px] h-[360px] cursor-pointer select-none touch-none">
+            <!-- Bridges and Islands rendered dynamically -->
+          </svg>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-center gap-4 text-xs text-slate-300">
+          <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> <span>Gereksinim Tamamlandı</span></div>
+          <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-slate-800 border border-white/40"></span> <span>Köprü Bekliyor</span></div>
+          <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-rose-500"></span> <span>Fazla Köprü!</span></div>
+        </div>
+
+        <div id="hashi-status" class="text-xs font-bold text-sky-400 text-center">İki ada arasına tıklayarak köprü kurun (Tek, Çift veya Kaldır).</div>
+      </div>
+
+      <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3">
+        <span class="text-xl">💡</span>
+        <div><strong class="text-white">Matematiksel Sırrı (Çizge Teorisi & El Sıkışma Teoremi):</strong> Hashi bulmacasında adalar düğümleri (köşe), köprüler ise kenarları temsil eder. Euler'in el sıkışma teoremine göre tüm adaların dereceleri toplamı köprü sayısının tam 2 katıdır (&sum; deg(v) = 2|E|). Ayrıca bulmacanın çözümü, tüm adaları kapsayan tek bir bağlantılı düzlemsel çizge oluşturmalıdır.</div>
+      </div>
+    </section>
+
   </main>
 
   <!-- SCRIPTS FOR SOUND, TABS & GAME LOGIC -->
@@ -594,6 +976,9 @@
 
       if (gameId === 'euler') drawEuler();
       if (gameId === 'untangle') drawUntangle();
+      if (gameId === 'laser') drawLaser();
+      if (gameId === 'hashi') drawHashi();
+      if (gameId === 'fourcolor') renderFourColorMap();
     }
 
     /* ─────────────────────────────────────────────────────────────
@@ -1789,6 +2174,1703 @@
     }
 
     /* INITIALIZE */
+    /* ─────────────────────────────────────────────────────────────
+       11. KAKURO LOGIC
+       ───────────────────────────────────────────────────────────── */
+    const kakuroPuzzles = [
+      {
+        size: 4,
+        cells: [
+          [{t:'b'}, {t:'c', d:4}, {t:'c', d:6}, {t:'b'}],
+          [{t:'c', a:3}, {t:'p', ans:1}, {t:'p', ans:2}, {t:'b'}],
+          [{t:'c', a:7}, {t:'p', ans:3}, {t:'p', ans:4}, {t:'b'}],
+          [{t:'b'}, {t:'b'}, {t:'b'}, {t:'b'}]
+        ]
+      },
+      {
+        size: 5,
+        cells: [
+          [{t:'b'}, {t:'c', d:5}, {t:'c', d:6}, {t:'b'}, {t:'b'}],
+          [{t:'c', a:4}, {t:'p', ans:1}, {t:'p', ans:3}, {t:'c', d:10}, {t:'b'}],
+          [{t:'c', a:7}, {t:'p', ans:4}, {t:'p', ans:1}, {t:'p', ans:2}, {t:'c', d:5}],
+          [{t:'b'}, {t:'b'}, {t:'c', a:10}, {t:'p', ans:2}, {t:'p', ans:7}, {t:'p', ans:1}],
+          [{t:'b'}, {t:'b'}, {t:'b'}, {t:'c', a:5}, {t:'p', ans:1}, {t:'p', ans:4}]
+        ]
+      },
+      {
+        size: 5,
+        cells: [
+          [{t:'b'}, {t:'c', d:17}, {t:'c', d:24}, {t:'b'}, {t:'b'}],
+          [{t:'c', a:16}, {t:'p', ans:9}, {t:'p', ans:7}, {t:'c', d:23}, {t:'b'}],
+          [{t:'c', a:23}, {t:'p', ans:8}, {t:'p', ans:9}, {t:'p', ans:6}, {t:'c', d:16}],
+          [{t:'b'}, {t:'b'}, {t:'c', a:24}, {t:'p', ans:8}, {t:'p', ans:9}, {t:'p', ans:7}],
+          [{t:'b'}, {t:'b'}, {t:'b'}, {t:'c', a:17}, {t:'p', ans:8}, {t:'p', ans:9}]
+        ]
+      }
+    ];
+
+    let kakuroCurrentBoard = [];
+    let kakuroSelectedCell = null;
+    let kakuroWon = false;
+
+    function resetKakuro() {
+      kakuroWon = false;
+      kakuroSelectedCell = null;
+      const lvl = parseInt(document.getElementById('kakuro-level').value) || 0;
+      const tmpl = kakuroPuzzles[lvl];
+      const sz = tmpl.size;
+
+      kakuroCurrentBoard = [];
+      for (let r = 0; r < sz; r++) {
+        const row = [];
+        for (let c = 0; c < sz; c++) {
+          const orig = tmpl.cells[r][c] || {t:'b'};
+          const copy = { ...orig };
+          if (copy.t === 'p') copy.val = 0;
+          row.push(copy);
+        }
+        kakuroCurrentBoard.push(row);
+      }
+
+      document.getElementById('kakuro-status').innerText = 'Bir beyaz hücre seçin ve rakam girin.';
+      renderKakuroBoard();
+    }
+
+    function renderKakuroBoard() {
+      const container = document.getElementById('kakuro-board');
+      container.innerHTML = '';
+      const sz = kakuroCurrentBoard.length;
+      container.style.gridTemplateColumns = `repeat(${sz}, minmax(0, 1fr))`;
+
+      const runs = getKakuroRuns();
+
+      for (let r = 0; r < sz; r++) {
+        for (let c = 0; c < sz; c++) {
+          const cell = kakuroCurrentBoard[r][c];
+          const div = document.createElement('div');
+          div.className = 'w-11 h-11 sm:w-13 sm:h-13 rounded-xl flex items-center justify-center font-bold relative transition-all text-sm select-none';
+
+          if (cell.t === 'b') {
+            div.className += ' bg-slate-950/80 border border-white/5 text-slate-700';
+          } else if (cell.t === 'c') {
+            div.className += ' bg-slate-900 border border-purple-500/20 text-[10px] overflow-hidden';
+            let html = '<svg class="absolute inset-0 w-full h-full stroke-slate-700" stroke-width="1"><line x1="0" y1="0" x2="100%" y2="100%" /></svg>';
+            if (cell.d) {
+              html += `<span class="absolute bottom-1 left-1.5 font-bold text-sky-400 z-10">${cell.d}</span>`;
+            }
+            if (cell.a) {
+              html += `<span class="absolute top-1 right-1.5 font-bold text-amber-400 z-10">${cell.a}</span>`;
+            }
+            div.innerHTML = html;
+          } else if (cell.t === 'p') {
+            const isSelected = kakuroSelectedCell && kakuroSelectedCell.r === r && kakuroSelectedCell.c === c;
+            const hasErr = isKakuroCellError(r, c, runs);
+
+            if (isSelected) {
+              div.className += ' bg-purple-500/30 border-2 border-purple-400 text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]';
+            } else if (hasErr) {
+              div.className += ' bg-rose-500/20 border border-rose-400/60 text-rose-300';
+            } else if (cell.val > 0) {
+              div.className += ' bg-slate-800/90 border border-white/20 text-sky-300 shadow-sm';
+            } else {
+              div.className += ' bg-slate-800/40 border border-white/10 hover:border-white/30 text-white cursor-pointer';
+            }
+
+            div.innerText = cell.val > 0 ? cell.val : '';
+            div.onclick = () => selectKakuroCell(r, c);
+          }
+
+          container.appendChild(div);
+        }
+      }
+    }
+
+    function selectKakuroCell(r, c) {
+      if (kakuroWon) return;
+      kakuroSelectedCell = { r, c };
+      playTone(450, 0.05);
+      renderKakuroBoard();
+    }
+
+    function inputKakuroDigit(digit) {
+      if (!kakuroSelectedCell || kakuroWon) return;
+      const { r, c } = kakuroSelectedCell;
+      const cell = kakuroCurrentBoard[r][c];
+      if (cell.t !== 'p') return;
+
+      cell.val = digit;
+      playTone(digit > 0 ? 300 + digit * 40 : 250, 0.08);
+      renderKakuroBoard();
+      checkKakuroCompletion();
+    }
+
+    function getKakuroRuns() {
+      const runs = [];
+      const sz = kakuroCurrentBoard.length;
+
+      // Across runs
+      for (let r = 0; r < sz; r++) {
+        for (let c = 0; c < sz; c++) {
+          const cell = kakuroCurrentBoard[r][c];
+          if (cell.t === 'c' && cell.a) {
+            const runCells = [];
+            let cc = c + 1;
+            while (cc < sz && kakuroCurrentBoard[r][cc].t === 'p') {
+              runCells.push({ r, c: cc, val: kakuroCurrentBoard[r][cc].val });
+              cc++;
+            }
+            if (runCells.length > 0) {
+              runs.push({ type: 'across', clueR: r, clueC: c, target: cell.a, cells: runCells });
+            }
+          }
+        }
+      }
+
+      // Down runs
+      for (let r = 0; r < sz; r++) {
+        for (let c = 0; c < sz; c++) {
+          const cell = kakuroCurrentBoard[r][c];
+          if (cell.t === 'c' && cell.d) {
+            const runCells = [];
+            let rr = r + 1;
+            while (rr < sz && kakuroCurrentBoard[rr][c].t === 'p') {
+              runCells.push({ r: rr, c, val: kakuroCurrentBoard[rr][c].val });
+              rr++;
+            }
+            if (runCells.length > 0) {
+              runs.push({ type: 'down', clueR: r, clueC: c, target: cell.d, cells: runCells });
+            }
+          }
+        }
+      }
+
+      return runs;
+    }
+
+    function isKakuroCellError(r, c, runs) {
+      const cell = kakuroCurrentBoard[r][c];
+      if (!cell || cell.val === 0) return false;
+
+      for (const run of runs) {
+        const inRun = run.cells.some(rc => rc.r === r && rc.c === c);
+        if (inRun) {
+          // Check duplicates in run
+          const nonZeros = run.cells.map(rc => rc.val).filter(v => v > 0);
+          const duplicates = nonZeros.filter((item, index) => nonZeros.indexOf(item) !== index);
+          if (duplicates.includes(cell.val)) return true;
+
+          // Check sum exceeded
+          const curSum = nonZeros.reduce((a, b) => a + b, 0);
+          if (curSum > run.target) return true;
+        }
+      }
+      return false;
+    }
+
+    function checkKakuroCompletion() {
+      const runs = getKakuroRuns();
+      let allFilled = true;
+      let allValid = true;
+
+      for (const run of runs) {
+        const values = run.cells.map(rc => rc.val);
+        if (values.some(v => v === 0)) {
+          allFilled = false;
+          continue;
+        }
+
+        const sum = values.reduce((a, b) => a + b, 0);
+        const unique = new Set(values).size === values.length;
+        if (sum !== run.target || !unique) {
+          allValid = false;
+        }
+      }
+
+      if (allFilled && allValid) {
+        kakuroWon = true;
+        document.getElementById('kakuro-status').innerHTML = '🎉 <strong>TEBRİKLER! Kakuro Bulmacasını Kusursuz Çözdünüz!</strong>';
+        playSuccessFanfare();
+        triggerConfetti();
+      } else if (allFilled) {
+        document.getElementById('kakuro-status').innerText = 'Hücreler dolu ancak bazı toplamlar veya tekrarlar hatalı!';
+      }
+    }
+
+    function hintKakuro() {
+      if (kakuroWon) return;
+      const sz = kakuroCurrentBoard.length;
+      const candidates = [];
+      for (let r = 0; r < sz; r++) {
+        for (let c = 0; c < sz; c++) {
+          const cell = kakuroCurrentBoard[r][c];
+          if (cell.t === 'p' && (cell.val === 0 || cell.val !== cell.ans)) {
+            candidates.push({ r, c, ans: cell.ans });
+          }
+        }
+      }
+
+      if (candidates.length > 0) {
+        const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+        kakuroCurrentBoard[chosen.r][chosen.c].val = chosen.ans;
+        kakuroSelectedCell = { r: chosen.r, c: chosen.c };
+        playTone(600, 0.12);
+        renderKakuroBoard();
+        checkKakuroCompletion();
+      }
+    }
+
+    // Keyboard support for Kakuro
+    window.addEventListener('keydown', (e) => {
+      const kakuroSec = document.getElementById('game-kakuro');
+      if (!kakuroSec || kakuroSec.classList.contains('hidden')) return;
+
+      if (e.key >= '1' && e.key <= '9') {
+        inputKakuroDigit(parseInt(e.key));
+      } else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
+        inputKakuroDigit(0);
+      }
+    });
+
+    /* ─────────────────────────────────────────────────────────────
+       12. KRİPTO-ARİTMETİK (ALFAMATİK) LOGIC
+       ───────────────────────────────────────────────────────────── */
+    const cryptPuzzles = [
+      {
+        title: "SEND + MORE = MONEY",
+        w1: "SEND",
+        w2: "MORE",
+        res: "MONEY",
+        sol: { S: 9, E: 5, N: 6, D: 7, M: 1, O: 0, R: 8, Y: 2 }
+      },
+      {
+        title: "TWO + TWO = FOUR",
+        w1: "TWO",
+        w2: "TWO",
+        res: "FOUR",
+        sol: { T: 7, W: 3, O: 4, F: 1, U: 6, R: 8 }
+      },
+      {
+        title: "BASE + BALL = GAMES",
+        w1: "BASE",
+        w2: "BALL",
+        res: "GAMES",
+        sol: { B: 7, A: 4, S: 8, E: 3, L: 5, G: 1, M: 9 }
+      },
+      {
+        title: "KARA + TREN = DUMAN",
+        w1: "KARA",
+        w2: "TREN",
+        res: "DUMAN",
+        sol: { K: 6, A: 0, R: 8, T: 7, E: 2, N: 4, D: 1, U: 3, M: 9 }
+      }
+    ];
+
+    let cryptCurrent = null;
+    let cryptAssignments = {};
+    let cryptSelectedLetter = null;
+    let cryptWon = false;
+
+    function resetCryptarithm() {
+      cryptWon = false;
+      cryptSelectedLetter = null;
+      document.getElementById('crypt-digit-picker').classList.add('hidden');
+
+      const sel = parseInt(document.getElementById('crypt-select').value) || 0;
+      cryptCurrent = cryptPuzzles[sel];
+      cryptAssignments = {};
+
+      const allLetters = new Set([...cryptCurrent.w1, ...cryptCurrent.w2, ...cryptCurrent.res]);
+      allLetters.forEach(l => {
+        cryptAssignments[l] = null;
+      });
+
+      renderCryptDisplay();
+      renderCryptRack();
+    }
+
+    function renderCryptDisplay() {
+      const container = document.getElementById('crypt-equation-display');
+      const { w1, w2, res } = cryptCurrent;
+      const maxLen = Math.max(w1.length, w2.length, res.length);
+
+      function formatLine(word, prefix = '') {
+        const pad = maxLen - word.length;
+        let lettersHtml = '';
+        let digitsHtml = '';
+
+        for (let i = 0; i < pad; i++) {
+          lettersHtml += '<span class="inline-block w-8 text-center text-transparent">_</span>';
+          digitsHtml += '<span class="inline-block w-8 text-center text-transparent">_</span>';
+        }
+
+        for (const char of word) {
+          const val = cryptAssignments[char];
+          const isSel = cryptSelectedLetter === char;
+          const letterClass = isSel ? 'text-amber-400 font-black underline' : 'text-purple-300';
+          lettersHtml += `<span class="inline-block w-8 text-center cursor-pointer ${letterClass}" onclick="selectCryptLetter('${char}')">${char}</span>`;
+          digitsHtml += `<span class="inline-block w-8 text-center text-xs text-sky-400 font-mono">${val !== null ? val : '·'}</span>`;
+        }
+
+        return `
+          <div class="flex flex-col items-end">
+            <div class="flex items-center gap-1"><span class="w-6 text-slate-500 font-mono text-base">${prefix}</span>${lettersHtml}</div>
+            <div class="flex items-center gap-1"><span class="w-6"></span>${digitsHtml}</div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = `
+        ${formatLine(w1, '')}
+        ${formatLine(w2, '+')}
+        <div class="w-full h-0.5 bg-white/20 my-1"></div>
+        ${formatLine(res, '=')}
+      `;
+
+      evaluateCryptarithm();
+    }
+
+    function renderCryptRack() {
+      const container = document.getElementById('crypt-letters-rack');
+      container.innerHTML = '';
+      const letters = Object.keys(cryptAssignments).sort();
+
+      letters.forEach(letter => {
+        const val = cryptAssignments[letter];
+        const isSel = cryptSelectedLetter === letter;
+        const btn = document.createElement('button');
+        btn.className = `px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          isSel
+            ? 'bg-amber-500 text-slate-950 shadow-lg scale-105'
+            : val !== null
+            ? 'bg-purple-500/20 border border-purple-400/40 text-purple-200'
+            : 'glass-card text-slate-300 hover:text-white'
+        }`;
+
+        btn.innerHTML = `<span>${letter}</span><span class="font-mono text-sm px-1.5 py-0.5 rounded bg-black/30">${val !== null ? val : '?'}</span>`;
+        btn.onclick = () => selectCryptLetter(letter);
+        container.appendChild(btn);
+      });
+    }
+
+    function selectCryptLetter(letter) {
+      if (cryptWon) return;
+      cryptSelectedLetter = letter;
+      document.getElementById('crypt-picker-title').innerText = `'${letter}' Harfi İçin Rakam:`;
+      document.getElementById('crypt-digit-picker').classList.remove('hidden');
+      playTone(450, 0.06);
+      renderCryptDisplay();
+      renderCryptRack();
+    }
+
+    function assignCryptDigit(digit) {
+      if (!cryptSelectedLetter || cryptWon) return;
+
+      if (digit !== null) {
+        // If digit is already used by another letter, swap or clear
+        for (const l in cryptAssignments) {
+          if (cryptAssignments[l] === digit) cryptAssignments[l] = null;
+        }
+      }
+
+      cryptAssignments[cryptSelectedLetter] = digit;
+      playTone(digit !== null ? 350 + digit * 30 : 220, 0.08);
+      renderCryptDisplay();
+      renderCryptRack();
+    }
+
+    function evaluateCryptarithm() {
+      const banner = document.getElementById('crypt-eval-banner');
+      const { w1, w2, res } = cryptCurrent;
+      const totalLetters = Object.keys(cryptAssignments).length;
+      const assignedCount = Object.values(cryptAssignments).filter(v => v !== null).length;
+
+      // Check leading zeros
+      const leadingLetters = [w1[0], w2[0], res[0]];
+      const hasLeadingZero = leadingLetters.some(l => cryptAssignments[l] === 0);
+
+      function wordToNum(word) {
+        let str = '';
+        for (const c of word) {
+          const v = cryptAssignments[c];
+          if (v === null) return null;
+          str += v;
+        }
+        return parseInt(str);
+      }
+
+      const n1 = wordToNum(w1);
+      const n2 = wordToNum(w2);
+      const nRes = wordToNum(res);
+
+      if (assignedCount < totalLetters) {
+        banner.className = 'px-4 py-2 rounded-xl text-xs font-mono font-bold bg-slate-800 border border-white/10 text-slate-300';
+        banner.innerText = `Atanan harfler: ${assignedCount} / ${totalLetters}`;
+        return;
+      }
+
+      if (hasLeadingZero) {
+        banner.className = 'px-4 py-2 rounded-xl text-xs font-mono font-bold bg-rose-500/20 border border-rose-500/40 text-rose-300';
+        banner.innerText = 'Hata: En soldaki baş harfler (0) olamaz!';
+        return;
+      }
+
+      if (n1 !== null && n2 !== null && nRes !== null) {
+        if (n1 + n2 === nRes) {
+          cryptWon = true;
+          banner.className = 'px-4 py-2 rounded-xl text-xs font-mono font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.3)]';
+          banner.innerText = `🎉 TEBRİKLER! ${n1} + ${n2} = ${nRes} (Eşitlik Doğrulandı)`;
+          playSuccessFanfare();
+          triggerConfetti();
+        } else {
+          banner.className = 'px-4 py-2 rounded-xl text-xs font-mono font-bold bg-amber-500/20 border border-amber-500/40 text-amber-300';
+          banner.innerText = `${n1} + ${n2} = ${n1 + n2} ≠ ${nRes} (Fark: ${Math.abs(n1 + n2 - nRes)})`;
+        }
+      }
+    }
+
+    function hintCryptarithm() {
+      if (cryptWon || !cryptCurrent) return;
+      const unassigned = Object.keys(cryptAssignments).filter(l => cryptAssignments[l] !== cryptCurrent.sol[l]);
+      if (unassigned.length > 0) {
+        const letter = unassigned[Math.floor(Math.random() * unassigned.length)];
+        const digit = cryptCurrent.sol[letter];
+        for (const l in cryptAssignments) {
+          if (cryptAssignments[l] === digit) cryptAssignments[l] = null;
+        }
+        cryptAssignments[letter] = digit;
+        cryptSelectedLetter = letter;
+        playTone(600, 0.12);
+        renderCryptDisplay();
+        renderCryptRack();
+      }
+    }
+
+    function solveCryptarithm() {
+      if (!cryptCurrent) return;
+      cryptAssignments = { ...cryptCurrent.sol };
+      playTone(500, 0.15);
+      renderCryptDisplay();
+      renderCryptRack();
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       13. DÖRT RENK HARİTA BOYAMA LOGIC
+       ───────────────────────────────────────────────────────────── */
+    const fourColorMaps = {
+      turkey: {
+        title: "Türkiye Coğrafi Bölgeleri",
+        regions: [
+          { id: 'marmara', name: 'Marmara', points: '120,60 210,50 220,110 180,140 100,120', adj: ['ege', 'icanadolu', 'karadeniz'], label: [155, 90] },
+          { id: 'ege', name: 'Ege', points: '100,120 180,140 170,240 90,230', adj: ['marmara', 'akdeniz', 'icanadolu'], label: [135, 180] },
+          { id: 'akdeniz', name: 'Akdeniz', points: '170,240 180,140 280,160 380,240 370,280 180,270', adj: ['ege', 'icanadolu', 'dogu', 'guneydogu'], label: [260, 230] },
+          { id: 'icanadolu', name: 'İç Anadolu', points: '180,140 220,110 320,100 370,160 280,160', adj: ['marmara', 'ege', 'akdeniz', 'karadeniz', 'dogu'], label: [255, 135] },
+          { id: 'karadeniz', name: 'Karadeniz', points: '210,50 480,60 460,110 320,100 220,110', adj: ['marmara', 'icanadolu', 'dogu'], label: [340, 75] },
+          { id: 'dogu', name: 'Doğu Anadolu', points: '320,100 460,110 540,140 520,240 430,220 370,160', adj: ['karadeniz', 'icanadolu', 'akdeniz', 'guneydogu'], label: [440, 160] },
+          { id: 'guneydogu', name: 'Güneydoğu Anadolu', points: '380,240 430,220 520,240 490,280 370,280', adj: ['akdeniz', 'dogu'], label: [445, 255] }
+        ]
+      },
+      island: {
+        title: "Adalar & Eyaletler",
+        regions: [
+          { id: 'r1', name: 'Kuzey Ada', points: '180,40 300,30 310,110 170,100', adj: ['r2', 'r3', 'r4'], label: [240, 70] },
+          { id: 'r2', name: 'Batı Sahili', points: '80,120 180,100 170,240 70,220', adj: ['r1', 'r3', 'r5'], label: [125, 170] },
+          { id: 'r3', name: 'Merkez Plato', points: '180,100 310,110 300,230 170,240', adj: ['r1', 'r2', 'r4', 'r5', 'r6'], label: [240, 170] },
+          { id: 'r4', name: 'Doğu Sahili', points: '310,110 440,100 430,220 300,230', adj: ['r1', 'r3', 'r6'], label: [370, 165] },
+          { id: 'r5', name: 'Güney Batı', points: '70,220 170,240 230,320 120,320', adj: ['r2', 'r3', 'r7'], label: [150, 270] },
+          { id: 'r6', name: 'Güney Doğu', points: '300,230 430,220 400,320 280,320', adj: ['r3', 'r4', 'r7'], label: [350, 270] },
+          { id: 'r7', name: 'Körfez Şehri', points: '170,240 300,230 280,320 230,320', adj: ['r3', 'r5', 'r6', 'r8'], label: [245, 275] },
+          { id: 'r8', name: 'Güney Resif', points: '190,335 320,335 290,355 210,355', adj: ['r7'], label: [255, 345] }
+        ]
+      },
+      tessellation: {
+        title: "Planar Çizge Ağı",
+        regions: [
+          { id: 'c1', name: 'A', points: '120,80 220,60 200,150 110,140', adj: ['c2', 'c3', 'c4'], label: [160, 110] },
+          { id: 'c2', name: 'B', points: '220,60 340,60 320,150 200,150', adj: ['c1', 'c3', 'c5'], label: [270, 105] },
+          { id: 'c3', name: 'C', points: '340,60 450,80 430,150 320,150', adj: ['c2', 'c5', 'c6'], label: [380, 110] },
+          { id: 'c4', name: 'D', points: '110,140 200,150 180,240 90,220', adj: ['c1', 'c5', 'c7'], label: [145, 190] },
+          { id: 'c5', name: 'E (Merkez)', points: '200,150 320,150 310,240 180,240', adj: ['c1', 'c2', 'c3', 'c4', 'c6', 'c7', 'c8'], label: [250, 195] },
+          { id: 'c6', name: 'F', points: '320,150 430,150 440,230 310,240', adj: ['c3', 'c5', 'c8'], label: [370, 195] },
+          { id: 'c7', name: 'G', points: '180,240 310,240 270,320 150,310', adj: ['c4', 'c5', 'c8', 'c9'], label: [225, 280] },
+          { id: 'c8', name: 'H', points: '310,240 440,230 400,320 270,320', adj: ['c5', 'c6', 'c7', 'c10'], label: [350, 280] },
+          { id: 'c9', name: 'K', points: '100,290 150,310 130,350 70,330', adj: ['c7'], label: [110, 320] },
+          { id: 'c10', name: 'L', points: '400,320 470,300 480,340 420,350', adj: ['c8'], label: [440, 330] }
+        ]
+      }
+    };
+
+    const fourColorPalette = {
+      1: { fill: '#f43f5e', name: 'Mercan' },
+      2: { fill: '#0ea5e9', name: 'Gök Mavi' },
+      3: { fill: '#10b981', name: 'Zümrüt' },
+      4: { fill: '#f59e0b', name: 'Kehribar' }
+    };
+
+    let fcSelectedColor = 1;
+    let fcRegionColors = {};
+    let fcWon = false;
+
+    function selectColor(c) {
+      fcSelectedColor = c;
+      for (let i = 1; i <= 4; i++) {
+        const btn = document.getElementById(`fcol-${i}`);
+        if (i === c) {
+          btn.className = btn.className.replace('border-transparent', 'border-white');
+          btn.innerText = '✔';
+        } else {
+          btn.className = btn.className.replace('border-white', 'border-transparent');
+          btn.innerText = '';
+        }
+      }
+      playTone(400 + c * 50, 0.05);
+    }
+
+    function resetFourColor() {
+      fcWon = false;
+      fcRegionColors = {};
+      renderFourColorMap();
+    }
+
+    function renderFourColorMap() {
+      const mapKey = document.getElementById('fourcolor-map-select').value || 'turkey';
+      const mapData = fourColorMaps[mapKey];
+      const svg = document.getElementById('fourcolor-svg');
+      svg.innerHTML = '';
+
+      const conflicts = getFourColorConflicts(mapData);
+
+      mapData.regions.forEach(reg => {
+        const colorIdx = fcRegionColors[reg.id];
+        const isConflict = conflicts.has(reg.id);
+        const fill = colorIdx ? fourColorPalette[colorIdx].fill : '#1e293b';
+
+        // Polygon
+        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        poly.setAttribute('points', reg.points);
+        poly.setAttribute('fill', fill);
+        poly.setAttribute('stroke', isConflict ? '#ef4444' : '#ffffff30');
+        poly.setAttribute('stroke-width', isConflict ? '3' : '1.5');
+        poly.setAttribute('class', 'transition-colors duration-200 cursor-pointer hover:opacity-90');
+        if (isConflict) {
+          poly.setAttribute('stroke-dasharray', '4');
+        }
+
+        poly.onclick = () => paintRegion(reg.id);
+        svg.appendChild(poly);
+
+        // Label
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', reg.label[0]);
+        text.setAttribute('y', reg.label[1]);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'middle');
+        text.setAttribute('fill', colorIdx ? '#ffffff' : '#94a3b8');
+        text.setAttribute('font-size', '11');
+        text.setAttribute('font-weight', 'bold');
+        text.setAttribute('pointer-events', 'none');
+        text.textContent = reg.name;
+        svg.appendChild(text);
+      });
+
+      updateFourColorStats(mapData, conflicts);
+    }
+
+    function paintRegion(regId) {
+      if (fcWon) return;
+      fcRegionColors[regId] = fcSelectedColor;
+      playTone(450 + fcSelectedColor * 60, 0.08);
+      renderFourColorMap();
+    }
+
+    function getFourColorConflicts(mapData) {
+      const conflicts = new Set();
+      mapData.regions.forEach(u => {
+        const cu = fcRegionColors[u.id];
+        if (!cu) return;
+        u.adj.forEach(vId => {
+          const cv = fcRegionColors[vId];
+          if (cv && cu === cv) {
+            conflicts.add(u.id);
+            conflicts.add(vId);
+          }
+        });
+      });
+      return conflicts;
+    }
+
+    function updateFourColorStats(mapData, conflicts) {
+      const total = mapData.regions.length;
+      const painted = Object.keys(fcRegionColors).length;
+      const usedColors = new Set(Object.values(fcRegionColors)).size;
+
+      document.getElementById('fc-painted-count').innerText = `${painted}/${total}`;
+      document.getElementById('fc-used-colors').innerText = `${usedColors}/4`;
+
+      const badge = document.getElementById('fc-conflict-badge');
+      if (conflicts.size > 0) {
+        badge.className = 'px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse';
+        badge.innerText = `⚠️ Çakışma Var: ${conflicts.size} bölge`;
+      } else {
+        badge.className = 'px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+        badge.innerText = '✅ Çakışma Yok: 0';
+      }
+
+      if (painted === total && conflicts.size === 0 && !fcWon) {
+        fcWon = true;
+        playSuccessFanfare();
+        triggerConfetti();
+      }
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       14. LAZER & AYNALAR LOGIC
+       ───────────────────────────────────────────────────────────── */
+    const laserLevels = [
+      {
+        size: 6,
+        emitter: { r: 0, c: 0, dr: 0, dc: 1 }, // (0,0) right
+        targets: [{ r: 5, c: 4 }],
+        walls: [],
+        slots: [{ r: 0, c: 4 }],
+        sol: { '0-4': '\\' }
+      },
+      {
+        size: 6,
+        emitter: { r: 1, c: 0, dr: 0, dc: 1 }, // (1,0) right
+        targets: [{ r: 2, c: 3 }, { r: 4, c: 5 }],
+        walls: [{ r: 3, c: 1 }],
+        slots: [{ r: 1, c: 3 }, { r: 4, c: 3 }],
+        sol: { '1-3': '\\', '4-3': '\\' }
+      },
+      {
+        size: 6,
+        emitter: { r: 0, c: 0, dr: 0, dc: 1 },
+        targets: [{ r: 0, c: 3 }, { r: 2, c: 5 }, { r: 4, c: 3 }],
+        walls: [{ r: 2, c: 2 }],
+        slots: [{ r: 0, c: 5 }, { r: 4, c: 5 }, { r: 4, c: 1 }, { r: 1, c: 1 }],
+        sol: { '0-5': '\\', '4-5': '/', '4-1': '/', '1-1': '\\' }
+      }
+    ];
+
+    let laserMirrors = {}; // "r-c": '/' or '\'
+    let laserCurrentLevel = 0;
+    let laserWon = false;
+
+    function resetLaser() {
+      laserWon = false;
+      laserCurrentLevel = parseInt(document.getElementById('laser-level').value) || 0;
+      laserMirrors = {};
+      drawLaser();
+    }
+
+    function toggleLaserMirror(r, c) {
+      if (laserWon) return;
+      const key = `${r}-${c}`;
+      const cur = laserMirrors[key];
+      if (!cur) {
+        laserMirrors[key] = '/';
+        playTone(500, 0.08);
+      } else if (cur === '/') {
+        laserMirrors[key] = '\\';
+        playTone(600, 0.08);
+      } else {
+        delete laserMirrors[key];
+        playTone(350, 0.08);
+      }
+      drawLaser();
+    }
+
+    function traceLaserPath(lvl) {
+      let { r, c, dr, dc } = lvl.emitter;
+      const path = [{ x: c * 60 + 30, y: r * 60 + 30 }];
+      const hitTargets = new Set();
+      const visited = new Set();
+      let step = 0;
+
+      while (step < 60) {
+        step++;
+        const nr = r + dr;
+        const nc = c + dc;
+
+        if (nr < 0 || nr >= lvl.size || nc < 0 || nc >= lvl.size) {
+          path.push({ x: (c + dc * 0.5) * 60 + 30, y: (r + dr * 0.5) * 60 + 30 });
+          break;
+        }
+
+        if (lvl.walls.some(w => w.r === nr && w.c === nc)) {
+          path.push({ x: nc * 60 + 30, y: nr * 60 + 30 });
+          break;
+        }
+
+        path.push({ x: nc * 60 + 30, y: nr * 60 + 30 });
+
+        if (lvl.targets.some(t => t.r === nr && t.c === nc)) {
+          hitTargets.add(`${nr}-${nc}`);
+        }
+
+        const m = laserMirrors[`${nr}-${nc}`];
+        if (m === '/') {
+          const temp = dr;
+          dr = -dc;
+          dc = -temp;
+        } else if (m === '\\') {
+          const temp = dr;
+          dr = dc;
+          dc = temp;
+        }
+
+        const stateKey = `${nr}-${nc}-${dr}-${dc}`;
+        if (visited.has(stateKey)) break;
+        visited.add(stateKey);
+
+        r = nr;
+        c = nc;
+      }
+
+      return { path, hitTargets };
+    }
+
+    function drawLaser() {
+      const canvas = document.getElementById('laser-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const lvl = laserLevels[laserCurrentLevel];
+      const sz = lvl.size;
+      const cellSize = canvas.width / sz;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Grid lines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= sz; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * cellSize, 0);
+        ctx.lineTo(i * cellSize, canvas.height);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, i * cellSize);
+        ctx.lineTo(canvas.width, i * cellSize);
+        ctx.stroke();
+      }
+
+      // Walls
+      lvl.walls.forEach(w => {
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(w.c * cellSize + 2, w.r * cellSize + 2, cellSize - 4, cellSize - 4);
+        ctx.strokeStyle = '#475569';
+        ctx.strokeRect(w.c * cellSize + 2, w.r * cellSize + 2, cellSize - 4, cellSize - 4);
+      });
+
+      // Mirror Slots
+      lvl.slots.forEach(s => {
+        const key = `${s.r}-${s.c}`;
+        const m = laserMirrors[key];
+        ctx.fillStyle = 'rgba(168, 85, 247, 0.12)';
+        ctx.fillRect(s.c * cellSize + 4, s.r * cellSize + 4, cellSize - 8, cellSize - 8);
+        ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
+        ctx.strokeRect(s.c * cellSize + 4, s.r * cellSize + 4, cellSize - 8, cellSize - 8);
+
+        if (m === '/') {
+          ctx.strokeStyle = '#c084fc';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo((s.c + 0.15) * cellSize, (s.r + 0.85) * cellSize);
+          ctx.lineTo((s.c + 0.85) * cellSize, (s.r + 0.15) * cellSize);
+          ctx.stroke();
+        } else if (m === '\\') {
+          ctx.strokeStyle = '#c084fc';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo((s.c + 0.15) * cellSize, (s.r + 0.15) * cellSize);
+          ctx.lineTo((s.c + 0.85) * cellSize, (s.r + 0.85) * cellSize);
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = 'rgba(255,255,255,0.2)';
+          ctx.font = '10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Ayna', (s.c + 0.5) * cellSize, (s.r + 0.5) * cellSize);
+        }
+      });
+
+      // Raytrace Laser
+      const { path, hitTargets } = traceLaserPath(lvl);
+
+      // Draw Laser Beam
+      if (path.length > 1) {
+        // Outer glow
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(path[0].x, path[0].y);
+        for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+        ctx.stroke();
+
+        // Inner bright beam
+        ctx.strokeStyle = '#f0f9ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(path[0].x, path[0].y);
+        for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+        ctx.stroke();
+      }
+
+      // Emitter
+      const emX = (lvl.emitter.c + 0.5) * cellSize;
+      const emY = (lvl.emitter.r + 0.5) * cellSize;
+      ctx.fillStyle = '#0284c7';
+      ctx.beginPath();
+      ctx.arc(emX, emY, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Targets
+      lvl.targets.forEach(t => {
+        const isHit = hitTargets.has(`${t.r}-${t.c}`);
+        const tx = (t.c + 0.5) * cellSize;
+        const ty = (t.r + 0.5) * cellSize;
+
+        ctx.fillStyle = isHit ? '#fbbf24' : '#78350f';
+        ctx.beginPath();
+        ctx.moveTo(tx, ty - 12);
+        ctx.lineTo(tx + 12, ty);
+        ctx.lineTo(tx, ty + 12);
+        ctx.lineTo(tx - 12, ty);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = isHit ? '#fef08a' : '#d97706';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+
+      // Update status
+      const totalTargets = lvl.targets.length;
+      const hits = hitTargets.size;
+      const statusEl = document.getElementById('laser-status');
+      if (hits === totalTargets && !laserWon) {
+        laserWon = true;
+        statusEl.innerHTML = '🎉 <strong>TEBRİKLER! Tüm Hedef Kristaller Aydınlatıldı!</strong>';
+        playSuccessFanfare();
+        triggerConfetti();
+      } else {
+        statusEl.innerText = `Hedefler: ${hits} / ${totalTargets} Aydınlatıldı`;
+      }
+    }
+
+    // Laser canvas click listener
+    window.addEventListener('DOMContentLoaded', () => {
+      const cvs = document.getElementById('laser-canvas');
+      if (cvs) {
+        cvs.addEventListener('click', (e) => {
+          const rect = cvs.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          const lvl = laserLevels[laserCurrentLevel];
+          const cellSize = cvs.width / lvl.size;
+          const c = Math.floor(x / cellSize);
+          const r = Math.floor(y / cellSize);
+
+          const isSlot = lvl.slots.some(s => s.r === r && s.c === c);
+          if (isSlot) toggleLaserMirror(r, c);
+        });
+      }
+    });
+
+    /* ─────────────────────────────────────────────────────────────
+       15. PENTOMINO LOGIC
+       ───────────────────────────────────────────────────────────── */
+    const pentominoShapes = {
+      P: { name: 'P', color: '#f43f5e', coords: [[0,0], [0,1], [1,0], [1,1], [2,0]] },
+      L: { name: 'L', color: '#fb923c', coords: [[0,0], [1,0], [2,0], [3,0], [3,1]] },
+      N: { name: 'N', color: '#38bdf8', coords: [[0,0], [1,0], [1,1], [2,1], [3,1]] },
+      W: { name: 'W', color: '#a855f7', coords: [[0,0], [1,0], [1,1], [2,1], [2,2]] },
+      T: { name: 'T', color: '#10b981', coords: [[0,0], [0,1], [0,2], [1,1], [2,1]] },
+      I: { name: 'I', color: '#06b6d4', coords: [[0,0], [0,1], [0,2], [0,3], [0,4]] }
+    };
+
+    let pentoSelectedPiece = null;
+    let pentoCurrentCoords = [];
+    let pentoBoard = [];
+    let pentoPlacedPieces = new Set();
+    let pentoWon = false;
+
+    function resetPentomino() {
+      pentoWon = false;
+      pentoSelectedPiece = null;
+      pentoCurrentCoords = [];
+      pentoPlacedPieces.clear();
+      document.getElementById('pento-selected-name').innerText = 'Yok';
+
+      const lvl = document.getElementById('pento-level').value;
+      const rows = 5;
+      const cols = lvl === '6x5' ? 6 : 5;
+
+      pentoBoard = [];
+      for (let r = 0; r < rows; r++) {
+        pentoBoard.push(new Array(cols).fill(null));
+      }
+
+      renderPentoBoard();
+      renderPentoRack();
+    }
+
+    function renderPentoBoard() {
+      const container = document.getElementById('pento-grid');
+      container.innerHTML = '';
+      const rows = pentoBoard.length;
+      const cols = pentoBoard[0].length;
+      container.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const piece = pentoBoard[r][c];
+          const cell = document.createElement('div');
+          cell.className = 'w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-xs transition-all select-none cursor-pointer';
+
+          if (piece) {
+            cell.style.backgroundColor = pentominoShapes[piece].color;
+            cell.className += ' text-white shadow-md border border-white/30';
+            cell.innerText = piece;
+            cell.onclick = () => removePentoFromBoard(piece);
+          } else {
+            cell.className += ' bg-slate-800/60 border border-white/10 hover:border-purple-400/50';
+            cell.onclick = () => placePentominoOnBoard(r, c);
+          }
+
+          container.appendChild(cell);
+        }
+      }
+    }
+
+    function renderPentoRack() {
+      const rack = document.getElementById('pento-rack');
+      rack.innerHTML = '';
+      const lvl = document.getElementById('pento-level').value;
+      const activeKeys = lvl === '6x5' ? ['P', 'L', 'N', 'W', 'T', 'I'] : ['P', 'L', 'N', 'W', 'T'];
+
+      activeKeys.forEach(k => {
+        const isPlaced = pentoPlacedPieces.has(k);
+        const isSelected = pentoSelectedPiece === k;
+        const p = pentominoShapes[k];
+
+        const card = document.createElement('div');
+        card.className = `p-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer transition-all ${
+          isPlaced
+            ? 'opacity-30 pointer-events-none grayscale'
+            : isSelected
+            ? 'bg-purple-500/30 border-2 border-purple-400 scale-105 shadow-lg'
+            : 'bg-slate-900 border border-white/10 hover:border-white/30'
+        }`;
+
+        card.innerHTML = `<span class="text-xs font-bold" style="color:${p.color}">${p.name}</span>`;
+        card.onclick = () => selectPentominoPiece(k);
+        rack.appendChild(card);
+      });
+    }
+
+    function selectPentominoPiece(key) {
+      if (pentoWon || pentoPlacedPieces.has(key)) return;
+      pentoSelectedPiece = key;
+      pentoCurrentCoords = pentominoShapes[key].coords.map(([r, c]) => [r, c]);
+      document.getElementById('pento-selected-name').innerText = key;
+      playTone(480, 0.06);
+      renderPentoRack();
+    }
+
+    function rotatePentomino() {
+      if (!pentoSelectedPiece || pentoWon) return;
+      // (r, c) -> (c, -r)
+      const rotated = pentoCurrentCoords.map(([r, c]) => [c, -r]);
+      const minR = Math.min(...rotated.map(([r]) => r));
+      const minC = Math.min(...rotated.map(([, c]) => c));
+      pentoCurrentCoords = rotated.map(([r, c]) => [r - minR, c - minC]);
+      playTone(550, 0.05);
+    }
+
+    function flipPentomino() {
+      if (!pentoSelectedPiece || pentoWon) return;
+      // (r, c) -> (r, -c)
+      const flipped = pentoCurrentCoords.map(([r, c]) => [r, -c]);
+      const minC = Math.min(...flipped.map(([, c]) => c));
+      pentoCurrentCoords = flipped.map(([r, c]) => [r, c - minC]);
+      playTone(520, 0.05);
+    }
+
+    function placePentominoOnBoard(targetR, targetC) {
+      if (!pentoSelectedPiece || pentoWon) return;
+      const rows = pentoBoard.length;
+      const cols = pentoBoard[0].length;
+
+      // Check boundary and collision
+      for (const [dr, dc] of pentoCurrentCoords) {
+        const nr = targetR + dr;
+        const nc = targetC + dc;
+        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || pentoBoard[nr][nc] !== null) {
+          playTone(200, 0.15, 'sawtooth');
+          return;
+        }
+      }
+
+      // Place piece
+      for (const [dr, dc] of pentoCurrentCoords) {
+        pentoBoard[targetR + dr][targetC + dc] = pentoSelectedPiece;
+      }
+      pentoPlacedPieces.add(pentoSelectedPiece);
+      pentoSelectedPiece = null;
+      pentoCurrentCoords = [];
+      document.getElementById('pento-selected-name').innerText = 'Yok';
+
+      playTone(440, 0.08);
+      renderPentoBoard();
+      renderPentoRack();
+      checkPentominoWin();
+    }
+
+    function removePentoFromBoard(pieceKey) {
+      if (pentoWon) return;
+      const rows = pentoBoard.length;
+      const cols = pentoBoard[0].length;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (pentoBoard[r][c] === pieceKey) pentoBoard[r][c] = null;
+        }
+      }
+      pentoPlacedPieces.delete(pieceKey);
+      selectPentominoPiece(pieceKey);
+      renderPentoBoard();
+      renderPentoRack();
+    }
+
+    function checkPentominoWin() {
+      const rows = pentoBoard.length;
+      const cols = pentoBoard[0].length;
+      let allFilled = true;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (pentoBoard[r][c] === null) {
+            allFilled = false;
+            break;
+          }
+        }
+      }
+
+      if (allFilled) {
+        pentoWon = true;
+        document.getElementById('pento-status').innerHTML = '🎉 <strong>TEBRİKLER! Pentomino Tahtasını Kusursuz Doldurdunuz!</strong>';
+        playSuccessFanfare();
+        triggerConfetti();
+      }
+    }
+
+    function solvePentominoHint() {
+      const lvl = document.getElementById('pento-level').value;
+      if (lvl === '5x5') {
+        const sol5x5 = [
+          ['P', 'P', 'T', 'T', 'T'],
+          ['P', 'P', 'W', 'T', 'L'],
+          ['P', 'W', 'W', 'T', 'L'],
+          ['W', 'W', 'N', 'N', 'L'],
+          ['N', 'N', 'N', 'L', 'L']
+        ];
+        pentoBoard = sol5x5;
+        pentoPlacedPieces = new Set(['P', 'L', 'N', 'W', 'T']);
+      } else {
+        const sol6x5 = [
+          ['P', 'P', 'T', 'T', 'T', 'I'],
+          ['P', 'P', 'W', 'T', 'L', 'I'],
+          ['P', 'W', 'W', 'T', 'L', 'I'],
+          ['W', 'W', 'N', 'N', 'L', 'I'],
+          ['N', 'N', 'N', 'L', 'L', 'I']
+        ];
+        pentoBoard = sol6x5;
+        pentoPlacedPieces = new Set(['P', 'L', 'N', 'W', 'T', 'I']);
+      }
+      playTone(500, 0.1);
+      renderPentoBoard();
+      renderPentoRack();
+      checkPentominoWin();
+    }
+
+    // Pentomino hotkeys
+    window.addEventListener('keydown', (e) => {
+      const sec = document.getElementById('game-pentomino');
+      if (!sec || sec.classList.contains('hidden')) return;
+      if (e.key === 'r' || e.key === 'R') rotatePentomino();
+      if (e.key === 'f' || e.key === 'F') flipPentomino();
+    });
+
+    /* ─────────────────────────────────────────────────────────────
+       16. HEX OYUNU LOGIC
+       ───────────────────────────────────────────────────────────── */
+    const hexSize = 7;
+    let hexBoard = [];
+    let hexTurn = 1; // 1: Red (Top-Bottom), 2: Blue (Left-Right)
+    let hexWon = false;
+    let hexWinningPath = new Set();
+
+    function resetHex() {
+      hexWon = false;
+      hexTurn = 1;
+      hexWinningPath.clear();
+      hexBoard = [];
+      for (let r = 0; r < hexSize; r++) {
+        hexBoard.push(new Array(hexSize).fill(0));
+      }
+      updateHexTurnIndicator();
+      renderHexBoard();
+    }
+
+    function updateHexTurnIndicator() {
+      const ind = document.getElementById('hex-turn-indicator');
+      if (hexWon) return;
+      if (hexTurn === 1) {
+        ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 font-bold text-xs';
+        ind.innerHTML = '<span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span><span>Sıra: Kırmızı (Kuzey ↕ Güney)</span>';
+      } else {
+        ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-xl bg-sky-500/20 border border-sky-500/30 text-sky-300 font-bold text-xs';
+        ind.innerHTML = '<span class="w-2.5 h-2.5 rounded-full bg-sky-500 animate-pulse"></span><span>Sıra: Mavi (Batı ↔ Doğu)</span>';
+      }
+    }
+
+    function renderHexBoard() {
+      const svg = document.getElementById('hex-svg');
+      svg.innerHTML = '';
+
+      const rRad = 21;
+      const wHex = Math.sqrt(3) * rRad;
+      const hHex = 2 * rRad;
+      const startX = 60;
+      const startY = 40;
+
+      // Draw boundary guidelines
+      // Top/Bottom: Red
+      // Left/Right: Blue
+      const topPts = [];
+      const botPts = [];
+      const leftPts = [];
+      const rightPts = [];
+
+      for (let r = 0; r < hexSize; r++) {
+        for (let c = 0; c < hexSize; c++) {
+          const cx = startX + c * wHex + r * (wHex / 2);
+          const cy = startY + r * (hHex * 0.75);
+
+          const val = hexBoard[r][c];
+          const isWinCell = hexWinningPath.has(`${r}-${c}`);
+
+          // Hexagon polygon points
+          let pts = '';
+          for (let a = 0; a < 6; a++) {
+            const angle = (Math.PI / 180) * (60 * a - 30);
+            const px = cx + rRad * Math.cos(angle);
+            const py = cy + rRad * Math.sin(angle);
+            pts += `${px.toFixed(1)},${py.toFixed(1)} `;
+          }
+
+          const hex = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+          hex.setAttribute('points', pts.trim());
+
+          let fill = '#0f172a';
+          let stroke = 'rgba(255, 255, 255, 0.15)';
+          let strokeW = '1';
+
+          if (val === 1) {
+            fill = '#f43f5e';
+            stroke = isWinCell ? '#fef08a' : '#fda4af';
+            strokeW = isWinCell ? '3' : '1.5';
+          } else if (val === 2) {
+            fill = '#0ea5e9';
+            stroke = isWinCell ? '#fef08a' : '#7dd3fc';
+            strokeW = isWinCell ? '3' : '1.5';
+          }
+
+          hex.setAttribute('fill', fill);
+          hex.setAttribute('stroke', stroke);
+          hex.setAttribute('stroke-width', strokeW);
+          hex.setAttribute('class', 'transition-colors cursor-pointer hover:opacity-80');
+          hex.onclick = () => handleHexClick(r, c);
+
+          svg.appendChild(hex);
+        }
+      }
+    }
+
+    function handleHexClick(r, c) {
+      if (hexWon || hexBoard[r][c] !== 0) return;
+
+      hexBoard[r][c] = hexTurn;
+      playTone(hexTurn === 1 ? 440 : 550, 0.08);
+
+      const winPath = checkHexWin(hexTurn);
+      if (winPath) {
+        hexWon = true;
+        hexWinningPath = new Set(winPath);
+        renderHexBoard();
+        const winner = hexTurn === 1 ? 'Kırmızı (Kuzey-Güney)' : 'Mavi (Batı-Doğu)';
+        document.getElementById('hex-status-msg').innerHTML = `🎉 <strong>TEBRİKLER! ${winner} KAZANDI!</strong>`;
+        playSuccessFanfare();
+        triggerConfetti();
+        return;
+      }
+
+      hexTurn = hexTurn === 1 ? 2 : 1;
+      updateHexTurnIndicator();
+      renderHexBoard();
+
+      const mode = document.getElementById('hex-mode').value;
+      if (mode === 'ai' && hexTurn === 2 && !hexWon) {
+        setTimeout(hexAIMove, 300);
+      }
+    }
+
+    function hexAIMove() {
+      if (hexWon || hexTurn !== 2) return;
+      // Heuristic: AI tries to block player or advance shortest path
+      const empties = [];
+      for (let r = 0; r < hexSize; r++) {
+        for (let c = 0; c < hexSize; c++) {
+          if (hexBoard[r][c] === 0) empties.push({ r, c });
+        }
+      }
+      if (empties.length === 0) return;
+
+      // Pick center or blocking adjacent
+      let best = empties[0];
+      let bestScore = -999;
+      for (const e of empties) {
+        let score = -(Math.abs(e.r - 3) + Math.abs(e.c - 3));
+        // Bonus for neighboring Blue stones
+        const nbs = getHexNeighbors(e.r, e.c);
+        for (const [nr, nc] of nbs) {
+          if (hexBoard[nr][nc] === 2) score += 3;
+          if (hexBoard[nr][nc] === 1) score += 2; // block red
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          best = e;
+        }
+      }
+
+      handleHexClick(best.r, best.c);
+    }
+
+    function getHexNeighbors(r, c) {
+      const candidates = [
+        [r - 1, c],
+        [r - 1, c + 1],
+        [r, c - 1],
+        [r, c + 1],
+        [r + 1, c - 1],
+        [r + 1, c]
+      ];
+      return candidates.filter(([nr, nc]) => nr >= 0 && nr < hexSize && nc >= 0 && nc < hexSize);
+    }
+
+    function checkHexWin(player) {
+      const queue = [];
+      const visited = new Set();
+      const parent = {};
+
+      if (player === 1) {
+        // Red connects Top (r = 0) to Bottom (r = hexSize - 1)
+        for (let c = 0; c < hexSize; c++) {
+          if (hexBoard[0][c] === 1) {
+            queue.push([0, c]);
+            visited.add(`0-${c}`);
+            parent[`0-${c}`] = null;
+          }
+        }
+
+        while (queue.length > 0) {
+          const [r, c] = queue.shift();
+          if (r === hexSize - 1) {
+            // Reconstruct path
+            const path = [];
+            let curr = `${r}-${c}`;
+            while (curr) {
+              path.push(curr);
+              curr = parent[curr];
+            }
+            return path;
+          }
+
+          for (const [nr, nc] of getHexNeighbors(r, c)) {
+            const key = `${nr}-${nc}`;
+            if (hexBoard[nr][nc] === 1 && !visited.has(key)) {
+              visited.add(key);
+              parent[key] = `${r}-${c}`;
+              queue.push([nr, nc]);
+            }
+          }
+        }
+      } else {
+        // Blue connects Left (c = 0) to Right (c = hexSize - 1)
+        for (let r = 0; r < hexSize; r++) {
+          if (hexBoard[r][0] === 2) {
+            queue.push([r, 0]);
+            visited.add(`${r}-0`);
+            parent[`${r}-0`] = null;
+          }
+        }
+
+        while (queue.length > 0) {
+          const [r, c] = queue.shift();
+          if (c === hexSize - 1) {
+            const path = [];
+            let curr = `${r}-${c}`;
+            while (curr) {
+              path.push(curr);
+              curr = parent[curr];
+            }
+            return path;
+          }
+
+          for (const [nr, nc] of getHexNeighbors(r, c)) {
+            const key = `${nr}-${nc}`;
+            if (hexBoard[nr][nc] === 2 && !visited.has(key)) {
+              visited.add(key);
+              parent[key] = `${r}-${c}`;
+              queue.push([nr, nc]);
+            }
+          }
+        }
+      }
+      return null;
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       17. HASHİWOKAKERO LOGIC
+       ───────────────────────────────────────────────────────────── */
+    const hashiLevels = [
+      {
+        islands: [
+          { id: 0, r: 0, c: 0, n: 2 },
+          { id: 1, r: 0, c: 3, n: 3 },
+          { id: 2, r: 0, c: 5, n: 2 },
+          { id: 3, r: 3, c: 0, n: 2 },
+          { id: 4, r: 3, c: 3, n: 3 },
+          { id: 5, r: 3, c: 5, n: 2 }
+        ],
+        sol: { '0-1': 1, '1-2': 1, '0-3': 1, '1-4': 1, '2-5': 1, '3-4': 1, '4-5': 1 }
+      },
+      {
+        islands: [
+          { id: 0, r: 0, c: 0, n: 4 },
+          { id: 1, r: 0, c: 4, n: 4 },
+          { id: 2, r: 2, c: 2, n: 3 },
+          { id: 3, r: 2, c: 4, n: 4 },
+          { id: 4, r: 4, c: 0, n: 3 },
+          { id: 5, r: 4, c: 2, n: 2 }
+        ],
+        sol: { '0-1': 2, '0-4': 2, '1-3': 2, '4-5': 1, '2-5': 1, '2-3': 2 }
+      },
+      {
+        islands: [
+          { id: 0, r: 0, c: 0, n: 3 },
+          { id: 1, r: 0, c: 3, n: 4 },
+          { id: 2, r: 0, c: 5, n: 2 },
+          { id: 3, r: 2, c: 0, n: 3 },
+          { id: 4, r: 2, c: 3, n: 2 },
+          { id: 5, r: 4, c: 0, n: 2 },
+          { id: 6, r: 4, c: 3, n: 3 },
+          { id: 7, r: 4, c: 5, n: 3 }
+        ],
+        sol: { '0-1': 2, '1-2': 1, '0-3': 1, '1-4': 1, '3-4': 1, '3-5': 1, '5-6': 1, '6-7': 2, '2-7': 1 }
+      }
+    ];
+
+    let hashiCurrentLevel = 0;
+    let hashiBridges = {}; // "u-v": count (1 or 2)
+    let hashiSelectedIsland = null;
+    let hashiWon = false;
+
+    function resetHashi() {
+      hashiWon = false;
+      hashiSelectedIsland = null;
+      hashiBridges = {};
+      hashiCurrentLevel = parseInt(document.getElementById('hashi-level').value) || 0;
+      document.getElementById('hashi-status').innerText = 'İki ada arasına tıklayarak köprü kurun (Tek, Çift veya Kaldır).';
+      drawHashi();
+    }
+
+    function drawHashi() {
+      const svg = document.getElementById('hashi-svg');
+      if (!svg) return;
+      svg.innerHTML = '';
+
+      const lvl = hashiLevels[hashiCurrentLevel];
+      const pad = 40;
+      const step = 50;
+
+      // Calculate island degrees
+      const degrees = {};
+      lvl.islands.forEach(i => degrees[i.id] = 0);
+      for (const [key, count] of Object.entries(hashiBridges)) {
+        const [u, v] = key.split('-').map(Number);
+        degrees[u] += count;
+        degrees[v] += count;
+      }
+
+      // Draw bridges
+      for (const [key, count] of Object.entries(hashiBridges)) {
+        const [uId, vId] = key.split('-').map(Number);
+        const u = lvl.islands.find(i => i.id === uId);
+        const v = lvl.islands.find(i => i.id === vId);
+        if (!u || !v) continue;
+
+        const x1 = pad + u.c * step;
+        const y1 = pad + u.r * step;
+        const x2 = pad + v.c * step;
+        const y2 = pad + v.r * step;
+
+        const isHoriz = u.r === v.r;
+
+        if (count === 1) {
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', x1);
+          line.setAttribute('y1', y1);
+          line.setAttribute('x2', x2);
+          line.setAttribute('y2', y2);
+          line.setAttribute('stroke', '#38bdf8');
+          line.setAttribute('stroke-width', '4');
+          svg.appendChild(line);
+        } else if (count === 2) {
+          const offset = 4;
+          const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+
+          if (isHoriz) {
+            line1.setAttribute('x1', x1); line1.setAttribute('y1', y1 - offset);
+            line1.setAttribute('x2', x2); line1.setAttribute('y2', y2 - offset);
+            line2.setAttribute('x1', x1); line2.setAttribute('y1', y1 + offset);
+            line2.setAttribute('x2', x2); line2.setAttribute('y2', y2 + offset);
+          } else {
+            line1.setAttribute('x1', x1 - offset); line1.setAttribute('y1', y1);
+            line1.setAttribute('x2', x2 - offset); line1.setAttribute('y2', y2);
+            line2.setAttribute('x1', x1 + offset); line2.setAttribute('y1', y1);
+            line2.setAttribute('x2', x2 + offset); line2.setAttribute('y2', y2);
+          }
+
+          line1.setAttribute('stroke', '#38bdf8'); line1.setAttribute('stroke-width', '3');
+          line2.setAttribute('stroke', '#38bdf8'); line2.setAttribute('stroke-width', '3');
+          svg.appendChild(line1);
+          svg.appendChild(line2);
+        }
+      }
+
+      // Draw islands
+      lvl.islands.forEach(isl => {
+        const x = pad + isl.c * step;
+        const y = pad + isl.r * step;
+        const deg = degrees[isl.id];
+        const isSelected = hashiSelectedIsland === isl.id;
+
+        let fill = '#0f172a';
+        let stroke = '#ffffff40';
+        let statusBadge = '';
+
+        if (deg === isl.n) {
+          stroke = '#10b981';
+          fill = '#064e3b';
+          statusBadge = '✔';
+        } else if (deg > isl.n) {
+          stroke = '#f43f5e';
+          fill = '#881337';
+          statusBadge = '!';
+        }
+
+        if (isSelected) {
+          stroke = '#a855f7';
+          fill = '#581c87';
+        }
+
+        // Island circle
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', x);
+        circle.setAttribute('cy', y);
+        circle.setAttribute('r', '18');
+        circle.setAttribute('fill', fill);
+        circle.setAttribute('stroke', stroke);
+        circle.setAttribute('stroke-width', isSelected ? '3' : '2');
+        circle.setAttribute('class', 'cursor-pointer hover:opacity-90 transition-colors');
+        circle.onclick = () => handleHashiIslandClick(isl.id);
+        svg.appendChild(circle);
+
+        // Island number
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', x);
+        text.setAttribute('y', y + 1);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'middle');
+        text.setAttribute('fill', '#ffffff');
+        text.setAttribute('font-size', '13');
+        text.setAttribute('font-weight', 'bold');
+        text.setAttribute('pointer-events', 'none');
+        text.textContent = isl.n;
+        svg.appendChild(text);
+      });
+
+      checkHashiWin();
+    }
+
+    function handleHashiIslandClick(id) {
+      if (hashiWon) return;
+      if (hashiSelectedIsland === null) {
+        hashiSelectedIsland = id;
+        playTone(450, 0.05);
+        drawHashi();
+      } else if (hashiSelectedIsland === id) {
+        hashiSelectedIsland = null;
+        drawHashi();
+      } else {
+        toggleHashiBridge(hashiSelectedIsland, id);
+        hashiSelectedIsland = null;
+        drawHashi();
+      }
+    }
+
+    function toggleHashiBridge(uId, vId) {
+      const lvl = hashiLevels[hashiCurrentLevel];
+      const u = lvl.islands.find(i => i.id === uId);
+      const v = lvl.islands.find(i => i.id === vId);
+      if (!u || !v) return;
+
+      // Must share row or column
+      if (u.r !== v.r && u.c !== v.c) {
+        playTone(200, 0.1, 'sawtooth');
+        return;
+      }
+
+      // Check no other island in between
+      const isHoriz = u.r === v.r;
+      if (isHoriz) {
+        const minC = Math.min(u.c, v.c);
+        const maxC = Math.max(u.c, v.c);
+        for (const o of lvl.islands) {
+          if (o.r === u.r && o.c > minC && o.c < maxC) {
+            playTone(200, 0.1, 'sawtooth');
+            return;
+          }
+        }
+      } else {
+        const minR = Math.min(u.r, v.r);
+        const maxR = Math.max(u.r, v.r);
+        for (const o of lvl.islands) {
+          if (o.c === u.c && o.r > minR && o.r < maxR) {
+            playTone(200, 0.1, 'sawtooth');
+            return;
+          }
+        }
+      }
+
+      const key = uId < vId ? `${uId}-${vId}` : `${vId}-${uId}`;
+      const cur = hashiBridges[key] || 0;
+
+      if (cur === 0) {
+        // Check crossing with existing perpendicular bridges
+        if (isBridgeCrossing(u, v)) {
+          playTone(200, 0.1, 'sawtooth');
+          return;
+        }
+        hashiBridges[key] = 1;
+        playTone(440, 0.08);
+      } else if (cur === 1) {
+        hashiBridges[key] = 2;
+        playTone(550, 0.08);
+      } else {
+        delete hashiBridges[key];
+        playTone(300, 0.08);
+      }
+    }
+
+    function isBridgeCrossing(u, v) {
+      const lvl = hashiLevels[hashiCurrentLevel];
+      const isHoriz = u.r === v.r;
+
+      for (const [key] of Object.entries(hashiBridges)) {
+        const [aId, bId] = key.split('-').map(Number);
+        const a = lvl.islands.find(i => i.id === aId);
+        const b = lvl.islands.find(i => i.id === bId);
+        if (!a || !b) continue;
+
+        const otherHoriz = a.r === b.r;
+        if (isHoriz === otherHoriz) continue;
+
+        if (isHoriz) {
+          const minX = Math.min(u.c, v.c);
+          const maxX = Math.max(u.c, v.c);
+          const minY = Math.min(a.r, b.r);
+          const maxY = Math.max(a.r, b.r);
+          if (a.c > minX && a.c < maxX && u.r > minY && u.r < maxY) return true;
+        } else {
+          const minY = Math.min(u.r, v.r);
+          const maxY = Math.max(u.r, v.r);
+          const minX = Math.min(a.c, b.c);
+          const maxX = Math.max(a.c, b.c);
+          if (u.c > minX && u.c < maxX && a.r > minY && a.r < maxY) return true;
+        }
+      }
+      return false;
+    }
+
+    function checkHashiWin() {
+      const lvl = hashiLevels[hashiCurrentLevel];
+      const degrees = {};
+      lvl.islands.forEach(i => degrees[i.id] = 0);
+
+      const adj = {};
+      lvl.islands.forEach(i => adj[i.id] = []);
+
+      for (const [key, count] of Object.entries(hashiBridges)) {
+        const [u, v] = key.split('-').map(Number);
+        degrees[u] += count;
+        degrees[v] += count;
+        adj[u].push(v);
+        adj[v].push(u);
+      }
+
+      // Check all island degrees match requirement
+      const degreesOk = lvl.islands.every(i => degrees[i.id] === i.n);
+      if (!degreesOk) return;
+
+      // Check full graph connectivity using BFS
+      const visited = new Set();
+      const start = lvl.islands[0].id;
+      const q = [start];
+      visited.add(start);
+
+      while (q.length > 0) {
+        const curr = q.shift();
+        for (const neighbor of adj[curr]) {
+          if (!visited.has(neighbor)) {
+            visited.add(neighbor);
+            q.push(neighbor);
+          }
+        }
+      }
+
+      const connected = visited.size === lvl.islands.length;
+      if (degreesOk && connected && !hashiWon) {
+        hashiWon = true;
+        document.getElementById('hashi-status').innerHTML = '🎉 <strong>TEBRİKLER! Tüm Adalar ve Köprüler Kusursuz Bağlandı!</strong>';
+        playSuccessFanfare();
+        triggerConfetti();
+      }
+    }
+
+    function hintHashi() {
+      if (hashiWon) return;
+      const lvl = hashiLevels[hashiCurrentLevel];
+      hashiBridges = { ...lvl.sol };
+      playTone(550, 0.12);
+      drawHashi();
+    }
+
+    /* INITIALIZE */
     window.addEventListener('DOMContentLoaded', () => {
       resetHanoi();
       resetKenken();
@@ -1799,6 +3881,13 @@
       resetMagicSquare();
       resetChomp();
       resetMontyGame();
+      resetKakuro();
+      resetCryptarithm();
+      resetFourColor();
+      resetLaser();
+      resetPentomino();
+      resetHex();
+      resetHashi();
     });
   </script>
 </body>
