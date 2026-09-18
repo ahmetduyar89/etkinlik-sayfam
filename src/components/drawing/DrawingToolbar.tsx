@@ -26,6 +26,8 @@ import {
     Type,
     FileText,
     Atom,
+    Maximize2,
+    Minimize2,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, MathObject, PenType } from '../../types';
@@ -42,6 +44,10 @@ import {
     makeShapeTools,
 } from '../../constants/drawing';
 import { PEN_TYPES } from './penEngine';
+import {
+    TOOLBAR_DENSITY_LABELS,
+    useToolbarScale,
+} from '../../hooks/useToolbarScale';
 import { ObjectLibraryPanel } from './ObjectLibraryPanel';
 import { DashedLineIcon, SolidLineIcon } from './DrawingIcons';
 
@@ -115,6 +121,8 @@ export function DrawingToolbar({
     const [showMath, setShowMath] = React.useState(false);
     const [showLab, setShowLab] = React.useState(false);
     const dragControls = useDragControls();
+    const barRef = React.useRef<HTMLDivElement>(null);
+    const { scale, density, cycleDensity } = useToolbarScale(barRef);
 
     const penType: PenType = config.penType ?? 'ballpoint';
     const eraserMode = config.eraserMode ?? 'pixel';
@@ -149,9 +157,19 @@ export function DrawingToolbar({
             aria-label="Çizim araç çubuğu"
             // Tam genişlikte durur: `left: 50%` verilseydi kullanılabilir
             // genişlik ekranın yarısına düşer ve çubuk erken satır atlardı.
-            className="fixed bottom-10 left-0 right-0 z-[5000] flex flex-col items-center gap-3 pointer-events-none"
+            className="fixed bottom-10 left-0 right-0 z-[5000] pointer-events-none"
             style={{ touchAction: 'none' }}
         >
+            {/* Ölçek yalnızca bu sarmalayıcıya uygulanır: sürükleme transformu
+                framer-motion'da dış katmanda kaldığı için ikisi çakışmaz. */}
+            <div
+                className="flex flex-col items-center gap-3"
+                style={{
+                    transform: `scale(${scale})`,
+                    transformOrigin: 'bottom center',
+                    transition: 'transform 180ms ease-out',
+                }}
+            >
             {onInsertMath && (
                 <ObjectLibraryPanel
                     open={showMath}
@@ -643,17 +661,22 @@ export function DrawingToolbar({
                 )}
             </AnimatePresence>
 
-            <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-1 max-w-[calc(100vw-20px)] bg-[#1a1b26] p-1.5 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5 transition-all duration-300">
+            {/* Tek satırda kalır: sığmazsa `useToolbarScale` ölçeği küçültür,
+                böylece tahtada çubuk ikinci satıra taşıp ekranı kaplamaz. */}
+            <div
+                ref={barRef}
+                className="pointer-events-auto flex flex-nowrap items-center justify-center gap-0.5 bg-[#1a1b26] p-1.5 rounded-2xl shadow-[0_18px_40px_rgba(0,0,0,0.45)] border border-white/5"
+            >
                 <div
                     onPointerDown={(e) => dragControls.start(e)}
-                    className="p-2.5 text-slate-500 hover:text-white cursor-grab active:cursor-grabbing border-r border-white/10"
+                    className="p-2 text-slate-500 hover:text-white cursor-grab active:cursor-grabbing border-r border-white/10"
                     title="Taşı"
                     aria-label="Araç çubuğunu taşı"
                 >
-                    <GripVertical className="w-5 h-5" />
+                    <GripVertical className="w-[18px] h-[18px]" />
                 </div>
 
-                <div className="flex items-center gap-0.5 px-2 border-white/10 lg:border-r">
+                <div className="flex items-center gap-0.5 px-1.5 border-white/10 border-r">
                     {MAIN_TOOLS.map((tool) => (
                         <button
                             key={tool.id}
@@ -663,17 +686,17 @@ export function DrawingToolbar({
                             aria-label={tool.label}
                             aria-pressed={config.tool === tool.id}
                             className={cn(
-                                'p-2.5 rounded-xl transition-all duration-200 group relative',
+                                'p-2 rounded-lg transition-all duration-200 group relative',
                                 config.tool === tool.id
                                     ? 'bg-[#2d3045] text-white'
                                     : 'text-slate-400 hover:text-white hover:bg-white/5'
                             )}
                         >
-                            <tool.icon className="w-5 h-5" />
+                            <tool.icon className="w-[18px] h-[18px]" />
                             {config.tool === tool.id && (
                                 <motion.div
                                     layoutId="activeTool"
-                                    className="absolute inset-0 border-2 border-emerald-500/50 rounded-xl pointer-events-none"
+                                    className="absolute inset-0 border-2 border-emerald-500/50 rounded-lg pointer-events-none"
                                 />
                             )}
                         </button>
@@ -685,7 +708,7 @@ export function DrawingToolbar({
                         aria-label="Şekiller ve damgalar"
                         aria-expanded={showShapes}
                         className={cn(
-                            'p-2.5 rounded-xl transition-all duration-200 relative',
+                            'p-2 rounded-lg transition-all duration-200 relative',
                             isShapeTool
                                 ? 'bg-[#2d3045] text-indigo-400'
                                 : 'text-slate-400 hover:text-white hover:bg-white/5',
@@ -698,7 +721,7 @@ export function DrawingToolbar({
                                 {config.stampIcon || '✅'}
                             </span>
                         ) : (
-                            <Shapes className="w-5 h-5" />
+                            <Shapes className="w-[18px] h-[18px]" />
                         )}
                         {isShapeTool && config.tool !== 'stamp' && (
                             <div className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full border border-[#1a1b26]" />
@@ -712,13 +735,13 @@ export function DrawingToolbar({
                         aria-expanded={showPen}
                         title="Kalem ucu, silgi, şekil düzeltme"
                         className={cn(
-                            'p-2.5 rounded-xl transition-all duration-200 relative',
+                            'p-2 rounded-lg transition-all duration-200 relative',
                             showPen
                                 ? 'bg-white/10 text-white'
                                 : 'text-slate-400 hover:text-white hover:bg-white/5'
                         )}
                     >
-                        <PenTool className="w-5 h-5" />
+                        <PenTool className="w-[18px] h-[18px]" />
                         {(config.snapShapes || penType !== 'ballpoint') && (
                             <div className="absolute top-1 right-1 w-2 h-2 bg-indigo-400 rounded-full border border-[#1a1b26]" />
                         )}
@@ -735,13 +758,13 @@ export function DrawingToolbar({
                                 : 'Çizgiyle Şekil Çizme: Kapalı (Açmak için tıklayın veya kalemle çizerken ucunda bekleyin)'
                         }
                         className={cn(
-                            'p-2.5 rounded-xl transition-all duration-200 relative',
+                            'p-2 rounded-lg transition-all duration-200 relative',
                             config.snapShapes
                                 ? 'bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 shadow-sm'
                                 : 'text-slate-400 hover:text-white hover:bg-white/5'
                         )}
                     >
-                        <Wand2 className="w-5 h-5" />
+                        <Wand2 className="w-[18px] h-[18px]" />
                         {config.snapShapes && (
                             <div className="absolute top-1 right-1 w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
                         )}
@@ -751,7 +774,7 @@ export function DrawingToolbar({
                 <div
                     role="radiogroup"
                     aria-label="Renk"
-                    className="flex items-center gap-1.5 px-2 border-white/10 lg:border-r"
+                    className="flex items-center gap-1 px-1.5 border-white/10 border-r"
                 >
                     {DRAWING_COLORS.map((color) => (
                         <button
@@ -762,7 +785,7 @@ export function DrawingToolbar({
                             aria-label={`Renk ${color}`}
                             onClick={() => setConfig({ ...config, color })}
                             className={cn(
-                                'w-6 h-6 rounded-full border-2 transition-all hover:scale-110',
+                                'w-[22px] h-[22px] rounded-full border-2 transition-all hover:scale-110',
                                 config.color === color
                                     ? 'border-white scale-110'
                                     : 'border-transparent'
@@ -775,7 +798,7 @@ export function DrawingToolbar({
                 <div
                     role="radiogroup"
                     aria-label="Kalınlık"
-                    className="flex items-center gap-2.5 px-2 border-white/10 lg:border-r"
+                    className="flex items-center gap-2 px-1.5 border-white/10 border-r"
                 >
                     {DRAWING_WIDTHS.map((size) => (
                         <button
@@ -791,41 +814,41 @@ export function DrawingToolbar({
                                     ? 'bg-white scale-125 ring-2 ring-indigo-500 ring-offset-2 ring-offset-[#1a1b26]'
                                     : 'hover:scale-110'
                             )}
-                            style={{ width: size + 4 + 'px', height: size + 4 + 'px' }}
+                            style={{ width: size + 3 + 'px', height: size + 3 + 'px' }}
                             title={`${size}px`}
                         />
                     ))}
                 </div>
 
-                <div className="flex items-center gap-1.5 px-2 border-white/10 lg:border-r">
+                <div className="flex items-center gap-1 px-1.5 border-white/10 border-r">
                     <button
                         type="button"
                         onClick={() => onCommand('UNDO_DRAWING')}
                         disabled={canUndo === false}
                         aria-label="Geri Al"
-                        className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                        className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
                         title="Geri Al"
                     >
-                        <Undo className="w-5 h-5" />
+                        <Undo className="w-[18px] h-[18px]" />
                     </button>
                     <button
                         type="button"
                         onClick={() => onCommand('REDO_DRAWING')}
                         disabled={canRedo === false}
                         aria-label="İleri Al"
-                        className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                        className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
                         title="İleri Al"
                     >
-                        <Redo className="w-5 h-5" />
+                        <Redo className="w-[18px] h-[18px]" />
                     </button>
                     <button
                         type="button"
                         onClick={() => onCommand('CLEAR_DRAWING')}
                         aria-label="Çizimi Temizle"
-                        className="p-2.5 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                        className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all"
                         title="Temizle"
                     >
-                        <Trash2 className="w-5 h-5" />
+                        <Trash2 className="w-[18px] h-[18px]" />
                     </button>
                     {setShowWhiteboard && (
                         <button
@@ -834,19 +857,19 @@ export function DrawingToolbar({
                             aria-label="Yazı Tahtası"
                             aria-pressed={showWhiteboard}
                             className={cn(
-                                'p-2.5 rounded-xl transition-all',
+                                'p-2 rounded-lg transition-all',
                                 showWhiteboard
                                     ? 'bg-emerald-600 text-white'
                                     : 'text-slate-400 hover:text-white hover:bg-white/5'
                             )}
                             title="Yazı Tahtası"
                         >
-                            <Grid className="w-5 h-5" />
+                            <Grid className="w-[18px] h-[18px]" />
                         </button>
                     )}
                 </div>
 
-                <div className="flex items-center gap-1.5 px-2">
+                <div className="flex items-center gap-1 px-1.5">
                     {onOpenLibrary && (
                         <button
                             type="button"
@@ -854,7 +877,7 @@ export function DrawingToolbar({
                             aria-label="Kütüphane"
                             aria-pressed={isLibraryOpen}
                             className={cn(
-                                'px-3 py-2 rounded-xl transition-all flex items-center gap-1 font-bold text-sm shadow-md',
+                                'px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 font-bold text-[13px] shadow-md',
                                 isLibraryOpen
                                     ? 'bg-indigo-600 text-white shadow-indigo-600/50 ring-2 ring-indigo-400'
                                     : 'bg-indigo-600/80 hover:bg-indigo-600 text-white hover:shadow-indigo-600/30'
@@ -872,14 +895,14 @@ export function DrawingToolbar({
                             aria-label="Laboratuvar ve branş araçları"
                             aria-expanded={showLab}
                             className={cn(
-                                'p-2.5 rounded-xl transition-all relative',
+                                'p-2 rounded-lg transition-all relative',
                                 showLab
                                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-white/20'
                                     : 'text-slate-400 hover:text-purple-300 hover:bg-purple-500/10'
                             )}
                             title="Dinamik Laboratuvar & Matematik Araçları"
                         >
-                            <FlaskConical className="w-5 h-5" />
+                            <FlaskConical className="w-[18px] h-[18px]" />
                             <span className="absolute -top-1 -right-1 flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
@@ -893,14 +916,14 @@ export function DrawingToolbar({
                             aria-label="Nesne kütüphanesi"
                             aria-expanded={showMath}
                             className={cn(
-                                'p-2.5 rounded-xl transition-all relative',
+                                'p-2 rounded-lg transition-all relative',
                                 showMath
                                     ? 'bg-indigo-600 text-white'
                                     : 'text-slate-400 hover:text-indigo-300 hover:bg-indigo-400/10'
                             )}
                             title="Matematik & Fen Kütüphanesi"
                         >
-                            <Sigma className="w-5 h-5" />
+                            <Sigma className="w-[18px] h-[18px]" />
                             <Sparkles className="w-2.5 h-2.5 absolute top-1 right-1 text-indigo-300" />
                         </button>
                     )}
@@ -922,13 +945,13 @@ export function DrawingToolbar({
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={isInsertingImage}
                                 aria-label="Sayfaya fotoğraf ekle"
-                                className="p-2.5 rounded-xl text-slate-400 hover:text-sky-300 hover:bg-sky-400/10 transition-all disabled:opacity-40"
+                                className="p-2 rounded-lg text-slate-400 hover:text-sky-300 hover:bg-sky-400/10 transition-all disabled:opacity-40"
                                 title="Fotoğraf Ekle"
                             >
                                 {isInsertingImage ? (
-                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                    <Loader2 className="w-[18px] h-[18px] animate-spin" />
                                 ) : (
-                                    <ImagePlus className="w-5 h-5" />
+                                    <ImagePlus className="w-[18px] h-[18px]" />
                                 )}
                             </button>
                         </>
@@ -940,14 +963,14 @@ export function DrawingToolbar({
                             aria-label="Metin kutusu ekle"
                             aria-pressed={isTextBoxMode}
                             className={cn(
-                                'p-2.5 rounded-xl transition-all',
+                                'p-2 rounded-lg transition-all',
                                 isTextBoxMode
                                     ? 'bg-amber-500 text-white'
                                     : 'text-slate-400 hover:text-white hover:bg-white/5'
                             )}
                             title="Metin Kutusu Ekle"
                         >
-                            <StickyNote className="w-5 h-5" />
+                            <StickyNote className="w-[18px] h-[18px]" />
                         </button>
                     )}
                     {onScreenshot && (
@@ -955,10 +978,10 @@ export function DrawingToolbar({
                             type="button"
                             onClick={onScreenshot}
                             aria-label="Çizimi PNG olarak indir"
-                            className="p-2.5 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 transition-all"
+                            className="p-2 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 transition-all"
                             title="Çizimi PNG Olarak İndir"
                         >
-                            <Camera className="w-5 h-5" />
+                            <Camera className="w-[18px] h-[18px]" />
                         </button>
                     )}
                     {onBgColorChange && (
@@ -968,7 +991,7 @@ export function DrawingToolbar({
                             aria-label="Arka plan rengi"
                             aria-expanded={showExtras}
                             className={cn(
-                                'p-2.5 rounded-xl transition-all relative',
+                                'p-2 rounded-lg transition-all relative',
                                 showExtras
                                     ? 'bg-white/10 text-white'
                                     : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -976,11 +999,27 @@ export function DrawingToolbar({
                             title="Arka Plan Rengi"
                         >
                             <div
-                                className="w-5 h-5 rounded-full border-2 border-white/40"
+                                className="w-[18px] h-[18px] rounded-full border-2 border-white/40"
                                 style={{ backgroundColor: bgColor || '#ffffff' }}
                             />
                         </button>
                     )}
+
+                    {/* Akıllı tahtada çubuk büyük duruyorsa kullanıcı buradan
+                        küçültür; tercih tarayıcıda saklanır. */}
+                    <button
+                        type="button"
+                        onClick={cycleDensity}
+                        aria-label={`Araç çubuğu boyutu: ${TOOLBAR_DENSITY_LABELS[density]}`}
+                        className="p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all"
+                        title={`Araç çubuğu boyutu: ${TOOLBAR_DENSITY_LABELS[density]} (değiştirmek için tıklayın)`}
+                    >
+                        {density === 'large' ? (
+                            <Minimize2 className="w-[18px] h-[18px]" />
+                        ) : (
+                            <Maximize2 className="w-[18px] h-[18px]" />
+                        )}
+                    </button>
                 </div>
 
             </div>
@@ -1019,6 +1058,7 @@ export function DrawingToolbar({
                     </motion.div>
                 )}
             </AnimatePresence>
+            </div>
         </motion.div>
     );
 
