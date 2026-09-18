@@ -31,6 +31,83 @@ export const SHAPE_TOOLS = [
 ];
 
 /**
+ * Dönüşü kendi alanında saklanan araçlar.
+ *
+ * Serbest çizim, çokgen, doğru parçaları ve daire iki/çok noktayla tanımlıdır;
+ * noktaları döndürmek şekli de döndürür. Kare, üçgen, üç boyutlu cisimler,
+ * metin, damga, görsel ve matematik nesneleri ise her zaman eksenlere hizalı
+ * çizildiği için dönüşleri ayrı tutulur ve çizim anında uygulanır.
+ */
+const ROTATION_FIELD_TOOLS = [
+    'rect',
+    'triangle',
+    'cube',
+    'rect_prism',
+    'tri_prism',
+    'pyramid',
+    'cylinder',
+    'cone',
+    'sphere',
+    'text',
+    'stamp',
+    'image',
+    'math',
+];
+
+/** Bir noktayı merkez etrafında döndürür. */
+export const rotatePoint = (p: Point, center: Point, angle: number): Point => {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const dx = p.x - center.x;
+    const dy = p.y - center.y;
+    return {
+        ...p,
+        x: center.x + dx * cos - dy * sin,
+        y: center.y + dx * sin + dy * cos,
+    };
+};
+
+/** Çizimin kendi noktalarının (dönüşsüz) kutu merkezi. */
+const rawCenter = (points: Point[]): Point => {
+    let x1 = Infinity;
+    let y1 = Infinity;
+    let x2 = -Infinity;
+    let y2 = -Infinity;
+    for (const p of points) {
+        if (p.x < x1) x1 = p.x;
+        if (p.y < y1) y1 = p.y;
+        if (p.x > x2) x2 = p.x;
+        if (p.y > y2) y2 = p.y;
+    }
+    return { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+};
+
+/**
+ * Bir çizimi verilen merkez etrafında döndürür.
+ *
+ * Noktalarıyla tanımlı çizimlerde noktalar döner; eksen hizalı çizilenlerde
+ * yalnızca merkez döner, şeklin kendi dönüşü `rotation` alanında birikir.
+ */
+export function rotateStroke(s: Stroke, center: Point, angle: number): Stroke {
+    if (!ROTATION_FIELD_TOOLS.includes(s.tool)) {
+        return { ...s, points: s.points.map((p) => rotatePoint(p, center, angle)) };
+    }
+    const c0 = rawCenter(s.points);
+    const c1 = rotatePoint(c0, center, angle);
+    const dx = c1.x - c0.x;
+    const dy = c1.y - c0.y;
+    return {
+        ...s,
+        points: s.points.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy })),
+        rotation: (s.rotation ?? 0) + angle,
+    };
+}
+
+/** Dönmüş bir çizimde isabet testi için noktayı çizimin kendi eksenine taşır. */
+const toLocalPoint = (s: Stroke, x: number, y: number): Point =>
+    s.rotation ? rotatePoint({ x, y }, rawCenter(s.points), -s.rotation) : { x, y };
+
+/**
  * Çizginin ekranda kapladığı azami yarı kalınlık.
  *
  * Kalem uçları baskıya göre taban kalınlığın katlarına çıkabilir (fırça 3x);
@@ -59,6 +136,22 @@ export const getBB = (s: Stroke): BoundingBox => {
         y2 = Math.max(y2, p1.y + r);
     }
 
+    // Döndürülmüş şekilde kutu, dönmüş köşelerin çevrelediği alandır.
+    const rotation = s.rotation;
+    if (rotation) {
+        const center = { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+        const corners = [
+            { x: x1, y: y1 },
+            { x: x2, y: y1 },
+            { x: x2, y: y2 },
+            { x: x1, y: y2 },
+        ].map((c) => rotatePoint(c, center, rotation));
+        x1 = Math.min(...corners.map((c) => c.x));
+        y1 = Math.min(...corners.map((c) => c.y));
+        x2 = Math.max(...corners.map((c) => c.x));
+        y2 = Math.max(...corners.map((c) => c.y));
+    }
+
     // Matematik nesneleri ve fotoğraflar kutularına birebir oturur; serbest
     // çizimde ise parmakla seçimi kolaylaştırmak için bol boşluk bırakılır.
     const pad = TIGHT_TOOLS.includes(s.tool) ? 6 : Math.max(maxHalfWidth(s) + 6, 24);
@@ -76,6 +169,10 @@ export const unionBB = (list: BoundingBox[]): BoundingBox | null => {
 };
 
 export const hitTest = (s: Stroke, x: number, y: number): boolean => {
+    if (s.rotation) {
+        const local = toLocalPoint(s, x, y);
+        return hitTest({ ...s, rotation: undefined }, local.x, local.y);
+    }
     const bb = getBB(s);
     return x >= bb.x1 && x <= bb.x2 && y >= bb.y1 && y <= bb.y2;
 };
@@ -635,6 +732,10 @@ const triangleEdges = (p1: Point, p2: Point): [Point, Point][] => {
  * seçilmesi gibi yanlışlara yol açıyordu.
  */
 export const strokeNearPoint = (s: Stroke, x: number, y: number, radius: number): boolean => {
+    if (s.rotation) {
+        const local = toLocalPoint(s, x, y);
+        return strokeNearPoint({ ...s, rotation: undefined }, local.x, local.y, radius);
+    }
     const p = { x, y };
     const tolerance = radius + maxHalfWidth(s);
 
@@ -747,9 +848,48 @@ export const strokeNearSegment = (
     return segments.some(([p1, p2]) => distanceSegmentToSegment(a, b, p1, p2) <= tolerance);
 };
 
+/** Noktaları orta nokta yumuşatmasıyla tek bir yol olarak çizer. */
+function drawSmoothPath(
+    tCtx: CanvasRenderingContext2D,
+    points: Point[],
+    width: number
+): void {
+    if (points.length === 0) return;
+    if (points.length < 2) {
+        tCtx.beginPath();
+        tCtx.arc(points[0].x, points[0].y, width / 2, 0, Math.PI * 2);
+        tCtx.fill();
+        return;
+    }
+    tCtx.beginPath();
+    tCtx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length - 1; i++) {
+        const mid = {
+            x: (points[i].x + points[i + 1].x) / 2,
+            y: (points[i].y + points[i + 1].y) / 2,
+        };
+        tCtx.quadraticCurveTo(points[i].x, points[i].y, mid.x, mid.y);
+    }
+    const last = points[points.length - 1];
+    tCtx.lineTo(last.x, last.y);
+    tCtx.stroke();
+}
+
 /** Tek bir çizimi verilen bağlama çizer. Küçük resimlerde de kullanılır. */
 export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0) => {
     if (!s || s.points.length < 1) return;
+
+    // Eksen hizalı çizilen şekiller dönüşlerini bağlam dönüşümüyle alır.
+    if (s.rotation) {
+        const c = rawCenter(s.points);
+        tCtx.save();
+        tCtx.translate(c.x, c.y);
+        tCtx.rotate(s.rotation);
+        tCtx.translate(-c.x, -c.y);
+        drawStroke(tCtx, { ...s, rotation: undefined }, time);
+        tCtx.restore();
+        return;
+    }
 
     if (s.tool === 'math') {
         drawLibraryObject(tCtx, s, time);
@@ -789,7 +929,24 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0) 
     if (s.tool === 'highlighter') tCtx.globalAlpha = 0.4;
     if (s.tool === 'dashed') tCtx.setLineDash([12, 6]);
 
+    // Kesikli/noktalı serbest çizgi. Desen, kalınlığın katı olarak verilir ki
+    // ince kalemde sık, kalın kalemde seyrek görünsün.
+    const dashed = s.dash && s.dash !== 'solid';
+    if (dashed) {
+        const w = s.width || 2;
+        tCtx.setLineDash(
+            s.dash === 'dotted' ? [0.1, w * 2.2] : [w * 3, w * 2.2]
+        );
+    }
+
     if (s.tool === 'pencil') {
+        // Desenli kalem sabit kalınlıkta çizer: değişken kalınlıklı şerit
+        // doldurularak üretildiği için çizgi deseni uygulanamaz.
+        if (dashed) {
+            drawSmoothPath(tCtx, s.points, s.width || 2);
+            tCtx.restore();
+            return;
+        }
         // Kalem ucuna göre değişken kalınlık (dolma kalem / fırça hissi).
         tCtx.globalAlpha *= getPenProfile(s.penType).alpha;
         drawVariableStroke(tCtx, s, s.width || 2);

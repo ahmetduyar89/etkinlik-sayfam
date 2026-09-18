@@ -121,6 +121,16 @@ export interface Stroke {
     math?: MathObject;
     /** `tool === 'image'` olduğunda görselin data URL'i. */
     src?: string;
+    /** Serbest çizginin deseni (kesikli/noktalı kalem). */
+    dash?: DashStyle;
+    /**
+     * Kutusunun merkezi etrafındaki dönüş açısı (radyan).
+     *
+     * Serbest çizim ve çokgende noktalar doğrudan döndürülür; iki noktayla
+     * tanımlanan şekiller, metin, damga, görsel ve matematik nesneleri
+     * eksenlere hizalı kaldığı için dönüşleri burada saklanır.
+     */
+    rotation?: number;
 }
 
 /** Çalışma alanının yakınlaştırma ve kaydırma durumu. */
@@ -389,7 +399,23 @@ export interface DrawConfig {
     snapAngle?: boolean;
     /** Silgi davranışı. */
     eraserMode?: EraserMode;
+    /** Serbest çizginin deseni. */
+    dash?: DashStyle;
+    /** Kaybolan mürekkep: çizilen iz birkaç saniyede solar, sayfaya işlenmez. */
+    ephemeral?: boolean;
+    /** Kalem kullanılırken parmak/avuç dokunuşlarını yok say. */
+    palmRejection?: boolean;
+    /** Izgaraya ve diğer nesnelere yapışma. */
+    snapToGrid?: boolean;
+    /** Ekranda duran ölçü aracı (cetvel / gönye / açıölçer). */
+    ruler?: RulerKind | null;
 }
+
+/** Serbest çizgi deseni. */
+export type DashStyle = 'solid' | 'dashed' | 'dotted';
+
+/** Ölçü aracı türü. */
+export type RulerKind = 'ruler' | 'setsquare' | 'protractor';
 
 export interface TextBoxData {
     id: string;
@@ -405,7 +431,14 @@ export interface TextBoxData {
  * listeleridir (seçim sırasıyla aynı hizada).
  */
 export type DragState =
-    | { type: 'move'; startX: number; startY: number; orig: Point[][] }
+    | {
+          type: 'move';
+          startX: number;
+          startY: number;
+          orig: Point[][];
+          /** Taşımaya başlarken seçimin kutusu — yapışma bunun kenarlarını kullanır. */
+          origBB?: BoundingBox;
+      }
     | {
           type: 'resize';
           handle: string;

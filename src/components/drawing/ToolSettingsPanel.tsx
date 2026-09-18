@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { PaintBucket, Pentagon } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import type { DrawConfig, DrawingTool, PenType } from '../../types';
+import type { DashStyle, DrawConfig, DrawingTool, PenType } from '../../types';
 import {
     ERASER_MODES,
     STAMP_CATEGORIES,
@@ -172,7 +172,55 @@ export function ToolSettingsPanel({
                         </div>
                     </div>
 
+                    <Row label="Çizgi Deseni">
+                        {(
+                            [
+                                { id: 'solid', label: 'Düz', dash: '' },
+                                { id: 'dashed', label: 'Kesikli', dash: '7 4' },
+                                { id: 'dotted', label: 'Noktalı', dash: '0.1 5' },
+                            ] as { id: DashStyle; label: string; dash: string }[]
+                        ).map((opt) => {
+                            const active = (config.dash ?? 'solid') === opt.id;
+                            return (
+                                <button
+                                    key={opt.id}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={active}
+                                    aria-label={opt.label}
+                                    title={opt.label}
+                                    onClick={() => setConfig({ ...config, dash: opt.id })}
+                                    className={cn(
+                                        'px-2.5 h-9 rounded-lg border transition-all flex items-center',
+                                        active
+                                            ? 'bg-[#2d3045] border-indigo-500/70'
+                                            : 'border-white/10 hover:bg-white/10'
+                                    )}
+                                >
+                                    <svg width="34" height="10" viewBox="0 0 34 10" aria-hidden="true">
+                                        <line
+                                            x1="2"
+                                            y1="5"
+                                            x2="32"
+                                            y2="5"
+                                            stroke={active ? '#ffffff' : '#94a3b8'}
+                                            strokeWidth="2.5"
+                                            strokeLinecap="round"
+                                            strokeDasharray={opt.dash || undefined}
+                                        />
+                                    </svg>
+                                </button>
+                            );
+                        })}
+                    </Row>
+
                     <div className="flex flex-col gap-1.5 border-t border-white/10 pt-2">
+                        <Toggle
+                            title="Kaybolan Mürekkep"
+                            hint="Çizilen iz birkaç saniyede solar, sayfaya işlenmez"
+                            checked={!!config.ephemeral}
+                            onChange={() => setConfig({ ...config, ephemeral: !config.ephemeral })}
+                        />
                         <Toggle
                             title="Çizgiyle Şekil Çizme (Akıllı Kalem)"
                             hint="Çizilen çizgi, ok, daire, kare ve üçgenleri geometrik şekle çevirir"
@@ -192,6 +240,23 @@ export function ToolSettingsPanel({
                     </div>
                 </>
             )}
+
+            <div className="flex flex-col gap-1.5 border-t border-white/10 pt-2">
+                <Toggle
+                    title="Izgaraya ve Nesnelere Yapışma"
+                    hint="Şekiller kareye oturur, taşınan nesne komşularıyla hizalanır"
+                    checked={!!config.snapToGrid}
+                    onChange={() => setConfig({ ...config, snapToGrid: !config.snapToGrid })}
+                />
+                <Toggle
+                    title="Avuç İçi Reddi"
+                    hint="Kalem kullanılırken parmak ve avuç dokunuşları çizmez"
+                    checked={config.palmRejection !== false}
+                    onChange={() =>
+                        setConfig({ ...config, palmRejection: config.palmRejection === false })
+                    }
+                />
+            </div>
 
             {section === 'eraser' && (
                 <Row label="Silgi Modu">

@@ -24,9 +24,12 @@ import {
     Atom,
     Maximize2,
     Minimize2,
+    Ruler,
+    Compass,
+    Triangle,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import type { DrawConfig, DrawingTool, MathObject } from '../../types';
+import type { DrawConfig, DrawingTool, MathObject, RulerKind } from '../../types';
 import { BG_COLORS, MAIN_TOOLS, SHAPE_TOOL_IDS } from '../../constants/drawing';
 import {
     TOOLBAR_DENSITY_LABELS,
@@ -75,6 +78,14 @@ interface DrawingToolbarProps {
 }
 
 type PanelId = 'settings' | 'shapes' | 'colors' | 'math' | 'lab' | 'extras';
+
+/** Ölçü aracı düğmesinin ipucu metinleri. */
+const RULER_LABELS: Record<RulerKind | 'off', string> = {
+    off: 'Kapalı',
+    ruler: 'Cetvel',
+    setsquare: 'Gönye',
+    protractor: 'Açıölçer',
+};
 
 /** Hangi aracın hangi ayar grubunu açacağı. Seç/kement/el ayarsızdır. */
 function sectionForTool(tool: DrawingTool): ToolSettingsSection | null {
@@ -487,6 +498,40 @@ export function DrawingToolbar({
                         )}
                     </button>
                 </div>
+                <div className="flex items-center gap-1 px-1.5 border-white/10 border-r">
+                    {/* Ölçü aracı: tahtada cetvelle düz çizgi çekmek için. */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const order: (RulerKind | null)[] = [
+                                null,
+                                'ruler',
+                                'setsquare',
+                                'protractor',
+                            ];
+                            const at = order.indexOf(config.ruler ?? null);
+                            setConfig({ ...config, ruler: order[(at + 1) % order.length] });
+                        }}
+                        aria-label={`Ölçü aracı: ${RULER_LABELS[config.ruler ?? 'off']}`}
+                        aria-pressed={!!config.ruler}
+                        title={`Ölçü aracı: ${RULER_LABELS[config.ruler ?? 'off']} (değiştirmek için tıklayın)`}
+                        className={cn(
+                            'p-2 rounded-lg transition-all relative',
+                            config.ruler
+                                ? 'bg-emerald-600/30 text-emerald-300 ring-1 ring-emerald-500/40'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        )}
+                    >
+                        {config.ruler === 'protractor' ? (
+                            <Compass className="w-[18px] h-[18px]" />
+                        ) : config.ruler === 'setsquare' ? (
+                            <Triangle className="w-[18px] h-[18px]" />
+                        ) : (
+                            <Ruler className="w-[18px] h-[18px]" />
+                        )}
+                    </button>
+                </div>
+
                 <div className="flex items-center gap-1 px-1.5 border-white/10 border-r">
                     {/* Yalnızca renk: kalem ucu/kalınlık aracın kendi panelinde. */}
                     <button
