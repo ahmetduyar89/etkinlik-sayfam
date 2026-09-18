@@ -15,7 +15,14 @@ interface PdfPageBackgroundProps {
     pageNumber: number; // 1-based index (1, 2, 3...)
     view: Viewport;
     canvasSize: { w: number; h: number };
+    /**
+     * Sayfanın dünya ölçüsü. Verilirse sayfa orijine oturur ve boyutu hiçbir
+     * koşulda değişmez; verilmezse eski yerleşim kullanılır (eski defterler).
+     */
+    box?: { w: number; h: number } | null;
     onPageDimensions?: (w: number, h: number, numPages: number) => void;
+    /** İşlenmiş sayfa tuvalini dışarı verir (PNG çıktısına PDF de girsin). */
+    onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
     onRebindSuccess?: () => void;
 }
 
@@ -25,7 +32,9 @@ export function PdfPageBackground({
     pageNumber,
     view,
     canvasSize,
+    box,
     onPageDimensions,
+    onCanvasReady,
     onRebindSuccess,
 }: PdfPageBackgroundProps) {
     const toast = useToast();
@@ -36,6 +45,10 @@ export function PdfPageBackground({
     const [rendering, setRendering] = React.useState(false);
 
     const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    React.useEffect(() => {
+        onCanvasReady?.(canvasRef.current);
+        return () => onCanvasReady?.(null);
+    }, [onCanvasReady]);
     const renderTaskRef = React.useRef<any>(null);
     const pdfDocRef = React.useRef<any>(null);
     const lastRenderedPageRef = React.useRef<number>(-1);
@@ -90,11 +103,14 @@ export function PdfPageBackground({
                 const baseW = unscaledViewport.width;
                 const baseH = unscaledViewport.height;
 
-                // Rahat bir genişlik için taban ölçek (hedef genişlik ~900px)
-                const targetWorldW = Math.max(baseW, Math.min(1000, canvasSize.w > 200 ? canvasSize.w - 80 : 900));
+                // Sayfanın dünya ölçüsü. Eskiden pencere genişliğine bağlıydı;
+                // aynı defter dar bir pencerede açılınca PDF küçülüyor, üstüne
+                // alınmış notlar kayıyordu. Artık ölçü ya defterle birlikte
+                // saklanır ya da sabit bir tabana (1000 birim) oturur.
+                const targetWorldW = box ? box.w : Math.max(baseW, 1000);
                 const fitScale = targetWorldW / baseW;
-                const worldW = baseW * fitScale;
-                const worldH = baseH * fitScale;
+                const worldW = box ? box.w : baseW * fitScale;
+                const worldH = box ? box.h : baseH * fitScale;
 
                 setPageSize({ w: worldW, h: worldH });
                 onPageDimensions?.(worldW, worldH, doc.numPages);
@@ -137,7 +153,7 @@ export function PdfPageBackground({
                 setRendering(false);
             }
         },
-        [canvasSize.w, view.scale, onPageDimensions]
+        [box, view.scale, onPageDimensions]
     );
 
     // Sayfa numarası veya doküman değiştiğinde çiz
@@ -215,9 +231,11 @@ export function PdfPageBackground({
         );
     }
 
-    // Sayfa konumu (Dünya koordinatlarında sabit x: 40, y: 24)
-    const worldX = 40;
-    const worldY = 24;
+    // Sayfa konumu. Yeni defterlerde sayfa orijine oturur (çizim katmanının
+    // sayfa kutusuyla birebir aynı yer); eski defterlerde eski konum korunur
+    // ki mevcut notlar kaymasın.
+    const worldX = box ? 0 : 40;
+    const worldY = box ? 0 : 24;
 
     const screenX = worldX * view.scale + view.tx;
     const screenY = worldY * view.scale + view.ty;

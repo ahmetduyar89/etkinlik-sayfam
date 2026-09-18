@@ -18,7 +18,6 @@ import { onImageReady } from './imageStore';
 import { applyOpToStrokes, newStrokeId, withIds } from './strokeOps';
 import { withAlpha } from './objectDrawing';
 import { drawPaper } from '../notebooks/paper';
-import { pageDims } from '../../constants/pageSizes';
 import {
     SHAPE_TOOLS,
     drawStroke,
@@ -38,7 +37,6 @@ import type {
     BoundingBox,
     DashStyle,
     DrawConfig,
-    PageSize,
     DrawingCanvasHandle,
     DragState,
     DrawingTool,
@@ -77,8 +75,11 @@ interface DrawingCanvasProps {
      *    yakınlaştırır. Defter/beyaz tahta bu kipi kullanır.
      */
     panMode?: 'passthrough' | 'viewport';
-    /** Sayfa boyutu; verilmezse çalışma alanı sınırsızdır. */
-    pageSize?: PageSize;
+    /**
+     * Sayfanın dünya ölçüsü; verilmezse çalışma alanı sınırsızdır. Kağıt
+     * ölçüsünden ya da bağlı PDF sayfasından gelir.
+     */
+    pageBox?: { w: number; h: number } | null;
     /**
      * Yakınlaştırma/kaydırma ya da tuval boyutu değiştiğinde tetiklenir.
      * `size`, kağıt deseninin çizimle aynı hizada durması için gerekir.
@@ -110,7 +111,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             onLocalOp,
             onHistoryChange,
             panMode = 'passthrough',
-            pageSize,
+            pageBox,
             onViewChange,
         },
         ref
@@ -294,10 +295,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
          * Sol üst köşe orijindedir: yeni bir defter açıldığında görünüm de
          * orijinde olduğu için çizim doğal olarak sayfanın içinde başlar.
          */
-        const pageRect = React.useMemo(() => {
-            const dims = pageDims(pageSize);
-            return dims ? { x: 0, y: 0, w: dims.w, h: dims.h } : null;
-        }, [pageSize]);
+        const pageRect = React.useMemo(
+            () => (pageBox ? { x: 0, y: 0, w: pageBox.w, h: pageBox.h } : null),
+            [pageBox]
+        );
         const pageRectRef = React.useRef(pageRect);
         pageRectRef.current = pageRect;
 
@@ -993,7 +994,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     window.setTimeout(redraw, 0);
                     notifyPageChange();
                 },
-                screenshot: (wbMode: boolean, color: string, paper?: PaperStyle) => {
+                screenshot: (
+                    wbMode: boolean,
+                    color: string,
+                    paper?: PaperStyle,
+                    background?: HTMLCanvasElement | null
+                ) => {
                     const canvas = canvasRef.current;
                     const buffer = bufferCanvasRef.current;
                     if (!canvas || !buffer) return;
@@ -1029,6 +1035,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                             h,
                             page ? { scale: 1, tx: 0, ty: 0 } : viewRef.current
                         );
+                    }
+
+                    // Bağlı PDF sayfası çizimlerin altına girer; aksi hâlde
+                    // çıktıda yalnızca notlar görünürdü.
+                    if (page && background && background.width > 0) {
+                        ctx.drawImage(background, 0, 0, w, h);
                     }
 
                     if (page) {

@@ -104,6 +104,11 @@ const PAPER_GROUPS = PAPER_STYLES.reduce<
 
 export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEditorProps) {
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
+    /** Bağlı PDF sayfasının işlenmiş tuvali — PNG çıktısında arka plan olur. */
+    const pdfCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
+    const handlePdfCanvas = React.useCallback((c: HTMLCanvasElement | null) => {
+        pdfCanvasRef.current = c;
+    }, []);
     const prompt = usePrompt();
     const toast = useToast();
     const confirm = useConfirm();
@@ -804,7 +809,9 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
 
     const currentPaper = PAPER_STYLES.find((p) => p.id === paper);
     const currentPageSize = PAGE_SIZES.find((p) => p.id === pageSize);
-    const pageBox = pageDims(pageSize);
+    // Sayfa kutusu: PDF bağlıysa PDF sayfası, değilse seçilen kağıt ölçüsü.
+    const pdfBox = notebook.pdf_id ? notebook.pdf_box ?? null : null;
+    const pageBox = pdfBox ?? pageDims(pageSize);
 
     const changePaper = (next: PaperStyle) => {
         setPaper(next);
@@ -902,7 +909,17 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                                     <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
                                         Sayfa Boyutu
                                     </p>
-                                    <div className="grid grid-cols-2 gap-1">
+                                    {pdfBox && (
+                                        <p className="px-2 pb-1.5 text-[11px] text-on-surface-variant leading-tight">
+                                            Bu defterde sayfa, bağlı PDF sayfasının ölçüsündedir.
+                                        </p>
+                                    )}
+                                    <div
+                                        className={cn(
+                                            'grid grid-cols-2 gap-1',
+                                            pdfBox && 'opacity-40 pointer-events-none'
+                                        )}
+                                    >
                                         {PAGE_SIZES.map((size) => (
                                             <button
                                                 key={size.id}
@@ -1060,7 +1077,14 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         <Redo2 className="w-[18px] h-[18px]" />
                     </button>
                     <button
-                        onClick={() => canvasRef.current?.screenshot(true, bgColor, paper)}
+                        onClick={() =>
+                                canvasRef.current?.screenshot(
+                                    true,
+                                    bgColor,
+                                    paper,
+                                    pdfCanvasRef.current
+                                )
+                            }
                         title="Sayfayı görsel olarak indir"
                         aria-label="Sayfayı görsel olarak indir"
                         className="p-2 rounded-xl hover:bg-white/15 transition-colors"
@@ -1225,6 +1249,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         pageNumber={pageInfo.current + 1}
                         view={view}
                         canvasSize={canvasSize}
+                        box={pdfBox}
+                        onCanvasReady={handlePdfCanvas}
                     />
                 )}
 
@@ -1251,7 +1277,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             }
                             onPageChange={(current, total) => setPageInfo({ current, total })}
                             panMode="viewport"
-                            pageSize={pageSize}
+                            pageBox={pageBox}
                             onViewChange={handleViewChange}
                             onRequestText={() =>
                                 prompt({
@@ -1332,7 +1358,9 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 setConfig={setConfig}
                 bgColor={bgColor}
                 onBgColorChange={changeBg}
-                onScreenshot={() => canvasRef.current?.screenshot(true, bgColor, paper)}
+                onScreenshot={() =>
+                    canvasRef.current?.screenshot(true, bgColor, paper, pdfCanvasRef.current)
+                }
                 isTextBoxMode={isTextBoxMode}
                 onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
                 onInsertMath={handleInsertMath}

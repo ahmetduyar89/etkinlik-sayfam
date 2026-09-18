@@ -209,7 +209,8 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
     const paper = notebook.paper || 'grid';
     // Öğrenci de öğretmenle aynı sayfayı görsün: kağıt ölçüsü varsa desen ve
     // yaprak aynı kutuya oturur.
-    const pageBox = pageDims(notebook.page_size);
+    const pdfBox = notebook.pdf_id ? notebook.pdf_box ?? null : null;
+    const pageBox = pdfBox ?? pageDims(notebook.page_size);
     const canGoPrev = pageInfo.current > 0;
     const canGoNext = pageInfo.current < pageInfo.total - 1;
 
@@ -256,7 +257,7 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
                     bgColor={bgColor}
                     initialPages={pages}
                     panMode="viewport"
-                    pageSize={notebook.page_size}
+                    pageBox={pageBox}
                     onPageChange={(current, total) => setPageInfo({ current, total })}
                     onViewChange={(v, size) => {
                         setView(v);

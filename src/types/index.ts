@@ -491,7 +491,13 @@ export interface DrawingCanvasHandle {
      * Sayfayı PNG olarak indirir. `paper` verilirse kağıt deseni de çizilir —
      * desen ekranda CSS arka planı olduğundan aksi hâlde çıktıda görünmez.
      */
-    screenshot: (wbMode: boolean, color: string, paper?: PaperStyle) => void;
+    screenshot: (
+        wbMode: boolean,
+        color: string,
+        paper?: PaperStyle,
+        /** Sayfanın altına çizilecek arka plan (bağlı PDF sayfası). */
+        background?: HTMLCanvasElement | null
+    ) => void;
 }
 
 // ── Ortak çizim (canlı operasyon akışı) ─────────────────────────────────
@@ -589,6 +595,13 @@ export interface Notebook {
     pdf_name?: string;
     /** PDF'in toplam sayfa sayısı */
     pdf_total_pages?: number;
+    /**
+     * PDF sayfasının dünya ölçüsü (birim). Defter oluşturulurken PDF'in kendi
+     * punto ölçüsünden hesaplanır ve bir daha değişmez: sayfa her cihazda aynı
+     * boyutta durur, üstüne alınan notlar kaymaz. Eski defterlerde yoktur;
+     * onlar eski yerleşimle açılır.
+     */
+    pdf_box?: { w: number; h: number };
     /**
      * Sayfa içeriğinin sürüm numarası. Her kayıtta artar; editör ve
      * görüntüleyici bu küçük üst veri dokümanını dinleyerek içeriğin başka

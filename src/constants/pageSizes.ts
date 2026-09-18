@@ -60,6 +60,23 @@ export const PAGE_SIZES: ReadonlyArray<PageSizeOption> = [
     },
 ];
 
+/**
+ * PDF ölçüsünden (punto) dünya birimine çevirim.
+ *
+ * PDF sayfaları puntoyla tanımlıdır (1 punto = 1/72 inç). Bu katsayı bir A4
+ * PDF'i tam olarak bizim A4 sayfamıza oturtur: 595 x 842 punto → 1092 x 1544
+ * birim. Böylece PDF üstüne alınan notlar her ekranda aynı yerde durur.
+ */
+export const UNITS_PER_PT = UNITS_PER_CM / 28.3465;
+
+/** PDF sayfasının punto ölçüsünü dünya ölçüsüne çevirir. */
+export function pdfBoxFromPoints(wPt: number, hPt: number): { w: number; h: number } {
+    return {
+        w: Math.round(wPt * UNITS_PER_PT),
+        h: Math.round(hPt * UNITS_PER_PT),
+    };
+}
+
 /** Seçilen boyutun dünya ölçüsü; sınırsızda `null`. */
 export function pageDims(size?: PageSize): { w: number; h: number } | null {
     if (!size || size === 'free') return null;
