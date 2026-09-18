@@ -7,8 +7,6 @@ import {
     ImagePlus,
     Loader2,
     Minus,
-    PaintBucket,
-    PenTool,
     Plus,
     Redo,
     Shapes,
@@ -17,8 +15,6 @@ import {
     StickyNote,
     Trash2,
     Undo,
-    Wand2,
-    Pentagon,
     FlaskConical,
     Scale,
     Dna,
@@ -30,26 +26,17 @@ import {
     Minimize2,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import type { DrawConfig, DrawingTool, MathObject, PenType } from '../../types';
-import {
-    BG_COLORS,
-    DRAWING_COLORS,
-    DRAWING_WIDTHS,
-    ERASER_MODES,
-    MAIN_TOOLS,
-    SHAPE_TOOL_IDS,
-    STAMP_CATEGORIES,
-    make2DShapeTools,
-    make3DShapeTools,
-    makeShapeTools,
-} from '../../constants/drawing';
-import { PEN_TYPES } from './penEngine';
+import type { DrawConfig, DrawingTool, MathObject } from '../../types';
+import { BG_COLORS, MAIN_TOOLS, SHAPE_TOOL_IDS } from '../../constants/drawing';
 import {
     TOOLBAR_DENSITY_LABELS,
     useToolbarScale,
 } from '../../hooks/useToolbarScale';
 import { ObjectLibraryPanel } from './ObjectLibraryPanel';
-import { DashedLineIcon, SolidLineIcon } from './DrawingIcons';
+import {
+    ToolSettingsPanel,
+    type ToolSettingsSection,
+} from './ToolSettingsPanel';
 
 export type ToolbarCommand =
     | 'UNDO_DRAWING'
@@ -86,9 +73,16 @@ interface DrawingToolbarProps {
     onSelectTool?: (toolId: string) => void;
 }
 
-const shape2DTools = make2DShapeTools(SolidLineIcon, DashedLineIcon);
-const shape3DTools = make3DShapeTools();
-const shapeTools = makeShapeTools(SolidLineIcon, DashedLineIcon);
+type PanelId = 'settings' | 'shapes' | 'math' | 'lab' | 'extras';
+
+/** Hangi aracın hangi ayar grubunu açacağı. Seç/kement/el ayarsızdır. */
+function sectionForTool(tool: DrawingTool): ToolSettingsSection | null {
+    if (tool === 'pencil' || tool === 'highlighter' || tool === 'sun') return 'pen';
+    if (tool === 'eraser') return 'eraser';
+    if (tool === 'text') return 'text';
+    if (SHAPE_TOOL_IDS.includes(tool) || tool === 'stamp') return 'shape';
+    return null;
+}
 
 export function DrawingToolbar({
     onCommand,
@@ -115,34 +109,63 @@ export function DrawingToolbar({
     onSelectTool,
 }: DrawingToolbarProps) {
     const fileInputRef = React.useRef<HTMLInputElement>(null);
-    const [showShapes, setShowShapes] = React.useState(false);
-    const [showExtras, setShowExtras] = React.useState(false);
-    const [showPen, setShowPen] = React.useState(false);
-    const [showMath, setShowMath] = React.useState(false);
-    const [showLab, setShowLab] = React.useState(false);
+    /** Aynı anda tek bir açılır panel görünür. */
+    const [panel, setPanel] = React.useState<PanelId | null>(null);
     const dragControls = useDragControls();
     const barRef = React.useRef<HTMLDivElement>(null);
+    const rootRef = React.useRef<HTMLDivElement>(null);
     const { scale, density, cycleDensity } = useToolbarScale(barRef);
 
-    const penType: PenType = config.penType ?? 'ballpoint';
-    const eraserMode = config.eraserMode ?? 'pixel';
+    const showMath = panel === 'math';
+    const showLab = panel === 'lab';
+    const showExtras = panel === 'extras';
 
-    /** Aynı anda tek bir açılır panel görünsün. */
-    const openOnly = (which: 'shapes' | 'pen' | 'math' | 'extras' | 'lab' | null) => {
-        setShowShapes(which === 'shapes');
-        setShowPen(which === 'pen');
-        setShowMath(which === 'math');
-        setShowExtras(which === 'extras');
-        setShowLab(which === 'lab');
-    };
+    const openOnly = (which: PanelId | null) => setPanel(which);
 
     const isShapeTool =
         SHAPE_TOOL_IDS.includes(config.tool) || config.tool === 'stamp';
 
+    /**
+     * Şekil düğmesi, seçili araç ne olursa olsun şekil ayarlarını açar.
+     * Seç/kement/el gibi ayarsız araçlarda renk düğmesi kalem ayarlarını
+     * gösterir; renk ve kalınlık bir sonraki çizim için geçerli olur.
+     */
+    const settingsSection: ToolSettingsSection =
+        panel === 'shapes' ? 'shape' : sectionForTool(config.tool) ?? 'pen';
+    const settingsOpen = panel === 'settings' || panel === 'shapes';
+
+    const toggleSettings = () =>
+        setPanel((prev) => (prev === 'settings' ? null : 'settings'));
+
+    /**
+     * Araca tıklamak hem aracı seçer hem de o araca ait ayarları açar:
+     * kalem boyutu/rengi, silgi modu ya da şekil seçenekleri aynı yerde.
+     * Aynı araca yeniden tıklanması paneli kapatır.
+     */
     const selectTool = (tool: DrawingTool) => {
         setConfig({ ...config, tool });
-        setShowShapes(false);
+        const section = sectionForTool(tool);
+        if (!section) {
+            setPanel(null);
+            return;
+        }
+        setPanel((prev) =>
+            prev === 'settings' && config.tool === tool ? null : 'settings'
+        );
     };
+
+    /** Panelden şekil seçilince panel açık kalsın (art arda deneme yapılabilsin). */
+    const selectShapeTool = (tool: DrawingTool) => setConfig({ ...config, tool });
+
+    // Tahtaya dokunulduğunda açık panel kapanır; çizim alanını kapatmasın.
+    React.useEffect(() => {
+        if (!panel) return;
+        const onPointerDown = (e: PointerEvent) => {
+            if (!rootRef.current?.contains(e.target as Node)) setPanel(null);
+        };
+        document.addEventListener('pointerdown', onPointerDown, true);
+        return () => document.removeEventListener('pointerdown', onPointerDown, true);
+    }, [panel]);
 
     const bar = (
         <motion.div
@@ -153,6 +176,7 @@ export function DrawingToolbar({
             dragElastic={0}
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
+            ref={rootRef}
             role="toolbar"
             aria-label="Çizim araç çubuğu"
             // Tam genişlikte durur: `left: 50%` verilseydi kullanılabilir
@@ -173,145 +197,24 @@ export function DrawingToolbar({
             {onInsertMath && (
                 <ObjectLibraryPanel
                     open={showMath}
-                    onClose={() => setShowMath(false)}
+                    onClose={() => setPanel(null)}
                     onInsert={onInsertMath}
                     onSelectTool={onSelectTool}
                 />
             )}
 
             <AnimatePresence>
-                {showPen && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="pointer-events-auto flex flex-col gap-2.5 bg-[#1a1b26]/95 backdrop-blur-md p-3 rounded-2xl border border-white/10 shadow-2xl w-[min(92vw,430px)]"
-                        onPointerDown={(e) => e.stopPropagation()}
-                    >
-                        <div>
-                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                                Kalem Ucu
-                            </span>
-                            <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-                                {PEN_TYPES.map((pen) => (
-                                    <button
-                                        key={pen.id}
-                                        type="button"
-                                        onClick={() => setConfig({ ...config, penType: pen.id })}
-                                        aria-pressed={penType === pen.id}
-                                        className={cn(
-                                            'text-left px-2.5 py-1.5 rounded-xl border transition-all',
-                                            penType === pen.id
-                                                ? 'bg-indigo-600/30 border-indigo-500/60'
-                                                : 'bg-white/[0.03] border-white/10 hover:bg-white/10'
-                                        )}
-                                    >
-                                        <span className="block text-[12.5px] font-bold text-white">
-                                            {pen.label}
-                                        </span>
-                                        <span className="block text-[10.5px] text-slate-400 leading-tight">
-                                            {pen.hint}
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div>
-                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                                Silgi
-                            </span>
-                            <div className="mt-1.5 flex items-center gap-1.5">
-                                {ERASER_MODES.map((mode) => (
-                                    <button
-                                        key={mode.id}
-                                        type="button"
-                                        onClick={() => setConfig({ ...config, eraserMode: mode.id })}
-                                        title={mode.hint}
-                                        aria-pressed={eraserMode === mode.id}
-                                        className={cn(
-                                            'px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition-all',
-                                            eraserMode === mode.id
-                                                ? 'bg-indigo-600/30 border-indigo-500/60 text-white'
-                                                : 'bg-white/[0.03] border-white/10 text-slate-300 hover:bg-white/10'
-                                        )}
-                                    >
-                                        {mode.label} silgi
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col gap-1.5 border-t border-white/10 pt-2.5">
-                            <button
-                                type="button"
-                                onClick={() => setConfig({ ...config, snapShapes: !config.snapShapes })}
-                                aria-pressed={!!config.snapShapes}
-                                className={cn(
-                                    'flex items-center justify-between gap-3 px-2.5 py-2 rounded-xl border transition-all text-left',
-                                    config.snapShapes
-                                        ? 'bg-emerald-600/25 border-emerald-500/60'
-                                        : 'bg-white/[0.03] border-white/10 hover:bg-white/10'
-                                )}
-                            >
-                                <span>
-                                    <span className="block text-[12.5px] font-bold text-white">
-                                        Çizgiyle Şekil Çizme (Akıllı Kalem)
-                                    </span>
-                                    <span className="block text-[10.5px] text-slate-400 leading-tight">
-                                        Çizilen çizgileri, okları, daire, kare ve üçgenleri geometrik şekle çevirir. Çizerken ucunda bekleyerek de yapabilirsiniz.
-                                    </span>
-                                </span>
-                                <span
-                                    className={cn(
-                                        'shrink-0 w-9 h-5 rounded-full transition-colors relative',
-                                        config.snapShapes ? 'bg-emerald-500' : 'bg-white/20'
-                                    )}
-                                >
-                                    <span
-                                        className={cn(
-                                            'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all',
-                                            config.snapShapes ? 'left-[18px]' : 'left-0.5'
-                                        )}
-                                    />
-                                </span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setConfig({ ...config, snapAngle: !config.snapAngle })}
-                                aria-pressed={!!config.snapAngle}
-                                className={cn(
-                                    'flex items-center justify-between gap-3 px-2.5 py-2 rounded-xl border transition-all text-left',
-                                    config.snapAngle
-                                        ? 'bg-emerald-600/25 border-emerald-500/60'
-                                        : 'bg-white/[0.03] border-white/10 hover:bg-white/10'
-                                )}
-                            >
-                                <span>
-                                    <span className="block text-[12.5px] font-bold text-white">
-                                        Açı kilidi (15°)
-                                    </span>
-                                    <span className="block text-[10.5px] text-slate-400 leading-tight">
-                                        Çizgi ve okları 15°nin katlarına oturtur
-                                    </span>
-                                </span>
-                                <span
-                                    className={cn(
-                                        'shrink-0 w-9 h-5 rounded-full transition-colors relative',
-                                        config.snapAngle ? 'bg-emerald-500' : 'bg-white/20'
-                                    )}
-                                >
-                                    <span
-                                        className={cn(
-                                            'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all',
-                                            config.snapAngle ? 'left-[18px]' : 'left-0.5'
-                                        )}
-                                    />
-                                </span>
-                            </button>
-                        </div>
-                    </motion.div>
+                {settingsOpen && (
+                    <ToolSettingsPanel
+                        section={settingsSection}
+                        config={config}
+                        setConfig={setConfig}
+                        onSelectShapeTool={selectShapeTool}
+                        onPickStamp={(emoji) => {
+                            setConfig({ ...config, tool: 'stamp', stampIcon: emoji });
+                            setPanel(null);
+                        }}
+                    />
                 )}
             </AnimatePresence>
 
@@ -342,7 +245,7 @@ export function DrawingToolbar({
                                 type="button"
                                 onClick={() => {
                                     onSelectTool?.('moleculeBuilder');
-                                    setShowLab(false);
+                                    setPanel(null);
                                 }}
                                 className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-indigo-600/25 border border-white/10 hover:border-indigo-500/50 text-left transition-all group"
                             >
@@ -363,7 +266,7 @@ export function DrawingToolbar({
                                 type="button"
                                 onClick={() => {
                                     onSelectTool?.('simpleMachines');
-                                    setShowLab(false);
+                                    setPanel(null);
                                 }}
                                 className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-indigo-600/25 border border-white/10 hover:border-indigo-500/50 text-left transition-all group"
                             >
@@ -384,7 +287,7 @@ export function DrawingToolbar({
                                 type="button"
                                 onClick={() => {
                                     onSelectTool?.('dnaGenetics');
-                                    setShowLab(false);
+                                    setPanel(null);
                                 }}
                                 className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-purple-600/25 border border-white/10 hover:border-purple-500/50 text-left transition-all group"
                             >
@@ -405,7 +308,7 @@ export function DrawingToolbar({
                                 type="button"
                                 onClick={() => {
                                     onSelectTool?.('linearGraph');
-                                    setShowLab(false);
+                                    setPanel(null);
                                 }}
                                 className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-blue-600/25 border border-white/10 hover:border-blue-500/50 text-left transition-all group"
                             >
@@ -426,7 +329,7 @@ export function DrawingToolbar({
                                 type="button"
                                 onClick={() => {
                                     onSelectTool?.('mathFormula');
-                                    setShowLab(false);
+                                    setPanel(null);
                                 }}
                                 className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-emerald-600/25 border border-white/10 hover:border-emerald-500/50 text-left transition-all group"
                             >
@@ -447,7 +350,7 @@ export function DrawingToolbar({
                                 type="button"
                                 onClick={() => {
                                     onSelectTool?.('geogebra');
-                                    setShowLab(false);
+                                    setPanel(null);
                                 }}
                                 className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-indigo-600/25 border border-white/10 hover:border-indigo-500/50 text-left transition-all group"
                             >
@@ -468,7 +371,7 @@ export function DrawingToolbar({
                                 type="button"
                                 onClick={() => {
                                     onSelectTool?.('3dStation');
-                                    setShowLab(false);
+                                    setPanel(null);
                                 }}
                                 className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-teal-600/25 border border-white/10 hover:border-teal-500/50 text-left transition-all group"
                             >
@@ -489,7 +392,7 @@ export function DrawingToolbar({
                                 type="button"
                                 onClick={() => {
                                     onSelectTool?.('pdfViewer');
-                                    setShowLab(false);
+                                    setPanel(null);
                                 }}
                                 className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-rose-600/25 border border-white/10 hover:border-rose-500/50 text-left transition-all group"
                             >
@@ -510,156 +413,6 @@ export function DrawingToolbar({
                 )}
             </AnimatePresence>
 
-            <AnimatePresence>
-                {showShapes && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="pointer-events-auto flex flex-col gap-2 max-h-[62vh] overflow-y-auto bg-[#1a1b26]/95 backdrop-blur-md p-3 rounded-2xl border border-white/10 shadow-2xl"
-                    >
-                        {/* Noktalarla Çokgen Vurgulu Buton */}
-                        <button
-                            type="button"
-                            onClick={() => selectTool('polygon')}
-                            className={cn(
-                                'w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl border text-left transition-all',
-                                config.tool === 'polygon'
-                                    ? 'bg-indigo-600/30 border-indigo-500/70 text-white shadow-lg ring-1 ring-indigo-500/50'
-                                    : 'bg-white/[0.04] border-white/10 hover:bg-white/10 text-slate-200'
-                            )}
-                        >
-                            <div className="flex items-center gap-2.5">
-                                <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 shrink-0">
-                                    <Pentagon className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <span className="block text-[12.5px] font-bold text-white leading-tight">
-                                        Noktalarla Çokgen (A-B-C...)
-                                    </span>
-                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
-                                        GeoGebra gibi noktalara tıklayarak üçgen, dörtgen ve çokgen oluşturun
-                                    </span>
-                                </div>
-                            </div>
-                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-indigo-500/25 text-indigo-300 shrink-0">
-                                {config.tool === 'polygon' ? 'Seçili' : 'Seç'}
-                            </span>
-                        </button>
-
-                        {/* 2B Şekiller */}
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-slate-400 font-semibold w-[78px] shrink-0 leading-tight">
-                                2B Şekil
-                            </span>
-                            <div className="flex items-center gap-0.5 flex-wrap">
-                                {shape2DTools.map((tool) => (
-                                    <button
-                                        key={tool.id}
-                                        type="button"
-                                        onClick={() => selectTool(tool.id)}
-                                        title={tool.label}
-                                        aria-label={tool.label}
-                                        className={cn(
-                                            'p-2 rounded-xl transition-all',
-                                            config.tool === tool.id
-                                                ? 'bg-[#2d3045] text-indigo-400 ring-1 ring-indigo-500/50'
-                                                : 'text-slate-400 hover:text-white hover:bg-white/5'
-                                        )}
-                                    >
-                                        {tool.Icon ? (
-                                            <tool.Icon className="w-5 h-5" />
-                                        ) : tool.Svg ? (
-                                            <tool.Svg />
-                                        ) : null}
-                                    </button>
-                                ))}
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setConfig({ ...config, fillEnabled: !config.fillEnabled })
-                                    }
-                                    title="Şekli Doldur / Yarı Saydam Renk"
-                                    aria-label="Şekli Doldur"
-                                    aria-pressed={config.fillEnabled}
-                                    className={cn(
-                                        'p-2 rounded-xl transition-all ml-1 border',
-                                        config.fillEnabled
-                                            ? 'bg-indigo-600/40 text-indigo-300 border-indigo-500/50'
-                                            : 'text-slate-500 hover:text-white hover:bg-white/5 border-white/10'
-                                    )}
-                                >
-                                    <PaintBucket className="w-5 h-5" />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* 3B Cisimler */}
-                        <div className="flex items-center gap-2 border-t border-white/10 pt-2">
-                            <span className="text-[10px] text-emerald-400 font-semibold w-[78px] shrink-0 leading-tight">
-                                3B Cisimler
-                            </span>
-                            <div className="flex items-center gap-0.5 flex-wrap">
-                                {shape3DTools.map((tool) => (
-                                    <button
-                                        key={tool.id}
-                                        type="button"
-                                        onClick={() => selectTool(tool.id)}
-                                        title={tool.label}
-                                        aria-label={tool.label}
-                                        className={cn(
-                                            'p-2 rounded-xl transition-all flex items-center justify-center',
-                                            config.tool === tool.id
-                                                ? 'bg-emerald-600/30 text-emerald-300 ring-1 ring-emerald-500/50'
-                                                : 'text-slate-400 hover:text-white hover:bg-white/5'
-                                        )}
-                                    >
-                                        {tool.Icon && <tool.Icon className="w-5 h-5" />}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {STAMP_CATEGORIES.map((cat) => (
-                            <div key={cat.label} className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 font-semibold w-[78px] shrink-0 leading-tight">
-                                    {cat.label}
-                                </span>
-                                <div className="flex items-center gap-0.5 flex-wrap">
-                                    {cat.items.map((stamp) => (
-                                        <button
-                                            key={stamp.emoji}
-                                            type="button"
-                                            onClick={() => {
-                                                setConfig({
-                                                    ...config,
-                                                    tool: 'stamp',
-                                                    stampIcon: stamp.emoji,
-                                                });
-                                                setShowShapes(false);
-                                            }}
-                                            title={stamp.label}
-                                            aria-label={`${cat.label}: ${stamp.label}`}
-                                            className={cn(
-                                                // Emoji kendi rengini taşır; π, ×, ∈ gibi metin
-                                                // semboller ise yazı rengini kullanır — açıkça
-                                                // verilmezse koyu panelde görünmez olurlar.
-                                                'w-9 h-9 rounded-xl text-xl leading-none text-slate-100 transition-all hover:bg-white/10 hover:text-white flex items-center justify-center',
-                                                config.tool === 'stamp' &&
-                                                    config.stampIcon === stamp.emoji
-                                                    ? 'bg-[#2d3045] ring-2 ring-indigo-500'
-                                                    : ''
-                                            )}
-                                        >
-                                            {stamp.emoji}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
-                    </motion.div>
-                )}
-            </AnimatePresence>
 
             {/* Tek satırda kalır: sığmazsa `useToolbarScale` ölçeği küçültür,
                 böylece tahtada çubuk ikinci satıra taşıp ekranı kaplamaz. */}
@@ -704,15 +457,15 @@ export function DrawingToolbar({
 
                     <button
                         type="button"
-                        onClick={() => openOnly(showShapes ? null : 'shapes')}
+                        onClick={() => openOnly(panel === 'shapes' ? null : 'shapes')}
                         aria-label="Şekiller ve damgalar"
-                        aria-expanded={showShapes}
+                        aria-expanded={panel === 'shapes'}
                         className={cn(
                             'p-2 rounded-lg transition-all duration-200 relative',
                             isShapeTool
                                 ? 'bg-[#2d3045] text-indigo-400'
                                 : 'text-slate-400 hover:text-white hover:bg-white/5',
-                            showShapes ? 'bg-white/10 text-white' : ''
+                            panel === 'shapes' ? 'bg-white/10 text-white' : ''
                         )}
                         title="Şekiller & Damgalar"
                     >
@@ -727,97 +480,35 @@ export function DrawingToolbar({
                             <div className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full border border-[#1a1b26]" />
                         )}
                     </button>
-
+                </div>
+                <div className="flex items-center gap-1 px-1.5 border-white/10 border-r">
+                    {/* Renk ve kalınlık artık aracın kendi ayar panelinde;
+                        buradaki düğme hem seçili rengi gösterir hem paneli açar. */}
                     <button
                         type="button"
-                        onClick={() => openOnly(showPen ? null : 'pen')}
-                        aria-label="Kalem ucu ve yazma ayarları"
-                        aria-expanded={showPen}
-                        title="Kalem ucu, silgi, şekil düzeltme"
+                        onClick={() => toggleSettings()}
+                        aria-label="Renk ve kalınlık ayarları"
+                        aria-expanded={panel === 'settings'}
+                        title="Renk, kalınlık ve araç ayarları"
                         className={cn(
-                            'p-2 rounded-lg transition-all duration-200 relative',
-                            showPen
-                                ? 'bg-white/10 text-white'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            'p-1.5 rounded-lg transition-all flex items-center gap-1.5',
+                            panel === 'settings'
+                                ? 'bg-white/10'
+                                : 'hover:bg-white/5'
                         )}
                     >
-                        <PenTool className="w-[18px] h-[18px]" />
-                        {(config.snapShapes || penType !== 'ballpoint') && (
-                            <div className="absolute top-1 right-1 w-2 h-2 bg-indigo-400 rounded-full border border-[#1a1b26]" />
-                        )}
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setConfig({ ...config, snapShapes: !config.snapShapes })}
-                        aria-label="Çizgiyle Geometrik Şekil Çizme"
-                        aria-pressed={!!config.snapShapes}
-                        title={
-                            config.snapShapes
-                                ? 'Çizgiyle Şekil Çizme: Açık (Çizilen şekiller otomatik düzelir)'
-                                : 'Çizgiyle Şekil Çizme: Kapalı (Açmak için tıklayın veya kalemle çizerken ucunda bekleyin)'
-                        }
-                        className={cn(
-                            'p-2 rounded-lg transition-all duration-200 relative',
-                            config.snapShapes
-                                ? 'bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 shadow-sm'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
-                        )}
-                    >
-                        <Wand2 className="w-[18px] h-[18px]" />
-                        {config.snapShapes && (
-                            <div className="absolute top-1 right-1 w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
-                        )}
-                    </button>
-                </div>
-
-                <div
-                    role="radiogroup"
-                    aria-label="Renk"
-                    className="flex items-center gap-1 px-1.5 border-white/10 border-r"
-                >
-                    {DRAWING_COLORS.map((color) => (
-                        <button
-                            key={color}
-                            type="button"
-                            role="radio"
-                            aria-checked={config.color === color}
-                            aria-label={`Renk ${color}`}
-                            onClick={() => setConfig({ ...config, color })}
-                            className={cn(
-                                'w-[22px] h-[22px] rounded-full border-2 transition-all hover:scale-110',
-                                config.color === color
-                                    ? 'border-white scale-110'
-                                    : 'border-transparent'
-                            )}
-                            style={{ backgroundColor: color }}
+                        <span
+                            className="w-[18px] h-[18px] rounded-full border-2 border-white/50 shrink-0"
+                            style={{ backgroundColor: config.color }}
                         />
-                    ))}
-                </div>
-
-                <div
-                    role="radiogroup"
-                    aria-label="Kalınlık"
-                    className="flex items-center gap-2 px-1.5 border-white/10 border-r"
-                >
-                    {DRAWING_WIDTHS.map((size) => (
-                        <button
-                            key={size}
-                            type="button"
-                            role="radio"
-                            aria-checked={config.width === size}
-                            aria-label={`${size} piksel`}
-                            onClick={() => setConfig({ ...config, width: size })}
-                            className={cn(
-                                'rounded-full bg-slate-400 transition-all hover:bg-white',
-                                config.width === size
-                                    ? 'bg-white scale-125 ring-2 ring-indigo-500 ring-offset-2 ring-offset-[#1a1b26]'
-                                    : 'hover:scale-110'
-                            )}
-                            style={{ width: size + 3 + 'px', height: size + 3 + 'px' }}
-                            title={`${size}px`}
+                        <span
+                            className="rounded-full bg-slate-300 shrink-0"
+                            style={{
+                                width: config.width + 3 + 'px',
+                                height: config.width + 3 + 'px',
+                            }}
                         />
-                    ))}
+                    </button>
                 </div>
 
                 <div className="flex items-center gap-1 px-1.5 border-white/10 border-r">
