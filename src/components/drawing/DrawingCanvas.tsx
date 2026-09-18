@@ -1,9 +1,10 @@
 import React from 'react';
 import { cn } from '../../utils/cn';
-import { Copy, Trash2 } from 'lucide-react';
+import { Copy, Sigma, Trash2 } from 'lucide-react';
 import { DRAWING_COLORS, HANDLE_CURSORS } from '../../constants/drawing';
 import { samplePressure, smoothTowards } from './penEngine';
 import { adjustSnappedShape, recognizeShape, snapAngle } from './shapeRecognizer';
+import { recognizeEquation } from './equationRecognizer';
 import {
     RULER_SNAP_PX,
     type RulerState,
@@ -214,6 +215,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             orig: Stroke[];
         } | null>(null);
         const [rotationHint, setRotationHint] = React.useState<number | null>(null);
+        /** Tanınan denklemin onay bekleyen hâli. */
+        const [equationDraft, setEquationDraft] = React.useState<string | null>(null);
 
         /** Son kalem (stylus) olayının zamanı — avuç içi reddi için. */
         const lastPenAtRef = React.useRef(0);
@@ -343,6 +346,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         }, []);
 
         const deselect = () => {
+            setEquationDraft(null);
             selectedIdxsRef.current = [];
             selBBRef.current = null;
             setSelectedIdxs([]);
@@ -2496,6 +2500,42 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             redraw();
         };
 
+        /**
+         * Onaylanan denklemi sayfaya yazar: el yazısı izleri kaldırılır,
+         * yerine aynı yükseklikte düzgün bir metin konur.
+         */
+        const applyEquation = () => {
+            const text = (equationDraft ?? '').trim();
+            const idxs = selectedIdxsRef.current;
+            const bb = selBBRef.current;
+            setEquationDraft(null);
+            if (!text || idxs.length === 0 || !bb) return;
+            const set = new Set(idxs);
+            const inkColor = strokesRef.current[idxs[0]]?.color ?? config.color;
+            const height = Math.max(18, Math.min(72, (bb.y2 - bb.y1) * 0.62));
+            const label: Stroke = {
+                id: newStrokeId(),
+                tool: 'text',
+                text,
+                color: inkColor,
+                width: height,
+                points: [{ x: bb.x1 + 24, y: (bb.y1 + bb.y2) / 2 }],
+            };
+            pushHistory();
+            const removed = strokesRef.current
+                .filter((_, i) => set.has(i))
+                .map((st) => st.id)
+                .filter((id): id is string => !!id);
+            strokesRef.current = strokesRef.current.filter((_, i) => !set.has(i));
+            strokesRef.current.push(label);
+            commitStrokes();
+            if (removed.length)
+                emit({ type: 'remove', page: currentPageRef.current, ids: removed });
+            emit({ type: 'add', page: currentPageRef.current, strokes: [label] });
+            deselect();
+            redraw();
+        };
+
         /** Seçili çizimleri toplu günceller (renk, çoğalt, sil). */
         const mutateSelection = (fn: (idxs: number[]) => void) => {
             if (selectedIdxsRef.current.length === 0) return;
@@ -2908,6 +2948,48 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                             );
                         })()}
 
+                        {/* Tanınan denklem: onaylanmadan sayfaya işlenmez. */}
+                        {equationDraft !== null && (
+                            <div
+                                className="absolute pointer-events-auto flex items-center gap-2 bg-[#1a1b26]/95 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10 shadow-xl"
+                                style={{
+                                    left: Math.max(4, selScreenBB.x1),
+                                    top: Math.max(0, selScreenBB.y2 + 10),
+                                    zIndex: 4700,
+                                }}
+                                onPointerDown={(e) => e.stopPropagation()}
+                            >
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">
+                                    Denklem
+                                </span>
+                                <input
+                                    autoFocus
+                                    value={equationDraft}
+                                    onChange={(e) => setEquationDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Escape') setEquationDraft(null);
+                                        if (e.key === 'Enter') applyEquation();
+                                    }}
+                                    aria-label="Tanınan denklem"
+                                    className="bg-white/10 focus:bg-white/15 rounded-lg px-2 py-1 text-[14px] font-mono text-white outline-none border border-white/15 focus:border-indigo-400 w-[220px]"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={applyEquation}
+                                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[12px] font-bold transition-colors"
+                                >
+                                    Uygula
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setEquationDraft(null)}
+                                    className="px-2 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 text-[12px] font-semibold transition-colors"
+                                >
+                                    Vazgeç
+                                </button>
+                            </div>
+                        )}
+
                         <div
                             role="toolbar"
                             aria-label="Seçim araçları"
@@ -2945,6 +3027,33 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                     }
                                 />
                             ))}
+                            {/* El yazısı denklemi metne çevir. Yalnızca kalem izi
+                                seçiliyken anlamlı olduğu için orada görünür. */}
+                            {selectedStrokes.some(
+                                (st) => st.tool === 'pencil' || st.tool === 'highlighter'
+                            ) && (
+                                <>
+                                    <div
+                                        className="w-px h-4 bg-white/20 mx-1 shrink-0"
+                                        aria-hidden="true"
+                                    />
+                                    <button
+                                        type="button"
+                                        aria-label="El yazısı denklemi tanı"
+                                        title="El yazısı denklemi metne çevir"
+                                        className="px-2 h-6 rounded-md text-slate-300 hover:text-white hover:bg-white/10 transition-all shrink-0 flex items-center gap-1"
+                                        onClick={() =>
+                                            setEquationDraft(
+                                                recognizeEquation(selectedStrokes) || ''
+                                            )
+                                        }
+                                    >
+                                        <Sigma className="w-3.5 h-3.5" />
+                                        <span className="text-[11px] font-semibold">Tanı</span>
+                                    </button>
+                                </>
+                            )}
+
                             <div className="w-px h-4 bg-white/20 mx-1 shrink-0" aria-hidden="true" />
 
                             {/* Seçime toplu kalınlık ve desen: renk gibi, tek

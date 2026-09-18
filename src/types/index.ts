@@ -544,7 +544,10 @@ export type PaperStyle =
     | 'music'
     | 'handwriting'
     | 'wide_lined'
-    | 'todo';
+    | 'todo'
+    | 'number_line'
+    | 'exam'
+    | 'lab_report';
 
 export interface DriveFolder {
     id: string;

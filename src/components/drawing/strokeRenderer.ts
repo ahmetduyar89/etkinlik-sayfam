@@ -974,7 +974,8 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0) 
             tCtx.stroke();
         }
     } else if (s.tool === 'text') {
-        tCtx.font = 'bold 20px Arial';
+        // Yazı boyu `width` ile taşınır; eski kayıtlarda yoktur.
+        tCtx.font = `bold ${s.width && s.width > 4 ? s.width : 20}px Arial`;
         tCtx.fillText(s.text || '', s.points[0].x, s.points[0].y);
     } else if (s.tool === 'stamp') {
         tCtx.font = '44px serif';
