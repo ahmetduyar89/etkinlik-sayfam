@@ -158,8 +158,8 @@ export const PORTAL_MODULES: PortalModule[] = [
         id: 'akil-oyunlari',
         title: 'Matematiksel Akıl Oyunları',
         description:
-            'Mantıksal akıl yürütme ve problem çözme atölyesi: Hanoi Kuleleri, KenKen, Nim Stratejisi, Euler Köprüleri, 24 Oyunu ve Sihirli Piramit.',
-        meta: '6 Zeka Oyunu · Algoritma · Strateji',
+            'Mantıksal akıl yürütme ve problem çözme atölyesi: Hanoi Kuleleri, KenKen, Untangle, Sihirli Kareler, Chomp, Monty Hall, Kakuro, Kripto-Aritmetik, Dört Renk, Lazer ve daha fazlası.',
+        meta: '17 Akıl Oyunu · Algoritma · Strateji',
         icon: Puzzle,
         accent: {
             icon: 'from-violet-500 to-fuchsia-600',
