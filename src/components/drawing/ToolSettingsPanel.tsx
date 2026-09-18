@@ -4,7 +4,6 @@ import { PaintBucket, Pentagon } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, PenType } from '../../types';
 import {
-    DRAWING_COLORS,
     DRAWING_WIDTHS,
     ERASER_MODES,
     STAMP_CATEGORIES,
@@ -15,7 +14,7 @@ import { PEN_TYPES } from './penEngine';
 import { DashedLineIcon, SolidLineIcon } from './DrawingIcons';
 
 /** Seçili araca göre gösterilecek ayar grubu. */
-export type ToolSettingsSection = 'pen' | 'eraser' | 'shape' | 'text';
+export type ToolSettingsSection = 'pen' | 'eraser' | 'shape';
 
 const shape2DTools = make2DShapeTools(SolidLineIcon, DashedLineIcon);
 const shape3DTools = make3DShapeTools();
@@ -34,7 +33,6 @@ const SECTION_TITLES: Record<ToolSettingsSection, string> = {
     pen: 'Kalem Ayarları',
     eraser: 'Silgi Ayarları',
     shape: 'Şekil Oluşturma',
-    text: 'Metin Ayarları',
 };
 
 function Row({
@@ -110,9 +108,8 @@ function Toggle({
 }
 
 /**
- * Renk, kalınlık, kalem ucu, silgi ve şekil seçenekleri tek panelde toplanır.
- * Araç çubuğunda ayrı ayrı durmaları çubuğu gereksiz uzatıyordu; artık ilgili
- * araca tıklandığında yalnızca o araca ait ayarlar açılır.
+ * Seçili aracın ayarları: kalınlık, kalem ucu, silgi modu, şekil ve damgalar.
+ * Renk seçimi bilinçli olarak dışarıda: o iş `ColorPalettePanel`'e ait.
  */
 export function ToolSettingsPanel({
     section,
@@ -123,8 +120,6 @@ export function ToolSettingsPanel({
 }: ToolSettingsPanelProps) {
     const penType: PenType = config.penType ?? 'ballpoint';
     const eraserMode = config.eraserMode ?? 'pixel';
-    const showColors = section !== 'eraser';
-    const showWidths = section !== 'text';
 
     return (
         <motion.div
@@ -140,57 +135,33 @@ export function ToolSettingsPanel({
                 {SECTION_TITLES[section]}
             </span>
 
-            {showColors && (
-                <Row label="Renk">
-                    {DRAWING_COLORS.map((color) => (
-                        <button
-                            key={color}
-                            type="button"
-                            role="radio"
-                            aria-checked={config.color === color}
-                            aria-label={`Renk ${color}`}
-                            onClick={() => setConfig({ ...config, color })}
+            <Row label={section === 'eraser' ? 'Silgi Ucu' : 'Kalınlık'}>
+                {DRAWING_WIDTHS.map((size) => (
+                    <button
+                        key={size}
+                        type="button"
+                        role="radio"
+                        aria-checked={config.width === size}
+                        aria-label={`${size} piksel`}
+                        onClick={() => setConfig({ ...config, width: size })}
+                        title={`${size}px`}
+                        className={cn(
+                            'w-9 h-9 rounded-xl flex items-center justify-center transition-all',
+                            config.width === size
+                                ? 'bg-[#2d3045] ring-1 ring-indigo-500/60'
+                                : 'hover:bg-white/10'
+                        )}
+                    >
+                        <span
                             className={cn(
-                                'w-7 h-7 rounded-full border-2 transition-all hover:scale-110',
-                                config.color === color
-                                    ? 'border-white scale-110'
-                                    : 'border-white/10'
+                                'rounded-full transition-all',
+                                config.width === size ? 'bg-white' : 'bg-slate-400'
                             )}
-                            style={{ backgroundColor: color }}
+                            style={{ width: size + 4 + 'px', height: size + 4 + 'px' }}
                         />
-                    ))}
-                </Row>
-            )}
-
-            {showWidths && (
-                <Row label={section === 'eraser' ? 'Silgi Ucu' : 'Kalınlık'}>
-                    {DRAWING_WIDTHS.map((size) => (
-                        <button
-                            key={size}
-                            type="button"
-                            role="radio"
-                            aria-checked={config.width === size}
-                            aria-label={`${size} piksel`}
-                            onClick={() => setConfig({ ...config, width: size })}
-                            title={`${size}px`}
-                            className={cn(
-                                'w-9 h-9 rounded-xl flex items-center justify-center transition-all',
-                                config.width === size
-                                    ? 'bg-[#2d3045] ring-1 ring-indigo-500/60'
-                                    : 'hover:bg-white/10'
-                            )}
-                        >
-                            <span
-                                className={cn(
-                                    'rounded-full transition-all',
-                                    config.width === size ? 'bg-white' : 'bg-slate-400'
-                                )}
-                                style={{ width: size + 4 + 'px', height: size + 4 + 'px' }}
-                            />
-                        </button>
-                    ))}
-                </Row>
-            )}
+                    </button>
+                ))}
+            </Row>
 
             {section === 'pen' && (
                 <>

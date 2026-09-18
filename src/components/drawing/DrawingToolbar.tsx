@@ -37,6 +37,7 @@ import {
     ToolSettingsPanel,
     type ToolSettingsSection,
 } from './ToolSettingsPanel';
+import { ColorPalettePanel } from './ColorPalettePanel';
 
 export type ToolbarCommand =
     | 'UNDO_DRAWING'
@@ -73,13 +74,12 @@ interface DrawingToolbarProps {
     onSelectTool?: (toolId: string) => void;
 }
 
-type PanelId = 'settings' | 'shapes' | 'math' | 'lab' | 'extras';
+type PanelId = 'settings' | 'shapes' | 'colors' | 'math' | 'lab' | 'extras';
 
 /** Hangi aracın hangi ayar grubunu açacağı. Seç/kement/el ayarsızdır. */
 function sectionForTool(tool: DrawingTool): ToolSettingsSection | null {
     if (tool === 'pencil' || tool === 'highlighter' || tool === 'sun') return 'pen';
     if (tool === 'eraser') return 'eraser';
-    if (tool === 'text') return 'text';
     if (SHAPE_TOOL_IDS.includes(tool) || tool === 'stamp') return 'shape';
     return null;
 }
@@ -134,8 +134,8 @@ export function DrawingToolbar({
         panel === 'shapes' ? 'shape' : sectionForTool(config.tool) ?? 'pen';
     const settingsOpen = panel === 'settings' || panel === 'shapes';
 
-    const toggleSettings = () =>
-        setPanel((prev) => (prev === 'settings' ? null : 'settings'));
+    const toggleColors = () =>
+        setPanel((prev) => (prev === 'colors' ? null : 'colors'));
 
     /**
      * Araca tıklamak hem aracı seçer hem de o araca ait ayarları açar:
@@ -202,6 +202,12 @@ export function DrawingToolbar({
                     onSelectTool={onSelectTool}
                 />
             )}
+
+            <AnimatePresence>
+                {panel === 'colors' && (
+                    <ColorPalettePanel config={config} setConfig={setConfig} />
+                )}
+            </AnimatePresence>
 
             <AnimatePresence>
                 {settingsOpen && (
@@ -482,31 +488,21 @@ export function DrawingToolbar({
                     </button>
                 </div>
                 <div className="flex items-center gap-1 px-1.5 border-white/10 border-r">
-                    {/* Renk ve kalınlık artık aracın kendi ayar panelinde;
-                        buradaki düğme hem seçili rengi gösterir hem paneli açar. */}
+                    {/* Yalnızca renk: kalem ucu/kalınlık aracın kendi panelinde. */}
                     <button
                         type="button"
-                        onClick={() => toggleSettings()}
-                        aria-label="Renk ve kalınlık ayarları"
-                        aria-expanded={panel === 'settings'}
-                        title="Renk, kalınlık ve araç ayarları"
+                        onClick={toggleColors}
+                        aria-label="Renk seçimi"
+                        aria-expanded={panel === 'colors'}
+                        title="Renk paleti"
                         className={cn(
-                            'p-1.5 rounded-lg transition-all flex items-center gap-1.5',
-                            panel === 'settings'
-                                ? 'bg-white/10'
-                                : 'hover:bg-white/5'
+                            'p-1.5 rounded-lg transition-all',
+                            panel === 'colors' ? 'bg-white/10' : 'hover:bg-white/5'
                         )}
                     >
                         <span
-                            className="w-[18px] h-[18px] rounded-full border-2 border-white/50 shrink-0"
+                            className="block w-[20px] h-[20px] rounded-md border-2 border-white/50 shadow-inner"
                             style={{ backgroundColor: config.color }}
-                        />
-                        <span
-                            className="rounded-full bg-slate-300 shrink-0"
-                            style={{
-                                width: config.width + 3 + 'px',
-                                height: config.width + 3 + 'px',
-                            }}
                         />
                     </button>
                 </div>
