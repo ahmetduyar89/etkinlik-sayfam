@@ -37,6 +37,7 @@ import { RecentActivities } from './components/content/RecentActivities';
 import { formatGradeLevel } from './constants/education';
 import { subjectColor } from './constants/appearance';
 import { GEOMETRI_10_ACTIVITIES, DEFAULT_GEOMETRI_FOLDERS } from './constants/activities-10-geometri';
+import { DNA_GENETICS_ACTIVITY } from './constants/activities-8-dna';
 import type { Activity, DriveFolder, Unit } from './types';
 
 const LESSON_MODE_KEY = 'icerik-merkezi:lesson-mode';
@@ -405,6 +406,9 @@ export default function App({ onExitToPortal, view: viewProp, onViewChange }: Ap
     useEffect(() => {
         const unsub = activitiesHandler.sync((data) => {
             const list = data && data.length > 0 ? [...data] : [...MOCK_ACTIVITIES];
+            if (!list.some((a) => a.id === DNA_GENETICS_ACTIVITY.id)) {
+                list.unshift(DNA_GENETICS_ACTIVITY);
+            }
             // 10. Sınıf Geometrik Şekiller etkinliklerinin kütüphanede daima bulunmasını sağla
             for (const ga of GEOMETRI_10_ACTIVITIES) {
                 if (!list.some((a) => a.id === ga.id || a.title === ga.title)) {
