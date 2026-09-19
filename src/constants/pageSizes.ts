@@ -35,6 +35,18 @@ export const PAGE_SIZES: ReadonlyArray<PageSizeOption> = [
         dims: { w: mm(210), h: mm(297) },
     },
     {
+        id: 'b5p',
+        label: 'B5 Dikey',
+        hint: '17,6 × 25 cm — standart okul defteri',
+        dims: { w: mm(176), h: mm(250) },
+    },
+    {
+        id: 'b5l',
+        label: 'B5 Yatay',
+        hint: '25 × 17,6 cm — yatay okul defteri',
+        dims: { w: mm(250), h: mm(176) },
+    },
+    {
         id: 'a3l',
         label: 'A3 Yatay',
         hint: '42 × 29,7 cm — geniş çalışma',

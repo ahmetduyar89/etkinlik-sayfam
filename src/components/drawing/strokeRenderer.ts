@@ -10,12 +10,14 @@ import { getImage } from './imageStore';
 import type { BoundingBox, Point, Stroke } from '../../types';
 
 /** Kutusu birebir kullanılan (boşluk eklenmeyen) araçlar. */
-export const TIGHT_TOOLS = ['math', 'image'];
+export const TIGHT_TOOLS = ['math', 'image', 'text'];
 
 export const SHAPE_TOOLS = [
     'rect',
     'circle',
+    'ellipse',
     'triangle',
+    'right_triangle',
     'polygon',
     'cube',
     'rect_prism',
@@ -40,7 +42,10 @@ export const SHAPE_TOOLS = [
  */
 const ROTATION_FIELD_TOOLS = [
     'rect',
+    'circle',
+    'ellipse',
     'triangle',
+    'right_triangle',
     'cube',
     'rect_prism',
     'tri_prism',
@@ -129,11 +134,23 @@ export const getBB = (s: Stroke): BoundingBox => {
     if (s.tool === 'circle' && s.points.length >= 2) {
         const p1 = s.points[0];
         const p2 = s.points[s.points.length - 1];
-        const r = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+        const r = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(y2 - y1, 2));
         x1 = Math.min(x1, p1.x - r);
         y1 = Math.min(y1, p1.y - r);
         x2 = Math.max(x2, p1.x + r);
         y2 = Math.max(y2, p1.y + r);
+    }
+
+    if (s.tool === 'text' && s.points.length > 0) {
+        const fontSize = s.width && s.width > 4 ? s.width : 20;
+        const lines = (s.text || '').split('\n');
+        const maxLen = Math.max(1, ...lines.map((l) => l.length));
+        const textW = Math.max(24, maxLen * fontSize * 0.62);
+        const textH = Math.max(fontSize, lines.length * fontSize * 1.25);
+        x1 = s.points[0].x;
+        y1 = s.points[0].y - fontSize * 0.85;
+        x2 = x1 + textW;
+        y2 = y1 + textH;
     }
 
     // Döndürülmüş şekilde kutu, dönmüş köşelerin çevrelediği alandır.
@@ -633,31 +650,55 @@ const drawShape = (
             0,
             Math.PI * 2
         );
-    else if (tool === 'triangle') {
+    else if (tool === 'ellipse') {
+        const rx = Math.max(1, Math.abs(x2 - x1) / 2);
+        const ry = Math.max(1, Math.abs(y2 - y1) / 2);
+        const cx = (x1 + x2) / 2;
+        const cy = (y1 + y2) / 2;
+        tCtx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    } else if (tool === 'triangle') {
         tCtx.moveTo((x1 + x2) / 2, y1);
         tCtx.lineTo(x2, y2);
         tCtx.lineTo(x1, y2);
+        tCtx.closePath();
+    } else if (tool === 'right_triangle') {
+        tCtx.moveTo(x1, y1);
+        tCtx.lineTo(x1, y2);
+        tCtx.lineTo(x2, y2);
         tCtx.closePath();
     } else if (tool === 'line' || tool === 'dashed') {
         tCtx.moveTo(x1, y1);
         tCtx.lineTo(x2, y2);
     } else if (tool === 'arrow' || tool === 'double_arrow') {
-        const h = 15;
+        const lineWidth = tCtx.lineWidth || 2;
+        const h = Math.max(12, Math.min(26, lineWidth * 3.8));
         const a = Math.atan2(y2 - y1, x2 - x1);
         tCtx.moveTo(x1, y1);
         tCtx.lineTo(x2, y2);
         tCtx.stroke();
+
+        // Dolu ve estetik ok uçları
+        tCtx.save();
+        tCtx.fillStyle = tCtx.strokeStyle;
         tCtx.beginPath();
         tCtx.moveTo(x2, y2);
-        tCtx.lineTo(x2 - h * Math.cos(a - Math.PI / 6), y2 - h * Math.sin(a - Math.PI / 6));
-        tCtx.moveTo(x2, y2);
-        tCtx.lineTo(x2 - h * Math.cos(a + Math.PI / 6), y2 - h * Math.sin(a + Math.PI / 6));
+        tCtx.lineTo(x2 - h * Math.cos(a - Math.PI / 7), y2 - h * Math.sin(a - Math.PI / 7));
+        tCtx.lineTo(x2 - (h * 0.72) * Math.cos(a), y2 - (h * 0.72) * Math.sin(a));
+        tCtx.lineTo(x2 - h * Math.cos(a + Math.PI / 7), y2 - h * Math.sin(a + Math.PI / 7));
+        tCtx.closePath();
+        tCtx.fill();
+
         if (tool === 'double_arrow') {
+            tCtx.beginPath();
             tCtx.moveTo(x1, y1);
-            tCtx.lineTo(x1 + h * Math.cos(a - Math.PI / 6), y1 + h * Math.sin(a - Math.PI / 6));
-            tCtx.moveTo(x1, y1);
-            tCtx.lineTo(x1 + h * Math.cos(a + Math.PI / 6), y1 + h * Math.sin(a + Math.PI / 6));
+            tCtx.lineTo(x1 + h * Math.cos(a - Math.PI / 7), y1 + h * Math.sin(a - Math.PI / 7));
+            tCtx.lineTo(x1 + (h * 0.72) * Math.cos(a), y1 + (h * 0.72) * Math.sin(a));
+            tCtx.lineTo(x1 + h * Math.cos(a + Math.PI / 7), y1 + h * Math.sin(a + Math.PI / 7));
+            tCtx.closePath();
+            tCtx.fill();
         }
+        tCtx.restore();
+        return;
     }
     if (fill && !['line', 'dashed', 'arrow', 'double_arrow'].includes(tool)) {
         tCtx.save();
@@ -723,6 +764,18 @@ const triangleEdges = (p1: Point, p2: Point): [Point, Point][] => {
     ];
 };
 
+/** Dik üçgenin üç kenarı (dik köşe sol altta). */
+const rightTriangleEdges = (p1: Point, p2: Point): [Point, Point][] => {
+    const top = { x: p1.x, y: p1.y };
+    const corner = { x: p1.x, y: p2.y };
+    const right = { x: p2.x, y: p2.y };
+    return [
+        [top, corner],
+        [corner, right],
+        [right, top],
+    ];
+};
+
 /**
  * Çizgi silgisi ve seçim için gerçek yola göre isabet testi.
  *
@@ -747,10 +800,26 @@ export const strokeNearPoint = (s: Stroke, x: number, y: number, radius: number)
         return s.fillEnabled ? dist <= r + tolerance : Math.abs(dist - r) <= tolerance;
     }
 
-    if ((s.tool === 'rect' || s.tool === 'triangle') && s.points.length >= 2) {
+    if (s.tool === 'ellipse' && s.points.length >= 2) {
         const p1 = s.points[0];
         const p2 = s.points[s.points.length - 1];
-        const edges = s.tool === 'rect' ? rectEdges(p1, p2) : triangleEdges(p1, p2);
+        const rx = Math.max(1, Math.abs(p2.x - p1.x) / 2);
+        const ry = Math.max(1, Math.abs(p2.y - p1.y) / 2);
+        const cx = (p1.x + p2.x) / 2;
+        const cy = (p1.y + p2.y) / 2;
+        const normDist = Math.hypot((x - cx) / rx, (y - cy) / ry);
+        const minR = Math.min(rx, ry);
+        return s.fillEnabled ? normDist <= 1 + tolerance / minR : Math.abs(normDist - 1) * minR <= tolerance;
+    }
+
+    if ((s.tool === 'rect' || s.tool === 'triangle' || s.tool === 'right_triangle') && s.points.length >= 2) {
+        const p1 = s.points[0];
+        const p2 = s.points[s.points.length - 1];
+        const edges = s.tool === 'rect'
+            ? rectEdges(p1, p2)
+            : s.tool === 'right_triangle'
+            ? rightTriangleEdges(p1, p2)
+            : triangleEdges(p1, p2);
         if (edges.some(([a, b]) => distanceToSegment(p, a, b) <= tolerance)) return true;
         if (!s.fillEnabled) return false;
         return (
@@ -802,14 +871,21 @@ export const strokeNearSegment = (
         for (let i = 0; i < s.points.length; i++) {
             segments.push([s.points[i], s.points[(i + 1) % s.points.length]]);
         }
-    } else if (s.tool === 'circle' || s.tool === 'rect' || s.tool === 'triangle') {
+    } else if (
+        s.tool === 'circle' ||
+        s.tool === 'ellipse' ||
+        s.tool === 'rect' ||
+        s.tool === 'triangle' ||
+        s.tool === 'right_triangle'
+    ) {
         if (s.points.length < 2) return strokeNearPoint(s, b.x, b.y, radius);
         const p1 = s.points[0];
         const p2 = s.points[s.points.length - 1];
         if (s.tool === 'rect') segments.push(...rectEdges(p1, p2));
         else if (s.tool === 'triangle') segments.push(...triangleEdges(p1, p2));
+        else if (s.tool === 'right_triangle') segments.push(...rightTriangleEdges(p1, p2));
         else {
-            // Daire: yol üzerinde birkaç örnek nokta yeterli.
+            // Daire / Elips: yol üzerinde birkaç örnek nokta yeterli.
             const steps = Math.max(2, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / radius));
             for (let i = 0; i <= steps; i++) {
                 const t = i / steps;
@@ -876,8 +952,22 @@ function drawSmoothPath(
 }
 
 /** Tek bir çizimi verilen bağlama çizer. Küçük resimlerde de kullanılır. */
-export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0) => {
+export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, isDarkBg = false) => {
     if (!s || s.points.length < 1) return;
+    // Lazer aracı kalıcı katmana çizilmez; geçici üst katmanda yaşar
+    if (s.tool === 'sun') return;
+
+    // Ayna simetrisi (yatay / dikey çevirme).
+    if (s.flipX || s.flipY) {
+        const c = rawCenter(s.points);
+        tCtx.save();
+        tCtx.translate(c.x, c.y);
+        tCtx.scale(s.flipX ? -1 : 1, s.flipY ? -1 : 1);
+        tCtx.translate(-c.x, -c.y);
+        drawStroke(tCtx, { ...s, flipX: undefined, flipY: undefined }, time, isDarkBg);
+        tCtx.restore();
+        return;
+    }
 
     // Eksen hizalı çizilen şekiller dönüşlerini bağlam dönüşümüyle alır.
     if (s.rotation) {
@@ -886,7 +976,7 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0) 
         tCtx.translate(c.x, c.y);
         tCtx.rotate(s.rotation);
         tCtx.translate(-c.x, -c.y);
-        drawStroke(tCtx, { ...s, rotation: undefined }, time);
+        drawStroke(tCtx, { ...s, rotation: undefined }, time, isDarkBg);
         tCtx.restore();
         return;
     }
@@ -926,7 +1016,12 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0) 
     tCtx.lineCap = 'round';
     tCtx.lineJoin = 'round';
     if (s.tool === 'eraser') tCtx.globalCompositeOperation = 'destination-out';
-    if (s.tool === 'highlighter') tCtx.globalAlpha = 0.4;
+    if (s.tool === 'highlighter') {
+        // Akıllı fosforlu: Açık renk kağıtta 'multiply' ile alttaki siyah yazıyı
+        // soluklaştırmaz / grileştirmez. Koyu kağıtta 'screen' ile parlama sağlar.
+        tCtx.globalCompositeOperation = isDarkBg ? 'screen' : 'multiply';
+        tCtx.globalAlpha = 0.45;
+    }
     if (s.tool === 'dashed') tCtx.setLineDash([12, 6]);
 
     // Kesikli/noktalı serbest çizgi. Desen, kalınlığın katı olarak verilir ki
@@ -975,8 +1070,13 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0) 
         }
     } else if (s.tool === 'text') {
         // Yazı boyu `width` ile taşınır; eski kayıtlarda yoktur.
-        tCtx.font = `bold ${s.width && s.width > 4 ? s.width : 20}px Arial`;
-        tCtx.fillText(s.text || '', s.points[0].x, s.points[0].y);
+        const fontSize = s.width && s.width > 4 ? s.width : 20;
+        tCtx.font = `bold ${fontSize}px Arial`;
+        const lines = (s.text || '').split('\n');
+        const lineHeight = fontSize * 1.25;
+        lines.forEach((line, idx) => {
+            tCtx.fillText(line, s.points[0].x, s.points[0].y + idx * lineHeight);
+        });
     } else if (s.tool === 'stamp') {
         tCtx.font = '44px serif';
         tCtx.textAlign = 'center';

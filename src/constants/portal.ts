@@ -142,8 +142,8 @@ export const PORTAL_MODULES: PortalModule[] = [
         id: 'gunes-sistemi',
         title: '3D Güneş Sistemi Planetaryumu',
         description:
-            'İnteraktif 3D uzay laboratuvarı: 8 gezegen, NASA Eyes canlı uzay gözlemevi, mevsimler, tutulmalar, Kepler yasaları ve gezegen karşılaştırıcı.',
-        meta: '8 Gezegen · NASA Eyes Canlı Uzay · Fen Laboratuvarı',
+            '14 ayrı keşif istasyonu: 3D Planetaryum, NASA Eyes (Güneş, Dünya, ISS, Asteroit, Ötegezegen), Solar System Scope, 100K Yıldız, Ventusky, Earth Nullschool, The Size of Space, 3D Mevsimler, Asteroid Launcher ve Space Elevator.',
+        meta: '14 Modül · Planetaryum · NASA Eyes · Solar Scope · Ventusky · 3D Mevsimler',
         icon: Orbit,
         accent: {
             icon: 'from-sky-500 to-indigo-600',
@@ -206,8 +206,8 @@ export const PORTAL_MODULES: PortalModule[] = [
         id: 'geometri',
         title: 'Dinamik GeoLaboratuvar',
         description:
-            'Görsel geometri atölyesi: İnteraktif çivili Geoboard tahtası, açıölçer (iletki) atölyesi, 3D prizma açınım katlama ve fraktal üretici.',
-        meta: 'Geoboard · 3D Açınım Katlama · Fraktallar',
+            'Görsel geometri atölyesi: İnteraktif çivili Geoboard tahtası, açıölçer (iletki) atölyesi, 3D prizma açınım katlama, fraktal üretici ve Mathigon Polypad sanal matematik tuvali.',
+        meta: 'Geoboard · Mathigon Polypad · 3D Açınım · Fraktal',
         icon: Shapes,
         accent: {
             icon: 'from-amber-500 to-orange-600',

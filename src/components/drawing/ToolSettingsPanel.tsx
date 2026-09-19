@@ -11,12 +11,12 @@ import {
 } from '../../constants/drawing';
 import { PEN_TYPES } from './penEngine';
 import { SizePicker } from './SizePicker';
-import { DashedLineIcon, SolidLineIcon } from './DrawingIcons';
+import { DashedLineIcon, EllipseIcon, RightTriangleIcon, SolidLineIcon } from './DrawingIcons';
 
 /** Seçili araca göre gösterilecek ayar grubu. */
 export type ToolSettingsSection = 'pen' | 'eraser' | 'shape';
 
-const shape2DTools = make2DShapeTools(SolidLineIcon, DashedLineIcon);
+const shape2DTools = make2DShapeTools(SolidLineIcon, DashedLineIcon, EllipseIcon, RightTriangleIcon);
 const shape3DTools = make3DShapeTools();
 
 interface ToolSettingsPanelProps {

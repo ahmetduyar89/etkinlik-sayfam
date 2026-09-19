@@ -1,6 +1,19 @@
 import React from 'react';
 import { cn } from '../../utils/cn';
-import { Copy, Sigma, Trash2 } from 'lucide-react';
+import {
+    AlignLeft,
+    AlignCenter,
+    AlignRight,
+    ChevronsDown,
+    ChevronsUp,
+    Copy,
+    Edit3,
+    FlipHorizontal,
+    FlipVertical,
+    RotateCw,
+    Sigma,
+    Trash2,
+} from 'lucide-react';
 import { DRAWING_COLORS, HANDLE_CURSORS } from '../../constants/drawing';
 import { samplePressure, smoothTowards } from './penEngine';
 import { adjustSnappedShape, recognizeShape, snapAngle } from './shapeRecognizer';
@@ -14,10 +27,10 @@ import {
     snapToRuler,
 } from './rulerTool';
 import { findLibraryItem, getSimSpec, isAnimated, objectRect } from './libraryObjects';
-import { onImageReady } from './imageStore';
+import { importImageFile, onImageReady } from './imageStore';
 import { applyOpToStrokes, newStrokeId, withIds } from './strokeOps';
 import { withAlpha } from './objectDrawing';
-import { drawPaper } from '../notebooks/paper';
+import { drawPaper, paperBackground } from '../notebooks/paper';
 import {
     SHAPE_TOOLS,
     drawStroke,
@@ -53,6 +66,7 @@ interface DrawingCanvasProps {
     enabled: boolean;
     whiteboardMode: boolean;
     bgColor?: string;
+    paper?: PaperStyle;
     onPageChange?: (current: number, total: number) => void;
     onRequestText?: () => Promise<string | null>;
     /** Açılışta yüklenecek sayfalar (defter içeriği). */
@@ -104,6 +118,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             enabled,
             whiteboardMode,
             bgColor,
+            paper,
             onPageChange,
             onRequestText,
             initialPages,
@@ -142,6 +157,17 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const lassoRef = React.useRef<Point[] | null>(null);
         const polyPointsRef = React.useRef<Point[]>([]);
         const [polyCount, setPolyCount] = React.useState<number>(0);
+
+        interface InlineTextState {
+            worldX: number;
+            worldY: number;
+            text: string;
+            fontSize: number;
+            color: string;
+            strokeIdx?: number;
+        }
+        const [inlineText, setInlineText] = React.useState<InlineTextState | null>(null);
+        const lastTextClickRef = React.useRef<{ idx: number; time: number }>({ idx: -1, time: 0 });
 
         // Ölçü aracı açılıp kapanınca konumlanır ve üst katman tazelenir.
         React.useEffect(() => {
@@ -288,6 +314,16 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const simTimeRef = React.useRef(0);
         const simFrameRef = React.useRef<number | null>(null);
         const simStartRef = React.useRef(0);
+
+        /** Lazer aracı için sönen kuyruk noktaları ve animasyon döngüsü */
+        const laserTrailRef = React.useRef<{ x: number; y: number; time: number }[]>([]);
+        const laserPosRef = React.useRef<{ x: number; y: number } | null>(null);
+        const laserRafRef = React.useRef<number | null>(null);
+
+        /** Koyu arka plan kontrolü (fosforlu kalem ve kontrast ayarları için) */
+        const isDark = React.useMemo(() => {
+            return bgColor === '#1a1a2e' || bgColor === '#111827';
+        }, [bgColor]);
 
         /**
          * Sayfanın dünya koordinatındaki dikdörtgeni.
@@ -468,9 +504,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             applyView(bCtx);
             strokesRef.current.forEach((s, i) => {
                 if (exclude?.has(i)) return;
-                drawStroke(bCtx, s, simTimeRef.current);
+                drawStroke(bCtx, s, simTimeRef.current, isDark);
             });
-        }, []);
+        }, [isDark]);
 
         /**
          * Ana katmanı tampondan tazeler. `live` verilirse (sürükleme sırasında
@@ -489,7 +525,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
             if (live && live.length) {
                 applyView(mainCtx);
-                live.forEach((s) => drawStroke(mainCtx, s, simTimeRef.current));
+                live.forEach((s) => drawStroke(mainCtx, s, simTimeRef.current, isDark));
                 applyIdentity(mainCtx);
             }
 
@@ -742,6 +778,86 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             // eslint-disable-next-line react-hooks/exhaustive-deps
         }, [commitStrokes, emitPage, notifyHistory, redraw]);
 
+        const commitInlineText = React.useCallback(
+            (textValue?: string) => {
+                if (!inlineText) return;
+                const text = (textValue !== undefined ? textValue : inlineText.text).trim();
+                if (inlineText.strokeIdx !== undefined) {
+                    const idx = inlineText.strokeIdx;
+                    const existing = strokesRef.current[idx];
+                    if (existing) {
+                        pushHistory();
+                        if (!text) {
+                            const removedId = existing.id;
+                            strokesRef.current.splice(idx, 1);
+                            commitStrokes();
+                            if (removedId)
+                                emit({ type: 'remove', page: currentPageRef.current, ids: [removedId] });
+                            deselect();
+                        } else {
+                            const updated: Stroke = {
+                                ...existing,
+                                text,
+                                color: inlineText.color,
+                                width: inlineText.fontSize,
+                            };
+                            strokesRef.current[idx] = updated;
+                            commitStrokes();
+                            emit({ type: 'update', page: currentPageRef.current, strokes: [updated] });
+                        }
+                        redraw();
+                    }
+                } else if (text) {
+                    pushHistory();
+                    const s: Stroke = {
+                        id: newStrokeId(),
+                        tool: 'text',
+                        text,
+                        color: inlineText.color,
+                        width: inlineText.fontSize,
+                        points: [{ x: inlineText.worldX, y: inlineText.worldY }],
+                    };
+                    strokesRef.current.push(s);
+                    commitStrokes();
+                    emit({ type: 'add', page: currentPageRef.current, strokes: [s] });
+                    setSelection([strokesRef.current.length - 1]);
+                    redraw();
+                }
+                setInlineText(null);
+            },
+            [commitStrokes, deselect, emit, inlineText, pushHistory, redraw, setSelection]
+        );
+
+        const insertImageAt = React.useCallback(
+            (src: string, width: number, height: number, cx?: number, cy?: number) => {
+                const vis = visibleWorldRect();
+                const maxW = vis.w * 0.6;
+                const maxH = vis.h * 0.6;
+                const ratio = Math.min(maxW / width, maxH / height, 1 / viewRef.current.scale);
+                const w = width * ratio;
+                const h = height * ratio;
+                const x = cx !== undefined ? cx - w / 2 : vis.x + (vis.w - w) / 2;
+                const y = cy !== undefined ? cy - h / 2 : vis.y + (vis.h - h) / 2;
+                pushHistory();
+                const stroke: Stroke = {
+                    id: newStrokeId(),
+                    tool: 'image',
+                    color: '#000000',
+                    src,
+                    points: [
+                        { x, y },
+                        { x: x + w, y: y + h },
+                    ],
+                };
+                strokesRef.current.push(stroke);
+                commitStrokes();
+                emit({ type: 'add', page: currentPageRef.current, strokes: [stroke] });
+                setSelection([strokesRef.current.length - 1]);
+                redraw();
+            },
+            [commitStrokes, emit, pushHistory, redraw, setSelection, visibleWorldRect]
+        );
+
         React.useImperativeHandle(
             ref,
             () => ({
@@ -795,30 +911,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     redraw();
                 },
                 insertImage: (src: string, width: number, height: number) => {
-                    const vis = visibleWorldRect();
-                    const maxW = vis.w * 0.6;
-                    const maxH = vis.h * 0.6;
-                    const ratio = Math.min(maxW / width, maxH / height, 1 / viewRef.current.scale);
-                    const w = width * ratio;
-                    const h = height * ratio;
-                    const x = vis.x + (vis.w - w) / 2;
-                    const y = vis.y + (vis.h - h) / 2;
-                    pushHistory();
-                    const stroke: Stroke = {
-                        id: newStrokeId(),
-                        tool: 'image',
-                        color: '#000000',
-                        src,
-                        points: [
-                            { x, y },
-                            { x: x + w, y: y + h },
-                        ],
-                    };
-                    strokesRef.current.push(stroke);
-                    commitStrokes();
-                    emit({ type: 'add', page: currentPageRef.current, strokes: [stroke] });
-                    setSelection([strokesRef.current.length - 1]);
-                    redraw();
+                    insertImageAt(src, width, height);
                 },
                 zoomBy: (factor: number) => {
                     const { w, h } = getCanvasSize();
@@ -1049,7 +1142,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         ctx.save();
                         ctx.translate(-page.x, -page.y);
                         strokesRef.current.forEach((st) =>
-                            drawStroke(ctx, st, simTimeRef.current)
+                            drawStroke(ctx, st, simTimeRef.current, isDark)
                         );
                         ctx.restore();
                     } else {
@@ -1081,6 +1174,65 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 zoomAt,
             ]
         );
+
+        // Pano (Clipboard) yapıştırma: Cmd+V / Ctrl+V ile görsel veya metin yapıştır.
+        React.useEffect(() => {
+            if (!enabled) return;
+
+            const handlePaste = async (e: ClipboardEvent) => {
+                const activeTag = document.activeElement?.tagName?.toLowerCase();
+                if (
+                    activeTag === 'input' ||
+                    activeTag === 'textarea' ||
+                    document.activeElement?.getAttribute('contenteditable') === 'true'
+                ) {
+                    return;
+                }
+
+                const items = e.clipboardData?.items;
+                if (!items || items.length === 0) return;
+
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    if (item.type.startsWith('image/')) {
+                        const file = item.getAsFile();
+                        if (file) {
+                            e.preventDefault();
+                            try {
+                                const imported = await importImageFile(file);
+                                insertImageAt(imported.dataUrl, imported.width, imported.height);
+                            } catch (err) {
+                                console.error('Pano görseli eklenemedi:', err);
+                            }
+                            return;
+                        }
+                    }
+                }
+
+                const text = e.clipboardData?.getData('text/plain');
+                if (text && text.trim()) {
+                    e.preventDefault();
+                    const vis = visibleWorldRect();
+                    const s: Stroke = {
+                        id: newStrokeId(),
+                        tool: 'text',
+                        text: text.trim(),
+                        color: config.color,
+                        width: 24,
+                        points: [{ x: vis.x + vis.w * 0.35, y: vis.y + vis.h * 0.45 }],
+                    };
+                    pushHistory();
+                    strokesRef.current.push(s);
+                    commitStrokes();
+                    emit({ type: 'add', page: currentPageRef.current, strokes: [s] });
+                    setSelection([strokesRef.current.length - 1]);
+                    redraw();
+                }
+            };
+
+            window.addEventListener('paste', handlePaste);
+            return () => window.removeEventListener('paste', handlePaste);
+        }, [commitStrokes, config.color, emit, enabled, insertImageAt, pushHistory, redraw, setSelection, visibleWorldRect]);
 
         const resize = React.useCallback(() => {
             // Çizim ortasında tuvali yeniden boyutlandırmak çizgiyi bozar;
@@ -1176,6 +1328,27 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             canvas.addEventListener('wheel', onWheel, { passive: false });
             return () => canvas.removeEventListener('wheel', onWheel);
         }, [applyViewChange, enabled, viewportEnabled, zoomAt]);
+
+        // Lazer aracı kapatıldığında veya bileşen kapandığında animasyonu durdur
+        React.useEffect(() => {
+            if (config.tool !== 'sun') {
+                if (laserRafRef.current) {
+                    cancelAnimationFrame(laserRafRef.current);
+                    laserRafRef.current = null;
+                }
+                laserTrailRef.current = [];
+                laserPosRef.current = null;
+            }
+        }, [config.tool]);
+
+        React.useEffect(() => {
+            return () => {
+                if (laserRafRef.current) {
+                    cancelAnimationFrame(laserRafRef.current);
+                    laserRafRef.current = null;
+                }
+            };
+        }, []);
 
         /** Devam eden çizimi iptal eder (çift parmak dokunuşunda). */
         const cancelCurrentStroke = () => {
@@ -1436,7 +1609,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             mainCtx.rect(minX, minY, width, height);
             mainCtx.clip();
             applyView(mainCtx);
-            drawStroke(mainCtx, stroke);
+            drawStroke(mainCtx, stroke, 0, isDark);
             mainCtx.restore();
             applyIdentity(mainCtx);
         };
@@ -1723,7 +1896,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 const alpha = remaining >= EPHEMERAL_FADE ? 1 : Math.max(0, remaining / EPHEMERAL_FADE);
                 oCtx.save();
                 oCtx.globalAlpha = alpha;
-                drawStroke(oCtx, item.stroke);
+                drawStroke(oCtx, item.stroke, 0, isDark);
                 oCtx.restore();
             }
             applyIdentity(oCtx);
@@ -1805,6 +1978,99 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (rulerRef.current) drawRuler(oCtx, rulerRef.current, viewRef.current);
         };
 
+        /** Lazer aracı için sönen neon kuyruk ve parlak işaretçi ucu çizer */
+        const renderLaser = () => {
+            const oCtx = overlayCtxRef.current;
+            if (!oCtx) return;
+            const now = performance.now();
+            const trail = laserTrailRef.current;
+            const DURATION = 1200; // ms
+
+            // Süresi dolan noktaları temizle
+            while (trail.length > 0 && now - trail[0].time > DURATION) {
+                trail.shift();
+            }
+
+            const { w, h } = getCanvasSize();
+            const v = viewRef.current;
+            applyIdentity(oCtx);
+            oCtx.clearRect(0, 0, w, h);
+            if (rulerRef.current) drawRuler(oCtx, rulerRef.current, v);
+
+            // Sönen neon lazer kuyruğu
+            if (trail.length > 1) {
+                oCtx.save();
+                oCtx.lineCap = 'round';
+                oCtx.lineJoin = 'round';
+
+                for (let i = 0; i < trail.length - 1; i++) {
+                    const p1 = toScreenPoint(trail[i], v);
+                    const p2 = toScreenPoint(trail[i + 1], v);
+                    const age = now - trail[i + 1].time;
+                    const progress = Math.max(0, Math.min(1, 1 - age / DURATION));
+                    const alpha = Math.pow(progress, 1.4);
+                    const width = Math.max(2, 7 * progress);
+
+                    // 1. Dış neon hale
+                    oCtx.beginPath();
+                    oCtx.moveTo(p1.x, p1.y);
+                    oCtx.lineTo(p2.x, p2.y);
+                    oCtx.strokeStyle = `rgba(239, 68, 68, ${alpha * 0.35})`;
+                    oCtx.lineWidth = width * 2.6;
+                    oCtx.stroke();
+
+                    // 2. Ana canlı lazer ışını
+                    oCtx.beginPath();
+                    oCtx.moveTo(p1.x, p1.y);
+                    oCtx.lineTo(p2.x, p2.y);
+                    oCtx.strokeStyle = `rgba(255, 40, 40, ${alpha * 0.95})`;
+                    oCtx.lineWidth = width;
+                    oCtx.stroke();
+
+                    // 3. Parlak beyaz iç çekirdek
+                    oCtx.beginPath();
+                    oCtx.moveTo(p1.x, p1.y);
+                    oCtx.lineTo(p2.x, p2.y);
+                    oCtx.strokeStyle = `rgba(255, 235, 235, ${alpha})`;
+                    oCtx.lineWidth = Math.max(1, width * 0.35);
+                    oCtx.stroke();
+                }
+                oCtx.restore();
+            }
+
+            // Parlayan lazer ucu göstergesi (işaretçi aktifse)
+            const pos = laserPosRef.current;
+            if (pos) {
+                const s = toScreenPoint(pos, v);
+                const r = 9;
+                const g = oCtx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r * 2.8);
+                g.addColorStop(0, 'rgba(255, 255, 255, 1)');
+                g.addColorStop(0.25, 'rgba(255, 55, 55, 0.9)');
+                g.addColorStop(0.65, 'rgba(239, 68, 68, 0.35)');
+                g.addColorStop(1, 'rgba(239, 68, 68, 0)');
+
+                oCtx.fillStyle = g;
+                oCtx.beginPath();
+                oCtx.arc(s.x, s.y, r * 2.8, 0, Math.PI * 2);
+                oCtx.fill();
+
+                oCtx.fillStyle = '#ffffff';
+                oCtx.beginPath();
+                oCtx.arc(s.x, s.y, 2.5, 0, Math.PI * 2);
+                oCtx.fill();
+            }
+
+            // Kuyrukta nokta varsa ya da lazer aracı seçiliyken işaretçi tuvaldeyse döngüyü sürdür
+            if (trail.length > 0 || (config.tool === 'sun' && pos)) {
+                laserRafRef.current = requestAnimationFrame(renderLaser);
+            } else {
+                laserRafRef.current = null;
+                if (!pos) {
+                    clearOverlay();
+                }
+            }
+        };
+
         const startDrawing = async (e: React.PointerEvent) => {
             if (!enabled) return;
             // İşaretçiyi yakala: el tuvalin kenarından ya da üstteki araç
@@ -1865,7 +2131,16 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 }
             }
 
-            if (config.tool === 'sun') return;
+            if (config.tool === 'sun') {
+                isDrawingRef.current = true;
+                const { x, y } = toWorld(e.clientX, e.clientY);
+                laserPosRef.current = { x, y };
+                laserTrailRef.current.push({ x, y, time: performance.now() });
+                if (!laserRafRef.current) {
+                    laserRafRef.current = requestAnimationFrame(renderLaser);
+                }
+                return;
+            }
 
             // El aracı: defterde çalışma alanını kaydırır, etkinlik ekranlarında
             // tıklamaları alttaki sayfaya geçirir (tuval zaten pointer-events:none).
@@ -1949,6 +2224,25 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 for (let i = strokesRef.current.length - 1; i >= 0; i--) {
                     if (!isSelectable(strokesRef.current[i])) continue;
                     if (strokeNearPoint(strokesRef.current[i], x, y, pickTolerance)) {
+                        const hitStroke = strokesRef.current[i];
+                        const isDoubleTextClick =
+                            hitStroke.tool === 'text' &&
+                            lastTextClickRef.current.idx === i &&
+                            Date.now() - lastTextClickRef.current.time < 350;
+                        lastTextClickRef.current = { idx: i, time: Date.now() };
+
+                        if (isDoubleTextClick) {
+                            setInlineText({
+                                worldX: hitStroke.points[0].x,
+                                worldY: hitStroke.points[0].y,
+                                text: hitStroke.text || '',
+                                fontSize: hitStroke.width && hitStroke.width > 4 ? hitStroke.width : 20,
+                                color: hitStroke.color,
+                                strokeIdx: i,
+                            });
+                            return;
+                        }
+
                         // Shift ile tıklamak seçime ekler/çıkarır.
                         if (e.shiftKey) {
                             const current = selectedIdxsRef.current;
@@ -1975,21 +2269,35 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
 
             if (config.tool === 'text') {
-                const val = onRequestText ? await onRequestText() : window.prompt('Metin girin:');
-                if (val && val.trim()) {
-                    const s: Stroke = {
-                        id: newStrokeId(),
-                        tool: 'text',
-                        text: val,
-                        color: config.color,
-                        points: [{ x, y }],
-                    };
-                    pushHistory();
-                    strokesRef.current.push(s);
-                    commitStrokes();
-                    emit({ type: 'add', page: currentPageRef.current, strokes: [s] });
-                    redraw();
+                if (inlineText) {
+                    commitInlineText();
                 }
+                if (onRequestText) {
+                    const val = await onRequestText();
+                    if (val && val.trim()) {
+                        const s: Stroke = {
+                            id: newStrokeId(),
+                            tool: 'text',
+                            text: val,
+                            color: config.color,
+                            width: Math.max(16, Math.min(64, (config.width || 3) * 6)),
+                            points: [{ x, y }],
+                        };
+                        pushHistory();
+                        strokesRef.current.push(s);
+                        commitStrokes();
+                        emit({ type: 'add', page: currentPageRef.current, strokes: [s] });
+                        redraw();
+                    }
+                    return;
+                }
+                setInlineText({
+                    worldX: x,
+                    worldY: y,
+                    text: '',
+                    fontSize: Math.max(16, Math.min(64, (config.width || 3) * 6)),
+                    color: config.color,
+                });
                 return;
             }
             if (config.tool === 'stamp') {
@@ -2214,26 +2522,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
 
             if (config.tool === 'sun') {
-                const oCtx = overlayCtxRef.current;
-                if (oCtx) {
-                    const { w, h } = getCanvasSize();
-                    const v = viewRef.current;
-                    const s = toScreenPoint({ x, y }, v);
-                    applyIdentity(oCtx);
-                    oCtx.clearRect(0, 0, w, h);
-                    const r = 12;
-                    const g = oCtx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r * 3);
-                    g.addColorStop(0, 'rgba(255,50,50,1)');
-                    g.addColorStop(0.3, 'rgba(255,80,80,0.4)');
-                    g.addColorStop(1, 'rgba(255,0,0,0)');
-                    oCtx.fillStyle = g;
-                    oCtx.beginPath();
-                    oCtx.arc(s.x, s.y, r * 3, 0, Math.PI * 2);
-                    oCtx.fill();
-                    oCtx.fillStyle = '#fff';
-                    oCtx.beginPath();
-                    oCtx.arc(s.x, s.y, 2, 0, Math.PI * 2);
-                    oCtx.fill();
+                laserPosRef.current = { x, y };
+                if (isDrawingRef.current) {
+                    laserTrailRef.current.push({ x, y, time: performance.now() });
+                }
+                if (!laserRafRef.current) {
+                    laserRafRef.current = requestAnimationFrame(renderLaser);
                 }
                 return;
             }
@@ -2266,11 +2560,37 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                           RULER_SNAP_PX / viewRef.current.scale
                       )
                     : null;
-                const end = rulerHit
+                let end = rulerHit
                     ? rulerHit.point
                     : config.snapAngle
                       ? snapAngle(start, { x, y })
                       : snapPoint({ x, y });
+
+                // Doğru çizgilerde (line, arrow, double_arrow, dashed) akıllı açı kilitlemesi (0, 30, 45, 60, 90)
+                if (
+                    !rulerHit &&
+                    !config.snapAngle &&
+                    ['line', 'arrow', 'double_arrow', 'dashed'].includes(stroke.tool)
+                ) {
+                    const dx = end.x - start.x;
+                    const dy = end.y - start.y;
+                    const r = Math.hypot(dx, dy);
+                    if (r > 18) {
+                        const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
+                        const targets = [
+                            0, 30, 45, 60, 90, 120, 135, 150, 180,
+                            -30, -45, -60, -90, -120, -135, -150, -180,
+                        ];
+                        for (const target of targets) {
+                            if (Math.abs(deg - target) < 5) {
+                                const rad = (target * Math.PI) / 180;
+                                end = { x: start.x + r * Math.cos(rad), y: start.y + r * Math.sin(rad) };
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 stroke.points = [start, end];
                 repaintStrokeRegion(stroke, unionBB([oldBB, getBB(stroke)]));
                 return;
@@ -2481,6 +2801,11 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 clearOverlay();
                 return;
             }
+            if (config.tool === 'sun') {
+                isDrawingRef.current = false;
+                // Çizim bittiğinde lazer kuyruğu rAF döngüsünde yumuşakça sönerek kaybolur
+                return;
+            }
             cancelHoldTimer();
             if (isDrawingRef.current && currentStrokeRef.current) {
                 let stroke = currentStrokeRef.current;
@@ -2525,7 +2850,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     redraw();
                 } else if (bufferCtxRef.current) {
                     applyView(bufferCtxRef.current);
-                    drawStroke(bufferCtxRef.current, stroke);
+                    drawStroke(bufferCtxRef.current, stroke, 0, isDark);
                     applyIdentity(bufferCtxRef.current);
                 }
             }
@@ -2535,7 +2860,6 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             heldShapeRef.current = null;
             // Çizim biterken bekleyen uzak işlemler uygulanır.
             window.setTimeout(flushPendingOps, 0);
-            if (config.tool === 'sun') clearOverlay();
             // Çizim sürerken ertelenen yeniden boyutlandırma şimdi uygulanır.
             if (pendingResizeRef.current) {
                 pendingResizeRef.current = false;
@@ -2643,6 +2967,213 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             redraw();
         };
 
+        const rotateSelection90 = () => {
+            const idxs = selectedIdxsRef.current;
+            if (idxs.length === 0) return;
+            const bb = selBBRef.current;
+            if (!bb) return;
+            const center = { x: (bb.x1 + bb.x2) / 2, y: (bb.y1 + bb.y2) / 2 };
+
+            pushHistory();
+            const updatedStrokes: Stroke[] = [];
+            idxs.forEach((idx) => {
+                const st = strokesRef.current[idx];
+                if (!st) return;
+                const rotated = rotateStroke(st, center, Math.PI / 2);
+                strokesRef.current[idx] = rotated;
+                updatedStrokes.push(rotated);
+            });
+            refreshSelectionBB();
+            commitStrokes();
+            emit({ type: 'update', page: currentPageRef.current, strokes: updatedStrokes });
+            redraw();
+        };
+
+        const flipSelectionH = () => {
+            const idxs = selectedIdxsRef.current;
+            if (idxs.length === 0) return;
+            const bb = selBBRef.current;
+            if (!bb) return;
+            const cx = (bb.x1 + bb.x2) / 2;
+
+            pushHistory();
+            const updatedStrokes: Stroke[] = [];
+            idxs.forEach((idx) => {
+                const st = strokesRef.current[idx];
+                if (!st) return;
+
+                let newStroke: Stroke;
+                if (['image', 'math'].includes(st.tool)) {
+                    const itemBB = getBB(st);
+                    const itemCx = (itemBB.x1 + itemBB.x2) / 2;
+                    const targetCx = 2 * cx - itemCx;
+                    const dx = targetCx - itemCx;
+                    newStroke = {
+                        ...st,
+                        points: st.points.map((p) => ({ ...p, x: p.x + dx })),
+                        flipX: !st.flipX,
+                        rotation: st.rotation ? -st.rotation : undefined,
+                    };
+                } else if (
+                    ['rect', 'circle', 'ellipse', 'triangle', 'right_triangle', 'text', 'stamp'].includes(
+                        st.tool
+                    )
+                ) {
+                    const itemBB = getBB(st);
+                    const itemCx = (itemBB.x1 + itemBB.x2) / 2;
+                    const targetCx = 2 * cx - itemCx;
+                    const dx = targetCx - itemCx;
+                    newStroke = {
+                        ...st,
+                        points: st.points.map((p) => ({ ...p, x: p.x + dx })),
+                        flipX: !st.flipX,
+                        rotation: st.rotation ? -st.rotation : undefined,
+                    };
+                } else {
+                    newStroke = {
+                        ...st,
+                        points: st.points.map((p) => ({ ...p, x: 2 * cx - p.x })),
+                    };
+                }
+                strokesRef.current[idx] = newStroke;
+                updatedStrokes.push(newStroke);
+            });
+            refreshSelectionBB();
+            commitStrokes();
+            emit({ type: 'update', page: currentPageRef.current, strokes: updatedStrokes });
+            redraw();
+        };
+
+        const flipSelectionV = () => {
+            const idxs = selectedIdxsRef.current;
+            if (idxs.length === 0) return;
+            const bb = selBBRef.current;
+            if (!bb) return;
+            const cy = (bb.y1 + bb.y2) / 2;
+
+            pushHistory();
+            const updatedStrokes: Stroke[] = [];
+            idxs.forEach((idx) => {
+                const st = strokesRef.current[idx];
+                if (!st) return;
+
+                let newStroke: Stroke;
+                if (['image', 'math'].includes(st.tool)) {
+                    const itemBB = getBB(st);
+                    const itemCy = (itemBB.y1 + itemBB.y2) / 2;
+                    const targetCy = 2 * cy - itemCy;
+                    const dy = targetCy - itemCy;
+                    newStroke = {
+                        ...st,
+                        points: st.points.map((p) => ({ ...p, y: p.y + dy })),
+                        flipY: !st.flipY,
+                        rotation: st.rotation ? -st.rotation : undefined,
+                    };
+                } else if (
+                    ['rect', 'circle', 'ellipse', 'triangle', 'right_triangle', 'text', 'stamp'].includes(
+                        st.tool
+                    )
+                ) {
+                    const itemBB = getBB(st);
+                    const itemCy = (itemBB.y1 + itemBB.y2) / 2;
+                    const targetCy = 2 * cy - itemCy;
+                    const dy = targetCy - itemCy;
+                    newStroke = {
+                        ...st,
+                        points: st.points.map((p) => ({ ...p, y: p.y + dy })),
+                        flipY: !st.flipY,
+                        rotation: st.rotation ? -st.rotation : undefined,
+                    };
+                } else {
+                    newStroke = {
+                        ...st,
+                        points: st.points.map((p) => ({ ...p, y: 2 * cy - p.y })),
+                    };
+                }
+                strokesRef.current[idx] = newStroke;
+                updatedStrokes.push(newStroke);
+            });
+            refreshSelectionBB();
+            commitStrokes();
+            emit({ type: 'update', page: currentPageRef.current, strokes: updatedStrokes });
+            redraw();
+        };
+
+        const bringSelectionToFront = () => {
+            const idxs = selectedIdxsRef.current;
+            if (idxs.length === 0) return;
+            pushHistory();
+            const selSet = new Set(idxs);
+            const unselected: Stroke[] = [];
+            const selected: Stroke[] = [];
+            strokesRef.current.forEach((st, i) => {
+                if (selSet.has(i)) selected.push(st);
+                else unselected.push(st);
+            });
+            strokesRef.current = [...unselected, ...selected];
+            const newIdxs = selected.map((_, i) => unselected.length + i);
+            selectedIdxsRef.current = newIdxs;
+            setSelectedIdxs(newIdxs);
+            commitStrokes();
+            emit({ type: 'page_set', page: currentPageRef.current, strokes: strokesRef.current });
+            redraw();
+        };
+
+        const sendSelectionToBack = () => {
+            const idxs = selectedIdxsRef.current;
+            if (idxs.length === 0) return;
+            pushHistory();
+            const selSet = new Set(idxs);
+            const unselected: Stroke[] = [];
+            const selected: Stroke[] = [];
+            strokesRef.current.forEach((st, i) => {
+                if (selSet.has(i)) selected.push(st);
+                else unselected.push(st);
+            });
+            strokesRef.current = [...selected, ...unselected];
+            const newIdxs = selected.map((_, i) => i);
+            selectedIdxsRef.current = newIdxs;
+            setSelectedIdxs(newIdxs);
+            commitStrokes();
+            emit({ type: 'page_set', page: currentPageRef.current, strokes: strokesRef.current });
+            redraw();
+        };
+
+        const alignSelection = (alignType: 'left' | 'center' | 'right') => {
+            const idxs = selectedIdxsRef.current;
+            if (idxs.length <= 1) return;
+            const bb = selBBRef.current;
+            if (!bb) return;
+
+            pushHistory();
+            const updatedStrokes: Stroke[] = [];
+            idxs.forEach((idx) => {
+                const st = strokesRef.current[idx];
+                if (!st) return;
+                const sBB = getBB(st);
+                let dx = 0;
+                if (alignType === 'left') {
+                    dx = bb.x1 - sBB.x1;
+                } else if (alignType === 'center') {
+                    const overallCx = (bb.x1 + bb.x2) / 2;
+                    const itemCx = (sBB.x1 + sBB.x2) / 2;
+                    dx = overallCx - itemCx;
+                } else if (alignType === 'right') {
+                    dx = bb.x2 - sBB.x2;
+                }
+                const newStroke = {
+                    ...st,
+                    points: st.points.map((p) => ({ ...p, x: p.x + dx })),
+                };
+                strokesRef.current[idx] = newStroke;
+                updatedStrokes.push(newStroke);
+            });
+            refreshSelectionBB();
+            commitStrokes();
+            emit({ type: 'update', page: currentPageRef.current, strokes: updatedStrokes });
+            redraw();
+        };
+
         return (
             <>
                 <canvas ref={bufferCanvasRef} style={{ display: 'none' }} aria-hidden="true" />
@@ -2652,6 +3183,65 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     onPointerMove={draw}
                     onPointerUp={stopDrawing}
                     onPointerCancel={stopDrawing}
+                    onDragOver={(e) => {
+                        if (
+                            e.dataTransfer.types.includes('Files') ||
+                            e.dataTransfer.types.includes('text/plain')
+                        ) {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'copy';
+                        }
+                    }}
+                    onDrop={async (e) => {
+                        e.preventDefault();
+                        const canvas = canvasRef.current;
+                        if (!canvas) return;
+                        const rect = canvas.getBoundingClientRect();
+                        const clientX = e.clientX - rect.left;
+                        const clientY = e.clientY - rect.top;
+                        const v = viewRef.current;
+                        const dropWorldX = (clientX - v.tx) / v.scale;
+                        const dropWorldY = (clientY - v.ty) / v.scale;
+
+                        const files = Array.from(e.dataTransfer.files).filter((f) =>
+                            f.type.startsWith('image/')
+                        );
+                        if (files.length > 0) {
+                            for (const file of files) {
+                                try {
+                                    const imported = await importImageFile(file);
+                                    insertImageAt(
+                                        imported.dataUrl,
+                                        imported.width,
+                                        imported.height,
+                                        dropWorldX,
+                                        dropWorldY
+                                    );
+                                } catch (err) {
+                                    console.error('Görsel bırakılamadı:', err);
+                                }
+                            }
+                            return;
+                        }
+
+                        const text = e.dataTransfer.getData('text/plain');
+                        if (text && text.trim()) {
+                            const s: Stroke = {
+                                id: newStrokeId(),
+                                tool: 'text',
+                                text: text.trim(),
+                                color: config.color,
+                                width: 24,
+                                points: [{ x: dropWorldX, y: dropWorldY }],
+                            };
+                            pushHistory();
+                            strokesRef.current.push(s);
+                            commitStrokes();
+                            emit({ type: 'add', page: currentPageRef.current, strokes: [s] });
+                            setSelection([strokesRef.current.length - 1]);
+                            redraw();
+                        }
+                    }}
                     // Yakalama koptuğunda (sistem müdahalesi) çizim kapatılır.
                     // Normal kalem kalkışında yakalama zaten stopDrawing
                     // içinde bırakıldığı için burada iş kalmaz.
@@ -2664,8 +3254,14 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     // göstergesi temizlenir. Çizim, işaretçi yakalandığı için
                     // dışarıda da sürer ve kalem kalkınca kapanır.
                     onPointerLeave={() => {
-                        // Silgi dairesi ve lazer noktası imleçle birlikte gider.
-                        if (!isDrawingRef.current) clearOverlay();
+                        laserPosRef.current = null;
+                        if (!isDrawingRef.current && laserTrailRef.current.length === 0) {
+                            if (laserRafRef.current) {
+                                cancelAnimationFrame(laserRafRef.current);
+                                laserRafRef.current = null;
+                            }
+                            clearOverlay();
+                        }
                     }}
                     aria-label="Çizim alanı"
                     className={cn(
@@ -2679,6 +3275,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     style={{
                         top: 0,
                         backgroundColor: whiteboardMode ? bgColor || '#ffffff' : 'transparent',
+                        ...(whiteboardMode && paper && paper !== 'blank'
+                            ? paperBackground(paper, bgColor || '#ffffff', viewRef.current)
+                            : {}),
                         cursor: handleCursorStyle(),
                     }}
                 />
@@ -3222,6 +3821,123 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 </svg>
                             </button>
                             <div className="w-px h-4 bg-white/20 mx-1 shrink-0" aria-hidden="true" />
+
+                            {/* Tek metin seçiliyken doğrudan düzenleme düğmesi */}
+                            {selectedStrokes.length === 1 && selectedStrokes[0].tool === 'text' && (
+                                <>
+                                    <button
+                                        type="button"
+                                        title="Metni Düzenle"
+                                        aria-label="Metni Düzenle"
+                                        className="px-2 h-6 rounded-md text-sky-400 hover:text-sky-300 hover:bg-sky-400/10 transition-all shrink-0 flex items-center gap-1 font-semibold text-[11px]"
+                                        onClick={() => {
+                                            const idx = selectedIdxs[0];
+                                            const st = strokesRef.current[idx];
+                                            if (st) {
+                                                setInlineText({
+                                                    worldX: st.points[0].x,
+                                                    worldY: st.points[0].y,
+                                                    text: st.text || '',
+                                                    fontSize: st.width && st.width > 4 ? st.width : 20,
+                                                    color: st.color,
+                                                    strokeIdx: idx,
+                                                });
+                                            }
+                                        }}
+                                    >
+                                        <Edit3 className="w-3.5 h-3.5" />
+                                        <span>Düzenle</span>
+                                    </button>
+                                    <div className="w-px h-4 bg-white/20 mx-1 shrink-0" aria-hidden="true" />
+                                </>
+                            )}
+
+                            {/* Döndürme ve Çevirme (Ayna) */}
+                            <button
+                                type="button"
+                                title="90° Saat Yönünde Döndür"
+                                aria-label="90° Döndür"
+                                className="p-1 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0"
+                                onClick={rotateSelection90}
+                            >
+                                <RotateCw className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                title="Yatay Çevir (Ayna)"
+                                aria-label="Yatay Çevir"
+                                className="p-1 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0"
+                                onClick={flipSelectionH}
+                            >
+                                <FlipHorizontal className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                title="Dikey Çevir (Ayna)"
+                                aria-label="Dikey Çevir"
+                                className="p-1 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0"
+                                onClick={flipSelectionV}
+                            >
+                                <FlipVertical className="w-3.5 h-3.5" />
+                            </button>
+
+                            <div className="w-px h-4 bg-white/20 mx-1 shrink-0" aria-hidden="true" />
+
+                            {/* Katman Sıralama: En Öne / En Arkaya */}
+                            <button
+                                type="button"
+                                title="En Öne Getir"
+                                aria-label="En Öne Getir"
+                                className="p-1 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0"
+                                onClick={bringSelectionToFront}
+                            >
+                                <ChevronsUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                title="En Arkaya Gönder"
+                                aria-label="En Arkaya Gönder"
+                                className="p-1 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0"
+                                onClick={sendSelectionToBack}
+                            >
+                                <ChevronsDown className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Çoklu Seçim Hizalama Araçları */}
+                            {selectedIdxs.length > 1 && (
+                                <>
+                                    <div className="w-px h-4 bg-white/20 mx-1 shrink-0" aria-hidden="true" />
+                                    <button
+                                        type="button"
+                                        title="Sola Hizala"
+                                        aria-label="Sola Hizala"
+                                        className="p-1 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0"
+                                        onClick={() => alignSelection('left')}
+                                    >
+                                        <AlignLeft className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        title="Ortaya Hizala"
+                                        aria-label="Ortaya Hizala"
+                                        className="p-1 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0"
+                                        onClick={() => alignSelection('center')}
+                                    >
+                                        <AlignCenter className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        title="Sağa Hizala"
+                                        aria-label="Sağa Hizala"
+                                        className="p-1 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0"
+                                        onClick={() => alignSelection('right')}
+                                    >
+                                        <AlignRight className="w-3.5 h-3.5" />
+                                    </button>
+                                </>
+                            )}
+
+                            <div className="w-px h-4 bg-white/20 mx-1 shrink-0" aria-hidden="true" />
                             <button
                                 type="button"
                                 title="Çoğalt"
@@ -3267,6 +3983,162 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                             >
                                 <Trash2 className="w-3.5 h-3.5" />
                             </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Satır İçi Metin Düzenleyici (Inline Text Editor) */}
+                {inlineText && (
+                    <div
+                        className="fixed inset-0 z-[5000] pointer-events-none"
+                        aria-label="Metin düzenleme katmanı"
+                    >
+                        {/* Arka plan tıklandığında kaydet / kapat */}
+                        <div
+                            className="absolute inset-0 pointer-events-auto bg-black/10"
+                            onClick={() => commitInlineText()}
+                        />
+                        <div
+                            className="absolute pointer-events-auto flex flex-col bg-[#1a1b26]/95 backdrop-blur-md rounded-xl border border-white/15 shadow-2xl p-2.5 min-w-[260px] max-w-[420px] transition-all"
+                            style={{
+                                left: Math.max(
+                                    12,
+                                    Math.min(
+                                        window.innerWidth - 300,
+                                        inlineText.worldX * view.scale + view.tx
+                                    )
+                                ),
+                                top: Math.max(
+                                    12,
+                                    Math.min(
+                                        window.innerHeight - 200,
+                                        inlineText.worldY * view.scale + view.ty - 60
+                                    )
+                                ),
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                        >
+                            {/* Üst Ayar Çubuğu: Boyut ve Renk */}
+                            <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-white/10">
+                                <div className="flex items-center gap-1">
+                                    <span className="text-[11px] font-medium text-slate-400 mr-1">
+                                        Boyut:
+                                    </span>
+                                    {[16, 20, 24, 32, 48].map((size) => (
+                                        <button
+                                            key={size}
+                                            type="button"
+                                            className={cn(
+                                                'px-1.5 py-0.5 text-[11px] font-bold rounded transition-colors',
+                                                inlineText.fontSize === size
+                                                    ? 'bg-sky-500 text-white'
+                                                    : 'text-slate-300 hover:bg-white/10'
+                                            )}
+                                            onClick={() =>
+                                                setInlineText((prev) =>
+                                                    prev ? { ...prev, fontSize: size } : null
+                                                )
+                                            }
+                                        >
+                                            {size}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    {DRAWING_COLORS.slice(0, 5).map((color) => (
+                                        <button
+                                            key={color}
+                                            type="button"
+                                            className={cn(
+                                                'w-4 h-4 rounded-full border transition-transform',
+                                                inlineText.color === color
+                                                    ? 'scale-125 border-white'
+                                                    : 'border-transparent hover:scale-110'
+                                            )}
+                                            style={{ backgroundColor: color }}
+                                            onClick={() =>
+                                                setInlineText((prev) =>
+                                                    prev ? { ...prev, color } : null
+                                                )
+                                            }
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Metin Giriş Alanı */}
+                            <textarea
+                                autoFocus
+                                value={inlineText.text}
+                                placeholder="Metin yazın... (Shift+Enter yeni satır)"
+                                rows={Math.max(2, Math.min(8, inlineText.text.split('\n').length))}
+                                className="w-full bg-black/30 text-white placeholder-slate-500 rounded-lg p-2 text-sm outline-none border border-white/10 focus:border-sky-500 resize-none font-sans"
+                                style={{
+                                    color: inlineText.color,
+                                    fontSize: `${Math.max(14, Math.min(28, inlineText.fontSize * 0.85))}px`,
+                                }}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setInlineText((prev) => (prev ? { ...prev, text: val } : null));
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        commitInlineText();
+                                    } else if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        setInlineText(null);
+                                    }
+                                }}
+                            />
+
+                            {/* Düğmeler */}
+                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/10">
+                                <div className="text-[10px] text-slate-400">
+                                    Enter: Kaydet • Esc: Vazgeç
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    {inlineText.strokeIdx !== undefined && (
+                                        <button
+                                            type="button"
+                                            className="px-2 py-1 text-[11px] font-medium text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-md transition-colors"
+                                            onClick={() => {
+                                                const idx = inlineText.strokeIdx!;
+                                                pushHistory();
+                                                const removedId = strokesRef.current[idx]?.id;
+                                                strokesRef.current.splice(idx, 1);
+                                                commitStrokes();
+                                                if (removedId)
+                                                    emit({
+                                                        type: 'remove',
+                                                        page: currentPageRef.current,
+                                                        ids: [removedId],
+                                                    });
+                                                deselect();
+                                                redraw();
+                                                setInlineText(null);
+                                            }}
+                                        >
+                                            Sil
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        className="px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+                                        onClick={() => setInlineText(null)}
+                                    >
+                                        Vazgeç
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="px-3 py-1 text-[11px] font-bold bg-sky-500 hover:bg-sky-400 text-white rounded-md shadow transition-colors"
+                                        onClick={() => commitInlineText()}
+                                    >
+                                        Tamam
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}

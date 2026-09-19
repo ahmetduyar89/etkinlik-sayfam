@@ -94,6 +94,9 @@
       <button onclick="setGeoMode('fractal')" id="gmode-fractal" class="gmode-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5">
         ❄️ Fraktal Çizici
       </button>
+      <button onclick="setGeoMode('polypad')" id="gmode-polypad" class="gmode-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5">
+        🧮 Mathigon Polypad
+      </button>
     </div>
 
     <!-- Right: Quick Tools -->
@@ -318,6 +321,34 @@
       </div>
     </section>
 
+    <!-- ─────────────────────────────────────────────────────────────
+         MODE 5: MATHIGON POLYPAD (AMPLIFY)
+         ───────────────────────────────────────────────────────────── -->
+    <section id="gsec-polypad" class="w-full hidden flex-col gap-4">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-3 sm:p-4 rounded-2xl border border-indigo-500/30">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2"><span>🧮</span> Mathigon Polypad: Sanal Matematik & Geometri Tuvali</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Poligonlar, fraktallar, 3D katlama cisimleri, cebir karoları ve kesir çubuklarıyla sınırsız matematik alanı.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="https://polypad.amplify.com/p" target="_blank" rel="noopener noreferrer" class="h-9 px-3.5 rounded-xl glass-card text-xs font-semibold text-indigo-300 hover:text-white flex items-center gap-1.5 transition shadow-lg">
+            <span>↗ Yeni Sekmede Aç</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="w-full rounded-2xl overflow-hidden glass-panel border border-white/10" style="height: calc(100vh - 200px); min-height: 650px;">
+        <iframe 
+          id="polypad-iframe" 
+          src="https://polypad.amplify.com/embed" 
+          title="Mathigon Polypad" 
+          class="w-full h-full border-0" 
+          allow="fullscreen; clipboard-write; clipboard-read" 
+          allowfullscreen>
+        </iframe>
+      </div>
+    </section>
+
     <!-- EDUCATIONAL NOTE CARD -->
     <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3 mt-2">
       <span class="text-xl">💡</span>
@@ -388,6 +419,8 @@
       document.getElementById('gsec-angle').classList.add('hidden');
       document.getElementById('gsec-net').classList.add('hidden');
       document.getElementById('gsec-fractal').classList.add('hidden');
+      const polypadSec = document.getElementById('gsec-polypad');
+      if (polypadSec) polypadSec.classList.add('hidden');
 
       const targetSec = document.getElementById(`gsec-${mode}`);
       if (targetSec) targetSec.classList.remove('hidden');
@@ -986,6 +1019,12 @@
       drawGeoBoard();
       drawProtractor();
       drawNet();
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const modeParam = urlParams.get('mode') || urlParams.get('tab');
+      if (modeParam === 'polypad') {
+        setGeoMode('polypad');
+      }
     });
   </script>
 </body>

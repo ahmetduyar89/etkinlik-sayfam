@@ -979,7 +979,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                                             >
                                                 <span
                                                     className="w-9 h-9 rounded-lg border border-outline-variant shrink-0"
-                                                    style={paperBackground(item.id, '#ffffff')}
+                                                    style={paperBackground(item.id, bgColor)}
                                                     aria-hidden="true"
                                                 />
                                                 <span className="min-w-0">
@@ -1368,6 +1368,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 setConfig={setConfig}
                 bgColor={bgColor}
                 onBgColorChange={changeBg}
+                paper={paper}
+                onPaperChange={changePaper}
                 onScreenshot={() =>
                     canvasRef.current?.screenshot(true, bgColor, paper, pdfCanvasRef.current)
                 }

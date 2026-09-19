@@ -116,6 +116,25 @@ export function snapToRuler(
     p: Point,
     tolerance: number
 ): { point: Point; edge: [Point, Point] } | null {
+    // Açıölçerde (Protractor) yay üzerine yapışma desteği:
+    if (state.kind === 'protractor') {
+        const r = PROTRACTOR_R;
+        const local = toLocal(state, p);
+        const rad = Math.hypot(local.x, local.y);
+        // Üst yarı dairesel kavis çevresinde miyiz?
+        if (local.y >= -tolerance && Math.abs(rad - r) <= tolerance) {
+            const angle = Math.atan2(local.y, local.x);
+            if (angle >= 0 && angle <= Math.PI) {
+                const snappedLocal = { x: Math.cos(angle) * r, y: Math.sin(angle) * r };
+                const snappedWorld = toWorld(state, snappedLocal);
+                return {
+                    point: { ...p, ...snappedWorld },
+                    edge: [toWorld(state, { x: -r, y: 0 }), toWorld(state, { x: r, y: 0 })],
+                };
+            }
+        }
+    }
+
     let best: { point: Point; edge: [Point, Point]; dist: number } | null = null;
     for (const edge of rulerEdges(state)) {
         const [a, b] = edge;
@@ -249,5 +268,31 @@ export function drawRuler(
     ctx.lineWidth = 2.5;
     ctx.fill();
     ctx.stroke();
+
+    // Canlı Açı Göstergesi (Pill Badge)
+    let deg = Math.round((state.angle * 180) / Math.PI) % 360;
+    if (deg < 0) deg += 360;
+    const badgeText = `${deg}°`;
+    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+    const textWidth = ctx.measureText(badgeText).width;
+    const badgeW = textWidth + 14;
+    const badgeH = 20;
+    const badgeX = hx + 16;
+    const badgeY = hy - badgeH / 2;
+
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
+    ctx.beginPath();
+    ctx.roundRect?.(badgeX, badgeY, badgeW, badgeH, 10);
+    if (!ctx.roundRect) ctx.rect(badgeX, badgeY, badgeW, badgeH);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2);
+
     ctx.restore();
 }

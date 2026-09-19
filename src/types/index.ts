@@ -67,7 +67,9 @@ export type DrawingTool =
     | 'lasso'
     | 'rect'
     | 'circle'
+    | 'ellipse'
     | 'triangle'
+    | 'right_triangle'
     | 'polygon'
     | 'cube'
     | 'rect_prism'
@@ -131,6 +133,10 @@ export interface Stroke {
      * eksenlere hizalı kaldığı için dönüşleri burada saklanır.
      */
     rotation?: number;
+    /** Yatayda ayna simetrisi (çevirme). */
+    flipX?: boolean;
+    /** Dikeyde ayna simetrisi (çevirme). */
+    flipY?: boolean;
 }
 
 /** Çalışma alanının yakınlaştırma ve kaydırma durumu. */
@@ -547,7 +553,7 @@ export type NotebookKind = 'notebook' | 'whiteboard';
  * Diğerleri gerçek kağıt ölçüleridir; dışa aktarma ve şablon bölmeleri bu
  * dikdörtgene göre hizalanır.
  */
-export type PageSize = 'free' | 'a4p' | 'a4l' | 'a3p' | 'a3l' | 'wide169';
+export type PageSize = 'free' | 'a4p' | 'a4l' | 'a3p' | 'a3l' | 'b5p' | 'b5l' | 'wide169';
 
 export type PaperStyle =
     | 'grid'

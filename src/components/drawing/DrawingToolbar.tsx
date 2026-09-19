@@ -28,10 +28,12 @@ import {
     Compass,
     Triangle,
     Scan,
+    PanelTop,
+    PanelBottom,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import type { DrawConfig, DrawingTool, MathObject, RulerKind } from '../../types';
-import { BG_COLORS, MAIN_TOOLS, SHAPE_TOOL_IDS } from '../../constants/drawing';
+import type { DrawConfig, DrawingTool, MathObject, PaperStyle, RulerKind } from '../../types';
+import { BG_COLORS, DEFAULT_QUICK_PENS, MAIN_TOOLS, SHAPE_TOOL_IDS } from '../../constants/drawing';
 import {
     TOOLBAR_DENSITY_LABELS,
     useToolbarScale,
@@ -57,6 +59,8 @@ interface DrawingToolbarProps {
     setShowWhiteboard?: (val: boolean) => void;
     bgColor?: string;
     onBgColorChange?: (c: string) => void;
+    paper?: PaperStyle;
+    onPaperChange?: (p: PaperStyle) => void;
     onScreenshot?: () => void;
     isTextBoxMode?: boolean;
     onTextBoxModeToggle?: () => void;
@@ -92,7 +96,7 @@ const RULER_LABELS: Record<RulerKind | 'off', string> = {
 
 /** Hangi aracın hangi ayar grubunu açacağı. Seç/kement/el ayarsızdır. */
 function sectionForTool(tool: DrawingTool): ToolSettingsSection | null {
-    if (tool === 'pencil' || tool === 'highlighter' || tool === 'sun') return 'pen';
+    if (tool === 'pencil' || tool === 'highlighter') return 'pen';
     if (tool === 'eraser') return 'eraser';
     if (SHAPE_TOOL_IDS.includes(tool) || tool === 'stamp') return 'shape';
     return null;
@@ -106,6 +110,8 @@ export function DrawingToolbar({
     setShowWhiteboard,
     bgColor,
     onBgColorChange,
+    paper,
+    onPaperChange,
     onScreenshot,
     isTextBoxMode,
     onTextBoxModeToggle,
@@ -126,6 +132,26 @@ export function DrawingToolbar({
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     /** Aynı anda tek bir açılır panel görünür. */
     const [panel, setPanel] = React.useState<PanelId | null>(null);
+    const [dockPosition, setDockPosition] = React.useState<'bottom' | 'top'>(() => {
+        try {
+            return (localStorage.getItem('notebook_toolbar_dock') as 'bottom' | 'top') || 'bottom';
+        } catch {
+            return 'bottom';
+        }
+    });
+
+    const toggleDock = () => {
+        setDockPosition((prev) => {
+            const next = prev === 'bottom' ? 'top' : 'bottom';
+            try {
+                localStorage.setItem('notebook_toolbar_dock', next);
+            } catch {
+                /* no-op */
+            }
+            return next;
+        });
+    };
+
     const dragControls = useDragControls();
     const barRef = React.useRef<HTMLDivElement>(null);
     const rootRef = React.useRef<HTMLDivElement>(null);
@@ -184,28 +210,35 @@ export function DrawingToolbar({
 
     const bar = (
         <motion.div
+            key={dockPosition}
             drag
             dragControls={dragControls}
             dragListener={false}
             dragMomentum={false}
             dragElastic={0}
-            initial={{ y: 20, opacity: 0 }}
+            initial={{ y: dockPosition === 'top' ? -20 : 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             ref={rootRef}
             role="toolbar"
             aria-label="Çizim araç çubuğu"
             // Tam genişlikte durur: `left: 50%` verilseydi kullanılabilir
             // genişlik ekranın yarısına düşer ve çubuk erken satır atlardı.
-            className="fixed bottom-10 left-0 right-0 z-[5000] pointer-events-none"
+            className={cn(
+                'fixed left-0 right-0 z-[5000] pointer-events-none transition-all duration-300',
+                dockPosition === 'top' ? 'top-6' : 'bottom-10'
+            )}
             style={{ touchAction: 'none' }}
         >
             {/* Ölçek yalnızca bu sarmalayıcıya uygulanır: sürükleme transformu
                 framer-motion'da dış katmanda kaldığı için ikisi çakışmaz. */}
             <div
-                className="flex flex-col items-center gap-3"
+                className={cn(
+                    'flex items-center gap-3',
+                    dockPosition === 'top' ? 'flex-col-reverse' : 'flex-col'
+                )}
                 style={{
                     transform: `scale(${scale})`,
-                    transformOrigin: 'bottom center',
+                    transformOrigin: dockPosition === 'top' ? 'top center' : 'bottom center',
                     transition: 'transform 180ms ease-out',
                 }}
             >
@@ -434,6 +467,97 @@ export function DrawingToolbar({
                 )}
             </AnimatePresence>
 
+            <AnimatePresence>
+                {showExtras && (onBgColorChange || onPaperChange) && (
+                    <motion.div
+                        initial={{ opacity: 0, y: dockPosition === 'top' ? -10 : 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: dockPosition === 'top' ? -10 : 10, scale: 0.95 }}
+                        className="pointer-events-auto flex flex-col gap-2.5 bg-[#1a1b26]/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 shadow-2xl max-w-[95vw]"
+                    >
+                        {onBgColorChange && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0 w-16">
+                                    Zemin
+                                </span>
+                                <div role="radiogroup" aria-label="Arka Plan Rengi" className="flex items-center gap-1.5 flex-wrap">
+                                    {BG_COLORS.map(({ color, label }) => (
+                                        <button
+                                            key={color}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={(bgColor || '#ffffff') === color}
+                                            onClick={() => onBgColorChange(color)}
+                                            className={cn(
+                                                'w-6 h-6 rounded-full border-2 transition-all hover:scale-110 shrink-0 shadow-sm',
+                                                (bgColor || '#ffffff') === color
+                                                    ? 'border-indigo-400 ring-2 ring-indigo-400/40 scale-110'
+                                                    : 'border-white/20'
+                                            )}
+                                            style={{ backgroundColor: color }}
+                                            title={label}
+                                            aria-label={label}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {onPaperChange && (
+                            <div className="flex items-center gap-2 pt-1 border-t border-white/10">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0 w-16">
+                                    Şablon
+                                </span>
+                                <div className="flex items-center gap-1 flex-wrap">
+                                    {[
+                                        { id: 'blank', label: 'Düz' },
+                                        { id: 'grid', label: 'Kareli' },
+                                        { id: 'lined', label: 'Çizgili' },
+                                        { id: 'dotted', label: 'Noktalı' },
+                                        { id: 'graph_mm', label: 'Milimetrik' },
+                                        { id: 'coordinate', label: 'Koordinat' },
+                                        { id: 'isometric', label: 'İzometrik' },
+                                    ].map((p) => (
+                                        <button
+                                            key={p.id}
+                                            type="button"
+                                            onClick={() => onPaperChange(p.id as PaperStyle)}
+                                            className={cn(
+                                                'px-2.5 py-1 rounded-lg text-xs font-semibold transition-all',
+                                                (paper || 'blank') === p.id
+                                                    ? 'bg-indigo-600 text-white shadow-sm'
+                                                    : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                            )}
+                                        >
+                                            {p.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-1 border-t border-white/10">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0">
+                                Izgaraya Hizalama
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setConfig({ ...config, snapToGrid: !config.snapToGrid })}
+                                className={cn(
+                                    'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all',
+                                    config.snapToGrid
+                                        ? 'bg-emerald-600/90 text-white shadow-sm'
+                                        : 'bg-white/5 text-slate-400 hover:text-slate-200'
+                                )}
+                                title={config.snapToGrid ? 'Izgaraya yapışma açık' : 'Izgaraya yapışma kapalı'}
+                            >
+                                <Grid className="w-3.5 h-3.5" />
+                                <span>{config.snapToGrid ? 'Açık' : 'Kapalı'}</span>
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Tek satırda kalır: sığmazsa `useToolbarScale` ölçeği küçültür,
                 böylece tahtada çubuk ikinci satıra taşıp ekranı kaplamaz. */}
@@ -502,6 +626,55 @@ export function DrawingToolbar({
                         )}
                     </button>
                 </div>
+
+                {/* Hızlı Kalem Slotları: 3 Kalem (Siyah, Mavi, Kırmızı) + 1 Fosforlu (Sarı) */}
+                <div className="flex items-center gap-1 px-1.5 border-white/10 border-r" title="Hızlı Kalem Slotları">
+                    {DEFAULT_QUICK_PENS.map((qp) => {
+                        const isCurrent =
+                            config.tool === qp.tool &&
+                            config.color.toLowerCase() === qp.color.toLowerCase();
+                        return (
+                            <button
+                                key={qp.id}
+                                type="button"
+                                onClick={() => {
+                                    setConfig({
+                                        ...config,
+                                        tool: qp.tool,
+                                        color: qp.color,
+                                        width: qp.width,
+                                        penType: qp.tool === 'pencil' ? (config.penType || 'ballpoint') : undefined,
+                                    });
+                                }}
+                                title={`Hızlı: ${qp.name} (${qp.width}px)`}
+                                aria-label={qp.name}
+                                aria-pressed={isCurrent}
+                                className={cn(
+                                    'relative w-7 h-7 rounded-lg flex items-center justify-center transition-all',
+                                    isCurrent
+                                        ? 'bg-white/20 ring-2 ring-white/70 shadow-sm scale-105'
+                                        : 'hover:bg-white/10 hover:scale-105 opacity-80 hover:opacity-100'
+                                )}
+                            >
+                                {qp.tool === 'highlighter' ? (
+                                    <div
+                                        className="w-3.5 h-2 rounded-sm shadow-sm"
+                                        style={{ backgroundColor: qp.color }}
+                                    />
+                                ) : (
+                                    <div
+                                        className="w-3 h-3 rounded-full border border-white/40 shadow-sm"
+                                        style={{ backgroundColor: qp.color }}
+                                    />
+                                )}
+                                {isCurrent && (
+                                    <span className="absolute -bottom-0.5 w-1 h-1 bg-white rounded-full shadow" />
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+
                 <div className="flex items-center gap-1 px-1.5 border-white/10 border-r">
                     {/* Ölçü aracı: tahtada cetvelle düz çizgi çekmek için. */}
                     <button
@@ -720,11 +893,11 @@ export function DrawingToolbar({
                             <Camera className="w-[18px] h-[18px]" />
                         </button>
                     )}
-                    {onBgColorChange && (
+                    {(onBgColorChange || onPaperChange) && (
                         <button
                             type="button"
                             onClick={() => openOnly(showExtras ? null : 'extras')}
-                            aria-label="Arka plan rengi"
+                            aria-label="Sayfa ve arka plan ayarları"
                             aria-expanded={showExtras}
                             className={cn(
                                 'p-2 rounded-lg transition-all relative',
@@ -732,7 +905,7 @@ export function DrawingToolbar({
                                     ? 'bg-white/10 text-white'
                                     : 'text-slate-400 hover:text-white hover:bg-white/5'
                             )}
-                            title="Arka Plan Rengi"
+                            title="Sayfa Şablonu ve Zemin Rengi"
                         >
                             <div
                                 className="w-[18px] h-[18px] rounded-full border-2 border-white/40"
@@ -756,44 +929,24 @@ export function DrawingToolbar({
                             <Maximize2 className="w-[18px] h-[18px]" />
                         )}
                     </button>
+
+                    {/* Üst / Alt sabitleme düğmesi */}
+                    <button
+                        type="button"
+                        onClick={toggleDock}
+                        aria-label={dockPosition === 'bottom' ? 'Araç çubuğunu üste sabitle' : 'Araç çubuğunu alta sabitle'}
+                        className="p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all"
+                        title={dockPosition === 'bottom' ? 'Üste Sabitle' : 'Alta Sabitle'}
+                    >
+                        {dockPosition === 'bottom' ? (
+                            <PanelTop className="w-[18px] h-[18px]" />
+                        ) : (
+                            <PanelBottom className="w-[18px] h-[18px]" />
+                        )}
+                    </button>
                 </div>
 
             </div>
-
-            <AnimatePresence>
-                {showExtras && onBgColorChange && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        role="radiogroup"
-                        aria-label="Arka Plan"
-                        className="pointer-events-auto flex items-center gap-2 bg-[#1a1b26]/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 shadow-2xl"
-                    >
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider shrink-0">
-                            Arka Plan
-                        </span>
-                        {BG_COLORS.map(({ color, label }) => (
-                            <button
-                                key={color}
-                                type="button"
-                                role="radio"
-                                aria-checked={(bgColor || '#ffffff') === color}
-                                onClick={() => onBgColorChange(color)}
-                                className={cn(
-                                    'w-7 h-7 rounded-full border-2 transition-all hover:scale-110 shrink-0',
-                                    (bgColor || '#ffffff') === color
-                                        ? 'border-white scale-110'
-                                        : 'border-transparent'
-                                )}
-                                style={{ backgroundColor: color }}
-                                title={label}
-                                aria-label={label}
-                            />
-                        ))}
-                    </motion.div>
-                )}
-            </AnimatePresence>
             </div>
         </motion.div>
     );

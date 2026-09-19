@@ -168,12 +168,59 @@ export function recognizeShape(rawPoints: Point[]): RecognizedShape | null {
         };
     }
 
+    // Basık çember / Elips tespiti
+    if (aspect >= 1.25 && aspect <= 4.5) {
+        const rx = bb.w / 2;
+        const ry = bb.h / 2;
+        if (rx > 12 && ry > 12) {
+            const normDists = pts.map((p) => Math.hypot((p.x - cx) / rx, (p.y - cy) / ry));
+            const normMean = normDists.reduce((s, d) => s + d, 0) / normDists.length;
+            const normDev =
+                Math.sqrt(normDists.reduce((s, d) => s + (d - normMean) ** 2, 0) / normDists.length);
+            if (normDev < 0.24 && normMean > 0.70 && normMean < 1.30) {
+                return {
+                    tool: 'ellipse',
+                    points: [
+                        { x: bb.x1, y: bb.y1 },
+                        { x: bb.x2, y: bb.y2 },
+                    ],
+                };
+            }
+        }
+    }
+
     // Köşe sayısına bak (Ramer-Douglas-Peucker ile sadeleştirme)
     const corners = simplify(pts, Math.max(diag * 0.05, 5.5));
     const cornerCount = Math.max(0, corners.length - 1);
 
-    // Üçgen: 3 belirgin köşe
+    // Üçgen: 3 belirgin köşe (Dik Üçgen veya Normal Üçgen)
     if (cornerCount === 3) {
+        // 3 köşenin açılarını analiz et
+        const c0 = corners[0];
+        const c1 = corners[1];
+        const c2 = corners[2];
+        const angleAt = (prev: Point, at: Point, next: Point) => {
+            const v1 = { x: prev.x - at.x, y: prev.y - at.y };
+            const v2 = { x: next.x - at.x, y: next.y - at.y };
+            const dot = v1.x * v2.x + v1.y * v2.y;
+            const m = Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y);
+            return m > 0 ? (Math.acos(Math.max(-1, Math.min(1, dot / m))) * 180) / Math.PI : 0;
+        };
+        const a0 = angleAt(c2, c0, c1);
+        const a1 = angleAt(c0, c1, c2);
+        const a2 = angleAt(c1, c2, c0);
+        const hasRightAngle = [a0, a1, a2].some((ang) => Math.abs(ang - 90) <= 18);
+
+        if (hasRightAngle) {
+            return {
+                tool: 'right_triangle',
+                points: [
+                    { x: bb.x1, y: bb.y1 },
+                    { x: bb.x2, y: bb.y2 },
+                ],
+            };
+        }
+
         return {
             tool: 'triangle',
             points: [
@@ -260,7 +307,10 @@ export function adjustSnappedShape(
         const r = Math.hypot(dx, dy);
         if (r > 15) {
             const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
-            const targets = [0, 45, 90, 135, 180, -45, -90, -135, -180];
+            const targets = [
+                0, 30, 45, 60, 90, 120, 135, 150, 180,
+                -30, -45, -60, -90, -120, -135, -150, -180,
+            ];
             for (const target of targets) {
                 if (Math.abs(deg - target) < 6) {
                     const rad = (target * Math.PI) / 180;
@@ -271,7 +321,12 @@ export function adjustSnappedShape(
         }
     }
 
-    if (shape.tool === 'line' || shape.tool === 'arrow') {
+    if (
+        shape.tool === 'line' ||
+        shape.tool === 'dashed' ||
+        shape.tool === 'arrow' ||
+        shape.tool === 'double_arrow'
+    ) {
         return {
             tool: shape.tool,
             points: [{ ...start }, end],
@@ -285,7 +340,12 @@ export function adjustSnappedShape(
         };
     }
 
-    if (shape.tool === 'rect' || shape.tool === 'triangle') {
+    if (
+        shape.tool === 'rect' ||
+        shape.tool === 'ellipse' ||
+        shape.tool === 'triangle' ||
+        shape.tool === 'right_triangle'
+    ) {
         return {
             tool: shape.tool,
             points: [{ ...start }, end],
