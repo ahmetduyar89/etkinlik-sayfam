@@ -142,8 +142,8 @@ export const PORTAL_MODULES: PortalModule[] = [
         id: 'gunes-sistemi',
         title: '3D Güneş Sistemi Planetaryumu',
         description:
-            'İnteraktif 3D uzay laboratuvarı: 8 gezegen, yörüngeler, mevsimler, tutulmalar, Kepler yasaları ve gezegen karşılaştırıcı.',
-        meta: '8 Gezegen · 3D Yörünge · Fen Laboratuvarı',
+            'İnteraktif 3D uzay laboratuvarı: 8 gezegen, NASA Eyes canlı uzay gözlemevi, mevsimler, tutulmalar, Kepler yasaları ve gezegen karşılaştırıcı.',
+        meta: '8 Gezegen · NASA Eyes Canlı Uzay · Fen Laboratuvarı',
         icon: Orbit,
         accent: {
             icon: 'from-sky-500 to-indigo-600',

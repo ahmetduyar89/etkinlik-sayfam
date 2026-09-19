@@ -88,6 +88,50 @@
   <!-- 3D WebGL Canvas Container -->
   <div id="canvas-container"></div>
 
+  <!-- NASA Eyes 3D Live Simulation Container -->
+  <div id="nasa-container" class="hidden absolute inset-0 w-full h-full z-10 bg-[#030712]">
+    <!-- Loading overlay for NASA iframe -->
+    <div id="nasa-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md z-20 pointer-events-none transition-opacity duration-500">
+      <div class="relative flex items-center justify-center mb-4">
+        <div class="w-16 h-16 rounded-full border-2 border-cyan-500/20 border-t-cyan-400 animate-spin"></div>
+        <span class="absolute text-2xl">🚀</span>
+      </div>
+      <div class="text-sm font-bold text-white tracking-wide">NASA Eyes on the Solar System</div>
+      <div class="text-xs text-cyan-300/90 mt-1.5 font-medium">Gerçek Zamanlı 3D Uzay Simülatörü Yükleniyor...</div>
+      <div class="text-[11px] text-slate-400 mt-2 max-w-xs text-center leading-relaxed">NASA JPL anlık telemetri ve gezegen veritabanına bağlanılıyor.</div>
+    </div>
+
+    <!-- NASA Control / Quick Header -->
+    <div class="absolute top-14 sm:top-16 inset-x-4 sm:inset-x-6 z-20 flex items-center justify-between pointer-events-none">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-panel pointer-events-auto border border-cyan-500/30 text-xs shadow-xl">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-effect"></span>
+        <span class="font-bold text-white hidden sm:inline">NASA Eyes:</span>
+        <span class="text-cyan-200 font-medium">Canlı 3D Uzay Gözlemevi</span>
+      </div>
+
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <a href="https://eyes.nasa.gov/apps/solar-system/#/home" target="_blank" rel="noopener noreferrer" title="Yeni Sekmede Aç" class="h-8 px-3 rounded-xl glass-card text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition shadow-lg">
+          <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          <span class="hidden md:inline">Yeni Sekmede Aç</span>
+        </a>
+        <button onclick="setLabMode('free')" class="h-8 px-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-sky-500/20">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          <span>Türkçe Planetaryuma Dön</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- NASA Iframe -->
+    <iframe 
+      id="nasa-iframe" 
+      src="" 
+      title="NASA Eyes on the Solar System"
+      class="w-full h-full border-0" 
+      allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+      allowfullscreen>
+    </iframe>
+  </div>
+
   <!-- TOP HEADER / NAV BAR -->
   <header class="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 py-3 sm:px-6 pointer-events-none">
     <!-- Left: Brand & Return -->
@@ -125,6 +169,10 @@
       <button onclick="setLabMode('kepler')" id="tab-kepler" class="mode-tab px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5">
         📐 Kepler Yasaları
       </button>
+      <button onclick="setLabMode('nasa')" id="tab-nasa" class="mode-tab px-3.5 py-1.5 rounded-xl text-xs font-semibold text-cyan-300 hover:text-white transition-all hover:bg-white/5 flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-cyan-400 pulse-effect"></span>
+        <span>🚀 NASA Eyes (Canlı 3D)</span>
+      </button>
     </div>
 
     <!-- Right: Quick Tools (Sound, Fullscreen, Reset Camera) -->
@@ -153,11 +201,18 @@
   <!-- MOBILE MODE DRAWER (MODAL) -->
   <div id="mobile-menu" class="hidden absolute top-14 inset-x-4 z-30 p-4 rounded-2xl glass-panel flex-col gap-2 shadow-2xl lg:hidden">
     <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Eğitsel Laboratuvar Modları</div>
-    <button onclick="setLabMode('free'); toggleMobileMenu();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-sky-400 bg-sky-500/10">🪐 Yörünge Keşfi</button>
-    <button onclick="setLabMode('seasons'); toggleMobileMenu();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5">🌍 Mevsimler & 23.5° Eksen Eğikliği</button>
-    <button onclick="setLabMode('eclipses'); toggleMobileMenu();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5">🌑 Ay Evreleri & Tutulmalar</button>
-    <button onclick="setLabMode('gravity'); toggleMobileMenu();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5">⚖️ Gezegen Karşılaştırıcı (Yerçekimi & Kilo)</button>
-    <button onclick="setLabMode('kepler'); toggleMobileMenu();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5">📐 Kepler Yasaları (Alanlar & Hız)</button>
+    <button data-mode="free" onclick="setLabMode('free'); toggleMobileMenu();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-sky-400 bg-sky-500/10">🪐 Yörünge Keşfi</button>
+    <button data-mode="seasons" onclick="setLabMode('seasons'); toggleMobileMenu();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5">🌍 Mevsimler & 23.5° Eksen Eğikliği</button>
+    <button data-mode="eclipses" onclick="setLabMode('eclipses'); toggleMobileMenu();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5">🌑 Ay Evreleri & Tutulmalar</button>
+    <button data-mode="gravity" onclick="setLabMode('gravity'); toggleMobileMenu();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5">⚖️ Gezegen Karşılaştırıcı (Yerçekimi & Kilo)</button>
+    <button data-mode="kepler" onclick="setLabMode('kepler'); toggleMobileMenu();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5">📐 Kepler Yasaları (Alanlar & Hız)</button>
+    <button data-mode="nasa" onclick="setLabMode('nasa'); toggleMobileMenu();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-cyan-300 hover:bg-white/5 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-cyan-400 pulse-effect"></span>
+        <span>🚀 NASA Eyes (Canlı 3D Uzay)</span>
+      </div>
+      <span class="text-[10px] uppercase font-bold text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded-full border border-cyan-500/30">Canlı</span>
+    </button>
   </div>
 
   <!-- RIGHT SIDEBAR: PLANET HUD / INFO CARD -->
@@ -948,6 +1003,10 @@
     function animate(time) {
       requestAnimationFrame(animate);
 
+      if (currentLabMode === 'nasa') {
+        return;
+      }
+
       const delta = (time - lastTime) * 0.001 || 0.016;
       lastTime = time;
 
@@ -1111,19 +1170,72 @@
       currentLabMode = mode;
 
       document.querySelectorAll('.mode-tab').forEach(t => {
-        t.classList.remove('active', 'text-sky-400', 'bg-sky-500/20', 'border', 'border-sky-400/40');
+        t.classList.remove('active', 'text-sky-400', 'bg-sky-500/20', 'border', 'border-sky-400/40', 'text-cyan-300', 'bg-cyan-500/20', 'border-cyan-400/40');
         t.classList.add('text-slate-300');
       });
       const activeTab = document.getElementById(`tab-${mode}`);
       if (activeTab) {
-        activeTab.classList.add('active', 'text-sky-400', 'bg-sky-500/20', 'border', 'border-sky-400/40');
+        if (mode === 'nasa') {
+          activeTab.classList.add('active', 'text-cyan-300', 'bg-cyan-500/20', 'border', 'border-cyan-400/40');
+        } else {
+          activeTab.classList.add('active', 'text-sky-400', 'bg-sky-500/20', 'border', 'border-sky-400/40');
+        }
         activeTab.classList.remove('text-slate-300');
       }
+
+      document.querySelectorAll('#mobile-menu button[data-mode]').forEach(btn => {
+        const btnMode = btn.getAttribute('data-mode');
+        if (btnMode === mode) {
+          btn.classList.add('font-bold', 'bg-sky-500/20', mode === 'nasa' ? 'text-cyan-300' : 'text-sky-400');
+          btn.classList.remove('font-semibold', 'text-slate-200');
+        } else {
+          btn.classList.remove('font-bold', 'bg-sky-500/20', 'text-sky-400', 'text-cyan-300', 'bg-sky-500/10');
+          btn.classList.add('font-semibold', 'text-slate-200');
+        }
+      });
 
       document.getElementById('seasons-modal').classList.add('hidden');
       document.getElementById('eclipses-modal').classList.add('hidden');
       document.getElementById('gravity-modal').classList.add('hidden');
       document.getElementById('kepler-modal').classList.add('hidden');
+
+      const nasaContainer = document.getElementById('nasa-container');
+      const nasaIframe = document.getElementById('nasa-iframe');
+      const nasaLoading = document.getElementById('nasa-loading');
+      const canvasContainer = document.getElementById('canvas-container');
+      const bottomFooter = document.querySelector('footer');
+      const reopenBtn = document.getElementById('reopen-panel-btn');
+
+      if (mode === 'nasa') {
+        if (nasaContainer) nasaContainer.classList.remove('hidden');
+        if (canvasContainer) canvasContainer.classList.add('hidden');
+        if (bottomFooter) bottomFooter.classList.add('hidden');
+        toggleInfoPanel(false);
+        if (reopenBtn) reopenBtn.classList.add('hidden');
+
+        // Lazy load NASA iframe on first activation
+        if (nasaIframe && !nasaIframe.getAttribute('src')) {
+          if (nasaLoading) nasaLoading.classList.remove('hidden', 'opacity-0');
+          nasaIframe.onload = function() {
+            setTimeout(() => {
+              if (nasaLoading) {
+                nasaLoading.classList.add('opacity-0');
+                setTimeout(() => {
+                  nasaLoading.classList.add('hidden');
+                }, 500);
+              }
+            }, 600);
+          };
+          nasaIframe.src = 'https://eyes.nasa.gov/apps/solar-system/#/home';
+        }
+        return;
+      }
+
+      // Restore normal 3D view when leaving NASA mode
+      if (nasaContainer) nasaContainer.classList.add('hidden');
+      if (canvasContainer) canvasContainer.classList.remove('hidden');
+      if (bottomFooter) bottomFooter.classList.remove('hidden');
+      onWindowResize();
 
       if (mode === 'free') {
         selectPlanet('sun');
