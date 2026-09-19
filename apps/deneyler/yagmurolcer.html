@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sihirli Yağmurölçer: İnşa Et & Veri Topla | Küçük Mucitler</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito (Kusursuz Türkçe font desteği) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'sans-serif'],
+            display: ['Baloo 2', 'cursive'],
+          },
+          colors: {
+            bgMain: '#f0fdfa', // Açık nane/gökyüzü ferahlığı
+            ink: '#0f172a',
+            primary: '#0284c7', // Gökyüzü mavisi
+            accent: '#06b6d4',
+            sun: '#facc15',
+            panel: '#ffffff',
+          },
+          borderWidth: {
+            '3': '3px',
+            '3.5': '3.5px',
+          },
+          boxShadow: {
+            'hard': '4px 4px 0px #0f172a',
+            'hard-lg': '6px 6px 0px #0f172a',
+            'hard-sm': '2px 2px 0px #0f172a',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #f0fdfa;
+      color: #0f172a;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display {
+      font-family: 'Baloo 2', cursive;
+    }
+    .chunky {
+      border: 3.5px solid #0f172a;
+      border-radius: 1.25rem;
+      box-shadow: 4px 4px 0px #0f172a;
+    }
+    .pushable {
+      border: 3px solid #0f172a;
+      border-radius: 0.85rem;
+      box-shadow: 3px 3px 0px #0f172a;
+      transition: all 0.12s ease;
+      cursor: pointer;
+    }
+    .pushable:hover {
+      transform: translate(-1.5px, -1.5px);
+      box-shadow: 4.5px 4.5px 0px #0f172a;
+    }
+    .pushable:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #0f172a;
+    }
+    .active-tab {
+      background-color: #0284c7 !important;
+      color: #ffffff !important;
+      border-color: #0f172a !important;
+    }
+    /* Yağmur damlaları ve titreşim */
+    @keyframes rainFall {
+      0% { transform: translateY(-30px); opacity: 0; }
+      20% { opacity: 0.9; }
+      100% { transform: translateY(320px); opacity: 0.2; }
+    }
+    .rain-drop {
+      animation: rainFall 0.7s linear infinite;
+    }
+    /* Şimşek parlaması */
+    .lightning-flash {
+      animation: flash 0.35s ease-out;
+    }
+    @keyframes flash {
+      0%, 100% { background-color: transparent; }
+      20%, 40% { background-color: rgba(255, 255, 255, 0.75); }
+    }
+    /* Tablo kaydırma çubuğu */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #94a3b8;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <!-- Şimşek Parlama Katmanı -->
+  <div id="lightningOverlay" class="fixed inset-0 pointer-events-none z-50 transition-colors duration-75"></div>
+
+  <!-- Üst Başlık & Navigasyon Çubuğu -->
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="pushable p-2 bg-sky-100 hover:bg-sky-200 text-ink text-sm font-bold flex items-center gap-1">
+        <span>⬅️</span> <span class="hidden sm:inline">Portala Dön</span>
+      </a>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">🌧️</span>
+          <h1 class="display text-lg sm:text-2xl font-black text-ink tracking-wide">
+            Sihirli Yağmurölçer (Plüviyometre)
+          </h1>
+        </div>
+        <p class="text-xs sm:text-sm font-bold text-gray-600">
+          Ölçüm aracı inşa et, yağmuru yakala ve bilimsel veri topla! 📊
+        </p>
+      </div>
+    </div>
+
+    <!-- Mod Değiştirme Butonları & Ses -->
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabBuild" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1">
+          <span>🛠️</span> <span>1. İnşa Et</span>
+        </button>
+        <button id="tabSimulate" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1">
+          <span>🌧️</span> <span>2. Yağmur & Veri</span>
+        </button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1" title="Sesi Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Ana Çalışma Alanı -->
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+    
+    <!-- SOL PANEL: İNTERAKTİF SİMÜLASYON VE ATÖLYE SAHNESİ (7 SÜTUN) -->
+    <section class="lg:col-span-7 flex flex-col gap-3">
+
+      <!-- Sahne Kutusu -->
+      <div class="chunky bg-white overflow-hidden relative shadow-lg flex flex-col">
+        
+        <!-- Sahne Üst Durum Çubuğu -->
+        <div class="px-4 py-2.5 bg-gradient-to-r from-sky-100 to-teal-50 border-b-3 border-ink flex items-center justify-between text-xs font-black">
+          <div class="flex items-center gap-2">
+            <span id="sceneBadgeIcon" class="text-lg">🛠️</span>
+            <span id="sceneBadgeText" class="text-sky-900 uppercase tracking-wider">Atölye: Plüviyometre Yapımı</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="liveReadoutPill" class="bg-white px-2.5 py-1 rounded-full border-2 border-ink text-sky-800 font-extrabold text-[11px] hidden">
+              💧 Seviye: <strong id="pillMmText" class="text-blue-600">0 mm</strong>
+            </span>
+          </div>
+        </div>
+
+        <!-- SVG ve Canvas Çizim Alanı (Yükseklik 420px) -->
+        <div id="simStage" class="relative w-full h-[430px] bg-gradient-to-b from-sky-200 via-sky-100 to-emerald-100 flex items-center justify-center overflow-hidden">
+          
+          <!-- Yağmur Damlaları Canvas / Katmanı -->
+          <canvas id="rainCanvas" class="absolute inset-0 w-full h-full pointer-events-none z-10 opacity-0 transition-opacity duration-500"></canvas>
+
+          <!-- SVG Sahne Çizimi -->
+          <svg id="stageSvg" viewBox="0 0 600 420" class="w-full h-full">
+            <defs>
+              <!-- Su Gradyanı -->
+              <linearGradient id="waterGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85" />
+                <stop offset="50%" stop-color="#0284c7" stop-opacity="0.9" />
+                <stop offset="100%" stop-color="#0369a1" stop-opacity="0.85" />
+              </linearGradient>
+              
+              <!-- Sıfır Seviyesi Denge Suyu (Açık Mavi) -->
+              <linearGradient id="baseWaterGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.7" />
+                <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.75" />
+              </linearGradient>
+
+              <!-- Plastik Şişe Cam Efekti -->
+              <linearGradient id="bottleGlass" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.5" />
+                <stop offset="15%" stop-color="#e0f2fe" stop-opacity="0.2" />
+                <stop offset="85%" stop-color="#e0f2fe" stop-opacity="0.1" />
+                <stop offset="100%" stop-color="#bae6fd" stop-opacity="0.4" />
+              </linearGradient>
+
+              <filter id="shadowFilter">
+                <feDropShadow dx="2" dy="3" stdDeviation="2" flood-opacity="0.25" />
+              </filter>
+            </defs>
+
+            <!-- 1. GÖKYÜZÜ / AÇIK HAVA ELEMENTLERİ -->
+            <g id="outdoorElements" opacity="0" class="transition-opacity duration-500">
+              <!-- Bulutlar -->
+              <g id="stormCloudGroup" transform="translate(300, 50)">
+                <!-- Koyu / Gri Fırtına Bulutu -->
+                <path d="M-140,20 Q-150,-10 -110,-20 Q-90,-50 -40,-40 Q0,-60 60,-40 Q110,-55 130,-20 Q160,-10 140,20 Z" 
+                      fill="#64748b" stroke="#0f172a" stroke-width="3" opacity="0.95" />
+                <path d="M-110,25 Q-80,-20 -20,-15 Q20,-35 80,-15 Q120,-20 120,25 Z" 
+                      fill="#94a3b8" opacity="0.6" />
+                <!-- Şimşek Simgesi -->
+                <path id="lightningBolt" d="M0,15 L-12,45 L-2,45 L-15,80 L18,35 L5,35 Z" 
+                      fill="#facc15" stroke="#ca8a04" stroke-width="2" opacity="0" />
+              </g>
+
+              <!-- Açık Hava Zemin Çimenliği ve Ahşap Çit / Destek Direği -->
+              <g transform="translate(0, 350)">
+                <!-- Çim Zemin -->
+                <rect x="0" y="0" width="600" height="70" fill="#4ade80" stroke="#0f172a" stroke-width="3" />
+                <path d="M0,0 Q150,-12 300,0 Q450,-12 600,0 L600,70 L0,70 Z" fill="#22c55e" opacity="0.5" />
+                
+                <!-- Destek Kazığı / Zemin Kaidesi -->
+                <rect x="250" y="-40" width="100" height="42" rx="6" fill="#b45309" stroke="#0f172a" stroke-width="3" />
+                <line x1="270" y1="-40" x2="270" y2="0" stroke="#78350f" stroke-width="2" />
+                <line x1="330" y1="-40" x2="330" y2="0" stroke="#78350f" stroke-width="2" />
+                <!-- Sabitleme İpi / Lastiği -->
+                <rect x="246" y="-20" width="108" height="8" rx="4" fill="#ef4444" stroke="#0f172a" stroke-width="2" />
+              </g>
+            </g>
+
+            <!-- 2. ATÖLYE MASA ZEMİNİ -->
+            <g id="workshopTable" class="transition-opacity duration-500">
+              <rect x="0" y="340" width="600" height="80" fill="#fed7aa" stroke="#0f172a" stroke-width="3.5" />
+              <rect x="0" y="340" width="600" height="14" fill="#fdba74" opacity="0.6" />
+              <!-- Masa Dokusu / Çizgiler -->
+              <line x1="120" y1="355" x2="120" y2="420" stroke="#f97316" stroke-width="2" opacity="0.4" />
+              <line x1="480" y1="355" x2="480" y2="420" stroke="#f97316" stroke-width="2" opacity="0.4" />
+            </g>
+
+            <!-- 3. YAĞMURÖLÇER RİGİ (MERKEZ: X=300, Y=335 Taban) -->
+            <g id="rainGaugeRig" transform="translate(300, 340)">
+
+              <!-- Gölge -->
+              <ellipse cx="0" cy="0" rx="65" ry="12" fill="#0f172a" opacity="0.25" />
+
+              <!-- ŞİŞE GÖVDESİ (Alt 2/3'lük Kısım: Genişlik 110, Yükseklik 210 -> Y: -210 to 0) -->
+              <!-- Şişe Kesim Çizgisi / Üst Kesik Ağız -->
+              <g id="bottleBodyGroup">
+                <!-- Şişe Arka Camı -->
+                <rect x="-55" y="-210" width="110" height="210" rx="14" fill="url(#bottleGlass)" stroke="#0f172a" stroke-width="3.5" />
+                <!-- Şişe Boğum Çizgisi -->
+                <line x1="-53" y1="-140" x2="53" y2="-140" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4 3" />
+                <line x1="-53" y1="-70" x2="53" y2="-70" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4 3" />
+              </g>
+
+              <!-- ADIM 2: RENKLİ ÇAKIL TAŞLARI (Denge Ağırlığı & Düz Zemin) -->
+              <g id="pebblesGroup" opacity="0" class="transition-opacity duration-300">
+                <!-- 6 Renkli Çakıl Taşı -->
+                <ellipse cx="-35" cy="-12" rx="14" ry="10" fill="#f59e0b" stroke="#0f172a" stroke-width="2" />
+                <ellipse cx="-15" cy="-14" rx="13" ry="9" fill="#10b981" stroke="#0f172a" stroke-width="2" />
+                <ellipse cx="10" cy="-12" rx="15" ry="10" fill="#ef4444" stroke="#0f172a" stroke-width="2" />
+                <ellipse cx="33" cy="-14" rx="14" ry="9" fill="#8b5cf6" stroke="#0f172a" stroke-width="2" />
+                <ellipse cx="-20" cy="-22" rx="12" ry="8" fill="#ec4899" stroke="#0f172a" stroke-width="2" />
+                <ellipse cx="15" cy="-22" rx="13" ry="9" fill="#06b6d4" stroke="#0f172a" stroke-width="2" />
+                <ellipse cx="0" cy="-20" rx="11" ry="7" fill="#fbbf24" stroke="#0f172a" stroke-width="2" />
+              </g>
+
+              <!-- ADIM 3: SIFIR DÜZEYİ TEMEL SUYU (Taşların tepesine kadar: Y: -32) -->
+              <g id="baseWaterGroup" opacity="0" class="transition-opacity duration-300">
+                <rect x="-53" y="-32" width="106" height="30" rx="4" fill="url(#baseWaterGrad)" />
+                <!-- 0 Noktası Referans Çizgisi -->
+                <line x1="-54" y1="-32" x2="54" y2="-32" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="4 2" />
+                <text x="-48" y="-36" font-size="9" font-weight="900" fill="#dc2626">SIFIR NOKTASI (0 mm)</text>
+              </g>
+
+              <!-- ÖLÇÜLEN YAĞMUR SUYU KATMANI (Y=-32 noktasından yukarıya doğru dolar, Max 60 mm = 150px) -->
+              <!-- Su Seviyesi Dikdörtgeni -->
+              <g id="rainWaterGroup">
+                <rect id="rainWaterRect" x="-53" y="-32" width="106" height="0" fill="url(#waterGrad)" />
+                <!-- Su Yüzeyi Menisküs Bombesi -->
+                <ellipse id="waterMeniscus" cx="0" cy="-32" rx="52" ry="4" fill="#7dd3fc" stroke="#0284c7" stroke-width="1.5" opacity="0" />
+              </g>
+
+              <!-- ADIM 4: MİLİMETRİK ŞEFFAF ÖLÇÜM CETVELİ (0 - 60 mm) -->
+              <!-- 0 mm = Y:-32, 60 mm = Y:-182 (Her 10 mm = 25 px) -->
+              <g id="rulerGroup" opacity="0" class="transition-opacity duration-300">
+                <!-- Şeffaf Cetvel Şeridi -->
+                <rect x="25" y="-190" width="28" height="162" rx="4" fill="#ffffff" fill-opacity="0.88" stroke="#0f172a" stroke-width="2" />
+                <text x="39" y="-194" text-anchor="middle" font-size="8" font-weight="900" fill="#0f172a">mm</text>
+                
+                <!-- 60 mm -->
+                <line x1="25" y1="-182" x2="42" y2="-182" stroke="#0f172a" stroke-width="2" />
+                <text x="46" y="-179" font-size="9" font-weight="800" fill="#0f172a">60</text>
+                <!-- 50 mm -->
+                <line x1="25" y1="-157" x2="40" y2="-157" stroke="#0f172a" stroke-width="1.5" />
+                <text x="46" y="-154" font-size="8" font-weight="700" fill="#334155">50</text>
+                <!-- 40 mm -->
+                <line x1="25" y1="-132" x2="42" y2="-132" stroke="#0f172a" stroke-width="2" />
+                <text x="46" y="-129" font-size="9" font-weight="800" fill="#0f172a">40</text>
+                <!-- 30 mm -->
+                <line x1="25" y1="-107" x2="40" y2="-107" stroke="#0f172a" stroke-width="1.5" />
+                <text x="46" y="-104" font-size="8" font-weight="700" fill="#334155">30</text>
+                <!-- 20 mm -->
+                <line x1="25" y1="-82" x2="42" y2="-82" stroke="#0f172a" stroke-width="2" />
+                <text x="46" y="-79" font-size="9" font-weight="800" fill="#0f172a">20</text>
+                <!-- 10 mm -->
+                <line x1="25" y1="-57" x2="40" y2="-57" stroke="#0f172a" stroke-width="1.5" />
+                <text x="46" y="-54" font-size="8" font-weight="700" fill="#334155">10</text>
+                <!-- 0 mm (Başlangıç) -->
+                <line x1="25" y1="-32" x2="44" y2="-32" stroke="#dc2626" stroke-width="2.5" />
+                <text x="46" y="-29" font-size="9" font-weight="900" fill="#dc2626">0</text>
+
+                <!-- 5'lik Ara Çizgiler -->
+                <line x1="25" y1="-44.5" x2="33" y2="-44.5" stroke="#64748b" stroke-width="1" />
+                <line x1="25" y1="-69.5" x2="33" y2="-69.5" stroke="#64748b" stroke-width="1" />
+                <line x1="25" y1="-94.5" x2="33" y2="-94.5" stroke="#64748b" stroke-width="1" />
+                <line x1="25" y1="-119.5" x2="33" y2="-119.5" stroke="#64748b" stroke-width="1" />
+                <line x1="25" y1="-144.5" x2="33" y2="-144.5" stroke="#64748b" stroke-width="1" />
+                <line x1="25" y1="-169.5" x2="33" y2="-169.5" stroke="#64748b" stroke-width="1" />
+              </g>
+
+              <!-- Şişe Ön Cam Parıltısı -->
+              <path d="M-45,-190 L-45,-20" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.6" />
+
+              <!-- ADIM 5: TERS ÇEVRİLMİŞ ŞİŞE KAPAĞI / HUNİ (Y: -210 hizasına oturur) -->
+              <g id="funnelGroup" transform="translate(0, -280)" class="transition-transform duration-500">
+                <!-- Ters Huni Gövdesi -->
+                <polygon points="-54,0 54,0 16,50 -16,50" fill="url(#bottleGlass)" stroke="#0f172a" stroke-width="3" />
+                <!-- Şişe Ağzı / Boğazı (Damlatıcı Uç) -->
+                <rect x="-14" y="50" width="28" height="18" fill="#38bdf8" fill-opacity="0.5" stroke="#0f172a" stroke-width="2.5" />
+                <line x1="-12" y1="56" x2="12" y2="56" stroke="#0284c7" stroke-width="1.5" />
+                <!-- Şişe Ağzından Düşen Damla İzi -->
+                <ellipse id="funnelDrip" cx="0" cy="74" rx="3.5" ry="5" fill="#0284c7" opacity="0" />
+                <!-- Huni Üst Çemberi -->
+                <ellipse cx="0" cy="0" rx="54" ry="10" fill="#e0f2fe" stroke="#0f172a" stroke-width="3" />
+              </g>
+
+              <!-- Şişenin Kesilen Üst Parçası (Atölye 1. Adımda sağda durur) -->
+              <g id="cutTopBottle" transform="translate(140, -120)" class="transition-all duration-500">
+                <!-- Şişenin Üst Kesik Parçası -->
+                <path d="M-35,0 L35,0 L18,-50 L-18,-50 Z" fill="url(#bottleGlass)" stroke="#0f172a" stroke-width="3" />
+                <!-- Kapak / Boğaz -->
+                <rect x="-12" y="-62" width="24" height="12" fill="#ef4444" stroke="#0f172a" stroke-width="2" />
+                <ellipse cx="0" cy="0" rx="35" ry="7" fill="#bae6fd" stroke="#0f172a" stroke-width="2" />
+                <text x="0" y="24" text-anchor="middle" font-size="10" font-weight="900" fill="#475569">Kesilen Üst Parça</text>
+              </g>
+
+            </g>
+
+            <!-- 4. CANLI BÜYÜTEÇ (LOUPE) GÖSTERGESİ (SAĞ ÜST KÖŞE) -->
+            <g id="loupeWidget" transform="translate(500, 110)" class="cursor-pointer" opacity="0.95">
+              <circle cx="0" cy="0" r="54" fill="#ffffff" stroke="#0f172a" stroke-width="4" filter="url(#shadowFilter)" />
+              <circle cx="0" cy="0" r="48" fill="#f8fafc" stroke="#38bdf8" stroke-width="2" />
+              <!-- Büyüteç Camı İçi Cetvel Görünümü -->
+              <line x1="-30" y1="0" x2="30" y2="0" stroke="#0284c7" stroke-width="2.5" stroke-dasharray="3 2" />
+              <text x="0" y="-18" text-anchor="middle" font-size="11" font-weight="900" fill="#0369a1">🔍 HASSAS OKUMA</text>
+              <text id="loupeMmDisplay" x="0" y="14" text-anchor="middle" font-size="22" font-weight="900" fill="#0f172a">0 mm</text>
+              <text id="loupeLabelDisplay" x="0" y="32" text-anchor="middle" font-size="10" font-weight="800" fill="#64748b">Taban Seviyesi</text>
+              <!-- Büyüteç Sapı -->
+              <path d="M38,38 L62,62" stroke="#b45309" stroke-width="8" stroke-linecap="round" />
+            </g>
+
+          </svg>
+
+          <!-- Anlık Bilimsel Rehber / Kavram Baloncuğu -->
+          <div id="guideBubble" class="absolute bottom-3 left-3 right-3 sm:left-4 sm:right-auto sm:max-w-sm bg-white p-3 rounded-xl chunky border-3 border-ink shadow-lg transition-all duration-300">
+            <div class="flex items-start gap-2.5">
+              <span id="bubbleEmoji" class="text-2xl">✂️</span>
+              <div>
+                <h4 id="bubbleTitle" class="display text-sm font-black text-ink">Adım 1: Şişeyi Kesme</h4>
+                <p id="bubbleDesc" class="text-xs text-gray-700 font-semibold leading-snug mt-0.5">
+                  Geri dönüştürülebilir 1.5 litrelik bir plastik şişenin üst 1/3'lük kısmını dikkatlice kestik!
+                </p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Alt Kontrol Şeridi -->
+        <div class="p-3 bg-teal-50 border-t-3 border-ink flex flex-wrap items-center justify-between gap-2">
+          
+          <!-- Atölye Butonları Grubu -->
+          <div id="buildControls" class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <button id="btnPrevStep" class="pushable px-3 py-1.5 bg-white text-ink text-xs font-bold opacity-50 pointer-events-none">
+              ⬅️ Önceki
+            </button>
+            <button id="btnNextStep" class="pushable px-4 py-1.5 bg-sun text-ink text-xs font-black flex items-center gap-1">
+              <span>Sonraki Parçayı Ekle</span> <span>➡️</span>
+            </button>
+            <span id="stepCounterBadge" class="text-xs font-black text-teal-900 ml-1">
+              Adım 1 / 5
+            </span>
+          </div>
+
+          <!-- Yağmur Simülasyon Butonları Grubu (Simülasyon Modunda Görünür) -->
+          <div id="simControls" class="hidden flex-wrap items-center gap-2 w-full justify-between sm:justify-end">
+            <div class="flex items-center gap-1.5">
+              <button class="rain-btn pushable px-2.5 py-1.5 bg-sky-100 hover:bg-sky-200 text-ink text-xs font-bold active-tab" data-intensity="light">
+                💧 Çisenti (5mm)
+              </button>
+              <button class="rain-btn pushable px-2.5 py-1.5 bg-blue-100 hover:bg-blue-200 text-ink text-xs font-bold" data-intensity="moderate">
+                🌧️ Sağanak (20mm)
+              </button>
+              <button class="rain-btn pushable px-2.5 py-1.5 bg-indigo-200 hover:bg-indigo-300 text-ink text-xs font-black" data-intensity="storm">
+                ⛈️ Fırtına (45mm)
+              </button>
+            </div>
+            <button id="btnSimRain" class="pushable px-4 py-1.5 bg-sun hover:bg-amber-300 text-ink text-xs font-black flex items-center gap-1">
+              <span>🌧️ Yağmuru Başlat</span>
+            </button>
+            <button id="btnEmptyGauge" class="pushable px-3 py-1.5 bg-white hover:bg-red-50 text-red-600 text-xs font-bold flex items-center gap-1">
+              <span>🧹 Boşalt</span>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Bilimsel Kural Kartı (Neden Huni? Neden Taşlar?) -->
+      <div class="chunky bg-white p-4">
+        <h3 class="display text-base font-black text-ink flex items-center gap-2 mb-2">
+          <span>🔬</span> Küçük Meteoroloğun Bilim Rehberi
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div class="p-2.5 bg-amber-50 rounded-xl border-2 border-amber-200">
+            <span class="font-extrabold text-amber-900 block mb-1">🪨 Neden Çakıl Taşı Koyduk?</span>
+            <p class="text-gray-700 font-semibold leading-relaxed">
+              Plastik şişelerin tabanı girintili çıkıntılıdır ve rüzgârda kolayca devrilir. Taşlar ağırlık yapar ve düz bir sıfır tabanı oluşturur.
+            </p>
+          </div>
+          <div class="p-2.5 bg-sky-50 rounded-xl border-2 border-sky-200">
+            <span class="font-extrabold text-sky-900 block mb-1">🌪️ Neden Ters Huni Koyduk?</span>
+            <p class="text-gray-700 font-semibold leading-relaxed">
+              Ters çevrilen üst kısım geniş ağzıyla yağmur damlalarını toplar ve dar boğazı sayesinde toplanan suyun güneşten buharlaşmasını engeller!
+            </p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- SAĞ PANEL: VERİ TOPLAMA DEFTERİ & DİNAMİK ÇUBUK GRAFİK (5 SÜTUN) -->
+    <aside class="lg:col-span-5 flex flex-col gap-3">
+
+      <!-- GÖZLEM VE VERİ KAYIT DEFTERİ -->
+      <div class="chunky bg-white p-4 flex flex-col gap-3">
+        <div class="flex items-center justify-between border-b-2 border-gray-200 pb-2">
+          <div>
+            <span class="text-[11px] font-black uppercase text-teal-700 tracking-wider block">Gözlem & Ölçüm</span>
+            <h2 class="display text-lg font-black text-ink">📊 5 Günlük Hava Defteri</h2>
+          </div>
+          <button id="btnLogData" class="pushable px-3 py-1.5 bg-teal-400 hover:bg-teal-300 text-ink text-xs font-black flex items-center gap-1 shadow-sm">
+            <span>✏️ Veriyi Kaydet</span>
+          </button>
+        </div>
+
+        <!-- Aktif Gün Seçici / İlerleme -->
+        <div class="flex items-center justify-between bg-teal-50 p-2 rounded-xl border-2 border-teal-200 text-xs">
+          <span class="font-bold text-gray-700">Şu Anki Gözlem Günü:</span>
+          <span id="currentDayBadge" class="bg-teal-600 text-white font-extrabold px-2.5 py-0.5 rounded-lg">
+            1. Gün: Pazartesi
+          </span>
+        </div>
+
+        <!-- Veri Tablosu -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="bg-gray-100 text-gray-700 font-extrabold border-b-2 border-ink">
+                <th class="p-1.5">Gün</th>
+                <th class="p-1.5">Hava</th>
+                <th class="p-1.5 text-right">Ölçülen (mm)</th>
+                <th class="p-1.5 text-center">Durum</th>
+              </tr>
+            </thead>
+            <tbody id="dataTableBody">
+              <tr class="border-b border-gray-200 font-semibold" data-day="0">
+                <td class="p-1.5 font-bold">Pazartesi</td>
+                <td class="p-1.5" id="weatherIcon-0">🌧️ Sağanak</td>
+                <td class="p-1.5 text-right font-black text-blue-600" id="val-0">-- mm</td>
+                <td class="p-1.5 text-center" id="status-0"><span class="text-gray-400">Bekleniyor</span></td>
+              </tr>
+              <tr class="border-b border-gray-200 font-semibold" data-day="1">
+                <td class="p-1.5 font-bold">Salı</td>
+                <td class="p-1.5" id="weatherIcon-1">💧 Çisenti</td>
+                <td class="p-1.5 text-right font-black text-blue-600" id="val-1">-- mm</td>
+                <td class="p-1.5 text-center" id="status-1"><span class="text-gray-400">Bekleniyor</span></td>
+              </tr>
+              <tr class="border-b border-gray-200 font-semibold" data-day="2">
+                <td class="p-1.5 font-bold">Çarşamba</td>
+                <td class="p-1.5" id="weatherIcon-2">⛈️ Fırtına</td>
+                <td class="p-1.5 text-right font-black text-blue-600" id="val-2">-- mm</td>
+                <td class="p-1.5 text-center" id="status-2"><span class="text-gray-400">Bekleniyor</span></td>
+              </tr>
+              <tr class="border-b border-gray-200 font-semibold" data-day="3">
+                <td class="p-1.5 font-bold">Perşembe</td>
+                <td class="p-1.5" id="weatherIcon-3">💧 Çisenti</td>
+                <td class="p-1.5 text-right font-black text-blue-600" id="val-3">-- mm</td>
+                <td class="p-1.5 text-center" id="status-3"><span class="text-gray-400">Bekleniyor</span></td>
+              </tr>
+              <tr class="border-b border-gray-200 font-semibold" data-day="4">
+                <td class="p-1.5 font-bold">Cuma</td>
+                <td class="p-1.5" id="weatherIcon-4">🌧️ Sağanak</td>
+                <td class="p-1.5 text-right font-black text-blue-600" id="val-4">-- mm</td>
+                <td class="p-1.5 text-center" id="status-4"><span class="text-gray-400">Bekleniyor</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- DİNAMİK ÇUBUK GRAFİK (BAR CHART) -->
+        <div class="mt-2 bg-slate-50 p-3 rounded-xl border-2 border-ink">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-black text-gray-600 uppercase">Haftalık Yağış Grafiği (mm)</span>
+            <span class="text-[10px] font-extrabold text-blue-700">Maks: 60 mm</span>
+          </div>
+          
+          <!-- Grafik Çubukları Alanı (Yükseklik 110px) -->
+          <div class="flex items-end justify-between gap-2 h-28 pt-2 px-1 border-b-2 border-l-2 border-ink bg-white rounded-b">
+            <!-- Pzt -->
+            <div class="flex-1 flex flex-col items-center h-full justify-end group">
+              <span id="barLabel-0" class="text-[9px] font-black text-blue-600 mb-0.5 opacity-0">0</span>
+              <div id="bar-0" class="w-full bg-sky-400 border border-ink rounded-t transition-all duration-500" style="height: 0%;"></div>
+              <span class="text-[10px] font-bold text-gray-700 mt-1">Pzt</span>
+            </div>
+            <!-- Sal -->
+            <div class="flex-1 flex flex-col items-center h-full justify-end group">
+              <span id="barLabel-1" class="text-[9px] font-black text-blue-600 mb-0.5 opacity-0">0</span>
+              <div id="bar-1" class="w-full bg-teal-400 border border-ink rounded-t transition-all duration-500" style="height: 0%;"></div>
+              <span class="text-[10px] font-bold text-gray-700 mt-1">Sal</span>
+            </div>
+            <!-- Çar -->
+            <div class="flex-1 flex flex-col items-center h-full justify-end group">
+              <span id="barLabel-2" class="text-[9px] font-black text-blue-600 mb-0.5 opacity-0">0</span>
+              <div id="bar-2" class="w-full bg-indigo-500 border border-ink rounded-t transition-all duration-500" style="height: 0%;"></div>
+              <span class="text-[10px] font-bold text-gray-700 mt-1">Çar</span>
+            </div>
+            <!-- Per -->
+            <div class="flex-1 flex flex-col items-center h-full justify-end group">
+              <span id="barLabel-3" class="text-[9px] font-black text-blue-600 mb-0.5 opacity-0">0</span>
+              <div id="bar-3" class="w-full bg-amber-400 border border-ink rounded-t transition-all duration-500" style="height: 0%;"></div>
+              <span class="text-[10px] font-bold text-gray-700 mt-1">Per</span>
+            </div>
+            <!-- Cum -->
+            <div class="flex-1 flex flex-col items-center h-full justify-end group">
+              <span id="barLabel-4" class="text-[9px] font-black text-blue-600 mb-0.5 opacity-0">0</span>
+              <div id="bar-4" class="w-full bg-emerald-400 border border-ink rounded-t transition-all duration-500" style="height: 0%;"></div>
+              <span class="text-[10px] font-bold text-gray-700 mt-1">Cum</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- İstatistik Özeti -->
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="p-2 bg-blue-50 rounded-xl border border-blue-200">
+            <span class="text-[10px] font-bold text-gray-500 block">Toplam Yağış:</span>
+            <span id="statTotalRain" class="text-sm font-black text-blue-900">0 mm</span>
+          </div>
+          <div class="p-2 bg-purple-50 rounded-xl border border-purple-200">
+            <span class="text-[10px] font-bold text-gray-500 block">En Yağışlı Gün:</span>
+            <span id="statMaxDay" class="text-sm font-black text-purple-900">--</span>
+          </div>
+        </div>
+
+        <button id="btnResetData" class="text-[11px] font-bold text-gray-500 hover:text-red-600 underline text-center">
+          Tüm Haftalık Verileri Sıfırla
+        </button>
+
+      </div>
+
+      <!-- Küçük Bilim İnsanı Sorusu (Mini Test) -->
+      <div class="chunky bg-gradient-to-br from-teal-50 to-sky-50 p-4">
+        <h3 class="display text-sm font-black text-teal-900 flex items-center gap-1.5 mb-1">
+          <span>🎯</span> Günün Meteoroloji Sorusu
+        </h3>
+        <p class="text-xs text-gray-700 font-semibold mb-2">
+          Yağmurölçerin üstündeki ters huninin en önemli görevi nedir?
+        </p>
+        <div class="flex flex-col gap-1.5">
+          <button id="quizOpt1" class="pushable bg-white hover:bg-emerald-50 text-ink text-left p-2 text-xs font-bold">
+            💧 Damlaları toplayıp suyun buharlaşmasını engellemek
+          </button>
+          <button id="quizOpt2" class="pushable bg-white hover:bg-red-50 text-ink text-left p-2 text-xs font-bold">
+            🎨 Şişeyi daha renkli ve güzel göstermek
+          </button>
+        </div>
+        <div id="quizFeedback" class="mt-2 text-xs font-black hidden"></div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Alt Bilgi -->
+  <footer class="max-w-6xl mx-auto w-full text-center text-xs font-bold text-gray-500 py-2 mt-2">
+    🧪 Küçük Mucitler Bilim Portalı · Yağmurölçer Yapımı ve Meteorolojik Veri Analizi
+  </footer>
+
+  <!-- SİMÜLASYON MOTORU VE METEOROLOJİK VERİ KODLARI -->
+  <script>
+    // --- 1. WEB AUDIO API SES MOTORU ---
+    let audioCtx = null;
+    let isSoundOn = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // Su Damlama Sesi (Plop / Drip)
+    function playDripSound() {
+      if (!isSoundOn) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(600 + Math.random() * 400, now);
+      osc.frequency.exponentialRampToValueAtTime(1200 + Math.random() * 200, now + 0.08);
+
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.09);
+    }
+
+    // Yağmur Hışırtısı (Filtreli Pembe/Beyaz Gürültü)
+    function playRainSound(duration = 2.0) {
+      if (!isSoundOn) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+      const bufferSize = audioCtx.sampleRate * duration;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+
+      let b0 = 0, b1 = 0, b2 = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99 * b0 + white * 0.05;
+        b1 = 0.96 * b1 + white * 0.11;
+        b2 = 0.86 * b2 + white * 0.25;
+        data[i] = (b0 + b1 + b2) * 0.18;
+      }
+
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1400, now);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.01, now);
+      gain.gain.linearRampToValueAtTime(0.22, now + 0.3);
+      gain.gain.linearRampToValueAtTime(0.001, now + duration);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      noise.start(now);
+    }
+
+    // Şimşek / Gök Gürültüsü Sesi
+    function playThunderSound() {
+      if (!isSoundOn) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(95, now);
+      osc.frequency.exponentialRampToValueAtTime(25, now + 0.8);
+
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.85);
+    }
+
+    // Kalem / Veri Kayıt Sesi
+    function playPenWriteSound() {
+      if (!isSoundOn) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+      [800, 1100, 950].forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + i * 0.04);
+        gain.gain.setValueAtTime(0.12, now + i * 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.04 + 0.05);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + i * 0.04);
+        osc.stop(now + i * 0.04 + 0.06);
+      });
+    }
+
+    // Doğru Cevap / Kutlama Akoru
+    function playWinSound() {
+      if (!isSoundOn) return;
+      initAudio();
+      [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+        setTimeout(() => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.16, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.35);
+        }, i * 80);
+      });
+    }
+
+    // --- 2. SİMÜLASYON DURUMU (STATE) ---
+    let currentMode = 'build'; // 'build' veya 'simulate'
+    let buildStep = 1; // 1 ile 5 arası
+    let currentWaterMm = 0; // Cetvel üzerindeki su yüksekliği (0 - 60 mm)
+    let selectedIntensity = 'light'; // 'light' (5mm), 'moderate' (20mm), 'storm' (45mm)
+    let currentDayIndex = 0; // 0 (Pzt) - 4 (Cum)
+    let isRaining = false;
+
+    // Haftalık Gözlem Verileri
+    const weekData = [
+      { dayName: 'Pazartesi', weather: '🌧️ Sağanak', targetMm: 22, measured: null },
+      { dayName: 'Salı', weather: '💧 Çisenti', targetMm: 8, measured: null },
+      { dayName: 'Çarşamba', weather: '⛈️ Fırtına', targetMm: 48, measured: null },
+      { dayName: 'Perşembe', weather: '💧 Çisenti', targetMm: 12, measured: null },
+      { dayName: 'Cuma', weather: '🌧️ Sağanak', targetMm: 26, measured: null }
+    ];
+
+    // DOM Elemanları
+    const tabBuild = document.getElementById('tabBuild');
+    const tabSimulate = document.getElementById('tabSimulate');
+    const sceneBadgeIcon = document.getElementById('sceneBadgeIcon');
+    const sceneBadgeText = document.getElementById('sceneBadgeText');
+    const liveReadoutPill = document.getElementById('liveReadoutPill');
+    const pillMmText = document.getElementById('pillMmText');
+
+    const buildControls = document.getElementById('buildControls');
+    const simControls = document.getElementById('simControls');
+    const btnPrevStep = document.getElementById('btnPrevStep');
+    const btnNextStep = document.getElementById('btnNextStep');
+    const stepCounterBadge = document.getElementById('stepCounterBadge');
+
+    const outdoorElements = document.getElementById('outdoorElements');
+    const workshopTable = document.getElementById('workshopTable');
+    const pebblesGroup = document.getElementById('pebblesGroup');
+    const baseWaterGroup = document.getElementById('baseWaterGroup');
+    const rulerGroup = document.getElementById('rulerGroup');
+    const funnelGroup = document.getElementById('funnelGroup');
+    const cutTopBottle = document.getElementById('cutTopBottle');
+
+    const rainWaterRect = document.getElementById('rainWaterRect');
+    const waterMeniscus = document.getElementById('waterMeniscus');
+    const funnelDrip = document.getElementById('funnelDrip');
+    const lightningBolt = document.getElementById('lightningBolt');
+    const lightningOverlay = document.getElementById('lightningOverlay');
+
+    const loupeMmDisplay = document.getElementById('loupeMmDisplay');
+    const loupeLabelDisplay = document.getElementById('loupeLabelDisplay');
+
+    const guideBubble = document.getElementById('guideBubble');
+    const bubbleEmoji = document.getElementById('bubbleEmoji');
+    const bubbleTitle = document.getElementById('bubbleTitle');
+    const bubbleDesc = document.getElementById('bubbleDesc');
+
+    const btnSimRain = document.getElementById('btnSimRain');
+    const btnEmptyGauge = document.getElementById('btnEmptyGauge');
+    const btnLogData = document.getElementById('btnLogData');
+    const btnResetData = document.getElementById('btnResetData');
+    const currentDayBadge = document.getElementById('currentDayBadge');
+    const statTotalRain = document.getElementById('statTotalRain');
+    const statMaxDay = document.getElementById('statMaxDay');
+
+    // Canvas Yağmur Parçacıkları
+    const rainCanvas = document.getElementById('rainCanvas');
+    const ctx = rainCanvas.getContext('2d');
+    let rainDrops = [];
+    let rainAnimId = null;
+
+    function resizeCanvas() {
+      rainCanvas.width = rainCanvas.parentElement.clientWidth;
+      rainCanvas.height = rainCanvas.parentElement.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // --- 3. ATÖLYE MODU: ADIM ADIM İNŞA MOTORU ---
+    const buildSteps = [
+      {
+        step: 1,
+        title: 'Adım 1: Plastik Şişeyi Kesme',
+        emoji: '✂️',
+        desc: '1.5 litrelik şeffaf plastik şişenin üst 1/3\'lük kısmını kestik. Kesilen parça sağda bekliyor.',
+        apply: () => {
+          pebblesGroup.setAttribute('opacity', '0');
+          baseWaterGroup.setAttribute('opacity', '0');
+          rulerGroup.setAttribute('opacity', '0');
+          funnelGroup.setAttribute('opacity', '0');
+          funnelGroup.setAttribute('transform', 'translate(0, -280)');
+          cutTopBottle.setAttribute('opacity', '1');
+          cutTopBottle.setAttribute('transform', 'translate(140, -120)');
+          setWaterLevelMm(0);
+        }
+      },
+      {
+        step: 2,
+        title: 'Adım 2: Çakıl Taşlarını Yerleştirme',
+        emoji: '🪨',
+        desc: 'Şişenin tabanına renkli çakıl taşları koyduk. Bu taşlar yağmurölçerin rüzgârda devrilmesini önler!',
+        apply: () => {
+          pebblesGroup.setAttribute('opacity', '1');
+          baseWaterGroup.setAttribute('opacity', '0');
+          rulerGroup.setAttribute('opacity', '0');
+          funnelGroup.setAttribute('opacity', '0');
+          cutTopBottle.setAttribute('opacity', '1');
+        }
+      },
+      {
+        step: 3,
+        title: 'Adım 3: Sıfır Seviyesi Suyu (Kalibrasyon)',
+        emoji: '💧',
+        desc: 'Taşların tam tepesine kadar su doldurup kırmızı SIFIR (0 mm) çizgisini çektik. Ölçüm bu çizgiden başlar!',
+        apply: () => {
+          pebblesGroup.setAttribute('opacity', '1');
+          baseWaterGroup.setAttribute('opacity', '1');
+          rulerGroup.setAttribute('opacity', '0');
+          funnelGroup.setAttribute('opacity', '0');
+          cutTopBottle.setAttribute('opacity', '1');
+        }
+      },
+      {
+        step: 4,
+        title: 'Adım 4: Milimetrik Cetveli Yapıştırma',
+        emoji: '📏',
+        desc: '0 noktasından başlayacak şekilde 60 mm\'ye kadar su geçirmez cetveli şişenin yanına yapıştırdık!',
+        apply: () => {
+          pebblesGroup.setAttribute('opacity', '1');
+          baseWaterGroup.setAttribute('opacity', '1');
+          rulerGroup.setAttribute('opacity', '1');
+          funnelGroup.setAttribute('opacity', '0');
+          cutTopBottle.setAttribute('opacity', '1');
+        }
+      },
+      {
+        step: 5,
+        title: 'Adım 5: Ters Huniyi Yerleştirme',
+        emoji: '🌪️',
+        desc: 'Kestiğimiz üst parçayı ters çevirip huni gibi şişenin ağzına oturttuk. Yağmurölçerimiz hazır!',
+        apply: () => {
+          pebblesGroup.setAttribute('opacity', '1');
+          baseWaterGroup.setAttribute('opacity', '1');
+          rulerGroup.setAttribute('opacity', '1');
+          cutTopBottle.setAttribute('opacity', '0');
+          funnelGroup.setAttribute('opacity', '1');
+          if (window.gsap) {
+            gsap.to(funnelGroup, { y: -210, duration: 0.6, ease: "bounce.out" });
+          } else {
+            funnelGroup.setAttribute('transform', 'translate(0, -210)');
+          }
+        }
+      }
+    ];
+
+    function applyBuildStep(stepNum) {
+      buildStep = stepNum;
+      stepCounterBadge.textContent = `Adım ${buildStep} / 5`;
+      
+      const cfg = buildSteps[buildStep - 1];
+      cfg.apply();
+
+      bubbleEmoji.textContent = cfg.emoji;
+      bubbleTitle.textContent = cfg.title;
+      bubbleDesc.textContent = cfg.desc;
+
+      btnPrevStep.classList.toggle('opacity-50', buildStep === 1);
+      btnPrevStep.classList.toggle('pointer-events-none', buildStep === 1);
+
+      if (buildStep === 5) {
+        btnNextStep.innerHTML = '<span>Yağmura Başla!</span> <span>🌧️</span>';
+        btnNextStep.className = 'pushable px-4 py-1.5 bg-emerald-400 hover:bg-emerald-300 text-ink text-xs font-black flex items-center gap-1';
+      } else {
+        btnNextStep.innerHTML = '<span>Sonraki Parçayı Ekle</span> <span>➡️</span>';
+        btnNextStep.className = 'pushable px-4 py-1.5 bg-sun text-ink text-xs font-black flex items-center gap-1';
+      }
+
+      playDripSound();
+    }
+
+    btnNextStep.addEventListener('click', () => {
+      if (buildStep < 5) {
+        applyBuildStep(buildStep + 1);
+      } else {
+        switchMode('simulate');
+      }
+    });
+
+    btnPrevStep.addEventListener('click', () => {
+      if (buildStep > 1) {
+        applyBuildStep(buildStep - 1);
+      }
+    });
+
+    // --- 4. MOD DEĞİŞTİRME MOTORU (ATÖLYE vs YAĞMUR SİMÜLATÖRÜ) ---
+    function switchMode(mode) {
+      currentMode = mode;
+      if (mode === 'build') {
+        tabBuild.className = 'pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1';
+        tabSimulate.className = 'pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1';
+        
+        sceneBadgeIcon.textContent = '🛠️';
+        sceneBadgeText.textContent = 'Atölye: Plüviyometre Yapımı';
+        liveReadoutPill.classList.add('hidden');
+
+        buildControls.classList.remove('hidden');
+        simControls.classList.add('hidden');
+        simControls.classList.remove('flex');
+
+        outdoorElements.setAttribute('opacity', '0');
+        workshopTable.setAttribute('opacity', '1');
+        rainCanvas.style.opacity = '0';
+        stopRainLoop();
+
+        applyBuildStep(buildStep);
+
+      } else {
+        tabSimulate.className = 'pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1';
+        tabBuild.className = 'pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1';
+
+        sceneBadgeIcon.textContent = '🌧️';
+        sceneBadgeText.textContent = 'Açık Hava Meteoroloji İstasyonu';
+        liveReadoutPill.classList.remove('hidden');
+
+        buildControls.classList.add('hidden');
+        simControls.classList.remove('hidden');
+        simControls.classList.add('flex');
+
+        // Açık hava sahnesini aktif et
+        outdoorElements.setAttribute('opacity', '1');
+        workshopTable.setAttribute('opacity', '0');
+        
+        // Yağmurölçeri tam kurulu hale getir
+        pebblesGroup.setAttribute('opacity', '1');
+        baseWaterGroup.setAttribute('opacity', '1');
+        rulerGroup.setAttribute('opacity', '1');
+        cutTopBottle.setAttribute('opacity', '0');
+        funnelGroup.setAttribute('opacity', '1');
+        funnelGroup.setAttribute('transform', 'translate(0, -210)');
+
+        bubbleEmoji.textContent = '🌧️';
+        bubbleTitle.textContent = 'Açık Hava İstasyonu Aktif!';
+        bubbleDesc.textContent = 'Yağmur şiddetini seçip "Yağmuru Başlat" butonuna bas. Suyun yükselişini büyüteçten milimetre olarak oku!';
+
+        if (window.confetti) {
+          confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+        }
+        playWinSound();
+      }
+    }
+
+    tabBuild.addEventListener('click', () => switchMode('build'));
+    tabSimulate.addEventListener('click', () => switchMode('simulate'));
+
+    // --- 5. SU SEVİYESİ VE BÜYÜTEÇ HESAPLAMA MOTORU ---
+    // 0 mm = Y: -32, 60 mm = Y: -182 -> 60 mm = 150 px (1 mm = 2.5 px)
+    function setWaterLevelMm(mm, animated = true) {
+      currentWaterMm = Math.max(0, Math.min(60, mm));
+      const targetHeightPx = currentWaterMm * 2.5;
+      const targetY = -32 - targetHeightPx;
+
+      pillMmText.textContent = `${Math.round(currentWaterMm)} mm`;
+      loupeMmDisplay.textContent = `${Math.round(currentWaterMm)} mm`;
+
+      if (currentWaterMm === 0) {
+        loupeLabelDisplay.textContent = 'Taban (Sıfır)';
+        waterMeniscus.setAttribute('opacity', '0');
+      } else if (currentWaterMm < 15) {
+        loupeLabelDisplay.textContent = 'Hafif Yağış';
+        waterMeniscus.setAttribute('opacity', '0.9');
+      } else if (currentWaterMm < 35) {
+        loupeLabelDisplay.textContent = 'Orta Sağanak';
+        waterMeniscus.setAttribute('opacity', '0.9');
+      } else {
+        loupeLabelDisplay.textContent = 'Şiddetli Fırtına!';
+        waterMeniscus.setAttribute('opacity', '0.9');
+      }
+
+      if (animated && window.gsap) {
+        gsap.to(rainWaterRect, {
+          attr: { y: targetY, height: targetHeightPx },
+          duration: 0.4,
+          ease: "power1.out"
+        });
+        gsap.to(waterMeniscus, {
+          attr: { cy: targetY },
+          duration: 0.4,
+          ease: "power1.out"
+        });
+      } else {
+        rainWaterRect.setAttribute('y', targetY);
+        rainWaterRect.setAttribute('height', targetHeightPx);
+        waterMeniscus.setAttribute('cy', targetY);
+      }
+    }
+
+    // --- 6. YAĞMUR ŞİDDETİ SEÇİCİ ---
+    document.querySelectorAll('.rain-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.rain-btn').forEach(b => b.classList.remove('active-tab'));
+        btn.classList.add('active-tab');
+        selectedIntensity = btn.dataset.intensity;
+
+        if (selectedIntensity === 'light') {
+          bubbleTitle.textContent = '💧 Çisenti Seçildi';
+          bubbleDesc.textContent = 'İnce ve seyrek damlalar. Saatte yaklaşık 5 mm su biriktirir.';
+        } else if (selectedIntensity === 'moderate') {
+          bubbleTitle.textContent = '🌧️ Sağanak Seçildi';
+          bubbleDesc.textContent = 'Düzenli ve kuvvetli yağmur. Saatte yaklaşık 20 mm su biriktirir.';
+        } else {
+          bubbleTitle.textContent = '⛈️ Fırtına & Sağanak';
+          bubbleDesc.textContent = 'Gök gürültülü yoğun fırtına! Şişe hızla dolar ve 45 mm seviyesine ulaşır.';
+        }
+        playDripSound();
+      });
+    });
+
+    // --- 7. YAĞMUR VE FIRTINA ANİMASYON MOTORU (CANVAS + PARTICLES) ---
+    function initRainDrops(count) {
+      rainDrops = [];
+      const w = rainCanvas.width;
+      const h = rainCanvas.height;
+      for (let i = 0; i < count; i++) {
+        rainDrops.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          speed: 6 + Math.random() * 8,
+          len: 12 + Math.random() * 15,
+          color: 'rgba(56, 189, 248, 0.75)'
+        });
+      }
+    }
+
+    function renderRain() {
+      ctx.clearRect(0, 0, rainCanvas.width, rainCanvas.height);
+      ctx.lineWidth = 1.8;
+      ctx.lineCap = 'round';
+
+      rainDrops.forEach(drop => {
+        ctx.strokeStyle = drop.color;
+        ctx.beginPath();
+        ctx.moveTo(drop.x, drop.y);
+        ctx.lineTo(drop.x - 1, drop.y + drop.len);
+        ctx.stroke();
+
+        drop.y += drop.speed;
+        drop.x -= 0.6;
+        if (drop.y > rainCanvas.height) {
+          drop.y = -drop.len;
+          drop.x = Math.random() * rainCanvas.width;
+        }
+      });
+
+      rainAnimId = requestAnimationFrame(renderRain);
+    }
+
+    function startRainLoop(intensity) {
+      resizeCanvas();
+      rainCanvas.style.opacity = '1';
+      let count = 40;
+      if (intensity === 'moderate') count = 100;
+      if (intensity === 'storm') count = 220;
+
+      initRainDrops(count);
+      if (!rainAnimId) {
+        renderRain();
+      }
+    }
+
+    function stopRainLoop() {
+      rainCanvas.style.opacity = '0';
+      if (rainAnimId) {
+        cancelAnimationFrame(rainAnimId);
+        rainAnimId = null;
+      }
+      ctx.clearRect(0, 0, rainCanvas.width, rainCanvas.height);
+    }
+
+    // Şimşek Efekti
+    function triggerLightning() {
+      playThunderSound();
+      lightningBolt.setAttribute('opacity', '1');
+      lightningOverlay.classList.add('lightning-flash');
+
+      setTimeout(() => {
+        lightningBolt.setAttribute('opacity', '0');
+        lightningOverlay.classList.remove('lightning-flash');
+      }, 350);
+    }
+
+    // Yağmuru Başlat Butonu
+    btnSimRain.addEventListener('click', () => {
+      if (isRaining) return;
+      isRaining = true;
+      btnSimRain.classList.add('opacity-50', 'pointer-events-none');
+      btnSimRain.innerHTML = '<span>⏳ Yağmur Yağıyor...</span>';
+
+      let targetMm = 8;
+      let duration = 2.8;
+
+      if (selectedIntensity === 'light') {
+        targetMm = currentWaterMm + 8;
+        playRainSound(2.5);
+        startRainLoop('light');
+      } else if (selectedIntensity === 'moderate') {
+        targetMm = currentWaterMm + 20;
+        playRainSound(3.0);
+        startRainLoop('moderate');
+      } else {
+        targetMm = currentWaterMm + 38;
+        playRainSound(3.8);
+        startRainLoop('storm');
+        setTimeout(triggerLightning, 600);
+        setTimeout(triggerLightning, 1600);
+      }
+
+      targetMm = Math.min(60, targetMm);
+
+      // Huniden damlatma animasyonu
+      funnelDrip.setAttribute('opacity', '1');
+      if (window.gsap) {
+        gsap.to(funnelDrip, { y: 120, repeat: 8, duration: 0.3, ease: "none" });
+      }
+
+      // Su Seviyesini Akıcı Yükselt
+      const counter = { val: currentWaterMm };
+      if (window.gsap) {
+        gsap.to(counter, {
+          val: targetMm,
+          duration: duration,
+          ease: "power1.inOut",
+          onUpdate: () => {
+            setWaterLevelMm(counter.val, false);
+          },
+          onComplete: () => {
+            isRaining = false;
+            btnSimRain.classList.remove('opacity-50', 'pointer-events-none');
+            btnSimRain.innerHTML = '<span>🌧️ Yağmuru Başlat</span>';
+            funnelDrip.setAttribute('opacity', '0');
+            stopRainLoop();
+
+            bubbleTitle.textContent = `Yağış Durdu! Ölçüm: ${Math.round(targetMm)} mm`;
+            bubbleDesc.textContent = `Yağmurölçerde tam ${Math.round(targetMm)} mm su toplandı. Sağ taraftaki "Veriyi Kaydet" butonuna basarak meteoroloji defterine işle!`;
+            playDripSound();
+          }
+        });
+      }
+    });
+
+    // Yağmurölçeri Boşalt Butonu
+    btnEmptyGauge.addEventListener('click', () => {
+      setWaterLevelMm(0);
+      bubbleTitle.textContent = 'Yağmurölçer Sıfırlandı!';
+      bubbleDesc.textContent = 'Su boşaltıldı ve referans kırmızı sıfır noktasına geri dönüldü. Yeni ölçüme hazırsın!';
+      playDripSound();
+    });
+
+    // --- 8. METEOROLOJİK VERİ TOPLAMA DEFTERİ VE ÇUBUK GRAFİK ---
+    function updateChartAndTable() {
+      let totalRain = 0;
+      let maxRain = -1;
+      let maxDayName = '--';
+
+      weekData.forEach((item, idx) => {
+        const valElem = document.getElementById(`val-${idx}`);
+        const statusElem = document.getElementById(`status-${idx}`);
+        const barElem = document.getElementById(`bar-${idx}`);
+        const barLabel = document.getElementById(`barLabel-${idx}`);
+
+        if (item.measured !== null) {
+          valElem.textContent = `${item.measured} mm`;
+          statusElem.innerHTML = '✅ <span class="text-emerald-700 font-extrabold">Ölçüldü</span>';
+          
+          // Çubuk Grafik Yüksekliği (Max 60 mm = %100)
+          const pct = Math.min(100, Math.round((item.measured / 60) * 100));
+          barElem.style.height = `${pct}%`;
+          barLabel.textContent = `${item.measured}`;
+          barLabel.classList.remove('opacity-0');
+
+          totalRain += item.measured;
+          if (item.measured > maxRain) {
+            maxRain = item.measured;
+            maxDayName = `${item.dayName} (${item.measured} mm)`;
+          }
+        } else {
+          valElem.textContent = '-- mm';
+          statusElem.innerHTML = '<span class="text-gray-400 font-bold">Bekleniyor</span>';
+          barElem.style.height = '0%';
+          barLabel.classList.add('opacity-0');
+        }
+      });
+
+      statTotalRain.textContent = `${totalRain} mm`;
+      statMaxDay.textContent = maxDayName;
+
+      // Günlük Rozeti Güncelle
+      if (currentDayIndex < 5) {
+        currentDayBadge.textContent = `${currentDayIndex + 1}. Gün: ${weekData[currentDayIndex].dayName}`;
+      } else {
+        currentDayBadge.textContent = '🎉 5 Günlük Ölçüm Tamamlandı!';
+        currentDayBadge.className = 'bg-emerald-600 text-white font-black px-2.5 py-0.5 rounded-lg';
+      }
+    }
+
+    // "Veriyi Kaydet" Butonu
+    btnLogData.addEventListener('click', () => {
+      playPenWriteSound();
+
+      if (currentDayIndex >= 5) {
+        bubbleTitle.textContent = 'Tüm Günler Kaydedildi!';
+        bubbleDesc.textContent = 'Harika bir bilim insanı gibi 5 günün verilerini topladın ve grafiği tamamladın!';
+        return;
+      }
+
+      // Eğer simülasyonda su sıfır ise otomatik günün yağışını simüle et
+      let recordMm = Math.round(currentWaterMm);
+      if (recordMm === 0) {
+        recordMm = weekData[currentDayIndex].targetMm;
+        setWaterLevelMm(recordMm);
+      }
+
+      weekData[currentDayIndex].measured = recordMm;
+      currentDayIndex++;
+
+      updateChartAndTable();
+
+      if (currentDayIndex === 5) {
+        if (window.confetti) {
+          confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+        }
+        playWinSound();
+        bubbleTitle.textContent = 'Tebrikler Küçük Meteorolog! 🎉';
+        bubbleDesc.textContent = 'Haftalık yağış grafiğini başarıyla çıkardın! En yağışlı günü ve toplam yağış miktarını tablodan incele.';
+      } else {
+        bubbleTitle.textContent = `Veri Deftere Kaydedildi! ✍️`;
+        bubbleDesc.textContent = `Şimdi sonraki gün için yeni yağışı ölçebilir veya "Boşalt" ile sıfırlayabilirsin.`;
+      }
+    });
+
+    // Tüm Verileri Sıfırla
+    btnResetData.addEventListener('click', () => {
+      weekData.forEach(d => d.measured = null);
+      currentDayIndex = 0;
+      updateChartAndTable();
+      setWaterLevelMm(0);
+      bubbleTitle.textContent = 'Defter Sıfırlandı!';
+      bubbleDesc.textContent = 'Pazartesi gününden itibaren yeniden ölçüm yapabilirsin.';
+      playDripSound();
+    });
+
+    // --- 9. MİNİ BİLGİ TESTİ ---
+    const quizOpt1 = document.getElementById('quizOpt1');
+    const quizOpt2 = document.getElementById('quizOpt2');
+    const quizFeedback = document.getElementById('quizFeedback');
+
+    quizOpt1.addEventListener('click', () => {
+      quizFeedback.classList.remove('hidden', 'text-red-600');
+      quizFeedback.classList.add('text-emerald-700');
+      quizFeedback.innerHTML = '🎉 <strong>HARİKA, DOĞRU CEVAP!</strong><br>Ters huni hem geniş ağzıyla yağmur damlalarını içeri yönlendirir hem de dar boynu sayesinde toplanan suyun güneş altında buharlaşıp kaybolmasını önler!';
+      if (window.confetti) {
+        confetti({ particleCount: 70, spread: 60, origin: { y: 0.7 } });
+      }
+      playWinSound();
+    });
+
+    quizOpt2.addEventListener('click', () => {
+      quizFeedback.classList.remove('hidden', 'text-emerald-700');
+      quizFeedback.classList.add('text-red-600');
+      quizFeedback.innerHTML = '🤔 <strong>Tekrar Düşünelim!</strong><br>Görsel görünümden çok bilimsel bir işlevi vardır: Damlaları toplamak ve buharlaşmayı engellemek!';
+      playDripSound();
+    });
+
+    // --- 10. SES AÇ/KAPAT ---
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    soundToggle.addEventListener('click', () => {
+      isSoundOn = !isSoundOn;
+      soundIcon.textContent = isSoundOn ? '🔊' : '🔇';
+    });
+
+    // Sayfa Yüklendiğinde Başlangıç
+    window.addEventListener('DOMContentLoaded', () => {
+      applyBuildStep(1);
+      updateChartAndTable();
+    });
+  </script>
+</body>
+</html>

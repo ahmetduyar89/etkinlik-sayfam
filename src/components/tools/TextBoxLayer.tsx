@@ -2,16 +2,17 @@ import React from 'react';
 import { motion, useDragControls } from 'framer-motion';
 import { GripHorizontal, X } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import type { TextBoxData } from '../../types';
+import type { TextBoxData, Viewport } from '../../types';
 import { TEXTBOX_COLORS, getTextBoxTextColor } from '../../constants/drawing';
 
 interface TextBoxItemProps {
     box: TextBoxData;
+    view: Viewport;
     onUpdate: (next: TextBoxData) => void;
     onDelete: () => void;
 }
 
-function TextBoxItem({ box, onUpdate, onDelete }: TextBoxItemProps) {
+function TextBoxItem({ box, view, onUpdate, onDelete }: TextBoxItemProps) {
     const [editing, setEditing] = React.useState(box.text === '');
     const textRef = React.useRef<HTMLTextAreaElement>(null);
     const dragControls = useDragControls();
@@ -29,10 +30,22 @@ function TextBoxItem({ box, onUpdate, onDelete }: TextBoxItemProps) {
             dragListener={false}
             dragMomentum={false}
             dragElastic={0}
+            onDragEnd={(_, info) => {
+                // Konumu dünya koordinatında sakla; ölçek geri alınır.
+                onUpdate({
+                    ...box,
+                    x: box.x + info.offset.x / view.scale,
+                    y: box.y + info.offset.y / view.scale,
+                });
+            }}
             className="absolute group pointer-events-auto"
             style={{
-                left: box.x,
-                top: box.y,
+                // Notlar da çizimlerle aynı dünya koordinatında durur;
+                // yakınlaştırma ölçek, kaydırma ise konum olarak uygulanır.
+                left: box.x * view.scale + view.tx,
+                top: box.y * view.scale + view.ty,
+                transform: `scale(${view.scale})`,
+                transformOrigin: '0 0',
                 zIndex: 4800,
                 minWidth: 120,
                 maxWidth: 320,
@@ -131,16 +144,27 @@ interface TextBoxLayerProps {
     onDelete: (id: string) => void;
     onAdd: (box: TextBoxData) => void;
     enabled: boolean;
+    /** Çalışma alanının yakınlaştırma/kaydırma durumu. */
+    view?: Viewport;
 }
 
-export function TextBoxLayer({ boxes, onUpdate, onDelete, onAdd, enabled }: TextBoxLayerProps) {
+const IDENTITY_VIEW: Viewport = { scale: 1, tx: 0, ty: 0 };
+
+export function TextBoxLayer({
+    boxes,
+    onUpdate,
+    onDelete,
+    onAdd,
+    enabled,
+    view = IDENTITY_VIEW,
+}: TextBoxLayerProps) {
     const handleClick = (e: React.MouseEvent) => {
         if (!enabled) return;
         const rect = e.currentTarget.getBoundingClientRect();
         onAdd({
             id: Date.now().toString(),
-            x: e.clientX - rect.left - 60,
-            y: e.clientY - rect.top - 20,
+            x: (e.clientX - rect.left - view.tx) / view.scale - 60,
+            y: (e.clientY - rect.top - view.ty) / view.scale - 20,
             text: '',
             color: '#fff9c4',
             fontSize: 15,
@@ -159,6 +183,7 @@ export function TextBoxLayer({ boxes, onUpdate, onDelete, onAdd, enabled }: Text
                 <TextBoxItem
                     key={b.id}
                     box={b}
+                    view={view}
                     onUpdate={(upd) => onUpdate(b.id, upd)}
                     onDelete={() => onDelete(b.id)}
                 />

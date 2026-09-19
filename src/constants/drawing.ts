@@ -1,4 +1,4 @@
-import type { DrawingTool } from '../types';
+import type { DrawingTool, EraserMode } from '../types';
 import {
     MousePointer2,
     Pencil,
@@ -7,11 +7,20 @@ import {
     Sun,
     Eraser,
     Type,
+    Lasso,
     Square,
     Circle,
     Triangle,
     MoveRight,
     ArrowRightLeft,
+    Pentagon,
+    Box,
+    Cuboid,
+    Boxes,
+    Pyramid,
+    Cylinder,
+    Cone,
+    Globe,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -27,16 +36,52 @@ export const DRAWING_COLORS = [
     '#000000',
 ] as const;
 
-export const DRAWING_WIDTHS = [2, 5, 10] as const;
+/**
+ * Kalem kalınlığı ön ayarları. Değerler çizim kaleminin piksel kalınlığıdır;
+ * fosforlu ve silgi bu değeri kendi katsayısıyla büyütür.
+ */
+export const PEN_SIZES: ReadonlyArray<{ value: number; label: string }> = [
+    { value: 1, label: 'Kıl' },
+    { value: 2, label: 'İnce' },
+    { value: 4, label: 'Normal' },
+    { value: 6, label: 'Orta' },
+    { value: 9, label: 'Kalın' },
+    { value: 14, label: 'Çok kalın' },
+    { value: 20, label: 'Dev' },
+];
+
+/** Kaydırıcının izin verdiği aralık. */
+export const PEN_SIZE_MIN = 1;
+export const PEN_SIZE_MAX = 40;
 
 export const BG_COLORS: ReadonlyArray<{ color: string; label: string }> = [
     { color: '#ffffff', label: 'Beyaz' },
     { color: '#fffde7', label: 'Krem' },
     { color: '#e8f5e9', label: 'Yeşil' },
     { color: '#e3f2fd', label: 'Mavi' },
+    { color: '#13382c', label: 'Yeşil Tahta' },
     { color: '#1a1a2e', label: 'Gece' },
     { color: '#111827', label: 'Siyah' },
 ];
+
+/**
+ * Hızlı Kalemler (GoodNotes / Notability tarzı tek tıkla geçiş yapılan slotlar)
+ */
+export interface QuickPen {
+    id: string;
+    name: string;
+    color: string;
+    width: number;
+    tool: 'pencil' | 'highlighter';
+}
+
+export const DEFAULT_QUICK_PENS: ReadonlyArray<QuickPen> = [
+    { id: 'qp-black', name: 'Siyah Kalem', color: '#000000', width: 2, tool: 'pencil' },
+    { id: 'qp-blue', name: 'Mavi Kalem', color: '#2563eb', width: 2, tool: 'pencil' },
+    { id: 'qp-red', name: 'Kırmızı Kalem', color: '#ef4444', width: 2, tool: 'pencil' },
+    { id: 'qp-highlighter', name: 'Sarı Fosforlu', color: '#facc15', width: 14, tool: 'highlighter' },
+];
+
 
 export interface MainTool {
     id: DrawingTool;
@@ -46,7 +91,9 @@ export interface MainTool {
 
 export const MAIN_TOOLS: ReadonlyArray<MainTool> = [
     { id: 'select', icon: MousePointer2, label: 'Seç & Düzenle' },
+    { id: 'lasso', icon: Lasso, label: 'Kement (çoklu seçim)' },
     { id: 'pencil', icon: Pencil, label: 'Kalem' },
+    { id: 'polygon', icon: Pentagon, label: 'Noktalarla Çokgen (A-B-C)' },
     { id: 'pan', icon: Hand, label: 'El' },
     { id: 'highlighter', icon: Highlighter, label: 'Fosforlu' },
     { id: 'sun', icon: Sun, label: 'Lazer' },
@@ -64,24 +111,59 @@ export interface ShapeTool {
 export const SHAPE_TOOL_IDS: DrawingTool[] = [
     'rect',
     'circle',
+    'ellipse',
     'triangle',
+    'right_triangle',
+    'polygon',
+    'cube',
+    'rect_prism',
+    'tri_prism',
+    'pyramid',
+    'cylinder',
+    'cone',
+    'sphere',
     'line',
     'arrow',
     'double_arrow',
     'dashed',
 ];
 
-export const makeShapeTools = (
+export const make2DShapeTools = (
     SolidLineIcon: React.ComponentType,
-    DashedLineIcon: React.ComponentType
+    DashedLineIcon: React.ComponentType,
+    EllipseIcon?: React.ComponentType,
+    RightTriangleIcon?: React.ComponentType
 ): ReadonlyArray<ShapeTool> => [
     { id: 'rect', Icon: Square, label: 'Dikdörtgen' },
     { id: 'circle', Icon: Circle, label: 'Daire' },
+    ...(EllipseIcon ? [{ id: 'ellipse' as DrawingTool, Svg: EllipseIcon, label: 'Elips' }] : []),
     { id: 'triangle', Icon: Triangle, label: 'Üçgen' },
+    ...(RightTriangleIcon ? [{ id: 'right_triangle' as DrawingTool, Svg: RightTriangleIcon, label: 'Dik Üçgen' }] : []),
+    { id: 'polygon', Icon: Pentagon, label: 'Noktalarla Çokgen (A-B-C)' },
     { id: 'line', Svg: SolidLineIcon, label: 'Çizgi' },
     { id: 'arrow', Icon: MoveRight, label: 'Ok' },
     { id: 'double_arrow', Icon: ArrowRightLeft, label: 'Çift Ok' },
     { id: 'dashed', Svg: DashedLineIcon, label: 'Kesikli' },
+];
+
+export const make3DShapeTools = (): ReadonlyArray<ShapeTool> => [
+    { id: 'cube', Icon: Box, label: 'Küp' },
+    { id: 'rect_prism', Icon: Cuboid, label: 'Dikdörtgen Prizma' },
+    { id: 'tri_prism', Icon: Boxes, label: 'Üçgen Prizma' },
+    { id: 'pyramid', Icon: Pyramid, label: 'Kare Piramit' },
+    { id: 'cylinder', Icon: Cylinder, label: 'Silindir' },
+    { id: 'cone', Icon: Cone, label: 'Koni' },
+    { id: 'sphere', Icon: Globe, label: 'Küre' },
+];
+
+export const makeShapeTools = (
+    SolidLineIcon: React.ComponentType,
+    DashedLineIcon: React.ComponentType,
+    EllipseIcon?: React.ComponentType,
+    RightTriangleIcon?: React.ComponentType
+): ReadonlyArray<ShapeTool> => [
+    ...make2DShapeTools(SolidLineIcon, DashedLineIcon, EllipseIcon, RightTriangleIcon),
+    ...make3DShapeTools(),
 ];
 
 export const STAMP_CATEGORIES: ReadonlyArray<{
@@ -133,6 +215,66 @@ export const STAMP_CATEGORIES: ReadonlyArray<{
             { emoji: '∠', label: 'Açı' },
         ],
     },
+    {
+        label: 'İşlem',
+        items: [
+            { emoji: '×', label: 'Çarpı' },
+            { emoji: '÷', label: 'Bölü' },
+            { emoji: '±', label: 'Artı Eksi' },
+            { emoji: '%', label: 'Yüzde' },
+            { emoji: '≈', label: 'Yaklaşık' },
+            { emoji: '≡', label: 'Denk' },
+            { emoji: '·', label: 'Nokta Çarpım' },
+            { emoji: '⁻¹', label: 'Ters' },
+            { emoji: '²', label: 'Kare' },
+            { emoji: '³', label: 'Küp' },
+        ],
+    },
+    {
+        label: 'Küme & Mantık',
+        items: [
+            { emoji: '∈', label: 'Elemanıdır' },
+            { emoji: '∉', label: 'Elemanı Değil' },
+            { emoji: '⊂', label: 'Alt Küme' },
+            { emoji: '∪', label: 'Birleşim' },
+            { emoji: '∩', label: 'Kesişim' },
+            { emoji: '∅', label: 'Boş Küme' },
+            { emoji: '∀', label: 'Her' },
+            { emoji: '∃', label: 'Vardır' },
+            { emoji: '⇒', label: 'İse' },
+            { emoji: '⇔', label: 'Ancak ve Ancak' },
+        ],
+    },
+    {
+        label: 'Geometri',
+        items: [
+            { emoji: '∥', label: 'Paralel' },
+            { emoji: '⊥', label: 'Dik' },
+            { emoji: '≅', label: 'Eş' },
+            { emoji: '∼', label: 'Benzer' },
+            { emoji: '°', label: 'Derece' },
+            { emoji: '⌒', label: 'Yay' },
+            { emoji: '□', label: 'Kare' },
+            { emoji: '○', label: 'Çember' },
+            { emoji: '⟶', label: 'Işın' },
+            { emoji: '↔', label: 'Doğru' },
+        ],
+    },
+    {
+        label: 'Fizik & Birim',
+        items: [
+            { emoji: 'Δ', label: 'Delta' },
+            { emoji: 'θ', label: 'Teta' },
+            { emoji: 'λ', label: 'Lambda' },
+            { emoji: 'μ', label: 'Mü' },
+            { emoji: 'Ω', label: 'Ohm' },
+            { emoji: '→', label: 'Vektör' },
+            { emoji: '↑', label: 'Yukarı' },
+            { emoji: '↓', label: 'Aşağı' },
+            { emoji: '⇌', label: 'Denge' },
+            { emoji: '∝', label: 'Orantılı' },
+        ],
+    },
 ];
 
 export const TEXTBOX_COLORS = [
@@ -151,6 +293,15 @@ export const TEXTBOX_TEXT_COLORS: Record<string, string> = {
 
 export const getTextBoxTextColor = (bg: string): string =>
     TEXTBOX_TEXT_COLORS[bg] || TEXTBOX_TEXT_COLORS.default;
+
+export const ERASER_MODES: ReadonlyArray<{ id: EraserMode; label: string; hint: string }> = [
+    { id: 'pixel', label: 'Piksel', hint: 'Kalem ve fosforlu izini dokunduğu yerden keser' },
+    {
+        id: 'stroke',
+        label: 'Çizgi',
+        hint: 'Dokunduğu çizimin tamamını siler (şekil, nesne, fotoğraf dahil)',
+    },
+];
 
 export const HANDLE_CURSORS: Record<string, string> = {
     nw: 'nw-resize',

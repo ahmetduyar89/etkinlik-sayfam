@@ -1,0 +1,602 @@
+/**
+ * duel.css — "İki Kişilik Oyun" ekranı (DuelPage.js).
+ *
+ * İki düzen vardır ve ikisi de AYNI sayfada yaşar:
+ *   .duel-boards.single → tek tahta
+ *   .duel-boards.dual   → yan yana iki tahta (sol beyaz, sağ siyah)
+ *
+ * Tahta ölçüsü hem sütun genişliğine hem de EKRAN YÜKSEKLİĞİNE bağlıdır:
+ * iki tahta yan yanayken bile son yatay ekrandan taşmamalıdır.
+ */
+
+.duel-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 17rem;
+  gap: 1.1rem;
+  align-items: start;
+}
+
+.duel-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+/* --- Düzen seçici (Tek Tahta / İki Tahta) --- */
+
+.duel-modes {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.duel-modes .panel-label { margin: 0; }
+.duel-modes .segmented { flex: 1; min-width: 14rem; }
+
+/*
+ * Ortak `.segmented button` kuralı düğmeyi yatay (inline-flex) dizer; başlık
+ * ve açıklama yan yana kalır. Buradaki açıklamalar uzun olduğu için ALT ALTA
+ * gelmeleri gerekir, yoksa dar ekranda ikisi de ince sütunlara bölünür.
+ */
+.duel-modes .seg-button {
+  flex-direction: column;
+  gap: 0.05rem;
+  min-height: 2.5rem;
+  padding: 0.35rem 0.5rem;
+  text-align: center;
+}
+
+.duel-modes .seg-button small { font-size: 0.66rem; line-height: 1.2; font-weight: 700; }
+
+/* --- Skor tahtası: iki saat, materyal farkı ve maç skoru --- */
+
+/*
+ * Şerit, tahtaların ÜSTÜNDE ve iki düzende de aynı yerdedir. Saatleri tahta
+ * kartlarının içine koymak yan yana iki tahta düzeninde kartları daraltır ve
+ * rakamları uzaktan okunmaz kılardı; akıllı tahtaya yansıtılan sınıfta saatin
+ * tek bakışta görünmesi gerekir.
+ */
+.duel-scorebar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.4rem;
+  padding: 0.3rem;
+  border-radius: 1rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.duel-scorebar[hidden] { display: none; }
+
+.duel-score-side {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.25rem 0.45rem;
+  border-radius: 0.8rem;
+  border: 2px solid transparent;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+
+/* Sıra kimdeyse onun kutusu öne çıkar. */
+.duel-score-side.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+/* Siyah oyuncu şeridin sağ ucundadır; içeriği de sağa yaslanır ki iki oyuncu
+   ekranın iki yanında karşılıklı dursun. */
+.duel-score-side[data-side="b"] { flex-direction: row-reverse; text-align: right; }
+
+.duel-score-piece .piece-svg { width: 1.6rem; height: 1.6rem; display: block; }
+
+.duel-score-id { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+
+.duel-score-name {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.duel-score-id small { font-size: 0.66rem; color: var(--muted); font-weight: 700; }
+
+/* --- Satranç saati --- */
+
+.duel-clock {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.5rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.7rem;
+  border: 2px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+.duel-clock[hidden] { display: none; }
+
+/* İşleyen saat: çocuk "sıra bende" bilgisini yazıdan değil, AKAN saatten okur. */
+.duel-clock.running { border-color: var(--primary); background: var(--primary-soft); }
+
+.duel-clock.low {
+  border-color: var(--sun-dark);
+  background: var(--sun-soft);
+  color: var(--sun-dark);
+}
+
+.duel-clock.critical {
+  border-color: var(--coral-dark);
+  background: var(--coral);
+  color: #fff;
+  animation: clock-pulse 1s ease-in-out infinite;
+}
+
+/* Son saniyelerde saat nefes alır; ses kapalıyken de fark edilir.
+   (Animasyon kapalıyken base.css'teki `.reduced-motion` kuralı bunu durdurur.) */
+@keyframes clock-pulse {
+  50% { transform: scale(1.07); }
+}
+
+/* --- Materyal farkı ve maç skoru --- */
+
+.duel-score-center {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.15rem;
+  padding: 0.1rem 0.6rem;
+  border-left: 1px dashed var(--line);
+  border-right: 1px dashed var(--line);
+}
+
+.duel-lead {
+  font-size: 0.76rem;
+  font-weight: 900;
+  white-space: nowrap;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--muted);
+}
+
+/* Önde olan tarafın rengi rozete taşınır: hangi taşların önde olduğu
+   yazıyı okumadan, RENKTEN anlaşılır. */
+.duel-lead.w { background: #fff; color: #22223b; }
+.duel-lead.b { background: #2f2b45; border-color: #2f2b45; color: #fff; }
+
+.duel-match-score {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* --- Tahta ızgarası --- */
+
+.duel-boards {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.duel-boards.single { grid-template-columns: minmax(0, 1fr); }
+.duel-boards.dual { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* --- Tek tahta kartı --- */
+
+.duel-seat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.5rem;
+  border-radius: 1.1rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  /* Sırası gelen tahta belirginleşir; kenarlık kalınlığı DEĞİŞMEZ ki
+     tahta yerinden oynamasın — yalnızca renk ve parıltı değişir. */
+  transition: border-color 200ms ease, box-shadow 200ms ease, opacity 200ms ease;
+}
+
+/* Sırası gelen oyuncunun tahtası. */
+.duel-seat.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(47, 143, 131, 0.28), var(--shadow);
+}
+
+/* Sırası gelmeyen tahta geri çekilir ama OKUNUR kalır: rakip de konumu
+   izleyip düşünmelidir, bu yüzden solukluk hafiftir. */
+.duel-boards.dual .duel-seat:not(.active):not(.setup) { opacity: 0.86; }
+
+.seat-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.1rem 0.2rem;
+  min-width: 0;
+}
+
+.seat-badge {
+  display: inline-grid;
+  place-items: center;
+  grid-auto-flow: column;
+  font-size: 1.5rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.seat-badge .piece-svg { width: 1.5rem; height: 1.5rem; }
+
+.seat-id {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.seat-name {
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seat-role {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.seat-turn {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.16rem 0.5rem;
+  flex-shrink: 0;
+}
+
+.duel-seat.active .seat-turn {
+  background: var(--primary);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* --- Tahta ölçüsü --- */
+
+/*
+ * Dikey pay ölçülerek belirlendi: üst çubuk (60px) + kompakt başlık (~46px) +
+ * düzen çubuğu (~52px) + kart başlığı (~30px) + alınan taş şeridi (~24px) +
+ * kart ve sayfa boşlukları (~120px) ≈ 21.5rem. Tahta bu payın dışında kalan
+ * yüksekliğe sığar; genişlikte de sütunu aşamaz. İki sınırın küçüğü kazanır.
+ *
+ * Bu ölçü olmadan tek tahta düzeninde tahta ekrandan taşıyor ve son yatay
+ * görünmüyordu — satrançta tahtanın tamamı tek bakışta görünmelidir.
+ */
+.duel-seat .cb-stage { width: min(100%, calc(100vh - 21.5rem)); }
+.duel-seat .cb-root { padding: 0.15rem 0 0.2rem; }
+
+/* Oyun aşamasında skor şeridi de yer kaplar (~3.5rem); tahta o kadar küçülür.
+   Şerit yalnızca oyun sırasında görünür, kurulumda tahta tam boyunda kalır. */
+.duel-stage.playing .duel-seat .cb-stage { width: min(100%, calc(100vh - 25rem)); }
+
+/* Odak modunda üst çubuk ve sayfa başlığı tamamen kalkar (~7rem kazanç). */
+body.focus-mode .duel-seat .cb-stage { width: min(100%, calc(100vh - 14.5rem)); }
+body.focus-mode .duel-stage.playing .duel-seat .cb-stage { width: min(100%, calc(100vh - 18rem)); }
+
+/* Odak modunda panel de daralır; kazanılan genişlik tahtalara gider. */
+body.focus-mode .duel-layout { grid-template-columns: minmax(0, 1fr) 14rem; gap: 0.7rem; }
+body.focus-mode .duel-panel { padding: 0.7rem; }
+
+/* --- Alınan taşlar --- */
+
+.duel-seat .captured-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 1.5rem;
+  padding: 0 0.2rem;
+}
+
+.captured-group {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+}
+
+.captured-group .captured-piece .piece-svg { width: 1rem; height: 1rem; }
+
+/* Alınan taşların puan toplamı: piyon 1, at/fil 3, kale 5, vezir 9. */
+.captured-points {
+  font-size: 0.66rem;
+  font-weight: 900;
+  color: var(--primary-dark);
+  background: var(--primary-soft);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  white-space: nowrap;
+}
+
+/* --- Yan panel --- */
+
+.duel-panel {
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--line);
+  border-radius: 1.2rem;
+  padding: 0.85rem;
+  box-shadow: var(--shadow);
+  position: sticky;
+  top: 1rem;
+}
+
+.duel-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+/* [hidden] tek başına yetmez: .duel-panel-body display'i ezerdi. */
+.duel-panel-body[hidden] { display: none; }
+
+.duel-panel-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+/* --- Kurulum: ipucu satırı --- */
+
+.duel-notice {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  border-radius: 0.7rem;
+  padding: 0.45rem 0.6rem;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.duel-notice.warn {
+  background: rgba(224, 122, 58, 0.14);
+  border-color: rgba(224, 122, 58, 0.4);
+  color: #8a4413;
+  font-weight: 700;
+}
+
+.duel-notice.ready {
+  background: rgba(47, 143, 131, 0.14);
+  border-color: rgba(47, 143, 131, 0.4);
+  color: #1c6459;
+  font-weight: 700;
+}
+
+/* --- Kurulum: taş paleti --- */
+
+.duel-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.brush-row { display: flex; flex-direction: column; gap: 0.2rem; }
+
+.brush-row-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.brush-set {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.brush {
+  display: grid;
+  place-items: center;
+  width: 2.3rem;
+  height: 2.3rem;
+  font-size: 1.4rem;
+  line-height: 1;
+  border-radius: 0.65rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--ink);
+  transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.brush .piece-svg { width: 1.5rem; height: 1.5rem; }
+.brush:hover { transform: translateY(-2px); }
+
+.brush.active {
+  background: var(--primary);
+  border-color: transparent;
+  box-shadow: 0 0 0 2px rgba(47, 143, 131, 0.3);
+}
+
+/* Seçili taş beyaz zemin üzerinde kaybolmasın diye çizim rengi ters çevrilir. */
+.brush.active .piece-svg { filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.9)); }
+
+/* --- Kurulum: hızlı düğmeler --- */
+
+.duel-quick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+}
+
+.duel-quick button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 0.4rem 0.35rem;
+  border-radius: 0.7rem;
+}
+
+.duel-quick .icon { width: 0.95rem; height: 0.95rem; }
+
+/* --- Kurulum: satranç saati seçimi ---
+   Ortak bileşen kuralları (.duel-time-grid, .time-btn, .duel-custom-time, .duel-time-note)
+   components.css içinde tanımlıdır. */
+
+.duel-names {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.duel-name-input {
+  width: 100%;
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.7rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+}
+
+.duel-name-input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.duel-start {
+  margin-top: 0.2rem;
+  padding: 0.6rem;
+  font-size: 0.95rem;
+}
+
+/* --- Oyun paneli --- */
+
+.duel-status {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* Simge düğmeleri gizlenebilmeli (tahtayı çevirme yalnızca tek tahtada). */
+.tool-button[hidden] { display: none; }
+
+.duel-autoflip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+  color: var(--muted);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.duel-autoflip[hidden] { display: none; }
+.duel-autoflip input { width: 1rem; height: 1rem; accent-color: var(--primary); }
+
+.duel-panel .move-list { max-height: 9rem; padding: 0.4rem; }
+
+/* --- Sonuç kartı --- */
+
+.duel-result-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  text-align: center;
+  padding: 0.7rem;
+  border-radius: 1rem;
+  background: rgba(47, 143, 131, 0.12);
+  border: 1px solid rgba(47, 143, 131, 0.35);
+}
+
+.duel-result-emoji { font-size: 1.8rem; line-height: 1; }
+.duel-result-card h3 { margin: 0; font-size: 0.95rem; }
+.duel-result-card p { margin: 0; font-size: 0.8rem; color: var(--muted); font-weight: 700; }
+
+/* Ortak `.duel-result-card p` kuralını ezmek için kart üzerinden seçilir. */
+.duel-result-card .duel-result-match {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--primary-dark);
+}
+
+.duel-result-actions {
+  display: grid;
+  gap: 0.3rem;
+  width: 100%;
+  margin-top: 0.3rem;
+}
+
+.duel-result-actions button { font-size: 0.8rem; padding: 0.45rem; border-radius: 0.7rem; }
+
+/* --- Duyarlı düzen --- */
+
+@media (max-width: 1180px) {
+  .duel-layout { grid-template-columns: minmax(0, 1fr); }
+  .duel-panel { position: static; }
+  .duel-seat .cb-stage { width: min(100%, 32rem); }
+}
+
+/* Dar ekranda iki tahta yan yana sığmaz; alt alta gelir ama EŞİTLEME sürer. */
+@media (max-width: 760px) {
+  .duel-boards.dual { grid-template-columns: minmax(0, 1fr); }
+  .duel-quick { grid-template-columns: 1fr; }
+
+  /*
+   * Dar ekranda iki oyuncu ÜSTTE yan yana kalır, materyal farkı ve maç skoru
+   * ALT SATIRA iner. Üçünü tek satıra sıkıştırmak oyuncu adına yalnızca birkaç
+   * piksel bırakıyor ve "Beyaz Oyuncu" adı "B." diye kırpılıyordu; oysa bu
+   * ekranın amacı çocukların kendi adlarını görmesi.
+   */
+  .duel-scorebar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+
+  /* Yerleşim ELLE verilir: iki oyuncu üst satırda yan yana, orta kutu altta.
+     Kendiliğinden yerleşimde iki sütunu kaplayan orta kutu siyah oyuncuyu
+     üçüncü satıra iter ve şerit üç kat uzardı. */
+  .duel-score-side[data-side="w"] { grid-area: 1 / 1; }
+  .duel-score-side[data-side="b"] { grid-area: 1 / 2; }
+
+  .duel-score-center {
+    grid-area: 2 / 1 / 3 / -1;
+    grid-auto-flow: column;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0 0.05rem;
+    border: 0;
+    border-top: 1px dashed var(--line);
+  }
+
+  .duel-score-id small { display: none; }
+  .duel-clock { font-size: 1.2rem; padding: 0.25rem 0.4rem; }
+
+  /* Dar sütunda ad KIRPILMAZ, alt satıra sarar: çocuk kendi adını görmelidir. */
+  .duel-score-name {
+    font-size: 0.72rem;
+    line-height: 1.15;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Akıllı tahta / geniş ekran: iki tahta rahatça büyür. */
+@media (min-width: 1500px) {
+  .duel-layout { grid-template-columns: minmax(0, 1fr) 19rem; }
+}

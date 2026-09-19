@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sağlıklı Tabak Şefi: Dengeli Beslen! | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+    .food-btn.selected { background: #fef08a !important; box-shadow: 0 0 0 4px #facc15, 3px 3px 0 #0f172a; transform: scale(1.05); }
+    .zone { transition: transform 0.12s, filter 0.12s; cursor: pointer; }
+    .zone.glow { filter: brightness(1.08) drop-shadow(0 0 6px #facc15); }
+    .plate-item { cursor: pointer; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-sm font-black flex items-center gap-1"><span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span></a>
+      <div>
+        <div class="flex items-center gap-2"><span class="text-2xl sm:text-3xl">🍽️</span><h1 class="display text-lg sm:text-2xl font-black tracking-wide">Sağlıklı Tabak Şefi</h1></div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Besinleri doğru bölmelere koy, müşterilerin siparişine göre dengeli tabaklar hazırla! 🥦🍞🥚🥛</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab"><span>👩‍🍳</span> <span>1. Siparişler</span></button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white"><span>🔬</span> <span>2. Besin Laboratuvarı</span></button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">SİPARİŞ 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">Dengeli Kahvaltı</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <!-- Müşteri Siparişi -->
+        <div id="orderCard" class="flex items-start gap-3 p-3 bg-orange-50 rounded-xl border-2 border-ink">
+          <div id="customer" class="text-4xl shrink-0">🧒</div>
+          <div class="flex-1">
+            <p class="text-[10px] font-black text-orange-700 uppercase tracking-wider">Müşterinin İsteği</p>
+            <p id="orderText" class="text-sm font-black">"Güne enerjik başlamak istiyorum!"</p>
+            <ul id="ruleList" class="mt-1.5 space-y-0.5"></ul>
+          </div>
+        </div>
+
+        <!-- TABAK SAHNESİ -->
+        <div id="stage" class="relative w-full rounded-2xl border-3 border-ink overflow-hidden bg-gradient-to-b from-amber-100 to-orange-200">
+          <svg id="plateSvg" viewBox="0 0 560 300" class="w-full h-auto block"></svg>
+          <div id="toast" class="absolute left-1/2 -translate-x-1/2 top-2 z-20 px-3 py-2 rounded-xl border-3 border-ink bg-white text-xs sm:text-sm font-black text-center hidden" style="max-width:92%"></div>
+        </div>
+
+        <!-- Besin Rafı -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-black text-gray-700">🧺 Besin Rafı: <span class="font-bold text-gray-500">Bir besine dokun, sonra tabakta doğru bölmeye dokun.</span></label>
+          </div>
+          <div id="shelf" class="grid grid-cols-4 sm:grid-cols-7 gap-2"></div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <div class="flex items-center gap-2">
+            <button id="btnServe" class="pushable px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm">🛎️ Servis Et</button>
+            <button id="btnClear" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-xs font-black">🔄 Tabağı Boşalt</button>
+          </div>
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black">💡 İpucu</button>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-emerald-50 to-lime-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🥗</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">Vücudumuz büyümek, hareket etmek ve hastalıklardan korunmak için farklı <b>besin öğelerine</b> ihtiyaç duyar. Tek bir besin hepsini içermez. Bu yüzden tabağımızı <b>çeşitli</b> besinlerle doldururuz!</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">Şef Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">📊</span><h3 class="display text-base font-black">Tabaktaki Besin Öğeleri</h3></div>
+          <span id="plateCount" class="text-xs font-bold text-gray-500">0 / 6 besin</span>
+        </div>
+        <div id="nutrientBars" class="space-y-1.5"></div>
+        <p id="junkWarn" class="hidden mt-2 text-[11px] font-black text-rose-700 bg-rose-50 border border-rose-300 rounded-lg p-1.5">⚠️ Tabakta çok fazla şeker ve tuz var!</p>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Fen Bilgisi Rehberi</h3></div>
+        <div class="space-y-2 text-xs">
+          <div class="p-2 bg-amber-50 rounded-lg border border-amber-300"><p class="font-extrabold text-amber-900">⚡ Karbonhidratlar ve Yağlar</p><p class="text-[11px] text-amber-800 font-semibold mt-0.5">Vücudun <b>enerji</b> kaynağıdır. Ekmek, makarna, pirinç ve patates karbonhidrattan zengindir.</p></div>
+          <div class="p-2 bg-rose-50 rounded-lg border border-rose-300"><p class="font-extrabold text-rose-900">💪 Proteinler</p><p class="text-[11px] text-rose-800 font-semibold mt-0.5"><b>Büyüme</b> ve yaraların iyileşmesi için gereklidir. Et, yumurta, balık, mercimek ve fasulyede bol bulunur.</p></div>
+          <div class="p-2 bg-emerald-50 rounded-lg border border-emerald-300"><p class="font-extrabold text-emerald-900">🛡️ Vitaminler ve Mineraller</p><p class="text-[11px] text-emerald-800 font-semibold mt-0.5">Vücudu <b>hastalıklara karşı korur</b>. Meyve ve sebzelerde bol bulunur. Sütteki <b>kalsiyum</b> kemikleri ve dişleri güçlendirir.</p></div>
+          <div class="p-2 bg-sky-50 rounded-lg border border-sky-300"><p class="font-extrabold text-sky-900">💧 Su</p><p class="text-[11px] text-sky-800 font-semibold mt-0.5">Vücudumuzun yarısından fazlası sudur. Gün boyunca bol su içmeliyiz.</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Afiyet Olsun!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-emerald-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-emerald-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      place() { tone('triangle', 400, 700, 0.1, 0.22); },
+      remove() { tone('sine', 500, 250, 0.1, 0.15); },
+      wrong() { tone('sawtooth', 220, 110, 0.3, 0.15); },
+      bell() { tone('sine', 1320, 1300, 0.4, 0.2); tone('sine', 1760, 1750, 0.4, 0.1, 0.05); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. BESİN VERİLERİ ---
+    // Gruplar Türkiye "Sağlıklı Tabak" modeline göre
+    const GROUPS = {
+      sebze: { name: 'Sebze & Meyve', icon: '🥦', color: '#86efac', dark: '#15803d' },
+      tahil: { name: 'Tahıllar', icon: '🌾', color: '#fde68a', dark: '#a16207' },
+      protein: { name: 'Et, Yumurta, Baklagil', icon: '🥚', color: '#fca5a5', dark: '#b91c1c' },
+      sut: { name: 'Süt Grubu', icon: '🥛', color: '#bfdbfe', dark: '#1d4ed8' },
+      icecek: { name: 'İçecek', icon: '💧', color: '#a5f3fc', dark: '#0e7490' },
+      abur: { name: 'Az Tüket!', icon: '⚠️', color: '#e5e7eb', dark: '#6b7280' }
+    };
+
+    // k: karbonhidrat, p: protein, y: yağ, v: vitamin & mineral, ca: kalsiyum, su: su, sk: şeker/tuz
+    const FOODS = [
+      { id: 'ekmek', e: '🍞', n: 'Tam Buğday Ekmeği', g: 'tahil', k: 3, p: 1, y: 0, v: 1, fact: 'Tam buğday ekmeği lif içerir ve bizi uzun süre tok tutar.' },
+      { id: 'makarna', e: '🍝', n: 'Makarna', g: 'tahil', k: 3, p: 1, y: 0, v: 0, fact: 'Makarna buğdaydan yapılır ve hızlı enerji verir.' },
+      { id: 'pilav', e: '🍚', n: 'Bulgur Pilavı', g: 'tahil', k: 3, p: 1, y: 1, v: 1, fact: 'Bulgur, buğdayın haşlanıp kurutulmasıyla elde edilir. Anadolu mutfağının vazgeçilmezidir.' },
+      { id: 'yulaf', e: '🥣', n: 'Yulaf Ezmesi', g: 'tahil', k: 3, p: 1, y: 1, v: 1, fact: 'Yulaf, kahvaltıda uzun süre enerji veren bir tahıldır.' },
+      { id: 'yumurta', e: '🥚', n: 'Haşlanmış Yumurta', g: 'protein', k: 0, p: 3, y: 2, v: 2, fact: 'Yumurta, kaliteli protein kaynağıdır. Kasların ve vücudun büyümesine yardım eder.' },
+      { id: 'tavuk', e: '🍗', n: 'Izgara Tavuk', g: 'protein', k: 0, p: 3, y: 1, v: 1, fact: 'Tavuk eti proteinden zengindir. Izgara pişirmek kızartmaktan daha sağlıklıdır.' },
+      { id: 'balik', e: '🐟', n: 'Balık', g: 'protein', k: 0, p: 3, y: 2, v: 2, fact: 'Balıkta hem protein hem de beyin ve göz sağlığına iyi gelen faydalı yağlar vardır.' },
+      { id: 'mercimek', e: '🍲', n: 'Mercimek Çorbası', g: 'protein', k: 2, p: 3, y: 0, v: 2, fact: 'Mercimek bir <b>baklagildir</b>. Etten değil bitkiden gelen protein ve demir içerir.' },
+      { id: 'fasulye', e: '🫘', n: 'Kuru Fasulye', g: 'protein', k: 2, p: 3, y: 0, v: 2, fact: 'Kuru fasulye, nohut ve mercimek bitkisel protein kaynaklarıdır.' },
+      { id: 'ceviz', e: '🌰', n: 'Ceviz', g: 'protein', k: 1, p: 2, y: 3, v: 2, fact: 'Ceviz ve fındık yağlı tohumlardır. Az miktarı bile çok enerji verir.' },
+      { id: 'sut', e: '🥛', n: 'Süt', g: 'sut', k: 1, p: 2, y: 1, v: 2, ca: true, su: 1, fact: 'Süt, kemik ve dişleri güçlendiren <b>kalsiyum</b> bakımından zengindir.' },
+      { id: 'yogurt', e: '🍶', n: 'Yoğurt', g: 'sut', k: 1, p: 2, y: 1, v: 2, ca: true, fact: 'Yoğurt, sütün faydalı minik canlılar (bakteriler) yardımıyla mayalanmasıyla yapılır.' },
+      { id: 'peynir', e: '🧀', n: 'Peynir', g: 'sut', k: 0, p: 3, y: 2, v: 2, ca: true, fact: 'Peynir hem protein hem kalsiyum içerir. Kahvaltıların yıldızıdır!' },
+      { id: 'elma', e: '🍎', n: 'Elma', g: 'sebze', k: 2, p: 0, y: 0, v: 3, fact: 'Elmayı kabuğuyla yemek daha fazla lif almamızı sağlar.' },
+      { id: 'portakal', e: '🍊', n: 'Portakal', g: 'sebze', k: 2, p: 0, y: 0, v: 3, fact: 'Portakal <b>C vitamini</b> bakımından zengindir. Bağışıklığımızı destekler.' },
+      { id: 'muz', e: '🍌', n: 'Muz', g: 'sebze', k: 3, p: 0, y: 0, v: 2, fact: 'Muz hızlı enerji verir. Sporculuğun gözde meyvesidir.' },
+      { id: 'domates', e: '🍅', n: 'Domates', g: 'sebze', k: 1, p: 0, y: 0, v: 3, fact: 'Domates bilimsel olarak bir meyvedir ama mutfakta sebze gibi kullanılır!' },
+      { id: 'havuc', e: '🥕', n: 'Havuç', g: 'sebze', k: 1, p: 0, y: 0, v: 3, fact: 'Havuç, gözlerimiz için önemli olan <b>A vitamini</b> bakımından zengindir.' },
+      { id: 'brokoli', e: '🥦', n: 'Brokoli', g: 'sebze', k: 1, p: 1, y: 0, v: 3, fact: 'Brokoli hem vitamin hem mineral deposudur.' },
+      { id: 'salatalik', e: '🥒', n: 'Salatalık', g: 'sebze', k: 1, p: 0, y: 0, v: 2, su: 1, fact: 'Salatalığın büyük kısmı sudur. Serinletir!' },
+      { id: 'su', e: '💧', n: 'Su', g: 'icecek', k: 0, p: 0, y: 0, v: 1, su: 3, fact: 'Su, vücut sıcaklığımızı dengeler ve besinlerin taşınmasına yardım eder.' },
+      { id: 'ayran', e: '🥛', n: 'Ayran', g: 'sut', k: 1, p: 2, y: 1, v: 2, ca: true, su: 2, fact: 'Ayran, yoğurt ve sudan yapılır. Hem kalsiyum hem su sağlar.' },
+      { id: 'cips', e: '🍟', n: 'Patates Cipsi', g: 'abur', k: 2, p: 0, y: 3, v: 0, sk: 3, fact: 'Cips çok yağ ve tuz içerir ama vücuda pek fayda sağlamaz. Ara sıra ve az tüketilmeli.' },
+      { id: 'gazoz', e: '🥤', n: 'Gazlı İçecek', g: 'abur', k: 3, p: 0, y: 0, v: 0, sk: 3, fact: 'Gazlı içeceklerde çok fazla şeker vardır. Dişlere de zarar verir. Susadığımızda en iyisi sudur!' },
+      { id: 'sekerleme', e: '🍭', n: 'Şekerleme', g: 'abur', k: 3, p: 0, y: 0, v: 0, sk: 3, fact: 'Şekerlemeler kısa süreli enerji verir ama hemen acıktırır ve dişleri çürütebilir.' }
+    ];
+    const FOOD = Object.fromEntries(FOODS.map(f => [f.id, f]));
+
+    // --- 3. SİPARİŞLER ---
+    const sum = (plate, key) => plate.reduce((a, id) => a + (FOOD[id][key] || 0), 0);
+    const countG = (plate, g) => plate.filter(id => FOOD[id].g === g).length;
+    const junk = plate => plate.filter(id => FOOD[id].g === 'abur').length;
+
+    const LEVELS = [
+      {
+        title: 'Dengeli Kahvaltı', customer: '🧒', order: '"Güne enerjik başlamak istiyorum!"',
+        shelf: ['ekmek', 'yulaf', 'yumurta', 'peynir', 'sut', 'domates', 'portakal', 'salatalik', 'su', 'gazoz', 'sekerleme', 'cips', 'havuc', 'makarna'],
+        rules: [
+          { t: 'Tahıl grubundan en az 1 besin', ok: p => countG(p, 'tahil') >= 1 },
+          { t: 'Yumurta ya da süt grubundan en az 1 besin', ok: p => countG(p, 'protein') + countG(p, 'sut') >= 1 },
+          { t: 'Sebze & meyveden en az 1 besin', ok: p => countG(p, 'sebze') >= 1 },
+          { t: 'Abur cubur yok', ok: p => junk(p) === 0 }
+        ],
+        hint: 'Tabağın her bölmesinden bir şey seç: ekmek, yumurta ya da peynir, domates... Gazlı içecek kahvaltıya uygun değil!',
+        fact: 'Kahvaltı günün ilk öğünüdür. Dengeli bir kahvaltı okulda dikkatimizi toplamamıza ve enerjik olmamıza yardım eder.'
+      },
+      {
+        title: 'Büyüyen Futbolcu', customer: '⚽', order: '"Antrenmandan sonra kaslarım büyüsün!"',
+        shelf: ['tavuk', 'balik', 'mercimek', 'fasulye', 'pilav', 'makarna', 'brokoli', 'domates', 'ayran', 'gazoz', 'cips', 'elma', 'yogurt', 'sekerleme'],
+        rules: [
+          { t: 'Proteinden zengin en az 2 besin', ok: p => p.filter(id => FOOD[id].p >= 3).length >= 2 },
+          { t: 'En az 1 sebze', ok: p => p.some(id => FOOD[id].g === 'sebze' && ['brokoli', 'domates', 'havuc', 'salatalik'].includes(id)) },
+          { t: 'İçecek olarak gazlı içecek yok', ok: p => !p.includes('gazoz') }
+        ],
+        hint: 'Protein; tavuk, balık, mercimek, fasulye ve peynirde boldur. Yanına brokoli ya da domates ekle!',
+        fact: '<b>Proteinler</b> vücudun yapı taşlarıdır. Kaslarımızın, saçımızın ve tırnaklarımızın büyümesi için gereklidir.'
+      },
+      {
+        title: 'Güçlü Kemikler', customer: '👵', order: '"Kemiklerim ve dişlerim güçlü olsun!"',
+        shelf: ['sut', 'yogurt', 'peynir', 'ayran', 'ekmek', 'brokoli', 'portakal', 'tavuk', 'gazoz', 'sekerleme', 'cips', 'makarna', 'muz', 'su'],
+        rules: [
+          { t: 'Kalsiyumdan zengin en az 2 besin', ok: p => p.filter(id => FOOD[id].ca).length >= 2 },
+          { t: 'En az 1 sebze ya da meyve', ok: p => countG(p, 'sebze') >= 1 },
+          { t: 'Şekerli yiyecek ya da içecek yok', ok: p => junk(p) === 0 }
+        ],
+        hint: 'Kalsiyum en çok süt grubunda bulunur: süt, yoğurt, peynir, ayran.',
+        fact: '<b>Kalsiyum</b> bir mineraldir. Kemiklerimizin ve dişlerimizin sağlam olmasını sağlar. Şekerli içecekler ise dişlere zarar verir.'
+      },
+      {
+        title: 'Maç Öncesi Enerji', customer: '🏃', order: '"Koşu yarışından önce enerji depolamam lazım!"',
+        shelf: ['makarna', 'pilav', 'ekmek', 'muz', 'elma', 'yogurt', 'su', 'gazoz', 'cips', 'sekerleme', 'tavuk', 'domates', 'ceviz', 'salatalik'],
+        rules: [
+          { t: 'Karbonhidrattan zengin en az 2 besin (abur cubur hariç)', ok: p => p.filter(id => FOOD[id].k >= 3 && FOOD[id].g !== 'abur').length >= 2 },
+          { t: 'Susuz kalmamak için su', ok: p => p.includes('su') },
+          { t: 'Abur cubur yok', ok: p => junk(p) === 0 }
+        ],
+        hint: 'Makarna, pilav, ekmek ve muz enerji verir. Koşarken ter atarız, suyu unutma!',
+        fact: '<b>Karbonhidratlar</b> vücudun ana enerji kaynağıdır. Şekerlemeler de karbonhidrattır ama vitamin içermez ve enerjisi çabuk biter.'
+      },
+      {
+        title: 'Vitamin Kalkanı', customer: '🤧', order: '"Hastalıklara karşı güçlü olmak istiyorum!"',
+        shelf: ['portakal', 'elma', 'havuc', 'brokoli', 'domates', 'salatalik', 'yogurt', 'mercimek', 'ekmek', 'gazoz', 'cips', 'sekerleme', 'makarna', 'su'],
+        rules: [
+          { t: 'Vitamin ve mineralden zengin en az 3 besin', ok: p => p.filter(id => FOOD[id].v >= 3).length >= 3 },
+          { t: 'Farklı renklerde meyve-sebze (en az 3 çeşit)', ok: p => new Set(p.filter(id => FOOD[id].g === 'sebze')).size >= 3 },
+          { t: 'Abur cubur yok', ok: p => junk(p) === 0 }
+        ],
+        hint: 'Portakal, havuç, brokoli, domates ve elma vitamin deposudur. Tabağı gökkuşağı gibi renklendir!',
+        fact: '<b>Vitaminler</b> vücudun düzenli çalışmasını ve hastalıklara karşı korunmasını sağlar. Farklı renkteki meyve ve sebzeler farklı vitaminler içerir.'
+      },
+      {
+        title: 'Şefin Büyük Sınavı', customer: '👨‍🍳', order: '"Bana tam dengeli bir akşam yemeği hazırla!"',
+        shelf: FOODS.map(f => f.id).filter(id => id !== 'yulaf'),
+        rules: [
+          { t: 'Tahıl grubundan en az 1', ok: p => countG(p, 'tahil') >= 1 },
+          { t: 'Et, yumurta ya da baklagilden en az 1', ok: p => countG(p, 'protein') >= 1 },
+          { t: 'Süt grubundan en az 1', ok: p => countG(p, 'sut') >= 1 },
+          { t: 'Sebze & meyveden en az 2', ok: p => countG(p, 'sebze') >= 2 },
+          { t: 'Abur cubur yok', ok: p => junk(p) === 0 }
+        ],
+        hint: 'Sağlıklı tabakta dört bölmenin hepsi dolu olmalı. Sebze ve meyve bölmesi en büyük bölmedir.',
+        fact: 'Tebrikler şef! <b>Dengeli beslenme</b>, her besin grubundan yeterli miktarda yemek demektir. Tabağın yarısını sebze ve meyveyle doldurmak iyi bir kuraldır.'
+      }
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: Grup Uzmanı', text: 'Hiç yanlış bölme seçmeden bir tabak hazırla.' },
+      { id: 'm2', title: '2. Görev: Laboratuvar Meraklısı', text: 'Besin Laboratuvarında 10 farklı besini incele.', progress: true },
+      { id: 'm3', title: '3. Görev: Abur Cubur Dedektifi', text: 'Laboratuvarda 3 abur cuburun da kartını oku.' },
+      { id: 'm4', title: '4. Görev: Baş Şef', text: '6 siparişin hepsini tamamla.' }
+    ];
+
+    // --- 4. DURUM ---
+    let mode = 'levels';
+    let levelIndex = 0;
+    let plate = [];
+    const plateZone = {};
+    let selected = null;
+    let wrongZones = 0;
+    let failedServes = 0;
+    let finished = false;
+    let score = 0;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    const labSeen = new Set();
+    const MAX_ITEMS = 6;
+    const $ = id => document.getElementById(id);
+
+    // --- 5. TABAK ÇİZİMİ ---
+    // Bölgeler: tabak dörde bölünmüş + yanında içecek bardağı
+    const ZONES = {
+      sebze: { cx: 175, cy: 150, a0: 180, a1: 360, label: 'SEBZE & MEYVE' },
+      tahil: { cx: 175, cy: 150, a0: 0, a1: 90, label: 'TAHIL' },
+      protein: { cx: 175, cy: 150, a0: 90, a1: 180, label: 'ET-YUMURTA-BAKLAGİL' },
+      sut: { cx: 400, cy: 110, r: 52, label: 'SÜT GRUBU' },
+      icecek: { cx: 400, cy: 225, label: 'İÇECEK' }
+    };
+    const PLATE_R = 125;
+
+    function arcPath(cx, cy, r, a0, a1) {
+      const p = a => [cx + r * Math.cos(a * Math.PI / 180), cy + r * Math.sin(a * Math.PI / 180)];
+      const [x0, y0] = p(a0), [x1, y1] = p(a1);
+      const large = a1 - a0 > 180 ? 1 : 0;
+      return `M${cx},${cy} L${x0},${y0} A${r},${r} 0 ${large} 1 ${x1},${y1} Z`;
+    }
+
+    function slotPositions(zone, n) {
+      const z = ZONES[zone];
+      const pts = [];
+      if (zone === 'sut') {
+        for (let i = 0; i < n; i++) { const a = -90 + i * 360 / Math.max(n, 1); pts.push(n === 1 ? [z.cx, z.cy + 6] : [z.cx + 22 * Math.cos(a * Math.PI / 180), z.cy + 6 + 22 * Math.sin(a * Math.PI / 180)]); }
+      } else if (zone === 'icecek') {
+        for (let i = 0; i < n; i++) pts.push([z.cx - 18 * (n - 1) + i * 36, z.cy + 8]);
+      } else {
+        const mid = (z.a0 + z.a1) / 2;
+        const span = (z.a1 - z.a0) * 0.7;
+        for (let i = 0; i < n; i++) {
+          const a = n === 1 ? mid : mid - span / 2 + span * i / (n - 1);
+          const r = n > 2 && i % 2 ? 50 : 78;
+          pts.push([z.cx + r * Math.cos(a * Math.PI / 180), z.cy + r * Math.sin(a * Math.PI / 180)]);
+        }
+      }
+      return pts;
+    }
+
+    function renderPlate() {
+      const svg = $('plateSvg');
+      let h = '';
+      // Masa örtüsü deseni
+      h += `<g opacity="0.25">${Array.from({ length: 12 }, (_, i) => `<rect x="${i * 50}" y="0" width="25" height="300" fill="#fb923c" />`).join('')}</g>`;
+      // Tabak
+      h += `<circle cx="175" cy="156" r="${PLATE_R + 14}" fill="#0f172a" opacity="0.2" />`;
+      h += `<circle cx="175" cy="150" r="${PLATE_R + 12}" fill="#ffffff" stroke="#0f172a" stroke-width="3.5" />`;
+      ['sebze', 'tahil', 'protein'].forEach(k => {
+        const z = ZONES[k], g = GROUPS[k];
+        h += `<path class="zone" data-zone="${k}" d="${arcPath(z.cx, z.cy, PLATE_R, z.a0, z.a1)}" fill="${g.color}" stroke="#0f172a" stroke-width="2.5" />`;
+      });
+      h += `<text x="175" y="${150 - 105}" font-size="10" font-weight="900" text-anchor="middle" fill="#15803d" pointer-events="none">🥦 SEBZE & MEYVE</text>`;
+      h += `<text x="${175 + 62}" y="${150 + 108}" font-size="9" font-weight="900" text-anchor="middle" fill="#a16207" pointer-events="none">🌾 TAHIL</text>`;
+      h += `<text x="${175 - 62}" y="${150 + 108}" font-size="8.5" font-weight="900" text-anchor="middle" fill="#b91c1c" pointer-events="none">🥚 ET-YUMURTA</text>`;
+      // Süt kasesi
+      h += `<ellipse cx="400" cy="120" rx="64" ry="54" fill="#0f172a" opacity="0.2" />`;
+      h += `<circle class="zone" data-zone="sut" cx="400" cy="112" r="58" fill="${GROUPS.sut.color}" stroke="#0f172a" stroke-width="3.5" />`;
+      h += `<text x="400" y="66" font-size="9.5" font-weight="900" text-anchor="middle" fill="#1d4ed8" pointer-events="none">🥛 SÜT GRUBU</text>`;
+      // İçecek tepsisi
+      h += `<rect class="zone" data-zone="icecek" x="330" y="190" width="140" height="72" rx="14" fill="${GROUPS.icecek.color}" stroke="#0f172a" stroke-width="3.5" />`;
+      h += `<text x="400" y="206" font-size="9.5" font-weight="900" text-anchor="middle" fill="#0e7490" pointer-events="none">💧 İÇECEK</text>`;
+      // Çöp kutusu (abur cubur)
+      h += `<g class="zone" data-zone="abur"><rect x="490" y="200" width="56" height="62" rx="10" fill="#e5e7eb" stroke="#0f172a" stroke-width="3" /><text x="518" y="226" font-size="20" text-anchor="middle">⚠️</text><text x="518" y="248" font-size="8" font-weight="900" text-anchor="middle">AZ TÜKET</text></g>`;
+
+      // Tabaktaki besinler
+      const byZone = {};
+      plate.forEach((id, idx) => {
+        const z = plateZone[id] || FOOD[id].g;
+        (byZone[z] = byZone[z] || []).push({ id, idx });
+      });
+      Object.entries(byZone).forEach(([z, arr]) => {
+        const pts = z === 'abur' ? arr.map((_, i) => [518, 150 - i * 36]) : slotPositions(z, arr.length);
+        arr.forEach((it, i) => {
+          const [x, y] = pts[i];
+          h += `<g class="plate-item" data-idx="${it.idx}" transform="translate(${x},${y})">
+            <circle r="19" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+            <text y="8" font-size="22" text-anchor="middle">${FOOD[it.id].e}</text>
+          </g>`;
+        });
+      });
+      svg.innerHTML = h;
+
+      svg.querySelectorAll('.zone').forEach(el => el.addEventListener('click', () => onZone(el.dataset.zone)));
+      svg.querySelectorAll('.plate-item').forEach(el => el.addEventListener('click', ev => { ev.stopPropagation(); removeFromPlate(+el.dataset.idx); }));
+      updateNutrients();
+      renderRules();
+    }
+
+    function zoneOf(id) {
+      const f = FOOD[id];
+      if (id === 'ayran' || id === 'sut') return ['sut', 'icecek'];
+      if (id === 'su') return ['icecek'];
+      if (id === 'gazoz') return ['abur', 'icecek'];
+      return [f.g];
+    }
+
+    // --- 6. ETKİLEŞİM ---
+    function renderShelf() {
+      const L = LEVELS[levelIndex];
+      const ids = mode === 'levels' ? L.shelf : FOODS.map(f => f.id);
+      $('shelf').innerHTML = ids.map(id => {
+        const f = FOOD[id];
+        const inPlate = mode === 'levels' && plate.includes(id);
+        return `<button data-id="${id}" class="food-btn pushable bg-white hover:bg-amber-50 py-1.5 flex flex-col items-center ${inPlate ? 'opacity-40' : ''} ${selected === id ? 'selected' : ''}">
+          <span class="text-2xl">${f.e}</span><span class="text-[9px] font-black leading-tight text-center px-0.5">${f.n}</span></button>`;
+      }).join('');
+      $('shelf').querySelectorAll('.food-btn').forEach(b => b.addEventListener('click', () => onFood(b.dataset.id)));
+    }
+
+    function onFood(id) {
+      initAudio();
+      if (mode === 'lab') { showLab(id); return; }
+      if (finished) return;
+      if (plate.includes(id)) { toast(`${FOOD[id].e} ${FOOD[id].n} zaten tabakta!`, '#fef9c3'); return; }
+      selected = selected === id ? null : id;
+      Sound.click();
+      renderShelf();
+      document.querySelectorAll('.zone').forEach(z => z.classList.toggle('glow', !!selected));
+    }
+
+    function onZone(zone) {
+      if (mode !== 'levels' || finished) return;
+      if (!selected) { toast('👆 Önce raftan bir besin seç!', '#e0f2fe'); return; }
+      const f = FOOD[selected];
+      if (plate.length >= MAX_ITEMS) { toast('🍽️ Tabak doldu! Bir besini çıkarmak için üstüne dokun.', '#fef9c3'); Sound.wrong(); return; }
+      if (!zoneOf(selected).includes(zone)) {
+        wrongZones++;
+        Sound.wrong();
+        const right = zoneOf(selected)[0];
+        toast(`❌ ${f.e} <b>${f.n}</b> buraya ait değil. <b>${GROUPS[right].name}</b> bölmesine gider.`, '#fee2e2');
+        return;
+      }
+      plate.push(selected);
+      plateZone[selected] = zone;
+      Sound.place();
+      selected = null;
+      renderShelf();
+      renderPlate();
+    }
+
+    function removeFromPlate(idx) {
+      if (mode !== 'levels' || finished) return;
+      plate.splice(idx, 1);
+      Sound.remove();
+      renderShelf();
+      renderPlate();
+    }
+
+    let toastT = null;
+    function toast(html, bg) {
+      const t = $('toast');
+      t.innerHTML = html; t.style.background = bg; t.classList.remove('hidden');
+      if (typeof gsap !== 'undefined') gsap.fromTo(t, { scale: 0.85 }, { scale: 1, duration: 0.25, ease: 'back.out(2)' });
+      clearTimeout(toastT); toastT = setTimeout(() => t.classList.add('hidden'), 2800);
+    }
+
+    function renderRules() {
+      if (mode !== 'levels') { $('ruleList').innerHTML = ''; return; }
+      const L = LEVELS[levelIndex];
+      $('ruleList').innerHTML = L.rules.map(r => {
+        const ok = r.ok(plate);
+        return `<li class="text-[11px] font-bold ${ok ? 'text-emerald-700' : 'text-gray-600'}">${ok ? '✅' : '⬜'} ${r.t}</li>`;
+      }).join('');
+    }
+
+    function updateNutrients(list = plate) {
+      const bars = [
+        ['⚡ Karbonhidrat', sum(list, 'k'), '#f59e0b'],
+        ['💪 Protein', sum(list, 'p'), '#ef4444'],
+        ['🧈 Yağ', sum(list, 'y'), '#eab308'],
+        ['🛡️ Vitamin & Mineral', sum(list, 'v'), '#22c55e'],
+        ['💧 Su', sum(list, 'su'), '#06b6d4']
+      ];
+      $('nutrientBars').innerHTML = bars.map(([n, v, c]) => `
+        <div class="flex items-center gap-2 text-[11px] font-black">
+          <span class="w-32">${n}</span>
+          <div class="flex-1 h-3.5 bg-gray-100 rounded-full border-2 border-ink overflow-hidden"><div class="h-full transition-all duration-300" style="width:${Math.min(100, v / 12 * 100)}%;background:${c}"></div></div>
+        </div>`).join('');
+      $('plateCount').textContent = mode === 'levels' ? `${plate.length} / ${MAX_ITEMS} besin` : '';
+      $('junkWarn').classList.toggle('hidden', sum(list, 'sk') < 3);
+    }
+
+    // --- 7. SERVİS ---
+    $('btnServe').addEventListener('click', () => {
+      if (mode !== 'levels' || finished) return;
+      const L = LEVELS[levelIndex];
+      if (plate.length === 0) { toast('🍽️ Tabak boş! Önce besin ekle.', '#fef9c3'); return; }
+      const failed = L.rules.filter(r => !r.ok(plate));
+      Sound.bell();
+      if (failed.length === 0) {
+        winLevel();
+      } else {
+        failedServes++;
+        Sound.wrong();
+        if (typeof gsap !== 'undefined') gsap.fromTo('#customer', { rotate: -15 }, { rotate: 0, duration: 0.6, ease: 'elastic.out(3,0.3)' });
+        toast(`😕 Müşteri memnun değil: <b>${failed[0].t}</b>`, '#fee2e2');
+      }
+    });
+
+    function winLevel() {
+      finished = true;
+      const L = LEVELS[levelIndex];
+      const s = Math.max(1, 3 - failedServes - (wrongZones > 1 ? 1 : 0));
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20;
+      if (wrongZones === 0) completeMission('m1');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      updateScore(); renderLevelDots();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+      showModal({
+        emoji: L.customer, title: 'Afiyet Olsun!', stars: '⭐'.repeat(s) + '☆'.repeat(3 - s),
+        info: `Tabakta ${plate.length} besin vardı: ${plate.map(id => FOOD[id].e).join(' ')}`,
+        fact: L.fact, next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Laboratuvar 🔬'
+      });
+    }
+
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info; $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next); if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 600);
+    }
+    let modalTimer = null;
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    // --- 8. LABORATUVAR ---
+    function showLab(id) {
+      const f = FOOD[id];
+      labSeen.add(id);
+      Sound.click();
+      renderMissions();
+      if (labSeen.size >= 10) completeMission('m2');
+      if (['cips', 'gazoz', 'sekerleme'].every(x => labSeen.has(x))) completeMission('m3');
+      const g = GROUPS[f.g];
+      const level = v => ['Yok', 'Az', 'Orta', 'Çok'][v || 0];
+      const row = (n, v, c) => `<div class="flex items-center gap-2"><span class="w-28 text-[11px] font-black">${n}</span>
+        <div class="flex gap-1">${[1, 2, 3].map(i => `<span class="w-6 h-4 rounded border-2 border-ink" style="background:${(v || 0) >= i ? c : '#fff'}"></span>`).join('')}</div>
+        <span class="text-[10px] font-bold text-gray-500">${level(v)}</span></div>`;
+      $('plateSvg').innerHTML = '';
+      $('plateSvg').insertAdjacentHTML('afterbegin', `
+        <foreignObject x="0" y="0" width="560" height="300">
+          <div xmlns="http://www.w3.org/1999/xhtml" style="padding:14px;height:100%;box-sizing:border-box;font-family:Nunito,sans-serif">
+            <div style="display:flex;gap:14px;align-items:center;background:#fff;border:3px solid #0f172a;border-radius:18px;padding:12px;height:100%;box-sizing:border-box">
+              <div style="font-size:84px;line-height:1;text-align:center;min-width:120px">${f.e}
+                <div style="font-size:12px;font-weight:900;margin-top:6px;background:${g.color};border:2px solid #0f172a;border-radius:10px;padding:2px 6px">${g.icon} ${g.name}</div>
+              </div>
+              <div style="flex:1">
+                <div style="font-family:'Baloo 2',cursive;font-size:22px;font-weight:900">${f.n}</div>
+                <div style="display:flex;flex-direction:column;gap:5px;margin:6px 0">
+                  ${row('⚡ Karbonhidrat', f.k, '#f59e0b')}${row('💪 Protein', f.p, '#ef4444')}${row('🧈 Yağ', f.y, '#eab308')}${row('🛡️ Vitamin/Mineral', f.v, '#22c55e')}${f.sk ? row('🍬 Şeker/Tuz', f.sk, '#a855f7') : ''}
+                </div>
+                <div style="font-size:12px;font-weight:700;color:#374151;line-height:1.4">${f.ca ? '🦴 <b>Kalsiyumdan zengin!</b> ' : ''}${f.fact}</div>
+              </div>
+            </div>
+          </div>
+        </foreignObject>`);
+      updateNutrients([id]);
+      if (typeof gsap !== 'undefined') gsap.from('#plateSvg', { scale: 0.95, opacity: 0.4, duration: 0.3 });
+    }
+
+    // --- 9. GÖREVLER & AKIŞ ---
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        const extra = m.progress && !done ? ` <b class="text-sky-700">(${Math.min(10, labSeen.size)}/10)</b>` : '';
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5">
+          <span class="text-lg">${done ? '✅' : '⬜'}</span><div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}${extra}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Siparişler:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function loadLevel(i) {
+      closeModal();
+      mode = 'levels'; levelIndex = i;
+      const L = LEVELS[i];
+      plate = []; selected = null; wrongZones = 0; failedServes = 0; finished = false;
+      $('levelBadge').textContent = `SİPARİŞ ${i + 1}`;
+      $('levelTitle').textContent = L.title;
+      $('customer').textContent = L.customer;
+      $('orderText').textContent = L.order;
+      $('toast').classList.add('hidden');
+      renderLevelDots(); renderShelf(); renderPlate();
+    }
+
+    function switchMode(m) {
+      const isLab = m === 'lab';
+      $('tabLevels').classList.toggle('active-tab', !isLab); $('tabLevels').classList.toggle('bg-white', isLab);
+      $('tabSandbox').classList.toggle('active-tab', isLab); $('tabSandbox').classList.toggle('bg-white', !isLab);
+      $('levelDots').classList.toggle('hidden', isLab);
+      $('btnServe').classList.toggle('hidden', isLab);
+      $('btnClear').classList.toggle('hidden', isLab);
+      if (isLab) {
+        mode = 'lab'; selected = null;
+        $('levelBadge').textContent = 'LABORATUVAR';
+        $('levelTitle').textContent = 'Besinlerin İçinde Ne Var?';
+        $('customer').textContent = '🔬';
+        $('orderText').textContent = 'Raftaki bir besine dokun ve içindeki besin öğelerini incele!';
+        $('ruleList').innerHTML = '';
+        renderShelf();
+        showLab('mercimek');
+      } else loadLevel(levelIndex);
+    }
+
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('lab'); });
+    $('btnClear').addEventListener('click', () => { if (finished) return; Sound.remove(); plate = []; selected = null; renderShelf(); renderPlate(); });
+    $('btnHint').addEventListener('click', () => {
+      Sound.click();
+      $('scienceNote').innerHTML = mode === 'levels' ? `<b>İpucu:</b> ${LEVELS[levelIndex].hint}` : '<b>Deney fikri:</b> Cipsle elmayı karşılaştır. Hangisinde daha çok vitamin var? Hangisinde daha çok yağ ve tuz var?';
+    });
+    $('btnModalRetry').addEventListener('click', () => { closeModal(); loadLevel(levelIndex); });
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('lab'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; Sound.click(); });
+
+    renderMissions(); updateScore(); loadLevel(0);
+  </script>
+</body>
+</html>

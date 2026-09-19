@@ -11,6 +11,7 @@ import {
     ZoomOut,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { FullscreenToggle } from '../common/FullscreenToggle';
 import { getFormattedHtml } from '../../utils/format-html';
 import { HTML2CANVAS_CDN } from '../../constants/drawing';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
@@ -18,6 +19,16 @@ import { DrawingToolbar } from '../drawing/DrawingToolbar';
 import { TextBoxLayer } from '../tools/TextBoxLayer';
 import { RulerTool } from '../tools/RulerTool';
 import { ProtractorTool } from '../tools/ProtractorTool';
+import { CompassTool } from '../tools/CompassTool';
+import { NumberLineTool } from '../tools/NumberLineTool';
+import { MiniCalculatorTool } from '../tools/MiniCalculatorTool';
+import { PeriodicTableTool } from '../tools/PeriodicTableTool';
+import { GeoGebraStudioTool } from '../tools/GeoGebraStudioTool';
+import { SimpleMachinesTool } from '../tools/SimpleMachinesTool';
+import { DnaGeneticsTool } from '../tools/DnaGeneticsTool';
+import { MoleculeBuilderTool } from '../tools/MoleculeBuilderTool';
+import { LinearGraphTool } from '../tools/LinearGraphTool';
+import { MathFormulaTool } from '../tools/MathFormulaTool';
 import { SpotlightOverlay } from '../tools/SpotlightOverlay';
 import { OverlayTimer } from '../tools/OverlayTimer';
 import { PageNav } from '../tools/PageNav';
@@ -94,11 +105,21 @@ export function ActivityPreviewModal({
     const [pageInfo, setPageInfo] = React.useState({ current: 0, total: 1 });
     const [showRuler, setShowRuler] = React.useState(false);
     const [showProtractor, setShowProtractor] = React.useState(false);
-
+    const [showCompass, setShowCompass] = React.useState(false);
+    const [showNumberLine, setShowNumberLine] = React.useState(false);
+    const [showCalculator, setShowCalculator] = React.useState(false);
+    const [showPeriodicTable, setShowPeriodicTable] = React.useState(false);
+    const [showGeogebra, setShowGeogebra] = React.useState(false);
+    const [showSimpleMachines, setShowSimpleMachines] = React.useState(false);
+    const [showDnaGenetics, setShowDnaGenetics] = React.useState(false);
+    const [showMoleculeBuilder, setShowMoleculeBuilder] = React.useState(false);
+    const [showLinearGraph, setShowLinearGraph] = React.useState(false);
+    const [showMathFormula, setShowMathFormula] = React.useState(false);
     const mainRef = React.useRef<HTMLElement>(null);
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const stageRef = React.useRef<HTMLDivElement>(null);
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
+    const [drawHistory, setDrawHistory] = React.useState({ canUndo: false, canRedo: false });
     const prompt = usePrompt();
     const toast = useToast();
 
@@ -416,6 +437,8 @@ export function ActivityPreviewModal({
                             </span>
                         </button>
 
+                        <FullscreenToggle variant="dark" />
+
                         <button
                             type="button"
                             onClick={onClose}
@@ -484,6 +507,9 @@ export function ActivityPreviewModal({
                                 onPageChange={(cur, tot) =>
                                     setPageInfo({ current: cur, total: tot })
                                 }
+                                onHistoryChange={(canUndo, canRedo) =>
+                                    setDrawHistory({ canUndo, canRedo })
+                                }
                                 onRequestText={() =>
                                     prompt({
                                         title: 'Metin ekle',
@@ -538,6 +564,7 @@ export function ActivityPreviewModal({
                             <DrawingToolbar
                                 onCommand={(type) => {
                                     if (type === 'UNDO_DRAWING') canvasRef.current?.undo();
+                                    if (type === 'REDO_DRAWING') canvasRef.current?.redo();
                                     if (type === 'CLEAR_DRAWING') canvasRef.current?.clear();
                                     if (type === 'TOGGLE_WHITEBOARD')
                                         setShowWhiteboard((v) => !v);
@@ -551,6 +578,20 @@ export function ActivityPreviewModal({
                                 onScreenshot={handleScreenshot}
                                 isTextBoxMode={isTextBoxMode}
                                 onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
+                                canUndo={drawHistory.canUndo}
+                                canRedo={drawHistory.canRedo}
+                                onSelectTool={(toolId) => {
+                                    if (toolId === 'compass') setShowCompass(true);
+                                    else if (toolId === 'numberLine' || toolId === 'number_line') setShowNumberLine(true);
+                                    else if (toolId === 'calculator') setShowCalculator(true);
+                                    else if (toolId === 'periodicTable' || toolId === 'periodic_table') setShowPeriodicTable(true);
+                                    else if (toolId === 'geogebra' || toolId === 'tool_geogebra') setShowGeogebra(true);
+                                    else if (toolId === 'simpleMachines' || toolId === 'simple_machines' || toolId === 'tool_simple_machines') setShowSimpleMachines(true);
+                                    else if (toolId === 'dnaGenetics' || toolId === 'dna_genetics' || toolId === 'tool_dna_genetics') setShowDnaGenetics(true);
+                                    else if (toolId === 'moleculeBuilder' || toolId === 'molecule_builder' || toolId === 'tool_molecule_builder') setShowMoleculeBuilder(true);
+                                    else if (toolId === 'linearGraph' || toolId === 'linear_graph' || toolId === 'tool_linear_graph') setShowLinearGraph(true);
+                                    else if (toolId === 'mathFormula' || toolId === 'math_formula' || toolId === 'tool_math_formula') setShowMathFormula(true);
+                                }}
                             />
                         )}
                     </AnimatePresence>
@@ -594,6 +635,71 @@ export function ActivityPreviewModal({
 
             {showRuler && <RulerTool onClose={() => setShowRuler(false)} />}
             {showProtractor && <ProtractorTool onClose={() => setShowProtractor(false)} />}
+            {showCompass && (
+                <CompassTool
+                    onClose={() => setShowCompass(false)}
+                    onDrawCircle={(cx, cy, r) => {
+                        toast.success(`Yarıçapı ${r}px olan çember çizildi.`);
+                    }}
+                />
+            )}
+            {showNumberLine && <NumberLineTool onClose={() => setShowNumberLine(false)} />}
+            {showCalculator && <MiniCalculatorTool onClose={() => setShowCalculator(false)} />}
+            {showPeriodicTable && <PeriodicTableTool onClose={() => setShowPeriodicTable(false)} />}
+            {showGeogebra && (
+                <GeoGebraStudioTool
+                    onClose={() => setShowGeogebra(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('GeoGebra çizimi tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showSimpleMachines && (
+                <SimpleMachinesTool
+                    onClose={() => setShowSimpleMachines(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('Basit makineler düzeneği tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showDnaGenetics && (
+                <DnaGeneticsTool
+                    onClose={() => setShowDnaGenetics(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('DNA / Çaprazlama tablosu tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showMoleculeBuilder && (
+                <MoleculeBuilderTool
+                    onClose={() => setShowMoleculeBuilder(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('Molekül modeli tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showLinearGraph && (
+                <LinearGraphTool
+                    onClose={() => setShowLinearGraph(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('Doğrusal denklem grafiği tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showMathFormula && (
+                <MathFormulaTool
+                    onClose={() => setShowMathFormula(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('Matematik formülü tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
         </div>
     );
 }
