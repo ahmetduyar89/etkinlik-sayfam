@@ -36,16 +36,52 @@ export const DRAWING_COLORS = [
     '#000000',
 ] as const;
 
-export const DRAWING_WIDTHS = [2, 5, 10] as const;
+/**
+ * Kalem kalınlığı ön ayarları. Değerler çizim kaleminin piksel kalınlığıdır;
+ * fosforlu ve silgi bu değeri kendi katsayısıyla büyütür.
+ */
+export const PEN_SIZES: ReadonlyArray<{ value: number; label: string }> = [
+    { value: 1, label: 'Kıl' },
+    { value: 2, label: 'İnce' },
+    { value: 4, label: 'Normal' },
+    { value: 6, label: 'Orta' },
+    { value: 9, label: 'Kalın' },
+    { value: 14, label: 'Çok kalın' },
+    { value: 20, label: 'Dev' },
+];
+
+/** Kaydırıcının izin verdiği aralık. */
+export const PEN_SIZE_MIN = 1;
+export const PEN_SIZE_MAX = 40;
 
 export const BG_COLORS: ReadonlyArray<{ color: string; label: string }> = [
     { color: '#ffffff', label: 'Beyaz' },
     { color: '#fffde7', label: 'Krem' },
     { color: '#e8f5e9', label: 'Yeşil' },
     { color: '#e3f2fd', label: 'Mavi' },
+    { color: '#13382c', label: 'Yeşil Tahta' },
     { color: '#1a1a2e', label: 'Gece' },
     { color: '#111827', label: 'Siyah' },
 ];
+
+/**
+ * Hızlı Kalemler (GoodNotes / Notability tarzı tek tıkla geçiş yapılan slotlar)
+ */
+export interface QuickPen {
+    id: string;
+    name: string;
+    color: string;
+    width: number;
+    tool: 'pencil' | 'highlighter';
+}
+
+export const DEFAULT_QUICK_PENS: ReadonlyArray<QuickPen> = [
+    { id: 'qp-black', name: 'Siyah Kalem', color: '#000000', width: 2, tool: 'pencil' },
+    { id: 'qp-blue', name: 'Mavi Kalem', color: '#2563eb', width: 2, tool: 'pencil' },
+    { id: 'qp-red', name: 'Kırmızı Kalem', color: '#ef4444', width: 2, tool: 'pencil' },
+    { id: 'qp-highlighter', name: 'Sarı Fosforlu', color: '#facc15', width: 14, tool: 'highlighter' },
+];
+
 
 export interface MainTool {
     id: DrawingTool;
@@ -75,7 +111,9 @@ export interface ShapeTool {
 export const SHAPE_TOOL_IDS: DrawingTool[] = [
     'rect',
     'circle',
+    'ellipse',
     'triangle',
+    'right_triangle',
     'polygon',
     'cube',
     'rect_prism',
@@ -92,11 +130,15 @@ export const SHAPE_TOOL_IDS: DrawingTool[] = [
 
 export const make2DShapeTools = (
     SolidLineIcon: React.ComponentType,
-    DashedLineIcon: React.ComponentType
+    DashedLineIcon: React.ComponentType,
+    EllipseIcon?: React.ComponentType,
+    RightTriangleIcon?: React.ComponentType
 ): ReadonlyArray<ShapeTool> => [
     { id: 'rect', Icon: Square, label: 'Dikdörtgen' },
     { id: 'circle', Icon: Circle, label: 'Daire' },
+    ...(EllipseIcon ? [{ id: 'ellipse' as DrawingTool, Svg: EllipseIcon, label: 'Elips' }] : []),
     { id: 'triangle', Icon: Triangle, label: 'Üçgen' },
+    ...(RightTriangleIcon ? [{ id: 'right_triangle' as DrawingTool, Svg: RightTriangleIcon, label: 'Dik Üçgen' }] : []),
     { id: 'polygon', Icon: Pentagon, label: 'Noktalarla Çokgen (A-B-C)' },
     { id: 'line', Svg: SolidLineIcon, label: 'Çizgi' },
     { id: 'arrow', Icon: MoveRight, label: 'Ok' },
@@ -116,9 +158,11 @@ export const make3DShapeTools = (): ReadonlyArray<ShapeTool> => [
 
 export const makeShapeTools = (
     SolidLineIcon: React.ComponentType,
-    DashedLineIcon: React.ComponentType
+    DashedLineIcon: React.ComponentType,
+    EllipseIcon?: React.ComponentType,
+    RightTriangleIcon?: React.ComponentType
 ): ReadonlyArray<ShapeTool> => [
-    ...make2DShapeTools(SolidLineIcon, DashedLineIcon),
+    ...make2DShapeTools(SolidLineIcon, DashedLineIcon, EllipseIcon, RightTriangleIcon),
     ...make3DShapeTools(),
 ];
 

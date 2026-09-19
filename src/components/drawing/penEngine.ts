@@ -116,6 +116,27 @@ export function samplePressure(
     return clamp(prev * s + raw * (1 - s), 0.02, 1);
 }
 
+/**
+ * Ham işaretçi noktasını bir önceki noktaya doğru yumuşatır.
+ *
+ * Kızılötesi/rezistif akıllı tahtalar birkaç piksellik gürültü üretir; yavaş
+ * çizerken bu gürültü çizgiyi titrek gösterir. Yumuşatma yalnızca yavaş
+ * hareketlerde devreye girer: hızlı çizgide katsayı 1'e çıkar, yani nokta
+ * olduğu gibi kullanılır ve kalem elin gerisinde kalmaz.
+ *
+ * @param screenStep Ham nokta ile önceki nokta arasındaki EKRAN mesafesi (px)
+ */
+export function smoothTowards(prev: Point, raw: Point, screenStep: number): Point {
+    // Gürültünün kendisi adımı büyüttüğü için eşik geniş tutulur: yaklaşık
+    // 10 px'lik gerçek bir hareketten sonra süzgeç tamamen devre dışı kalır.
+    const alpha = clamp(0.35 + screenStep / 14, 0.35, 1);
+    if (alpha >= 1) return { x: raw.x, y: raw.y };
+    return {
+        x: prev.x + (raw.x - prev.x) * alpha,
+        y: prev.y + (raw.y - prev.y) * alpha,
+    };
+}
+
 /** Baskı değerini gerçek piksel kalınlığına çevirir. */
 export function pressureToWidth(base: number, p: number | undefined, pen?: PenType): number {
     const profile = getPenProfile(pen);

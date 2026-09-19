@@ -67,7 +67,9 @@ export type DrawingTool =
     | 'lasso'
     | 'rect'
     | 'circle'
+    | 'ellipse'
     | 'triangle'
+    | 'right_triangle'
     | 'polygon'
     | 'cube'
     | 'rect_prism'
@@ -121,6 +123,20 @@ export interface Stroke {
     math?: MathObject;
     /** `tool === 'image'` olduğunda görselin data URL'i. */
     src?: string;
+    /** Serbest çizginin deseni (kesikli/noktalı kalem). */
+    dash?: DashStyle;
+    /**
+     * Kutusunun merkezi etrafındaki dönüş açısı (radyan).
+     *
+     * Serbest çizim ve çokgende noktalar doğrudan döndürülür; iki noktayla
+     * tanımlanan şekiller, metin, damga, görsel ve matematik nesneleri
+     * eksenlere hizalı kaldığı için dönüşleri burada saklanır.
+     */
+    rotation?: number;
+    /** Yatayda ayna simetrisi (çevirme). */
+    flipX?: boolean;
+    /** Dikeyde ayna simetrisi (çevirme). */
+    flipY?: boolean;
 }
 
 /** Çalışma alanının yakınlaştırma ve kaydırma durumu. */
@@ -389,7 +405,23 @@ export interface DrawConfig {
     snapAngle?: boolean;
     /** Silgi davranışı. */
     eraserMode?: EraserMode;
+    /** Serbest çizginin deseni. */
+    dash?: DashStyle;
+    /** Kaybolan mürekkep: çizilen iz birkaç saniyede solar, sayfaya işlenmez. */
+    ephemeral?: boolean;
+    /** Kalem kullanılırken parmak/avuç dokunuşlarını yok say. */
+    palmRejection?: boolean;
+    /** Izgaraya ve diğer nesnelere yapışma. */
+    snapToGrid?: boolean;
+    /** Ekranda duran ölçü aracı (cetvel / gönye / açıölçer). */
+    ruler?: RulerKind | null;
 }
+
+/** Serbest çizgi deseni. */
+export type DashStyle = 'solid' | 'dashed' | 'dotted';
+
+/** Ölçü aracı türü. */
+export type RulerKind = 'ruler' | 'setsquare' | 'protractor';
 
 export interface TextBoxData {
     id: string;
@@ -405,7 +437,14 @@ export interface TextBoxData {
  * listeleridir (seçim sırasıyla aynı hizada).
  */
 export type DragState =
-    | { type: 'move'; startX: number; startY: number; orig: Point[][] }
+    | {
+          type: 'move';
+          startX: number;
+          startY: number;
+          orig: Point[][];
+          /** Taşımaya başlarken seçimin kutusu — yapışma bunun kenarlarını kullanır. */
+          origBB?: BoundingBox;
+      }
     | {
           type: 'resize';
           handle: string;
@@ -430,6 +469,8 @@ export interface DrawingCanvasHandle {
     zoomBy: (factor: number) => void;
     /** Yakınlaştırmayı %100'e döndürür ve kaydırmayı sıfırlar. */
     resetView: () => void;
+    /** Görünümü sayfanın tamamı görünecek şekilde ayarlar. */
+    fitPage: () => void;
     getView: () => Viewport;
     deleteSelected: () => void;
     setSelectedColor: (color: string) => void;
@@ -456,7 +497,13 @@ export interface DrawingCanvasHandle {
      * Sayfayı PNG olarak indirir. `paper` verilirse kağıt deseni de çizilir —
      * desen ekranda CSS arka planı olduğundan aksi hâlde çıktıda görünmez.
      */
-    screenshot: (wbMode: boolean, color: string, paper?: PaperStyle) => void;
+    screenshot: (
+        wbMode: boolean,
+        color: string,
+        paper?: PaperStyle,
+        /** Sayfanın altına çizilecek arka plan (bağlı PDF sayfası). */
+        background?: HTMLCanvasElement | null
+    ) => void;
 }
 
 // ── Ortak çizim (canlı operasyon akışı) ─────────────────────────────────
@@ -499,6 +546,15 @@ export interface ToastMessage {
 // ── Defter / Klasör (Not Defteri modülü) ────────────────────────────────
 export type NotebookKind = 'notebook' | 'whiteboard';
 
+/**
+ * Sayfa boyutu.
+ *
+ * `free` eski davranıştır: sayfanın sınırı yoktur, çizim her yere yayılır.
+ * Diğerleri gerçek kağıt ölçüleridir; dışa aktarma ve şablon bölmeleri bu
+ * dikdörtgene göre hizalanır.
+ */
+export type PageSize = 'free' | 'a4p' | 'a4l' | 'a3p' | 'a3l' | 'b5p' | 'b5l' | 'wide169';
+
 export type PaperStyle =
     | 'grid'
     | 'lined'
@@ -511,7 +567,10 @@ export type PaperStyle =
     | 'music'
     | 'handwriting'
     | 'wide_lined'
-    | 'todo';
+    | 'todo'
+    | 'number_line'
+    | 'exam'
+    | 'lab_report';
 
 export interface DriveFolder {
     id: string;
@@ -529,6 +588,8 @@ export interface Notebook {
     kind: NotebookKind;
     parent_id: string | null;
     paper: PaperStyle;
+    /** Sayfa boyutu (A4, A3…). Verilmezse sınırsız çalışma alanı. */
+    page_size?: PageSize;
     bg_color?: string;
     page_count?: number;
     subject?: string;
@@ -540,6 +601,13 @@ export interface Notebook {
     pdf_name?: string;
     /** PDF'in toplam sayfa sayısı */
     pdf_total_pages?: number;
+    /**
+     * PDF sayfasının dünya ölçüsü (birim). Defter oluşturulurken PDF'in kendi
+     * punto ölçüsünden hesaplanır ve bir daha değişmez: sayfa her cihazda aynı
+     * boyutta durur, üstüne alınan notlar kaymaz. Eski defterlerde yoktur;
+     * onlar eski yerleşimle açılır.
+     */
+    pdf_box?: { w: number; h: number };
     /**
      * Sayfa içeriğinin sürüm numarası. Her kayıtta artar; editör ve
      * görüntüleyici bu küçük üst veri dokümanını dinleyerek içeriğin başka

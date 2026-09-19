@@ -150,6 +150,186 @@ const MOCK_ACTIVITIES: Activity[] = [
     ...GEOMETRI_10_ACTIVITIES,
 ];
 
+const GUNES_SISTEMI_ACTIVITY: Activity = {
+    id: 'planetaryum-3d',
+    title: '3D Güneş Sistemi Planetaryumu',
+    description: '8 gezegen, 3D yörüngeler, 23.5° eksen eğikliğiyle mevsimler, tutulmalar ve yerçekimi laboratuvarı.',
+    category: 'Simülasyon',
+    subject: 'Fen Bilimleri',
+    grade_level: '7',
+    unit: 'Güneş Sistemi ve Ötesi',
+    tags: 'uzay, gezegenler, güneş sistemi, 3d, mevsimler, tutulmalar, yerçekimi, planetaryum',
+    is_test: false,
+    html_code: '<iframe src="/gunes-sistemi/?tab=planetaryum" style="width:100%;height:100%;border:none;min-height:720px;border-radius:16px;" allowfullscreen></iframe>',
+    content_mode: 'raw_html',
+    created_at: '2026-09-18T14:40:00Z',
+};
+
+const NASA_SOLAR_ACTIVITY: Activity = {
+    id: 'nasa-eyes-solar',
+    title: 'NASA Eyes: Canlı Güneş Sistemi',
+    description: 'NASA JPL canlı telemetrisiyle James Webb, Perseverance, Voyager sondaları, gezegenler ve asteroitler.',
+    category: 'Simülasyon',
+    subject: 'Fen Bilimleri',
+    grade_level: '7',
+    unit: 'Güneş Sistemi ve Ötesi',
+    tags: 'uzay, gezegenler, nasa, nasa eyes, uzay sondaları, james webb, perseverance, canlı simülasyon',
+    is_test: false,
+    html_code: '<iframe src="/gunes-sistemi/?tab=nasa-solar" style="width:100%;height:100%;border:none;min-height:720px;border-radius:16px;" allowfullscreen></iframe>',
+    content_mode: 'raw_html',
+    created_at: '2026-09-19T10:00:00Z',
+};
+
+const NASA_EARTH_ACTIVITY: Activity = {
+    id: 'nasa-eyes-earth',
+    title: 'NASA Eyes: Canlı Dünya & Uydular',
+    description: 'Yörüngedeki aktif yapay uydular (ISS, Landsat), anlık küresel sıcaklık, CO₂ ve ozon tabakası göstergeleri.',
+    category: 'Simülasyon',
+    subject: 'Fen Bilimleri',
+    grade_level: '7',
+    unit: 'Güneş Sistemi ve Ötesi',
+    tags: 'dünya, uydular, yapay uydular, uzay araştırmaları, iklim, co2, ozon, küresel ısınma, nasa eyes',
+    is_test: false,
+    html_code: '<iframe src="/gunes-sistemi/?tab=nasa-earth" style="width:100%;height:100%;border:none;min-height:720px;border-radius:16px;" allowfullscreen></iframe>',
+    content_mode: 'raw_html',
+    created_at: '2026-09-19T10:05:00Z',
+};
+
+const NASA_ISS_ACTIVITY: Activity = {
+    id: 'nasa-eyes-iss',
+    title: 'NASA Eyes: Uluslararası Uzay İstasyonu (ISS)',
+    description: 'Dünya yörüngesindeki ISS Uzay İstasyonu’nun anlık konumu, Dünya üzerinden geçiş rotası, irtifası ve canlı telemetrisi.',
+    category: 'Simülasyon',
+    subject: 'Fen Bilimleri',
+    grade_level: '7',
+    unit: 'Güneş Sistemi ve Ötesi',
+    tags: 'iss, uzay istasyonu, yapay uydu, astronot, uzay araştırmaları, canlı takip, nasa eyes',
+    is_test: false,
+    html_code: '<iframe src="/gunes-sistemi/?tab=nasa-iss" style="width:100%;height:100%;border:none;min-height:720px;border-radius:16px;" allowfullscreen></iframe>',
+    content_mode: 'raw_html',
+    created_at: '2026-09-19T10:12:00Z',
+};
+
+const NASA_ASTEROIDS_ACTIVITY: Activity = {
+    id: 'nasa-eyes-asteroids',
+    title: 'NASA Eyes: Asteroitler & Gezegen Savunması',
+    description: 'Dünyaya Yakın Cisimler (NEO), potansiyel tehlikeli göktaşları, DART gezegen savunma görevi ve kuyruklu yıldız yörüngeleri.',
+    category: 'Simülasyon',
+    subject: 'Fen Bilimleri',
+    grade_level: '7',
+    unit: 'Güneş Sistemi ve Ötesi',
+    tags: 'asteroitler, meteor, göktaşı, kuyruklu yıldız, neo, pha, gezegen savunma, dart, uzay, nasa eyes',
+    is_test: false,
+    html_code: '<iframe src="/gunes-sistemi/?tab=nasa-asteroids" style="width:100%;height:100%;border:none;min-height:720px;border-radius:16px;" allowfullscreen></iframe>',
+    content_mode: 'raw_html',
+    created_at: '2026-09-19T10:15:00Z',
+};
+
+const NASA_EXO_ACTIVITY: Activity = {
+    id: 'nasa-eyes-exo',
+    title: 'NASA Eyes: Ötegezegenler (Exoplanets)',
+    description: 'Samanyolu Galaksisi ve ötesinde keşfedilen 5000+ ötegezegen, yabancı yıldız sistemleri ve yaşanabilir bölgeler.',
+    category: 'Simülasyon',
+    subject: 'Fen Bilimleri',
+    grade_level: '7',
+    unit: 'Güneş Sistemi ve Ötesi',
+    tags: 'ötegezegenler, exoplanets, galaksi, samanyolu, yaşanabilir bölge, uzay araştırmaları, nasa eyes, yabancı dünyalar',
+    is_test: false,
+    html_code: '<iframe src="/gunes-sistemi/?tab=nasa-exo" style="width:100%;height:100%;border:none;min-height:720px;border-radius:16px;" allowfullscreen></iframe>',
+    content_mode: 'raw_html',
+    created_at: '2026-09-19T10:10:00Z',
+};
+
+const STARS_100K_ACTIVITY: Activity = {
+    id: 'stars-100k-galaxy',
+    title: '100.000 Yıldız: Samanyolu Galaksisi (3D WebGL)',
+    description: 'Güneş ve yakınındaki 100.000 yıldızın gerçek astronomik konumları, tayf türleri ve galaktik ölçekte 3D etkileşimli WebGL haritası.',
+    category: 'Simülasyon',
+    subject: 'Fen Bilimleri',
+    grade_level: '7',
+    unit: 'Güneş Sistemi ve Ötesi',
+    tags: 'yıldızlar, samanyolu, galaksi, webgl, 100000 stars, chrome experiments, uzay, astronomi',
+    is_test: false,
+    html_code: '<iframe src="/gunes-sistemi/?tab=stars-100k" style="width:100%;height:100%;border:none;min-height:720px;border-radius:16px;" allowfullscreen></iframe>',
+    content_mode: 'raw_html',
+    created_at: '2026-09-19T13:00:00Z',
+};
+
+const EARTH_NULLSCHOOL_ACTIVITY: Activity = {
+    id: 'earth-nullschool-climate',
+    title: 'Earth Nullschool: Canlı Rüzgar & Okyanus Akıntıları',
+    description: 'Süperbilgisayar modelleriyle güncellenen gerçek zamanlı küresel rüzgar akımları, okyanus dalgaları, sıcaklık ve atmosferik hava olayları küresi.',
+    category: 'Simülasyon',
+    subject: 'Fen Bilimleri',
+    grade_level: '8',
+    unit: 'Mevsimler ve İklim',
+    tags: 'rüzgar, okyanus, iklim, hava durumu, atmosfer, earth nullschool, fırtına, jet stream',
+    is_test: false,
+    html_code: '<iframe src="/gunes-sistemi/?tab=earth-nullschool" style="width:100%;height:100%;border:none;min-height:720px;border-radius:16px;" allowfullscreen></iframe>',
+    content_mode: 'raw_html',
+    created_at: '2026-09-19T13:05:00Z',
+};
+
+const SIZE_OF_SPACE_ACTIVITY: Activity = {
+    id: 'size-of-space-nealfun',
+    title: 'The Size of Space: Evrenin Ölçeği & Boyutlar',
+    description: 'Astronottan başlayarak ISS, Ay, Dünya, Güneş, dev yıldızlar, nebulalar ve 93 milyar ışık yılı gözlemlenebilir evrene uzanan ölçek simülasyonu.',
+    category: 'Simülasyon',
+    subject: 'Fen Bilimleri',
+    grade_level: '7',
+    unit: 'Güneş Sistemi ve Ötesi',
+    tags: 'evrenin boyutu, size of space, neal fun, astronomi, ışık yılı, galaksiler, ölçek',
+    is_test: false,
+    html_code: '<iframe src="/gunes-sistemi/?tab=size-of-space" style="width:100%;height:100%;border:none;min-height:720px;border-radius:16px;" allowfullscreen></iframe>',
+    content_mode: 'raw_html',
+    created_at: '2026-09-19T13:10:00Z',
+};
+
+const MATHIGON_POLYPAD_ACTIVITY: Activity = {
+    id: 'mathigon-polypad-canvas',
+    title: 'Mathigon Polypad: Sanal Matematik & Geometri Tuvali',
+    description: 'Geometrik şekiller, kesir çubukları, cebir karoları, tangram, koordinat düzlemi ve sanal matematik manipülatifleri tuvali.',
+    category: 'Uygulama',
+    subject: 'Matematik',
+    grade_level: '5',
+    unit: 'Geometrik Cisimler ve Hacim Ölçme',
+    tags: 'polypad, mathigon, geometri, manipülatif, kesirler, cebir, tangram, koordinat, çizim',
+    is_test: false,
+    html_code: '<iframe src="/geometri/?mode=polypad" style="width:100%;height:100%;border:none;min-height:720px;border-radius:16px;" allowfullscreen></iframe>',
+    content_mode: 'raw_html',
+    created_at: '2026-09-19T13:15:00Z',
+};
+
+const NEAL_DEEP_SEA_ACTIVITY: Activity = {
+    id: 'the-deep-sea-ocean',
+    title: 'The Deep Sea: Okyanusun Derinlikleri & Basınç',
+    description: 'Yüzeyden 11.000 metre Mariana Çukuru’na iniş: Hidrostatik basınç (1-1100 atm), fotosentez sınırı ve derin deniz canlılarının adaptasyonları.',
+    category: 'Simülasyon',
+    subject: 'Fen Bilimleri',
+    grade_level: '8',
+    unit: 'Basınç',
+    tags: 'okyanus, derin deniz, mariana çukuru, sıvı basıncı, the deep sea, neal fun, adaptasyon, ekoloji',
+    is_test: false,
+    html_code: '<iframe src="/deneyler/okyanusun-derinlikleri.html" style="width:100%;height:100%;border:none;min-height:720px;border-radius:16px;" allowfullscreen></iframe>',
+    content_mode: 'raw_html',
+    created_at: '2026-09-19T13:20:00Z',
+};
+
+const AKIL_OYUNLARI_ACTIVITY: Activity = {
+    id: 'akil-oyunlari-atolyem',
+    title: 'Matematiksel Akıl Oyunları Atölyesi',
+    description: 'Hanoi Kuleleri, KenKen, Nim Stratejisi, Euler Köprüleri, 24 Oyunu ve Sihirli Piramit zeka oyunları.',
+    category: 'Oyun',
+    subject: 'Matematik',
+    grade_level: '8',
+    unit: 'Mantık ve Akıl Yürütme',
+    tags: 'zeka oyunları, akıl oyunları, hanoi, kenken, nim, euler, matematik, algoritma',
+    is_test: false,
+    html_code: '<iframe src="/akil-oyunlari/" style="width:100%;height:100%;border:none;min-height:720px;border-radius:16px;" allowfullscreen></iframe>',
+    content_mode: 'raw_html',
+    created_at: '2026-09-18T21:20:00Z',
+};
+
 interface Shelf {
     key: string;
     title: string;
@@ -231,6 +411,42 @@ export default function App({ onExitToPortal, view: viewProp, onViewChange }: Ap
                     list.unshift(ga);
                 }
             }
+            if (!list.some((a) => a.id === GUNES_SISTEMI_ACTIVITY.id || a.title === GUNES_SISTEMI_ACTIVITY.title)) {
+                list.unshift(GUNES_SISTEMI_ACTIVITY);
+            }
+            if (!list.some((a) => a.id === NASA_SOLAR_ACTIVITY.id || a.title === NASA_SOLAR_ACTIVITY.title)) {
+                list.unshift(NASA_SOLAR_ACTIVITY);
+            }
+            if (!list.some((a) => a.id === NASA_EARTH_ACTIVITY.id || a.title === NASA_EARTH_ACTIVITY.title)) {
+                list.unshift(NASA_EARTH_ACTIVITY);
+            }
+            if (!list.some((a) => a.id === NASA_ISS_ACTIVITY.id || a.title === NASA_ISS_ACTIVITY.title)) {
+                list.unshift(NASA_ISS_ACTIVITY);
+            }
+            if (!list.some((a) => a.id === NASA_ASTEROIDS_ACTIVITY.id || a.title === NASA_ASTEROIDS_ACTIVITY.title)) {
+                list.unshift(NASA_ASTEROIDS_ACTIVITY);
+            }
+            if (!list.some((a) => a.id === NASA_EXO_ACTIVITY.id || a.title === NASA_EXO_ACTIVITY.title)) {
+                list.unshift(NASA_EXO_ACTIVITY);
+            }
+            if (!list.some((a) => a.id === STARS_100K_ACTIVITY.id || a.title === STARS_100K_ACTIVITY.title)) {
+                list.unshift(STARS_100K_ACTIVITY);
+            }
+            if (!list.some((a) => a.id === EARTH_NULLSCHOOL_ACTIVITY.id || a.title === EARTH_NULLSCHOOL_ACTIVITY.title)) {
+                list.unshift(EARTH_NULLSCHOOL_ACTIVITY);
+            }
+            if (!list.some((a) => a.id === SIZE_OF_SPACE_ACTIVITY.id || a.title === SIZE_OF_SPACE_ACTIVITY.title)) {
+                list.unshift(SIZE_OF_SPACE_ACTIVITY);
+            }
+            if (!list.some((a) => a.id === MATHIGON_POLYPAD_ACTIVITY.id || a.title === MATHIGON_POLYPAD_ACTIVITY.title)) {
+                list.unshift(MATHIGON_POLYPAD_ACTIVITY);
+            }
+            if (!list.some((a) => a.id === NEAL_DEEP_SEA_ACTIVITY.id || a.title === NEAL_DEEP_SEA_ACTIVITY.title)) {
+                list.unshift(NEAL_DEEP_SEA_ACTIVITY);
+            }
+            if (!list.some((a) => a.id === AKIL_OYUNLARI_ACTIVITY.id || a.title === AKIL_OYUNLARI_ACTIVITY.title)) {
+                list.unshift(AKIL_OYUNLARI_ACTIVITY);
+            }
             setActivities(list);
             setIsLoading(false);
         });
@@ -246,6 +462,22 @@ export default function App({ onExitToPortal, view: viewProp, onViewChange }: Ap
                     grade_level: '10',
                     subject: 'Matematik',
                     name: 'Geometrik Şekiller',
+                });
+            }
+            if (!list.some((u) => u.grade_level === '7' && u.name === 'Güneş Sistemi ve Ötesi')) {
+                list.push({
+                    id: 'unit-7-gunes-sistemi',
+                    grade_level: '7',
+                    subject: 'Fen Bilimleri',
+                    name: 'Güneş Sistemi ve Ötesi',
+                });
+            }
+            if (!list.some((u) => u.grade_level === '8' && u.name === 'Mantık ve Akıl Yürütme')) {
+                list.push({
+                    id: 'unit-8-akil-oyunlari',
+                    grade_level: '8',
+                    subject: 'Matematik',
+                    name: 'Mantık ve Akıl Yürütme',
                 });
             }
             setUnits(list);

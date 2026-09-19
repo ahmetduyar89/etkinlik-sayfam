@@ -1,0 +1,2846 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
+  <title>3D Güneş Sistemi Planetaryumu | Atölye</title>
+  <meta name="description" content="İnteraktif 3D Güneş Sistemi simülasyonu, gezegenler, mevsimler, tutulmalar ve yerçekimi laboratuvarı.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='20' fill='%23fbbf24'/><circle cx='50' cy='50' r='40' fill='none' stroke='%2338bdf8' stroke-width='3' stroke-dasharray='6 6'/><circle cx='85' cy='35' r='8' fill='%2338bdf8'/></svg>">
+  
+  <!-- Tailwind CSS CDN for lightweight glassmorphism UI -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js and OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+    
+    * {
+      box-sizing: border-box;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #030712;
+      color: #f3f4f6;
+    }
+
+    #canvas-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* Glassmorphism Classes */
+    .glass-panel {
+      background: rgba(13, 22, 41, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(56, 189, 248, 0.18);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+    }
+
+    .glass-card {
+      background: rgba(17, 27, 49, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+    }
+
+    .glass-card:hover {
+      border-color: rgba(56, 189, 248, 0.35);
+    }
+
+    .glow-cyan {
+      box-shadow: 0 0 25px -4px rgba(56, 189, 248, 0.5);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+    ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.35); border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.6); }
+
+    /* Touch Friendly Pulse Effect */
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 0.3; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .pulse-effect {
+      animation: pulse-ring 3s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="relative w-full h-full overflow-hidden select-none">
+
+  <!-- 3D WebGL Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- NASA Eyes Solar System 3D Simulation Container -->
+  <div id="nasa-solar-container" class="hidden absolute inset-0 w-full h-full z-10 bg-[#030712]">
+    <!-- Loading overlay for NASA Solar iframe -->
+    <div id="nasa-solar-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md z-20 pointer-events-none transition-opacity duration-500">
+      <div class="relative flex items-center justify-center mb-4">
+        <div class="w-16 h-16 rounded-full border-2 border-cyan-500/20 border-t-cyan-400 animate-spin"></div>
+        <span class="absolute text-2xl">🚀</span>
+      </div>
+      <div class="text-sm font-bold text-white tracking-wide">NASA Eyes on the Solar System</div>
+      <div class="text-xs text-cyan-300/90 mt-1.5 font-medium">Gerçek Zamanlı 3D Uzay Simülatörü Yükleniyor...</div>
+      <div class="text-[11px] text-slate-400 mt-2 max-w-xs text-center leading-relaxed">NASA JPL telemetri veritabanı, gezegenler ve uzay sondaları yükleniyor.</div>
+    </div>
+
+    <!-- NASA Solar Quick Header -->
+    <div class="absolute top-14 sm:top-16 inset-x-4 sm:inset-x-6 z-20 flex items-center justify-between pointer-events-none">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-panel pointer-events-auto border border-cyan-500/30 text-xs shadow-xl">
+        <span class="w-2 h-2 rounded-full bg-cyan-400 pulse-effect"></span>
+        <span class="font-bold text-white hidden sm:inline">NASA Eyes:</span>
+        <span class="text-cyan-200 font-medium">Güneş Sistemi & Uzay Görevleri</span>
+      </div>
+
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <a href="https://eyes.nasa.gov/apps/solar-system/#/home" target="_blank" rel="noopener noreferrer" title="Yeni Sekmede Aç" class="h-8 px-3 rounded-xl glass-card text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition shadow-lg">
+          <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          <span class="hidden md:inline">Yeni Sekmede Aç</span>
+        </a>
+        <button onclick="openHub()" class="h-8 px-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-sky-500/20">
+          <span>🗂️ Modül Kartları</span>
+        </button>
+      </div>
+    </div>
+
+    <iframe 
+      id="nasa-solar-iframe" 
+      src="" 
+      title="NASA Eyes on the Solar System"
+      class="w-full h-full border-0" 
+      allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+      allowfullscreen>
+    </iframe>
+  </div>
+
+  <!-- NASA Eyes Earth 3D Live Simulation Container -->
+  <div id="nasa-earth-container" class="hidden absolute inset-0 w-full h-full z-10 bg-[#030712]">
+    <!-- Loading overlay for NASA Earth iframe -->
+    <div id="nasa-earth-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md z-20 pointer-events-none transition-opacity duration-500">
+      <div class="relative flex items-center justify-center mb-4">
+        <div class="w-16 h-16 rounded-full border-2 border-emerald-500/20 border-t-emerald-400 animate-spin"></div>
+        <span class="absolute text-2xl">🌍</span>
+      </div>
+      <div class="text-sm font-bold text-white tracking-wide">NASA Eyes on the Earth</div>
+      <div class="text-xs text-emerald-300/90 mt-1.5 font-medium">Canlı Uydular ve İklim Göstergeleri Yükleniyor...</div>
+      <div class="text-[11px] text-slate-400 mt-2 max-w-xs text-center leading-relaxed">NASA JPL Dünya gözlem uyduları, CO₂, ozon ve sıcaklık haritaları bağlanılıyor.</div>
+    </div>
+
+    <!-- NASA Earth Quick Header -->
+    <div class="absolute top-14 sm:top-16 inset-x-4 sm:inset-x-6 z-20 flex items-center justify-between pointer-events-none">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-panel pointer-events-auto border border-emerald-500/30 text-xs shadow-xl">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-effect"></span>
+        <span class="font-bold text-white hidden sm:inline">NASA Eyes:</span>
+        <span class="text-emerald-200 font-medium">Canlı Dünya & İklim Atlası</span>
+      </div>
+
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <a href="https://eyes.nasa.gov/apps/earth/#/" target="_blank" rel="noopener noreferrer" title="Yeni Sekmede Aç" class="h-8 px-3 rounded-xl glass-card text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition shadow-lg">
+          <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          <span class="hidden md:inline">Yeni Sekmede Aç</span>
+        </a>
+        <button onclick="openHub()" class="h-8 px-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-emerald-500/20">
+          <span>🗂️ Modül Kartları</span>
+        </button>
+      </div>
+    </div>
+
+    <iframe 
+      id="nasa-earth-iframe" 
+      src="" 
+      title="NASA Eyes on the Earth"
+      class="w-full h-full border-0" 
+      allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+      allowfullscreen>
+    </iframe>
+  </div>
+
+  <!-- NASA Eyes Exoplanets 3D Simulation Container -->
+  <div id="nasa-exo-container" class="hidden absolute inset-0 w-full h-full z-10 bg-[#030712]">
+    <!-- Loading overlay for NASA Exo iframe -->
+    <div id="nasa-exo-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md z-20 pointer-events-none transition-opacity duration-500">
+      <div class="relative flex items-center justify-center mb-4">
+        <div class="w-16 h-16 rounded-full border-2 border-purple-500/20 border-t-purple-400 animate-spin"></div>
+        <span class="absolute text-2xl">🔭</span>
+      </div>
+      <div class="text-sm font-bold text-white tracking-wide">NASA Eyes on Exoplanets</div>
+      <div class="text-xs text-purple-300/90 mt-1.5 font-medium">Ötegezegenler ve Yıldız Sistemleri Yükleniyor...</div>
+      <div class="text-[11px] text-slate-400 mt-2 max-w-xs text-center leading-relaxed">NASA JPL 5,500+ onaylanmış ötegezegen ve derin uzay kataloğuna bağlanılıyor.</div>
+    </div>
+
+    <!-- NASA Exo Quick Header -->
+    <div class="absolute top-14 sm:top-16 inset-x-4 sm:inset-x-6 z-20 flex items-center justify-between pointer-events-none">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-panel pointer-events-auto border border-purple-500/30 text-xs shadow-xl">
+        <span class="w-2 h-2 rounded-full bg-purple-400 pulse-effect"></span>
+        <span class="font-bold text-white hidden sm:inline">NASA Eyes:</span>
+        <span class="text-purple-200 font-medium">Ötegezegenler & Derin Uzay</span>
+      </div>
+
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <a href="https://eyes.nasa.gov/apps/exo/#/" target="_blank" rel="noopener noreferrer" title="Yeni Sekmede Aç" class="h-8 px-3 rounded-xl glass-card text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition shadow-lg">
+          <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          <span class="hidden md:inline">Yeni Sekmede Aç</span>
+        </a>
+        <button onclick="openHub()" class="h-8 px-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-purple-500/20">
+          <span>🗂️ Modül Kartları</span>
+        </button>
+      </div>
+    </div>
+
+    <iframe 
+      id="nasa-exo-iframe" 
+      src="" 
+      title="NASA Eyes on Exoplanets"
+      class="w-full h-full border-0" 
+      allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+      allowfullscreen>
+    </iframe>
+  </div>
+
+  <!-- NASA Eyes ISS (International Space Station) Simulation Container -->
+  <div id="nasa-iss-container" class="hidden absolute inset-0 w-full h-full z-10 bg-[#030712]">
+    <!-- Loading overlay for NASA ISS iframe -->
+    <div id="nasa-iss-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md z-20 pointer-events-none transition-opacity duration-500">
+      <div class="relative flex items-center justify-center mb-4">
+        <div class="w-16 h-16 rounded-full border-2 border-blue-500/20 border-t-blue-400 animate-spin"></div>
+        <span class="absolute text-2xl">🛰️</span>
+      </div>
+      <div class="text-sm font-bold text-white tracking-wide">NASA Eyes: International Space Station (ISS)</div>
+      <div class="text-xs text-blue-300/90 mt-1.5 font-medium">Canlı ISS Konumu ve Yörüngesi Yükleniyor...</div>
+      <div class="text-[11px] text-slate-400 mt-2 max-w-xs text-center leading-relaxed">NASA JPL telemetrisiyle ISS'nin anlık Dünya yörüngesi, hızı ve irtifası bağlanılıyor.</div>
+    </div>
+
+    <!-- NASA ISS Quick Header -->
+    <div class="absolute top-14 sm:top-16 inset-x-4 sm:inset-x-6 z-20 flex items-center justify-between pointer-events-none">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-panel pointer-events-auto border border-blue-500/30 text-xs shadow-xl">
+        <span class="w-2 h-2 rounded-full bg-blue-400 pulse-effect"></span>
+        <span class="font-bold text-white hidden sm:inline">NASA Eyes:</span>
+        <span class="text-blue-200 font-medium">Uluslararası Uzay İstasyonu (ISS)</span>
+      </div>
+
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <a href="https://eyes.nasa.gov/apps/earth/#/satellites/iss" target="_blank" rel="noopener noreferrer" title="Yeni Sekmede Aç" class="h-8 px-3 rounded-xl glass-card text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition shadow-lg">
+          <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          <span class="hidden md:inline">Yeni Sekmede Aç</span>
+        </a>
+        <button onclick="openHub()" class="h-8 px-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-blue-500/20">
+          <span>🗂️ Modül Kartları</span>
+        </button>
+      </div>
+    </div>
+
+    <iframe 
+      id="nasa-iss-iframe" 
+      src="" 
+      title="NASA Eyes on ISS"
+      class="w-full h-full border-0" 
+      allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+      allowfullscreen>
+    </iframe>
+  </div>
+
+  <!-- NASA Eyes Asteroids & Planetary Defense Simulation Container -->
+  <div id="nasa-asteroids-container" class="hidden absolute inset-0 w-full h-full z-10 bg-[#030712]">
+    <!-- Loading overlay for NASA Asteroids iframe -->
+    <div id="nasa-asteroids-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md z-20 pointer-events-none transition-opacity duration-500">
+      <div class="relative flex items-center justify-center mb-4">
+        <div class="w-16 h-16 rounded-full border-2 border-amber-500/20 border-t-amber-400 animate-spin"></div>
+        <span class="absolute text-2xl">☄️</span>
+      </div>
+      <div class="text-sm font-bold text-white tracking-wide">NASA Eyes on Asteroids</div>
+      <div class="text-xs text-amber-300/90 mt-1.5 font-medium">Dünyaya Yakın Asteroitler & Savunma Yükleniyor...</div>
+      <div class="text-[11px] text-slate-400 mt-2 max-w-xs text-center leading-relaxed">NASA JPL Gezegen Savunması (Planetary Defense), NEO, PHA ve kuyruklu yıldız yörüngelerine bağlanılıyor.</div>
+    </div>
+
+    <!-- NASA Asteroids Quick Header -->
+    <div class="absolute top-14 sm:top-16 inset-x-4 sm:inset-x-6 z-20 flex items-center justify-between pointer-events-none">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-panel pointer-events-auto border border-amber-500/30 text-xs shadow-xl">
+        <span class="w-2 h-2 rounded-full bg-amber-400 pulse-effect"></span>
+        <span class="font-bold text-white hidden sm:inline">NASA Eyes:</span>
+        <span class="text-amber-200 font-medium">Asteroitler & Gezegen Savunması</span>
+      </div>
+
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <a href="https://eyes.nasa.gov/apps/asteroids/#/home" target="_blank" rel="noopener noreferrer" title="Yeni Sekmede Aç" class="h-8 px-3 rounded-xl glass-card text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition shadow-lg">
+          <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          <span class="hidden md:inline">Yeni Sekmede Aç</span>
+        </a>
+        <button onclick="openHub()" class="h-8 px-3.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-amber-500/20">
+          <span>🗂️ Modül Kartları</span>
+        </button>
+      </div>
+    </div>
+
+    <iframe 
+      id="nasa-asteroids-iframe" 
+      src="" 
+      title="NASA Eyes on Asteroids"
+      class="w-full h-full border-0" 
+      allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+      allowfullscreen>
+    </iframe>
+  </div>
+
+  <!-- 100,000 Stars (Google Chrome Experiment) Simulation Container -->
+  <div id="stars-100k-container" class="hidden absolute inset-0 w-full h-full z-10 bg-[#000]">
+    <div id="stars-100k-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md z-20 pointer-events-none transition-opacity duration-500">
+      <div class="relative flex items-center justify-center mb-4">
+        <div class="w-16 h-16 rounded-full border-2 border-yellow-500/20 border-t-yellow-400 animate-spin"></div>
+        <span class="absolute text-2xl">✨</span>
+      </div>
+      <div class="text-sm font-bold text-white tracking-wide">100,000 Stars</div>
+      <div class="text-xs text-yellow-300/90 mt-1.5 font-medium">Samanyolu Galaksisi Yıldız Haritası Yükleniyor...</div>
+      <div class="text-[11px] text-slate-400 mt-2 max-w-xs text-center leading-relaxed">Güneş'e en yakın 100.000 yıldızın 3D WebGL galaksi simülasyonuna bağlanılıyor.</div>
+    </div>
+
+    <!-- Stars 100k Quick Header -->
+    <div class="absolute top-14 sm:top-16 inset-x-4 sm:inset-x-6 z-20 flex items-center justify-between pointer-events-none">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-panel pointer-events-auto border border-yellow-500/30 text-xs shadow-xl">
+        <span class="w-2 h-2 rounded-full bg-yellow-400 pulse-effect"></span>
+        <span class="font-bold text-white hidden sm:inline">WebGL Galaksi:</span>
+        <span class="text-yellow-200 font-medium">100.000 Yıldız (Samanyolu)</span>
+      </div>
+
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <a href="https://stars.chromeexperiments.com" target="_blank" rel="noopener noreferrer" title="Yeni Sekmede Aç" class="h-8 px-3 rounded-xl glass-card text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition shadow-lg">
+          <svg class="w-3.5 h-3.5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          <span class="hidden md:inline">Yeni Sekmede Aç</span>
+        </a>
+        <button onclick="openHub()" class="h-8 px-3.5 rounded-xl bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-yellow-500/20">
+          <span>🗂️ Modül Kartları</span>
+        </button>
+      </div>
+    </div>
+
+    <iframe 
+      id="stars-100k-iframe" 
+      src="" 
+      title="100,000 Stars"
+      class="w-full h-full border-0" 
+      allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+      allowfullscreen>
+    </iframe>
+  </div>
+
+  <!-- Earth Nullschool (Live Wind & Ocean Currents) Container -->
+  <div id="earth-nullschool-container" class="hidden absolute inset-0 w-full h-full z-10 bg-[#000]">
+    <div id="earth-nullschool-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md z-20 pointer-events-none transition-opacity duration-500">
+      <div class="relative flex items-center justify-center mb-4">
+        <div class="w-16 h-16 rounded-full border-2 border-teal-500/20 border-t-teal-400 animate-spin"></div>
+        <span class="absolute text-2xl">🌪️</span>
+      </div>
+      <div class="text-sm font-bold text-white tracking-wide">Earth Nullschool</div>
+      <div class="text-xs text-teal-300/90 mt-1.5 font-medium">Canlı Rüzgar & Okyanus Küresi Yükleniyor...</div>
+      <div class="text-[11px] text-slate-400 mt-2 max-w-xs text-center leading-relaxed">Süperbilgisayar atmosfer ve okyanus modelleriyle küresel rüzgar akımlarına bağlanılıyor.</div>
+    </div>
+
+    <!-- Earth Nullschool Quick Header -->
+    <div class="absolute top-14 sm:top-16 inset-x-4 sm:inset-x-6 z-20 flex items-center justify-between pointer-events-none">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-panel pointer-events-auto border border-teal-500/30 text-xs shadow-xl">
+        <span class="w-2 h-2 rounded-full bg-teal-400 pulse-effect"></span>
+        <span class="font-bold text-white hidden sm:inline">Canlı Dünya İklimi:</span>
+        <span class="text-teal-200 font-medium">Rüzgar, Akıntılar & Atmosfer</span>
+      </div>
+
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <a href="https://earth.nullschool.net/#current/wind/surface/level/orthographic=-331.91,3.24,443" target="_blank" rel="noopener noreferrer" title="Yeni Sekmede Aç" class="h-8 px-3 rounded-xl glass-card text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition shadow-lg">
+          <svg class="w-3.5 h-3.5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          <span class="hidden md:inline">Yeni Sekmede Aç</span>
+        </a>
+        <button onclick="openHub()" class="h-8 px-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-teal-500/20">
+          <span>🗂️ Modül Kartları</span>
+        </button>
+      </div>
+    </div>
+
+    <iframe 
+      id="earth-nullschool-iframe" 
+      src="" 
+      title="Earth Nullschool"
+      class="w-full h-full border-0" 
+      allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+      allowfullscreen>
+    </iframe>
+  </div>
+
+  <!-- The Size of Space (Neal.fun) Container -->
+  <div id="size-of-space-container" class="hidden absolute inset-0 w-full h-full z-10 bg-[#050814] flex flex-col justify-between overflow-y-auto p-4 sm:p-8 pt-20 sm:pt-24">
+    <div class="max-w-4xl mx-auto w-full flex flex-col items-center text-center my-auto">
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-500/20 border border-violet-400/40 text-violet-300 text-xs font-bold uppercase tracking-wider mb-4">
+        <span>🌌 Evrenin Ölçeği & Boyutlar</span>
+      </div>
+
+      <h2 class="text-3xl sm:text-5xl font-black text-white tracking-tight mb-3">
+        The Size of Space
+      </h2>
+      <p class="text-sm sm:text-base text-slate-300 max-w-xl leading-relaxed mb-6">
+        Bir astronotun boyundan (1.7 m) başlayıp galaksilere ve 93 milyar ışık yılı genişliğindeki gözlemlenebilir evrene uzanan devasa ölçek karşılaştırması.
+      </p>
+
+      <!-- Scale Milestones Grid -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-2xl mb-8 text-left">
+        <div class="p-3 rounded-2xl glass-card border border-white/10">
+          <div class="text-2xl mb-1">🧑‍🚀</div>
+          <div class="text-xs font-bold text-white">Astronot</div>
+          <div class="text-[10px] text-violet-300 font-mono">1.7 metre</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-white/10">
+          <div class="text-2xl mb-1">🛰️</div>
+          <div class="text-xs font-bold text-white">ISS İstasyonu</div>
+          <div class="text-[10px] text-violet-300 font-mono">109 metre</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-white/10">
+          <div class="text-2xl mb-1">🌍</div>
+          <div class="text-xs font-bold text-white">Dünya</div>
+          <div class="text-[10px] text-violet-300 font-mono">12.742 km</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-white/10">
+          <div class="text-2xl mb-1">☀️</div>
+          <div class="text-xs font-bold text-white">Güneş</div>
+          <div class="text-[10px] text-violet-300 font-mono">1.392.700 km</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-white/10">
+          <div class="text-2xl mb-1">🔴</div>
+          <div class="text-xs font-bold text-white">Betelgeuse</div>
+          <div class="text-[10px] text-violet-300 font-mono">1.2 milyar km</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-white/10">
+          <div class="text-2xl mb-1">🌀</div>
+          <div class="text-xs font-bold text-white">Samanyolu</div>
+          <div class="text-[10px] text-violet-300 font-mono">100.000 ışık yılı</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-white/10">
+          <div class="text-2xl mb-1">🕸️</div>
+          <div class="text-xs font-bold text-white">Galaksi Ağı</div>
+          <div class="text-[10px] text-violet-300 font-mono">1 milyar ışık yılı</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-white/10">
+          <div class="text-2xl mb-1">🌐</div>
+          <div class="text-xs font-bold text-white">Evren</div>
+          <div class="text-[10px] text-violet-300 font-mono">93 milyar ışık yılı</div>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <div class="flex flex-wrap items-center justify-center gap-3">
+        <a href="https://neal.fun/size-of-space/" target="_blank" rel="noopener noreferrer" class="h-12 px-6 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-extrabold text-sm flex items-center gap-2 shadow-xl shadow-violet-500/30 transition transform hover:scale-105 active:scale-95">
+          <span>Simülasyonu Tam Ekran Başlat 🚀</span>
+          <span>↗</span>
+        </a>
+        <button onclick="openHub()" class="h-12 px-5 rounded-2xl glass-panel text-slate-300 hover:text-white font-bold text-sm flex items-center gap-2 transition">
+          <span>🗂️ Diğer Modüller</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Earth Space Lab 3D Seasons & Axial Tilt Container -->
+  <div id="seasons-container" class="hidden absolute inset-0 w-full h-full z-10 bg-[#000]">
+    <div id="seasons-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md z-20 pointer-events-none transition-opacity duration-500">
+      <div class="relative flex items-center justify-center mb-4">
+        <div class="w-16 h-16 rounded-full border-2 border-emerald-500/20 border-t-emerald-400 animate-spin"></div>
+        <span class="absolute text-2xl">🌍</span>
+      </div>
+      <div class="text-sm font-bold text-white tracking-wide">Earth Space Lab</div>
+      <div class="text-xs text-emerald-300/90 mt-1.5 font-medium">Mevsimler & 23.5° Eksen Eğikliği Simülasyonu Yükleniyor...</div>
+      <div class="text-[11px] text-slate-400 mt-2 max-w-xs text-center leading-relaxed">Dünya'nın dolanımı, 21 Haziran/21 Aralık gündönümleri ve güneş ışınlarının geliş açısı 3D ortamda yükleniyor.</div>
+    </div>
+
+    <!-- Seasons Quick Header -->
+    <div class="absolute top-14 sm:top-16 inset-x-4 sm:inset-x-6 z-20 flex items-center justify-between pointer-events-none">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-panel pointer-events-auto border border-emerald-500/30 text-xs shadow-xl">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-effect"></span>
+        <span class="font-bold text-white hidden sm:inline">8. Sınıf Fen:</span>
+        <span class="text-emerald-200 font-medium">Mevsimler & 23.5° Eksen Eğikliği (3D)</span>
+      </div>
+
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <a href="https://www.earthspacelab.com/app/seasons/tr" target="_blank" rel="noopener noreferrer" title="Yeni Sekmede Aç" class="h-8 px-3 rounded-xl glass-card text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition shadow-lg">
+          <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          <span class="hidden md:inline">Yeni Sekmede Aç</span>
+        </a>
+        <button onclick="openHub()" class="h-8 px-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-emerald-500/20">
+          <span>🗂️ Modül Kartları</span>
+        </button>
+      </div>
+    </div>
+
+    <iframe 
+      id="seasons-iframe" 
+      src="" 
+      title="Earth Space Lab - Mevsimler ve Eksen Eğikliği"
+      class="w-full h-full border-0" 
+      allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+      allowfullscreen>
+    </iframe>
+  </div>
+
+  <!-- Solar System Scope 3D Container -->
+  <div id="solar-scope-container" class="hidden absolute inset-0 w-full h-full z-10 bg-[#000]">
+    <div id="solar-scope-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md z-20 pointer-events-none transition-opacity duration-500">
+      <div class="relative flex items-center justify-center mb-4">
+        <div class="w-16 h-16 rounded-full border-2 border-amber-500/20 border-t-amber-400 animate-spin"></div>
+        <span class="absolute text-2xl">🪐</span>
+      </div>
+      <div class="text-sm font-bold text-white tracking-wide">Solar System Scope</div>
+      <div class="text-xs text-amber-300/90 mt-1.5 font-medium">3D İnteraktif Güneş Sistemi & Orrery Yükleniyor...</div>
+      <div class="text-[11px] text-slate-400 mt-2 max-w-xs text-center leading-relaxed">Gezegen yörüngeleri, boyutları, yıldızlar ve gerçek zamanlı gökyüzü modeli yükleniyor.</div>
+    </div>
+
+    <!-- Solar Scope Quick Header -->
+    <div class="absolute top-14 sm:top-16 inset-x-4 sm:inset-x-6 z-20 flex items-center justify-between pointer-events-none">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-panel pointer-events-auto border border-amber-500/30 text-xs shadow-xl">
+        <span class="w-2 h-2 rounded-full bg-amber-400 pulse-effect"></span>
+        <span class="font-bold text-white hidden sm:inline">3D Keşif:</span>
+        <span class="text-amber-200 font-medium">Solar System Scope (İnteraktif Model)</span>
+      </div>
+
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <a href="https://www.solarsystemscope.com/iframe" target="_blank" rel="noopener noreferrer" title="Yeni Sekmede Aç" class="h-8 px-3 rounded-xl glass-card text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition shadow-lg">
+          <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          <span class="hidden md:inline">Yeni Sekmede Aç</span>
+        </a>
+        <button onclick="openHub()" class="h-8 px-3.5 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-amber-500/20">
+          <span>🗂️ Modül Kartları</span>
+        </button>
+      </div>
+    </div>
+
+    <iframe 
+      id="solar-scope-iframe" 
+      src="" 
+      title="Solar System Scope - 3D Solar System"
+      class="w-full h-full border-0" 
+      allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+      allowfullscreen>
+    </iframe>
+  </div>
+
+  <!-- Ventusky Weather Dynamics Container -->
+  <div id="ventusky-container" class="hidden absolute inset-0 w-full h-full z-10 bg-[#000]">
+    <div id="ventusky-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md z-20 pointer-events-none transition-opacity duration-500">
+      <div class="relative flex items-center justify-center mb-4">
+        <div class="w-16 h-16 rounded-full border-2 border-teal-500/20 border-t-teal-400 animate-spin"></div>
+        <span class="absolute text-2xl">🌪️</span>
+      </div>
+      <div class="text-sm font-bold text-white tracking-wide">Ventusky: Canlı Hava Durumu & Rüzgar</div>
+      <div class="text-xs text-teal-300/90 mt-1.5 font-medium">Küresel Rüzgar, Basınç & Sıcaklık Dalgaları Yükleniyor...</div>
+      <div class="text-[11px] text-slate-400 mt-2 max-w-xs text-center leading-relaxed">8. Sınıf İklim ve Hava Hareketleri: Canlı meteoroloji radarı ve alçak/yüksek basınç merkezleri bağlanıyor.</div>
+    </div>
+
+    <!-- Ventusky Quick Header -->
+    <div class="absolute top-14 sm:top-16 inset-x-4 sm:inset-x-6 z-20 flex items-center justify-between pointer-events-none">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-panel pointer-events-auto border border-teal-500/30 text-xs shadow-xl">
+        <span class="w-2 h-2 rounded-full bg-teal-400 pulse-effect"></span>
+        <span class="font-bold text-white hidden sm:inline">8. Sınıf Fen:</span>
+        <span class="text-teal-200 font-medium">Ventusky Canlı İklim & Rüzgar Dinamikleri</span>
+      </div>
+
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <a href="https://www.ventusky.com/?p=39.0;35.0;5&l=wind-10m" target="_blank" rel="noopener noreferrer" title="Yeni Sekmede Aç" class="h-8 px-3 rounded-xl glass-card text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition shadow-lg">
+          <svg class="w-3.5 h-3.5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          <span class="hidden md:inline">Yeni Sekmede Aç</span>
+        </a>
+        <button onclick="openHub()" class="h-8 px-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-teal-500/20">
+          <span>🗂️ Modül Kartları</span>
+        </button>
+      </div>
+    </div>
+
+    <iframe 
+      id="ventusky-iframe" 
+      src="" 
+      title="Ventusky Weather Dynamics"
+      class="w-full h-full border-0" 
+      allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+      allowfullscreen>
+    </iframe>
+  </div>
+
+  <!-- Asteroid Launcher (Neal.fun) Container -->
+  <div id="asteroid-launcher-container" class="hidden absolute inset-0 w-full h-full z-10 bg-[#070b19] flex flex-col justify-between overflow-y-auto p-4 sm:p-8 pt-20 sm:pt-24">
+    <div class="max-w-4xl mx-auto w-full flex flex-col items-center text-center my-auto">
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 text-xs font-bold uppercase tracking-wider mb-4">
+        <span>☄️ Gezegen Savunması & Çarpma Simülasyonu</span>
+      </div>
+
+      <h2 class="text-3xl sm:text-5xl font-black text-white tracking-tight mb-3">
+        Asteroid Launcher
+      </h2>
+      <p class="text-sm sm:text-base text-slate-300 max-w-xl leading-relaxed mb-6">
+        Bir göktaşı Dünya'ya çarparsa ne olur? Boyutunu, hızını ve açısını seçerek yeryüzünün istediğiniz noktasına fırlatın; krater boyutunu, şok dalgasını, rüzgar hızını ve deprem büyüklüğünü anında hesaplayın.
+      </p>
+
+      <!-- Parameters Grid -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-2xl mb-8 text-left">
+        <div class="p-3 rounded-2xl glass-card border border-rose-500/20">
+          <div class="text-2xl mb-1">🪨</div>
+          <div class="text-xs font-bold text-white">Asteroit Türü</div>
+          <div class="text-[10px] text-rose-300 font-medium">Demir, Taş, Karbon, Altın</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-rose-500/20">
+          <div class="text-2xl mb-1">📏</div>
+          <div class="text-xs font-bold text-white">Çap & Boyut</div>
+          <div class="text-[10px] text-rose-300 font-medium">1 metre - 1.5 kilometre</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-rose-500/20">
+          <div class="text-2xl mb-1">⚡</div>
+          <div class="text-xs font-bold text-white">Çarpma Hızı</div>
+          <div class="text-[10px] text-rose-300 font-medium">17 km/s - 100 km/s</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-rose-500/20">
+          <div class="text-2xl mb-1">📐</div>
+          <div class="text-xs font-bold text-white">Çarpışma Açısı</div>
+          <div class="text-[10px] text-rose-300 font-medium">5° ile 90° arası</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-rose-500/20">
+          <div class="text-2xl mb-1">🕳️</div>
+          <div class="text-xs font-bold text-white">Krater Hesabı</div>
+          <div class="text-[10px] text-rose-300 font-medium">Derinlik & Genişlik analizi</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-rose-500/20">
+          <div class="text-2xl mb-1">🔥</div>
+          <div class="text-xs font-bold text-white">Ateş Topu</div>
+          <div class="text-[10px] text-rose-300 font-medium">Termal radyasyon & Yangın</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-rose-500/20">
+          <div class="text-2xl mb-1">💨</div>
+          <div class="text-xs font-bold text-white">Şok Dalgası</div>
+          <div class="text-[10px] text-rose-300 font-medium">Basınç & Kasırga rüzgarı</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-rose-500/20">
+          <div class="text-2xl mb-1">🌋</div>
+          <div class="text-xs font-bold text-white">Sismik Etki</div>
+          <div class="text-[10px] text-rose-300 font-medium">Richter ölçeğinde deprem</div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex flex-wrap items-center justify-center gap-3">
+        <a href="https://neal.fun/asteroid-launcher/" target="_blank" rel="noopener noreferrer" class="h-12 px-6 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-extrabold text-sm flex items-center gap-2 shadow-xl shadow-rose-500/30 transition transform hover:scale-105 active:scale-95">
+          <span>Simülasyonu Tam Ekran Başlat ☄️</span>
+          <span>↗</span>
+        </a>
+        <button onclick="openHub()" class="h-12 px-5 rounded-2xl glass-panel text-slate-300 hover:text-white font-bold text-sm flex items-center gap-2 transition">
+          <span>🗂️ Diğer Modüller</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Space Elevator (Neal.fun) Container -->
+  <div id="space-elevator-container" class="hidden absolute inset-0 w-full h-full z-10 bg-[#050b1d] flex flex-col justify-between overflow-y-auto p-4 sm:p-8 pt-20 sm:pt-24">
+    <div class="max-w-4xl mx-auto w-full flex flex-col items-center text-center my-auto">
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 text-xs font-bold uppercase tracking-wider mb-4">
+        <span>🚀 Atmosfer Katmanları & Dikey Yolculuk</span>
+      </div>
+
+      <h2 class="text-3xl sm:text-5xl font-black text-white tracking-tight mb-3">
+        Space Elevator (Uzay Asansörü)
+      </h2>
+      <p class="text-sm sm:text-base text-slate-300 max-w-xl leading-relaxed mb-6">
+        Dünya yüzeyinden başlayıp gökyüzünü ve atmosfer katmanlarını aşarak 100 km'lik Karman çizgisine ve uzayın derinliklerine uzanan interaktif dikey keşif asansörü.
+      </p>
+
+      <!-- Altitude Layers Grid -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-2xl mb-8 text-left">
+        <div class="p-3 rounded-2xl glass-card border border-cyan-500/20">
+          <div class="text-2xl mb-1">🏔️</div>
+          <div class="text-xs font-bold text-white">Troposfer</div>
+          <div class="text-[10px] text-cyan-300 font-mono">0 - 12 km (Hava olayları)</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-cyan-500/20">
+          <div class="text-2xl mb-1">🎈</div>
+          <div class="text-xs font-bold text-white">Stratosfer</div>
+          <div class="text-[10px] text-cyan-300 font-mono">12 - 50 km (Ozon tabakası)</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-cyan-500/20">
+          <div class="text-2xl mb-1">🌠</div>
+          <div class="text-xs font-bold text-white">Mezosfer</div>
+          <div class="text-[10px] text-cyan-300 font-mono">50 - 85 km (Yanan meteorlar)</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-cyan-500/20">
+          <div class="text-2xl mb-1">🌌</div>
+          <div class="text-xs font-bold text-white">Karman Çizgisi</div>
+          <div class="text-[10px] text-cyan-300 font-mono">100 km (Uzayın resmi sınırı)</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-cyan-500/20">
+          <div class="text-2xl mb-1">✨</div>
+          <div class="text-xs font-bold text-white">Termosfer</div>
+          <div class="text-[10px] text-cyan-300 font-mono">85 - 600 km (Kutup Işıkları)</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-cyan-500/20">
+          <div class="text-2xl mb-1">🛰️</div>
+          <div class="text-xs font-bold text-white">ISS Yörüngesi</div>
+          <div class="text-[10px] text-cyan-300 font-mono">408 km irtifa</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-cyan-500/20">
+          <div class="text-2xl mb-1">📡</div>
+          <div class="text-xs font-bold text-white">Ekzosfer</div>
+          <div class="text-[10px] text-cyan-300 font-mono">600 - 10.000 km</div>
+        </div>
+        <div class="p-3 rounded-2xl glass-card border border-cyan-500/20">
+          <div class="text-2xl mb-1">🛰️</div>
+          <div class="text-xs font-bold text-white">Jeosenkron Uydu</div>
+          <div class="text-[10px] text-cyan-300 font-mono">35.786 km yörünge</div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex flex-wrap items-center justify-center gap-3">
+        <a href="https://neal.fun/space-elevator/" target="_blank" rel="noopener noreferrer" class="h-12 px-6 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-extrabold text-sm flex items-center gap-2 shadow-xl shadow-cyan-500/30 transition transform hover:scale-105 active:scale-95">
+          <span>Uzay Asansörüne Bin 🚀</span>
+          <span>↗</span>
+        </a>
+        <button onclick="openHub()" class="h-12 px-5 rounded-2xl glass-panel text-slate-300 hover:text-white font-bold text-sm flex items-center gap-2 transition">
+          <span>🗂️ Diğer Modüller</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODÜL SEÇİM MERKEZİ (14 KARTLI HUB MODALI)
+       ========================================================================= -->
+  <div id="hub-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 bg-slate-950/90 backdrop-blur-xl overflow-y-auto">
+    <div class="relative w-full max-w-6xl my-auto flex flex-col items-center">
+      
+      <!-- Close Button -->
+      <button onclick="closeHub()" class="absolute -top-3 right-0 sm:-top-2 sm:right-0 p-2.5 rounded-2xl glass-card text-slate-400 hover:text-white hover:border-white/30 transition shadow-xl z-10" title="Kapat">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+
+      <!-- Hub Header Title -->
+      <div class="text-center mb-5 sm:mb-7 mt-2">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-500/10 border border-sky-400/30 text-sky-300 text-xs font-bold uppercase tracking-wider mb-2.5">
+          <span class="w-2 h-2 rounded-full bg-sky-400 pulse-effect"></span>
+          <span>Uzay & Astronomi Keşif Merkezi</span>
+        </div>
+        <h1 class="text-2xl sm:text-4xl font-black text-white tracking-tight">
+          Güneş Sistemi & Canlı Uzay İstasyonları
+        </h1>
+        <p class="text-xs sm:text-sm text-slate-300 max-w-2xl mx-auto mt-2 leading-relaxed">
+          Keşfetmek istediğiniz laboratuvarı seçin. Türkçe fen müfredatı araçları, NASA Eyes, 100.000 Yıldız ve canlı iklim simülasyonlarıyla 14 büyük keşif istasyonu:
+        </p>
+      </div>
+
+      <!-- 14 CARDS GRID (4 Cols on xl) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-4.5 w-full">
+        
+        <!-- KART 1: 3D Türkçe Planetaryum -->
+        <div onclick="selectStation('planetaryum'); closeHub();" class="group relative rounded-3xl glass-panel p-5 sm:p-5.5 border border-sky-500/30 hover:border-sky-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-sky-500/20 cursor-pointer flex flex-col justify-between">
+          <div class="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-sky-400/20 text-sky-300 border border-sky-400/30">
+            Müfredat & Fen
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-2xl mb-3.5 shadow-lg shadow-sky-500/30 group-hover:rotate-6 transition-transform">
+              🪐
+            </div>
+            <h2 class="text-base sm:text-lg font-extrabold text-white group-hover:text-sky-300 transition">
+              3D Planetaryum
+            </h2>
+            <div class="text-[11px] text-slate-400 font-medium mt-0.5">Türkçe Müfredat Laboratuvarı</div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-2.5">
+              8 gezegenin 3D yörüngeleri, 23.5° eksen eğikliğiyle mevsimler, tutulmalar, kilo testi ve Kepler yasaları.
+            </p>
+            <div class="mt-3.5 space-y-1 text-[10.5px] text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>7. & 8. Sınıf Fen Kazanımları</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Mevsimler, Tutulmalar, Kilo</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Tamamen Türkçe ve Hızlı</span>
+              </div>
+            </div>
+          </div>
+          <button class="mt-5 w-full h-9 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 group-hover:from-sky-400 group-hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-sky-500/25 transition">
+            <span>Başlat 🚀</span>
+          </button>
+        </div>
+
+        <!-- KART 2: NASA Eyes Güneş Sistemi -->
+        <div onclick="selectStation('nasa-solar'); closeHub();" class="group relative rounded-3xl glass-panel p-5 sm:p-5.5 border border-cyan-500/30 hover:border-cyan-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-cyan-500/20 cursor-pointer flex flex-col justify-between">
+          <div class="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-cyan-400/20 text-cyan-300 border border-cyan-400/30">
+            Canlı NASA JPL
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-2xl mb-3.5 shadow-lg shadow-cyan-500/30 group-hover:rotate-6 transition-transform">
+              🌌
+            </div>
+            <h2 class="text-base sm:text-lg font-extrabold text-white group-hover:text-cyan-300 transition">
+              NASA: Güneş Sistemi
+            </h2>
+            <div class="text-[11px] text-slate-400 font-medium mt-0.5">Canlı Uzay Görevleri & Sondalar</div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-2.5">
+              James Webb, Perseverance, Voyager uzay araçları, gezegenler ve asteroitler gerçek zamanlı yörüngelerinde.
+            </p>
+            <div class="mt-3.5 space-y-1 text-[10.5px] text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Canlı NASA Telemetrisi</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>100+ Aktif Uzay Aracı</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Zaman Makinesi (Tarihsel)</span>
+              </div>
+            </div>
+          </div>
+          <button class="mt-5 w-full h-9 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 group-hover:from-cyan-400 group-hover:to-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/25 transition">
+            <span>Keşfet 🔭</span>
+          </button>
+        </div>
+
+        <!-- KART 3: NASA Eyes Canlı Dünya -->
+        <div onclick="selectStation('nasa-earth'); closeHub();" class="group relative rounded-3xl glass-panel p-5 sm:p-5.5 border border-emerald-500/30 hover:border-emerald-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-500/20 cursor-pointer flex flex-col justify-between">
+          <div class="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
+            Canlı Uydular
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-2xl mb-3.5 shadow-lg shadow-emerald-500/30 group-hover:rotate-6 transition-transform">
+              🌍
+            </div>
+            <h2 class="text-base sm:text-lg font-extrabold text-white group-hover:text-emerald-300 transition">
+              NASA: Canlı Dünya
+            </h2>
+            <div class="text-[11px] text-slate-400 font-medium mt-0.5">Uydular, Atmosfer & İklim</div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-2.5">
+              Yapay uydular (Landsat, Aqua vb.), canlı küresel sıcaklık haritaları, karbondioksit (CO₂) ve ozon tabakası.
+            </p>
+            <div class="mt-3.5 space-y-1 text-[10.5px] text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Yapay Uyduların Canlı Turu</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Küresel Sıcaklık, CO₂ & Ozon</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>7. & 8. Sınıf İklim / Uydu</span>
+              </div>
+            </div>
+          </div>
+          <button class="mt-5 w-full h-9 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 group-hover:from-emerald-400 group-hover:to-teal-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/25 transition">
+            <span>Dünyayı Aç 🌐</span>
+          </button>
+        </div>
+
+        <!-- KART 4: NASA Eyes ISS (Uluslararası Uzay İstasyonu) -->
+        <div onclick="selectStation('nasa-iss'); closeHub();" class="group relative rounded-3xl glass-panel p-5 sm:p-5.5 border border-blue-500/30 hover:border-blue-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/20 cursor-pointer flex flex-col justify-between">
+          <div class="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-blue-400/20 text-blue-300 border border-blue-400/30">
+            Canlı ISS
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-2xl mb-3.5 shadow-lg shadow-blue-500/30 group-hover:rotate-6 transition-transform">
+              🛰️
+            </div>
+            <h2 class="text-base sm:text-lg font-extrabold text-white group-hover:text-blue-300 transition">
+              NASA: ISS İstasyonu
+            </h2>
+            <div class="text-[11px] text-slate-400 font-medium mt-0.5">Uluslararası Uzay İstasyonu</div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-2.5">
+              Dünya yörüngesindeki ISS'nin anlık konumu, Dünya üzerinden geçiş rotası, 28,000 km/s hızı ve 400 km irtifası.
+            </p>
+            <div class="mt-3.5 space-y-1 text-[10.5px] text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Canlı Uydu Konumu & Yörünge İzi</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Astronotların Yaşam Laboratuvarı</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>7. Sınıf Uzay Araştırmaları</span>
+              </div>
+            </div>
+          </div>
+          <button class="mt-5 w-full h-9 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 group-hover:from-blue-500 group-hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/25 transition">
+            <span>ISS'yi Takip Et 🛰️</span>
+          </button>
+        </div>
+
+        <!-- KART 5: NASA Eyes Asteroitler & Gezegen Savunması -->
+        <div onclick="selectStation('nasa-asteroids'); closeHub();" class="group relative rounded-3xl glass-panel p-5 sm:p-5.5 border border-amber-500/30 hover:border-amber-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-amber-500/20 cursor-pointer flex flex-col justify-between">
+          <div class="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+            Savunma & NEO
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-2xl mb-3.5 shadow-lg shadow-amber-500/30 group-hover:rotate-6 transition-transform">
+              ☄️
+            </div>
+            <h2 class="text-base sm:text-lg font-extrabold text-white group-hover:text-amber-300 transition">
+              NASA: Asteroitler
+            </h2>
+            <div class="text-[11px] text-slate-400 font-medium mt-0.5">Asteroids & Gezegen Savunması</div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-2.5">
+              Dünyaya yakın cisimler (NEO), potansiyel tehlikeli göktaşları, DART çarpışma görevi ve kuyruklu yıldızlar.
+            </p>
+            <div class="mt-3.5 space-y-1 text-[10.5px] text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Dünyaya Yakın Göktaşları (NEO)</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>DART Savunma & Numune Görevleri</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Canlı Risk & Yörünge İzleme</span>
+              </div>
+            </div>
+          </div>
+          <button class="mt-5 w-full h-9 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 group-hover:from-amber-500 group-hover:to-orange-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/25 transition">
+            <span>Asteroitleri İncele ☄️</span>
+          </button>
+        </div>
+
+        <!-- KART 6: NASA Eyes Ötegezegenler -->
+        <div onclick="selectStation('nasa-exo'); closeHub();" class="group relative rounded-3xl glass-panel p-5 sm:p-5.5 border border-purple-500/30 hover:border-purple-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-purple-500/20 cursor-pointer flex flex-col justify-between">
+          <div class="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-purple-400/20 text-purple-300 border border-purple-400/30">
+            Derin Uzay
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center text-2xl mb-3.5 shadow-lg shadow-purple-500/30 group-hover:rotate-6 transition-transform">
+              🔭
+            </div>
+            <h2 class="text-base sm:text-lg font-extrabold text-white group-hover:text-purple-300 transition">
+              NASA: Ötegezegenler
+            </h2>
+            <div class="text-[11px] text-slate-400 font-medium mt-0.5">Exoplanets & Yıldız Sistemleri</div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-2.5">
+              Samanyolu'ndaki 5,500+ keşfedilmiş ötegezegen, yaşanabilir bölge (Goldilocks zone), Trappist-1 ve yıldızlar.
+            </p>
+            <div class="mt-3.5 space-y-1 text-[10.5px] text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>5,500+ Onaylanmış Gezegen</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Yaşanabilir Bölge (Goldilocks)</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>7. Sınıf Yıldız & Galaksiler</span>
+              </div>
+            </div>
+          </div>
+          <button class="mt-5 w-full h-9 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 group-hover:from-purple-500 group-hover:to-pink-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/25 transition">
+            <span>Derin Uzayı Aç 🌌</span>
+          </button>
+        </div>
+
+        <!-- KART 7: 100,000 Stars (Google Chrome WebGL) -->
+        <div onclick="selectStation('stars-100k'); closeHub();" class="group relative rounded-3xl glass-panel p-5 sm:p-5.5 border border-yellow-500/30 hover:border-yellow-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-yellow-500/20 cursor-pointer flex flex-col justify-between">
+          <div class="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-yellow-400/20 text-yellow-300 border border-yellow-400/30">
+            3D WebGL Galaksi
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-yellow-500 to-amber-600 flex items-center justify-center text-2xl mb-3.5 shadow-lg shadow-yellow-500/30 group-hover:rotate-6 transition-transform">
+              ✨
+            </div>
+            <h2 class="text-base sm:text-lg font-extrabold text-white group-hover:text-yellow-300 transition">
+              100.000 Yıldız
+            </h2>
+            <div class="text-[11px] text-slate-400 font-medium mt-0.5">Samanyolu Yıldız Haritası</div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-2.5">
+              Güneş'e en yakın 100.000 yıldızın gerçek astronomi koordinatlarıyla 3D galaksi turu ve spektral renkleri.
+            </p>
+            <div class="mt-3.5 space-y-1 text-[10.5px] text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Google Chrome Experiment WebGL</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Yıldız Sıcaklıkları & İsimleri</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Samanyolu Sarmal Kolları</span>
+              </div>
+            </div>
+          </div>
+          <button class="mt-5 w-full h-9 rounded-xl bg-gradient-to-r from-yellow-600 to-amber-600 group-hover:from-yellow-500 group-hover:to-amber-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-yellow-500/25 transition">
+            <span>Yıldızları Aç ✨</span>
+          </button>
+        </div>
+
+        <!-- KART 8: Earth Nullschool (Canlı Rüzgar & İklim) -->
+        <div onclick="selectStation('earth-nullschool'); closeHub();" class="group relative rounded-3xl glass-panel p-5 sm:p-5.5 border border-teal-500/30 hover:border-teal-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-teal-500/20 cursor-pointer flex flex-col justify-between">
+          <div class="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-teal-400/20 text-teal-300 border border-teal-400/30">
+            Canlı Atmosfer
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-teal-500 to-emerald-600 flex items-center justify-center text-2xl mb-3.5 shadow-lg shadow-teal-500/30 group-hover:rotate-6 transition-transform">
+              🌪️
+            </div>
+            <h2 class="text-base sm:text-lg font-extrabold text-white group-hover:text-teal-300 transition">
+              Canlı Rüzgar & İklim
+            </h2>
+            <div class="text-[11px] text-slate-400 font-medium mt-0.5">Earth Nullschool Küresi</div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-2.5">
+              Süperbilgisayar modelleriyle anlık küresel rüzgar akımları, siklonlar, okyanus dalgaları ve hava kirliliği.
+            </p>
+            <div class="mt-3.5 space-y-1 text-[10.5px] text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-teal-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>3D Canlı Rüzgar Akımları</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-teal-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Okyanus Akıntıları & Dalgalar</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-teal-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>8. Sınıf Mevsimler & İklim</span>
+              </div>
+            </div>
+          </div>
+          <button class="mt-5 w-full h-9 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 group-hover:from-teal-500 group-hover:to-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-teal-500/25 transition">
+            <span>Rüzgar Küresini Aç 🌪️</span>
+          </button>
+        </div>
+
+        <!-- KART 9: The Size of Space (Neal.fun) -->
+        <div onclick="selectStation('size-of-space'); closeHub();" class="group relative rounded-3xl glass-panel p-5 sm:p-5.5 border border-violet-500/30 hover:border-violet-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-violet-500/20 cursor-pointer flex flex-col justify-between">
+          <div class="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-violet-400/20 text-violet-300 border border-violet-400/30">
+            Boyut & Ölçek
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-2xl mb-3.5 shadow-lg shadow-violet-500/30 group-hover:rotate-6 transition-transform">
+              🌌
+            </div>
+            <h2 class="text-base sm:text-lg font-extrabold text-white group-hover:text-violet-300 transition">
+              Evrenin Ölçeği
+            </h2>
+            <div class="text-[11px] text-slate-400 font-medium mt-0.5">The Size of Space (Neal.fun)</div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-2.5">
+              Bir astronottan (1.7 m) başlayıp galaksilere ve 93 milyar ışık yıllık gözlemlenebilir evrene uzanan ölçek.
+            </p>
+            <div class="mt-3.5 space-y-1 text-[10.5px] text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-violet-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Astronottan Evrene Karşılaştırma</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-violet-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Gezegen, Yıldız ve Galaksi Boyutları</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-violet-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>7. Sınıf Uzay & Evren</span>
+              </div>
+            </div>
+          </div>
+          <button class="mt-5 w-full h-9 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 group-hover:from-violet-500 group-hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-violet-500/25 transition">
+            <span>Ölçeği Keşfet 🚀</span>
+          </button>
+        </div>
+
+        <!-- KART 10: Earth Space Lab 3D Mevsimler & Eksen Eğikliği -->
+        <div onclick="selectStation('seasons'); closeHub();" class="group relative rounded-3xl glass-panel p-5 sm:p-5.5 border border-emerald-500/30 hover:border-emerald-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-500/20 cursor-pointer flex flex-col justify-between">
+          <div class="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
+            3D Simülasyon
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-2xl mb-3.5 shadow-lg shadow-emerald-500/30 group-hover:rotate-6 transition-transform">
+              🌍
+            </div>
+            <h2 class="text-base sm:text-lg font-extrabold text-white group-hover:text-emerald-300 transition">
+              Mevsimler & Eksen Eğikliği
+            </h2>
+            <div class="text-[11px] text-slate-400 font-medium mt-0.5">Earth Space Lab (Türkçe)</div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-2.5">
+              23.5° eksen eğikliğini değiştirme, 21 Haziran/Aralık gündönümleri, ekinokslar ve güneş ışını geliş açısı.
+            </p>
+            <div class="mt-3.5 space-y-1 text-[10.5px] text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>0°-90° Eksen Eğikliği Sürgüsü</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Yengeç / Oğlak / Ekvator Enlemleri</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Gündüz / Gece Süreleri & Işın Açısı</span>
+              </div>
+            </div>
+          </div>
+          <button class="mt-5 w-full h-9 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 group-hover:from-emerald-500 group-hover:to-teal-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/25 transition">
+            <span>Mevsimleri Simüle Et ☀️</span>
+          </button>
+        </div>
+
+        <!-- KART 11: Solar System Scope 3D -->
+        <div onclick="selectStation('solarscope'); closeHub();" class="group relative rounded-3xl glass-panel p-5 sm:p-5.5 border border-amber-500/30 hover:border-amber-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-amber-500/20 cursor-pointer flex flex-col justify-between">
+          <div class="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+            3D Model
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-600 flex items-center justify-center text-2xl mb-3.5 shadow-lg shadow-amber-500/30 group-hover:rotate-6 transition-transform">
+              🪐
+            </div>
+            <h2 class="text-base sm:text-lg font-extrabold text-white group-hover:text-amber-300 transition">
+              Solar System Scope
+            </h2>
+            <div class="text-[11px] text-slate-400 font-medium mt-0.5">3D İnteraktif Orrery & Gökyüzü</div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-2.5">
+              Gezegenlerin gerçek zamanlı yörüngeleri, gezegen boyut karşılaştırmaları ve gece gökyüzü yıldız haritası.
+            </p>
+            <div class="mt-3.5 space-y-1 text-[10.5px] text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Akıcı 3D Gezegen Hareketi</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Gök Cisimleri ve Yıldızlar</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>İnteraktif Mesafe & Ölçek</span>
+              </div>
+            </div>
+          </div>
+          <button class="mt-5 w-full h-9 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 group-hover:from-amber-500 group-hover:to-yellow-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/25 transition">
+            <span>Modeli Başlat 🪐</span>
+          </button>
+        </div>
+
+        <!-- KART 12: Ventusky Canlı Hava Durumu & Rüzgar -->
+        <div onclick="selectStation('ventusky'); closeHub();" class="group relative rounded-3xl glass-panel p-5 sm:p-5.5 border border-teal-500/30 hover:border-teal-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-teal-500/20 cursor-pointer flex flex-col justify-between">
+          <div class="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-teal-400/20 text-teal-300 border border-teal-400/30">
+            Canlı Meteoroloji
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-teal-500 to-emerald-600 flex items-center justify-center text-2xl mb-3.5 shadow-lg shadow-teal-500/30 group-hover:rotate-6 transition-transform">
+              🌪️
+            </div>
+            <h2 class="text-base sm:text-lg font-extrabold text-white group-hover:text-teal-300 transition">
+              Ventusky İklim & Rüzgar
+            </h2>
+            <div class="text-[11px] text-slate-400 font-medium mt-0.5">8. Sınıf İklim ve Hava Hareketleri</div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-2.5">
+              Anlık rüzgar akımları, alçak ve yüksek basınç merkezleri, hava sıcaklığı ve canlı meteoroloji radarı.
+            </p>
+            <div class="mt-3.5 space-y-1 text-[10.5px] text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-teal-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Canlı Rüzgar & Fırtına Akışı</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-teal-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Alçak / Yüksek Basınç Göstergeleri</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-teal-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Türkiye ve Dünya Sıcaklık Haritası</span>
+              </div>
+            </div>
+          </div>
+          <button class="mt-5 w-full h-9 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 group-hover:from-teal-500 group-hover:to-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-teal-500/25 transition">
+            <span>Rüzgarları İzle 🌪️</span>
+          </button>
+        </div>
+
+        <!-- KART 13: Asteroid Launcher (Neal.fun) -->
+        <div onclick="selectStation('asteroid-launcher'); closeHub();" class="group relative rounded-3xl glass-panel p-5 sm:p-5.5 border border-rose-500/30 hover:border-rose-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-rose-500/20 cursor-pointer flex flex-col justify-between">
+          <div class="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-rose-400/20 text-rose-300 border border-rose-400/30">
+            Çarpma Fiziği
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-500 to-red-600 flex items-center justify-center text-2xl mb-3.5 shadow-lg shadow-rose-500/30 group-hover:rotate-6 transition-transform">
+              ☄️
+            </div>
+            <h2 class="text-base sm:text-lg font-extrabold text-white group-hover:text-rose-300 transition">
+              Asteroid Launcher
+            </h2>
+            <div class="text-[11px] text-slate-400 font-medium mt-0.5">Neal.fun Çarpma Simülatörü</div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-2.5">
+              Dünya'ya çarpacak bir göktaşının boyutunu ve hızını seçin; krater, şok dalgası ve yıkım etkilerini hesaplayın.
+            </p>
+            <div class="mt-3.5 space-y-1 text-[10.5px] text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Krater Genişliği & Derinliği</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Ateş Topu & Termal Etki</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Deprem & Rüzgar Şiddeti</span>
+              </div>
+            </div>
+          </div>
+          <button class="mt-5 w-full h-9 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 group-hover:from-rose-500 group-hover:to-red-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-rose-500/25 transition">
+            <span>Çarpmayı Simüle Et ☄️</span>
+          </button>
+        </div>
+
+        <!-- KART 14: Space Elevator (Neal.fun) -->
+        <div onclick="selectStation('space-elevator'); closeHub();" class="group relative rounded-3xl glass-panel p-5 sm:p-5.5 border border-cyan-500/30 hover:border-cyan-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-cyan-500/20 cursor-pointer flex flex-col justify-between">
+          <div class="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-cyan-400/20 text-cyan-300 border border-cyan-400/30">
+            Dikey Keşif
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-2xl mb-3.5 shadow-lg shadow-cyan-500/30 group-hover:rotate-6 transition-transform">
+              🚀
+            </div>
+            <h2 class="text-base sm:text-lg font-extrabold text-white group-hover:text-cyan-300 transition">
+              Space Elevator
+            </h2>
+            <div class="text-[11px] text-slate-400 font-medium mt-0.5">Neal.fun Atmosfer & Uzay Asansörü</div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-2.5">
+              Yeryüzünden 100 km uzay sınırına dikey yolculuk: Troposfer, Stratosfer, Ozon tabakası, auroralar ve uydular.
+            </p>
+            <div class="mt-3.5 space-y-1 text-[10.5px] text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Tüm Atmosfer Katmanları</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>100 km Karman Çizgisi</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Uydular & ISS İrtifası</span>
+              </div>
+            </div>
+          </div>
+          <button class="mt-5 w-full h-9 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 group-hover:from-cyan-500 group-hover:to-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/25 transition">
+            <span>Asansöre Bin 🚀</span>
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TOP HEADER / NAV BAR -->
+  <header class="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-3 sm:px-6 py-2.5 pointer-events-none">
+    <!-- Left: Brand & Return -->
+    <div class="flex items-center gap-2 sm:gap-3 pointer-events-auto">
+      <a href="/" class="flex items-center gap-2 h-9 px-3 sm:px-3.5 rounded-xl glass-card text-xs sm:text-sm font-semibold text-slate-300 hover:text-white hover:border-sky-400/50 transition-all active:scale-95 shadow-md">
+        <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        <span class="hidden md:inline">Atölye'ye Dön</span>
+      </a>
+      
+      <button onclick="openHub()" class="flex items-center gap-2 h-9 px-3 rounded-xl glass-panel text-white font-bold text-xs sm:text-sm hover:border-sky-400/60 transition shadow-md">
+        <span class="w-2.5 h-2.5 rounded-full bg-amber-400 pulse-effect"></span>
+        <span class="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-sky-300 to-indigo-300">
+          Planetaryum & Uzay
+        </span>
+      </button>
+    </div>
+
+    <!-- Center: 14 Main Station Tabs (Desktop) -->
+    <div class="hidden xl:flex items-center gap-1 p-1 rounded-2xl glass-panel pointer-events-auto shadow-xl overflow-x-auto max-w-[calc(100vw-360px)]">
+      <button onclick="selectStation('planetaryum')" id="station-btn-planetaryum" class="station-tab active px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all text-sky-400 bg-sky-500/20 border border-sky-400/40 flex items-center gap-1 whitespace-nowrap">
+        <span>🪐 3D Planetaryum</span>
+      </button>
+      <button onclick="selectStation('nasa-solar')" id="station-btn-nasa-solar" class="station-tab px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 flex items-center gap-1 whitespace-nowrap">
+        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+        <span>🚀 NASA Güneş</span>
+      </button>
+      <button onclick="selectStation('solarscope')" id="station-btn-solarscope" class="station-tab px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 flex items-center gap-1 whitespace-nowrap">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+        <span>🪐 Solar Scope</span>
+      </button>
+      <button onclick="selectStation('nasa-earth')" id="station-btn-nasa-earth" class="station-tab px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 flex items-center gap-1 whitespace-nowrap">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span>🌍 NASA Dünya</span>
+      </button>
+      <button onclick="selectStation('seasons')" id="station-btn-seasons" class="station-tab px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 flex items-center gap-1 whitespace-nowrap">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span>🌍 3D Mevsimler</span>
+      </button>
+      <button onclick="selectStation('ventusky')" id="station-btn-ventusky" class="station-tab px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 flex items-center gap-1 whitespace-nowrap">
+        <span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
+        <span>🌪️ Ventusky</span>
+      </button>
+      <button onclick="selectStation('earth-nullschool')" id="station-btn-earth-nullschool" class="station-tab px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 flex items-center gap-1 whitespace-nowrap">
+        <span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
+        <span>💨 Canlı Rüzgar</span>
+      </button>
+      <button onclick="selectStation('nasa-iss')" id="station-btn-nasa-iss" class="station-tab px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 flex items-center gap-1 whitespace-nowrap">
+        <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+        <span>🛰️ ISS</span>
+      </button>
+      <button onclick="selectStation('space-elevator')" id="station-btn-space-elevator" class="station-tab px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 flex items-center gap-1 whitespace-nowrap">
+        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+        <span>🚀 Uzay Asansörü</span>
+      </button>
+      <button onclick="selectStation('nasa-asteroids')" id="station-btn-nasa-asteroids" class="station-tab px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 flex items-center gap-1 whitespace-nowrap">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+        <span>☄️ Asteroit</span>
+      </button>
+      <button onclick="selectStation('asteroid-launcher')" id="station-btn-asteroid-launcher" class="station-tab px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 flex items-center gap-1 whitespace-nowrap">
+        <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+        <span>💥 Çarpma Sim</span>
+      </button>
+      <button onclick="selectStation('nasa-exo')" id="station-btn-nasa-exo" class="station-tab px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 flex items-center gap-1 whitespace-nowrap">
+        <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+        <span>🔭 Ötegezegen</span>
+      </button>
+      <button onclick="selectStation('stars-100k')" id="station-btn-stars-100k" class="station-tab px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 flex items-center gap-1 whitespace-nowrap">
+        <span class="w-1.5 h-1.5 rounded-full bg-yellow-400"></span>
+        <span>✨ 100K Yıldız</span>
+      </button>
+      <button onclick="selectStation('size-of-space')" id="station-btn-size-of-space" class="station-tab px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 flex items-center gap-1 whitespace-nowrap">
+        <span class="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+        <span>🌌 Evren Ölçeği</span>
+      </button>
+      <div class="w-px h-4 bg-white/10 mx-0.5"></div>
+      <button onclick="openHub()" title="Modül Kartlarını Aç" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-300 hover:text-white hover:bg-white/5 transition flex items-center gap-1 whitespace-nowrap">
+        <span>🗂️ 14 İstasyon</span>
+      </button>
+    </div>
+
+    <!-- Right: Quick Tools -->
+    <div class="flex items-center gap-2 pointer-events-auto">
+      <!-- Mobile Stations Menu Button -->
+      <button onclick="toggleMobileMenu()" class="xl:hidden h-9 px-3 rounded-xl glass-panel text-xs font-bold text-sky-400 flex items-center gap-1.5">
+        <span>Modüller</span>
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+
+      <button onclick="openHub()" title="Modül Kartlarını Göster" class="hidden sm:flex xl:hidden h-9 px-3 rounded-xl glass-card text-xs font-semibold text-amber-300 hover:text-white items-center gap-1.5 transition">
+        <span>🗂️ Kartlar</span>
+      </button>
+
+      <button id="sound-btn" onclick="toggleAudio()" title="Uzay Ambiyans Sesi" class="h-9 w-9 rounded-xl glass-card flex items-center justify-center text-slate-300 hover:text-amber-400 transition">
+        <svg id="sound-icon-off" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
+        <svg id="sound-icon-on" class="w-4 h-4 hidden text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+      </button>
+
+      <button id="reset-cam-btn" onclick="resetCamera()" title="Kamerayı Sıfırla" class="h-9 w-9 rounded-xl glass-card flex items-center justify-center text-slate-300 hover:text-sky-400 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      </button>
+
+      <button onclick="toggleFullscreen()" title="Tam Ekran" class="h-9 w-9 rounded-xl glass-card flex items-center justify-center text-slate-300 hover:text-white transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- SUB-BAR FOR PLANETARYUM LAB MODES (shown when Planetaryum is active) -->
+  <div id="planetaryum-subbar" class="absolute top-14 sm:top-15 inset-x-0 z-20 flex justify-center px-4 pointer-events-none transition-all duration-300">
+    <div class="flex items-center gap-1 p-1 rounded-2xl glass-panel pointer-events-auto max-w-full overflow-x-auto shadow-xl">
+      <button onclick="setLabMode('free')" id="tab-free" class="mode-tab active px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-sky-400 bg-sky-500/20 border border-sky-400/40 whitespace-nowrap">
+        🪐 Yörünge Keşfi
+      </button>
+      <button onclick="setLabMode('seasons')" id="tab-seasons" class="mode-tab px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 whitespace-nowrap">
+        🌍 Mevsimler & Eksen Eğikliği
+      </button>
+      <button onclick="setLabMode('eclipses')" id="tab-eclipses" class="mode-tab px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 whitespace-nowrap">
+        🌑 Ay Evreleri & Tutulmalar
+      </button>
+      <button onclick="setLabMode('gravity')" id="tab-gravity" class="mode-tab px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 whitespace-nowrap">
+        ⚖️ Gezegen Karşılaştırıcı
+      </button>
+      <button onclick="setLabMode('kepler')" id="tab-kepler" class="mode-tab px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5 whitespace-nowrap">
+        📐 Kepler Yasaları
+      </button>
+    </div>
+  </div>
+
+  <!-- MOBILE MODE DRAWER (MODAL) -->
+  <div id="mobile-menu" class="hidden absolute top-14 inset-x-4 z-40 p-4 rounded-2xl glass-panel flex-col gap-2 shadow-2xl xl:hidden max-h-[calc(100vh-80px)] overflow-y-auto">
+    <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Ana Keşif İstasyonları (14 Modül)</div>
+    <button data-station="planetaryum" onclick="selectStation('planetaryum'); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold text-sky-400 bg-sky-500/10 flex items-center justify-between border border-sky-500/20">
+      <span>🪐 3D Türkçe Planetaryum</span>
+      <span class="text-[10px] text-sky-300 font-medium">Müfredat</span>
+    </button>
+    <button data-station="nasa-solar" onclick="selectStation('nasa-solar'); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-cyan-300 hover:bg-white/5 flex items-center justify-between">
+      <span>🚀 NASA Eyes: Güneş Sistemi</span>
+      <span class="text-[10px] uppercase font-bold text-cyan-400 bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-500/30">Canlı</span>
+    </button>
+    <button data-station="solarscope" onclick="selectStation('solarscope'); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-amber-300 hover:bg-white/5 flex items-center justify-between">
+      <span>🪐 Solar System Scope (3D Orrery)</span>
+      <span class="text-[10px] uppercase font-bold text-amber-400 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/30">3D Model</span>
+    </button>
+    <button data-station="nasa-earth" onclick="selectStation('nasa-earth'); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-emerald-300 hover:bg-white/5 flex items-center justify-between">
+      <span>🌍 NASA Eyes: Canlı Dünya & İklim</span>
+      <span class="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/30">Canlı</span>
+    </button>
+    <button data-station="seasons" onclick="selectStation('seasons'); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-emerald-300 hover:bg-white/5 flex items-center justify-between">
+      <span>🌍 3D Mevsimler & Eksen Eğikliği</span>
+      <span class="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/30">Türkçe</span>
+    </button>
+    <button data-station="ventusky" onclick="selectStation('ventusky'); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-teal-300 hover:bg-white/5 flex items-center justify-between">
+      <span>🌪️ Ventusky: Canlı Rüzgar & Hava</span>
+      <span class="text-[10px] uppercase font-bold text-teal-400 bg-teal-950/80 px-1.5 py-0.5 rounded border border-teal-500/30">Canlı</span>
+    </button>
+    <button data-station="earth-nullschool" onclick="selectStation('earth-nullschool'); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-teal-300 hover:bg-white/5 flex items-center justify-between">
+      <span>💨 Canlı Rüzgar & İklim Küresi</span>
+      <span class="text-[10px] uppercase font-bold text-teal-400 bg-teal-950/80 px-1.5 py-0.5 rounded border border-teal-500/30">Canlı</span>
+    </button>
+    <button data-station="nasa-iss" onclick="selectStation('nasa-iss'); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-blue-300 hover:bg-white/5 flex items-center justify-between">
+      <span>🛰️ NASA Eyes: ISS Uzay İstasyonu</span>
+      <span class="text-[10px] uppercase font-bold text-blue-400 bg-blue-950/80 px-1.5 py-0.5 rounded border border-blue-500/30">Canlı</span>
+    </button>
+    <button data-station="space-elevator" onclick="selectStation('space-elevator'); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-cyan-300 hover:bg-white/5 flex items-center justify-between">
+      <span>🚀 Space Elevator (Atmosfer Asansörü)</span>
+      <span class="text-[10px] uppercase font-bold text-cyan-400 bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-500/30">Dikey</span>
+    </button>
+    <button data-station="nasa-asteroids" onclick="selectStation('nasa-asteroids'); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-amber-300 hover:bg-white/5 flex items-center justify-between">
+      <span>☄️ NASA Eyes: Asteroitler & Savunma</span>
+      <span class="text-[10px] uppercase font-bold text-amber-400 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/30">Canlı</span>
+    </button>
+    <button data-station="asteroid-launcher" onclick="selectStation('asteroid-launcher'); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-rose-300 hover:bg-white/5 flex items-center justify-between">
+      <span>💥 Asteroid Launcher (Göktaşı Çarpma)</span>
+      <span class="text-[10px] uppercase font-bold text-rose-400 bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-500/30">Çarpma</span>
+    </button>
+    <button data-station="nasa-exo" onclick="selectStation('nasa-exo'); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-purple-300 hover:bg-white/5 flex items-center justify-between">
+      <span>🔭 NASA Eyes: Ötegezegenler</span>
+      <span class="text-[10px] uppercase font-bold text-purple-400 bg-purple-950/80 px-1.5 py-0.5 rounded border border-purple-500/30">Canlı</span>
+    </button>
+    <button data-station="stars-100k" onclick="selectStation('stars-100k'); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-yellow-300 hover:bg-white/5 flex items-center justify-between">
+      <span>✨ 100.000 Yıldız (Samanyolu 3D)</span>
+      <span class="text-[10px] uppercase font-bold text-yellow-400 bg-yellow-950/80 px-1.5 py-0.5 rounded border border-yellow-500/30">WebGL</span>
+    </button>
+    <button data-station="size-of-space" onclick="selectStation('size-of-space'); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-violet-300 hover:bg-white/5 flex items-center justify-between">
+      <span>🌌 Evrenin Ölçeği (The Size of Space)</span>
+      <span class="text-[10px] uppercase font-bold text-violet-400 bg-violet-950/80 px-1.5 py-0.5 rounded border border-violet-500/30">Ölçek</span>
+    </button>
+    <button onclick="openHub(); toggleMobileMenu();" class="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold text-amber-300 hover:bg-white/5 flex items-center gap-2 border-t border-white/10 pt-2.5">
+      <span>🗂️ 14 Kartlı Modül Seçimini Aç</span>
+    </button>
+
+    <div id="mobile-planetaryum-modes" class="pt-2 border-t border-white/10 flex flex-col gap-1.5">
+      <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Planetaryum Eğitsel Araçları</div>
+      <button onclick="setLabMode('free'); toggleMobileMenu();" class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5">🪐 Yörünge Keşfi</button>
+      <button onclick="setLabMode('seasons'); toggleMobileMenu();" class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5">🌍 Mevsimler & Eksen Eğikliği</button>
+      <button onclick="setLabMode('eclipses'); toggleMobileMenu();" class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5">🌑 Ay Evreleri & Tutulmalar</button>
+      <button onclick="setLabMode('gravity'); toggleMobileMenu();" class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5">⚖️ Gezegen Karşılaştırıcı (Kilo Testi)</button>
+      <button onclick="setLabMode('kepler'); toggleMobileMenu();" class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5">📐 Kepler Yasaları</button>
+    </div>
+  </div>
+
+  <!-- RIGHT SIDEBAR: PLANET HUD / INFO CARD -->
+  <aside id="info-panel" class="absolute top-16 right-4 sm:right-6 z-20 w-80 max-w-[calc(100vw-32px)] max-h-[calc(100vh-160px)] overflow-y-auto rounded-3xl glass-panel p-5 transition-all duration-300 transform translate-x-0 shadow-2xl">
+    <div class="flex items-start justify-between gap-3 border-b border-white/10 pb-3.5">
+      <div>
+        <div class="flex items-center gap-2">
+          <span id="hud-badge" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">Yıldız</span>
+          <span id="hud-latin" class="text-xs text-slate-400 italic">Sol</span>
+        </div>
+        <h2 id="hud-name" class="text-2xl font-black tracking-tight text-white mt-0.5">Güneş</h2>
+      </div>
+      <button onclick="toggleInfoPanel(false)" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- Quick Stats Grid -->
+    <div class="grid grid-cols-2 gap-2 my-3.5">
+      <div class="glass-card rounded-xl p-2.5">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ekvator Çapı</div>
+        <div id="hud-diameter" class="text-xs font-mono font-bold text-sky-300 mt-0.5">1,392,700 km</div>
+      </div>
+      <div class="glass-card rounded-xl p-2.5">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Güneş'e Mesafe</div>
+        <div id="hud-distance" class="text-xs font-mono font-bold text-emerald-300 mt-0.5">0 km (Merkez)</div>
+      </div>
+      <div class="glass-card rounded-xl p-2.5">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Yıl Periyodu</div>
+        <div id="hud-orbit" class="text-xs font-mono font-bold text-amber-300 mt-0.5">—</div>
+      </div>
+      <div class="glass-card rounded-xl p-2.5">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Yerçekimi</div>
+        <div id="hud-gravity" class="text-xs font-mono font-bold text-purple-300 mt-0.5">274 m/s² (28g)</div>
+      </div>
+      <div class="glass-card rounded-xl p-2.5">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Yüzey Sıcaklığı</div>
+        <div id="hud-temp" class="text-xs font-mono font-bold text-rose-300 mt-0.5">~5,500 °C</div>
+      </div>
+      <div class="glass-card rounded-xl p-2.5">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bilinen Uydu</div>
+        <div id="hud-moons" class="text-xs font-mono font-bold text-indigo-300 mt-0.5">—</div>
+      </div>
+    </div>
+
+    <!-- Description & Educational Note -->
+    <div class="border-t border-white/10 pt-3">
+      <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span> Müfredat & Fen Bilgisi
+      </h3>
+      <p id="hud-desc" class="text-xs leading-relaxed text-slate-300 font-normal">
+        Güneş sisteminin kütlece %99.8'ini oluşturan merkez yıldızımızdır. Nükleer füzyon ile hidrojen helyuma dönüşür ve sistemdeki yaşamın enerji kaynağıdır.
+      </p>
+    </div>
+
+    <div class="mt-4 flex items-center gap-2">
+      <button id="focus-btn" onclick="focusCurrentPlanet()" class="flex-1 h-9 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-lg shadow-sky-500/20">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+        <span>Yaklaş & Odaklan</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- PANEL RE-OPEN BUTTON (when collapsed) -->
+  <button id="reopen-panel-btn" onclick="toggleInfoPanel(true)" class="hidden absolute top-16 right-4 sm:right-6 z-10 h-10 px-3.5 rounded-2xl glass-panel text-xs font-bold text-sky-400 hover:text-white flex items-center gap-2 shadow-xl">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <span>Bilgi Kartını Aç</span>
+  </button>
+
+  <!-- SPECIAL LAB OVERLAY: MEVSİMLER & EKSEN EĞİKLİĞİ MODU -->
+  <div id="seasons-modal" class="hidden absolute bottom-24 left-4 sm:left-6 z-20 w-96 max-w-[calc(100vw-32px)] rounded-3xl glass-panel p-5 shadow-2xl border-sky-400/30">
+    <div class="flex items-center justify-between border-b border-white/10 pb-2.5 mb-3">
+      <div class="flex items-center gap-2">
+        <span class="text-base">🌍</span>
+        <h3 class="font-bold text-sm text-white">Mevsimler ve 23.5° Eksen Eğikliği</h3>
+      </div>
+      <span class="text-[11px] font-mono font-bold text-sky-300">8. Sınıf Fen</span>
+    </div>
+    
+    <p class="text-xs text-slate-300 leading-relaxed mb-3">
+      Mevsimlerin oluşmasının ana sebebi <strong>Dünya'nın 23° 27' eksen eğikliği</strong> ve Güneş etrafındaki dolanımıdır.
+    </p>
+
+    <!-- Date selector buttons -->
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <button onclick="setSeasonDate('june')" id="season-june" class="season-btn p-2 rounded-xl text-xs font-bold glass-card text-left text-amber-300 border-amber-400/40 bg-amber-400/10">
+        ☀️ 21 Haziran
+        <div class="text-[10px] font-normal text-slate-400 mt-0.5">KYK En Uzun Gündüz (Yaz)</div>
+      </button>
+      <button onclick="setSeasonDate('december')" id="season-december" class="season-btn p-2 rounded-xl text-xs font-bold glass-card text-left text-slate-300 hover:text-white">
+        ❄️ 21 Aralık
+        <div class="text-[10px] font-normal text-slate-400 mt-0.5">KYK En Uzun Gece (Kış)</div>
+      </button>
+      <button onclick="setSeasonDate('march')" id="season-march" class="season-btn p-2 rounded-xl text-xs font-bold glass-card text-left text-slate-300 hover:text-white">
+        🌱 21 Mart
+        <div class="text-[10px] font-normal text-slate-400 mt-0.5">Ekinoks (Gece = Gündüz)</div>
+      </button>
+      <button onclick="setSeasonDate('september')" id="season-september" class="season-btn p-2 rounded-xl text-xs font-bold glass-card text-left text-slate-300 hover:text-white">
+        🍂 23 Eylül
+        <div class="text-[10px] font-normal text-slate-400 mt-0.5">Ekinoks (Gece = Gündüz)</div>
+      </button>
+    </div>
+
+    <!-- Active Season Note -->
+    <div id="season-info-box" class="p-2.5 rounded-xl bg-sky-950/60 border border-sky-500/20 text-xs text-sky-200 leading-relaxed font-mono">
+      21 Haziran: Güneş ışınları Yengeç Dönencesi'ne 90° dik açıyla düşer. Kuzey Yarımküre'de yaz başlar, gölge boyu en kısadır.
+    </div>
+
+    <!-- Direct Launcher to 3D Earth Space Lab Seasons -->
+    <button onclick="selectStation('seasons');" class="mt-3 w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/25 transition active:scale-95">
+      <span>🚀 Gelişmiş 3D Simülatörü Aç (Earth Space Lab)</span>
+    </button>
+  </div>
+
+  <!-- SPECIAL LAB OVERLAY: AY'IN EVRELERİ VE TUTULMALAR -->
+  <div id="eclipses-modal" class="hidden absolute bottom-24 left-4 sm:left-6 z-20 w-96 max-w-[calc(100vw-32px)] rounded-3xl glass-panel p-5 shadow-2xl border-indigo-400/30">
+    <div class="flex items-center justify-between border-b border-white/10 pb-2.5 mb-3">
+      <div class="flex items-center gap-2">
+        <span class="text-base">🌑</span>
+        <h3 class="font-bold text-sm text-white">Ay Evreleri & Tutulmalar</h3>
+      </div>
+      <span class="text-[11px] font-mono font-bold text-indigo-300">5. & 8. Sınıf</span>
+    </div>
+
+    <!-- Toggle Eclipse vs Phases -->
+    <div class="flex gap-2 mb-3">
+      <button onclick="setEclipseMode('solar')" id="eclipse-solar" class="flex-1 py-1.5 rounded-xl text-xs font-bold glass-card text-amber-300 bg-amber-400/10 border-amber-400/30">
+        ☀️ Güneş Tutulması
+      </button>
+      <button onclick="setEclipseMode('lunar')" id="eclipse-lunar" class="flex-1 py-1.5 rounded-xl text-xs font-bold glass-card text-rose-300 hover:bg-rose-400/10">
+        🌕 Ay Tutulması
+      </button>
+    </div>
+
+    <div id="eclipse-desc" class="p-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-xs text-slate-200 leading-relaxed mb-3">
+      <strong>Güneş Tutulması:</strong> Ay, Güneş ile Dünya arasına girer (Yeni Ay evresi). Ay'ın gölgesi Dünya'nın belirli bölgelerine düşer ve Güneş tamamen veya kısmen kapanır.
+    </div>
+
+    <!-- Moon phase slider -->
+    <div>
+      <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+        <span>Ay'ın Yörünge Dolanımı:</span>
+        <span id="moon-phase-name" class="font-bold text-sky-400">Yeni Ay (0 Gün)</span>
+      </div>
+      <input type="range" id="moon-phase-slider" min="0" max="29.5" step="0.5" value="0" oninput="updateMoonSlider(this.value)" class="w-full accent-sky-400 cursor-pointer">
+    </div>
+  </div>
+
+  <!-- SPECIAL LAB OVERLAY: GEZEGEN KARŞILAŞTIRICI & KİLO HESAPLAYICI -->
+  <div id="gravity-modal" class="hidden absolute bottom-24 left-4 sm:left-6 z-20 w-[420px] max-w-[calc(100vw-32px)] rounded-3xl glass-panel p-5 shadow-2xl border-purple-400/30">
+    <div class="flex items-center justify-between border-b border-white/10 pb-2.5 mb-3">
+      <div class="flex items-center gap-2">
+        <span class="text-base">⚖️</span>
+        <h3 class="font-bold text-sm text-white">Gezegenlerde Kilo & Zıplama Testi</h3>
+      </div>
+      <span class="text-[11px] font-mono font-bold text-purple-300">Yerçekimi Laboratuvarı</span>
+    </div>
+
+    <!-- Input Form -->
+    <div class="flex items-center gap-3 mb-3.5">
+      <div class="flex-1">
+        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Dünya'daki Kilonuz (kg)</label>
+        <input type="number" id="user-weight" value="60" min="10" max="250" oninput="calculateWeights()" class="w-full h-9 px-3 rounded-xl bg-slate-900/80 border border-white/10 text-white font-mono font-bold text-sm focus:border-purple-400 focus:outline-none">
+      </div>
+      <div class="flex-1">
+        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Normal Zıplama (cm)</label>
+        <input type="number" id="user-jump" value="40" min="5" max="150" oninput="calculateWeights()" class="w-full h-9 px-3 rounded-xl bg-slate-900/80 border border-white/10 text-white font-mono font-bold text-sm focus:border-purple-400 focus:outline-none">
+      </div>
+    </div>
+
+    <!-- Results Table -->
+    <div class="max-h-48 overflow-y-auto pr-1 flex flex-col gap-1.5" id="gravity-results-list">
+      <!-- Generated via JS -->
+    </div>
+  </div>
+
+  <!-- SPECIAL LAB OVERLAY: KEPLER YASALARI -->
+  <div id="kepler-modal" class="hidden absolute bottom-24 left-4 sm:left-6 z-20 w-96 max-w-[calc(100vw-32px)] rounded-3xl glass-panel p-5 shadow-2xl border-emerald-400/30">
+    <div class="flex items-center justify-between border-b border-white/10 pb-2.5 mb-3">
+      <div class="flex items-center gap-2">
+        <span class="text-base">📐</span>
+        <h3 class="font-bold text-sm text-white">Kepler'in Gezegen Yasaları</h3>
+      </div>
+      <span class="text-[11px] font-mono font-bold text-emerald-300">12. Sınıf Fizik</span>
+    </div>
+
+    <div class="space-y-2.5 text-xs text-slate-300">
+      <div class="p-2.5 rounded-xl glass-card border-l-2 border-emerald-400">
+        <div class="font-bold text-white mb-0.5">1. Yörüngeler Yasası</div>
+        <div>Tüm gezegenler, odaklarından birinde Güneş bulunan eliptik yörüngelerde dolanırlar.</div>
+      </div>
+      <div class="p-2.5 rounded-xl glass-card border-l-2 border-sky-400">
+        <div class="font-bold text-white mb-0.5">2. Alanlar Yasası (Hız Değişimi)</div>
+        <div>Gezegeni Güneş'e birleştiren yarıçap vektörü, eşit zaman aralıklarında eşit alanlar tarar (A₁ = A₂). Bu yüzden gezegen Güneş'e yakınken (günberi) daha hızlı, uzakken (günöte) daha yavaş hareket eder.</div>
+      </div>
+      <div class="p-2.5 rounded-xl glass-card border-l-2 border-purple-400">
+        <div class="font-bold text-white mb-0.5">3. Periyotlar Yasası</div>
+        <div>Bütün gezegenler için yörünge periyodunun karesinin, ortalama yarıçapın küpüne oranı sabittir: <code class="font-mono text-purple-300">T² / R³ = Sabit</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM CONTROL BAR: TIMELINE & PLANET SELECTION -->
+  <footer class="absolute bottom-3 inset-x-3 sm:inset-x-6 z-20 flex flex-col gap-2 pointer-events-none">
+    
+    <!-- Top Row of Footer: Simulation Speed & Toggles -->
+    <div class="flex items-center justify-between pointer-events-auto">
+      <!-- Left: Play/Pause and Speed -->
+      <div class="flex items-center gap-1.5 p-1 rounded-2xl glass-panel">
+        <button id="play-btn" onclick="togglePlay()" class="h-8 w-8 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 flex items-center justify-center font-bold transition active:scale-95 shadow-md">
+          <svg id="play-icon" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="pause-icon" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+
+        <div class="flex items-center gap-1 px-1">
+          <button onclick="setSpeed(0.2)" class="speed-btn px-2 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white">0.2x</button>
+          <button onclick="setSpeed(1)" class="speed-btn active px-2 py-1 rounded-lg text-[11px] font-bold text-sky-400 bg-sky-400/20">1x</button>
+          <button onclick="setSpeed(5)" class="speed-btn px-2 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white">5x</button>
+          <button onclick="setSpeed(25)" class="speed-btn px-2 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white">25x</button>
+          <button onclick="setSpeed(100)" class="speed-btn px-2 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white">100x</button>
+        </div>
+      </div>
+
+      <!-- Right: Orbit Lines & Scale Toggle -->
+      <div class="flex items-center gap-2">
+        <button onclick="toggleOrbitLines()" id="orbit-lines-btn" class="h-8 px-3 rounded-xl glass-panel text-xs font-semibold text-sky-300 border-sky-400/30 flex items-center gap-1.5 transition hover:text-white">
+          <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+          <span class="hidden sm:inline">Yörüngeler</span>
+        </button>
+
+        <button onclick="toggleScaleMode()" id="scale-mode-btn" class="h-8 px-3 rounded-xl glass-panel text-xs font-semibold text-amber-300 border-amber-400/30 flex items-center gap-1.5 transition hover:text-white" title="Görsel Ders Modu: Gezegenler daha büyük görünür">
+          <span>🔍</span>
+          <span class="hidden sm:inline">Görsel Ders Modu</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Bottom Row of Footer: Planet Quick Picker Bar -->
+    <div class="overflow-x-auto py-1 px-2 rounded-2xl glass-panel flex items-center gap-1 sm:gap-2 justify-start md:justify-center pointer-events-auto">
+      <button onclick="selectPlanet('sun')" id="btn-sun" class="planet-btn active flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-amber-300 bg-amber-400/20 border border-amber-400/40 whitespace-nowrap">
+        <span class="w-3 h-3 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 shadow-sm shadow-amber-400"></span>
+        <span>Güneş</span>
+      </button>
+
+      <button onclick="selectPlanet('mercury')" id="btn-mercury" class="planet-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all whitespace-nowrap">
+        <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+        <span>Merkür</span>
+      </button>
+
+      <button onclick="selectPlanet('venus')" id="btn-venus" class="planet-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all whitespace-nowrap">
+        <span class="w-2.5 h-2.5 rounded-full bg-amber-200"></span>
+        <span>Venüs</span>
+      </button>
+
+      <button onclick="selectPlanet('earth')" id="btn-earth" class="planet-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all whitespace-nowrap">
+        <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+        <span>Dünya</span>
+      </button>
+
+      <button onclick="selectPlanet('moon')" id="btn-moon" class="planet-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all whitespace-nowrap">
+        <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+        <span>Ay</span>
+      </button>
+
+      <button onclick="selectPlanet('mars')" id="btn-mars" class="planet-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all whitespace-nowrap">
+        <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+        <span>Mars</span>
+      </button>
+
+      <button onclick="selectPlanet('jupiter')" id="btn-jupiter" class="planet-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all whitespace-nowrap">
+        <span class="w-3 h-3 rounded-full bg-amber-700"></span>
+        <span>Jüpiter</span>
+      </button>
+
+      <button onclick="selectPlanet('saturn')" id="btn-saturn" class="planet-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all whitespace-nowrap">
+        <span class="w-3 h-3 rounded-full bg-yellow-600"></span>
+        <span>Satürn</span>
+      </button>
+
+      <button onclick="selectPlanet('uranus')" id="btn-uranus" class="planet-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all whitespace-nowrap">
+        <span class="w-2.5 h-2.5 rounded-full bg-teal-400"></span>
+        <span>Uranüs</span>
+      </button>
+
+      <button onclick="selectPlanet('neptune')" id="btn-neptune" class="planet-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all whitespace-nowrap">
+        <span class="w-2.5 h-2.5 rounded-full bg-blue-700"></span>
+        <span>Neptün</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- THREE.JS SIMULATION SCRIPT -->
+  <script>
+    /* ─────────────────────────────────────────────────────────────────────────────
+       GEZEGEN VERİ TABANI & BİLİMSEL VERİLER
+       ───────────────────────────────────────────────────────────────────────────── */
+    const PLANET_DATA = {
+      sun: {
+        name: 'Güneş',
+        latin: 'Sol',
+        type: 'Sarı Cüce Yıldız (G2V)',
+        diameter: '1,392,700 km',
+        distance: '0 km (Merkez)',
+        orbit: '—',
+        rotation: '27 gün',
+        gravity: '274.0 m/s² (28.0g)',
+        gravityNum: 274.0,
+        temp: '~5,500 °C (Yüzey) / 15M °C (Çekirdek)',
+        moons: '8 Gezegen, Milyonlarca Cisim',
+        desc: 'Güneş sisteminin kütlece %99.86\'sını oluşturan nükleer güç santralimizdir. Çekirdeğinde saniyede 600 milyon ton hidrojen helyuma dönüşür. Güneş olmasaydı Dünya buzdan ibaret, ışıksız bir ölü kayaç olurdu.',
+        color: 0xfbbf24,
+        size: 14,
+        realSize: 10,
+        dist: 0,
+        speed: 0
+      },
+      mercury: {
+        name: 'Merkür',
+        latin: 'Mercurius',
+        type: 'Karasal Gezegen',
+        diameter: '4,879 km',
+        distance: '57.9 Milyon km (0.39 AU)',
+        orbit: '88 Dünya Günü',
+        rotation: '58.6 Gün',
+        gravity: '3.7 m/s² (0.38g)',
+        gravityNum: 3.7,
+        temp: '-180 °C (Gece) / +430 °C (Gündüz)',
+        moons: '0',
+        desc: 'Güneş\'e en yakın ve en küçük gezegendir. Belirgin bir atmosferi olmadığı için gündüz ile gece arasındaki sıcaklık farkı 600 dereceyi bulur. Yüzeyi tıpkı Ay gibi meteor kraterleriyle kaplıdır.',
+        color: 0x9ca3af,
+        size: 2.2,
+        realSize: 0.8,
+        dist: 28,
+        speed: 0.04
+      },
+      venus: {
+        name: 'Venüs',
+        latin: 'Venus',
+        type: 'Karasal Gezegen (Sera Cehennemi)',
+        diameter: '12,104 km',
+        distance: '108.2 Milyon km (0.72 AU)',
+        orbit: '225 Dünya Günü',
+        rotation: '243 Gün (Geriye Dönüş)',
+        gravity: '8.87 m/s² (0.90g)',
+        gravityNum: 8.87,
+        temp: 'Sabit ~465 °C (En Sıcak Gezegen)',
+        moons: '0',
+        desc: 'Gökyüzündeki en parlak "Çoban Yıldızı"dır. %96 karbondioksit ve sülfürik asit bulutlarından oluşan devasa sera etkisi nedeniyle Güneş sisteminin en sıcak gezegenidir. Kendi ekseni etrafında diğer gezegenlerin aksine saat yönünde ters döner.',
+        color: 0xfde68a,
+        size: 3.6,
+        realSize: 1.8,
+        dist: 42,
+        speed: 0.03
+      },
+      earth: {
+        name: 'Dünya',
+        latin: 'Terra',
+        type: 'Karasal (Yaşam Barındıran)',
+        diameter: '12,742 km',
+        distance: '149.6 Milyon km (1.00 AU)',
+        orbit: '365.25 Gün (1 Yıl)',
+        rotation: '24 Saat (1 Gün)',
+        gravity: '9.81 m/s² (1.00g)',
+        gravityNum: 9.81,
+        temp: 'Ortalama 15 °C (-89°C ile +57°C)',
+        moons: '1 (Ay)',
+        desc: 'Üzerinde sıvı su ve oksijen bulunan bilinen tek yaşam vahasidir. 23.5 derecelik eksen eğikliği sayesinde mevsimler oluşur. Güçlü manyetosferi bizi Güneş fırtınalarından korur.',
+        color: 0x3b82f6,
+        size: 4.0,
+        realSize: 2.0,
+        dist: 60,
+        speed: 0.02
+      },
+      moon: {
+        name: 'Ay',
+        latin: 'Luna',
+        type: 'Dünya\'nın Doğal Uydusu',
+        diameter: '3,474 km',
+        distance: 'Dünya\'ya 384,400 km',
+        orbit: '27.3 Gün (Dünya Çevresinde)',
+        rotation: '27.3 Gün (Kütleçekimsel Kilit)',
+        gravity: '1.62 m/s² (0.16g)',
+        gravityNum: 1.62,
+        temp: '-130 °C / +120 °C',
+        moons: '—',
+        desc: 'Dünya\'ya kütleçekimsel kilitlidir; bu yüzden Dünya\'dan her zaman aynı yüzü görünür. Okyanuslardaki gel-git (med-cezir) olayının ana sebebidir.',
+        color: 0xe2e8f0,
+        size: 1.3,
+        realSize: 0.5,
+        dist: 6,
+        speed: 0.08
+      },
+      mars: {
+        name: 'Mars',
+        latin: 'Mars',
+        type: 'Karasal Gezegen (Kızıl Gezegen)',
+        diameter: '6,779 km',
+        distance: '227.9 Milyon km (1.52 AU)',
+        orbit: '687 Dünya Günü',
+        rotation: '24 Saat 37 Dk',
+        gravity: '3.72 m/s² (0.38g)',
+        gravityNum: 3.72,
+        temp: 'Ortalama -65 °C',
+        moons: '2 (Phobos, Deimos)',
+        desc: 'Toprağındaki demir oksit (pas) nedeniyle pas kırmızısı görünür. Güneş sisteminin en yüksek yanardağı olan 22 km yüksekliğindeki Olimpos Dağı (Olympus Mons) buradadır.',
+        color: 0xef4444,
+        size: 2.8,
+        realSize: 1.1,
+        dist: 80,
+        speed: 0.015
+      },
+      jupiter: {
+        name: 'Jüpiter',
+        latin: 'Iuppiter',
+        type: 'Gaz Devi (Gezegenlerin Kralı)',
+        diameter: '139,820 km',
+        distance: '778.5 Milyon km (5.20 AU)',
+        orbit: '11.86 Yıl',
+        rotation: '9 Saat 55 Dk (En Hızlı)',
+        gravity: '24.79 m/s² (2.53g)',
+        gravityNum: 24.79,
+        temp: '-110 °C',
+        moons: '95 (Ganymede, Europa…)',
+        desc: 'Güneş sisteminin en büyük gezegenidir; içine yaklaşık 1,300 tane Dünya sığabilir. Üzerindeki meşhur "Büyük Kırmızı Leke", Dünya büyüklüğünde ve en az 350 yıldır esen devasa bir siklon fırtınasıdır.',
+        color: 0xd97706,
+        size: 9.0,
+        realSize: 4.5,
+        dist: 110,
+        speed: 0.009
+      },
+      saturn: {
+        name: 'Satürn',
+        latin: 'Saturnus',
+        type: 'Gaz Devi (Halkalı Gezegen)',
+        diameter: '116,460 km',
+        distance: '1.43 Milyar km (9.58 AU)',
+        orbit: '29.4 Yıl',
+        rotation: '10 Saat 33 Dk',
+        gravity: '10.44 m/s² (1.06g)',
+        gravityNum: 10.44,
+        temp: '-140 °C',
+        moons: '146 (Titan, Enceladus…)',
+        desc: 'Buz, kaya ve toz parçacıklarından oluşan binlerce halkasıyla gökyüzünün en büyüleyici mücevheridir. Ortalama yoğunluğu sudan daha azdır (0.69 g/cm³); devasa bir okyanus olsaydı Satürn batmaz, yüzerdi!',
+        color: 0xfbbf24,
+        size: 7.5,
+        realSize: 3.8,
+        dist: 145,
+        speed: 0.006,
+        hasRings: true
+      },
+      uranus: {
+        name: 'Uranüs',
+        latin: 'Uranus',
+        type: 'Buz Devi',
+        diameter: '50,724 km',
+        distance: '2.87 Milyar km (19.2 AU)',
+        orbit: '84 Yıl',
+        rotation: '17 Saat 14 Dk (Ters)',
+        gravity: '8.69 m/s² (0.89g)',
+        gravityNum: 8.69,
+        temp: '-195 °C (En Soğuk Gezegen)',
+        moons: '28 (Titania, Miranda…)',
+        desc: 'Metan gazı nedeniyle turkuaz renkte parlar. En ilginç özelliği 98 derecelik eksen eğikliğidir; adeta yuvarlanan bir top gibi yörüngesinde yan yatarak döner. Kutupları 42 yıl kesintisiz gündüz, 42 yıl gece yaşar.',
+        color: 0x2dd4bf,
+        size: 5.0,
+        realSize: 2.5,
+        dist: 180,
+        speed: 0.004
+      },
+      neptune: {
+        name: 'Neptün',
+        latin: 'Neptunus',
+        type: 'Buz Devi (Rüzgarlı Gezegen)',
+        diameter: '49,244 km',
+        distance: '4.50 Milyar km (30.1 AU)',
+        orbit: '164.8 Yıl',
+        rotation: '16 Saat 6 Dk',
+        gravity: '11.15 m/s² (1.14g)',
+        gravityNum: 11.15,
+        temp: '-200 °C',
+        moons: '16 (Triton…)',
+        desc: 'Güneş sisteminin en dıştaki gaz devidir. Derin masmavi rengi atmosferindeki metandan gelir. Saatte 2,100 km hıza ulaşan süpersonik rüzgarlarıyla sistemin en fırtınalı yeridir.',
+        color: 0x2563eb,
+        size: 4.8,
+        realSize: 2.4,
+        dist: 215,
+        speed: 0.003
+      }
+    };
+
+    /* ─────────────────────────────────────────────────────────────────────────────
+       PROSEDÜREL DOKU OLUŞTURUCU (SIFIR HARİCİ ASSET GEREKTİRİR)
+       ───────────────────────────────────────────────────────────────────────────── */
+    function createProceduralTexture(type, colorHex) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+
+      const baseColor = new THREE.Color(colorHex);
+      ctx.fillStyle = `#${baseColor.getHexString()}`;
+      ctx.fillRect(0, 0, 512, 256);
+
+      if (type === 'sun') {
+        for (let i = 0; i < 80; i++) {
+          const x = Math.random() * 512;
+          const y = Math.random() * 256;
+          const r = 20 + Math.random() * 50;
+          const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+          grad.addColorStop(0, 'rgba(255, 255, 200, 0.4)');
+          grad.addColorStop(1, 'rgba(234, 88, 12, 0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (type === 'earth') {
+        ctx.fillStyle = '#1d4ed8';
+        ctx.fillRect(0, 0, 512, 256);
+        ctx.fillStyle = '#15803d';
+        for (let i = 0; i < 35; i++) {
+          const cx = Math.random() * 512;
+          const cy = 40 + Math.random() * 170;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 30 + Math.random() * 45, 20 + Math.random() * 30, Math.random(), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+        for (let i = 0; i < 15; i++) {
+          const cy = Math.random() * 256;
+          ctx.fillRect(0, cy, 512, 4 + Math.random() * 8);
+        }
+      } else if (type === 'jupiter') {
+        const colors = ['#d97706', '#b45309', '#fef3c7', '#78350f', '#f59e0b'];
+        for (let y = 0; y < 256; y += 12) {
+          ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+          ctx.fillRect(0, y, 512, 12);
+        }
+        ctx.fillStyle = '#b91c1c';
+        ctx.beginPath();
+        ctx.ellipse(350, 160, 35, 20, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (type === 'saturn') {
+        const colors = ['#fde68a', '#fef08a', '#d97706', '#fbbf24'];
+        for (let y = 0; y < 256; y += 8) {
+          ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+          ctx.fillRect(0, y, 512, 8);
+        }
+      } else if (type === 'mars') {
+        ctx.fillStyle = '#b91c1c';
+        ctx.fillRect(0, 0, 512, 256);
+        ctx.fillStyle = '#7f1d1d';
+        for (let i = 0; i < 40; i++) {
+          ctx.beginPath();
+          ctx.arc(Math.random() * 512, Math.random() * 256, 4 + Math.random() * 15, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function createSaturnRingTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 1;
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 256, 0);
+      grad.addColorStop(0.0, 'rgba(0,0,0,0)');
+      grad.addColorStop(0.1, 'rgba(217, 119, 6, 0.4)');
+      grad.addColorStop(0.4, 'rgba(251, 191, 36, 0.8)');
+      grad.addColorStop(0.55, 'rgba(0,0,0,0.1)');
+      grad.addColorStop(0.65, 'rgba(254, 240, 138, 0.9)');
+      grad.addColorStop(0.9, 'rgba(217, 119, 6, 0.3)');
+      grad.addColorStop(1.0, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 256, 1);
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    /* ─────────────────────────────────────────────────────────────────────────────
+       THREE.JS SAHNE VE KAMERA KURULUMU
+       ───────────────────────────────────────────────────────────────────────────── */
+    let scene, camera, renderer, controls;
+    let planets = {};
+    let orbitLines = [];
+    let isPlaying = true;
+    let simSpeed = 1;
+    let currentSelected = 'sun';
+    let currentStation = 'planetaryum'; // 'planetaryum' | 'nasa-solar' | 'nasa-earth'
+    let currentLabMode = 'free';
+    let isEducationalScale = true;
+    let areOrbitsVisible = true;
+    let cameraTarget = new THREE.Vector3(0, 0, 0);
+    let targetCameraPos = new THREE.Vector3(0, 120, 240);
+
+    const container = document.getElementById('canvas-container');
+
+    function initThree() {
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x030712, 0.001);
+
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 3000);
+      camera.position.set(0, 130, 240);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.1;
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.06;
+      controls.maxDistance = 1200;
+      controls.minDistance = 3;
+
+      const ambientLight = new THREE.AmbientLight(0x334155, 0.4);
+      scene.add(ambientLight);
+
+      const sunLight = new THREE.PointLight(0xffffff, 2.4, 2500, 0.5);
+      sunLight.position.set(0, 0, 0);
+      scene.add(sunLight);
+
+      createStarfield();
+      createAsteroidBelt();
+      createPlanets();
+
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    function createStarfield() {
+      const starsCount = 4500;
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(starsCount * 3);
+      const colors = new Float32Array(starsCount * 3);
+
+      for (let i = 0; i < starsCount; i++) {
+        const radius = 1000 + Math.random() * 1000;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+
+        positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+        positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+        positions[i * 3 + 2] = radius * Math.cos(phi);
+
+        const shade = 0.7 + Math.random() * 0.3;
+        colors[i * 3] = shade;
+        colors[i * 3 + 1] = shade;
+        colors[i * 3 + 2] = 1.0;
+      }
+
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const material = new THREE.PointsMaterial({
+        size: 2.2,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.85
+      });
+
+      const starPoints = new THREE.Points(geometry, material);
+      scene.add(starPoints);
+    }
+
+    function createAsteroidBelt() {
+      const count = 1200;
+      const geom = new THREE.BufferGeometry();
+      const pos = new Float32Array(count * 3);
+
+      for (let i = 0; i < count; i++) {
+        const dist = 92 + Math.random() * 12;
+        const angle = Math.random() * Math.PI * 2;
+        const y = (Math.random() - 0.5) * 4;
+
+        pos[i * 3] = Math.cos(angle) * dist;
+        pos[i * 3 + 1] = y;
+        pos[i * 3 + 2] = Math.sin(angle) * dist;
+      }
+
+      geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const mat = new THREE.PointsMaterial({ color: 0x94a3b8, size: 1.2, transparent: true, opacity: 0.7 });
+      const belt = new THREE.Points(geom, mat);
+      scene.add(belt);
+    }
+
+    function createPlanets() {
+      const sunData = PLANET_DATA.sun;
+      const sunGeom = new THREE.SphereGeometry(sunData.size, 64, 64);
+      const sunTex = createProceduralTexture('sun', sunData.color);
+      const sunMat = new THREE.MeshBasicMaterial({ map: sunTex });
+      const sunMesh = new THREE.Mesh(sunGeom, sunMat);
+      scene.add(sunMesh);
+
+      const glowGeom = new THREE.SphereGeometry(sunData.size * 1.3, 32, 32);
+      const glowMat = new THREE.MeshBasicMaterial({
+        color: 0xf59e0b,
+        transparent: true,
+        opacity: 0.22,
+        side: THREE.BackSide
+      });
+      const glowMesh = new THREE.Mesh(glowGeom, glowMat);
+      sunMesh.add(glowMesh);
+
+      planets.sun = { mesh: sunMesh, data: sunData, angle: 0 };
+
+      Object.keys(PLANET_DATA).forEach(key => {
+        if (key === 'sun' || key === 'moon') return;
+        const data = PLANET_DATA[key];
+
+        const pivot = new THREE.Group();
+        scene.add(pivot);
+
+        const size = isEducationalScale ? data.size : data.realSize;
+        const geom = new THREE.SphereGeometry(size, 48, 48);
+        const tex = createProceduralTexture(key, data.color);
+        const mat = new THREE.MeshStandardMaterial({
+          map: tex,
+          roughness: 0.7,
+          metalness: 0.1
+        });
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.position.x = data.dist;
+        pivot.add(mesh);
+
+        if (data.hasRings) {
+          const ringGeom = new THREE.RingGeometry(size * 1.4, size * 2.5, 64);
+          const ringTex = createSaturnRingTexture();
+          const ringMat = new THREE.MeshStandardMaterial({
+            map: ringTex,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.9
+          });
+          const ringMesh = new THREE.Mesh(ringGeom, ringMat);
+          ringMesh.rotation.x = Math.PI / 2 + 0.35;
+          mesh.add(ringMesh);
+        }
+
+        if (key === 'earth') {
+          mesh.rotation.z = (23.5 * Math.PI) / 180;
+
+          const moonData = PLANET_DATA.moon;
+          const moonGeom = new THREE.SphereGeometry(moonData.size, 24, 24);
+          const moonMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.9 });
+          const moonMesh = new THREE.Mesh(moonGeom, moonMat);
+          mesh.add(moonMesh);
+
+          planets.moon = {
+            mesh: moonMesh,
+            data: moonData,
+            angle: 0,
+            dist: 7.5
+          };
+        }
+
+        const orbitCurve = new THREE.EllipseCurve(0, 0, data.dist, data.dist, 0, 2 * Math.PI, false, 0);
+        const orbitPoints = orbitCurve.getPoints(120);
+        const orbitGeom = new THREE.BufferGeometry().setFromPoints(
+          orbitPoints.map(p => new THREE.Vector3(p.x, 0, p.y))
+        );
+        const orbitMat = new THREE.LineBasicMaterial({
+          color: 0x38bdf8,
+          transparent: true,
+          opacity: 0.25
+        });
+        const orbitLine = new THREE.Line(orbitGeom, orbitMat);
+        scene.add(orbitLine);
+        orbitLines.push(orbitLine);
+
+        planets[key] = {
+          pivot,
+          mesh,
+          data,
+          angle: Math.random() * Math.PI * 2,
+          orbitLine
+        };
+      });
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    /* ─────────────────────────────────────────────────────────────────────────────
+       ANİMASYON DÖNGÜSÜ (RENDER LOOP)
+       ───────────────────────────────────────────────────────────────────────────── */
+    let lastTime = 0;
+
+    function animate(time) {
+      requestAnimationFrame(animate);
+
+      if (currentStation !== 'planetaryum') {
+        return;
+      }
+
+      const delta = (time - lastTime) * 0.001 || 0.016;
+      lastTime = time;
+
+      if (planets.sun) {
+        planets.sun.mesh.rotation.y += 0.003;
+      }
+
+      if (isPlaying) {
+        Object.keys(planets).forEach(key => {
+          if (key === 'sun') return;
+
+          if (key === 'moon') {
+            const moon = planets.moon;
+            moon.angle += 0.04 * simSpeed;
+            moon.mesh.position.x = Math.cos(moon.angle) * moon.dist;
+            moon.mesh.position.z = Math.sin(moon.angle) * moon.dist;
+            return;
+          }
+
+          const p = planets[key];
+          p.angle += p.data.speed * 0.5 * simSpeed;
+
+          p.mesh.position.x = Math.cos(p.angle) * p.data.dist;
+          p.mesh.position.z = Math.sin(p.angle) * p.data.dist;
+
+          p.mesh.rotation.y += 0.02 * simSpeed;
+        });
+      }
+
+      controls.target.lerp(cameraTarget, 0.05);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    /* ─────────────────────────────────────────────────────────────────────────────
+       KULLANICI ARAYÜZÜ (UI) & ETKİLEŞİM FONKSİYONLARI
+       ───────────────────────────────────────────────────────────────────────────── */
+    function selectPlanet(key) {
+      currentSelected = key;
+      const data = PLANET_DATA[key];
+      if (!data) return;
+
+      document.querySelectorAll('.planet-btn').forEach(btn => {
+        btn.classList.remove('active', 'bg-amber-400/20', 'border', 'border-amber-400/40', 'text-amber-300');
+        btn.classList.add('text-slate-300');
+      });
+      const activeBtn = document.getElementById(`btn-${key}`);
+      if (activeBtn) {
+        activeBtn.classList.add('active', 'bg-amber-400/20', 'border', 'border-amber-400/40', 'text-amber-300');
+        activeBtn.classList.remove('text-slate-300');
+      }
+
+      document.getElementById('hud-name').innerText = data.name;
+      document.getElementById('hud-latin').innerText = data.latin;
+      document.getElementById('hud-badge').innerText = data.type;
+      document.getElementById('hud-diameter').innerText = data.diameter;
+      document.getElementById('hud-distance').innerText = data.distance;
+      document.getElementById('hud-orbit').innerText = data.orbit;
+      document.getElementById('hud-gravity').innerText = data.gravity;
+      document.getElementById('hud-temp').innerText = data.temp;
+      document.getElementById('hud-moons').innerText = data.moons;
+      document.getElementById('hud-desc').innerText = data.desc;
+
+      toggleInfoPanel(true);
+      focusCurrentPlanet();
+    }
+
+    function focusCurrentPlanet() {
+      const key = currentSelected;
+      if (key === 'sun') {
+        cameraTarget = new THREE.Vector3(0, 0, 0);
+        targetCameraPos = new THREE.Vector3(0, 25, 45);
+      } else if (key === 'moon') {
+        const earthMesh = planets.earth.mesh;
+        cameraTarget = earthMesh.position;
+        targetCameraPos = new THREE.Vector3(earthMesh.position.x + 8, earthMesh.position.y + 4, earthMesh.position.z + 12);
+      } else {
+        const p = planets[key];
+        if (p) {
+          cameraTarget = p.mesh.position;
+          const offset = isEducationalScale ? p.data.size * 3.5 : p.data.realSize * 5;
+          targetCameraPos = new THREE.Vector3(
+            p.mesh.position.x + offset,
+            p.mesh.position.y + offset * 0.6,
+            p.mesh.position.z + offset
+          );
+        }
+      }
+
+      camera.position.set(targetCameraPos.x, targetCameraPos.y, targetCameraPos.z);
+    }
+
+    function resetCamera() {
+      cameraTarget = new THREE.Vector3(0, 0, 0);
+      camera.position.set(0, 130, 240);
+      controls.target.set(0, 0, 0);
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      document.getElementById('play-icon').classList.toggle('hidden', isPlaying);
+      document.getElementById('pause-icon').classList.toggle('hidden', !isPlaying);
+    }
+
+    function setSpeed(s) {
+      simSpeed = s;
+      document.querySelectorAll('.speed-btn').forEach(b => {
+        b.classList.remove('active', 'text-sky-400', 'bg-sky-400/20');
+        b.classList.add('text-slate-400');
+      });
+      event.target.classList.add('active', 'text-sky-400', 'bg-sky-400/20');
+      event.target.classList.remove('text-slate-400');
+    }
+
+    function toggleOrbitLines() {
+      areOrbitsVisible = !areOrbitsVisible;
+      orbitLines.forEach(l => l.visible = areOrbitsVisible);
+      document.getElementById('orbit-lines-btn').classList.toggle('opacity-50', !areOrbitsVisible);
+    }
+
+    function toggleScaleMode() {
+      isEducationalScale = !isEducationalScale;
+      document.getElementById('scale-mode-btn').innerText = isEducationalScale ? '🔍 Görsel Ders Modu' : '📏 Gerçek Oran Modu';
+
+      Object.keys(planets).forEach(k => {
+        if (k === 'sun') return;
+        const p = planets[k];
+        const newSize = isEducationalScale ? p.data.size : p.data.realSize;
+        p.mesh.scale.set(newSize / p.data.size, newSize / p.data.size, newSize / p.data.size);
+      });
+    }
+
+    function toggleInfoPanel(show) {
+      const panel = document.getElementById('info-panel');
+      const reopenBtn = document.getElementById('reopen-panel-btn');
+      if (show) {
+        panel.classList.remove('translate-x-full', 'opacity-0');
+        reopenBtn.classList.add('hidden');
+      } else {
+        panel.classList.add('translate-x-full', 'opacity-0');
+        reopenBtn.classList.remove('hidden');
+      }
+    }
+
+    function toggleMobileMenu() {
+      document.getElementById('mobile-menu').classList.toggle('hidden');
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    /* ─────────────────────────────────────────────────────────────────────────────
+       ANA İSTASYON YÖNETİMİ & MODÜL SEÇİM MERKEZİ (HUB)
+       ───────────────────────────────────────────────────────────────────────────── */
+    function openHub() {
+      const hub = document.getElementById('hub-modal');
+      if (hub) hub.classList.remove('hidden');
+    }
+
+    function closeHub() {
+      const hub = document.getElementById('hub-modal');
+      if (hub) hub.classList.add('hidden');
+    }
+
+    function selectStation(station) {
+      currentStation = station;
+
+      // Update Desktop Station Tabs
+      document.querySelectorAll('.station-tab').forEach(btn => {
+        btn.classList.remove(
+          'active', 
+          'text-sky-400', 'bg-sky-500/20', 'border', 'border-sky-400/40', 
+          'text-cyan-300', 'bg-cyan-500/20', 'border-cyan-400/40', 
+          'text-emerald-300', 'bg-emerald-500/20', 'border-emerald-400/40', 
+          'text-blue-300', 'bg-blue-500/20', 'border-blue-400/40', 
+          'text-amber-300', 'bg-amber-500/20', 'border-amber-400/40', 
+          'text-purple-300', 'bg-purple-500/20', 'border-purple-400/40',
+          'text-yellow-300', 'bg-yellow-500/20', 'border-yellow-400/40',
+          'text-teal-300', 'bg-teal-500/20', 'border-teal-400/40',
+          'text-violet-300', 'bg-violet-500/20', 'border-violet-400/40',
+          'text-rose-300', 'bg-rose-500/20', 'border-rose-400/40'
+        );
+        btn.classList.add('text-slate-300');
+      });
+      const activeBtn = document.getElementById(`station-btn-${station}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('text-slate-300');
+        if (station === 'planetaryum') {
+          activeBtn.classList.add('active', 'text-sky-400', 'bg-sky-500/20', 'border', 'border-sky-400/40');
+        } else if (station === 'nasa-solar') {
+          activeBtn.classList.add('active', 'text-cyan-300', 'bg-cyan-500/20', 'border', 'border-cyan-400/40');
+        } else if (station === 'nasa-earth') {
+          activeBtn.classList.add('active', 'text-emerald-300', 'bg-emerald-500/20', 'border', 'border-emerald-400/40');
+        } else if (station === 'nasa-iss') {
+          activeBtn.classList.add('active', 'text-blue-300', 'bg-blue-500/20', 'border', 'border-blue-400/40');
+        } else if (station === 'nasa-asteroids') {
+          activeBtn.classList.add('active', 'text-amber-300', 'bg-amber-500/20', 'border', 'border-amber-400/40');
+        } else if (station === 'nasa-exo') {
+          activeBtn.classList.add('active', 'text-purple-300', 'bg-purple-500/20', 'border', 'border-purple-400/40');
+        } else if (station === 'stars-100k') {
+          activeBtn.classList.add('active', 'text-yellow-300', 'bg-yellow-500/20', 'border', 'border-yellow-400/40');
+        } else if (station === 'earth-nullschool') {
+          activeBtn.classList.add('active', 'text-teal-300', 'bg-teal-500/20', 'border', 'border-teal-400/40');
+        } else if (station === 'size-of-space') {
+          activeBtn.classList.add('active', 'text-violet-300', 'bg-violet-500/20', 'border', 'border-violet-400/40');
+        } else if (station === 'seasons') {
+          activeBtn.classList.add('active', 'text-emerald-300', 'bg-emerald-500/20', 'border', 'border-emerald-400/40');
+        } else if (station === 'solarscope') {
+          activeBtn.classList.add('active', 'text-amber-300', 'bg-amber-500/20', 'border', 'border-amber-400/40');
+        } else if (station === 'ventusky') {
+          activeBtn.classList.add('active', 'text-teal-300', 'bg-teal-500/20', 'border', 'border-teal-400/40');
+        } else if (station === 'asteroid-launcher') {
+          activeBtn.classList.add('active', 'text-rose-300', 'bg-rose-500/20', 'border', 'border-rose-400/40');
+        } else if (station === 'space-elevator') {
+          activeBtn.classList.add('active', 'text-cyan-300', 'bg-cyan-500/20', 'border', 'border-cyan-400/40');
+        }
+      }
+
+      // Update Mobile Menu Buttons
+      document.querySelectorAll('#mobile-menu button[data-station]').forEach(btn => {
+        const s = btn.getAttribute('data-station');
+        if (s === station) {
+          btn.classList.add('font-bold', 'bg-white/10', 'border', 'border-white/20');
+          btn.classList.remove('font-semibold');
+        } else {
+          btn.classList.remove('font-bold', 'bg-white/10', 'border', 'border-white/20', 'border-sky-500/20', 'bg-sky-500/10');
+          btn.classList.add('font-semibold');
+        }
+      });
+
+      const canvasContainer = document.getElementById('canvas-container');
+      const solarContainer = document.getElementById('nasa-solar-container');
+      const earthContainer = document.getElementById('nasa-earth-container');
+      const issContainer = document.getElementById('nasa-iss-container');
+      const asteroidsContainer = document.getElementById('nasa-asteroids-container');
+      const exoContainer = document.getElementById('nasa-exo-container');
+      const starsContainer = document.getElementById('stars-100k-container');
+      const nullschoolContainer = document.getElementById('earth-nullschool-container');
+      const sizeContainer = document.getElementById('size-of-space-container');
+      const seasonsContainer = document.getElementById('seasons-container');
+      const solarScopeContainer = document.getElementById('solar-scope-container');
+      const ventuskyContainer = document.getElementById('ventusky-container');
+      const asteroidLauncherContainer = document.getElementById('asteroid-launcher-container');
+      const spaceElevatorContainer = document.getElementById('space-elevator-container');
+      const bottomFooter = document.querySelector('footer');
+      const subbar = document.getElementById('planetaryum-subbar');
+      const reopenBtn = document.getElementById('reopen-panel-btn');
+      const mobilePlanetaryumModes = document.getElementById('mobile-planetaryum-modes');
+
+      const allNasaContainers = [
+        solarContainer, earthContainer, issContainer, asteroidsContainer, 
+        exoContainer, starsContainer, nullschoolContainer, sizeContainer, 
+        seasonsContainer, solarScopeContainer, ventuskyContainer, 
+        asteroidLauncherContainer, spaceElevatorContainer
+      ];
+
+      if (station === 'planetaryum') {
+        allNasaContainers.forEach(c => { if (c) c.classList.add('hidden'); });
+        if (canvasContainer) canvasContainer.classList.remove('hidden');
+        if (bottomFooter) bottomFooter.classList.remove('hidden');
+        if (subbar) subbar.classList.remove('hidden');
+        if (mobilePlanetaryumModes) mobilePlanetaryumModes.classList.remove('hidden');
+        onWindowResize();
+        return;
+      }
+
+      // If a non-planetaryum station is active
+      if (canvasContainer) canvasContainer.classList.add('hidden');
+      if (bottomFooter) bottomFooter.classList.add('hidden');
+      if (subbar) subbar.classList.add('hidden');
+      if (mobilePlanetaryumModes) mobilePlanetaryumModes.classList.add('hidden');
+      toggleInfoPanel(false);
+      if (reopenBtn) reopenBtn.classList.add('hidden');
+
+      function activateNasaIframe(targetContainer, iframeId, loadingId, url) {
+        allNasaContainers.forEach(c => {
+          if (c) {
+            if (c === targetContainer) c.classList.remove('hidden');
+            else c.classList.add('hidden');
+          }
+        });
+
+        const iframe = document.getElementById(iframeId);
+        const loading = document.getElementById(loadingId);
+        if (iframe && !iframe.getAttribute('src')) {
+          if (loading) loading.classList.remove('hidden', 'opacity-0');
+          iframe.onload = function() {
+            setTimeout(() => {
+              if (loading) {
+                loading.classList.add('opacity-0');
+                setTimeout(() => loading.classList.add('hidden'), 500);
+              }
+            }, 600);
+          };
+          iframe.src = url;
+        }
+      }
+
+      if (station === 'nasa-solar') {
+        activateNasaIframe(solarContainer, 'nasa-solar-iframe', 'nasa-solar-loading', 'https://eyes.nasa.gov/apps/solar-system/#/home');
+      } else if (station === 'nasa-earth') {
+        activateNasaIframe(earthContainer, 'nasa-earth-iframe', 'nasa-earth-loading', 'https://eyes.nasa.gov/apps/earth/#/');
+      } else if (station === 'nasa-iss') {
+        activateNasaIframe(issContainer, 'nasa-iss-iframe', 'nasa-iss-loading', 'https://eyes.nasa.gov/apps/earth/#/satellites/iss');
+      } else if (station === 'nasa-asteroids') {
+        activateNasaIframe(asteroidsContainer, 'nasa-asteroids-iframe', 'nasa-asteroids-loading', 'https://eyes.nasa.gov/apps/asteroids/#/home');
+      } else if (station === 'nasa-exo') {
+        activateNasaIframe(exoContainer, 'nasa-exo-iframe', 'nasa-exo-loading', 'https://eyes.nasa.gov/apps/exo/#/');
+      } else if (station === 'stars-100k') {
+        activateNasaIframe(starsContainer, 'stars-100k-iframe', 'stars-100k-loading', 'https://stars.chromeexperiments.com');
+      } else if (station === 'earth-nullschool') {
+        activateNasaIframe(nullschoolContainer, 'earth-nullschool-iframe', 'earth-nullschool-loading', 'https://earth.nullschool.net/#current/wind/surface/level/orthographic=-331.91,3.24,443');
+      } else if (station === 'size-of-space') {
+        allNasaContainers.forEach(c => {
+          if (c) {
+            if (c === sizeContainer) c.classList.remove('hidden');
+            else c.classList.add('hidden');
+          }
+        });
+      } else if (station === 'seasons') {
+        activateNasaIframe(seasonsContainer, 'seasons-iframe', 'seasons-loading', 'https://www.earthspacelab.com/app/seasons/tr');
+      } else if (station === 'solarscope') {
+        activateNasaIframe(solarScopeContainer, 'solar-scope-iframe', 'solar-scope-loading', 'https://www.solarsystemscope.com/iframe');
+      } else if (station === 'ventusky') {
+        activateNasaIframe(ventuskyContainer, 'ventusky-iframe', 'ventusky-loading', 'https://www.ventusky.com/?p=39.0;35.0;5&l=wind-10m');
+      } else if (station === 'asteroid-launcher') {
+        allNasaContainers.forEach(c => {
+          if (c) {
+            if (c === asteroidLauncherContainer) c.classList.remove('hidden');
+            else c.classList.add('hidden');
+          }
+        });
+      } else if (station === 'space-elevator') {
+        allNasaContainers.forEach(c => {
+          if (c) {
+            if (c === spaceElevatorContainer) c.classList.remove('hidden');
+            else c.classList.add('hidden');
+          }
+        });
+      }
+    }
+
+    /* ─────────────────────────────────────────────────────────────────────────────
+       ÖZEL EĞİTSEL LABORATUVAR MODLARI (Planetaryum İçi)
+       ───────────────────────────────────────────────────────────────────────────── */
+    function setLabMode(mode) {
+      currentLabMode = mode;
+
+      document.querySelectorAll('.mode-tab').forEach(t => {
+        t.classList.remove('active', 'text-sky-400', 'bg-sky-500/20', 'border', 'border-sky-400/40');
+        t.classList.add('text-slate-300');
+      });
+      const activeTab = document.getElementById(`tab-${mode}`);
+      if (activeTab) {
+        activeTab.classList.add('active', 'text-sky-400', 'bg-sky-500/20', 'border', 'border-sky-400/40');
+        activeTab.classList.remove('text-slate-300');
+      }
+
+      document.getElementById('seasons-modal').classList.add('hidden');
+      document.getElementById('eclipses-modal').classList.add('hidden');
+      document.getElementById('gravity-modal').classList.add('hidden');
+      document.getElementById('kepler-modal').classList.add('hidden');
+
+      if (mode === 'free') {
+        selectPlanet('sun');
+        resetCamera();
+      } else if (mode === 'seasons') {
+        document.getElementById('seasons-modal').classList.remove('hidden');
+        selectPlanet('earth');
+        setSeasonDate('june');
+      } else if (mode === 'eclipses') {
+        document.getElementById('eclipses-modal').classList.remove('hidden');
+        selectPlanet('earth');
+        setEclipseMode('solar');
+      } else if (mode === 'gravity') {
+        document.getElementById('gravity-modal').classList.remove('hidden');
+        calculateWeights();
+      } else if (mode === 'kepler') {
+        document.getElementById('kepler-modal').classList.remove('hidden');
+        selectPlanet('mercury');
+      }
+    }
+
+    function setSeasonDate(date) {
+      document.querySelectorAll('.season-btn').forEach(b => {
+        b.classList.remove('border-amber-400/40', 'bg-amber-400/10', 'text-amber-300');
+        b.classList.add('text-slate-300');
+      });
+      const activeBtn = document.getElementById(`season-${date}`);
+      if (activeBtn) {
+        activeBtn.classList.add('border-amber-400/40', 'bg-amber-400/10', 'text-amber-300');
+      }
+
+      const infoBox = document.getElementById('season-info-box');
+      const earth = planets.earth;
+
+      if (date === 'june') {
+        earth.angle = Math.PI / 2;
+        infoBox.innerHTML = "<strong>21 Haziran (Yaz Gündönümü):</strong> Güneş ışınları Yengeç Dönencesi'ne 90° dik açıyla düşer. Kuzey Yarımküre'de en uzun gündüz yaşanır ve yaz mevsimi başlar. Güney Yarımküre kışı yaşar.";
+      } else if (date === 'december') {
+        earth.angle = (3 * Math.PI) / 2;
+        infoBox.innerHTML = "<strong>21 Aralık (Kış Gündönümü):</strong> Güneş ışınları Oğlak Dönencesi'ne dik açıyla düşer. Kuzey Yarımküre'de en uzun gece yaşanır ve kış mevsimi başlar.";
+      } else if (date === 'march') {
+        earth.angle = 0;
+        infoBox.innerHTML = "<strong>21 Mart (İlkbahar Ekinoksu):</strong> Güneş ışınları Ekvator'a dik düşer. Tüm Dünya'da gece ve gündüz süreleri eşittir (12 saat gündüz, 12 saat gece).";
+      } else if (date === 'september') {
+        earth.angle = Math.PI;
+        infoBox.innerHTML = "<strong>23 Eylül (Sonbahar Ekinoksu):</strong> Güneş ışınları Ekvator'a dik düşer. Ekinoks gerçekleşir; Kuzey Yarımküre'de sonbahar, Güney Yarımküre'de ilkbahar başlar.";
+      }
+
+      earth.mesh.position.x = Math.cos(earth.angle) * earth.data.dist;
+      earth.mesh.position.z = Math.sin(earth.angle) * earth.data.dist;
+      focusCurrentPlanet();
+    }
+
+    function setEclipseMode(type) {
+      const earth = planets.earth;
+      const moon = planets.moon;
+      const desc = document.getElementById('eclipse-desc');
+
+      if (type === 'solar') {
+        moon.angle = 0;
+        desc.innerHTML = "<strong>Güneş Tutulması:</strong> Ay, Güneş ile Dünya arasına girer (Yeni Ay evresi). Ay'ın tam gölgesi (umbra) Dünya üzerinde küçük bir alana düşer. O bölgedekiler gündüz vakti Güneş'in tamamen karardığını görür.";
+      } else {
+        moon.angle = Math.PI;
+        desc.innerHTML = "<strong>Ay Tutulması:</strong> Dünya, Ay ile Güneş arasına girer (Dolunay evresi). Dünya'nın devasa gölgesi Ay'ı örter. Atmosferden süzülen kırmızı dalga boylu ışınlar yüzünden Ay bakır kırmızısı görünür (Kanlı Ay).";
+      }
+      moon.mesh.position.x = Math.cos(moon.angle) * moon.dist;
+      moon.mesh.position.z = Math.sin(moon.angle) * moon.dist;
+    }
+
+    function updateMoonSlider(val) {
+      const days = parseFloat(val);
+      const moon = planets.moon;
+      moon.angle = (days / 29.5) * Math.PI * 2;
+      moon.mesh.position.x = Math.cos(moon.angle) * moon.dist;
+      moon.mesh.position.z = Math.sin(moon.angle) * moon.dist;
+
+      const phaseName = document.getElementById('moon-phase-name');
+      if (days < 3.5 || days > 26) phaseName.innerText = `Yeni Ay (${days} Gün)`;
+      else if (days < 7) phaseName.innerText = `Hilal (${days} Gün)`;
+      else if (days < 11) phaseName.innerText = `İlk Dördün (${days} Gün)`;
+      else if (days < 14.5) phaseName.innerText = `Şişkin Ay (${days} Gün)`;
+      else if (days < 18) phaseName.innerText = `Dolunay (${days} Gün)`;
+      else if (days < 22) phaseName.innerText = `Son Dördün (${days} Gün)`;
+      else phaseName.innerText = `Hilal (${days} Gün)`;
+    }
+
+    function calculateWeights() {
+      const weight = parseFloat(document.getElementById('user-weight').value) || 60;
+      const jump = parseFloat(document.getElementById('user-jump').value) || 40;
+      const list = document.getElementById('gravity-results-list');
+      list.innerHTML = '';
+
+      const items = [
+        { name: 'Ay', g: 1.62, color: 'text-slate-300' },
+        { name: 'Merkür', g: 3.7, color: 'text-slate-400' },
+        { name: 'Mars', g: 3.72, color: 'text-red-400' },
+        { name: 'Venüs', g: 8.87, color: 'text-amber-300' },
+        { name: 'Dünya', g: 9.81, color: 'text-sky-400' },
+        { name: 'Satürn', g: 10.44, color: 'text-yellow-400' },
+        { name: 'Neptün', g: 11.15, color: 'text-blue-400' },
+        { name: 'Jüpiter', g: 24.79, color: 'text-amber-500' }
+      ];
+
+      items.forEach(item => {
+        const planetWeight = ((weight / 9.81) * item.g).toFixed(1);
+        const planetJump = ((jump * 9.81) / item.g).toFixed(0);
+
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between p-2 rounded-xl glass-card text-xs';
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="font-bold ${item.color}">${item.name}</span>
+            <span class="text-[10px] text-slate-400 font-mono">(${item.g} m/s²)</span>
+          </div>
+          <div class="flex items-center gap-4 font-mono font-bold">
+            <span class="text-emerald-300">${planetWeight} kg</span>
+            <span class="text-purple-300">Zıplama: ${planetJump} cm</span>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+    }
+
+    /* ─────────────────────────────────────────────────────────────────────────────
+       UZAY AMBİYANS SES MOTORU (WEB AUDIO API)
+       ───────────────────────────────────────────────────────────────────────────── */
+    let audioCtx = null;
+    let isAudioPlaying = false;
+    let osc1, osc2, gainNode;
+
+    function toggleAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        osc1 = audioCtx.createOscillator();
+        osc2 = audioCtx.createOscillator();
+        gainNode = audioCtx.createGain();
+
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(55, audioCtx.currentTime);
+
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(110, audioCtx.currentTime);
+
+        gainNode.gain.setValueAtTime(0.04, audioCtx.currentTime);
+
+        osc1.connect(gainNode);
+        osc2.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        osc1.start();
+        osc2.start();
+        isAudioPlaying = true;
+      } else {
+        if (isAudioPlaying) {
+          gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+          isAudioPlaying = false;
+        } else {
+          gainNode.gain.setTargetAtTime(0.04, audioCtx.currentTime, 0.1);
+          isAudioPlaying = true;
+        }
+      }
+
+      document.getElementById('sound-icon-on').classList.toggle('hidden', !isAudioPlaying);
+      document.getElementById('sound-icon-off').classList.toggle('hidden', isAudioPlaying);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initThree();
+      animate(0);
+      selectPlanet('sun');
+
+      // Check URL parameters for direct station selection
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab') || params.get('station');
+      if (tab === 'nasa-solar' || tab === 'solar') {
+        selectStation('nasa-solar');
+        closeHub();
+      } else if (tab === 'nasa-earth' || tab === 'earth') {
+        selectStation('nasa-earth');
+        closeHub();
+      } else if (tab === 'nasa-iss' || tab === 'iss') {
+        selectStation('nasa-iss');
+        closeHub();
+      } else if (tab === 'nasa-asteroids' || tab === 'asteroids' || tab === 'neo') {
+        selectStation('nasa-asteroids');
+        closeHub();
+      } else if (tab === 'nasa-exo' || tab === 'exo' || tab === 'exoplanets') {
+        selectStation('nasa-exo');
+        closeHub();
+      } else if (tab === 'stars-100k' || tab === 'stars' || tab === 'galaxy') {
+        selectStation('stars-100k');
+        closeHub();
+      } else if (tab === 'earth-nullschool' || tab === 'nullschool' || tab === 'wind') {
+        selectStation('earth-nullschool');
+        closeHub();
+      } else if (tab === 'size-of-space' || tab === 'space-size' || tab === 'size') {
+        selectStation('size-of-space');
+        closeHub();
+      } else if (tab === 'seasons' || tab === 'mevsimler' || tab === 'earthspace') {
+        selectStation('seasons');
+        closeHub();
+      } else if (tab === 'solarscope' || tab === 'solarsystemscope' || tab === 'scope') {
+        selectStation('solarscope');
+        closeHub();
+      } else if (tab === 'ventusky' || tab === 'weather') {
+        selectStation('ventusky');
+        closeHub();
+      } else if (tab === 'asteroid-launcher' || tab === 'asteroid' || tab === 'launcher') {
+        selectStation('asteroid-launcher');
+        closeHub();
+      } else if (tab === 'space-elevator' || tab === 'elevator' || tab === 'asansor') {
+        selectStation('space-elevator');
+        closeHub();
+      } else if (tab === 'planetaryum' || tab === '3d') {
+        selectStation('planetaryum');
+        closeHub();
+      } else {
+        // By default open the 14 Cards Hub so student/teacher can choose
+        selectStation('planetaryum');
+        openHub();
+      }
+    });
+  </script>
+</body>
+</html>
