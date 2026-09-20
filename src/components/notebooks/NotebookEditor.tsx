@@ -495,11 +495,27 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         if (isLoading) return;
         dirtyRef.current = true;
         if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+        /**
+         * Kalem kağıttayken kaydetme.
+         *
+         * Kayıt, bütün sayfaları kopyalayıp JSON'a çevirir; bu iş ana iş
+         * parçacığını yüz milisaniyelerce kilitleyebilir. Çizimin ortasına
+         * denk geldiğinde işaretçi olayları birikir ve çizgi kalemin
+         * gerisinde kalıp sıçrar. Hareket bitene kadar beklenir.
+         */
+        const deadline = Date.now() + 6000;
+        const runWhenIdle = () => {
+            saveTimerRef.current = null;
+            // Erteleme sonsuza kadar sürmesin: bir işaretçi olayı düşerse
+            // (tarayıcı "pointerup" göndermezse) defter yine de kaydedilir.
+            if (canvasRef.current?.isBusy() && Date.now() < deadline) {
+                saveTimerRef.current = window.setTimeout(runWhenIdle, 350);
+                return;
+            }
+            void save();
+        };
         saveTimerRef.current = window.setTimeout(
-            () => {
-                saveTimerRef.current = null;
-                void save();
-            },
+            runWhenIdle,
             // Ortak çizimde canlılığı işlem akışı sağlar; anlık görüntü daha
             // seyrek yazılır, iki cihaz birbirini sürekli tetiklemesin.
             Date.now() - collabAtRef.current < 20000 ? 3000 : 1200
@@ -1051,7 +1067,10 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             {saveBlock === 'full' ? 'Defter dolu — kaydedilmiyor' : 'Kayıt durduruldu'}
                         </span>
                     ) : (
-                        <span className="hidden sm:flex items-center gap-1.5 text-[12px] font-semibold text-white/85 px-2">
+                        // Genişlik sabit: durum yazısı değiştikçe (Otomatik
+                        // kayıt → Kaydediliyor… → Kaydedildi) yanındaki
+                        // düğmeler sağa sola kaymasın.
+                        <span className="hidden sm:flex items-center gap-1.5 text-[12px] font-semibold text-white/85 px-2 w-[136px] shrink-0">
                             {saveState === 'saving' ? (
                                 <>
                                     <Loader2 className="w-3.5 h-3.5 animate-spin" /> Kaydediliyor…
