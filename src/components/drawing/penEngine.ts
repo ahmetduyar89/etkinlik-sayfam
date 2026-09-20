@@ -151,11 +151,19 @@ export const hasPressure = (points: Point[]): boolean =>
 /**
  * Değişken kalınlıklı serbest çizgi.
  *
- * Çizgi, tek bir kapalı şerit olarak DOLDURULUR: her noktanın iki yanına
+ * Çizgi, kapalı şeritler olarak DOLDURULUR: her noktanın iki yanına
  * kalınlığın yarısı kadar açılıp sol kenar ileri, sağ kenar geri dolaşılır.
  * Parça parça `stroke()` çağırmak daha basit olurdu ama komşu parçaların
  * kalınlıkları farklı olduğunda yuvarlak uçlar birbirinin üstüne taşar ve
  * çizgi boncuklu görünür.
+ *
+ * Şerit KESKİN DÖNÜŞLERDE bölünür. Kalem geri döndüğünde (karalama, keskin
+ * köşe, kalın uçla dar viraj) iç kenar kendi üstünden geçer; tek bir kapalı
+ * yol olarak doldurulduğunda bu bölgenin sarım sayısı sıfıra düşer ve
+ * çizginin ortasında beyaz yarıklar açılırdı. Her parça kendi içinde
+ * dönüşsüz olduğu için hepsi aynı yönde sarar; üst üste binmeleri sorun
+ * çıkarmaz. Parçalar tek bir yolda toplanıp bir kez doldurulur: yarı saydam
+ * uçlarda (keçeli, fırça) kesişmeler koyu benek bırakmaz.
  */
 export function drawVariableStroke(
     ctx: CanvasRenderingContext2D,
@@ -171,15 +179,25 @@ export function drawVariableStroke(
         if (!last || Math.hypot(q.x - last.x, q.y - last.y) > 0.01) pts.push(q);
     }
 
-    const dot = (pt: Point) => {
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, Math.max(0.3, widthAt(pt) / 2), 0, Math.PI * 2);
-        ctx.fill();
+    if (pts.length === 0) return;
+
+    /**
+     * Tam daire. Şeritlerle aynı yönde (saat yönünün tersi kapalı) sarar;
+     * ters sararsa şeritle kesiştiği yerde dolgu birbirini götürürdü.
+     */
+    const disc = (pt: Point) => {
+        const r = Math.max(0.3, widthAt(pt) / 2);
+        ctx.moveTo(pt.x + r, pt.y);
+        // Bitiş açısı EKSİ 2π: tarayıcı tam daireyi ancak bu yönde ister,
+        // `0 → 2π` ters yönde istendiğinde boş yay çizilir.
+        ctx.arc(pt.x, pt.y, r, 0, -Math.PI * 2, true);
     };
 
-    if (pts.length === 0) return;
+    ctx.beginPath();
+
     if (pts.length === 1) {
-        dot(pts[0]);
+        disc(pts[0]);
+        ctx.fill();
         return;
     }
 
@@ -200,6 +218,69 @@ export function drawVariableStroke(
         right.push({ x: pts[i].x - nx, y: pts[i].y - ny });
     }
 
+    /**
+     * Şeridin bölünmesi gereken köşeler.
+     *
+     * İki ölçüt var:
+     *  1. Dönüş 90°'den keskinse (kalem geri dönüyorsa) kenarlar yer değiştirir.
+     *  2. Dönüş daha yumuşak olsa bile iç kenar, komşu adımdan uzun bir yay
+     *     çizmek zorunda kalıyorsa (kalın uçla dar viraj) yine kendini keser.
+     */
+    const breakAt: boolean[] = new Array(n).fill(false);
+    for (let i = 1; i < n - 1; i++) {
+        const inX = pts[i].x - pts[i - 1].x;
+        const inY = pts[i].y - pts[i - 1].y;
+        const outX = pts[i + 1].x - pts[i].x;
+        const outY = pts[i + 1].y - pts[i].y;
+        const inLen = Math.hypot(inX, inY) || 1;
+        const outLen = Math.hypot(outX, outY) || 1;
+        const cos = (inX * outX + inY * outY) / (inLen * outLen);
+        if (cos <= 0) {
+            breakAt[i] = true;
+            continue;
+        }
+        // tan(θ/2): dönüş açısının yarısı. İç kenarın geri gittiği mesafe
+        // yarı kalınlığın bu katı kadardır; komşu adımı aşıyorsa şerit katlanır.
+        const half = pressureToWidth(base, pts[i].p, stroke.penType) / 2;
+        const sin = Math.abs((inX * outY - inY * outX) / (inLen * outLen));
+        if (half * (sin / (1 + cos)) > Math.min(inLen, outLen)) breakAt[i] = true;
+    }
+
+    // İkinci güvence: kenarlardan biri, çizginin gittiği yönün TERSİNE
+    // ilerliyorsa o adımda şerit zaten katlanmıştır. Köşe ölçütü kaçırırsa
+    // (kalınlık noktadan noktaya çok değiştiğinde olur) bu yakalar.
+    for (let i = 0; i < n - 1; i++) {
+        if (breakAt[i] && breakAt[i + 1]) continue;
+        const dx = pts[i + 1].x - pts[i].x;
+        const dy = pts[i + 1].y - pts[i].y;
+        const len = Math.hypot(dx, dy) || 1;
+        const ux = dx / len;
+        const uy = dy / len;
+        const lFwd = (left[i + 1].x - left[i].x) * ux + (left[i + 1].y - left[i].y) * uy;
+        const rFwd = (right[i + 1].x - right[i].x) * ux + (right[i + 1].y - right[i].y) * uy;
+        if (lFwd <= 0 || rFwd <= 0) {
+            // Adımın iki ucu da kırılırsa bu parça tek başına kalır ve
+            // katlanma parçanın içinde değil, parçalar arasında olur.
+            breakAt[i] = true;
+            breakAt[i + 1] = true;
+        }
+    }
+
+    // Parçalar ayrıca uzunlukça sınırlanır: uzun bir şerit keskin dönüş
+    // olmadan da (geniş bir ilmek çizerken) kendi üstünden geçebilir ve aynı
+    // sıfır sarım sorununu yaşar. Ayrı parçalar birbirini götürmez; kısa
+    // tutmak bu ihtimali ortadan kaldırır, görünüşe etkisi yoktur.
+    const MAX_PIECE_POINTS = 24;
+    const breaks: number[] = [];
+    let sinceBreak = 0;
+    for (let i = 1; i < n - 1; i++) {
+        sinceBreak++;
+        if (breakAt[i] || sinceBreak >= MAX_PIECE_POINTS) {
+            breaks.push(i);
+            sinceBreak = 0;
+        }
+    }
+
     const mid = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
     /**
@@ -212,20 +293,35 @@ export function drawVariableStroke(
         ctx.arc(center.x, center.y, widthAt(center) / 2, angle, angle - Math.PI, true);
     };
 
-    ctx.beginPath();
-    ctx.moveTo(left[0].x, left[0].y);
-    for (let i = 1; i < n - 1; i++) {
-        const to = mid(left[i], left[i + 1]);
-        ctx.quadraticCurveTo(left[i].x, left[i].y, to.x, to.y);
+    /** [a, b] aralığındaki noktaları tek bir kapalı şerit olarak ekler. */
+    const ribbon = (a: number, b: number) => {
+        if (a === b) {
+            disc(pts[a]);
+            return;
+        }
+        ctx.moveTo(left[a].x, left[a].y);
+        for (let i = a + 1; i < b; i++) {
+            const to = mid(left[i], left[i + 1]);
+            ctx.quadraticCurveTo(left[i].x, left[i].y, to.x, to.y);
+        }
+        ctx.lineTo(left[b].x, left[b].y);
+        cap(pts[b], left[b]);
+        for (let i = b - 1; i > a; i--) {
+            const to = mid(right[i], right[i - 1]);
+            ctx.quadraticCurveTo(right[i].x, right[i].y, to.x, to.y);
+        }
+        ctx.lineTo(right[a].x, right[a].y);
+        cap(pts[a], right[a]);
+        ctx.closePath();
+    };
+
+    // Parçalar kırılma noktasını PAYLAŞIR; aralarında boşluk kalmaz.
+    let start = 0;
+    for (const i of breaks) {
+        ribbon(start, i);
+        start = i;
     }
-    ctx.lineTo(left[n - 1].x, left[n - 1].y);
-    cap(pts[n - 1], left[n - 1]);
-    for (let i = n - 2; i > 0; i--) {
-        const to = mid(right[i], right[i - 1]);
-        ctx.quadraticCurveTo(right[i].x, right[i].y, to.x, to.y);
-    }
-    ctx.lineTo(right[0].x, right[0].y);
-    cap(pts[0], right[0]);
-    ctx.closePath();
+    ribbon(start, n - 1);
+
     ctx.fill();
 }

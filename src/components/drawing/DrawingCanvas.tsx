@@ -219,13 +219,17 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const onViewChangeRef = React.useRef(onViewChange);
         /** Aktif işaretçiler — çift parmak yakınlaştırmayı tanımak için. */
         const pointersRef = React.useRef(new Map<number, Point>());
+        /**
+         * Çift parmak jestinin başlangıç durumu: parmak arası mesafe, o anki
+         * ölçek ve parmakların ORTA NOKTASININ altında kalan dünya noktası.
+         * Görünüm her karede bu dünya noktası güncel orta noktaya gelecek
+         * şekilde kurulur; böylece aynı jest hem yakınlaştırır hem kaydırır.
+         */
         const pinchRef = React.useRef<{
             dist: number;
             scale: number;
-            centerX: number;
-            centerY: number;
-            tx: number;
-            ty: number;
+            worldX: number;
+            worldY: number;
         } | null>(null);
         const panRef = React.useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
 
@@ -1068,6 +1072,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 applyOps: (ops: NotebookOp[]) => applyOps(ops),
                 getCurrentPage: () => currentPageRef.current,
                 getPageCount: () => pagesRef.current.length,
+                isBusy: () =>
+                    isDrawingRef.current ||
+                    dragStateRef.current !== null ||
+                    pointersRef.current.size > 0,
                 getPages: () => {
                     pagesRef.current[currentPageRef.current] = [...strokesRef.current];
                     return pagesRef.current.map((page) =>
@@ -2071,6 +2079,29 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
         };
 
+        /**
+         * Çift parmak jestini o anki parmak konumlarına göre kurar.
+         *
+         * Parmak eklenip çıkarıldığında da çağrılır: aksi hâlde kalan
+         * parmaklar eski ölçüye göre hesaplanır ve sayfa bir anda sıçrardı.
+         */
+        const anchorPinch = () => {
+            const pointers = [...pointersRef.current.values()];
+            if (pointers.length < 2) {
+                pinchRef.current = null;
+                return;
+            }
+            const [a, b] = pointers;
+            const center = toCanvasPoint((a.x + b.x) / 2, (a.y + b.y) / 2);
+            const v = viewRef.current;
+            pinchRef.current = {
+                dist: Math.hypot(b.x - a.x, b.y - a.y) || 1,
+                scale: v.scale,
+                worldX: (center.x - v.tx) / v.scale,
+                worldY: (center.y - v.ty) / v.scale,
+            };
+        };
+
         const startDrawing = async (e: React.PointerEvent) => {
             if (!enabled) return;
             // İşaretçiyi yakala: el tuvalin kenarından ya da üstteki araç
@@ -2087,16 +2118,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (viewportEnabled && pointersRef.current.size === 2) {
                 cancelCurrentStroke();
                 clearOverlay();
-                const [a, b] = [...pointersRef.current.values()];
-                const center = toCanvasPoint((a.x + b.x) / 2, (a.y + b.y) / 2);
-                pinchRef.current = {
-                    dist: Math.hypot(b.x - a.x, b.y - a.y) || 1,
-                    scale: viewRef.current.scale,
-                    centerX: center.x,
-                    centerY: center.y,
-                    tx: viewRef.current.tx,
-                    ty: viewRef.current.ty,
-                };
+                anchorPinch();
                 return;
             }
             if (pointersRef.current.size > 1) return;
@@ -2407,7 +2429,11 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 }
             }
 
-            // Çift parmak yakınlaştırma
+            // Çift parmak: yakınlaştırma VE kaydırma.
+            // Parmakların orta noktası nereye giderse, jest başladığında onun
+            // altında duran dünya noktası da oraya taşınır. Yalnızca ölçek
+            // hesaplansaydı (eski hâli) parmaklar birlikte kaydırıldığında
+            // aralarındaki mesafe değişmediği için sayfa yerinde kalırdı.
             const pinch = pinchRef.current;
             if (pinch && pointersRef.current.size >= 2) {
                 const [a, b] = [...pointersRef.current.values()];
@@ -2416,11 +2442,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     MAX_SCALE,
                     Math.max(MIN_SCALE, (pinch.scale * dist) / pinch.dist)
                 );
-                const focus = {
-                    x: pinch.centerX - (pinch.centerX - pinch.tx) * (scale / pinch.scale),
-                    y: pinch.centerY - (pinch.centerY - pinch.ty) * (scale / pinch.scale),
-                };
-                applyViewChange({ scale, tx: focus.x, ty: focus.y });
+                const center = toCanvasPoint((a.x + b.x) / 2, (a.y + b.y) / 2);
+                applyViewChange({
+                    scale,
+                    tx: center.x - pinch.worldX * scale,
+                    ty: center.y - pinch.worldY * scale,
+                });
                 return;
             }
 
@@ -2721,7 +2748,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 // İki parmak = geri al, üç parmak = ileri al.
                 resolveTap();
             }
-            if (pointersRef.current.size < 2) pinchRef.current = null;
+            // Parmak sayısı değişti: jest kalan parmaklara göre yeniden kurulur
+            // (ikiden aza inince kapanır), yoksa görünüm sıçrar.
+            if (pinchRef.current) anchorPinch();
             if (rulerDragRef.current) {
                 rulerDragRef.current = null;
                 return;

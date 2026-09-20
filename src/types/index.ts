@@ -489,6 +489,13 @@ export interface DrawingCanvasHandle {
     getPageCount: () => number;
     /** Tüm sayfaların çizim verisini (kayıt için) döndürür. */
     getPages: () => Stroke[][];
+    /**
+     * Şu anda bir hareket sürüyor mu (kalem kağıtta, nesne sürükleniyor,
+     * parmak ekranda)? Otomatik kayıt bu sırada beklemeli: sayfanın tamamını
+     * JSON'a çevirmek ana iş parçacığını kilitler ve çizgi kalemin gerisinde
+     * kalır.
+     */
+    isBusy: () => boolean;
     /** Kayıtlı sayfa verisini canvas'a yükler. */
     loadPages: (pages: Stroke[][]) => void;
     /** Başka bir cihazdan gelen değişiklikleri uygular (ortak çizim). */
