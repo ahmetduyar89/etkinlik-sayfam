@@ -18,6 +18,7 @@ import { MoleculeBuilderTool } from '../tools/MoleculeBuilderTool';
 import { LinearGraphTool } from '../tools/LinearGraphTool';
 import { MathFormulaTool } from '../tools/MathFormulaTool';
 import { useToast } from '../common/ToastProvider';
+import { useSurfaceTint } from '../../utils/surfaceTint';
 import type { Activity, DrawConfig, DrawingCanvasHandle, Submission } from '../../types';
 
 interface StudentPortalProps {
@@ -58,6 +59,10 @@ export function StudentPortal({ act }: StudentPortalProps) {
     const submissionsHandler = useFirestore<Submission>('submissions');
     const isMountedRef = React.useRef(true);
     const toast = useToast();
+
+    // Öğrenci ekranı tam ekran ve koyudur; kurulu uygulamada üstteki
+    // saat/pil şeridi de aynı renge boyanır.
+    useSurfaceTint('#0f172a');
 
     useEffect(() => {
         isMountedRef.current = true;
