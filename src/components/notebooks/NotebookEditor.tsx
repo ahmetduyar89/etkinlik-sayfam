@@ -25,6 +25,7 @@ import {
     FileText,
 } from 'lucide-react';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
+import { useSurfaceTint } from '../../utils/surfaceTint';
 import { DrawingToolbar } from '../drawing/DrawingToolbar';
 import { TextBoxLayer } from '../tools/TextBoxLayer';
 import { usePrompt } from '../common/PromptDialog';
@@ -104,6 +105,10 @@ const PAPER_GROUPS = PAPER_STYLES.reduce<
 
 export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEditorProps) {
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
+
+    // Defter tam ekran açılır; kurulu uygulamada saat/pil şeridi üst şeridin
+    // rengini alsın, araya beyaz bir bant girmesin.
+    useSurfaceTint('#6366f1');
     /** Bağlı PDF sayfasının işlenmiş tuvali — PNG çıktısında arka plan olur. */
     const pdfCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
     const handlePdfCanvas = React.useCallback((c: HTMLCanvasElement | null) => {
