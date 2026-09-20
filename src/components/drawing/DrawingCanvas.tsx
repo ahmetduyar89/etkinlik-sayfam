@@ -230,6 +230,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             scale: number;
             worldX: number;
             worldY: number;
+            /** Tuvalin ekrandaki yeri; jest boyunca yeniden ölçülmez. */
+            map: { left: number; top: number; sx: number; sy: number };
         } | null>(null);
         const panRef = React.useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
 
@@ -380,6 +382,26 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
          * dahil). Yakınlaştırma çapasının `toWorld` ile aynı ölçüyü kullanması
          * şart; aksi halde üst katmanda ölçek varken zoom kayıyordu.
          */
+        /**
+         * Tuvalin ekrandaki yeri ve CSS ölçeği.
+         *
+         * `getBoundingClientRect` yerleşimi (layout) hesaplatır; jest boyunca
+         * her işaretçi olayında çağırmak, aynı anda süren React render'larıyla
+         * birleşince kaydırmayı takılmalı yapar. Jest başında bir kez ölçülüp
+         * saklanır.
+         */
+        const canvasMetrics = () => {
+            const canvas = canvasRef.current;
+            const rect = canvas?.getBoundingClientRect();
+            if (!canvas || !rect) return { left: 0, top: 0, sx: 1, sy: 1 };
+            return {
+                left: rect.left,
+                top: rect.top,
+                sx: rect.width ? canvas.offsetWidth / rect.width : 1,
+                sy: rect.height ? canvas.offsetHeight / rect.height : 1,
+            };
+        };
+
         const toCanvasPoint = (clientX: number, clientY: number): Point => {
             const canvas = canvasRef.current;
             const rect = canvas?.getBoundingClientRect();
@@ -645,19 +667,69 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             };
         }, [animatedIndexes, hasAnimated, paintMain]);
 
-        /** Görünümü değiştirir ve yeniden çizer. */
+        /**
+         * Görünümü değiştirir ve yeniden çizer.
+         *
+         * İşaretçi olayları ekran karesinden daha sık gelir (tablette saniyede
+         * 120'ye kadar). Her olayda hem bütün sayfayı yeniden çizmek hem de
+         * React durumunu güncellemek — ki bu, kağıt deseni ve metin kutuları
+         * görünümü takip etsin diye defter ekranının tamamını yeniden
+         * render eder — kaydırmayı takılmalı hâle getiriyordu. Görünüm artık
+         * KAREDE BİR kez uygulanır: `viewRef` anında güncellenir (isabet
+         * testleri ve dünya/ekran dönüşümleri doğru kalsın), ekrana yansıması
+         * bir sonraki çizim karesine bırakılır.
+         */
+        const viewFrameRef = React.useRef<number | null>(null);
+        const pendingViewRef = React.useRef<Viewport | null>(null);
+
+        const flushView = React.useCallback(() => {
+            const pending = pendingViewRef.current;
+            pendingViewRef.current = null;
+            if (!pending) return;
+            // Jest sürerken bu bileşenin kendi durumu güncellenmez: `view`
+            // yalnızca seçim tutamaçlarının ve metin kutusu imlecinin DOM
+            // konumunu besler, mürekkep ve seçim çerçevesi zaten `viewRef` ile
+            // çizilir. Hareket bitince (stopDrawing) bir kez eşitlenir.
+            if (!pinchRef.current && !panRef.current) setViewState(pending);
+            onViewChangeRef.current?.(pending, getCanvasSize());
+            redraw();
+            if (rulerRef.current) clearOverlay();
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [redraw]);
+
+        /** Jest bitince görünüm durumunu tuvalin gerçek görünümüyle eşitler. */
+        const syncViewState = React.useCallback(() => {
+            setViewState((prev) => {
+                const v = viewRef.current;
+                return prev.scale === v.scale && prev.tx === v.tx && prev.ty === v.ty
+                    ? prev
+                    : { ...v };
+            });
+        }, []);
+
         const applyViewChange = React.useCallback(
             (next: Viewport) => {
                 const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, next.scale));
                 const v = { scale, tx: next.tx, ty: next.ty };
                 viewRef.current = v;
-                setViewState(v);
-                onViewChangeRef.current?.(v, getCanvasSize());
-                redraw();
-                if (rulerRef.current) clearOverlay();
+                pendingViewRef.current = v;
+                if (viewFrameRef.current !== null) return;
+                viewFrameRef.current = window.requestAnimationFrame(() => {
+                    viewFrameRef.current = null;
+                    flushView();
+                });
             },
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-            [redraw]
+            [flushView]
+        );
+
+        React.useEffect(
+            () => () => {
+                if (viewFrameRef.current !== null) {
+                    window.cancelAnimationFrame(viewFrameRef.current);
+                    viewFrameRef.current = null;
+                }
+            },
+            []
         );
 
         /** Ekrandaki bir noktayı sabit tutarak yakınlaştırır. */
@@ -2092,13 +2164,18 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
             const [a, b] = pointers;
-            const center = toCanvasPoint((a.x + b.x) / 2, (a.y + b.y) / 2);
+            const map = canvasMetrics();
+            const center = {
+                x: ((a.x + b.x) / 2 - map.left) * map.sx,
+                y: ((a.y + b.y) / 2 - map.top) * map.sy,
+            };
             const v = viewRef.current;
             pinchRef.current = {
                 dist: Math.hypot(b.x - a.x, b.y - a.y) || 1,
                 scale: v.scale,
                 worldX: (center.x - v.tx) / v.scale,
                 worldY: (center.y - v.ty) / v.scale,
+                map,
             };
         };
 
@@ -2442,11 +2519,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     MAX_SCALE,
                     Math.max(MIN_SCALE, (pinch.scale * dist) / pinch.dist)
                 );
-                const center = toCanvasPoint((a.x + b.x) / 2, (a.y + b.y) / 2);
+                const { map } = pinch;
+                const centerX = ((a.x + b.x) / 2 - map.left) * map.sx;
+                const centerY = ((a.y + b.y) / 2 - map.top) * map.sy;
                 applyViewChange({
                     scale,
-                    tx: center.x - pinch.worldX * scale,
-                    ty: center.y - pinch.worldY * scale,
+                    tx: centerX - pinch.worldX * scale,
+                    ty: centerY - pinch.worldY * scale,
                 });
                 return;
             }
@@ -2751,6 +2830,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             // Parmak sayısı değişti: jest kalan parmaklara göre yeniden kurulur
             // (ikiden aza inince kapanır), yoksa görünüm sıçrar.
             if (pinchRef.current) anchorPinch();
+            if (!pinchRef.current && !panRef.current) syncViewState();
             if (rulerDragRef.current) {
                 rulerDragRef.current = null;
                 return;
@@ -2758,6 +2838,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             rulerEdgeRef.current = null;
             if (panRef.current) {
                 panRef.current = null;
+                syncViewState();
                 return;
             }
 
