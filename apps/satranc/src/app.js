@@ -1,6 +1,6 @@
 import { el, clear } from "./utils/dom.js";
 import { currentRoute, navigate, onRouteChange } from "./utils/router.js";
-import { navItems } from "./data/lessons.js";
+import { navGroups } from "./data/lessons.js";
 import { ProgressService } from "./services/ProgressService.js";
 import { SoundService } from "./audio/SoundService.js";
 import { icon } from "./components/Icon.js";
@@ -24,17 +24,40 @@ import { ProfilePage } from "./pages/ProfilePage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
 import { ClassesPage } from "./pages/ClassesPage.js";
 import { TournamentPage } from "./pages/TournamentPage.js";
+import { ReportsPage } from "./pages/ReportsPage.js";
 import { classroom } from "./services/ClassroomService.js";
 
 const progress = new ProgressService();
 const sound = new SoundService(progress);
 const root = document.querySelector("#app");
+const ROLE_KEY = "satranc-okulu-role";
+
+function readRole() {
+  try {
+    return localStorage.getItem(ROLE_KEY) === "student" ? "student" : "teacher";
+  } catch {
+    return "teacher";
+  }
+}
+
+let role = readRole();
+
+function setRole(next) {
+  role = next === "student" ? "student" : "teacher";
+  try { localStorage.setItem(ROLE_KEY, role); } catch { /* Kısıtlı tarayıcıda oturumluk çalışır. */ }
+  if (role === "student" && ["siniflar", "turnuva", "reports"].includes(currentRoute())) {
+    navigate("home");
+    return;
+  }
+  render();
+}
 
 const pages = {
   home: HomePage,
   plan: PlanPage,
   siniflar: ClassesPage,
   turnuva: TournamentPage,
+  reports: ReportsPage,
   learn: LearnPage,
   board: BoardPage,
   pieces: PiecesPage,
@@ -55,17 +78,22 @@ const pages = {
 function renderNav(route) {
   return el("nav", { className: "side-nav", "aria-label": "Ana menü" }, [
     el("button", { className: "brand", type: "button", onClick: () => navigate("home"), html: `${icon("crown")}<span>Satranç Eğitimi</span>` }),
-    ...navItems.map(([id, label, iconName]) =>
-      el("button", {
-        className: `nav-link ${route === id ? "active" : ""}`,
-        type: "button",
-        onClick: () => {
-          sound.play("click");
-          navigate(id);
-        },
-        html: `${icon(iconName)}<span>${label}</span>`
-      })
-    ),
+    ...navGroups
+      .filter((group) => group.roles.includes(role))
+      .flatMap((group) => [
+        group.title ? el("p", { className: "nav-section-title", text: group.title }) : null,
+        ...group.items.map(([id, label, iconName]) =>
+          el("button", {
+            className: `nav-link ${route === id ? "active" : ""}`,
+            type: "button",
+            onClick: () => {
+              sound.play("click");
+              navigate(id);
+            },
+            html: `${icon(iconName)}<span>${label}</span>`
+          })
+        )
+      ]),
     // Menünün en altındaki imza — her ekranda görünür ama içeriği gölgelemez.
     el("footer", { className: "nav-credit" }, [
       el("span", { className: "credit-line", text: "Hazırlayan" }),
@@ -103,7 +131,23 @@ function renderTopbar() {
       },
       html: icon(collapsed ? "menuOpen" : "menuClose")
     }),
-    renderClassPicker(),
+    el("div", { className: "role-switch", "aria-label": "Kullanım modu" }, [
+      el("button", {
+        className: role === "student" ? "active" : "",
+        type: "button",
+        text: "Öğrenci",
+        "aria-pressed": String(role === "student"),
+        onClick: () => setRole("student")
+      }),
+      el("button", {
+        className: role === "teacher" ? "active" : "",
+        type: "button",
+        text: "Öğretmen",
+        "aria-pressed": String(role === "teacher"),
+        onClick: () => setRole("teacher")
+      })
+    ]),
+    role === "teacher" ? renderClassPicker() : null,
     xpStat,
     starStat,
     el("button", { className: "icon-button", type: "button", title: "Ayarlar", onClick: () => navigate("settings"), html: icon("settings") })
@@ -162,7 +206,7 @@ function render() {
   clear(root);
   const content = el("div", { className: "content-shell" }, [
     renderTopbar(),
-    pages[route]({ progress, sound, rerender: render })
+    pages[route]({ progress, sound, rerender: render, role })
   ]);
   root.append(renderNav(route), content);
   reveal(content);
