@@ -30,6 +30,7 @@ import {
     Scan,
     PanelTop,
     PanelBottom,
+    BookOpen,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, MathObject, PaperStyle, RulerKind } from '../../types';
@@ -55,6 +56,7 @@ interface DrawingToolbarProps {
     onCommand: (type: ToolbarCommand) => void;
     config: DrawConfig;
     setConfig: (c: DrawConfig) => void;
+    fixed?: boolean;
     showWhiteboard?: boolean;
     setShowWhiteboard?: (val: boolean) => void;
     bgColor?: string;
@@ -102,10 +104,20 @@ function sectionForTool(tool: DrawingTool): ToolSettingsSection | null {
     return null;
 }
 
+const TOOL_SHORTCUTS: Record<string, string> = {
+    pencil: 'P',
+    eraser: 'E',
+    highlighter: 'H',
+    laser: 'L',
+    text: 'T',
+    select: 'V',
+};
+
 export function DrawingToolbar({
     onCommand,
     config,
     setConfig,
+    fixed = false,
     showWhiteboard,
     setShowWhiteboard,
     bgColor,
@@ -179,20 +191,30 @@ export function DrawingToolbar({
         setPanel((prev) => (prev === 'colors' ? null : 'colors'));
 
     /**
-     * Araca tıklamak hem aracı seçer hem de o araca ait ayarları açar:
-     * kalem boyutu/rengi, silgi modu ya da şekil seçenekleri aynı yerde.
-     * Aynı araca yeniden tıklanması paneli kapatır.
+     * GoodNotes & Notability standardı:
+     * - Pasif bir araca tıklandığında araç seçilir ve açık panel kapatılır.
+     * - Halihazırda seçili olan araca 2. kez tıklandığında (çift tıklama/toggle)
+     *   o araca ait ayar paneli açılır/kapanır.
      */
     const selectTool = (tool: DrawingTool) => {
-        setConfig({ ...config, tool });
-        const section = sectionForTool(tool);
-        if (!section) {
+        if (config.tool === tool) {
+            const section = sectionForTool(tool);
+            if (section) {
+                setPanel((prev) => (prev === 'settings' ? null : 'settings'));
+            }
+        } else {
+            setConfig({ ...config, tool });
             setPanel(null);
-            return;
         }
-        setPanel((prev) =>
-            prev === 'settings' && config.tool === tool ? null : 'settings'
-        );
+    };
+
+    const handleShapesClick = () => {
+        if (isShapeTool) {
+            setPanel((prev) => (prev === 'shapes' ? null : 'shapes'));
+        } else {
+            setConfig({ ...config, tool: 'rect' });
+            setPanel('shapes');
+        }
     };
 
     /** Panelden şekil seçilince panel açık kalsın (art arda deneme yapılabilsin). */
@@ -208,78 +230,89 @@ export function DrawingToolbar({
         return () => document.removeEventListener('pointerdown', onPointerDown, true);
     }, [panel]);
 
-    const bar = (
-        <motion.div
-            key={dockPosition}
-            drag
-            dragControls={dragControls}
-            dragListener={false}
-            dragMomentum={false}
-            dragElastic={0}
-            initial={{ y: dockPosition === 'top' ? -20 : 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            ref={rootRef}
-            role="toolbar"
-            aria-label="Çizim araç çubuğu"
-            // Tam genişlikte durur: `left: 50%` verilseydi kullanılabilir
-            // genişlik ekranın yarısına düşer ve çubuk erken satır atlardı.
-            className={cn(
-                'fixed left-0 right-0 z-[5000] pointer-events-none transition-all duration-300',
-                dockPosition === 'top' ? 'top-6' : 'bottom-10'
-            )}
-            style={{ touchAction: 'none' }}
-        >
-            {/* Ölçek yalnızca bu sarmalayıcıya uygulanır: sürükleme transformu
-                framer-motion'da dış katmanda kaldığı için ikisi çakışmaz. */}
-            <div
-                className={cn(
-                    'flex items-center gap-3',
-                    dockPosition === 'top' ? 'flex-col-reverse' : 'flex-col'
-                )}
-                style={{
-                    transform: `scale(${scale})`,
-                    transformOrigin: dockPosition === 'top' ? 'top center' : 'bottom center',
-                    transition: 'transform 180ms ease-out',
-                }}
-            >
+    // Çizim modu klavye kısayolları (P: Kalem, E: Silgi, H: Fosforlu, L: Lazer, S: Şekiller, K: Kütüphane)
+    React.useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            const target = e.target as HTMLElement | null;
+            if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+            if (target?.isContentEditable) return;
+
+            const key = e.key.toLowerCase();
+            if (key === 'p') {
+                selectTool('pencil');
+            } else if (key === 'e') {
+                selectTool('eraser');
+            } else if (key === 'h') {
+                selectTool('highlighter');
+            } else if (key === 's') {
+                handleShapesClick();
+            } else if (key === 'v') {
+                selectTool('select');
+            } else if (key === 't') {
+                selectTool('text');
+            } else if (key === 'l' && !e.shiftKey) {
+                selectTool('sun');
+            } else if (key === 'k') {
+                if (onOpenLibrary) {
+                    onOpenLibrary();
+                } else if (onInsertMath) {
+                    openOnly(panel === 'math' ? null : 'math');
+                }
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [panel, config.tool, isShapeTool, onInsertMath, onOpenLibrary]);
+
+    const popovers = (
+        <>
             {onInsertMath && (
-                <ObjectLibraryPanel
-                    open={showMath}
-                    onClose={() => setPanel(null)}
-                    onInsert={onInsertMath}
-                    onSelectTool={onSelectTool}
-                />
+                <div className={cn('pointer-events-none z-[5001]', fixed ? 'absolute top-1 left-1/2 -translate-x-1/2' : 'relative')}>
+                    <ObjectLibraryPanel
+                        open={showMath}
+                        onClose={() => setPanel(null)}
+                        onInsert={onInsertMath}
+                        onSelectTool={onSelectTool}
+                    />
+                </div>
             )}
 
             <AnimatePresence>
                 {panel === 'colors' && (
-                    <ColorPalettePanel config={config} setConfig={setConfig} />
+                    <div className={cn('pointer-events-none z-[5001]', fixed ? 'absolute top-1 left-24 sm:left-48' : 'relative')}>
+                        <ColorPalettePanel config={config} setConfig={setConfig} />
+                    </div>
                 )}
             </AnimatePresence>
 
             <AnimatePresence>
                 {settingsOpen && (
-                    <ToolSettingsPanel
-                        section={settingsSection}
-                        config={config}
-                        setConfig={setConfig}
-                        onSelectShapeTool={selectShapeTool}
-                        onPickStamp={(emoji) => {
-                            setConfig({ ...config, tool: 'stamp', stampIcon: emoji });
-                            setPanel(null);
-                        }}
-                    />
+                    <div className={cn('pointer-events-none z-[5001]', fixed ? (settingsSection === 'shape' ? 'absolute top-1 left-20 sm:left-44' : 'absolute top-1 left-4 sm:left-14') : 'relative')}>
+                        <ToolSettingsPanel
+                            section={settingsSection}
+                            config={config}
+                            setConfig={setConfig}
+                            onSelectShapeTool={selectShapeTool}
+                            onPickStamp={(emoji) => {
+                                setConfig({ ...config, tool: 'stamp', stampIcon: emoji });
+                                setPanel(null);
+                            }}
+                        />
+                    </div>
                 )}
             </AnimatePresence>
 
             <AnimatePresence>
                 {showLab && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="pointer-events-auto flex flex-col gap-2.5 max-h-[68vh] overflow-y-auto bg-[#161826]/95 backdrop-blur-xl p-3.5 rounded-2xl border border-indigo-500/30 shadow-2xl w-[min(94vw,560px)]"
-                    >
+                    <div className={cn('pointer-events-none z-[5001]', fixed ? 'absolute top-1 right-12 sm:right-40' : 'relative')}>
+                        <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            className="pointer-events-auto flex flex-col gap-2.5 max-h-[68vh] overflow-y-auto bg-[#161826]/95 backdrop-blur-xl p-3.5 rounded-2xl border border-indigo-500/30 shadow-2xl w-[min(94vw,560px)]"
+                            onPointerDown={(e) => e.stopPropagation()}
+                        >
                         <div className="flex items-center justify-between pb-2 border-b border-white/10">
                             <div className="flex items-center gap-2">
                                 <div className="p-1.5 rounded-lg bg-indigo-600/30 text-indigo-400">
@@ -464,107 +497,116 @@ export function DrawingToolbar({
                             </button>
                         </div>
                     </motion.div>
+                    </div>
                 )}
             </AnimatePresence>
 
             <AnimatePresence>
                 {showExtras && (onBgColorChange || onPaperChange) && (
-                    <motion.div
-                        initial={{ opacity: 0, y: dockPosition === 'top' ? -10 : 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: dockPosition === 'top' ? -10 : 10, scale: 0.95 }}
-                        className="pointer-events-auto flex flex-col gap-2.5 bg-[#1a1b26]/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 shadow-2xl max-w-[95vw]"
-                    >
-                        {onBgColorChange && (
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0 w-16">
-                                    Zemin
-                                </span>
-                                <div role="radiogroup" aria-label="Arka Plan Rengi" className="flex items-center gap-1.5 flex-wrap">
-                                    {BG_COLORS.map(({ color, label }) => (
-                                        <button
-                                            key={color}
-                                            type="button"
-                                            role="radio"
-                                            aria-checked={(bgColor || '#ffffff') === color}
-                                            onClick={() => onBgColorChange(color)}
-                                            className={cn(
-                                                'w-6 h-6 rounded-full border-2 transition-all hover:scale-110 shrink-0 shadow-sm',
-                                                (bgColor || '#ffffff') === color
-                                                    ? 'border-indigo-400 ring-2 ring-indigo-400/40 scale-110'
-                                                    : 'border-white/20'
-                                            )}
-                                            style={{ backgroundColor: color }}
-                                            title={label}
-                                            aria-label={label}
-                                        />
-                                    ))}
+                    <div className={cn('pointer-events-none z-[5001]', fixed ? 'absolute top-1 right-4 sm:right-16' : 'relative')}>
+                        <motion.div
+                            initial={{ opacity: 0, y: dockPosition === 'top' ? -10 : 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: dockPosition === 'top' ? -10 : 10, scale: 0.95 }}
+                            className="pointer-events-auto flex flex-col gap-2.5 bg-[#1a1b26]/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 shadow-2xl max-w-[95vw]"
+                            onPointerDown={(e) => e.stopPropagation()}
+                        >
+                            {onBgColorChange && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0 w-16">
+                                        Zemin
+                                    </span>
+                                    <div role="radiogroup" aria-label="Arka Plan Rengi" className="flex items-center gap-1.5 flex-wrap">
+                                        {BG_COLORS.map(({ color, label }) => (
+                                            <button
+                                                key={color}
+                                                type="button"
+                                                role="radio"
+                                                aria-checked={(bgColor || '#ffffff') === color}
+                                                onClick={() => onBgColorChange(color)}
+                                                className={cn(
+                                                    'w-6 h-6 rounded-full border-2 transition-all hover:scale-110 shrink-0 shadow-sm',
+                                                    (bgColor || '#ffffff') === color
+                                                        ? 'border-indigo-400 ring-2 ring-indigo-400/40 scale-110'
+                                                        : 'border-white/20'
+                                                )}
+                                                style={{ backgroundColor: color }}
+                                                title={label}
+                                                aria-label={label}
+                                            />
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {onPaperChange && (
-                            <div className="flex items-center gap-2 pt-1 border-t border-white/10">
-                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0 w-16">
-                                    Şablon
-                                </span>
-                                <div className="flex items-center gap-1 flex-wrap">
-                                    {[
-                                        { id: 'blank', label: 'Düz' },
-                                        { id: 'grid', label: 'Kareli' },
-                                        { id: 'lined', label: 'Çizgili' },
-                                        { id: 'dotted', label: 'Noktalı' },
-                                        { id: 'graph_mm', label: 'Milimetrik' },
-                                        { id: 'coordinate', label: 'Koordinat' },
-                                        { id: 'isometric', label: 'İzometrik' },
-                                    ].map((p) => (
-                                        <button
-                                            key={p.id}
-                                            type="button"
-                                            onClick={() => onPaperChange(p.id as PaperStyle)}
-                                            className={cn(
-                                                'px-2.5 py-1 rounded-lg text-xs font-semibold transition-all',
-                                                (paper || 'blank') === p.id
-                                                    ? 'bg-indigo-600 text-white shadow-sm'
-                                                    : 'text-slate-300 hover:text-white hover:bg-white/10'
-                                            )}
-                                        >
-                                            {p.label}
-                                        </button>
-                                    ))}
+                            {onPaperChange && (
+                                <div className="flex items-center gap-2 pt-1 border-t border-white/10">
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0 w-16">
+                                        Şablon
+                                    </span>
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                        {[
+                                            { id: 'blank', label: 'Düz' },
+                                            { id: 'grid', label: 'Kareli' },
+                                            { id: 'lined', label: 'Çizgili' },
+                                            { id: 'dotted', label: 'Noktalı' },
+                                            { id: 'graph_mm', label: 'Milimetrik' },
+                                            { id: 'coordinate', label: 'Koordinat' },
+                                            { id: 'isometric', label: 'İzometrik' },
+                                        ].map((p) => (
+                                            <button
+                                                key={p.id}
+                                                type="button"
+                                                onClick={() => onPaperChange(p.id as PaperStyle)}
+                                                className={cn(
+                                                    'px-2.5 py-1 rounded-lg text-xs font-semibold transition-all',
+                                                    (paper || 'blank') === p.id
+                                                        ? 'bg-indigo-600 text-white shadow-sm'
+                                                        : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                                )}
+                                            >
+                                                {p.label}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        <div className="flex items-center justify-between pt-1 border-t border-white/10">
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0">
-                                Izgaraya Hizalama
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => setConfig({ ...config, snapToGrid: !config.snapToGrid })}
-                                className={cn(
-                                    'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all',
-                                    config.snapToGrid
-                                        ? 'bg-emerald-600/90 text-white shadow-sm'
-                                        : 'bg-white/5 text-slate-400 hover:text-slate-200'
-                                )}
-                                title={config.snapToGrid ? 'Izgaraya yapışma açık' : 'Izgaraya yapışma kapalı'}
-                            >
-                                <Grid className="w-3.5 h-3.5" />
-                                <span>{config.snapToGrid ? 'Açık' : 'Kapalı'}</span>
-                            </button>
-                        </div>
-                    </motion.div>
+                            <div className="flex items-center justify-between pt-1 border-t border-white/10">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0">
+                                    Izgaraya Hizalama
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setConfig({ ...config, snapToGrid: !config.snapToGrid })}
+                                    className={cn(
+                                        'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all',
+                                        config.snapToGrid
+                                            ? 'bg-emerald-600/90 text-white shadow-sm'
+                                            : 'bg-white/5 text-slate-400 hover:text-slate-200'
+                                    )}
+                                    title={config.snapToGrid ? 'Izgaraya yapışma açık' : 'Izgaraya yapışma kapalı'}
+                                >
+                                    <Grid className="w-3.5 h-3.5" />
+                                    <span>{config.snapToGrid ? 'Açık' : 'Kapalı'}</span>
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
                 )}
             </AnimatePresence>
+        </>
+    );
 
-            {/* Tek satırda kalır: sığmazsa `useToolbarScale` ölçeği küçültür,
-                böylece tahtada çubuk ikinci satıra taşıp ekranı kaplamaz. */}
-            <div
-                ref={barRef}
-                className="pointer-events-auto flex flex-nowrap items-center justify-center gap-0.5 bg-[#1a1b26] p-1.5 rounded-2xl shadow-[0_18px_40px_rgba(0,0,0,0.45)] border border-white/5"
-            >
+    const strip = (
+        <div
+            ref={barRef}
+            className={cn(
+                'pointer-events-auto flex flex-nowrap items-center justify-center gap-0.5 bg-[#1a1b26] p-1.5 rounded-2xl shadow-[0_18px_40px_rgba(0,0,0,0.45)] border border-white/5',
+                fixed && 'bg-transparent shadow-none border-0 p-0 rounded-none'
+            )}
+        >
+            {!fixed && (
                 <div
                     onPointerDown={(e) => dragControls.start(e)}
                     className="p-2 text-slate-500 hover:text-white cursor-grab active:cursor-grabbing border-r border-white/10"
@@ -573,37 +615,45 @@ export function DrawingToolbar({
                 >
                     <GripVertical className="w-[18px] h-[18px]" />
                 </div>
+            )}
 
                 <div className="flex items-center gap-0.5 px-1.5 border-white/10 border-r">
-                    {MAIN_TOOLS.map((tool) => (
-                        <button
-                            key={tool.id}
-                            type="button"
-                            onClick={() => selectTool(tool.id)}
-                            title={tool.label}
-                            aria-label={tool.label}
-                            aria-pressed={config.tool === tool.id}
-                            className={cn(
-                                'p-2 rounded-lg transition-all duration-200 group relative',
-                                config.tool === tool.id
-                                    ? 'bg-[#2d3045] text-white'
-                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            )}
-                        >
-                            <tool.icon className="w-[18px] h-[18px]" />
-                            {config.tool === tool.id && (
-                                <motion.div
-                                    layoutId="activeTool"
-                                    className="absolute inset-0 border-2 border-emerald-500/50 rounded-lg pointer-events-none"
-                                />
-                            )}
-                        </button>
-                    ))}
+                    {/* Seçim, Kalem, Fosforlu, Silgi */}
+                    {['select', 'pencil', 'highlighter', 'eraser'].map((toolId) => {
+                        const tool = MAIN_TOOLS.find((t) => t.id === toolId);
+                        if (!tool) return null;
+                        const isActive = config.tool === tool.id;
+                        return (
+                            <button
+                                key={tool.id}
+                                type="button"
+                                onClick={() => selectTool(tool.id)}
+                                title={tool.label}
+                                aria-label={tool.label}
+                                aria-pressed={isActive}
+                                className={cn(
+                                    'p-2 rounded-lg transition-all duration-200 group relative',
+                                    isActive
+                                        ? 'bg-[#2d3045] text-white'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                )}
+                            >
+                                <tool.icon className="w-[18px] h-[18px]" />
+                                {isActive && (
+                                    <motion.div
+                                        layoutId="activeTool"
+                                        className="absolute inset-0 border-2 border-emerald-500/50 rounded-lg pointer-events-none"
+                                    />
+                                )}
+                            </button>
+                        );
+                    })}
 
+                    {/* Şekiller (GoodNotes standardı: Silgi ile Kement arasında) */}
                     <button
                         type="button"
-                        onClick={() => openOnly(panel === 'shapes' ? null : 'shapes')}
-                        aria-label="Şekiller ve damgalar"
+                        onClick={handleShapesClick}
+                        aria-label="Şekiller"
                         aria-expanded={panel === 'shapes'}
                         className={cn(
                             'p-2 rounded-lg transition-all duration-200 relative',
@@ -612,19 +662,44 @@ export function DrawingToolbar({
                                 : 'text-slate-400 hover:text-white hover:bg-white/5',
                             panel === 'shapes' ? 'bg-white/10 text-white' : ''
                         )}
-                        title="Şekiller & Damgalar"
+                        title="Şekiller"
                     >
-                        {config.tool === 'stamp' ? (
-                            <span className="text-xl leading-none">
-                                {config.stampIcon || '✅'}
-                            </span>
-                        ) : (
-                            <Shapes className="w-[18px] h-[18px]" />
-                        )}
-                        {isShapeTool && config.tool !== 'stamp' && (
+                        <Shapes className="w-[18px] h-[18px]" />
+                        {isShapeTool && (
                             <div className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full border border-[#1a1b26]" />
                         )}
                     </button>
+
+                    {/* Kement, Metin, Lazer, El */}
+                    {['lasso', 'text', 'sun', 'pan'].map((toolId) => {
+                        const tool = MAIN_TOOLS.find((t) => t.id === toolId);
+                        if (!tool) return null;
+                        const isActive = config.tool === tool.id;
+                        return (
+                            <button
+                                key={tool.id}
+                                type="button"
+                                onClick={() => selectTool(tool.id)}
+                                title={tool.label}
+                                aria-label={tool.label}
+                                aria-pressed={isActive}
+                                className={cn(
+                                    'p-2 rounded-lg transition-all duration-200 group relative',
+                                    isActive
+                                        ? 'bg-[#2d3045] text-white'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                )}
+                            >
+                                <tool.icon className="w-[18px] h-[18px]" />
+                                {isActive && (
+                                    <motion.div
+                                        layoutId="activeTool"
+                                        className="absolute inset-0 border-2 border-emerald-500/50 rounded-lg pointer-events-none"
+                                    />
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {/* Hızlı Kalem Slotları: 3 Kalem (Siyah, Mavi, Kırmızı) + 1 Fosforlu (Sarı) */}
@@ -783,18 +858,19 @@ export function DrawingToolbar({
                         <button
                             type="button"
                             onClick={onOpenLibrary}
-                            aria-label="Kütüphane"
+                            aria-label="Kütüphane (K)"
                             aria-pressed={isLibraryOpen}
                             className={cn(
-                                'px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 font-bold text-[13px] shadow-md',
+                                'px-2.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 font-bold text-[12px] shadow-sm relative group',
                                 isLibraryOpen
-                                    ? 'bg-indigo-600 text-white shadow-indigo-600/50 ring-2 ring-indigo-400'
-                                    : 'bg-indigo-600/80 hover:bg-indigo-600 text-white hover:shadow-indigo-600/30'
+                                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white ring-2 ring-indigo-400/70 shadow-indigo-500/30'
+                                    : 'bg-indigo-500/20 hover:bg-indigo-500/35 text-indigo-300 hover:text-white border border-indigo-500/30 hover:border-indigo-400/50'
                             )}
-                            title="Kütüphane (Matematik & Fen Araçları)"
+                            title="Kütüphane (Matematik & Fen Nesneleri, 3D Modeller, Canlı Simülasyonlar) [K]"
                         >
-                            <span className="font-serif text-base leading-none">∑</span>
-                            <span className="text-[11px] leading-none">✨</span>
+                            <BookOpen className="w-[15px] h-[15px] text-indigo-300 group-hover:text-white transition-colors" />
+                            <span className="font-semibold tracking-wide text-xs">Kütüphane</span>
+                            <Sparkles className="w-2.5 h-2.5 text-amber-300 animate-pulse" />
                         </button>
                     )}
                     {onSelectTool && (
@@ -804,14 +880,14 @@ export function DrawingToolbar({
                             aria-label="Laboratuvar ve branş araçları"
                             aria-expanded={showLab}
                             className={cn(
-                                'p-2 rounded-lg transition-all relative',
+                                'p-2 rounded-xl transition-all relative group',
                                 showLab
                                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-white/20'
                                     : 'text-slate-400 hover:text-purple-300 hover:bg-purple-500/10'
                             )}
-                            title="Dinamik Laboratuvar & Matematik Araçları"
+                            title="Ders & Dinamik Branş Araçları (Pergel, GeoGebra, Hesap Makinesi, 3D vb.)"
                         >
-                            <FlaskConical className="w-[18px] h-[18px]" />
+                            <FlaskConical className="w-[18px] h-[18px] group-hover:scale-110 transition-transform" />
                             <span className="absolute -top-1 -right-1 flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
@@ -822,18 +898,19 @@ export function DrawingToolbar({
                         <button
                             type="button"
                             onClick={() => openOnly(showMath ? null : 'math')}
-                            aria-label="Nesne kütüphanesi"
+                            aria-label="Kütüphane (K)"
                             aria-expanded={showMath}
                             className={cn(
-                                'p-2 rounded-lg transition-all relative',
+                                'px-2.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 font-bold text-[12px] shadow-sm relative group',
                                 showMath
-                                    ? 'bg-indigo-600 text-white'
-                                    : 'text-slate-400 hover:text-indigo-300 hover:bg-indigo-400/10'
+                                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white ring-2 ring-indigo-400/70 shadow-indigo-500/30'
+                                    : 'bg-indigo-500/20 hover:bg-indigo-500/35 text-indigo-300 hover:text-white border border-indigo-500/30 hover:border-indigo-400/50'
                             )}
-                            title="Matematik & Fen Kütüphanesi"
+                            title="Kütüphane (Matematik & Fen Nesneleri, 3D Modeller, Canlı Simülasyonlar) [K]"
                         >
-                            <Sigma className="w-[18px] h-[18px]" />
-                            <Sparkles className="w-2.5 h-2.5 absolute top-1 right-1 text-indigo-300" />
+                            <BookOpen className="w-[15px] h-[15px] text-indigo-300 group-hover:text-white transition-colors" />
+                            <span className="font-semibold tracking-wide text-xs">Kütüphane</span>
+                            <Sparkles className="w-2.5 h-2.5 text-amber-300 animate-pulse" />
                         </button>
                     )}
                     {onInsertImages && (
@@ -931,22 +1008,101 @@ export function DrawingToolbar({
                     </button>
 
                     {/* Üst / Alt sabitleme düğmesi */}
-                    <button
-                        type="button"
-                        onClick={toggleDock}
-                        aria-label={dockPosition === 'bottom' ? 'Araç çubuğunu üste sabitle' : 'Araç çubuğunu alta sabitle'}
-                        className="p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all"
-                        title={dockPosition === 'bottom' ? 'Üste Sabitle' : 'Alta Sabitle'}
-                    >
-                        {dockPosition === 'bottom' ? (
-                            <PanelTop className="w-[18px] h-[18px]" />
-                        ) : (
-                            <PanelBottom className="w-[18px] h-[18px]" />
-                        )}
-                    </button>
+                    {!fixed && (
+                        <button
+                            type="button"
+                            onClick={toggleDock}
+                            aria-label={dockPosition === 'bottom' ? 'Araç çubuğunu üste sabitle' : 'Araç çubuğunu alta sabitle'}
+                            className="p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all"
+                            title={dockPosition === 'bottom' ? 'Üste Sabitle' : 'Alta Sabitle'}
+                        >
+                            {dockPosition === 'bottom' ? (
+                                <PanelTop className="w-[18px] h-[18px]" />
+                            ) : (
+                                <PanelBottom className="w-[18px] h-[18px]" />
+                            )}
+                        </button>
+                    )}
                 </div>
 
+                {/* Fixed (GoodNotes) modunda zoom kontrolleri çubuğun sağında yer alır */}
+                {fixed && onZoomIn && onZoomOut && (
+                    <div className="flex items-center gap-0.5 px-1.5 border-l border-white/10 shrink-0" role="group" aria-label="Yakınlaştırma">
+                        <button
+                            type="button"
+                            onClick={onZoomOut}
+                            aria-label="Uzaklaştır"
+                            title="Uzaklaştır"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                        >
+                            <Minus className="w-4 h-4" />
+                        </button>
+                        {onZoomFit && (
+                            <button
+                                type="button"
+                                onClick={onZoomFit}
+                                aria-label="Sayfaya sığdır"
+                                title="Sayfaya sığdır"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                            >
+                                <Scan className="w-4 h-4" />
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={onZoomReset}
+                            aria-label="Yakınlaştırmayı sıfırla"
+                            title="%100'e dön"
+                            className="min-w-[40px] px-1 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white hover:bg-white/10 transition-all tabular-nums"
+                        >
+                            %{Math.round((zoom ?? 1) * 100)}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onZoomIn}
+                            aria-label="Yakınlaştır"
+                            title="Yakınlaştır"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                        >
+                            <Plus className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
             </div>
+    );
+
+    const bar = fixed ? (
+        <div
+            ref={rootRef}
+            role="toolbar"
+            aria-label="Çizim araçları"
+            className="relative w-full z-[5000] bg-[#161722] border-b border-white/10 px-2 py-1 flex items-center justify-center flex-shrink-0 shadow-sm"
+        >
+            <div className="w-full flex items-center justify-center relative">
+                <div className="absolute top-full left-0 right-0 z-[5001] pointer-events-none">
+                    {popovers}
+                </div>
+                {strip}
+            </div>
+        </div>
+    ) : (
+        <motion.div
+            ref={rootRef}
+            key={dockPosition}
+            drag
+            dragControls={dragControls}
+            dragListener={false}
+            dragMomentum={false}
+            role="toolbar"
+            aria-label="Çizim araçları"
+            className={cn(
+                'fixed left-1/2 -translate-x-1/2 z-[4000] flex flex-col items-center select-none pointer-events-none transition-all duration-300 ease-out',
+                dockPosition === 'bottom' ? 'bottom-6' : 'top-6'
+            )}
+        >
+            <div className="flex flex-col items-center relative">
+                {popovers}
+                {strip}
             </div>
         </motion.div>
     );
@@ -954,7 +1110,7 @@ export function DrawingToolbar({
     return (
         <>
             {bar}
-            {onZoomIn && onZoomOut && (
+            {!fixed && onZoomIn && onZoomOut && (
                 // Yakınlaştırma, sürüklenebilir çubuğu şişirmemesi için
                 // ekranın sağ alt köşesinde ayrı durur.
                 <div

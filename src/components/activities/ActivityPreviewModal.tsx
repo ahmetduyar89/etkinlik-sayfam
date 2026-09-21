@@ -515,13 +515,6 @@ export function ActivityPreviewModal({
                                 onHistoryChange={(canUndo, canRedo) =>
                                     setDrawHistory({ canUndo, canRedo })
                                 }
-                                onRequestText={() =>
-                                    prompt({
-                                        title: 'Metin ekle',
-                                        placeholder: 'Yazı girin',
-                                        confirmLabel: 'Ekle',
-                                    })
-                                }
                             />
                             <TextBoxLayer
                                 boxes={textBoxes}

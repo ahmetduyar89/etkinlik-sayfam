@@ -147,7 +147,13 @@ export const getBB = (s: Stroke): BoundingBox => {
         const maxLen = Math.max(1, ...lines.map((l) => l.length));
         const textW = Math.max(24, maxLen * fontSize * 0.62);
         const textH = Math.max(fontSize, lines.length * fontSize * 1.25);
-        x1 = s.points[0].x;
+        if (s.textAlign === 'center') {
+            x1 = s.points[0].x - textW / 2;
+        } else if (s.textAlign === 'right') {
+            x1 = s.points[0].x - textW;
+        } else {
+            x1 = s.points[0].x;
+        }
         y1 = s.points[0].y - fontSize * 0.85;
         x2 = x1 + textW;
         y2 = y1 + textH;
@@ -1035,14 +1041,13 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, 
     }
 
     if (s.tool === 'pencil') {
-        // Desenli kalem sabit kalınlıkta çizer: değişken kalınlıklı şerit
-        // doldurularak üretildiği için çizgi deseni uygulanamaz.
-        if (dashed) {
+        // Desenli veya standart tükenmez kalem sabit ve pürüzsüz kalınlıkta çizer
+        if (dashed || (s.penType ?? 'ballpoint') === 'ballpoint') {
             drawSmoothPath(tCtx, s.points, s.width || 2);
             tCtx.restore();
             return;
         }
-        // Kalem ucuna göre değişken kalınlık (dolma kalem / fırça hissi).
+        // Kalem ucuna göre değişken kalınlık (dolma kalem / fırça / keçeli).
         tCtx.globalAlpha *= getPenProfile(s.penType).alpha;
         drawVariableStroke(tCtx, s, s.width || 2);
         tCtx.restore();
@@ -1071,7 +1076,17 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, 
     } else if (s.tool === 'text') {
         // Yazı boyu `width` ile taşınır; eski kayıtlarda yoktur.
         const fontSize = s.width && s.width > 4 ? s.width : 20;
-        tCtx.font = `bold ${fontSize}px Arial`;
+        const fontFam = s.fontFamily === 'serif'
+            ? 'Georgia, Cambria, "Times New Roman", serif'
+            : s.fontFamily === 'mono'
+            ? 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
+            : s.fontFamily === 'cursive'
+            ? 'Caveat, "Comic Sans MS", cursive'
+            : 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        const weight = s.bold ? 'bold ' : '';
+        const style = s.italic ? 'italic ' : '';
+        tCtx.font = `${style}${weight}${fontSize}px ${fontFam}`;
+        tCtx.textAlign = (s.textAlign || 'left') as CanvasTextAlign;
         const lines = (s.text || '').split('\n');
         const lineHeight = fontSize * 1.25;
         lines.forEach((line, idx) => {

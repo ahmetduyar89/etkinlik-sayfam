@@ -4,6 +4,12 @@ import {
     AlignLeft,
     AlignCenter,
     AlignRight,
+    Bold,
+    Italic,
+    Check,
+    Plus,
+    Minus,
+    PaintBucket,
     ChevronsDown,
     ChevronsUp,
     Copy,
@@ -164,10 +170,15 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             text: string;
             fontSize: number;
             color: string;
+            fontFamily?: string;
+            textAlign?: 'left' | 'center' | 'right';
+            bold?: boolean;
+            italic?: boolean;
             strokeIdx?: number;
         }
         const [inlineText, setInlineText] = React.useState<InlineTextState | null>(null);
         const lastTextClickRef = React.useRef<{ idx: number; time: number }>({ idx: -1, time: 0 });
+        const activeStrokeBBRef = React.useRef<BoundingBox | null>(null);
 
         // Ölçü aracı açılıp kapanınca konumlanır ve üst katman tazelenir.
         React.useEffect(() => {
@@ -908,6 +919,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 text,
                                 color: inlineText.color,
                                 width: inlineText.fontSize,
+                                fontFamily: inlineText.fontFamily,
+                                textAlign: inlineText.textAlign,
+                                bold: inlineText.bold,
+                                italic: inlineText.italic,
                             };
                             strokesRef.current[idx] = updated;
                             commitStrokes();
@@ -923,6 +938,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         text,
                         color: inlineText.color,
                         width: inlineText.fontSize,
+                        fontFamily: inlineText.fontFamily,
+                        textAlign: inlineText.textAlign,
+                        bold: inlineText.bold,
+                        italic: inlineText.italic,
                         points: [{ x: inlineText.worldX, y: inlineText.worldY }],
                     };
                     strokesRef.current.push(s);
@@ -2118,7 +2137,6 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             // Sönen neon lazer kuyruğu
             if (trail.length > 1) {
                 oCtx.save();
-                oCtx.lineCap = 'round';
                 oCtx.lineJoin = 'round';
 
                 for (let i = 0; i < trail.length - 1; i++) {
@@ -2128,6 +2146,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     const progress = Math.max(0, Math.min(1, 1 - age / DURATION));
                     const alpha = Math.pow(progress, 1.4);
                     const width = Math.max(2, 7 * progress);
+
+                    // lineCap='butt' prevents overlapping circular caps from creating bead-like artifacts
+                    oCtx.lineCap = i === 0 ? 'round' : 'butt';
 
                     // 1. Dış neon hale
                     oCtx.beginPath();
@@ -2158,7 +2179,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
             // Parlayan lazer ucu göstergesi (işaretçi aktifse)
             const pos = laserPosRef.current;
-            if (pos) {
+            if (pos && config.tool === 'sun') {
                 const s = toScreenPoint(pos, v);
                 const r = 9;
                 const g = oCtx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r * 2.8);
@@ -2304,8 +2325,59 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
 
-            // Kement: serbest bir çerçeve çizip içine düşenleri seçer.
+            // Kement: varsa seçili nesnelerin tutamacına veya içine dokunulduğunda taşı/boyutlandır.
+            if (config.tool === 'lasso' && selectedIdxsRef.current.length > 0 && selBBRef.current) {
+                const bb = selBBRef.current;
+                const v = viewRef.current;
+                const screen = toScreenPoint({ x, y }, v);
+                let handled = false;
+                for (const h of getHandlePositions(bb)) {
+                    const hs = toScreenPoint(h, v);
+                    if (Math.hypot(screen.x - hs.x, screen.y - hs.y) < 12) {
+                        gestureDirtyRef.current = false;
+                        dragStateRef.current = {
+                            type: 'resize',
+                            handle: h.id,
+                            startX: x,
+                            startY: y,
+                            orig: selectedIdxsRef.current.map((i) =>
+                                JSON.parse(JSON.stringify(strokesRef.current[i].points))
+                            ),
+                            origBB: { ...bb },
+                        };
+                        beginDragCache();
+                        handled = true;
+                        break;
+                    }
+                }
+                if (!handled && x >= bb.x1 && x <= bb.x2 && y >= bb.y1 && y <= bb.y2) {
+                    gestureDirtyRef.current = false;
+                    dragStateRef.current = {
+                        type: 'move',
+                        startX: x,
+                        startY: y,
+                        orig: selectedIdxsRef.current.map((i) =>
+                            JSON.parse(JSON.stringify(strokesRef.current[i].points))
+                        ),
+                        origBB: { ...bb },
+                    };
+                    beginDragCache();
+                    handled = true;
+                }
+                if (handled) return;
+            }
+
+            // Kement: tek dokunuş bir nesneye isabet ederse onu seçer; aksi halde çerçeve çizer.
             if (config.tool === 'lasso') {
+                const pickTolerance = 10 / viewRef.current.scale;
+                for (let i = strokesRef.current.length - 1; i >= 0; i--) {
+                    if (!isSelectable(strokesRef.current[i])) continue;
+                    if (strokeNearPoint(strokesRef.current[i], x, y, pickTolerance)) {
+                        setSelection([i]);
+                        redraw();
+                        return;
+                    }
+                }
                 deselect();
                 lassoRef.current = [{ x, y }];
                 isDrawingRef.current = true;
@@ -2383,8 +2455,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 worldX: hitStroke.points[0].x,
                                 worldY: hitStroke.points[0].y,
                                 text: hitStroke.text || '',
-                                fontSize: hitStroke.width && hitStroke.width > 4 ? hitStroke.width : 20,
+                                fontSize: hitStroke.width && hitStroke.width > 4 ? hitStroke.width : 22,
                                 color: hitStroke.color,
+                                fontFamily: hitStroke.fontFamily || 'sans',
+                                textAlign: hitStroke.textAlign || 'left',
+                                bold: Boolean(hitStroke.bold),
+                                italic: Boolean(hitStroke.italic),
                                 strokeIdx: i,
                             });
                             return;
@@ -2419,31 +2495,35 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 if (inlineText) {
                     commitInlineText();
                 }
-                if (onRequestText) {
-                    const val = await onRequestText();
-                    if (val && val.trim()) {
-                        const s: Stroke = {
-                            id: newStrokeId(),
-                            tool: 'text',
-                            text: val,
-                            color: config.color,
-                            width: Math.max(16, Math.min(64, (config.width || 3) * 6)),
-                            points: [{ x, y }],
-                        };
-                        pushHistory();
-                        strokesRef.current.push(s);
-                        commitStrokes();
-                        emit({ type: 'add', page: currentPageRef.current, strokes: [s] });
-                        redraw();
+                const pickTolerance = 14 / viewRef.current.scale;
+                for (let i = strokesRef.current.length - 1; i >= 0; i--) {
+                    const st = strokesRef.current[i];
+                    if (st.tool === 'text' && strokeNearPoint(st, x, y, pickTolerance)) {
+                        setInlineText({
+                            worldX: st.points[0].x,
+                            worldY: st.points[0].y,
+                            text: st.text || '',
+                            fontSize: st.width && st.width > 4 ? st.width : 22,
+                            color: st.color,
+                            fontFamily: st.fontFamily || 'sans',
+                            textAlign: st.textAlign || 'left',
+                            bold: Boolean(st.bold),
+                            italic: Boolean(st.italic),
+                            strokeIdx: i,
+                        });
+                        return;
                     }
-                    return;
                 }
                 setInlineText({
                     worldX: x,
                     worldY: y,
                     text: '',
-                    fontSize: Math.max(16, Math.min(64, (config.width || 3) * 6)),
+                    fontSize: Math.max(16, Math.min(64, (config.width || 4) * 5)),
                     color: config.color,
+                    fontFamily: 'sans',
+                    textAlign: 'left',
+                    bold: false,
+                    italic: false,
                 });
                 return;
             }
@@ -2534,6 +2614,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 dash: config.dash && config.dash !== 'solid' ? config.dash : undefined,
                 points: [first],
             };
+            activeStrokeBBRef.current = { x1: first.x, y1: first.y, x2: first.x, y2: first.y };
         };
 
         const draw = (e: React.PointerEvent) => {
@@ -2627,7 +2708,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 return;
             }
 
-            if (config.tool === 'select' && dragStateRef.current && selectedIdxsRef.current.length) {
+            if ((config.tool === 'select' || config.tool === 'lasso') && dragStateRef.current && selectedIdxsRef.current.length) {
                 const drag = dragStateRef.current;
                 let dx = x - drag.startX;
                 let dy = y - drag.startY;
@@ -2751,19 +2832,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
 
             // Serbest çizim: tarayıcının kareye sıkıştırdığı ARA noktalar da
-            // işlenir. Yalnızca son konumu almak, 120-240 Hz kalemlerde hızlı
-            // hareketlerde köşeleri kesiyordu.
-            const half = maxHalfWidth(stroke);
-            let dirty: BoundingBox | null = null;
-            const grow = (a: Point, b: Point) => {
-                const box = {
-                    x1: Math.min(a.x, b.x) - half - 2,
-                    y1: Math.min(a.y, b.y) - half - 2,
-                    x2: Math.max(a.x, b.x) + half + 2,
-                    y2: Math.max(a.y, b.y) + half + 2,
-                };
-                dirty = dirty ? unionBB([dirty, box]) : box;
-            };
+            // Serbest çizim: çizgi parça parça kesikli görünmesin diye
+            // aktif çizimin önceki ve yeni sınırlarını kapsayan temiz bölge tazelenir.
+            const oldBB = activeStrokeBBRef.current || getBB(stroke);
+            let addedPoints = 0;
 
             for (const sample of coalescedSamples(e)) {
                 let raw = toWorld(sample.clientX, sample.clientY);
@@ -2817,10 +2889,19 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     );
                 }
                 stroke.points.push(point);
-                grow(last, point);
+                addedPoints++;
             }
 
-            if (dirty) repaintStrokeRegion(paintableTail(stroke, dirty, half), dirty, stroke);
+            if (addedPoints > 0) {
+                const newBB = getBB(stroke);
+                activeStrokeBBRef.current = newBB;
+                const pad = maxHalfWidth(stroke) + 16;
+                const dirty = unionBB([
+                    { x1: oldBB.x1 - pad, y1: oldBB.y1 - pad, x2: oldBB.x2 + pad, y2: oldBB.y2 + pad },
+                    { x1: newBB.x1 - pad, y1: newBB.y1 - pad, x2: newBB.x2 + pad, y2: newBB.y2 + pad },
+                ]);
+                repaintStrokeRegion(stroke, dirty, stroke);
+            }
 
             // Kalem modunda "Çiz ve Bekle": yalnızca akıllı kalem açıkken.
             // Her zaman açık olması, uzun bir eğri çizerken duraksayan
@@ -2887,6 +2968,22 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (panRef.current) {
                 panRef.current = null;
                 syncViewState();
+                return;
+            }
+
+            if (config.tool === 'lasso' && dragStateRef.current) {
+                dragStateRef.current = null;
+                guidesRef.current = { x: [], y: [] };
+                clearOverlay();
+                window.setTimeout(flushPendingOps, 0);
+                gestureDirtyRef.current = false;
+                endDragCache();
+                commitStrokes();
+                const moved = new Set(selectedIdxsRef.current);
+                const changed = strokesRef.current.filter((_, i) => moved.has(i));
+                if (changed.length)
+                    emit({ type: 'update', page: currentPageRef.current, strokes: changed });
+                redraw();
                 return;
             }
 
@@ -3003,14 +3100,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 strokesRef.current.push(stroke);
                 commitStrokes();
                 emit({ type: 'add', page: currentPageRef.current, strokes: [stroke] });
-                if (snapped) {
-                    // Ana katmanda serbest çizimin izi duruyor; baştan çiz.
-                    redraw();
-                } else if (bufferCtxRef.current) {
-                    applyView(bufferCtxRef.current);
-                    drawStroke(bufferCtxRef.current, stroke, 0, isDark);
-                    applyIdentity(bufferCtxRef.current);
-                }
+                redraw();
             }
             isDrawingRef.current = false;
             gestureDirtyRef.current = false;
@@ -3850,8 +3940,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                             aria-label="Seçim araçları"
                             className="absolute pointer-events-auto flex items-center gap-1 bg-[#1a1b26]/95 backdrop-blur-md px-2 py-1.5 rounded-xl border border-white/10 shadow-xl"
                             style={{
-                                left: Math.max(4, selScreenBB.x1),
-                                top: Math.max(0, selScreenBB.y1 - 52),
+                                left: Math.max(8, Math.min(selScreenBB.x1, getCanvasSize().w - 360)),
+                                top: Math.max(8, selScreenBB.y1 < 60 ? selScreenBB.y2 + 10 : selScreenBB.y1 - 52),
                                 zIndex: 4700,
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
@@ -3978,6 +4068,53 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                     />
                                 </svg>
                             </button>
+
+                            {/* Şekil veya çokgen seçiliyse iç dolgusu açma/kapama */}
+                            {selectedStrokes.some(
+                                (st) => SHAPE_TOOLS.includes(st.tool as any) || st.tool === 'polygon'
+                            ) && (
+                                <button
+                                    type="button"
+                                    aria-label="Şekil iç dolgusunu aç / kapat"
+                                    title="Şekil İç Dolgusu"
+                                    className={cn(
+                                        'px-2 h-6 rounded-md transition-all shrink-0 flex items-center gap-1 text-[11px]',
+                                        selectedStrokes
+                                            .filter(
+                                                (st) =>
+                                                    SHAPE_TOOLS.includes(st.tool as any) ||
+                                                    st.tool === 'polygon'
+                                            )
+                                            .every((st) => st.fillEnabled)
+                                            ? 'bg-sky-500/20 text-sky-400 font-semibold'
+                                            : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                    )}
+                                    onClick={() =>
+                                        mutateSelection((idxs) => {
+                                            const set = new Set(idxs);
+                                            const anyUnfilled = strokesRef.current.some(
+                                                (st, i) =>
+                                                    set.has(i) &&
+                                                    (SHAPE_TOOLS.includes(st.tool as any) ||
+                                                        st.tool === 'polygon') &&
+                                                    !st.fillEnabled
+                                            );
+                                            strokesRef.current = strokesRef.current.map((st, i) =>
+                                                set.has(i) &&
+                                                (SHAPE_TOOLS.includes(st.tool as any) ||
+                                                    st.tool === 'polygon')
+                                                    ? { ...st, fillEnabled: anyUnfilled }
+                                                    : st
+                                            );
+                                            refreshSelectionBB();
+                                        })
+                                    }
+                                >
+                                    <PaintBucket className="w-3.5 h-3.5" />
+                                    <span>Dolgu</span>
+                                </button>
+                            )}
+
                             <div className="w-px h-4 bg-white/20 mx-1 shrink-0" aria-hidden="true" />
 
                             {/* Tek metin seçiliyken doğrudan düzenleme düğmesi */}
@@ -3998,6 +4135,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                                     text: st.text || '',
                                                     fontSize: st.width && st.width > 4 ? st.width : 20,
                                                     color: st.color,
+                                                    fontFamily: st.fontFamily || 'sans',
+                                                    textAlign: st.textAlign || 'left',
+                                                    bold: Boolean(st.bold),
+                                                    italic: Boolean(st.italic),
                                                     strokeIdx: idx,
                                                 });
                                             }
@@ -4153,44 +4294,169 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     >
                         {/* Arka plan tıklandığında kaydet / kapat */}
                         <div
-                            className="absolute inset-0 pointer-events-auto bg-black/10"
+                            className="absolute inset-0 pointer-events-auto bg-black/20 backdrop-blur-[1px]"
                             onClick={() => commitInlineText()}
                         />
                         <div
-                            className="absolute pointer-events-auto flex flex-col bg-[#1a1b26]/95 backdrop-blur-md rounded-xl border border-white/15 shadow-2xl p-2.5 min-w-[260px] max-w-[420px] transition-all"
+                            className="absolute pointer-events-auto flex flex-col bg-[#1a1b26]/95 backdrop-blur-md rounded-2xl border border-white/15 shadow-2xl p-3 min-w-[320px] max-w-[440px] transition-all"
                             style={{
                                 left: Math.max(
-                                    12,
+                                    16,
                                     Math.min(
-                                        window.innerWidth - 300,
+                                        window.innerWidth - 420,
                                         inlineText.worldX * view.scale + view.tx
                                     )
                                 ),
                                 top: Math.max(
-                                    12,
+                                    16,
                                     Math.min(
-                                        window.innerHeight - 200,
-                                        inlineText.worldY * view.scale + view.ty - 60
+                                        window.innerHeight - 300,
+                                        inlineText.worldY * view.scale + view.ty - 110
                                     )
                                 ),
                             }}
                             onClick={(e) => e.stopPropagation()}
                             onPointerDown={(e) => e.stopPropagation()}
                         >
-                            {/* Üst Ayar Çubuğu: Boyut ve Renk */}
-                            <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-white/10">
+                            {/* 1. Sıra: Yazı Tipi Ailesi, Kalın/İtalik ve Yaslama */}
+                            <div className="flex items-center justify-between gap-1 pb-2 mb-2 border-b border-white/10 flex-wrap">
+                                {/* Font Ailesi */}
+                                <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10">
+                                    {[
+                                        { id: 'sans', label: 'Sans' },
+                                        { id: 'serif', label: 'Serif' },
+                                        { id: 'mono', label: 'Mono' },
+                                        { id: 'cursive', label: 'Yazı' },
+                                    ].map((f) => (
+                                        <button
+                                            key={f.id}
+                                            type="button"
+                                            className={cn(
+                                                'px-2 py-0.5 text-xs rounded-md transition-all font-medium',
+                                                (inlineText.fontFamily || 'sans') === f.id
+                                                    ? 'bg-sky-500 text-white shadow-sm font-semibold'
+                                                    : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                            )}
+                                            onClick={() =>
+                                                setInlineText((prev) =>
+                                                    prev ? { ...prev, fontFamily: f.id } : null
+                                                )
+                                            }
+                                        >
+                                            {f.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Kalın / İtalik */}
+                                <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10">
+                                    <button
+                                        type="button"
+                                        title="Kalın (Bold)"
+                                        aria-label="Kalın"
+                                        className={cn(
+                                            'p-1 rounded-md transition-all',
+                                            inlineText.bold
+                                                ? 'bg-sky-500 text-white font-bold'
+                                                : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                        )}
+                                        onClick={() =>
+                                            setInlineText((prev) =>
+                                                prev ? { ...prev, bold: !prev.bold } : null
+                                            )
+                                        }
+                                    >
+                                        <Bold className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        title="İtalik"
+                                        aria-label="İtalik"
+                                        className={cn(
+                                            'p-1 rounded-md transition-all',
+                                            inlineText.italic
+                                                ? 'bg-sky-500 text-white'
+                                                : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                        )}
+                                        onClick={() =>
+                                            setInlineText((prev) =>
+                                                prev ? { ...prev, italic: !prev.italic } : null
+                                            )
+                                        }
+                                    >
+                                        <Italic className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+
+                                {/* Yaslama (Align) */}
+                                <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10">
+                                    {[
+                                        { id: 'left', icon: AlignLeft, title: 'Sola Yasla' },
+                                        { id: 'center', icon: AlignCenter, title: 'Ortala' },
+                                        { id: 'right', icon: AlignRight, title: 'Sağa Yasla' },
+                                    ].map((a) => {
+                                        const Icon = a.icon;
+                                        const active = (inlineText.textAlign || 'left') === a.id;
+                                        return (
+                                            <button
+                                                key={a.id}
+                                                type="button"
+                                                title={a.title}
+                                                aria-label={a.title}
+                                                className={cn(
+                                                    'p-1 rounded-md transition-all',
+                                                    active
+                                                        ? 'bg-sky-500 text-white'
+                                                        : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                                )}
+                                                onClick={() =>
+                                                    setInlineText((prev) =>
+                                                        prev
+                                                            ? {
+                                                                  ...prev,
+                                                                  textAlign: a.id as
+                                                                      | 'left'
+                                                                      | 'center'
+                                                                      | 'right',
+                                                              }
+                                                            : null
+                                                    )
+                                                }
+                                            >
+                                                <Icon className="w-3.5 h-3.5" />
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* 2. Sıra: Boyut ve Renk Paleti */}
+                            <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-white/10 flex-wrap">
+                                {/* Boyut Ayarı (+ / - ve Hazır Değerler) */}
                                 <div className="flex items-center gap-1">
-                                    <span className="text-[11px] font-medium text-slate-400 mr-1">
-                                        Boyut:
-                                    </span>
-                                    {[16, 20, 24, 32, 48].map((size) => (
+                                    <button
+                                        type="button"
+                                        title="Küçült"
+                                        aria-label="Yazı Boyutunu Küçült"
+                                        className="p-1 text-slate-300 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+                                        onClick={() =>
+                                            setInlineText((prev) =>
+                                                prev
+                                                    ? { ...prev, fontSize: Math.max(12, prev.fontSize - 2) }
+                                                    : null
+                                            )
+                                        }
+                                    >
+                                        <Minus className="w-3.5 h-3.5" />
+                                    </button>
+                                    {[16, 20, 24, 32, 42].map((size) => (
                                         <button
                                             key={size}
                                             type="button"
                                             className={cn(
-                                                'px-1.5 py-0.5 text-[11px] font-bold rounded transition-colors',
+                                                'px-1.5 py-0.5 text-[11px] font-semibold rounded transition-colors',
                                                 inlineText.fontSize === size
-                                                    ? 'bg-sky-500 text-white'
+                                                    ? 'bg-sky-500 text-white shadow-sm'
                                                     : 'text-slate-300 hover:bg-white/10'
                                             )}
                                             onClick={() =>
@@ -4202,17 +4468,35 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                             {size}
                                         </button>
                                     ))}
+                                    <button
+                                        type="button"
+                                        title="Büyüt"
+                                        aria-label="Yazı Boyutunu Büyüt"
+                                        className="p-1 text-slate-300 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+                                        onClick={() =>
+                                            setInlineText((prev) =>
+                                                prev
+                                                    ? { ...prev, fontSize: Math.min(72, prev.fontSize + 2) }
+                                                    : null
+                                            )
+                                        }
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                    </button>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    {DRAWING_COLORS.slice(0, 5).map((color) => (
+
+                                {/* Renk Paleti */}
+                                <div className="flex items-center gap-1.5">
+                                    {DRAWING_COLORS.slice(0, 6).map((color) => (
                                         <button
                                             key={color}
                                             type="button"
+                                            aria-label={`Yazı Rengi: ${color}`}
                                             className={cn(
-                                                'w-4 h-4 rounded-full border transition-transform',
+                                                'w-5 h-5 rounded-full border-2 transition-all shrink-0',
                                                 inlineText.color === color
-                                                    ? 'scale-125 border-white'
-                                                    : 'border-transparent hover:scale-110'
+                                                    ? 'scale-110 border-white shadow-md'
+                                                    : 'border-transparent hover:scale-105'
                                             )}
                                             style={{ backgroundColor: color }}
                                             onClick={() =>
@@ -4225,16 +4509,27 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 </div>
                             </div>
 
-                            {/* Metin Giriş Alanı */}
+                            {/* Metin Giriş Alanı (Gerçek zamanlı yazı tipi, hizalama ve renk önizlemesiyle) */}
                             <textarea
                                 autoFocus
                                 value={inlineText.text}
                                 placeholder="Metin yazın... (Shift+Enter yeni satır)"
                                 rows={Math.max(2, Math.min(8, inlineText.text.split('\n').length))}
-                                className="w-full bg-black/30 text-white placeholder-slate-500 rounded-lg p-2 text-sm outline-none border border-white/10 focus:border-sky-500 resize-none font-sans"
+                                className="w-full bg-black/40 text-white placeholder-slate-500 rounded-xl p-2.5 text-sm outline-none border border-white/15 focus:border-sky-500 resize-none transition-all"
                                 style={{
                                     color: inlineText.color,
-                                    fontSize: `${Math.max(14, Math.min(28, inlineText.fontSize * 0.85))}px`,
+                                    fontSize: `${Math.max(14, Math.min(30, inlineText.fontSize * 0.9))}px`,
+                                    fontFamily:
+                                        inlineText.fontFamily === 'serif'
+                                            ? 'Georgia, Cambria, "Times New Roman", serif'
+                                            : inlineText.fontFamily === 'mono'
+                                            ? 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
+                                            : inlineText.fontFamily === 'cursive'
+                                            ? 'Caveat, "Comic Sans MS", cursive'
+                                            : 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                    fontWeight: inlineText.bold ? 'bold' : 'normal',
+                                    fontStyle: inlineText.italic ? 'italic' : 'normal',
+                                    textAlign: inlineText.textAlign || 'left',
                                 }}
                                 onChange={(e) => {
                                     const val = e.target.value;
@@ -4251,16 +4546,16 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 }}
                             />
 
-                            {/* Düğmeler */}
-                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/10">
+                            {/* Düğmeler ve Kısayollar */}
+                            <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-white/10">
                                 <div className="text-[10px] text-slate-400">
-                                    Enter: Kaydet • Esc: Vazgeç
+                                    Enter: Kaydet • Shift+Enter: Satır
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     {inlineText.strokeIdx !== undefined && (
                                         <button
                                             type="button"
-                                            className="px-2 py-1 text-[11px] font-medium text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-md transition-colors"
+                                            className="px-2.5 py-1 text-[11px] font-medium text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg transition-colors"
                                             onClick={() => {
                                                 const idx = inlineText.strokeIdx!;
                                                 pushHistory();
@@ -4283,17 +4578,18 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                     )}
                                     <button
                                         type="button"
-                                        className="px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+                                        className="px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                                         onClick={() => setInlineText(null)}
                                     >
                                         Vazgeç
                                     </button>
                                     <button
                                         type="button"
-                                        className="px-3 py-1 text-[11px] font-bold bg-sky-500 hover:bg-sky-400 text-white rounded-md shadow transition-colors"
+                                        className="px-3.5 py-1 text-[11px] font-bold bg-sky-500 hover:bg-sky-400 text-white rounded-lg shadow transition-all flex items-center gap-1"
                                         onClick={() => commitInlineText()}
                                     >
-                                        Tamam
+                                        <Check className="w-3.5 h-3.5" />
+                                        <span>Tamam</span>
                                     </button>
                                 </div>
                             </div>

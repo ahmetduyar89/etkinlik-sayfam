@@ -138,6 +138,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const chunksRef = React.useRef<string[]>([]);
     /** Kaydedilmemiş değişiklik var mı (kapanış uyarısı için). */
     const dirtyRef = React.useRef(false);
+    const savingRef = React.useRef(false);
+    const editRevisionRef = React.useRef(0);
     /** Elimizdeki içeriğin sürümü; başka cihazdaki kayıt bunu ileri taşır. */
     const revRef = React.useRef(0);
     /** Çakışmada kullanıcı "benimkini kaydet" dedi: sonraki kayıt zorlanır. */
@@ -1228,8 +1230,47 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 />
             </div>
 
+            {/* GoodNotes Tarzı Sabit Çizim Araç Çubuğu */}
+            {!presenting && (
+                <DrawingToolbar
+                    fixed
+                    onCommand={(type) => {
+                        if (type === 'UNDO_DRAWING') handleUndo();
+                        if (type === 'REDO_DRAWING') handleRedo();
+                        if (type === 'CLEAR_DRAWING') {
+                            canvasRef.current?.clear();
+                            scheduleSave();
+                        }
+                    }}
+                    config={config}
+                    setConfig={setConfig}
+                    bgColor={bgColor}
+                    onBgColorChange={changeBg}
+                    paper={paper}
+                    onPaperChange={changePaper}
+                    onScreenshot={() =>
+                        canvasRef.current?.screenshot(true, bgColor, paper, pdfCanvasRef.current)
+                    }
+                    isTextBoxMode={isTextBoxMode}
+                    onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
+                    onInsertMath={handleInsertMath}
+                    canUndo={history.canUndo}
+                    canRedo={history.canRedo}
+                    onInsertImages={(files) => void handleInsertImages(files)}
+                    isInsertingImage={isInsertingImage}
+                    zoom={view.scale}
+                    onZoomIn={() => canvasRef.current?.zoomBy(1.25)}
+                    onZoomOut={() => canvasRef.current?.zoomBy(0.8)}
+                    onZoomReset={() => canvasRef.current?.resetView()}
+                    onZoomFit={
+                        pageBox ? () => canvasRef.current?.fitPage() : undefined
+                    }
+                    onSelectTool={handleSelectTool}
+                />
+            )}
+
             {/* Çalışma alanı */}
-            <div ref={stageRef} className="flex-1 min-h-0 flex bg-background">
+            <div ref={stageRef} className="flex-1 min-h-0 flex bg-background relative z-0">
                 <PageThumbnails
                     open={showPages && !presenting}
                     onClose={() => setShowPages(false)}
@@ -1313,13 +1354,6 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             panMode="viewport"
                             pageBox={pageBox}
                             onViewChange={handleViewChange}
-                            onRequestText={() =>
-                                prompt({
-                                    title: 'Metin ekle',
-                                    placeholder: 'Yazı girin',
-                                    confirmLabel: 'Ekle',
-                                })
-                            }
                         />
                         <TextBoxLayer
                             boxes={currentBoxes}
@@ -1377,44 +1411,6 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 )}
                 </div>
             </div>
-
-            {/* Çizim araç çubuğu (sürüklenebilir) — sunum modunda gizlenir. */}
-            {!presenting && (
-            <DrawingToolbar
-                onCommand={(type) => {
-                    if (type === 'UNDO_DRAWING') handleUndo();
-                    if (type === 'REDO_DRAWING') handleRedo();
-                    if (type === 'CLEAR_DRAWING') {
-                        canvasRef.current?.clear();
-                        scheduleSave();
-                    }
-                }}
-                config={config}
-                setConfig={setConfig}
-                bgColor={bgColor}
-                onBgColorChange={changeBg}
-                paper={paper}
-                onPaperChange={changePaper}
-                onScreenshot={() =>
-                    canvasRef.current?.screenshot(true, bgColor, paper, pdfCanvasRef.current)
-                }
-                isTextBoxMode={isTextBoxMode}
-                onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
-                onInsertMath={handleInsertMath}
-                canUndo={history.canUndo}
-                canRedo={history.canRedo}
-                onInsertImages={(files) => void handleInsertImages(files)}
-                isInsertingImage={isInsertingImage}
-                zoom={view.scale}
-                onZoomIn={() => canvasRef.current?.zoomBy(1.25)}
-                onZoomOut={() => canvasRef.current?.zoomBy(0.8)}
-                onZoomReset={() => canvasRef.current?.resetView()}
-                onZoomFit={
-                    pageBox ? () => canvasRef.current?.fitPage() : undefined
-                }
-                onSelectTool={handleSelectTool}
-            />
-            )}
 
             {showQr && <NotebookQrModal notebook={notebook} onClose={() => setShowQr(false)} />}
 

@@ -137,6 +137,14 @@ export interface Stroke {
     flipX?: boolean;
     /** Dikeyde ayna simetrisi (çevirme). */
     flipY?: boolean;
+    /** Metin font ailesi (sans, serif, mono, cursive vb.) */
+    fontFamily?: string;
+    /** Metin hizalama */
+    textAlign?: 'left' | 'center' | 'right';
+    /** Kalın metin */
+    bold?: boolean;
+    /** İtalik metin */
+    italic?: boolean;
 }
 
 /** Çalışma alanının yakınlaştırma ve kaydırma durumu. */
