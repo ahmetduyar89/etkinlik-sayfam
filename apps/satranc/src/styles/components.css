@@ -140,6 +140,87 @@
 .menu-tile:hover::after { transform: scale(1.25); }
 .menu-tile:active { transform: translateY(-1px); }
 
+/* --- Kişiselleştirilmiş günlük çalışma --- */
+
+.daily-hero {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: 1.2rem;
+  align-items: center;
+  padding: clamp(1rem, 3vw, 1.8rem);
+  border-radius: var(--r-xl);
+  border: 2px solid rgba(123, 92, 240, 0.25);
+  background: linear-gradient(135deg, var(--grape-soft), var(--sky-soft));
+  box-shadow: var(--shadow-lift);
+}
+
+.daily-hero.complete { background: linear-gradient(135deg, var(--lime-soft), var(--sun-soft)); }
+
+.daily-ring {
+  display: grid;
+  place-items: center;
+  width: 7rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(135deg, var(--grape), var(--sky));
+  border: 0.65rem solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 8px 22px rgba(90, 58, 210, 0.25);
+  font-size: 1.7rem;
+  font-weight: 900;
+}
+
+.daily-hero.complete .daily-ring { background: linear-gradient(135deg, var(--lime), var(--primary)); }
+.daily-copy { display: grid; justify-items: start; gap: 0.55rem; }
+.daily-copy h2, .daily-copy p { margin: 0; }
+.daily-copy p { color: var(--ink-soft); font-weight: 700; }
+
+.daily-topics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8rem; }
+
+.daily-topic {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.7rem;
+  align-items: start;
+  padding: 1rem;
+  border-radius: var(--r-lg);
+  border: 2px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.daily-topic-no {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--primary);
+  font-weight: 900;
+}
+
+.daily-topic h3, .daily-topic p { margin: 0; }
+.daily-topic h3 { font-size: 1rem; }
+.daily-topic p { margin-top: 0.25rem; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+.daily-topic-count { grid-column: 2; color: var(--grape-dark); font-size: 0.74rem; font-weight: 900; }
+
+.daily-session-note {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--r-sm);
+  background: var(--grape-soft);
+  color: var(--grape-dark);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .daily-topics { grid-template-columns: 1fr; }
+  .daily-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  .daily-copy { justify-items: center; }
+}
+
 .hero-board, .side-panel, .settings-panel, .piece-detail {
   display: grid;
   gap: 1rem;
@@ -944,4 +1025,83 @@
   color: var(--muted);
   font-weight: 700;
   padding: 0 0.15rem;
+}
+/* --- Profil bazlı oyun arşivi ve hamle inceleme --- */
+
+.archive-content { display: grid; gap: 1rem; }
+
+.archive-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.archive-summary-card,
+.archive-card,
+.archive-empty,
+.archive-review {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 1.2rem;
+  box-shadow: var(--shadow);
+}
+
+.archive-summary-card { padding: 1rem; display: grid; gap: 0.2rem; }
+.archive-summary-card strong { font-size: 1.45rem; color: var(--primary); }
+.archive-summary-card span { color: var(--muted); font-size: 0.82rem; }
+
+.archive-list { display: grid; gap: 0.7rem; }
+.archive-card {
+  padding: 0.9rem 1rem;
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.8fr) minmax(13rem, 1.5fr) auto;
+  gap: 1rem;
+  align-items: center;
+  border-left: 5px solid var(--line);
+}
+.archive-card.won { border-left-color: #2f9b68; }
+.archive-card.drawn { border-left-color: #d59b2b; }
+.archive-card.lost { border-left-color: #748096; }
+
+.archive-result { display: flex; align-items: center; gap: 0.65rem; }
+.archive-result > span { font-size: 1.6rem; }
+.archive-result div { display: grid; gap: 0.15rem; }
+.archive-result small { color: var(--muted); }
+.archive-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.archive-meta span, .archive-meta strong {
+  background: rgba(47, 143, 131, 0.09);
+  border-radius: 999px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.78rem;
+}
+.archive-actions { display: flex; gap: 0.45rem; }
+
+.archive-empty { padding: 3rem 1rem; text-align: center; }
+.archive-empty-icon { display: block; font-size: 3.5rem; margin-bottom: 0.7rem; }
+.archive-empty h2 { margin: 0; }
+.archive-empty p { max-width: 34rem; margin: 0.55rem auto 1.2rem; color: var(--muted); }
+
+.archive-review { padding: 1rem; }
+.archive-review-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.archive-review-head > div { display: flex; align-items: center; gap: 0.7rem; }
+.archive-ply { color: var(--muted); font-size: 0.82rem; }
+.archive-review-grid { display: grid; grid-template-columns: minmax(18rem, 1fr) minmax(15rem, 0.62fr); gap: 1rem; align-items: start; }
+.archive-board .cb-stage { width: min(100%, 38rem); margin-inline: auto; }
+.archive-review-panel { display: grid; gap: 0.75rem; }
+.archive-review-note { min-height: 3.5rem; margin: 0; padding: 0.8rem; border-radius: 0.85rem; background: rgba(61, 124, 255, 0.09); }
+.archive-review-controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+.archive-moves { max-height: 22rem; overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; padding: 0.45rem; border: 1px solid var(--line); border-radius: 0.8rem; }
+.archive-move { padding: 0.45rem 0.55rem; border-radius: 0.55rem; text-align: left; color: var(--ink); background: transparent; }
+.archive-move:hover, .archive-move.active { color: #fff; background: var(--primary); }
+.profile-archive-link { margin-top: -0.4rem; }
+
+@media (max-width: 850px) {
+  .archive-card { grid-template-columns: 1fr; }
+  .archive-actions { justify-content: flex-start; }
+  .archive-review-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .archive-summary { grid-template-columns: 1fr; }
+  .archive-actions, .archive-review-controls { grid-template-columns: 1fr; display: grid; }
 }

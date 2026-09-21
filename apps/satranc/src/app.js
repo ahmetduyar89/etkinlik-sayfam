@@ -25,12 +25,16 @@ import { SettingsPage } from "./pages/SettingsPage.js";
 import { ClassesPage } from "./pages/ClassesPage.js";
 import { TournamentPage } from "./pages/TournamentPage.js";
 import { ReportsPage } from "./pages/ReportsPage.js";
+import { DailyPracticePage } from "./pages/DailyPracticePage.js";
+import { GameArchivePage } from "./pages/GameArchivePage.js";
 import { classroom } from "./services/ClassroomService.js";
 
 const progress = new ProgressService();
 const sound = new SoundService(progress);
 const root = document.querySelector("#app");
 const ROLE_KEY = "satranc-okulu-role";
+const STUDENT_KEY = "satranc-okulu-active-student";
+const TEACHER_ROUTES = ["siniflar", "turnuva", "reports"];
 
 function readRole() {
   try {
@@ -42,15 +46,38 @@ function readRole() {
 
 let role = readRole();
 
+function readStudentId() {
+  try { return localStorage.getItem(STUDENT_KEY) || ""; } catch { return ""; }
+}
+
+function selectedStudent() {
+  const id = readStudentId();
+  return classroom.students(classroom.state.activeClassId).find((student) => student.id === id) || null;
+}
+
+function useRoleProfile() {
+  if (role === "teacher") {
+    progress.switchProfile("teacher", "Öğretmen");
+    return;
+  }
+  const student = selectedStudent();
+  progress.switchProfile(student ? `student:${student.id}` : "guest", student?.name || "Misafir Öğrenci");
+}
+
 function setRole(next) {
   role = next === "student" ? "student" : "teacher";
   try { localStorage.setItem(ROLE_KEY, role); } catch { /* Kısıtlı tarayıcıda oturumluk çalışır. */ }
-  if (role === "student" && ["siniflar", "turnuva", "reports"].includes(currentRoute())) {
+  useRoleProfile();
+  if (role === "student" && TEACHER_ROUTES.includes(currentRoute())) {
     navigate("home");
     return;
   }
   render();
 }
+
+// Eski tek profilli kayıt öğretmen profiline taşınır; uygulama öğrenci
+// modunda kapatıldıysa son seçilen öğrencinin profili yeniden açılır.
+useRoleProfile();
 
 const pages = {
   home: HomePage,
@@ -58,6 +85,8 @@ const pages = {
   siniflar: ClassesPage,
   turnuva: TournamentPage,
   reports: ReportsPage,
+  daily: DailyPracticePage,
+  games: GameArchivePage,
   learn: LearnPage,
   board: BoardPage,
   pieces: PiecesPage,
@@ -111,6 +140,7 @@ function renderNav(route) {
 let xpStat = null;
 let starStat = null;
 let classPicker = null;
+let studentPicker = null;
 
 function renderTopbar() {
   const collapsed = Boolean(progress.state.settings.navCollapsed);
@@ -147,11 +177,48 @@ function renderTopbar() {
         onClick: () => setRole("teacher")
       })
     ]),
-    role === "teacher" ? renderClassPicker() : null,
+    role === "teacher" ? renderClassPicker() : renderStudentPicker(),
     xpStat,
     starStat,
     el("button", { className: "icon-button", type: "button", title: "Ayarlar", onClick: () => navigate("settings"), html: icon("settings") })
   ]);
+}
+
+/** Öğrenci modunda seçili sınıftan kimin ilerlemesinin açılacağını belirler. */
+function renderStudentPicker() {
+  studentPicker = el("select", {
+    className: "class-picker-select student-picker-select",
+    "aria-label": "Öğrenci profili",
+    onChange: (event) => {
+      if (event.target.value === "__manage") {
+        setRole("teacher");
+        navigate("siniflar");
+        return;
+      }
+      try { localStorage.setItem(STUDENT_KEY, event.target.value); } catch { /* Oturumluk seçim. */ }
+      const student = classroom.findStudent(event.target.value);
+      progress.switchProfile(student ? `student:${student.id}` : "guest", student?.name || "Misafir Öğrenci");
+      sound.play("click");
+      render();
+    }
+  });
+  syncStudentPicker();
+  return el("label", { className: "class-picker student-picker", title: "Öğrenci profili" }, [
+    el("span", { className: "class-picker-emoji", text: "🙂" }),
+    studentPicker
+  ]);
+}
+
+function syncStudentPicker() {
+  if (!studentPicker) return;
+  const students = classroom.students(classroom.state.activeClassId);
+  const selected = selectedStudent();
+  studentPicker.replaceChildren(
+    el("option", { value: "", text: students.length ? "Öğrenci seç" : "Misafir Öğrenci" }),
+    ...students.map((student) => el("option", { value: student.id, text: student.name })),
+    el("option", { value: "__manage", text: "＋ Öğrencileri yönet…" })
+  );
+  studentPicker.value = selected?.id || "";
 }
 
 /**
@@ -197,6 +264,10 @@ function syncClassPicker() {
 
 function render() {
   const route = pages[currentRoute()] ? currentRoute() : "home";
+  if (role === "student" && TEACHER_ROUTES.includes(route)) {
+    navigate("home");
+    return;
+  }
   document.body.classList.toggle("high-contrast", progress.state.settings.contrast);
   document.body.classList.toggle("reduced-motion", !progress.state.settings.motion);
   // Menü kapalıyken kabuk dar sütuna geçer; sayfa içeriği genişler.
@@ -249,7 +320,10 @@ function bump(node, text) {
 // Abonelik BİR KEZ kurulur; render() her sayfa geçişinde yeni düğümler üretse de
 // syncTopbar güncel referansları kullanır.
 progress.onChange(syncTopbar);
-classroom.onChange(syncClassPicker);
+classroom.onChange(() => {
+  syncClassPicker();
+  syncStudentPicker();
+});
 
 onRouteChange(render);
 render();

@@ -662,6 +662,8 @@ body.focus-mode .play-board .cb-stage {
 .play-panel .teacher-text { font-size: 0.79rem; }
 
 .play-panel .move-list { max-height: 7.5rem; padding: 0.4rem; }
+.report-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; }
+.report-actions button { min-height: 2.5rem; padding-inline: 0.7rem; font-size: 0.78rem; }
 
 /* Odak modunda panel daha da sadeleşir. */
 body.focus-mode .play-panel { padding: 0.7rem; }

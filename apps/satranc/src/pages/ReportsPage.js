@@ -10,10 +10,11 @@ import { el } from "../utils/dom.js";
 import { navigate } from "../utils/router.js";
 import { classroom } from "../services/ClassroomService.js";
 import { pageShell } from "./pageUtils.js";
+import { PUZZLE_THEME_LABELS } from "../data/puzzleThemes.js";
 
 const number = (value) => new Intl.NumberFormat("tr-TR").format(value);
 
-export function ReportsPage({ sound }) {
+export function ReportsPage({ sound, progress }) {
   const active = classroom.activeClass;
 
   if (!active) {
@@ -39,6 +40,21 @@ export function ReportsPage({ sound }) {
   const completedTournaments = tournaments.filter((item) => item.finished).length;
   const activeStudents = standings.filter((row) => row.played > 0).length;
   const totalPoints = standings.reduce((sum, row) => sum + row.points, 0);
+  const learningProfiles = students.filter((student) => progress.profile(`student:${student.id}`)).length;
+  const themeRows = Object.keys(PUZZLE_THEME_LABELS).map((theme) => {
+    const total = students.reduce((sum, student) => {
+      const item = progress.profile(`student:${student.id}`)?.puzzleStats?.[theme];
+      if (!item) return sum;
+      return {
+        solved: sum.solved + (item.solved || 0),
+        wrong: sum.wrong + (item.wrong || 0),
+        hints: sum.hints + (item.hints || 0)
+      };
+    }, { solved: 0, wrong: 0, hints: 0 });
+    const decisions = total.solved + total.wrong;
+    return { theme, ...total, decisions, accuracy: decisions ? Math.round((total.solved / decisions) * 100) : null };
+  }).filter((row) => row.decisions > 0 || row.hints > 0)
+    .sort((a, b) => (a.accuracy ?? 101) - (b.accuracy ?? 101));
 
   const stat = (label, value, hint) => el("article", { className: "report-stat" }, [
     el("strong", { text: number(value) }),
@@ -50,7 +66,7 @@ export function ReportsPage({ sound }) {
 
   return pageShell("Sınıf Raporları", `${active.name} sınıfının maç ve turnuva görünümü.`, [
     el("section", { className: "report-summary", "aria-label": "Sınıf özeti" }, [
-      stat("Öğrenci", students.length, `${activeStudents} öğrenci maç yaptı`),
+      stat("Öğrenci", students.length, `${learningProfiles} öğrenme profili açıldı`),
       stat("Toplam Maç", matches.length, `${number(totalPoints)} oyuncu puanı`),
       stat("Turnuva", tournaments.length, `${completedTournaments} tamamlandı`),
       stat("Katılım", students.length ? Math.round((activeStudents / students.length) * 100) : 0, "yüzde")
@@ -80,7 +96,14 @@ export function ReportsPage({ sound }) {
                 ])
               ]),
               el("span", { className: "report-score", text: `${row.points} puan` }),
-              el("small", { text: `${row.played} maç · ${row.wins}G ${row.draws}B ${row.losses}M` })
+              (() => {
+                const learning = progress.profile(`student:${row.student.id}`);
+                return el("small", {
+                  text: learning
+                    ? `${row.played} maç · ${row.wins}G ${row.draws}B ${row.losses}M · ${learning.xp} XP · ${learning.completedLessons.length} ders`
+                    : `${row.played} maç · ${row.wins}G ${row.draws}B ${row.losses}M · öğrenme profili açılmadı`
+                });
+              })()
             ])
           ))
         : el("p", { className: "class-empty", text: "Bu sınıfta henüz kayıtlı maç yok. İki Kişilik Oyun veya Turnuva bölümünden ilk maçı başlatabilirsin." })
@@ -98,6 +121,25 @@ export function ReportsPage({ sound }) {
           ? `${tournaments.length} turnuvanın ${completedTournaments} tanesi tamamlandı.`
           : "Henüz sınıf turnuvası oluşturulmadı." })
       ])
+    ]),
+
+    el("section", { className: "class-card" }, [
+      el("h2", { className: "class-card-title", text: "Bulmaca konuları" }),
+      el("p", { className: "class-hint", text: "En çok desteğe ihtiyaç duyulan konular önce gösterilir." }),
+      themeRows.length
+        ? el("div", { className: "report-themes" }, themeRows.map((row) =>
+            el("article", { className: "report-theme" }, [
+              el("div", { className: "report-theme-head" }, [
+                el("strong", { text: PUZZLE_THEME_LABELS[row.theme] }),
+                el("span", { text: `%${row.accuracy ?? 0}` })
+              ]),
+              el("div", { className: "report-bar" }, [
+                el("span", { style: `width:${row.accuracy ?? 0}%` })
+              ]),
+              el("small", { text: `${row.solved} doğru · ${row.wrong} yanlış · ${row.hints} ipucu` })
+            ])
+          ))
+        : el("p", { className: "class-empty", text: "Öğrenciler henüz bulmaca çözmedi. İlk sonuçlardan sonra konu doğrulukları burada görünecek." })
     ])
   ]);
 }

@@ -35,6 +35,7 @@ export const navGroups = [
     title: "Çalış ve Oyna",
     roles: ["student", "teacher"],
     items: [
+      ["daily", "Bugünkü Çalışmam", "sparkles"],
       ["tactics", "Taktikler", "target"],
       ["puzzles", "Bulmacalar", "puzzle"],
       ["minigames", "Mini Oyunlar", "game"],
@@ -48,6 +49,7 @@ export const navGroups = [
     title: "Gelişimim",
     roles: ["student", "teacher"],
     items: [
+      ["games", "Oyun Arşivim", "archive"],
       ["badges", "Rozetler", "badge"],
       ["profile", "Profil", "user"]
     ]
@@ -72,8 +74,6 @@ export const navGroups = [
 
 /** Eski çağıranlar için düz liste; tek doğru kaynak yukarıdaki gruplardır. */
 export const navItems = navGroups.flatMap((group) => group.items);
-
-
 
 
 

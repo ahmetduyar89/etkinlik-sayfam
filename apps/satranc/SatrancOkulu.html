@@ -742,6 +742,87 @@ body.focus-mode .page-hero { display: none; }
 .menu-tile:hover::after { transform: scale(1.25); }
 .menu-tile:active { transform: translateY(-1px); }
 
+/* --- Kişiselleştirilmiş günlük çalışma --- */
+
+.daily-hero {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: 1.2rem;
+  align-items: center;
+  padding: clamp(1rem, 3vw, 1.8rem);
+  border-radius: var(--r-xl);
+  border: 2px solid rgba(123, 92, 240, 0.25);
+  background: linear-gradient(135deg, var(--grape-soft), var(--sky-soft));
+  box-shadow: var(--shadow-lift);
+}
+
+.daily-hero.complete { background: linear-gradient(135deg, var(--lime-soft), var(--sun-soft)); }
+
+.daily-ring {
+  display: grid;
+  place-items: center;
+  width: 7rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(135deg, var(--grape), var(--sky));
+  border: 0.65rem solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 8px 22px rgba(90, 58, 210, 0.25);
+  font-size: 1.7rem;
+  font-weight: 900;
+}
+
+.daily-hero.complete .daily-ring { background: linear-gradient(135deg, var(--lime), var(--primary)); }
+.daily-copy { display: grid; justify-items: start; gap: 0.55rem; }
+.daily-copy h2, .daily-copy p { margin: 0; }
+.daily-copy p { color: var(--ink-soft); font-weight: 700; }
+
+.daily-topics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8rem; }
+
+.daily-topic {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.7rem;
+  align-items: start;
+  padding: 1rem;
+  border-radius: var(--r-lg);
+  border: 2px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.daily-topic-no {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--primary);
+  font-weight: 900;
+}
+
+.daily-topic h3, .daily-topic p { margin: 0; }
+.daily-topic h3 { font-size: 1rem; }
+.daily-topic p { margin-top: 0.25rem; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+.daily-topic-count { grid-column: 2; color: var(--grape-dark); font-size: 0.74rem; font-weight: 900; }
+
+.daily-session-note {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--r-sm);
+  background: var(--grape-soft);
+  color: var(--grape-dark);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .daily-topics { grid-template-columns: 1fr; }
+  .daily-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  .daily-copy { justify-items: center; }
+}
+
 .hero-board, .side-panel, .settings-panel, .piece-detail {
   display: grid;
   gap: 1rem;
@@ -1546,6 +1627,85 @@ body.focus-mode .page-hero { display: none; }
   color: var(--muted);
   font-weight: 700;
   padding: 0 0.15rem;
+}
+/* --- Profil bazlı oyun arşivi ve hamle inceleme --- */
+
+.archive-content { display: grid; gap: 1rem; }
+
+.archive-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.archive-summary-card,
+.archive-card,
+.archive-empty,
+.archive-review {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 1.2rem;
+  box-shadow: var(--shadow);
+}
+
+.archive-summary-card { padding: 1rem; display: grid; gap: 0.2rem; }
+.archive-summary-card strong { font-size: 1.45rem; color: var(--primary); }
+.archive-summary-card span { color: var(--muted); font-size: 0.82rem; }
+
+.archive-list { display: grid; gap: 0.7rem; }
+.archive-card {
+  padding: 0.9rem 1rem;
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.8fr) minmax(13rem, 1.5fr) auto;
+  gap: 1rem;
+  align-items: center;
+  border-left: 5px solid var(--line);
+}
+.archive-card.won { border-left-color: #2f9b68; }
+.archive-card.drawn { border-left-color: #d59b2b; }
+.archive-card.lost { border-left-color: #748096; }
+
+.archive-result { display: flex; align-items: center; gap: 0.65rem; }
+.archive-result > span { font-size: 1.6rem; }
+.archive-result div { display: grid; gap: 0.15rem; }
+.archive-result small { color: var(--muted); }
+.archive-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.archive-meta span, .archive-meta strong {
+  background: rgba(47, 143, 131, 0.09);
+  border-radius: 999px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.78rem;
+}
+.archive-actions { display: flex; gap: 0.45rem; }
+
+.archive-empty { padding: 3rem 1rem; text-align: center; }
+.archive-empty-icon { display: block; font-size: 3.5rem; margin-bottom: 0.7rem; }
+.archive-empty h2 { margin: 0; }
+.archive-empty p { max-width: 34rem; margin: 0.55rem auto 1.2rem; color: var(--muted); }
+
+.archive-review { padding: 1rem; }
+.archive-review-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.archive-review-head > div { display: flex; align-items: center; gap: 0.7rem; }
+.archive-ply { color: var(--muted); font-size: 0.82rem; }
+.archive-review-grid { display: grid; grid-template-columns: minmax(18rem, 1fr) minmax(15rem, 0.62fr); gap: 1rem; align-items: start; }
+.archive-board .cb-stage { width: min(100%, 38rem); margin-inline: auto; }
+.archive-review-panel { display: grid; gap: 0.75rem; }
+.archive-review-note { min-height: 3.5rem; margin: 0; padding: 0.8rem; border-radius: 0.85rem; background: rgba(61, 124, 255, 0.09); }
+.archive-review-controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+.archive-moves { max-height: 22rem; overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; padding: 0.45rem; border: 1px solid var(--line); border-radius: 0.8rem; }
+.archive-move { padding: 0.45rem 0.55rem; border-radius: 0.55rem; text-align: left; color: var(--ink); background: transparent; }
+.archive-move:hover, .archive-move.active { color: #fff; background: var(--primary); }
+.profile-archive-link { margin-top: -0.4rem; }
+
+@media (max-width: 850px) {
+  .archive-card { grid-template-columns: 1fr; }
+  .archive-actions { justify-content: flex-start; }
+  .archive-review-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .archive-summary { grid-template-columns: 1fr; }
+  .archive-actions, .archive-review-controls { grid-template-columns: 1fr; display: grid; }
 }
 
 
@@ -2604,6 +2764,8 @@ body.focus-mode .play-board .cb-stage {
 .play-panel .teacher-text { font-size: 0.79rem; }
 
 .play-panel .move-list { max-height: 7.5rem; padding: 0.4rem; }
+.report-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; }
+.report-actions button { min-height: 2.5rem; padding-inline: 0.7rem; font-size: 0.78rem; }
 
 /* Odak modunda panel daha da sadeleşir. */
 body.focus-mode .play-panel { padding: 0.7rem; }
@@ -5071,6 +5233,13 @@ body.focus-mode .duel-panel { padding: 0.7rem; }
 
 .class-picker-select:focus-visible { outline: 2px solid var(--primary); border-radius: 0.5rem; }
 
+.student-picker {
+  background: var(--grape-soft);
+  border-color: rgba(123, 92, 240, 0.3);
+}
+
+.student-picker-select { max-width: 13rem; }
+
 /* --- Ortak parçalar --- */
 
 .class-layout {
@@ -5289,6 +5458,11 @@ body.focus-mode .duel-panel { padding: 0.7rem; }
 .report-row small { color: var(--muted); font-weight: 700; white-space: nowrap; }
 .report-insights { display: grid; gap: 0.5rem; }
 .report-insights p { margin: 0; padding: 0.75rem; border-radius: var(--r-sm); background: var(--sun-soft); color: var(--ink-soft); font-weight: 700; }
+.report-themes { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.65rem; }
+.report-theme { display: grid; gap: 0.4rem; padding: 0.75rem; border-radius: var(--r-sm); background: var(--panel-2); border: 1px solid var(--line); }
+.report-theme-head { display: flex; justify-content: space-between; gap: 0.5rem; }
+.report-theme-head span { color: var(--grape-dark); font-weight: 900; }
+.report-theme small { color: var(--muted); font-weight: 700; }
 
 @media (max-width: 820px) {
   .report-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -6277,6 +6451,7 @@ const navGroups = [
     title: "Çalış ve Oyna",
     roles: ["student", "teacher"],
     items: [
+      ["daily", "Bugünkü Çalışmam", "sparkles"],
       ["tactics", "Taktikler", "target"],
       ["puzzles", "Bulmacalar", "puzzle"],
       ["minigames", "Mini Oyunlar", "game"],
@@ -6290,6 +6465,7 @@ const navGroups = [
     title: "Gelişimim",
     roles: ["student", "teacher"],
     items: [
+      ["games", "Oyun Arşivim", "archive"],
       ["badges", "Rozetler", "badge"],
       ["profile", "Profil", "user"]
     ]
@@ -6318,8 +6494,6 @@ const navItems = navGroups.flatMap((group) => group.items);
 
 
 
-
-
   Object.defineProperty(__d, "navGroups", { get: () => navGroups, enumerable: true });
   Object.defineProperty(__d, "navItems", { get: () => navItems, enumerable: true });
 },
@@ -6330,8 +6504,14 @@ const defaultProgress = {
   stars: 0,
   completedLessons: [],
   solvedPuzzles: [],
+  // Tema bazında doğru/yanlış/ipucu sayıları; günlük çalışma önerilerini besler.
+  puzzleStats: {},
+  // { "YYYY-MM-DD": çözülen günlük çalışma bulmacası }
+  dailyPractice: {},
   badges: [],
   games: { won: 0, lost: 0, drawn: 0 },
+  // Bilgisayara karşı tamamlanan son oyunlar; hamle hamle inceleme için saklanır.
+  gamesArchive: [],
   // Mini oyun kayıtları: { [oyunId]: { best, plays, total } }
   miniGames: {},
   // sound: ses efektleri, voice: sesli anlatım, motion: animasyonlar, contrast: yüksek kontrast
@@ -8679,14 +8859,42 @@ function badgeGroups() {
 const { defaultProgress } = __yukle("src/models/progress.js");
 const { badges, badgeStatus } = __yukle("src/data/badges.js");
 const KEY = "satranc-okulu-progress";
+const VERSION = 2;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function localDayKey(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Eski ya da eksik kaydı güncel ilerleme biçimine tamamlar. */
+function normalizeProgress(value) {
+  const raw = value && typeof value === "object" ? value : {};
+  return {
+    ...clone(defaultProgress),
+    ...raw,
+    completedLessons: Array.isArray(raw.completedLessons) ? raw.completedLessons : [],
+    solvedPuzzles: Array.isArray(raw.solvedPuzzles) ? raw.solvedPuzzles : [],
+    puzzleStats: raw.puzzleStats && typeof raw.puzzleStats === "object" ? raw.puzzleStats : {},
+    dailyPractice: raw.dailyPractice && typeof raw.dailyPractice === "object" ? raw.dailyPractice : {},
+    badges: Array.isArray(raw.badges) ? raw.badges : [],
+    games: { ...defaultProgress.games, ...(raw.games || {}) },
+    gamesArchive: Array.isArray(raw.gamesArchive)
+      ? raw.gamesArchive.filter((entry) => entry?.id && Array.isArray(entry.moves)).slice(0, 100)
+      : [],
+    miniGames: raw.miniGames && typeof raw.miniGames === "object" ? raw.miniGames : {},
+    settings: { ...defaultProgress.settings, ...(raw.settings || {}) }
+  };
+}
+
 class ProgressService {
   constructor() {
-    this.state = this.load();
+    this.store = this.load();
+    this.activeProfileId = this.store.activeProfileId;
+    this.state = this.store.profiles[this.activeProfileId];
     /** Değişiklik dinleyicileri — bkz. onChange(). */
     this.listeners = new Set();
   }
@@ -8730,10 +8938,88 @@ class ProgressService {
   load() {
     try {
       const stored = JSON.parse(localStorage.getItem(KEY));
-      return { ...clone(defaultProgress), ...stored, settings: { ...defaultProgress.settings, ...stored?.settings } };
+      if (stored?.version === VERSION && stored.profiles && typeof stored.profiles === "object") {
+        const profiles = Object.fromEntries(
+          Object.entries(stored.profiles).map(([id, value]) => [id, normalizeProgress(value)])
+        );
+        if (!profiles.teacher) profiles.teacher = normalizeProgress(null);
+        const activeProfileId = profiles[stored.activeProfileId] ? stored.activeProfileId : "teacher";
+        return {
+          version: VERSION,
+          activeProfileId,
+          profiles,
+          profileNames: stored.profileNames && typeof stored.profileNames === "object"
+            ? stored.profileNames
+            : { teacher: "Öğretmen" }
+        };
+      }
+
+      // Sürüm 1 tek profildi. Bütün mevcut ilerlemeyi öğretmen profiline
+      // taşıyarak hiçbir XP, rozet veya tamamlanan dersi kaybetmeyiz.
+      return {
+        version: VERSION,
+        activeProfileId: "teacher",
+        profiles: { teacher: normalizeProgress(stored) },
+        profileNames: { teacher: "Öğretmen" }
+      };
     } catch {
-      return clone(defaultProgress);
+      return {
+        version: VERSION,
+        activeProfileId: "teacher",
+        profiles: { teacher: normalizeProgress(null) },
+        profileNames: { teacher: "Öğretmen" }
+      };
     }
+  }
+
+  /** Aktif profili değiştirir; profil yoksa temiz bir kayıt oluşturur. */
+  switchProfile(id, name = "Öğrenci") {
+    const profileId = String(id || "guest");
+    if (!this.store.profiles[profileId]) {
+      this.store.profiles[profileId] = normalizeProgress(null);
+    }
+    this.store.profileNames[profileId] = String(name || "Öğrenci").slice(0, 40);
+    this.activeProfileId = profileId;
+    this.store.activeProfileId = profileId;
+    this.state = this.store.profiles[profileId];
+    this.save();
+  }
+
+  /** Raporlarda kullanılmak üzere bir profil kaydını salt okunur biçimde bulur. */
+  profile(id) {
+    return this.store.profiles[String(id)] || null;
+  }
+
+  get activeProfileName() {
+    return this.store.profileNames[this.activeProfileId] || "Öğrenci";
+  }
+
+  /** Sınıf yedeğine eklenebilen tüm profil verisi. */
+  exportData() {
+    return clone(this.store);
+  }
+
+  /** Yeni birleşik yedekten profilleri yükler; eski yedeklerde çağrılmaz. */
+  importData(data) {
+    if (!data || data.version !== VERSION || !data.profiles || typeof data.profiles !== "object") {
+      return false;
+    }
+    const profiles = Object.fromEntries(
+      Object.entries(data.profiles).map(([id, value]) => [id, normalizeProgress(value)])
+    );
+    if (!profiles.teacher) profiles.teacher = normalizeProgress(null);
+    this.store = {
+      version: VERSION,
+      activeProfileId: profiles[data.activeProfileId] ? data.activeProfileId : "teacher",
+      profiles,
+      profileNames: data.profileNames && typeof data.profileNames === "object"
+        ? { ...data.profileNames, teacher: data.profileNames.teacher || "Öğretmen" }
+        : { teacher: "Öğretmen" }
+    };
+    this.activeProfileId = this.store.activeProfileId;
+    this.state = this.store.profiles[this.activeProfileId];
+    this.save();
+    return true;
   }
 
   /**
@@ -8746,8 +9032,10 @@ class ProgressService {
    * kötüdür — o yüzden sessizce devam eder ve bir kez uyarırız.
    */
   save() {
+    this.store.activeProfileId = this.activeProfileId;
+    this.store.profiles[this.activeProfileId] = this.state;
     try {
-      localStorage.setItem(KEY, JSON.stringify(this.state));
+      localStorage.setItem(KEY, JSON.stringify(this.store));
       this.storageBlocked = false;
     } catch {
       if (!this.storageBlocked) {
@@ -8779,11 +9067,52 @@ class ProgressService {
     }
   }
 
+  /** Bulmaca temasındaki doğru, yanlış ve ipucu kullanımını kaydeder. */
+  recordPuzzleAttempt(theme, kind) {
+    this.state.puzzleStats ||= {};
+    const stats = this.state.puzzleStats[theme] || { solved: 0, wrong: 0, hints: 0, lastAt: null };
+    if (kind === "solved") stats.solved += 1;
+    else if (kind === "wrong") stats.wrong += 1;
+    else if (kind === "hint") stats.hints += 1;
+    stats.lastAt = new Date().toISOString();
+    this.state.puzzleStats[theme] = stats;
+    this.save();
+  }
+
+  /** Günlük çalışma içinde çözülen soru sayısını bugünün kaydına ekler. */
+  recordDailyPuzzle() {
+    this.state.dailyPractice ||= {};
+    const day = localDayKey();
+    this.state.dailyPractice[day] = (this.state.dailyPractice[day] || 0) + 1;
+    this.save();
+    return this.state.dailyPractice[day];
+  }
+
+  dailyCount(day = localDayKey()) {
+    return this.state.dailyPractice?.[day] || 0;
+  }
+
   finishGame(result) {
     this.state.games[result] += 1;
     this.state.xp += result === "won" ? 30 : 12;
     this.checkBadges();
     this.save();
+  }
+
+  /**
+   * Tamamlanmış bir bilgisayar oyununu aktif profil arşivine ekler.
+   * Aynı oyun geri alınıp yeniden tamamlanırsa kimliğine göre güncellenir.
+   */
+  saveGame(game) {
+    if (!game?.id || !Array.isArray(game.moves)) return false;
+    this.state.gamesArchive ||= [];
+    const safe = clone(game);
+    const existing = this.state.gamesArchive.findIndex((entry) => entry.id === safe.id);
+    if (existing >= 0) this.state.gamesArchive.splice(existing, 1);
+    this.state.gamesArchive.unshift(safe);
+    this.state.gamesArchive = this.state.gamesArchive.slice(0, 100);
+    this.save();
+    return true;
   }
 
   /**
@@ -8827,6 +9156,7 @@ class ProgressService {
 
   reset() {
     this.state = clone(defaultProgress);
+    this.store.profiles[this.activeProfileId] = this.state;
     this.save();
   }
 
@@ -8938,7 +9268,8 @@ const paths = {
   // Sınıf (okul binası) ve turnuva kupası
   school: "M3 21h18M5 21V10l7-5 7 5v11M10 21v-5h4v5M12 9.5h.01",
   trophy: "M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 21h8M9.5 17h5",
-  chart: "M4 20V10h4v10M10 20V4h4v16M16 20v-7h4v7M3 20h18"
+  chart: "M4 20V10h4v10M10 20V4h4v16M16 20v-7h4v7M3 20h18",
+  archive: "M4 5h16v4H4zM5 9h14v11H5zM9 13h6"
 };
 
 function icon(name, className = "icon") {
@@ -9329,7 +9660,12 @@ function HomePage({ progress, sound, role = "teacher" }) {
   return el("main", { className: "home-page page" }, [
     el("section", { className: "welcome-panel" }, [
       el("div", { className: "welcome-copy" }, [
-        el("span", { className: "eyebrow", text: "1-4. sınıflar için · 36 haftalık program" }),
+        el("span", {
+          className: "eyebrow",
+          text: role === "student"
+            ? `${progress.activeProfileName} · 36 haftalık program`
+            : "1-4. sınıflar için · 36 haftalık program"
+        }),
         el("h1", { text: "Satranç Eğitimi" }),
         el("p", { text: "Taşları tanı, taktikleri keşfet, bulmacaları çöz ve bilgisayara karşı güvenle oyna." }),
         el("div", { className: "hero-actions" }, [
@@ -9377,7 +9713,7 @@ function HomePage({ progress, sound, role = "teacher" }) {
 
     el("section", { className: "home-shortcuts", "aria-label": "Hızlı başlangıç" }, [
       ["plan", "Derse devam et", "36 haftalık program", "book"],
-      ["puzzles", "Bulmaca çöz", "Seviyene uygun taktikler", "puzzle"],
+      ["daily", "Bugünkü çalışmam", "Sana özel 5 bulmaca", "sparkles"],
       ["play", "Oyun oyna", "Bilgisayara karşı dene", "bot"],
       role === "teacher"
         ? ["reports", "Sınıf raporu", "Maç ve turnuva özeti", "chart"]
@@ -45631,6 +45967,36 @@ const THEME_LIST = ["mat-1","mat-2","catal","koridor","bogmaca","terfi","sis","a
   Object.defineProperty(__d, "THEME_LIST", { get: () => THEME_LIST, enumerable: true });
 },
 
+"src/data/puzzleThemes.js": function (__d) {
+/** Bulmaca tema adları ve yanlış hamlede gösterilen öğretici yönlendirmeler. */
+const PUZZLE_THEME_LABELS = {
+  "mat-1": "Tek hamlede mat",
+  "mat-2": "İki hamlede mat",
+  koridor: "Koridor matı",
+  bogmaca: "Boğmaca matı",
+  terfi: "Terfi ile mat",
+  catal: "At çatalı",
+  sis: "Şiş",
+  acmaz: "Açmaz",
+  "cifte-sah": "Çifte şah",
+  askida: "Askıda taş"
+};
+
+const PUZZLE_THEME_NUDGES = {
+  koridor: "Şahın önü kendi piyonlarıyla kapalı. Son yatayı boydan boya tarayan hamleyi ara.",
+  bogmaca: "Şah kendi taşlarıyla çevrili. Taşların üzerinden atlayabilen tek taş hangisi?",
+  terfi: "Son yataya bir adım kalan piyonu bul; oraya varınca yeni bir taşa dönüşür.",
+  catal: "Atının aynı anda İKİ hedefe saldırabileceği kareyi ara.",
+  sis: "Şah ile arkasındaki değerli taşı aynı hatta yakala, sonra şah çek.",
+  acmaz: "Siyah vezir şahıyla aynı hatta. O hattın arkasına geçersen vezir kıpırdayamaz.",
+  "cifte-sah": "Bir taşı oynatınca arkasındaki taşın yolu açılıyor mu? İki taş birden şah çeksin.",
+  askida: "Rakibin hiçbir taşının korumadığı taşı bul."
+};
+
+  Object.defineProperty(__d, "PUZZLE_THEME_LABELS", { get: () => PUZZLE_THEME_LABELS, enumerable: true });
+  Object.defineProperty(__d, "PUZZLE_THEME_NUDGES", { get: () => PUZZLE_THEME_NUDGES, enumerable: true });
+},
+
 "src/pages/PuzzlesPage.js": function (__d) {
 /**
  * PuzzlesPage.js — Bulmaca çözme ekranı.
@@ -45647,7 +46013,7 @@ const THEME_LIST = ["mat-1","mat-2","catal","koridor","bogmaca","terfi","sis","a
  */
 
 const { el } = __yukle("src/utils/dom.js");
-const { routeParam } = __yukle("src/utils/router.js");
+const { navigate, routeParam } = __yukle("src/utils/router.js");
 const { Chess } = __yukle("src/engine/Chess.js");
 const { ChessBoard } = __yukle("src/components/ChessBoard.js");
 const { puzzles, puzzleCounts, themeCounts } = __yukle("src/data/puzzles.js");
@@ -45655,42 +46021,20 @@ const { icon } = __yukle("src/components/Icon.js");
 const { burst } = __yukle("src/animations/effects.js");
 const { pageShell } = __yukle("src/pages/pageUtils.js");
 const { sanTr } = __yukle("src/engine/Chess.js");
+const { PUZZLE_THEME_LABELS as THEME_LABELS, PUZZLE_THEME_NUDGES as THEME_NUDGE } = __yukle("src/data/puzzleThemes.js");
 const LEVELS = ["Kolay", "Orta", "Zor"];
-
-/** Tema kodu → çocuğun göreceği ad. Sıra, tema seçicideki sırayı da belirler. */
-const THEME_LABELS = {
-  "mat-1": "Tek hamlede mat",
-  "mat-2": "İki hamlede mat",
-  koridor: "Koridor matı",
-  bogmaca: "Boğmaca matı",
-  terfi: "Terfi ile mat",
-  catal: "At çatalı",
-  sis: "Şiş",
-  acmaz: "Açmaz",
-  "cifte-sah": "Çifte şah",
-  askida: "Askıda taş"
-};
 
 /** "Tümü" seçeneği dahil tema listesi. */
 const THEME_KEYS = ["hepsi", ...Object.keys(THEME_LABELS)];
 
-/**
- * Yanlış hamlede temaya özel yönlendirme.
- * Genel "çözüm değil" cümlesi çocuğa yol göstermez; her tema kendi desenine
- * işaret eden bir ipucu verir.
- */
-const THEME_NUDGE = {
-  koridor: "Şahın önü kendi piyonlarıyla kapalı. Son yatayı boydan boya tarayan hamleyi ara.",
-  bogmaca: "Şah kendi taşlarıyla çevrili. Taşların üzerinden atlayabilen tek taş hangisi?",
-  terfi: "Son yataya bir adım kalan piyonu bul; oraya varınca yeni bir taşa dönüşür.",
-  catal: "Atının aynı anda İKİ hedefe saldırabileceği kareyi ara.",
-  sis: "Şah ile arkasındaki değerli taşı aynı hatta yakala, sonra şah çek.",
-  acmaz: "Siyah vezir şahıyla aynı hatta. O hattın arkasına geçersen vezir kıpırdayamaz.",
-  "cifte-sah": "Bir taşı oynatınca arkasındaki taşın yolu açılıyor mu? İki taş birden şah çeksin.",
-  askida: "Rakibin hiçbir taşının korumadığı taşı bul."
-};
-
 function PuzzlesPage({ progress, sound }) {
+  const daily = routeParam("gunluk") === "1";
+  const dailyThemes = String(routeParam("temalar", ""))
+    .split(",")
+    .filter((key) => Object.hasOwn(THEME_LABELS, key));
+  if (dailyThemes.length === 0) dailyThemes.push("mat-1", "catal", "askida");
+  const dailyGoal = 5;
+  let dailySolved = Math.min(dailyGoal, progress.dailyCount());
   // Derin bağlantı: #/puzzles?seviye=Orta
   let level = LEVELS.includes(routeParam("seviye")) ? routeParam("seviye") : "Kolay";
   // Derin bağlantı: #/puzzles?tema=acmaz — öğretmen dersin konusuna uygun
@@ -45702,6 +46046,9 @@ function PuzzlesPage({ progress, sound }) {
   let solvedThisPuzzle = false;
   let attempts = 0;
   let streak = 0;
+  let hintRecorded = false;
+  let solutionRecorded = false;
+  let nextButton = null;
 
   /* ---------------------------------------------------------------- *
    * Arayüz parçaları
@@ -45731,6 +46078,7 @@ function PuzzlesPage({ progress, sound }) {
   const solutionLine = el("p", { className: "puzzle-solution", hidden: "" });
   const streakLine = el("strong", { text: "0" });
   const solvedLine = el("strong", { text: "0" });
+  const dailyLine = el("strong", { text: `${dailySolved}/${dailyGoal}` });
 
   const board = ChessBoard({
     chess: new Chess(),
@@ -45753,7 +46101,9 @@ function PuzzlesPage({ progress, sound }) {
    * kısıtını gevşetir, temayı koruruz — çünkü seçilen KONU önemlidir.
    */
   function pickPuzzle() {
-    const byTheme = theme === "hepsi" ? puzzles : puzzles.filter((item) => item.theme === theme);
+    const targetTheme = daily ? dailyThemes[dailySolved % dailyThemes.length] : theme;
+    if (daily) theme = targetTheme;
+    const byTheme = targetTheme === "hepsi" ? puzzles : puzzles.filter((item) => item.theme === targetTheme);
     let pool = byTheme.filter((item) => item.level === level);
     if (pool.length === 0) pool = byTheme;
     if (pool.length === 0) pool = puzzles;
@@ -45769,6 +46119,8 @@ function PuzzlesPage({ progress, sound }) {
     step = 0;
     attempts = 0;
     solvedThisPuzzle = false;
+    hintRecorded = false;
+    solutionRecorded = false;
 
     board.attach(chess);
     board.setOrientation(puzzle.side);
@@ -45782,6 +46134,10 @@ function PuzzlesPage({ progress, sound }) {
     feedback.className = "puzzle-feedback";
     hintLine.hidden = true;
     solutionLine.hidden = true;
+    if (nextButton) {
+      nextButton.disabled = daily;
+      nextButton.innerHTML = `${icon("puzzle")} ${daily ? "Sıradaki" : "Yeni Bulmaca"}`;
+    }
     refreshStats();
   }
 
@@ -45814,6 +46170,7 @@ function PuzzlesPage({ progress, sound }) {
     if (!correct) {
       attempts += 1;
       streak = 0;
+      progress.recordPuzzleAttempt(puzzle.theme, "wrong");
       sound.play("error");
       board.shake(move.from);
       setFeedback(wrongMessage(played, probe), "wrong");
@@ -45861,7 +46218,15 @@ function PuzzlesPage({ progress, sound }) {
     // İpucu almadan ve hata yapmadan çözülen bulmaca seriyi büyütür.
     const clean = attempts === 0;
     if (clean) streak += 1;
+    progress.recordPuzzleAttempt(puzzle.theme, "solved");
     progress.solvePuzzle(puzzle.id);
+    if (daily) {
+      dailySolved = Math.min(dailyGoal, progress.recordDailyPuzzle());
+      if (nextButton) nextButton.disabled = false;
+      if (dailySolved >= dailyGoal && nextButton) {
+        nextButton.innerHTML = `${icon("sparkles")} Çalışmayı tamamla`;
+      }
+    }
 
     sound.play("badge");
     burst(feedback);
@@ -45887,6 +46252,7 @@ function PuzzlesPage({ progress, sound }) {
   function refreshStats() {
     solvedLine.textContent = String(progress.state.solvedPuzzles.length);
     streakLine.textContent = String(streak);
+    dailyLine.textContent = `${dailySolved}/${dailyGoal}`;
   }
 
   /* ---------------------------------------------------------------- *
@@ -45931,6 +46297,10 @@ function PuzzlesPage({ progress, sound }) {
       onClick: () => {
         sound.play("click");
         attempts += 1; // ipucu kullanınca seri korunmaz
+        if (!hintRecorded) {
+          hintRecorded = true;
+          progress.recordPuzzleAttempt(puzzle.theme, "hint");
+        }
         hintLine.hidden = false;
         hintLine.textContent = `💡 ${puzzle.hint}`;
         sound.speak(puzzle.hint);
@@ -45963,6 +46333,10 @@ function PuzzlesPage({ progress, sound }) {
       onClick: () => {
         sound.play("click");
         attempts += 1;
+        if (!solutionRecorded) {
+          solutionRecorded = true;
+          progress.recordPuzzleAttempt(puzzle.theme, "hint");
+        }
         solutionLine.hidden = false;
         solutionLine.textContent = `Doğru hamle: ${sanTr(puzzle.solution)} — ${puzzle.explanation}`;
         sound.speak(`Doğru hamle ${sanTr(puzzle.solution)}. ${puzzle.explanation}`);
@@ -45972,12 +46346,16 @@ function PuzzlesPage({ progress, sound }) {
         if (move) board.showHint(move.from, move.to);
       }
     }),
-    el("button", {
+    nextButton = el("button", {
       className: "primary",
       type: "button",
-      html: `${icon("puzzle")} Yeni Bulmaca`,
+      html: `${icon("puzzle")} ${daily ? "Sıradaki" : "Yeni Bulmaca"}`,
       onClick: () => {
         sound.play("click");
+        if (daily && dailySolved >= dailyGoal) {
+          navigate("daily");
+          return;
+        }
         loadPuzzle();
       }
     })
@@ -45986,8 +46364,10 @@ function PuzzlesPage({ progress, sound }) {
   loadPuzzle();
 
   return pageShell(
-    "Bulmacalar",
-    `${puzzles.length} doğrulanmış satranç problemi. Her bulmacanın tek bir doğru çözümü var — sen bulabilir misin?`,
+    daily ? "Bugünkü Çalışmam" : "Bulmacalar",
+    daily
+      ? "Sana özel seçilen beş soruyu tamamla."
+      : `${puzzles.length} doğrulanmış satranç problemi. Her bulmacanın tek bir doğru çözümü var — sen bulabilir misin?`,
     [
       el("section", { className: "puzzle-layout" }, [
         el("div", { className: "puzzle-board" }, [board.element]),
@@ -45997,15 +46377,16 @@ function PuzzlesPage({ progress, sound }) {
           goalLine,
           el("div", { className: "puzzle-stats" }, [
             el("div", { className: "stat" }, [solvedLine, el("span", { text: "Çözülen" })]),
-            el("div", { className: "stat" }, [streakLine, el("span", { text: "Seri" })])
+            el("div", { className: "stat" }, [streakLine, el("span", { text: "Seri" })]),
+            daily ? el("div", { className: "stat" }, [dailyLine, el("span", { text: "Bugün" })]) : null
           ]),
           feedback,
           hintLine,
           solutionLine,
-          el("label", { className: "panel-label", text: "Konu" }),
-          el("div", { className: "puzzle-themes" }, themeButtons),
-          el("label", { className: "panel-label", text: "Zorluk seviyesi" }),
-          el("div", { className: "segmented" }, levelButtons),
+          daily ? el("p", { className: "daily-session-note", text: "Konu ve zorluk, önceki çalışmalarına göre otomatik seçiliyor." }) : el("label", { className: "panel-label", text: "Konu" }),
+          daily ? null : el("div", { className: "puzzle-themes" }, themeButtons),
+          daily ? null : el("label", { className: "panel-label", text: "Zorluk seviyesi" }),
+          daily ? null : el("div", { className: "segmented" }, levelButtons),
           controls
         ])
       ])
@@ -48265,6 +48646,7 @@ const { pieceHTML, symbolHTML } = __yukle("src/components/PieceGlyph.js");
 const { burst } = __yukle("src/animations/effects.js");
 const { pageShell, focusToggle } = __yukle("src/pages/pageUtils.js");
 const { sanTr } = __yukle("src/engine/Chess.js");
+const { navigate } = __yukle("src/utils/router.js");
 const TIME_CONTROLS = [
   { id: "yok", label: "Süresiz", detail: "Saat yok", icon: "⚪", base: 0, increment: 0 },
   { id: "5", label: "5 dk", detail: "Yıldırım", icon: "⚡", base: 300, increment: 0 },
@@ -48289,6 +48671,12 @@ function clockText(ms) {
 function PlayPage({ progress, sound }) {
   const game = new GameService({ level: "kolay", playerColor: "w" });
   let resultRecorded = false;
+  let rewardGranted = false;
+  let currentGameId = newGameId();
+
+  function newGameId() {
+    return `game-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
 
   /* ---------------------------------------------------------------- *
    * Arayüz parçaları
@@ -48403,7 +48791,11 @@ function PlayPage({ progress, sound }) {
     if (!resultRecorded) {
       resultRecorded = true;
       const outcome = isPlayer ? "lost" : "won";
-      progress.finishGame(outcome);
+      if (!rewardGranted) {
+        progress.finishGame(outcome);
+        rewardGranted = true;
+      }
+      archiveGame({ over: true, reason: msg, winner: isPlayer ? game.engineColor : game.playerColor }, outcome);
       sound.play(outcome === "won" ? "badge" : "error");
       if (outcome === "won") burst(statusLine);
     }
@@ -48515,13 +48907,61 @@ function PlayPage({ progress, sound }) {
     if (!resultRecorded) {
       resultRecorded = true;
       const outcome = status.winner === null ? "drawn" : status.winner === game.playerColor ? "won" : "lost";
-      progress.finishGame(outcome);
+      if (!rewardGranted) {
+        progress.finishGame(outcome);
+        rewardGranted = true;
+      }
+      archiveGame(status, outcome);
       sound.play(outcome === "won" ? "badge" : "success");
       if (outcome === "won") burst(statusLine);
     }
 
     showReport(status);
     return true;
+  }
+
+  /** Oyunu, analiz verileriyle birlikte aktif öğrenci profiline kaydeder. */
+  function archiveGame(status, outcome) {
+    const report = game.report();
+    const moves = game.chess.getHistory({ verbose: true }).map((move) => ({
+      from: move.from,
+      to: move.to,
+      promotion: move.promotion || null,
+      san: move.san,
+      color: move.color
+    }));
+    const reviews = game.moveReports
+      .filter((entry) => entry.by === "player")
+      .map((entry) => ({
+        ply: entry.ply,
+        san: entry.san,
+        bestSan: entry.bestSan || null,
+        loss: entry.loss || 0,
+        advice: entry.advice || "",
+        classification: entry.classification
+          ? {
+              key: entry.classification.key,
+              label: entry.classification.label,
+              emoji: entry.classification.emoji,
+              color: entry.classification.color
+            }
+          : null
+      }));
+
+    progress.saveGame({
+      id: currentGameId,
+      playedAt: new Date().toISOString(),
+      result: outcome,
+      reason: status.reason,
+      playerColor: game.playerColor,
+      level: { id: game.level.id, label: game.level.label },
+      timeControl: { id: timeControl.id, label: timeControl.label },
+      accuracy: report.accuracy,
+      counts: report.counts,
+      reportText: report.text,
+      moves,
+      reviews
+    });
   }
 
   /** Oyun sonu raporunu çizer. */
@@ -48555,7 +48995,10 @@ function PlayPage({ progress, sound }) {
         report.worst && report.worst.loss > 120 && report.worst.bestSan
           ? el("p", { className: "report-note", text: `Çalışılacak hamle: ${sanTr(report.worst.san)} — burada ${sanTr(report.worst.bestSan)} daha güçlüydü.` })
           : null,
-        el("button", { className: "primary", type: "button", text: "Yeni Oyun", onClick: () => startNewGame() })
+        el("div", { className: "report-actions" }, [
+          el("button", { className: "primary", type: "button", text: "Yeni Oyun", onClick: () => startNewGame() }),
+          el("button", { className: "ghost", type: "button", text: "Arşivde İncele", onClick: () => navigate("games") })
+        ])
       ])
     );
   }
@@ -48563,7 +49006,9 @@ function PlayPage({ progress, sound }) {
   /** Yeni oyun kurar. */
   async function startNewGame({ level = game.level.id, playerColor = game.playerColor } = {}) {
     game.newGame({ level, playerColor });
+    currentGameId = newGameId();
     resultRecorded = false;
+    rewardGranted = false;
     reportHost.replaceChildren();
     moveList.replaceChildren();
     // GameService yeni bir Chess örneği ürettiği için tahtayı yeni konuma bağlarız.
@@ -51979,7 +52424,7 @@ function ProfilePage({ progress, sound }) {
       hint ? el("small", { text: hint }) : null
     ]);
 
-  return pageShell("Profil", "İlerlemeni, seviyeni ve rozetlerini buradan takip et.", [
+  return pageShell(`${progress.activeProfileName} Profili`, "İlerlemeni, seviyeni ve rozetlerini buradan takip et.", [
     // --- Seviye kartı ---
     el("section", { className: "profile-hero" }, [
       el("div", { className: "level-badge" }, [
@@ -52003,7 +52448,8 @@ function ProfilePage({ progress, sound }) {
       statBox("Rozet", `${earnedBadges.length}/${badges.length}`),
       statBox("Tamamlanan Ders", `${overall.done}/${overall.total}`),
       statBox("Çözülen Bulmaca", `${state.solvedPuzzles.length}`, `${puzzles.length} bulmacadan`),
-      statBox("Kazanma Oranı", `%${winRate}`, `${totalGames} oyun`)
+      statBox("Kazanma Oranı", `%${winRate}`, `${totalGames} oyun`),
+      statBox("Bugünkü Çalışma", `${Math.min(5, progress.dailyCount())}/5`, "kişisel bulmaca seti")
     ]),
 
     // --- Bölüm bölüm ilerleme ---
@@ -52037,6 +52483,12 @@ function ProfilePage({ progress, sound }) {
       statBox("Berabere", games.drawn),
       statBox("Kaybedilen", games.lost)
     ]),
+    el("button", {
+      className: "ghost profile-archive-link",
+      type: "button",
+      text: `Oyun arşivini aç (${state.gamesArchive?.length || 0})`,
+      onClick: () => { sound.play("click"); navigate("games"); }
+    }),
 
     // --- Mini oyun rekorları ---
     el("h2", { className: "section-heading", text: "Mini oyun rekorların" }),
@@ -52123,8 +52575,8 @@ function SettingsPage({ progress, sound, rerender }) {
         ...SETTINGS.map(toggle),
         el("div", { className: "settings-danger" }, [
           el("div", {}, [
-            el("strong", { text: "İlerlemeyi Sıfırla" }),
-            el("small", { text: "Tüm XP, rozet, ders ve bulmaca ilerlemesi silinir; geri alınamaz. Onay için SİL yazman istenir — bunu öğretmenin yapması beklenir." })
+            el("strong", { text: `${progress.activeProfileName} ilerlemesini sıfırla` }),
+            el("small", { text: "Yalnızca açık profilin XP, rozet, ders ve bulmaca ilerlemesi silinir; diğer öğrenci profilleri korunur. Onay için SİL yazman istenir." })
           ]),
           el("button", {
             className: "danger",
@@ -52136,7 +52588,7 @@ function SettingsPage({ progress, sound, rerender }) {
               // Bu yüzden yazarak onay isteriz: harf harf SİL yazmak, kazayla
               // tüm sınıfın yıllık ilerlemesinin silinmesini gerçekten önler.
               const cevap = window.prompt(
-                "Tüm ilerleme (XP, rozet, ders, bulmaca) silinecek ve geri alınamaz.\n" +
+                `${progress.activeProfileName} profiline ait ilerleme (XP, rozet, ders, bulmaca) silinecek ve geri alınamaz.\n` +
                 "Bu genellikle öğretmenin yapacağı bir işlemdir.\n\n" +
                 "Devam etmek için büyük harflerle SİL yazıp Tamam'a bas:"
               );
@@ -52271,7 +52723,7 @@ function dateText(iso) {
   return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("tr-TR");
 }
 
-function ClassesPage({ sound }) {
+function ClassesPage({ sound, progress }) {
   let selectedStudentId = null;
   let bulkOpen = false;
   let notice = { text: "", tone: "" };
@@ -52327,8 +52779,16 @@ function ClassesPage({ sound }) {
         event.target.value = "";
         if (!file) return;
         const text = await file.text();
-        if (!window.confirm("Yedek yüklenirse bu bilgisayardaki TÜM sınıf, öğrenci ve turnuva kayıtları yedektekilerle değiştirilir. Devam edilsin mi?")) return;
+        if (!window.confirm("Yedek yüklenirse bu bilgisayardaki TÜM sınıf, öğrenci, turnuva ve öğrenme profilleri yedektekilerle değiştirilir. Devam edilsin mi?")) return;
         if (classroom.importJSON(text)) {
+          try {
+            const parsed = JSON.parse(text);
+            if (parsed.progress && progress.importData(parsed.progress)) {
+              progress.switchProfile("teacher", "Öğretmen");
+            }
+          } catch {
+            // Sınıf yedeği geçerli olduğuna göre bu yalnızca eski biçim olabilir.
+          }
           sound.play("success");
           selectedStudentId = null;
           say("Yedek yüklendi.", "correct");
@@ -52371,7 +52831,7 @@ function ClassesPage({ sound }) {
         el("h2", { className: "class-card-title", text: "Yedek" }),
         el("p", {
           className: "class-hint",
-          text: "Kayıtlar yalnızca bu bilgisayarda durur. Başka bilgisayara taşımak ya da güvenceye almak için yedek dosyası al."
+          text: "Sınıflar, maçlar ve öğrenci ilerlemeleri yalnızca bu bilgisayarda durur. Başka bilgisayara taşımak ya da güvenceye almak için yedek dosyası al."
         }),
         el("div", { className: "class-row-buttons" }, [
           el("button", {
@@ -52380,7 +52840,9 @@ function ClassesPage({ sound }) {
             text: "Yedekle",
             onClick: () => {
               sound.play("click");
-              const blob = new Blob([classroom.exportJSON()], { type: "application/json" });
+              const backup = JSON.parse(classroom.exportJSON());
+              backup.progress = progress.exportData();
+              const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
               const link = el("a", {
                 href: URL.createObjectURL(blob),
                 download: `satranc-siniflar-${new Date().toISOString().slice(0, 10)}.json`
@@ -53312,9 +53774,10 @@ const { el } = __yukle("src/utils/dom.js");
 const { navigate } = __yukle("src/utils/router.js");
 const { classroom } = __yukle("src/services/ClassroomService.js");
 const { pageShell } = __yukle("src/pages/pageUtils.js");
+const { PUZZLE_THEME_LABELS } = __yukle("src/data/puzzleThemes.js");
 const number = (value) => new Intl.NumberFormat("tr-TR").format(value);
 
-function ReportsPage({ sound }) {
+function ReportsPage({ sound, progress }) {
   const active = classroom.activeClass;
 
   if (!active) {
@@ -53340,6 +53803,21 @@ function ReportsPage({ sound }) {
   const completedTournaments = tournaments.filter((item) => item.finished).length;
   const activeStudents = standings.filter((row) => row.played > 0).length;
   const totalPoints = standings.reduce((sum, row) => sum + row.points, 0);
+  const learningProfiles = students.filter((student) => progress.profile(`student:${student.id}`)).length;
+  const themeRows = Object.keys(PUZZLE_THEME_LABELS).map((theme) => {
+    const total = students.reduce((sum, student) => {
+      const item = progress.profile(`student:${student.id}`)?.puzzleStats?.[theme];
+      if (!item) return sum;
+      return {
+        solved: sum.solved + (item.solved || 0),
+        wrong: sum.wrong + (item.wrong || 0),
+        hints: sum.hints + (item.hints || 0)
+      };
+    }, { solved: 0, wrong: 0, hints: 0 });
+    const decisions = total.solved + total.wrong;
+    return { theme, ...total, decisions, accuracy: decisions ? Math.round((total.solved / decisions) * 100) : null };
+  }).filter((row) => row.decisions > 0 || row.hints > 0)
+    .sort((a, b) => (a.accuracy ?? 101) - (b.accuracy ?? 101));
 
   const stat = (label, value, hint) => el("article", { className: "report-stat" }, [
     el("strong", { text: number(value) }),
@@ -53351,7 +53829,7 @@ function ReportsPage({ sound }) {
 
   return pageShell("Sınıf Raporları", `${active.name} sınıfının maç ve turnuva görünümü.`, [
     el("section", { className: "report-summary", "aria-label": "Sınıf özeti" }, [
-      stat("Öğrenci", students.length, `${activeStudents} öğrenci maç yaptı`),
+      stat("Öğrenci", students.length, `${learningProfiles} öğrenme profili açıldı`),
       stat("Toplam Maç", matches.length, `${number(totalPoints)} oyuncu puanı`),
       stat("Turnuva", tournaments.length, `${completedTournaments} tamamlandı`),
       stat("Katılım", students.length ? Math.round((activeStudents / students.length) * 100) : 0, "yüzde")
@@ -53381,7 +53859,14 @@ function ReportsPage({ sound }) {
                 ])
               ]),
               el("span", { className: "report-score", text: `${row.points} puan` }),
-              el("small", { text: `${row.played} maç · ${row.wins}G ${row.draws}B ${row.losses}M` })
+              (() => {
+                const learning = progress.profile(`student:${row.student.id}`);
+                return el("small", {
+                  text: learning
+                    ? `${row.played} maç · ${row.wins}G ${row.draws}B ${row.losses}M · ${learning.xp} XP · ${learning.completedLessons.length} ders`
+                    : `${row.played} maç · ${row.wins}G ${row.draws}B ${row.losses}M · öğrenme profili açılmadı`
+                });
+              })()
             ])
           ))
         : el("p", { className: "class-empty", text: "Bu sınıfta henüz kayıtlı maç yok. İki Kişilik Oyun veya Turnuva bölümünden ilk maçı başlatabilirsin." })
@@ -53399,11 +53884,309 @@ function ReportsPage({ sound }) {
           ? `${tournaments.length} turnuvanın ${completedTournaments} tanesi tamamlandı.`
           : "Henüz sınıf turnuvası oluşturulmadı." })
       ])
+    ]),
+
+    el("section", { className: "class-card" }, [
+      el("h2", { className: "class-card-title", text: "Bulmaca konuları" }),
+      el("p", { className: "class-hint", text: "En çok desteğe ihtiyaç duyulan konular önce gösterilir." }),
+      themeRows.length
+        ? el("div", { className: "report-themes" }, themeRows.map((row) =>
+            el("article", { className: "report-theme" }, [
+              el("div", { className: "report-theme-head" }, [
+                el("strong", { text: PUZZLE_THEME_LABELS[row.theme] }),
+                el("span", { text: `%${row.accuracy ?? 0}` })
+              ]),
+              el("div", { className: "report-bar" }, [
+                el("span", { style: `width:${row.accuracy ?? 0}%` })
+              ]),
+              el("small", { text: `${row.solved} doğru · ${row.wrong} yanlış · ${row.hints} ipucu` })
+            ])
+          ))
+        : el("p", { className: "class-empty", text: "Öğrenciler henüz bulmaca çözmedi. İlk sonuçlardan sonra konu doğrulukları burada görünecek." })
     ])
   ]);
 }
 
   Object.defineProperty(__d, "ReportsPage", { get: () => ReportsPage, enumerable: true });
+},
+
+"src/pages/DailyPracticePage.js": function (__d) {
+/** DailyPracticePage.js — öğrenci verisine göre beş soruluk günlük çalışma. */
+
+const { el } = __yukle("src/utils/dom.js");
+const { navigate } = __yukle("src/utils/router.js");
+const { themeCounts } = __yukle("src/data/puzzles.js");
+const { PUZZLE_THEME_LABELS } = __yukle("src/data/puzzleThemes.js");
+const { icon } = __yukle("src/components/Icon.js");
+const { pageShell } = __yukle("src/pages/pageUtils.js");
+const GOAL = 5;
+const STARTER_PRIORITY = { "mat-1": 50, catal: 49, askida: 48, "mat-2": 47, koridor: 46 };
+
+function recommendations(progress) {
+  const stats = progress.state.puzzleStats || {};
+  const entries = Object.keys(PUZZLE_THEME_LABELS).map((theme, index) => {
+    const item = stats[theme] || { solved: 0, wrong: 0, hints: 0 };
+    const decisions = item.solved + item.wrong;
+    const accuracy = decisions ? item.solved / decisions : null;
+    // Yanlış ve ipucu önceliği artırır. Hiç çalışılmayan konular da listenin
+    // sonunda kaybolmasın diye orta düzey başlangıç puanı alır.
+    const priority = accuracy === null
+      ? (STARTER_PRIORITY[theme] ?? 40 - index / 10)
+      : (1 - accuracy) * 100 + Math.min(item.wrong, 10) * 2 + Math.min(item.hints, 5) * 3;
+    return { theme, ...item, decisions, accuracy, priority };
+  });
+  return entries.sort((a, b) => b.priority - a.priority).slice(0, 3);
+}
+
+function DailyPracticePage({ progress, sound }) {
+  const suggested = recommendations(progress);
+  const today = Math.min(GOAL, progress.dailyCount());
+  const completed = today >= GOAL;
+  const themes = suggested.map((item) => item.theme).join(",");
+
+  return pageShell(
+    "Bugünkü Çalışmam",
+    `${progress.activeProfileName} için hatalara ve eksik konulara göre hazırlanan kısa çalışma.`,
+    [
+      el("section", { className: `daily-hero ${completed ? "complete" : ""}` }, [
+        el("div", { className: "daily-ring", text: completed ? "✓" : `${today}/${GOAL}` }),
+        el("div", { className: "daily-copy" }, [
+          el("span", { className: "eyebrow", text: completed ? "Bugün tamamlandı" : "Yaklaşık 10 dakika" }),
+          el("h2", { text: completed ? "Harika çalışma!" : "Beş bulmaca, üç önemli konu" }),
+          el("p", { text: completed
+            ? "Bugünkü hedefini tamamladın. İstersen tekrar ederek serini güçlendirebilirsin."
+            : `Bugün ${GOAL - today} bulmaca daha çözerek hedefini tamamlayabilirsin.` }),
+          el("button", {
+            className: "primary",
+            type: "button",
+            html: `${icon(completed ? "sparkles" : "target")} ${completed ? "Bir tur daha çöz" : today ? "Çalışmaya devam et" : "Çalışmayı başlat"}`,
+            onClick: () => {
+              sound.play("click");
+              navigate("puzzles", { gunluk: "1", temalar: themes });
+            }
+          })
+        ])
+      ]),
+
+      el("section", { className: "daily-topics" }, suggested.map((item, index) => {
+        const accuracy = item.accuracy === null ? null : Math.round(item.accuracy * 100);
+        return el("article", { className: "daily-topic" }, [
+          el("span", { className: "daily-topic-no", text: String(index + 1) }),
+          el("div", {}, [
+            el("h3", { text: PUZZLE_THEME_LABELS[item.theme] }),
+            el("p", { text: accuracy === null
+              ? "Bu konu henüz çalışılmadı; başlangıç setine eklendi."
+              : `%${accuracy} doğruluk · ${item.wrong} yanlış · ${item.hints} ipucu` })
+          ]),
+          el("span", { className: "daily-topic-count", text: `${themeCounts[item.theme] || 0} soru` })
+        ]);
+      })),
+
+      el("section", { className: "class-card" }, [
+        el("h2", { className: "class-card-title", text: "Nasıl seçiliyor?" }),
+        el("p", { className: "class-hint", text: "Yanlış yaptığın, ipucu kullandığın veya henüz hiç çalışmadığın konular öne alınır. Sonuçların geliştikçe yarının çalışma seti kendiliğinden değişir." })
+      ])
+    ]
+  );
+}
+
+  Object.defineProperty(__d, "DailyPracticePage", { get: () => DailyPracticePage, enumerable: true });
+},
+
+"src/pages/GameArchivePage.js": function (__d) {
+/**
+ * GameArchivePage.js — Profilde kayıtlı bilgisayar oyunlarını listeler ve
+ * hamle hamle, çevrimdışı çalışan bir tahta üzerinde yeniden oynatır.
+ */
+
+const { el } = __yukle("src/utils/dom.js");
+const { Chess, sanTr } = __yukle("src/engine/Chess.js");
+const { ChessBoard } = __yukle("src/components/ChessBoard.js");
+const { navigate } = __yukle("src/utils/router.js");
+const { pageShell } = __yukle("src/pages/pageUtils.js");
+const RESULT = {
+  won: { label: "Kazandın", emoji: "🏆", className: "won" },
+  drawn: { label: "Berabere", emoji: "🤝", className: "drawn" },
+  lost: { label: "Kaybettin", emoji: "📘", className: "lost" }
+};
+
+function dateText(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Tarih yok";
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+  }).format(date);
+}
+
+function pgnFor(game) {
+  const result = game.result === "won"
+    ? game.playerColor === "w" ? "1-0" : "0-1"
+    : game.result === "lost"
+      ? game.playerColor === "w" ? "0-1" : "1-0"
+      : "1/2-1/2";
+  const date = new Date(game.playedAt);
+  const pgnDate = Number.isNaN(date.getTime())
+    ? "????.??.??"
+    : `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
+  const body = game.moves.map((move, index) => `${index % 2 === 0 ? `${Math.floor(index / 2) + 1}. ` : ""}${move.san}`).join(" ");
+  return [
+    `[Event "Satranç Eğitimi"]`, `[Date "${pgnDate}"]`,
+    `[White "${game.playerColor === "w" ? "Öğrenci" : "Bilgisayar"}"]`,
+    `[Black "${game.playerColor === "b" ? "Öğrenci" : "Bilgisayar"}"]`,
+    `[Result "${result}"]`, "", `${body} ${result}`
+  ].join("\n");
+}
+
+function downloadPgn(game) {
+  const blob = new Blob([pgnFor(game)], { type: "application/x-chess-pgn;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `satranc-oyunu-${String(game.playedAt || "oyun").slice(0, 10)}.pgn`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function GameArchivePage({ progress, sound }) {
+  const games = [...(progress.state.gamesArchive || [])];
+  const host = el("div", { className: "archive-content" });
+
+  const renderArchive = () => {
+    if (games.length === 0) {
+      host.replaceChildren(el("section", { className: "archive-empty" }, [
+      el("span", { className: "archive-empty-icon", text: "♟️" }),
+      el("h2", { text: "Henüz kayıtlı oyunun yok" }),
+      el("p", { text: "Bilgisayara karşı bir oyunu tamamladığında sonuç ve bütün hamleler burada görünecek." }),
+      el("button", {
+        className: "primary", type: "button", text: "İlk oyunumu başlat",
+        onClick: () => { sound.play("click"); navigate("play"); }
+      })
+      ]));
+      return;
+    }
+
+    const average = Math.round(games.reduce((sum, game) => sum + (Number(game.accuracy) || 0), 0) / games.length);
+    const wins = games.filter((game) => game.result === "won").length;
+    host.replaceChildren(
+      el("section", { className: "archive-summary" }, [
+        summary("Kayıtlı oyun", games.length),
+        summary("Kazanılan", wins),
+        summary("Ortalama doğruluk", `%${average}`)
+      ]),
+      el("section", { className: "archive-list" }, games.map((game) => gameCard(game, host, sound, renderArchive)))
+    );
+  };
+
+  renderArchive();
+
+  return pageShell("Oyun Arşivim", `${progress.activeProfileName} için tamamlanan oyunlar ve hamle analizleri.`, [host]);
+}
+
+function summary(label, value) {
+  return el("div", { className: "archive-summary-card" }, [
+    el("strong", { text: String(value) }), el("span", { text: label })
+  ]);
+}
+
+function gameCard(game, host, sound, onBack) {
+  const result = RESULT[game.result] || RESULT.drawn;
+  return el("article", { className: `archive-card ${result.className}` }, [
+    el("div", { className: "archive-result" }, [
+      el("span", { text: result.emoji }),
+      el("div", {}, [el("strong", { text: result.label }), el("small", { text: dateText(game.playedAt) })])
+    ]),
+    el("div", { className: "archive-meta" }, [
+      el("span", { text: game.level?.label || "Seviye yok" }),
+      el("span", { text: game.playerColor === "b" ? "Siyah" : "Beyaz" }),
+      el("span", { text: game.timeControl?.label || "Süresiz" }),
+      el("strong", { text: `%${game.accuracy ?? 0} doğruluk` })
+    ]),
+    el("div", { className: "archive-actions" }, [
+      el("button", {
+        className: "primary", type: "button", text: "Hamleleri incele",
+        onClick: () => { sound.play("click"); showReview(game, host, sound, onBack); }
+      }),
+      el("button", {
+        className: "ghost", type: "button", text: "PGN indir",
+        onClick: () => { sound.play("click"); downloadPgn(game); }
+      })
+    ])
+  ]);
+}
+
+function showReview(game, host, sound, onBack) {
+  const chess = new Chess();
+  const board = ChessBoard({ chess, orientation: game.playerColor || "w", interactive: false });
+  let ply = 0;
+  const title = el("strong", { text: "Başlangıç konumu" });
+  const note = el("p", { className: "archive-review-note", text: "Bir hamle seçerek oyunu incelemeye başla." });
+  const counter = el("span", { className: "archive-ply", text: `0 / ${game.moves.length}` });
+  const moveButtons = [];
+
+  const paint = (next) => {
+    ply = Math.max(0, Math.min(game.moves.length, next));
+    const position = new Chess();
+    let last = null;
+    for (let index = 0; index < ply; index += 1) last = position.move(game.moves[index]);
+    board.attach(position);
+    board.setOrientation(game.playerColor || "w");
+    board.setLastMove(last ? { from: last.from, to: last.to } : null);
+    counter.textContent = `${ply} / ${game.moves.length}`;
+    moveButtons.forEach((button, index) => button.classList.toggle("active", index === ply - 1));
+
+    if (!last) {
+      title.textContent = "Başlangıç konumu";
+      note.textContent = "İleri düğmesine bas veya listeden bir hamle seç.";
+      return;
+    }
+    title.textContent = `${Math.ceil(ply / 2)}${ply % 2 ? "." : "..."} ${sanTr(last.san)}`;
+    const review = (game.reviews || []).find((entry) => entry.ply === ply);
+    if (review?.classification) {
+      note.textContent = `${review.classification.emoji} ${review.classification.label} — ${review.advice || game.reportText || ""}`;
+    } else {
+      note.textContent = last.color === game.playerColor ? "Senin hamlen." : "Bilgisayarın hamlesi.";
+    }
+  };
+
+  const moves = el("div", { className: "archive-moves" });
+  game.moves.forEach((move, index) => {
+    const review = (game.reviews || []).find((entry) => entry.ply === index + 1);
+    const button = el("button", {
+      className: "archive-move", type: "button",
+      title: review?.classification?.label || "Hamleyi göster",
+      text: `${index % 2 === 0 ? `${Math.floor(index / 2) + 1}. ` : ""}${sanTr(move.san)}${review?.classification?.emoji ? ` ${review.classification.emoji}` : ""}`,
+      onClick: () => { sound.play("click"); paint(index + 1); }
+    });
+    moveButtons.push(button);
+    moves.append(button);
+  });
+
+  host.replaceChildren(el("section", { className: "archive-review" }, [
+    el("div", { className: "archive-review-head" }, [
+      el("button", {
+        className: "ghost", type: "button", text: "← Arşive dön",
+        onClick: () => { sound.play("click"); onBack(); }
+      }),
+      el("div", {}, [title, counter])
+    ]),
+    el("div", { className: "archive-review-grid" }, [
+      el("div", { className: "archive-board" }, [board.element]),
+      el("aside", { className: "archive-review-panel" }, [
+        note,
+        el("div", { className: "archive-review-controls" }, [
+          el("button", { className: "ghost", type: "button", text: "⏮ Baştan", onClick: () => paint(0) }),
+          el("button", { className: "ghost", type: "button", text: "← Geri", onClick: () => paint(ply - 1) }),
+          el("button", { className: "primary", type: "button", text: "İleri →", onClick: () => paint(ply + 1) })
+        ]),
+        moves,
+        el("button", { className: "ghost", type: "button", text: "PGN olarak indir", onClick: () => downloadPgn(game) })
+      ])
+    ])
+  ]));
+  paint(0);
+}
+
+  Object.defineProperty(__d, "GameArchivePage", { get: () => GameArchivePage, enumerable: true });
 },
 
 "src/app.js": function (__d) {
@@ -53434,11 +54217,15 @@ const { SettingsPage } = __yukle("src/pages/SettingsPage.js");
 const { ClassesPage } = __yukle("src/pages/ClassesPage.js");
 const { TournamentPage } = __yukle("src/pages/TournamentPage.js");
 const { ReportsPage } = __yukle("src/pages/ReportsPage.js");
+const { DailyPracticePage } = __yukle("src/pages/DailyPracticePage.js");
+const { GameArchivePage } = __yukle("src/pages/GameArchivePage.js");
 const { classroom } = __yukle("src/services/ClassroomService.js");
 const progress = new ProgressService();
 const sound = new SoundService(progress);
 const root = document.querySelector("#app");
 const ROLE_KEY = "satranc-okulu-role";
+const STUDENT_KEY = "satranc-okulu-active-student";
+const TEACHER_ROUTES = ["siniflar", "turnuva", "reports"];
 
 function readRole() {
   try {
@@ -53450,15 +54237,38 @@ function readRole() {
 
 let role = readRole();
 
+function readStudentId() {
+  try { return localStorage.getItem(STUDENT_KEY) || ""; } catch { return ""; }
+}
+
+function selectedStudent() {
+  const id = readStudentId();
+  return classroom.students(classroom.state.activeClassId).find((student) => student.id === id) || null;
+}
+
+function useRoleProfile() {
+  if (role === "teacher") {
+    progress.switchProfile("teacher", "Öğretmen");
+    return;
+  }
+  const student = selectedStudent();
+  progress.switchProfile(student ? `student:${student.id}` : "guest", student?.name || "Misafir Öğrenci");
+}
+
 function setRole(next) {
   role = next === "student" ? "student" : "teacher";
   try { localStorage.setItem(ROLE_KEY, role); } catch { /* Kısıtlı tarayıcıda oturumluk çalışır. */ }
-  if (role === "student" && ["siniflar", "turnuva", "reports"].includes(currentRoute())) {
+  useRoleProfile();
+  if (role === "student" && TEACHER_ROUTES.includes(currentRoute())) {
     navigate("home");
     return;
   }
   render();
 }
+
+// Eski tek profilli kayıt öğretmen profiline taşınır; uygulama öğrenci
+// modunda kapatıldıysa son seçilen öğrencinin profili yeniden açılır.
+useRoleProfile();
 
 const pages = {
   home: HomePage,
@@ -53466,6 +54276,8 @@ const pages = {
   siniflar: ClassesPage,
   turnuva: TournamentPage,
   reports: ReportsPage,
+  daily: DailyPracticePage,
+  games: GameArchivePage,
   learn: LearnPage,
   board: BoardPage,
   pieces: PiecesPage,
@@ -53519,6 +54331,7 @@ function renderNav(route) {
 let xpStat = null;
 let starStat = null;
 let classPicker = null;
+let studentPicker = null;
 
 function renderTopbar() {
   const collapsed = Boolean(progress.state.settings.navCollapsed);
@@ -53555,11 +54368,48 @@ function renderTopbar() {
         onClick: () => setRole("teacher")
       })
     ]),
-    role === "teacher" ? renderClassPicker() : null,
+    role === "teacher" ? renderClassPicker() : renderStudentPicker(),
     xpStat,
     starStat,
     el("button", { className: "icon-button", type: "button", title: "Ayarlar", onClick: () => navigate("settings"), html: icon("settings") })
   ]);
+}
+
+/** Öğrenci modunda seçili sınıftan kimin ilerlemesinin açılacağını belirler. */
+function renderStudentPicker() {
+  studentPicker = el("select", {
+    className: "class-picker-select student-picker-select",
+    "aria-label": "Öğrenci profili",
+    onChange: (event) => {
+      if (event.target.value === "__manage") {
+        setRole("teacher");
+        navigate("siniflar");
+        return;
+      }
+      try { localStorage.setItem(STUDENT_KEY, event.target.value); } catch { /* Oturumluk seçim. */ }
+      const student = classroom.findStudent(event.target.value);
+      progress.switchProfile(student ? `student:${student.id}` : "guest", student?.name || "Misafir Öğrenci");
+      sound.play("click");
+      render();
+    }
+  });
+  syncStudentPicker();
+  return el("label", { className: "class-picker student-picker", title: "Öğrenci profili" }, [
+    el("span", { className: "class-picker-emoji", text: "🙂" }),
+    studentPicker
+  ]);
+}
+
+function syncStudentPicker() {
+  if (!studentPicker) return;
+  const students = classroom.students(classroom.state.activeClassId);
+  const selected = selectedStudent();
+  studentPicker.replaceChildren(
+    el("option", { value: "", text: students.length ? "Öğrenci seç" : "Misafir Öğrenci" }),
+    ...students.map((student) => el("option", { value: student.id, text: student.name })),
+    el("option", { value: "__manage", text: "＋ Öğrencileri yönet…" })
+  );
+  studentPicker.value = selected?.id || "";
 }
 
 /**
@@ -53605,6 +54455,10 @@ function syncClassPicker() {
 
 function render() {
   const route = pages[currentRoute()] ? currentRoute() : "home";
+  if (role === "student" && TEACHER_ROUTES.includes(route)) {
+    navigate("home");
+    return;
+  }
   document.body.classList.toggle("high-contrast", progress.state.settings.contrast);
   document.body.classList.toggle("reduced-motion", !progress.state.settings.motion);
   // Menü kapalıyken kabuk dar sütuna geçer; sayfa içeriği genişler.
@@ -53657,7 +54511,10 @@ function bump(node, text) {
 // Abonelik BİR KEZ kurulur; render() her sayfa geçişinde yeni düğümler üretse de
 // syncTopbar güncel referansları kullanır.
 progress.onChange(syncTopbar);
-classroom.onChange(syncClassPicker);
+classroom.onChange(() => {
+  syncClassPicker();
+  syncStudentPicker();
+});
 
 onRouteChange(render);
 render();

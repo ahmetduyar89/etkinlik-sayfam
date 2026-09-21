@@ -31,7 +31,7 @@ export function dateText(iso) {
   return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("tr-TR");
 }
 
-export function ClassesPage({ sound }) {
+export function ClassesPage({ sound, progress }) {
   let selectedStudentId = null;
   let bulkOpen = false;
   let notice = { text: "", tone: "" };
@@ -87,8 +87,16 @@ export function ClassesPage({ sound }) {
         event.target.value = "";
         if (!file) return;
         const text = await file.text();
-        if (!window.confirm("Yedek yüklenirse bu bilgisayardaki TÜM sınıf, öğrenci ve turnuva kayıtları yedektekilerle değiştirilir. Devam edilsin mi?")) return;
+        if (!window.confirm("Yedek yüklenirse bu bilgisayardaki TÜM sınıf, öğrenci, turnuva ve öğrenme profilleri yedektekilerle değiştirilir. Devam edilsin mi?")) return;
         if (classroom.importJSON(text)) {
+          try {
+            const parsed = JSON.parse(text);
+            if (parsed.progress && progress.importData(parsed.progress)) {
+              progress.switchProfile("teacher", "Öğretmen");
+            }
+          } catch {
+            // Sınıf yedeği geçerli olduğuna göre bu yalnızca eski biçim olabilir.
+          }
           sound.play("success");
           selectedStudentId = null;
           say("Yedek yüklendi.", "correct");
@@ -131,7 +139,7 @@ export function ClassesPage({ sound }) {
         el("h2", { className: "class-card-title", text: "Yedek" }),
         el("p", {
           className: "class-hint",
-          text: "Kayıtlar yalnızca bu bilgisayarda durur. Başka bilgisayara taşımak ya da güvenceye almak için yedek dosyası al."
+          text: "Sınıflar, maçlar ve öğrenci ilerlemeleri yalnızca bu bilgisayarda durur. Başka bilgisayara taşımak ya da güvenceye almak için yedek dosyası al."
         }),
         el("div", { className: "class-row-buttons" }, [
           el("button", {
@@ -140,7 +148,9 @@ export function ClassesPage({ sound }) {
             text: "Yedekle",
             onClick: () => {
               sound.play("click");
-              const blob = new Blob([classroom.exportJSON()], { type: "application/json" });
+              const backup = JSON.parse(classroom.exportJSON());
+              backup.progress = progress.exportData();
+              const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
               const link = el("a", {
                 href: URL.createObjectURL(blob),
                 download: `satranc-siniflar-${new Date().toISOString().slice(0, 10)}.json`

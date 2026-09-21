@@ -53,8 +53,8 @@ export function SettingsPage({ progress, sound, rerender }) {
         ...SETTINGS.map(toggle),
         el("div", { className: "settings-danger" }, [
           el("div", {}, [
-            el("strong", { text: "İlerlemeyi Sıfırla" }),
-            el("small", { text: "Tüm XP, rozet, ders ve bulmaca ilerlemesi silinir; geri alınamaz. Onay için SİL yazman istenir — bunu öğretmenin yapması beklenir." })
+            el("strong", { text: `${progress.activeProfileName} ilerlemesini sıfırla` }),
+            el("small", { text: "Yalnızca açık profilin XP, rozet, ders ve bulmaca ilerlemesi silinir; diğer öğrenci profilleri korunur. Onay için SİL yazman istenir." })
           ]),
           el("button", {
             className: "danger",
@@ -66,7 +66,7 @@ export function SettingsPage({ progress, sound, rerender }) {
               // Bu yüzden yazarak onay isteriz: harf harf SİL yazmak, kazayla
               // tüm sınıfın yıllık ilerlemesinin silinmesini gerçekten önler.
               const cevap = window.prompt(
-                "Tüm ilerleme (XP, rozet, ders, bulmaca) silinecek ve geri alınamaz.\n" +
+                `${progress.activeProfileName} profiline ait ilerleme (XP, rozet, ders, bulmaca) silinecek ve geri alınamaz.\n` +
                 "Bu genellikle öğretmenin yapacağı bir işlemdir.\n\n" +
                 "Devam etmek için büyük harflerle SİL yazıp Tamam'a bas:"
               );

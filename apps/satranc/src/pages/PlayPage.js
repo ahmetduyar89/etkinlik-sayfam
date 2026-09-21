@@ -19,6 +19,7 @@ import { pieceHTML, symbolHTML } from "../components/PieceGlyph.js";
 import { burst } from "../animations/effects.js";
 import { pageShell, focusToggle } from "./pageUtils.js";
 import { sanTr } from "../engine/Chess.js";
+import { navigate } from "../utils/router.js";
 
 const TIME_CONTROLS = [
   { id: "yok", label: "Süresiz", detail: "Saat yok", icon: "⚪", base: 0, increment: 0 },
@@ -44,6 +45,12 @@ function clockText(ms) {
 export function PlayPage({ progress, sound }) {
   const game = new GameService({ level: "kolay", playerColor: "w" });
   let resultRecorded = false;
+  let rewardGranted = false;
+  let currentGameId = newGameId();
+
+  function newGameId() {
+    return `game-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
 
   /* ---------------------------------------------------------------- *
    * Arayüz parçaları
@@ -158,7 +165,11 @@ export function PlayPage({ progress, sound }) {
     if (!resultRecorded) {
       resultRecorded = true;
       const outcome = isPlayer ? "lost" : "won";
-      progress.finishGame(outcome);
+      if (!rewardGranted) {
+        progress.finishGame(outcome);
+        rewardGranted = true;
+      }
+      archiveGame({ over: true, reason: msg, winner: isPlayer ? game.engineColor : game.playerColor }, outcome);
       sound.play(outcome === "won" ? "badge" : "error");
       if (outcome === "won") burst(statusLine);
     }
@@ -270,13 +281,61 @@ export function PlayPage({ progress, sound }) {
     if (!resultRecorded) {
       resultRecorded = true;
       const outcome = status.winner === null ? "drawn" : status.winner === game.playerColor ? "won" : "lost";
-      progress.finishGame(outcome);
+      if (!rewardGranted) {
+        progress.finishGame(outcome);
+        rewardGranted = true;
+      }
+      archiveGame(status, outcome);
       sound.play(outcome === "won" ? "badge" : "success");
       if (outcome === "won") burst(statusLine);
     }
 
     showReport(status);
     return true;
+  }
+
+  /** Oyunu, analiz verileriyle birlikte aktif öğrenci profiline kaydeder. */
+  function archiveGame(status, outcome) {
+    const report = game.report();
+    const moves = game.chess.getHistory({ verbose: true }).map((move) => ({
+      from: move.from,
+      to: move.to,
+      promotion: move.promotion || null,
+      san: move.san,
+      color: move.color
+    }));
+    const reviews = game.moveReports
+      .filter((entry) => entry.by === "player")
+      .map((entry) => ({
+        ply: entry.ply,
+        san: entry.san,
+        bestSan: entry.bestSan || null,
+        loss: entry.loss || 0,
+        advice: entry.advice || "",
+        classification: entry.classification
+          ? {
+              key: entry.classification.key,
+              label: entry.classification.label,
+              emoji: entry.classification.emoji,
+              color: entry.classification.color
+            }
+          : null
+      }));
+
+    progress.saveGame({
+      id: currentGameId,
+      playedAt: new Date().toISOString(),
+      result: outcome,
+      reason: status.reason,
+      playerColor: game.playerColor,
+      level: { id: game.level.id, label: game.level.label },
+      timeControl: { id: timeControl.id, label: timeControl.label },
+      accuracy: report.accuracy,
+      counts: report.counts,
+      reportText: report.text,
+      moves,
+      reviews
+    });
   }
 
   /** Oyun sonu raporunu çizer. */
@@ -310,7 +369,10 @@ export function PlayPage({ progress, sound }) {
         report.worst && report.worst.loss > 120 && report.worst.bestSan
           ? el("p", { className: "report-note", text: `Çalışılacak hamle: ${sanTr(report.worst.san)} — burada ${sanTr(report.worst.bestSan)} daha güçlüydü.` })
           : null,
-        el("button", { className: "primary", type: "button", text: "Yeni Oyun", onClick: () => startNewGame() })
+        el("div", { className: "report-actions" }, [
+          el("button", { className: "primary", type: "button", text: "Yeni Oyun", onClick: () => startNewGame() }),
+          el("button", { className: "ghost", type: "button", text: "Arşivde İncele", onClick: () => navigate("games") })
+        ])
       ])
     );
   }
@@ -318,7 +380,9 @@ export function PlayPage({ progress, sound }) {
   /** Yeni oyun kurar. */
   async function startNewGame({ level = game.level.id, playerColor = game.playerColor } = {}) {
     game.newGame({ level, playerColor });
+    currentGameId = newGameId();
     resultRecorded = false;
+    rewardGranted = false;
     reportHost.replaceChildren();
     moveList.replaceChildren();
     // GameService yeni bir Chess örneği ürettiği için tahtayı yeni konuma bağlarız.
