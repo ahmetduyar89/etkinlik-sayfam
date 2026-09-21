@@ -344,6 +344,22 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const pageRectRef = React.useRef(pageRect);
         pageRectRef.current = pageRect;
 
+        /**
+         * Sayfalı defterlerde çalışma masasının kendisi çizim yüzeyi değildir.
+         * Küçük bir tolerans kalem ucunun tam kenarda kesilmesini engeller;
+         * kaydedilen mürekkep yine aşağıdaki canvas kırpmasıyla sayfada kalır.
+         */
+        const isInsidePage = (point: Point, tolerance = 0) => {
+            const page = pageRectRef.current;
+            if (!page) return true;
+            return (
+                point.x >= page.x - tolerance &&
+                point.x <= page.x + page.w + tolerance &&
+                point.y >= page.y - tolerance &&
+                point.y <= page.y + page.h + tolerance
+            );
+        };
+
         const getCanvasSize = () => {
             const c = canvasRef.current;
             if (!c) return { w: 0, h: 0 };
@@ -528,10 +544,18 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             applyIdentity(bCtx);
             bCtx.clearRect(0, 0, w, h);
             applyView(bCtx);
+            const page = pageRectRef.current;
+            if (page) {
+                bCtx.save();
+                bCtx.beginPath();
+                bCtx.rect(page.x, page.y, page.w, page.h);
+                bCtx.clip();
+            }
             strokesRef.current.forEach((s, i) => {
                 if (exclude?.has(i)) return;
                 drawStroke(bCtx, s, simTimeRef.current, isDark);
             });
+            if (page) bCtx.restore();
         }, [isDark]);
 
         /**
@@ -551,12 +575,20 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
             if (live && live.length) {
                 applyView(mainCtx);
+                const page = pageRectRef.current;
+                if (page) {
+                    mainCtx.save();
+                    mainCtx.beginPath();
+                    mainCtx.rect(page.x, page.y, page.w, page.h);
+                    mainCtx.clip();
+                }
                 live.forEach((s) => drawStroke(mainCtx, s, simTimeRef.current, isDark));
+                if (page) mainCtx.restore();
                 applyIdentity(mainCtx);
             }
 
-            // Sayfa dışı: mürekkep silinmez ama soluklaşır ve dışa aktarmaya
-            // girmez; öğretmen kağıdın nerede bittiğini görür.
+            // Sayfa dışı masa yüzeyini belirginleştir. Mürekkep üstteki
+            // çizim adımlarında zaten sayfa kutusuna kırpılmıştır.
             const page = pageRectRef.current;
             if (page) {
                 const pv = viewRef.current;
@@ -1689,6 +1721,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             mainCtx.rect(minX, minY, width, height);
             mainCtx.clip();
             applyView(mainCtx);
+            const page = pageRectRef.current;
+            if (page) {
+                mainCtx.beginPath();
+                mainCtx.rect(page.x, page.y, page.w, page.h);
+                mainCtx.clip();
+            }
             drawStroke(mainCtx, stroke, 0, isDark);
             mainCtx.restore();
             applyIdentity(mainCtx);
@@ -2255,6 +2293,16 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
 
             const { x, y } = toWorld(e.clientX, e.clientY);
+
+            // A4/B5/PDF gibi gerçek sayfalarda gri masa yalnızca gezinme
+            // alanıdır. İçerik araçları sayfa dışında yeni nesne başlatmaz.
+            if (!isInsidePage({ x, y }, 1 / viewRef.current.scale)) {
+                if (config.tool === 'select' && selectedIdxsRef.current.length) {
+                    deselect();
+                    redraw();
+                }
+                return;
+            }
 
             // Kement: serbest bir çerçeve çizip içine düşenleri seçer.
             if (config.tool === 'lasso') {

@@ -1325,6 +1325,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             boxes={currentBoxes}
                             enabled={isTextBoxMode}
                             view={view}
+                            pageBox={pageBox}
                             onAdd={(b) => updateCurrentBoxes((list) => [...list, b])}
                             onUpdate={(id, upd) =>
                                 updateCurrentBoxes((list) =>

@@ -2421,8 +2421,29 @@
       if (hub) hub.classList.add('hidden');
     }
 
+    function clearPlanetaryumLabMode() {
+      currentLabMode = 'free';
+      document.querySelectorAll('.mode-tab').forEach(tab => {
+        tab.classList.remove('active', 'text-sky-400', 'bg-sky-500/20', 'border', 'border-sky-400/40');
+        tab.classList.add('text-slate-300');
+      });
+      const freeTab = document.getElementById('tab-free');
+      if (freeTab) {
+        freeTab.classList.add('active', 'text-sky-400', 'bg-sky-500/20', 'border', 'border-sky-400/40');
+        freeTab.classList.remove('text-slate-300');
+      }
+      ['seasons-modal', 'eclipses-modal', 'gravity-modal', 'kepler-modal'].forEach(id => {
+        const modal = document.getElementById(id);
+        if (modal) modal.classList.add('hidden');
+      });
+    }
+
     function selectStation(station) {
       currentStation = station;
+      // İstasyon sekmesine/kartına her geçiş temiz bir görünüm açar. Böylece
+      // daha önce seçilmiş bir eğitim kartı 3D Planetaryumun veya iframe'in
+      // üzerinde asılı kalmaz.
+      clearPlanetaryumLabMode();
 
       // Update Desktop Station Tabs
       document.querySelectorAll('.station-tab').forEach(btn => {
