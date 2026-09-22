@@ -30,6 +30,9 @@ export function StudentPortal({ act }: StudentPortalProps) {
     const [nameError, setNameError] = useState('');
     const [isStarted, setIsStarted] = useState(!act.is_test);
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
+    const submittingRef = React.useRef(false);
+    const answersWriteRef = React.useRef<Promise<unknown>>(Promise.resolve());
+    const latestAnswersRef = React.useRef<Record<string, unknown>>({});
     const [isFinished, setIsFinished] = useState(false);
     const [isStarting, setIsStarting] = useState(false);
     const [submissionId, setSubmissionId] = useState<string | null>(null);
@@ -79,17 +82,20 @@ export function StudentPortal({ act }: StudentPortalProps) {
     }, [isStarted, act]);
 
     const handleSubmit = React.useCallback(async () => {
-        if (isFinished) return;
-        setIsFinished(true);
+        if (isFinished || submittingRef.current) return;
+        submittingRef.current = true;
         if (submissionId) {
             try {
+                await answersWriteRef.current.catch(() => undefined);
                 await submissionsHandler.update(submissionId, {
+                    answers: latestAnswersRef.current,
                     submitted_at: new Date().toISOString(),
                 });
+                setIsFinished(true);
             } catch (err) {
                 console.error('Submission update error:', err);
                 toast.error('Cevaplar kaydedilemedi. Lütfen tekrar deneyin.');
-            }
+            } finally { submittingRef.current = false; }
         }
     }, [isFinished, submissionId, submissionsHandler, toast]);
 
@@ -147,16 +153,18 @@ export function StudentPortal({ act }: StudentPortalProps) {
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
+            if (event.source !== iframeRef.current?.contentWindow) return;
             const data = event.data as { type?: string; height?: number; data?: unknown; error?: string };
             if (data?.type === 'IFRAME_HEIGHT_SYNC' && (data.height ?? 0) > 0) {
                 setIframeHeight(data.height as number);
             }
-            if (data?.type === 'SIM_ANSWER' && submissionId) {
-                submissionsHandler
+            if (data?.type === 'SIM_ANSWER' && submissionId && !isFinished && !submittingRef.current && data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+                latestAnswersRef.current = data.data as Record<string, unknown>;
+                answersWriteRef.current = submissionsHandler
                     .update(submissionId, {
                         answers: (data.data ?? {}) as Record<string, unknown>,
                     })
-                    .catch((err) => console.error('Answer sync error:', err));
+                    .catch(() => { toast.error('Cevaplar buluta gönderilemedi; Bitir düğmesiyle yeniden deneyebilirsiniz.'); });
             }
             if (data?.type === 'JS_ERROR') {
                 const msg = data.error || '';
@@ -167,7 +175,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
         };
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, [submissionId, submissionsHandler, toast]);
+    }, [submissionId, submissionsHandler, toast, isFinished]);
 
     const handleToolbarCommand = (type: string) => {
         if (type === 'UNDO_DRAWING') canvasRef.current?.undo();
@@ -255,6 +263,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
                             </label>
                             <input
                                 id="student-name"
+                                maxLength={120}
                                 value={name}
                                 onChange={(e) => {
                                     setName(e.target.value);

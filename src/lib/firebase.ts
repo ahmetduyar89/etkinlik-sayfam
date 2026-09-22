@@ -17,7 +17,10 @@ import {
     DocumentReference,
     runTransaction,
 } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { connectFirestoreEmulator } from 'firebase/firestore';
+import { scopedCollection } from './classroomScope';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -32,7 +35,15 @@ const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {
     ignoreUndefinedProperties: true,
 });
+// Connect before initializing dependent services so no request uses the live host.
+const emulated = import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true';
+if (emulated) connectFirestoreEmulator(db, '127.0.0.1', 8080);
 export const storage = getStorage(app);
+export const auth = getAuth(app);
+if (emulated) {
+    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+    connectStorageEmulator(storage, '127.0.0.1', 9199);
+}
 
 export interface FirestoreHandler<T extends { id: string }> {
     sync: (onUpdate: (data: T[]) => void, onError?: (e: Error) => void) => () => void;
@@ -47,7 +58,7 @@ export function useFirestore<T extends { id: string }>(
     return {
         sync: (onUpdate, onError) => {
             const q = query(
-                collection(db, collectionName),
+                collection(db, scopedCollection(collectionName)),
                 orderBy('created_at', 'desc')
             );
             return onSnapshot(
@@ -62,16 +73,17 @@ export function useFirestore<T extends { id: string }>(
             );
         },
         add: async (data) =>
-            addDoc(collection(db, collectionName), {
+            addDoc(collection(db, scopedCollection(collectionName)), {
                 ...data,
+                ...(collectionName === 'submissions' ? { owner_uid: auth.currentUser?.uid } : {}),
                 created_at: Timestamp.now().toDate().toISOString(),
             }),
         update: async (id, data) => {
-            const docRef = doc(db, collectionName, id);
+            const docRef = doc(db, scopedCollection(collectionName), id);
             await updateDoc(docRef, data as Record<string, unknown>);
         },
         remove: async (id) => {
-            const docRef = doc(db, collectionName, id);
+            const docRef = doc(db, scopedCollection(collectionName), id);
             await deleteDoc(docRef);
         },
     };
@@ -82,7 +94,7 @@ export async function fetchDocById<T>(
     collectionName: string,
     id: string
 ): Promise<T | null> {
-    const snap = await getDoc(doc(db, collectionName, id));
+    const snap = await getDoc(doc(db, scopedCollection(collectionName), id));
     if (!snap.exists()) return null;
     return { id: snap.id, ...snap.data() } as unknown as T;
 }
@@ -95,7 +107,7 @@ export function watchDocById<T>(
     onError?: (e: Error) => void
 ): () => void {
     return onSnapshot(
-        doc(db, collectionName, id),
+        doc(db, scopedCollection(collectionName), id),
         (snap) => onUpdate(snap.exists() ? ({ id: snap.id, ...snap.data() } as unknown as T) : null),
         (error) => onError?.(error)
     );
@@ -107,7 +119,7 @@ export async function saveDocById(
     id: string,
     data: Record<string, unknown>
 ): Promise<void> {
-    await setDoc(doc(db, collectionName, id), data, { merge: true });
+    await setDoc(doc(db, scopedCollection(collectionName), id), data, { merge: true });
 }
 
 /** Bir işlemde yazılacak (veya `data` yoksa silinecek) doküman. */
@@ -128,11 +140,11 @@ export async function saveDocsTransaction(
     build: (current: Record<string, unknown> | null) => DocWrite[] | null
 ): Promise<boolean> {
     return runTransaction(db, async (tx) => {
-        const snap = await tx.get(doc(db, read.collection, read.id));
+        const snap = await tx.get(doc(db, scopedCollection(read.collection), read.id));
         const writes = build(snap.exists() ? (snap.data() as Record<string, unknown>) : null);
         if (!writes) return false;
         for (const w of writes) {
-            const ref = doc(db, w.collection, w.id);
+            const ref = doc(db, scopedCollection(w.collection), w.id);
             if (w.data) tx.set(ref, w.data, { merge: true });
             else tx.delete(ref);
         }
@@ -153,7 +165,7 @@ export function watchNewDocs<T>(
 ): () => void {
     const [parent, parentId, sub] = path;
     const q = query(
-        collection(db, parent, parentId, sub),
+        collection(db, scopedCollection(parent), parentId, sub),
         orderBy(options.orderBy, 'desc'),
         queryLimit(options.limit)
     );
@@ -181,7 +193,7 @@ export async function addSubDoc(
     data: Record<string, unknown>
 ): Promise<string> {
     const [parent, parentId, sub] = path;
-    const ref = await addDoc(collection(db, parent, parentId, sub), data);
+    const ref = await addDoc(collection(db, scopedCollection(parent), parentId, sub), data);
     return ref.id;
 }
 
@@ -193,7 +205,7 @@ export async function fetchSubDocs<T>(
     const [parent, parentId, sub] = path;
     const snap = await getDocs(
         query(
-            collection(db, parent, parentId, sub),
+            collection(db, scopedCollection(parent), parentId, sub),
             orderBy(options.orderBy, 'desc'),
             queryLimit(options.limit)
         )
@@ -207,7 +219,7 @@ export async function deleteSubDoc(
     id: string
 ): Promise<void> {
     const [parent, parentId, sub] = path;
-    await deleteDoc(doc(db, parent, parentId, sub, id));
+    await deleteDoc(doc(db, scopedCollection(parent), parentId, sub, id));
 }
 
 /** Dokümanı id ile siler. */
@@ -215,5 +227,5 @@ export async function deleteDocById(
     collectionName: string,
     id: string
 ): Promise<void> {
-    await deleteDoc(doc(db, collectionName, id));
+    await deleteDoc(doc(db, scopedCollection(collectionName), id));
 }

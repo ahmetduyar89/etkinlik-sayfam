@@ -311,6 +311,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
         /** Son kalem (stylus) olayının zamanı — avuç içi reddi için. */
         const lastPenAtRef = React.useRef(0);
+        /** Ekranda aktif kalem varsa pointerId'si saklanır. */
+        const activePenPointerIdRef = React.useRef<number | null>(null);
         /** Kalem kullanıldıktan sonra parmağın yok sayılacağı süre. */
         const PEN_PRIORITY_MS = 1200;
         /** Sürücü temas alanı bildiriyorsa bu genişlikten büyüğü avuç sayılır. */
@@ -863,7 +865,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
          */
         const applyOps = React.useCallback(
             (ops: NotebookOp[]) => {
-                if (isDrawingRef.current || dragStateRef.current) {
+                if (isDrawingRef.current || dragStateRef.current || inlineTextRef.current !== null) {
                     pendingOpsRef.current.push(...ops);
                     return;
                 }
@@ -942,10 +944,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
         const commitInlineText = React.useCallback(
             (textValue?: string) => {
-                if (!inlineText) return;
-                const text = (textValue !== undefined ? textValue : inlineText.text).trim();
-                if (inlineText.strokeIdx !== undefined) {
-                    const idx = inlineText.strokeIdx;
+                const current = inlineTextRef.current;
+                if (!current) return;
+                const domVal = textareaRef.current?.value;
+                const rawText = textValue !== undefined ? textValue : (domVal !== undefined ? domVal : current.text);
+                const text = rawText.trim();
+                if (current.strokeIdx !== undefined) {
+                    const idx = current.strokeIdx;
                     const existing = strokesRef.current[idx];
                     if (existing) {
                         pushHistory();
@@ -960,12 +965,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                             const updated: Stroke = {
                                 ...existing,
                                 text,
-                                color: inlineText.color,
-                                width: inlineText.fontSize,
-                                fontFamily: inlineText.fontFamily,
-                                textAlign: inlineText.textAlign,
-                                bold: inlineText.bold,
-                                italic: inlineText.italic,
+                                color: current.color,
+                                width: current.fontSize,
+                                fontFamily: current.fontFamily,
+                                textAlign: current.textAlign,
+                                bold: current.bold,
+                                italic: current.italic,
+                                points: [{ x: current.worldX, y: current.worldY }],
                             };
                             strokesRef.current[idx] = updated;
                             commitStrokes();
@@ -979,13 +985,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         id: newStrokeId(),
                         tool: 'text',
                         text,
-                        color: inlineText.color,
-                        width: inlineText.fontSize,
-                        fontFamily: inlineText.fontFamily,
-                        textAlign: inlineText.textAlign,
-                        bold: inlineText.bold,
-                        italic: inlineText.italic,
-                        points: [{ x: inlineText.worldX, y: inlineText.worldY }],
+                        color: current.color,
+                        width: current.fontSize,
+                        fontFamily: current.fontFamily,
+                        textAlign: current.textAlign,
+                        bold: current.bold,
+                        italic: current.italic,
+                        points: [{ x: current.worldX, y: current.worldY }],
                     };
                     strokesRef.current.push(s);
                     commitStrokes();
@@ -994,8 +1000,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     redraw();
                 }
                 setInlineText(null);
+                window.setTimeout(flushPendingOps, 0);
             },
-            [commitStrokes, deselect, emit, inlineText, pushHistory, redraw, setSelection]
+            [commitStrokes, deselect, emit, flushPendingOps, pushHistory, redraw, setSelection]
         );
 
         // Metin modu dışına çıkıldığında açık metni kaydet
@@ -1009,14 +1016,15 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         React.useEffect(() => {
             if (!inlineText) return;
             const onPointerDownOutside = (e: PointerEvent) => {
-                if (textBoxContainerRef.current?.contains(e.target as Node)) {
+                const target = e.target as HTMLElement | null;
+                // Metin kutusunun kendisine veya çocuklarına tıklandıysa kapatma
+                if (textBoxContainerRef.current?.contains(target as Node)) {
                     return;
                 }
-                const target = e.target as HTMLElement | null;
-                // Toolbar veya araç butonlarına basıldığında (yazı tipi, renk, kalın vb. değiştirirken) kutuyu kapatma
+                // Toolbar, araç butonları, renk veya ayar panellerine basıldığında kutuyu kapatma
                 if (
                     target?.closest(
-                        '[data-drawing-toolbar], [aria-label*="araç"], [aria-label*="Araç"], [title*="Yazı"], [title*="Metin"], [title*="Font"], [title*="Renk"], [title*="Boyut"]'
+                        '[data-drawing-toolbar], [role="toolbar"], [role="dialog"], [aria-label*="araç"], [aria-label*="Araç"], [title*="Yazı"], [title*="Metin"], [title*="Font"], [title*="Renk"], [title*="Boyut"]'
                     )
                 ) {
                     return;
@@ -1274,9 +1282,42 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 isBusy: () =>
                     isDrawingRef.current ||
                     dragStateRef.current !== null ||
-                    pointersRef.current.size > 0,
+                    pointersRef.current.size > 0 ||
+                    inlineTextRef.current !== null,
                 getPages: () => {
-                    pagesRef.current[currentPageRef.current] = [...strokesRef.current];
+                    let currentStrokes = [...strokesRef.current];
+                    const currentInline = inlineTextRef.current;
+                    const domText = textareaRef.current?.value ?? currentInline?.text ?? '';
+                    const trimmed = domText.trim();
+                    if (currentInline && trimmed) {
+                        if (currentInline.strokeIdx !== undefined && currentStrokes[currentInline.strokeIdx]) {
+                            currentStrokes[currentInline.strokeIdx] = {
+                                ...currentStrokes[currentInline.strokeIdx],
+                                text: trimmed,
+                                color: currentInline.color,
+                                width: currentInline.fontSize,
+                                fontFamily: currentInline.fontFamily,
+                                textAlign: currentInline.textAlign,
+                                bold: currentInline.bold,
+                                italic: currentInline.italic,
+                                points: [{ x: currentInline.worldX, y: currentInline.worldY }],
+                            };
+                        } else if (currentInline.strokeIdx === undefined) {
+                            currentStrokes.push({
+                                id: newStrokeId(),
+                                tool: 'text',
+                                text: trimmed,
+                                color: currentInline.color,
+                                width: currentInline.fontSize,
+                                fontFamily: currentInline.fontFamily,
+                                textAlign: currentInline.textAlign,
+                                bold: currentInline.bold,
+                                italic: currentInline.italic,
+                                points: [{ x: currentInline.worldX, y: currentInline.worldY }],
+                            });
+                        }
+                    }
+                    pagesRef.current[currentPageRef.current] = currentStrokes;
                     return pagesRef.current.map((page) =>
                         page.map((stroke) => ({
                             ...stroke,
@@ -1285,6 +1326,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     );
                 },
                 loadPages: (pages: Stroke[][]) => {
+                    if (inlineTextRef.current) {
+                        commitInlineText();
+                    }
                     pagesRef.current = pages.length ? pages.map((p) => withIds(p)) : [[]];
                     currentPageRef.current = 0;
                     strokesRef.current = [...pagesRef.current[0]];
@@ -2208,16 +2252,22 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
          */
         const isPalmTouch = (e: React.PointerEvent): boolean => {
             if (e.pointerType === 'pen') {
+                activePenPointerIdRef.current = e.pointerId;
                 lastPenAtRef.current = performance.now();
                 return false;
             }
             if (config.palmRejection === false || e.pointerType !== 'touch') return false;
+            if (activePenPointerIdRef.current !== null) return true;
             if (performance.now() - lastPenAtRef.current < PEN_PRIORITY_MS) return true;
             return (e.width ?? 0) > PALM_CONTACT_PX || (e.height ?? 0) > PALM_CONTACT_PX;
         };
 
-        /** Çok parmak dokunuşunu izlemeye başlar/genişletir. */
+        /** Çok parmak dokunuşunu izlemeye başlar/genişletir (yalnızca kalem aktif değilken). */
         const trackTapStart = (e: React.PointerEvent) => {
+            if (activePenPointerIdRef.current !== null || performance.now() - lastPenAtRef.current < PEN_PRIORITY_MS) {
+                tapRef.current = null;
+                return;
+            }
             const count = pointersRef.current.size;
             if (count < 2) {
                 tapRef.current = null;
@@ -2382,6 +2432,17 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
         const startDrawing = async (e: React.PointerEvent) => {
             if (!enabled) return;
+
+            // 1. Önce Kalem ve Avuç İçi Kontrolü:
+            if (e.pointerType === 'pen') {
+                activePenPointerIdRef.current = e.pointerId;
+                lastPenAtRef.current = performance.now();
+            } else if (isPalmTouch(e)) {
+                // Kalem yazarken veya yakın zamanda kullanılmışken gelen dokunmalar avuç içidir;
+                // çizimi bölmemeli, mevcut çizgiyi iptal etmemeli ve jest tetiklememelidir.
+                return;
+            }
+
             // İşaretçiyi yakala: el tuvalin kenarından ya da üstteki araç
             // çubuğunun üzerinden geçtiğinde çizgi ortadan kesilmesin.
             try {
@@ -2392,17 +2453,19 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
             trackTapStart(e);
 
-            // Çift parmak: yakınlaştırma/kaydırma kipine geç.
-            if (viewportEnabled && pointersRef.current.size === 2) {
+            // Çift parmak: yalnızca iki parmakla dokunuluyorsa ve aktif bir kalem yoksa yakınlaştırma/kaydırma kipine geç.
+            if (
+                viewportEnabled &&
+                pointersRef.current.size === 2 &&
+                activePenPointerIdRef.current === null &&
+                performance.now() - lastPenAtRef.current >= PEN_PRIORITY_MS
+            ) {
                 cancelCurrentStroke();
                 clearOverlay();
                 anchorPinch();
                 return;
             }
             if (pointersRef.current.size > 1) return;
-
-            // Avuç içi reddi: kalem elde dururken parmak çizmez.
-            if (isPalmTouch(e)) return;
 
             // Ölçü aracı: gövdesinden taşınır, tutamağından döndürülür.
             const ruler = rulerRef.current;
@@ -2637,7 +2700,24 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
 
             if (config.tool === 'text') {
-                if (inlineText) {
+                if (inlineTextRef.current) {
+                    const cur = inlineTextRef.current;
+                    const fontSize = cur.fontSize;
+                    const lines = (textareaRef.current?.value ?? cur.text).split('\n');
+                    const maxLen = Math.max(4, ...lines.map((l) => l.length));
+                    const boxW = Math.max(120 / viewRef.current.scale, maxLen * fontSize * 0.65);
+                    const boxH = Math.max(40 / viewRef.current.scale, lines.length * fontSize * 1.3);
+                    const pad = 28 / viewRef.current.scale;
+                    // Tıklanan nokta mevcut açık metin kutusunun içindeyse veya çok yakınındaysa yeni kutu açma, odağı koru
+                    if (
+                        x >= cur.worldX - pad &&
+                        x <= cur.worldX + boxW + pad &&
+                        y >= cur.worldY - pad &&
+                        y <= cur.worldY + boxH + pad
+                    ) {
+                        textareaRef.current?.focus();
+                        return;
+                    }
                     commitInlineText();
                 }
                 const pickTolerance = 14 / viewRef.current.scale;
@@ -2780,7 +2860,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         };
 
         const draw = (e: React.PointerEvent) => {
-            if (e.pointerType === 'pen') lastPenAtRef.current = performance.now();
+            if (e.pointerType === 'pen') {
+                activePenPointerIdRef.current = e.pointerId;
+                lastPenAtRef.current = performance.now();
+            }
             if (pointersRef.current.has(e.pointerId)) {
                 pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
             }
@@ -2803,7 +2886,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             // hesaplansaydı (eski hâli) parmaklar birlikte kaydırıldığında
             // aralarındaki mesafe değişmediği için sayfa yerinde kalırdı.
             const pinch = pinchRef.current;
-            if (pinch && pointersRef.current.size >= 2) {
+            if (pinch && pointersRef.current.size >= 2 && activePenPointerIdRef.current === null) {
                 const [a, b] = [...pointersRef.current.values()];
                 const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
                 const scale = Math.min(
@@ -3112,6 +3195,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
         const stopDrawing = (e?: React.PointerEvent) => {
             if (e) {
+                if (activePenPointerIdRef.current === e.pointerId) {
+                    activePenPointerIdRef.current = null;
+                    lastPenAtRef.current = performance.now();
+                }
                 pointersRef.current.delete(e.pointerId);
                 if (e.currentTarget?.hasPointerCapture?.(e.pointerId)) {
                     e.currentTarget.releasePointerCapture(e.pointerId);
@@ -4457,6 +4544,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     >
                         <div
                             ref={textBoxContainerRef}
+                            data-drawing-toolbar="true"
                             className="absolute pointer-events-auto flex flex-col items-start transition-none"
                             style={{
                                 left: inlineText.worldX * view.scale + view.tx,

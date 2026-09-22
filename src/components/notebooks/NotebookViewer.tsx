@@ -1,3 +1,4 @@
+import { PdfPageBackground } from './PdfPageBackground';
 // src/components/notebooks/NotebookViewer.tsx
 // Öğrencinin gördüğü SALT-OKUNUR defter. `?view=notebook&id=...` bağlantısıyla
 // açılır; öğretmenin QR kodunu okutan öğrenci burayı görür.
@@ -249,6 +250,7 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
                         style={paperBackground(paper, bgColor, view, canvasSize)}
                     />
                 )}
+                {notebook.pdf_id && <PdfPageBackground pdfId={notebook.pdf_id} pdfName={notebook.pdf_name} pageNumber={pageInfo.current + 1} view={view} canvasSize={canvasSize} box={pdfBox} readOnly />}
                 <DrawingCanvas
                     ref={canvasRef}
                     config={VIEW_CONFIG}

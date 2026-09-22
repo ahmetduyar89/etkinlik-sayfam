@@ -10,6 +10,7 @@ import { getPdfDocument, savePdfToDB } from '../../lib/pdfStorage';
 import { useToast } from '../common/ToastProvider';
 
 interface PdfPageBackgroundProps {
+    readOnly?: boolean;
     pdfId: string;
     pdfName?: string;
     pageNumber: number; // 1-based index (1, 2, 3...)
@@ -27,6 +28,7 @@ interface PdfPageBackgroundProps {
 }
 
 export function PdfPageBackground({
+    readOnly = false,
     pdfId,
     pdfName = 'PDF Belgesi',
     pageNumber,
@@ -202,7 +204,7 @@ export function PdfPageBackground({
         }
     };
 
-    if (missingInDb) {
+    if (missingInDb && !readOnly) {
         return (
             <div className="absolute inset-0 flex items-center justify-center bg-surface-container-lowest/90 backdrop-blur-sm z-10 p-6 pointer-events-auto">
                 <div className="max-w-md w-full bg-surface-container-high p-6 rounded-2xl border border-outline-variant shadow-2xl text-center space-y-4">
@@ -232,6 +234,8 @@ export function PdfPageBackground({
             </div>
         );
     }
+
+    if (missingInDb && readOnly) return <p className="absolute inset-0 grid place-items-center text-sm text-red-700">PDF bu cihazdan yüklenemedi. Öğretmeninizden dosyayı buluta yeniden yüklemesini isteyin.</p>;
 
     if (error) {
         return (

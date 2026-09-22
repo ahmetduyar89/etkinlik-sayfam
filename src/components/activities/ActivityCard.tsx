@@ -1,3 +1,5 @@
+import { useSession } from '../../contexts/SessionContext';
+import { AssignActivityButton } from '../classrooms/AssignActivityButton';
 // src/components/activities/ActivityCard.tsx — İÇERİK MERKEZİ (Ünite Rafı)
 // Raf ızgarasındaki görsel kart. Aksiyon satırı derste kullanılan üç işlemi
 // öne çıkarır (tam ekran aç · QR ile öğrenciye gönder · klasöre taşı); yönetim
@@ -31,6 +33,7 @@ function ActivityCardBase({
     act, onOpenPreview, onOpenFullscreen, onShowQr, onMoveToFolder,
     onEdit, onRequestDelete, onShowResults, onCopyLink, onCopyHtml,
 }: ActivityCardProps) {
+    const { role } = useSession();
     const c = subjectColor(act.subject);
     const poster = posterBackground(c);
     const [menuOpen, setMenuOpen] = useState(false);
@@ -56,9 +59,9 @@ function ActivityCardBase({
     const menuItems: Array<{ icon: typeof Copy; label: string; onClick: () => void; danger?: boolean }> = [
         { icon: Copy, label: 'HTML kopyala', onClick: () => onCopyHtml(act) },
         { icon: Share2, label: 'Bağlantı paylaş', onClick: () => onCopyLink(act) },
-        { icon: Edit3, label: 'Düzenle', onClick: () => onEdit(act) },
+        ...(role === 'admin' ? [{ icon: Edit3, label: 'Düzenle', onClick: () => onEdit(act) }] : []),
         ...(act.is_test ? [{ icon: BarChart3, label: 'Sonuçlar', onClick: () => onShowResults(act.id) }] : []),
-        { icon: Trash2, label: 'Sil', onClick: () => onRequestDelete(act), danger: true },
+        ...(role === 'admin' ? [{ icon: Trash2, label: 'Sil', onClick: () => onRequestDelete(act), danger: true }] : []),
     ];
 
     return (
@@ -171,7 +174,7 @@ function ActivityCardBase({
                     >
                         <QrCode className="w-5 h-5" />
                     </button>
-                    <button
+                    {role === 'admin' && <button
                         type="button"
                         onClick={stop(() => onMoveToFolder(act))}
                         aria-label="Klasöre taşı"
@@ -179,7 +182,8 @@ function ActivityCardBase({
                         className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors"
                     >
                         <FolderInput className="w-5 h-5" />
-                    </button>
+                    </button>}
+                    <AssignActivityButton activityId={act.id} />
                     <span className="ml-auto inline-flex items-center gap-1 text-[13px] font-bold text-primary">
                         Aç
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.4} viewBox="0 0 24 24">

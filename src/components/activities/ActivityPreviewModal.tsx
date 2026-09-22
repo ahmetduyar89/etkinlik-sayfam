@@ -1,3 +1,4 @@
+import { useActivityWork } from '../../hooks/useActivityWork';
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -32,7 +33,6 @@ import { MathFormulaTool } from '../tools/MathFormulaTool';
 import { SpotlightOverlay } from '../tools/SpotlightOverlay';
 import { OverlayTimer } from '../tools/OverlayTimer';
 import { PageNav } from '../tools/PageNav';
-import { usePrompt } from '../common/PromptDialog';
 import { useToast } from '../common/ToastProvider';
 import { useSurfaceTint } from '../../utils/surfaceTint';
 import type {
@@ -121,8 +121,12 @@ export function ActivityPreviewModal({
     const stageRef = React.useRef<HTMLDivElement>(null);
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
     const [drawHistory, setDrawHistory] = React.useState({ canUndo: false, canRedo: false });
-    const prompt = usePrompt();
     const toast = useToast();
+    const work = useActivityWork(activity, canvasRef, textBoxes, setTextBoxes);
+    const recordAnswers = work.recordAnswers;
+    const closeRef = React.useRef<() => void>(() => undefined);
+    closeRef.current = () => { void work.close(onClose); };
+    const handleClose = React.useCallback(() => closeRef.current(), []);
 
     // Tam ekran koyu yüzey: kurulu uygulamada saat/pil şeridi de aynı renge
     // boyansın, ekranın üstünde beyaz bir bant kalmasın.
@@ -171,7 +175,9 @@ export function ActivityPreviewModal({
 
     React.useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
-            const data = event.data as { type?: string; height?: number; error?: string };
+            if (event.source !== iframeRef.current?.contentWindow) return;
+            const data = event.data as { type?: string; height?: number; error?: string; data?: unknown };
+            if (data?.type === 'SIM_ANSWER' && data.data && typeof data.data === 'object' && !Array.isArray(data.data)) recordAnswers(data.data as Record<string, unknown>);
             if (data?.type === 'IFRAME_HEIGHT_SYNC' && (data.height ?? 0) > 0) {
                 setIframeHeight(data.height as number);
             }
@@ -184,7 +190,7 @@ export function ActivityPreviewModal({
         };
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, [toast]);
+    }, [toast, recordAnswers]);
 
     React.useEffect(() => {
         if (!timerRunning || timerSecs <= 0) return;
@@ -212,11 +218,11 @@ export function ActivityPreviewModal({
 
     React.useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
+            if (e.key === 'Escape') handleClose();
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [onClose]);
+    }, [handleClose]);
 
     const handleScreenshot = async () => {
         const stage = stageRef.current;
@@ -282,7 +288,7 @@ export function ActivityPreviewModal({
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                onClick={onClose}
+                onClick={handleClose}
                 className="absolute inset-0 bg-neutral-900/90"
                 aria-hidden="true"
             />
@@ -292,8 +298,8 @@ export function ActivityPreviewModal({
                 aria-label={activity.title}
                 className="relative w-full h-full bg-white overflow-hidden flex flex-col"
             >
-                <header className="h-14 px-4 bg-slate-900 border-b border-white/5 flex justify-between items-center shrink-0 z-[11000] gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
+                <header className="min-h-14 py-2 px-4 bg-slate-900 border-b border-white/5 flex flex-wrap justify-between items-center shrink-0 z-[11000] gap-2">
+                    <div className="flex flex-1 items-center gap-2 min-w-0">
                         <div className="w-7 h-7 bg-indigo-500/20 rounded-lg flex items-center justify-center shrink-0">
                             <Blocks className="w-3.5 h-3.5 text-indigo-400" aria-hidden="true" />
                         </div>
@@ -302,6 +308,7 @@ export function ActivityPreviewModal({
                         </h3>
                     </div>
 
+                    {work.enabled && <div className="order-3 basis-full flex justify-between items-center gap-2 text-xs text-white border-t border-white/10 pt-2"><button className="max-w-[160px] sm:max-w-[260px] text-left text-teal-200" onClick={() => void work.retry()} aria-live="polite">{work.status}</button><button disabled={!work.ready} onClick={work.toggleCompleted} className="rounded-lg bg-white/10 px-3 py-2 disabled:opacity-50">{work.completed ? '✓ Tamamlandı' : 'Tamamlandı işaretle'}</button></div>}
                     <div className="flex items-center gap-1.5 shrink-0">
                         <div
                             role="group"
@@ -427,6 +434,7 @@ export function ActivityPreviewModal({
 
                         <button
                             type="button"
+                            aria-label={isPreviewDrawingMode ? "Çizimi kapat" : "Kalem modu"}
                             onClick={() => setIsPreviewDrawingMode((m) => !m)}
                             aria-pressed={isPreviewDrawingMode}
                             className={cn(
@@ -446,7 +454,7 @@ export function ActivityPreviewModal({
 
                         <button
                             type="button"
-                            onClick={onClose}
+                            onClick={handleClose}
                             aria-label="Önizlemeyi kapat"
                             className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/10"
                         >
@@ -504,9 +512,12 @@ export function ActivityPreviewModal({
                                 />
                             )}
                             <DrawingCanvas
+                                key={work.ready ? "loaded" : "loading"}
+                                initialPages={work.initialPages}
+                                onDirty={work.markDirty}
                                 ref={canvasRef}
                                 config={previewDrawConfig}
-                                enabled={isPreviewDrawingMode}
+                                enabled={isPreviewDrawingMode && work.ready}
                                 whiteboardMode={showWhiteboard}
                                 bgColor={bgColor}
                                 onPageChange={(cur, tot) =>
@@ -518,7 +529,7 @@ export function ActivityPreviewModal({
                             />
                             <TextBoxLayer
                                 boxes={textBoxes}
-                                enabled={isTextBoxMode}
+                                enabled={isTextBoxMode && work.ready}
                                 onAdd={(b) => setTextBoxes((prev) => [...prev, b])}
                                 onUpdate={(id, upd) =>
                                     setTextBoxes((prev) =>

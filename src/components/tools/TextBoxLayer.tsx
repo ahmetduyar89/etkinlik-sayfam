@@ -51,6 +51,7 @@ function TextBoxItem({ box, view, onUpdate, onDelete }: TextBoxItemProps) {
                 maxWidth: 320,
                 touchAction: 'none',
             }}
+            onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
         >
             <div

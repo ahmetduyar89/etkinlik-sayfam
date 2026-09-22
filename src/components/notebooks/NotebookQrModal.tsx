@@ -1,7 +1,9 @@
+import { saveDocsTransaction } from '../../lib/firebase';
+import { studentLink } from '../../lib/classroomScope';
 // src/components/notebooks/NotebookQrModal.tsx — Defteri öğrenciye gönder
 // Tahtaya yansıtılıp öğrencilerin kendi cihazlarından okutması içindir.
 // Açılan bağlantı salt-okunurdur; öğrenci defteri değiştiremez.
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Check, Copy } from 'lucide-react';
 import { copyText } from '../../utils/clipboard';
@@ -15,7 +17,20 @@ interface NotebookQrModalProps {
 
 export function NotebookQrModal({ notebook, onClose }: NotebookQrModalProps) {
     // NotebookViewer'ın beklediği biçim: ?view=notebook&id=...
-    const link = `${window.location.origin}${window.location.pathname}?view=notebook&id=${notebook.id}`;
+    const link = studentLink('notebook', notebook.id);
+    const [sharing, setSharing] = useState(false);
+    const [shareError, setShareError] = useState('');
+    const changeSharing = useCallback(async (shared: boolean) => {
+        try {
+            const written = await saveDocsTransaction({ collection: 'notebooks', id: notebook.id }, current => current ? [
+                { collection: 'notebooks', id: notebook.id, data: { shared } },
+                ...(notebook.pdf_id ? [{ collection: 'pdf_files', id: notebook.pdf_id, data: { shared } }] : []),
+            ] : null);
+            if (!written) throw new Error('Defter bulunamadı');
+            setSharing(shared); setShareError('');
+        } catch { setShareError('Paylaşım güncellenemedi. Bağlantınızı kontrol edin.'); }
+    }, [notebook.id, notebook.pdf_id]);
+    useEffect(() => { void changeSharing(true); }, [changeSharing]);
     const [copied, setCopied] = useState(false);
     const [failed, setFailed] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -36,13 +51,15 @@ export function NotebookQrModal({ notebook, onClose }: NotebookQrModalProps) {
     return (
         <Modal isOpen onClose={onClose} title="Öğrenciye gönder">
             <div className="flex flex-col items-center gap-5 py-2">
+                {shareError && <p role="alert" className="text-red-600 text-sm">{shareError}</p>}
+                <button className="text-sm text-teal-700 underline" onClick={() => void changeSharing(!sharing)}>{sharing ? 'Bağlantıyla erişimi kapat' : 'Bağlantıyla erişimi aç'}</button>
                 <p className="text-[13.5px] text-on-surface-variant text-center max-w-[380px]">
                     <b className="text-on-surface">{notebook.title}</b> defterini açmak için öğrenciler
                     bu kodu kendi cihazlarıyla okutabilir. Bağlantı yalnızca görüntülemek içindir.
                 </p>
 
                 <div className="p-4 bg-white border border-outline-variant rounded-[22px] shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
-                    <QRCodeSVG value={link} size={220} level="M" marginSize={0} fgColor="#0f172a" bgColor="#ffffff" />
+                    {sharing ? <QRCodeSVG value={link} size={220} level="M" marginSize={0} fgColor="#0f172a" bgColor="#ffffff" /> : <p>Paylaşım kapalı</p>}
                 </div>
 
                 <div className="w-full flex items-center gap-2.5 bg-surface-container-high rounded-2xl px-4 h-12">
@@ -58,6 +75,7 @@ export function NotebookQrModal({ notebook, onClose }: NotebookQrModalProps) {
                     />
                     <button
                         type="button"
+                        disabled={!sharing}
                         onClick={copy}
                         className="flex-shrink-0 inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-white border border-outline-variant text-[12.5px] font-semibold text-on-surface-variant hover:text-primary hover:border-primary transition-colors"
                     >

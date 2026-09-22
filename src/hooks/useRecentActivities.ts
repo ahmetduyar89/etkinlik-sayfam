@@ -1,9 +1,13 @@
+import { collection, doc, limit, onSnapshot, orderBy, query, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { classroomId } from '../lib/classroomScope';
+import { useToast } from '../components/common/ToastProvider';
 // src/hooks/useRecentActivities.ts — "Son kullanılanlar" listesi
 // Derste en son açılan etkinlikler yalnızca tarayıcıda tutulur (localStorage);
 // Firestore'a yazılmaz. Kayıt: { id, at } — en yeni başta, en fazla 8 kayıt.
 import { useCallback, useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'icerik-merkezi:recent-activities';
+const STORAGE_KEY = `icerik-merkezi:recent-activities:${classroomId || 'library'}`;
 const MAX_RECENTS = 8;
 
 export interface RecentEntry {
@@ -49,7 +53,15 @@ export function formatRecentTime(at: string): string {
 }
 
 export function useRecentActivities() {
+    const toast = useToast();
     const [recents, setRecents] = useState<RecentEntry[]>(() => read());
+
+    useEffect(() => {
+        if (!classroomId || new URLSearchParams(window.location.search).has('view')) return;
+        return onSnapshot(query(collection(db, 'classrooms', classroomId, 'recent_activities'), orderBy('at', 'desc'), limit(MAX_RECENTS)), snap => {
+            setRecents(snap.docs.map(d => ({ id: d.id, at: d.data().at as string })));
+        }, () => toast.error('Sınıfın son etkinlikleri yüklenemedi.'));
+    }, [toast]);
 
     // Başka bir sekmede açılan etkinlikler de listeye yansısın.
     useEffect(() => {
@@ -61,12 +73,15 @@ export function useRecentActivities() {
     }, []);
 
     const markOpened = useCallback((id: string) => {
+        if (classroomId) {
+            void setDoc(doc(db, 'classrooms', classroomId, 'recent_activities', id), { at: new Date().toISOString() }).catch(() => toast.error('Son etkinlik kaydedilemedi.'));
+        }
         setRecents((prev) => {
             const next = [{ id, at: new Date().toISOString() }, ...prev.filter((e) => e.id !== id)].slice(0, MAX_RECENTS);
             write(next);
             return next;
         });
-    }, []);
+    }, [toast]);
 
     return { recents, markOpened };
 }

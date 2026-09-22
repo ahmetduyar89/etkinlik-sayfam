@@ -1,3 +1,4 @@
+import { useSession } from '../../contexts/SessionContext';
 // src/components/content/LessonModeBar.tsx — "Devam eden ders" şeridi
 // Ders Modu açıkken sayfanın en üstünde durur; en son açılan etkinliği tek
 // dokunuşla tam ekran açmak, QR ile öğrenciye göndermek ve düzenlemek içindir.
@@ -13,6 +14,7 @@ interface LessonModeBarProps {
 }
 
 export function LessonModeBar({ activity, onOpenFullscreen, onShowQr, onEdit }: LessonModeBarProps) {
+    const { role } = useSession();
     const meta = ['Devam eden ders', formatGradeLevel(activity.grade_level), activity.unit || activity.subject]
         .filter(Boolean)
         .join(' · ');
@@ -47,7 +49,7 @@ export function LessonModeBar({ activity, onOpenFullscreen, onShowQr, onEdit }: 
                 >
                     <QrCode className="w-[21px] h-[21px]" />
                 </button>
-                <button
+                {role === 'admin' && <button
                     type="button"
                     onClick={() => onEdit(activity)}
                     aria-label="Etkinliği düzenle"
@@ -55,7 +57,7 @@ export function LessonModeBar({ activity, onOpenFullscreen, onShowQr, onEdit }: 
                     className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/[.08] text-slate-200 hover:bg-white/[.16] transition-colors"
                 >
                     <Edit3 className="w-[21px] h-[21px]" />
-                </button>
+                </button>}
             </div>
         </section>
     );

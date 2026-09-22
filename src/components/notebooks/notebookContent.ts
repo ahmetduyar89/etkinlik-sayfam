@@ -1,3 +1,4 @@
+import { readDraft, writeDraft, clearDraft } from '../../lib/drafts';
 // src/components/notebooks/notebookContent.ts
 // Defter sayfalarının Firestore'a yazılması, okunması ve cihazlar arası
 // senkronu.
@@ -68,6 +69,7 @@ export class NotebookTooLargeError extends Error {
 
 /** Yüklenmiş içerik. */
 export interface LoadedContent {
+    isLocalDraft?: boolean;
     pages: NotebookPage[];
     /** Kayıtta artan parçaların silinebilmesi için okunan parça sayısı. */
     chunkCount: number;
@@ -99,7 +101,11 @@ async function readChunks(notebookId: string, from: number, to: number): Promise
  * Defter içeriğini okur. Bir parça eksikse hata atar — yarım içeriği
  * "boş defter" gibi açmak, sonraki otomatik kayıtta gerçek veriyi silerdi.
  */
-export async function loadNotebookPages(notebookId: string): Promise<LoadedContent> {
+export async function loadNotebookPages(notebookId: string, restoreDraft = false): Promise<LoadedContent> {
+    if (restoreDraft) {
+        const draft = await readDraft<{ pages: NotebookPage[]; baseRev: number }>(`notebook:${notebookId}`).catch(() => null);
+        if (draft) return { pages: draft.value.pages, rev: draft.value.baseRev, chunkCount: MAX_CHUNKS, isEmpty: false, isLocalDraft: true };
+    }
     const main = await fetchDocById<NotebookContent>(COLLECTION, notebookId);
     const rev = main?.rev ?? 0;
     const chunkCount = Math.max(0, Math.min(MAX_CHUNKS, main?.chunk_count ?? 0));
@@ -125,6 +131,8 @@ export async function loadNotebookPages(notebookId: string): Promise<LoadedConte
 
 /** Kaydetme seçenekleri. */
 export interface SaveOptions {
+    localBackup?: boolean;
+    metadata?: { collection: string; id: string; fields: Record<string, unknown> };
     /** Bir önceki kaydın parçaları; değişmeyen parça yeniden yazılmaz. */
     previous?: string[];
     /** Elimizdeki içeriğin sürümü; sunucudaki bundan yeniyse çakışma olur. */
@@ -148,8 +156,10 @@ export interface SaveResult {
 export async function saveNotebookPages(
     notebookId: string,
     pages: NotebookPage[],
-    { previous = [], baseRev = 0, force = false }: SaveOptions = {}
+    { previous = [], baseRev = 0, force = false, metadata, localBackup = true }: SaveOptions = {}
 ): Promise<SaveResult> {
+    const draftToken = localBackup ? await writeDraft(`notebook:${notebookId}`, { pages, baseRev }).catch(() => null) : null;
+    if (!navigator.onLine) throw new Error(draftToken ? 'İnternet yok. Çalışma cihazda saklandı; bağlantı gelince yeniden gönderilecek.' : 'İnternet yok ve cihaz taslağı yazılamadı. Bu pencereyi kapatmayın.');
     const json = encodePages(pages);
     const bytes = utf8Bytes(json);
     if (bytes > MAX_CONTENT_BYTES) throw new NotebookTooLargeError(bytes);
@@ -181,9 +191,10 @@ export async function saveNotebookPages(
             {
                 // Üst veri, içerikle aynı işlemde güncellenir; diğer cihazlar
                 // değişikliği bu küçük dokümanı dinleyerek duyar.
-                collection: NOTEBOOKS,
-                id: notebookId,
+                collection: metadata?.collection ?? NOTEBOOKS,
+                id: metadata?.id ?? notebookId,
                 data: {
+                    ...metadata?.fields,
                     page_count: pages.length,
                     content_rev: rev,
                     content_writer: WRITER_ID,
@@ -202,6 +213,7 @@ export async function saveNotebookPages(
         return writes;
     });
     if (!written) throw new NotebookConflictError(serverRev);
+    if (draftToken) await clearDraft(`notebook:${notebookId}`, draftToken).catch(() => undefined);
     return { parts, rev };
 }
 
@@ -221,4 +233,11 @@ export async function deleteNotebookPages(notebookId: string): Promise<void> {
             deleteDocById(COLLECTION, chunkId(notebookId, i)).catch(() => undefined)
         )
     );
+}
+
+/** Explicitly accepting the cloud copy discards only the draft just read. */
+export async function discardNotebookDraft(notebookId: string): Promise<void> {
+    const key = `notebook:${notebookId}`;
+    const draft = await readDraft(key).catch(() => null);
+    if (draft) await clearDraft(key, draft.token);
 }

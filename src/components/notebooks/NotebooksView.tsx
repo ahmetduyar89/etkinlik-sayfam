@@ -1,3 +1,5 @@
+import { useClassroom, belongsToClass } from '../../contexts/ClassroomContext';
+import { studentLink } from '../../lib/classroomScope';
 // src/components/notebooks/NotebooksView.tsx
 // "Defterlerim" ekranı: klasörleme mantığıyla defter ve beyaz tahta yönetimi.
 // Üstte ayrı bir şeritte "+ Yeni" menüsü (Not Defteri · Beyaz Tahta · Klasör),
@@ -62,6 +64,7 @@ function formatDate(value?: string): string {
 }
 
 export function NotebooksView() {
+    const classroom = useClassroom();
     const foldersHandler = useFirestore<DriveFolder>('folders');
     const notebooksHandler = useFirestore<Notebook>('notebooks');
     const activitiesHandler = useFirestore<Activity>('activities');
@@ -80,8 +83,9 @@ export function NotebooksView() {
     const [isNewMenuOpen, setIsNewMenuOpen] = React.useState(false);
     const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
     const [moveTarget, setMoveTarget] = React.useState<MoveTarget | null>(null);
-    const [openNotebookId, setOpenNotebookId] = React.useState<string | null>(null);
-    const [activities, setActivities] = React.useState<Activity[]>([]);
+    const [openNotebookId, setOpenNotebookId] = React.useState<string | null>(() => new URLSearchParams(window.location.search).get('notebook'));
+    const [allActivities, setActivities] = React.useState<Activity[]>([]);
+    const activities = React.useMemo(() => allActivities.filter(a => belongsToClass(a, classroom)), [allActivities, classroom]);
     const [previewActivityId, setPreviewActivityId] = React.useState<string | null>(null);
     const [isPickerOpen, setIsPickerOpen] = React.useState(false);
     const [folderEditActivityId, setFolderEditActivityId] = React.useState<string | null>(null);
@@ -93,7 +97,7 @@ export function NotebooksView() {
             (data) => {
                 const list = data && data.length > 0 ? [...data] : [];
                 // Maarif modeli Geometrik Şekiller klasörlerini ekle
-                for (const df of DEFAULT_GEOMETRI_FOLDERS) {
+                for (const df of (!classroom || classroom.grade_level === '10' ? DEFAULT_GEOMETRI_FOLDERS : [])) {
                     if (!list.some((f) => f.id === df.id || (f.name === df.name && f.parent_id === df.parent_id))) {
                         list.push(df);
                     }
@@ -300,8 +304,9 @@ export function NotebooksView() {
 
             toast.success(`"${file.name}" başarıyla açıldı (${numPages} sayfa).`);
             setOpenNotebookId(ref.id);
-        } catch (err: any) {
-            toast.error('PDF açılırken hata oluştu: ' + (err?.message || 'Bilinmeyen hata'));
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Bilinmeyen hata';
+            toast.error('PDF açılırken hata oluştu: ' + msg);
         } finally {
             setIsImportingPdf(false);
         }
@@ -474,7 +479,7 @@ export function NotebooksView() {
     };
 
     const handleCopyActivityLink = async (a: Activity) => {
-        const link = `${window.location.origin}${window.location.pathname}?view=student&id=${a.id}`;
+        const link = studentLink('student', a.id);
         if (await copyText(link)) {
             toast.success('Öğrenci giriş linki kopyalandı.');
         } else {
@@ -1146,7 +1151,14 @@ export function NotebooksView() {
                 <NotebookEditor
                     key={openNotebook.id}
                     notebook={openNotebook}
-                    onClose={() => setOpenNotebookId(null)}
+                    onClose={() => {
+                        setOpenNotebookId(null);
+                        const url = new URL(window.location.href);
+                        if (url.searchParams.has('notebook')) {
+                            url.searchParams.delete('notebook');
+                            window.history.replaceState(null, '', url);
+                        }
+                    }}
                     onMetaChange={(patch) => {
                         void notebooksHandler.update(openNotebook.id, patch).catch(() => undefined);
                     }}

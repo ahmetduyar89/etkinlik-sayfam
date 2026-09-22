@@ -10,7 +10,11 @@
     "export:dna": "node scripts/export-dna-lesson.mjs",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:security": "firebase emulators:exec --project demo-atolye-tests --only firestore,auth,storage \"node --test scripts/classrooms/security.test.mjs\"",
+    "classrooms:setup": "node scripts/classrooms/provision.mjs",
+    "emulators": "firebase emulators:start --project demo-atolye --only firestore,auth,storage",
+    "test:classrooms": "firebase emulators:exec --project demo-atolye-tests --only firestore,auth,storage \"node --test scripts/classrooms/*.test.mjs\""
   },
   "dependencies": {
     "@types/three": "^0.185.4",
@@ -25,6 +29,7 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
     "@tailwindcss/forms": "^0.5.7",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
@@ -35,6 +40,9 @@
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "fake-indexeddb": "^6.2.2",
+    "firebase-admin": "^13.4.0",
+    "firebase-tools": "^14.15.2",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.2.2",
