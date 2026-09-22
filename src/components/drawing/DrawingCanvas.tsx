@@ -1294,6 +1294,67 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     window.setTimeout(redraw, 0);
                     notifyPageChange();
                 },
+                renderPageToCanvas: (
+                    pageIdx: number,
+                    wbMode: boolean,
+                    color: string,
+                    paper?: PaperStyle,
+                    background?: HTMLCanvasElement | null
+                ) => {
+                    const canvas = canvasRef.current;
+                    const buffer = bufferCanvasRef.current;
+                    if (!canvas || !buffer) return null;
+                    const dpr = window.devicePixelRatio || 1;
+                    const page = pageRectRef.current;
+                    const exp = document.createElement('canvas');
+
+                    const w = page ? page.w : canvas.width / dpr;
+                    const h = page ? page.h : canvas.height / dpr;
+                    const outScale = page ? 2 : dpr;
+                    exp.width = Math.round(w * outScale);
+                    exp.height = Math.round(h * outScale);
+                    const ctx = exp.getContext('2d');
+                    if (!ctx) return null;
+                    ctx.setTransform(outScale, 0, 0, outScale, 0, 0);
+
+                    if (wbMode || page) {
+                        ctx.fillStyle = color || '#ffffff';
+                        ctx.fillRect(0, 0, w, h);
+                    }
+                    if (paper && paper !== 'blank') {
+                        drawPaper(
+                            ctx,
+                            paper,
+                            wbMode || page ? color || '#ffffff' : 'transparent',
+                            w,
+                            h,
+                            page ? { scale: 1, tx: 0, ty: 0 } : viewRef.current
+                        );
+                    }
+
+                    if (page && background && background.width > 0) {
+                        ctx.drawImage(background, 0, 0, w, h);
+                    }
+
+                    const isDark = color === '#1a1a2e' || color === '#111827';
+                    const pageStrokes =
+                        pageIdx === currentPageRef.current
+                            ? strokesRef.current
+                            : (pagesRef.current[pageIdx] || []);
+
+                    if (page) {
+                        ctx.save();
+                        ctx.translate(-page.x, -page.y);
+                        pageStrokes.forEach((st) =>
+                            drawStroke(ctx, st, simTimeRef.current, isDark)
+                        );
+                        ctx.restore();
+                    } else {
+                        ctx.drawImage(buffer, 0, 0, w, h);
+                    }
+
+                    return exp;
+                },
                 screenshot: (
                     wbMode: boolean,
                     color: string,
@@ -1323,9 +1384,6 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         ctx.fillStyle = color || '#ffffff';
                         ctx.fillRect(0, 0, w, h);
                     }
-                    // Kağıt deseni ekranda CSS arka planıdır; çıktıda da
-                    // görünsün diye aynı desen tuvale çizilir. Sayfa varken
-                    // desen sayfanın kendi kutusuna oturur.
                     if (paper && paper !== 'blank') {
                         drawPaper(
                             ctx,
@@ -1337,15 +1395,11 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         );
                     }
 
-                    // Bağlı PDF sayfası çizimlerin altına girer; aksi hâlde
-                    // çıktıda yalnızca notlar görünürdü.
                     if (page && background && background.width > 0) {
                         ctx.drawImage(background, 0, 0, w, h);
                     }
 
                     if (page) {
-                        // Çizimler dünya koordinatında; sayfanın sol üst köşesi
-                        // çıktının başlangıcı olacak şekilde kaydırılır.
                         ctx.save();
                         ctx.translate(-page.x, -page.y);
                         strokesRef.current.forEach((st) =>
@@ -1353,7 +1407,6 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         );
                         ctx.restore();
                     } else {
-                        // Seçim çerçevesi görüntüye girmesin diye tampon kullanılır.
                         ctx.drawImage(buffer, 0, 0, w, h);
                     }
 

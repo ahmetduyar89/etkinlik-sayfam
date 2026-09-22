@@ -527,6 +527,17 @@ export interface DrawingCanvasHandle {
         /** Sayfanın altına çizilecek arka plan (bağlı PDF sayfası). */
         background?: HTMLCanvasElement | null
     ) => void;
+    /**
+     * Belirtilen sayfayı yüksek çözünürlüklü bir canvas'a işler ve döndürür.
+     * Dışa aktarım ve PDF oluşturmada kullanılır.
+     */
+    renderPageToCanvas: (
+        pageIdx: number,
+        wbMode: boolean,
+        color: string,
+        paper?: PaperStyle,
+        background?: HTMLCanvasElement | null
+    ) => HTMLCanvasElement | null;
 }
 
 // ── Ortak çizim (canlı operasyon akışı) ─────────────────────────────────
