@@ -16,6 +16,7 @@ import {
     Edit3,
     FlipHorizontal,
     FlipVertical,
+    GripHorizontal,
     RotateCw,
     Sigma,
     Trash2,
@@ -105,6 +106,8 @@ interface DrawingCanvasProps {
      * `size`, kağıt deseninin çizimle aynı hizada durması için gerekir.
      */
     onViewChange?: (view: Viewport, size: { w: number; h: number }) => void;
+    /** Üst araç çubuğu ayarlarını (font, boyut, renk) tuvalden güncellemek için. */
+    onConfigChange?: (patch: Partial<DrawConfig>) => void;
 }
 
 /** Geri al yığınında tutulan en fazla adım sayısı. */
@@ -134,6 +137,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             panMode = 'passthrough',
             pageBox,
             onViewChange,
+            onConfigChange,
         },
         ref
     ) {
@@ -179,6 +183,44 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const [inlineText, setInlineText] = React.useState<InlineTextState | null>(null);
         const lastTextClickRef = React.useRef<{ idx: number; time: number }>({ idx: -1, time: 0 });
         const activeStrokeBBRef = React.useRef<BoundingBox | null>(null);
+        const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+        const textBoxContainerRef = React.useRef<HTMLDivElement>(null);
+        const inlineTextRef = React.useRef<InlineTextState | null>(null);
+        inlineTextRef.current = inlineText;
+
+        const isIOS = React.useMemo(() => {
+            if (typeof navigator === 'undefined') return false;
+            return (
+                /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+            );
+        }, []);
+
+        React.useEffect(() => {
+            if (inlineText && textareaRef.current) {
+                // iPad / iOS klavye açılışı için anında odaklan
+                textareaRef.current.focus();
+                const len = textareaRef.current.value.length;
+                textareaRef.current.setSelectionRange(len, len);
+            }
+        }, [inlineText]);
+
+        // Araç çubuğundaki metin ayarları değiştiğinde aktif metin kutusunu gerçek zamanlı güncelle
+        React.useEffect(() => {
+            if (!inlineText) return;
+            setInlineText((prev) => {
+                if (!prev) return null;
+                return {
+                    ...prev,
+                    color: config.color,
+                    fontSize: config.width && config.width >= 10 ? config.width : prev.fontSize,
+                    fontFamily: config.fontFamily || prev.fontFamily,
+                    textAlign: config.textAlign || prev.textAlign,
+                    bold: config.bold !== undefined ? config.bold : prev.bold,
+                    italic: config.italic !== undefined ? config.italic : prev.italic,
+                };
+            });
+        }, [config.color, config.width, config.fontFamily, config.textAlign, config.bold, config.italic]);
 
         // Ölçü aracı açılıp kapanınca konumlanır ve üst katman tazelenir.
         React.useEffect(() => {
@@ -564,6 +606,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
             strokesRef.current.forEach((s, i) => {
                 if (exclude?.has(i)) return;
+                if (inlineTextRef.current?.strokeIdx === i) return;
                 drawStroke(bCtx, s, simTimeRef.current, isDark);
             });
             if (page) bCtx.restore();
@@ -954,6 +997,39 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             },
             [commitStrokes, deselect, emit, inlineText, pushHistory, redraw, setSelection]
         );
+
+        // Metin modu dışına çıkıldığında açık metni kaydet
+        React.useEffect(() => {
+            if (config.tool !== 'text' && inlineTextRef.current) {
+                commitInlineText();
+            }
+        }, [config.tool, commitInlineText]);
+
+        // Sayfa dışına veya farklı bir alana tıklandığında metin kutusunu tamamla ve sayfaya işle
+        React.useEffect(() => {
+            if (!inlineText) return;
+            const onPointerDownOutside = (e: PointerEvent) => {
+                if (textBoxContainerRef.current?.contains(e.target as Node)) {
+                    return;
+                }
+                const target = e.target as HTMLElement | null;
+                // Toolbar veya araç butonlarına basıldığında (yazı tipi, renk, kalın vb. değiştirirken) kutuyu kapatma
+                if (
+                    target?.closest(
+                        '[data-drawing-toolbar], [aria-label*="araç"], [aria-label*="Araç"], [title*="Yazı"], [title*="Metin"], [title*="Font"], [title*="Renk"], [title*="Boyut"]'
+                    )
+                ) {
+                    return;
+                }
+                // Tuval üzerine basıldığında zaten startDrawing commitInlineText() çağırıp yeni kutuyu açacaktır
+                if (canvasRef.current && canvasRef.current === target) {
+                    return;
+                }
+                commitInlineText();
+            };
+            window.addEventListener('pointerdown', onPointerDownOutside);
+            return () => window.removeEventListener('pointerdown', onPointerDownOutside);
+        }, [inlineText, commitInlineText]);
 
         const insertImageAt = React.useCallback(
             (src: string, width: number, height: number, cx?: number, cy?: number) => {
@@ -1634,6 +1710,19 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const coalescedSamples = (
             e: React.PointerEvent
         ): { clientX: number; clientY: number; pressure: number; pointerType: string }[] => {
+            // iOS/iPadOS WebKit'te getCoalescedEvents() örnekleri ters sırada veya
+            // mikro-titreşimlerle döndüren bir çekirdek hatasına sahiptir. Kalın uçlu
+            // fosforlu kalemlerde katlanma ve kesikler oluşmaması için iOS'ta ana olay kullanılır.
+            if (isIOS) {
+                return [
+                    {
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        pressure: e.pressure,
+                        pointerType: e.pointerType,
+                    },
+                ];
+            }
             const native = e.nativeEvent as PointerEvent;
             const list =
                 typeof native?.getCoalescedEvents === 'function'
@@ -2318,6 +2407,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             // A4/B5/PDF gibi gerçek sayfalarda gri masa yalnızca gezinme
             // alanıdır. İçerik araçları sayfa dışında yeni nesne başlatmaz.
             if (!isInsidePage({ x, y }, 1 / viewRef.current.scale)) {
+                if (inlineTextRef.current) {
+                    commitInlineText();
+                }
                 if (config.tool === 'select' && selectedIdxsRef.current.length) {
                     deselect();
                     redraw();
@@ -2499,32 +2591,49 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 for (let i = strokesRef.current.length - 1; i >= 0; i--) {
                     const st = strokesRef.current[i];
                     if (st.tool === 'text' && strokeNearPoint(st, x, y, pickTolerance)) {
+                        const fontSize = st.width && st.width > 4 ? st.width : 22;
+                        const fontFam = st.fontFamily || 'sans';
+                        const align = st.textAlign || 'left';
+                        const isBold = Boolean(st.bold);
+                        const isItalic = Boolean(st.italic);
+                        deselect();
                         setInlineText({
                             worldX: st.points[0].x,
                             worldY: st.points[0].y,
                             text: st.text || '',
-                            fontSize: st.width && st.width > 4 ? st.width : 22,
+                            fontSize,
                             color: st.color,
-                            fontFamily: st.fontFamily || 'sans',
-                            textAlign: st.textAlign || 'left',
-                            bold: Boolean(st.bold),
-                            italic: Boolean(st.italic),
+                            fontFamily: fontFam,
+                            textAlign: align,
+                            bold: isBold,
+                            italic: isItalic,
                             strokeIdx: i,
                         });
+                        onConfigChange?.({
+                            color: st.color,
+                            width: fontSize,
+                            fontFamily: fontFam,
+                            textAlign: align,
+                            bold: isBold,
+                            italic: isItalic,
+                        });
+                        redraw();
                         return;
                     }
                 }
+                deselect();
                 setInlineText({
                     worldX: x,
                     worldY: y,
                     text: '',
-                    fontSize: Math.max(16, Math.min(64, (config.width || 4) * 5)),
+                    fontSize: config.width && config.width >= 10 ? config.width : 22,
                     color: config.color,
-                    fontFamily: 'sans',
-                    textAlign: 'left',
-                    bold: false,
-                    italic: false,
+                    fontFamily: config.fontFamily || 'sans',
+                    textAlign: config.textAlign || 'left',
+                    bold: Boolean(config.bold),
+                    italic: Boolean(config.italic),
                 });
+                redraw();
                 return;
             }
             if (config.tool === 'stamp') {
@@ -2865,7 +2974,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 const last = stroke.points[stroke.points.length - 1];
                 if (!last) break;
                 const rawStep = Math.hypot(raw.x - last.x, raw.y - last.y);
-                if (rawStep * viewRef.current.scale < 0.5) continue;
+                const minStepPx = 0.8;
+                if (rawStep * viewRef.current.scale < minStepPx) continue;
 
                 // Dokunmatik tahtaların sinyal gürültüsünü süz: yavaş
                 // hareketlerde yumuşat, hızlı hareketlerde olduğu gibi bırak.
@@ -4286,312 +4396,143 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     </div>
                 )}
 
-                {/* Satır İçi Metin Düzenleyici (Inline Text Editor) */}
+                {/* GoodNotes & Notability Standardı: Sayfa Üzerinde Doğrudan, Tam Tıklanan Noktada Metin Kutusu */}
                 {inlineText && (
                     <div
-                        className="fixed inset-0 z-[5000] pointer-events-none"
-                        aria-label="Metin düzenleme katmanı"
+                        className="absolute left-0 top-0 w-full h-full z-[5000] pointer-events-none overflow-visible"
+                        aria-label="Metin kutusu katmanı"
                     >
-                        {/* Arka plan tıklandığında kaydet / kapat */}
                         <div
-                            className="absolute inset-0 pointer-events-auto bg-black/20 backdrop-blur-[1px]"
-                            onClick={() => commitInlineText()}
-                        />
-                        <div
-                            className="absolute pointer-events-auto flex flex-col bg-[#1a1b26]/95 backdrop-blur-md rounded-2xl border border-white/15 shadow-2xl p-3 min-w-[320px] max-w-[440px] transition-all"
+                            ref={textBoxContainerRef}
+                            className="absolute pointer-events-auto flex flex-col items-start transition-none"
                             style={{
-                                left: Math.max(
-                                    16,
-                                    Math.min(
-                                        window.innerWidth - 420,
-                                        inlineText.worldX * view.scale + view.tx
-                                    )
-                                ),
-                                top: Math.max(
-                                    16,
-                                    Math.min(
-                                        window.innerHeight - 300,
-                                        inlineText.worldY * view.scale + view.ty - 110
-                                    )
-                                ),
+                                left: inlineText.worldX * view.scale + view.tx,
+                                top: inlineText.worldY * view.scale + view.ty,
                             }}
                             onClick={(e) => e.stopPropagation()}
                             onPointerDown={(e) => e.stopPropagation()}
                         >
-                            {/* 1. Sıra: Yazı Tipi Ailesi, Kalın/İtalik ve Yaslama */}
-                            <div className="flex items-center justify-between gap-1 pb-2 mb-2 border-b border-white/10 flex-wrap">
-                                {/* Font Ailesi */}
-                                <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10">
-                                    {[
-                                        { id: 'sans', label: 'Sans' },
-                                        { id: 'serif', label: 'Serif' },
-                                        { id: 'mono', label: 'Mono' },
-                                        { id: 'cursive', label: 'Yazı' },
-                                    ].map((f) => (
-                                        <button
-                                            key={f.id}
-                                            type="button"
-                                            className={cn(
-                                                'px-2 py-0.5 text-xs rounded-md transition-all font-medium',
-                                                (inlineText.fontFamily || 'sans') === f.id
-                                                    ? 'bg-sky-500 text-white shadow-sm font-semibold'
-                                                    : 'text-slate-300 hover:text-white hover:bg-white/10'
-                                            )}
-                                            onClick={() =>
-                                                setInlineText((prev) =>
-                                                    prev ? { ...prev, fontFamily: f.id } : null
-                                                )
-                                            }
-                                        >
-                                            {f.label}
-                                        </button>
-                                    ))}
+                            {/* Üst Taşıma ve İşlem Başlığı (GoodNotes Minimal Tutamaç) */}
+                            <div
+                                className={cn(
+                                    'absolute flex items-center justify-between gap-1.5 select-none z-10',
+                                    inlineText.worldY * view.scale + view.ty < 36
+                                        ? 'top-full mt-1.5 left-0'
+                                        : '-top-7 left-0'
+                                )}
+                            >
+                                <div
+                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-sky-500 hover:bg-sky-600 text-white text-[11px] font-semibold cursor-move shadow-md active:opacity-80"
+                                    title="Metin Kutusunu Taşı"
+                                    onPointerDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        const startX = e.clientX;
+                                        const startY = e.clientY;
+                                        const origX = inlineText.worldX;
+                                        const origY = inlineText.worldY;
+                                        const scale = viewRef.current.scale;
+                                        const onMove = (me: PointerEvent) => {
+                                            const dx = (me.clientX - startX) / scale;
+                                            const dy = (me.clientY - startY) / scale;
+                                            setInlineText((p) =>
+                                                p ? { ...p, worldX: origX + dx, worldY: origY + dy } : null
+                                            );
+                                        };
+                                        const onUp = () => {
+                                            window.removeEventListener('pointermove', onMove);
+                                            window.removeEventListener('pointerup', onUp);
+                                        };
+                                        window.addEventListener('pointermove', onMove);
+                                        window.addEventListener('pointerup', onUp);
+                                    }}
+                                >
+                                    <GripHorizontal className="w-3.5 h-3.5 opacity-90" />
+                                    <span className="text-[10px] uppercase tracking-wider font-bold">Metin</span>
                                 </div>
 
-                                {/* Kalın / İtalik */}
-                                <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10">
+                                {inlineText.strokeIdx !== undefined && (
                                     <button
                                         type="button"
-                                        title="Kalın (Bold)"
-                                        aria-label="Kalın"
-                                        className={cn(
-                                            'p-1 rounded-md transition-all',
-                                            inlineText.bold
-                                                ? 'bg-sky-500 text-white font-bold'
-                                                : 'text-slate-300 hover:text-white hover:bg-white/10'
-                                        )}
-                                        onClick={() =>
-                                            setInlineText((prev) =>
-                                                prev ? { ...prev, bold: !prev.bold } : null
-                                            )
-                                        }
+                                        title="Metni Sil"
+                                        aria-label="Metni Sil"
+                                        className="p-1 text-red-500 hover:text-red-600 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors shadow-sm"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const idx = inlineText.strokeIdx!;
+                                            pushHistory();
+                                            const removedId = strokesRef.current[idx]?.id;
+                                            strokesRef.current.splice(idx, 1);
+                                            commitStrokes();
+                                            if (removedId)
+                                                emit({
+                                                    type: 'remove',
+                                                    page: currentPageRef.current,
+                                                    ids: [removedId],
+                                                });
+                                            deselect();
+                                            redraw();
+                                            setInlineText(null);
+                                        }}
                                     >
-                                        <Bold className="w-3.5 h-3.5" />
+                                        <Trash2 className="w-3 h-3" />
                                     </button>
-                                    <button
-                                        type="button"
-                                        title="İtalik"
-                                        aria-label="İtalik"
-                                        className={cn(
-                                            'p-1 rounded-md transition-all',
-                                            inlineText.italic
-                                                ? 'bg-sky-500 text-white'
-                                                : 'text-slate-300 hover:text-white hover:bg-white/10'
-                                        )}
-                                        onClick={() =>
-                                            setInlineText((prev) =>
-                                                prev ? { ...prev, italic: !prev.italic } : null
-                                            )
-                                        }
-                                    >
-                                        <Italic className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
-
-                                {/* Yaslama (Align) */}
-                                <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10">
-                                    {[
-                                        { id: 'left', icon: AlignLeft, title: 'Sola Yasla' },
-                                        { id: 'center', icon: AlignCenter, title: 'Ortala' },
-                                        { id: 'right', icon: AlignRight, title: 'Sağa Yasla' },
-                                    ].map((a) => {
-                                        const Icon = a.icon;
-                                        const active = (inlineText.textAlign || 'left') === a.id;
-                                        return (
-                                            <button
-                                                key={a.id}
-                                                type="button"
-                                                title={a.title}
-                                                aria-label={a.title}
-                                                className={cn(
-                                                    'p-1 rounded-md transition-all',
-                                                    active
-                                                        ? 'bg-sky-500 text-white'
-                                                        : 'text-slate-300 hover:text-white hover:bg-white/10'
-                                                )}
-                                                onClick={() =>
-                                                    setInlineText((prev) =>
-                                                        prev
-                                                            ? {
-                                                                  ...prev,
-                                                                  textAlign: a.id as
-                                                                      | 'left'
-                                                                      | 'center'
-                                                                      | 'right',
-                                                              }
-                                                            : null
-                                                    )
-                                                }
-                                            >
-                                                <Icon className="w-3.5 h-3.5" />
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                )}
                             </div>
 
-                            {/* 2. Sıra: Boyut ve Renk Paleti */}
-                            <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-white/10 flex-wrap">
-                                {/* Boyut Ayarı (+ / - ve Hazır Değerler) */}
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        type="button"
-                                        title="Küçült"
-                                        aria-label="Yazı Boyutunu Küçült"
-                                        className="p-1 text-slate-300 hover:text-white hover:bg-white/10 rounded-md transition-colors"
-                                        onClick={() =>
-                                            setInlineText((prev) =>
-                                                prev
-                                                    ? { ...prev, fontSize: Math.max(12, prev.fontSize - 2) }
-                                                    : null
-                                            )
-                                        }
-                                    >
-                                        <Minus className="w-3.5 h-3.5" />
-                                    </button>
-                                    {[16, 20, 24, 32, 42].map((size) => (
-                                        <button
-                                            key={size}
-                                            type="button"
-                                            className={cn(
-                                                'px-1.5 py-0.5 text-[11px] font-semibold rounded transition-colors',
-                                                inlineText.fontSize === size
-                                                    ? 'bg-sky-500 text-white shadow-sm'
-                                                    : 'text-slate-300 hover:bg-white/10'
-                                            )}
-                                            onClick={() =>
-                                                setInlineText((prev) =>
-                                                    prev ? { ...prev, fontSize: size } : null
-                                                )
-                                            }
-                                        >
-                                            {size}
-                                        </button>
-                                    ))}
-                                    <button
-                                        type="button"
-                                        title="Büyüt"
-                                        aria-label="Yazı Boyutunu Büyüt"
-                                        className="p-1 text-slate-300 hover:text-white hover:bg-white/10 rounded-md transition-colors"
-                                        onClick={() =>
-                                            setInlineText((prev) =>
-                                                prev
-                                                    ? { ...prev, fontSize: Math.min(72, prev.fontSize + 2) }
-                                                    : null
-                                            )
-                                        }
-                                    >
-                                        <Plus className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
-
-                                {/* Renk Paleti */}
-                                <div className="flex items-center gap-1.5">
-                                    {DRAWING_COLORS.slice(0, 6).map((color) => (
-                                        <button
-                                            key={color}
-                                            type="button"
-                                            aria-label={`Yazı Rengi: ${color}`}
-                                            className={cn(
-                                                'w-5 h-5 rounded-full border-2 transition-all shrink-0',
-                                                inlineText.color === color
-                                                    ? 'scale-110 border-white shadow-md'
-                                                    : 'border-transparent hover:scale-105'
-                                            )}
-                                            style={{ backgroundColor: color }}
-                                            onClick={() =>
-                                                setInlineText((prev) =>
-                                                    prev ? { ...prev, color } : null
-                                                )
-                                            }
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Metin Giriş Alanı (Gerçek zamanlı yazı tipi, hizalama ve renk önizlemesiyle) */}
-                            <textarea
-                                autoFocus
-                                value={inlineText.text}
-                                placeholder="Metin yazın... (Shift+Enter yeni satır)"
-                                rows={Math.max(2, Math.min(8, inlineText.text.split('\n').length))}
-                                className="w-full bg-black/40 text-white placeholder-slate-500 rounded-xl p-2.5 text-sm outline-none border border-white/15 focus:border-sky-500 resize-none transition-all"
+                            {/* Doğrudan Sayfa Üzerindeki Şeffaf Metin Kutusu Çerçevesi */}
+                            <div
+                                className="relative border-2 border-dashed border-sky-400/90 rounded-sm bg-transparent group"
                                 style={{
-                                    color: inlineText.color,
-                                    fontSize: `${Math.max(14, Math.min(30, inlineText.fontSize * 0.9))}px`,
-                                    fontFamily:
-                                        inlineText.fontFamily === 'serif'
-                                            ? 'Georgia, Cambria, "Times New Roman", serif'
-                                            : inlineText.fontFamily === 'mono'
-                                            ? 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
-                                            : inlineText.fontFamily === 'cursive'
-                                            ? 'Caveat, "Comic Sans MS", cursive'
-                                            : 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                                    fontWeight: inlineText.bold ? 'bold' : 'normal',
-                                    fontStyle: inlineText.italic ? 'italic' : 'normal',
-                                    textAlign: inlineText.textAlign || 'left',
+                                    minWidth: `${Math.max(120, inlineText.fontSize * view.scale * 3)}px`,
                                 }}
-                                onChange={(e) => {
-                                    const val = e.target.value;
-                                    setInlineText((prev) => (prev ? { ...prev, text: val } : null));
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        commitInlineText();
-                                    } else if (e.key === 'Escape') {
-                                        e.preventDefault();
-                                        setInlineText(null);
-                                    }
-                                }}
-                            />
+                            >
+                                {/* 4 Köşe GoodNotes Tutamacı */}
+                                <span className="absolute -top-1.5 -left-1.5 w-2.5 h-2.5 bg-sky-500 border-2 border-white rounded-full pointer-events-none shadow-sm" />
+                                <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-sky-500 border-2 border-white rounded-full pointer-events-none shadow-sm" />
+                                <span className="absolute -bottom-1.5 -left-1.5 w-2.5 h-2.5 bg-sky-500 border-2 border-white rounded-full pointer-events-none shadow-sm" />
+                                <span className="absolute -bottom-1.5 -right-1.5 w-2.5 h-2.5 bg-sky-500 border-2 border-white rounded-full pointer-events-none shadow-sm" />
 
-                            {/* Düğmeler ve Kısayollar */}
-                            <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-white/10">
-                                <div className="text-[10px] text-slate-400">
-                                    Enter: Kaydet • Shift+Enter: Satır
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    {inlineText.strokeIdx !== undefined && (
-                                        <button
-                                            type="button"
-                                            className="px-2.5 py-1 text-[11px] font-medium text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg transition-colors"
-                                            onClick={() => {
-                                                const idx = inlineText.strokeIdx!;
-                                                pushHistory();
-                                                const removedId = strokesRef.current[idx]?.id;
-                                                strokesRef.current.splice(idx, 1);
-                                                commitStrokes();
-                                                if (removedId)
-                                                    emit({
-                                                        type: 'remove',
-                                                        page: currentPageRef.current,
-                                                        ids: [removedId],
-                                                    });
-                                                deselect();
-                                                redraw();
-                                                setInlineText(null);
-                                            }}
-                                        >
-                                            Sil
-                                        </button>
-                                    )}
-                                    <button
-                                        type="button"
-                                        className="px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                                        onClick={() => setInlineText(null)}
-                                    >
-                                        Vazgeç
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="px-3.5 py-1 text-[11px] font-bold bg-sky-500 hover:bg-sky-400 text-white rounded-lg shadow transition-all flex items-center gap-1"
-                                        onClick={() => commitInlineText()}
-                                    >
-                                        <Check className="w-3.5 h-3.5" />
-                                        <span>Tamam</span>
-                                    </button>
-                                </div>
+                                <textarea
+                                    ref={textareaRef}
+                                    autoFocus
+                                    value={inlineText.text}
+                                    placeholder="Metin yazın..."
+                                    rows={Math.max(1, inlineText.text.split('\n').length)}
+                                    className="w-full bg-transparent border-0 outline-none resize-none p-0.5 block leading-tight overflow-hidden text-slate-900 dark:text-white"
+                                    style={{
+                                        color: inlineText.color,
+                                        fontSize: `${inlineText.fontSize * view.scale}px`,
+                                        lineHeight: 1.25,
+                                        fontFamily:
+                                            inlineText.fontFamily === 'serif'
+                                                ? 'Georgia, Cambria, "Times New Roman", serif'
+                                                : inlineText.fontFamily === 'mono'
+                                                ? 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
+                                                : inlineText.fontFamily === 'cursive'
+                                                ? 'Caveat, "Comic Sans MS", cursive'
+                                                : 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                        fontWeight: inlineText.bold ? 'bold' : 'normal',
+                                        fontStyle: inlineText.italic ? 'italic' : 'normal',
+                                        textAlign: inlineText.textAlign || 'left',
+                                        caretColor: '#0284c7',
+                                    }}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setInlineText((prev) => (prev ? { ...prev, text: val } : null));
+                                    }}
+                                    onInput={(e) => {
+                                        const target = e.currentTarget;
+                                        target.style.height = 'auto';
+                                        target.style.height = `${target.scrollHeight}px`;
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Escape') {
+                                            e.preventDefault();
+                                            commitInlineText();
+                                        }
+                                    }}
+                                />
                             </div>
                         </div>
                     </div>

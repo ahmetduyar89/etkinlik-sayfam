@@ -423,6 +423,14 @@ export interface DrawConfig {
     snapToGrid?: boolean;
     /** Ekranda duran ölçü aracı (cetvel / gönye / açıölçer). */
     ruler?: RulerKind | null;
+    /** Metin aracı varsayılan font ailesi. */
+    fontFamily?: string;
+    /** Metin aracı varsayılan hizalama. */
+    textAlign?: 'left' | 'center' | 'right';
+    /** Metin aracı varsayılan kalınlık. */
+    bold?: boolean;
+    /** Metin aracı varsayılan italik. */
+    italic?: boolean;
 }
 
 /** Serbest çizgi deseni. */

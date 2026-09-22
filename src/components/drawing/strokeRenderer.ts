@@ -154,7 +154,7 @@ export const getBB = (s: Stroke): BoundingBox => {
         } else {
             x1 = s.points[0].x;
         }
-        y1 = s.points[0].y - fontSize * 0.85;
+        y1 = s.points[0].y;
         x2 = x1 + textW;
         y2 = y1 + textH;
     }
@@ -1055,24 +1055,7 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, 
     }
 
     if (['highlighter', 'eraser'].includes(s.tool)) {
-        if (s.points.length < 2) {
-            tCtx.beginPath();
-            tCtx.arc(s.points[0].x, s.points[0].y, (s.width || 2) / 2, 0, Math.PI * 2);
-            tCtx.fill();
-        } else {
-            tCtx.beginPath();
-            tCtx.moveTo(s.points[0].x, s.points[0].y);
-            for (let i = 1; i < s.points.length - 1; i++) {
-                const mid = {
-                    x: (s.points[i].x + s.points[i + 1].x) / 2,
-                    y: (s.points[i].y + s.points[i + 1].y) / 2,
-                };
-                tCtx.quadraticCurveTo(s.points[i].x, s.points[i].y, mid.x, mid.y);
-            }
-            const last = s.points[s.points.length - 1];
-            if (last) tCtx.lineTo(last.x, last.y);
-            tCtx.stroke();
-        }
+        drawSmoothPath(tCtx, s.points, s.width || 2);
     } else if (s.tool === 'text') {
         // Yazı boyu `width` ile taşınır; eski kayıtlarda yoktur.
         const fontSize = s.width && s.width > 4 ? s.width : 20;
@@ -1087,6 +1070,7 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, 
         const style = s.italic ? 'italic ' : '';
         tCtx.font = `${style}${weight}${fontSize}px ${fontFam}`;
         tCtx.textAlign = (s.textAlign || 'left') as CanvasTextAlign;
+        tCtx.textBaseline = 'top';
         const lines = (s.text || '').split('\n');
         const lineHeight = fontSize * 1.25;
         lines.forEach((line, idx) => {

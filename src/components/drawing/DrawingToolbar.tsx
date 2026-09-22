@@ -31,6 +31,11 @@ import {
     PanelTop,
     PanelBottom,
     BookOpen,
+    AlignLeft,
+    AlignCenter,
+    AlignRight,
+    Bold,
+    Italic,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, MathObject, PaperStyle, RulerKind } from '../../types';
@@ -602,22 +607,22 @@ export function DrawingToolbar({
         <div
             ref={barRef}
             className={cn(
-                'pointer-events-auto flex flex-nowrap items-center justify-center gap-0.5 bg-[#1a1b26] p-1.5 rounded-2xl shadow-[0_18px_40px_rgba(0,0,0,0.45)] border border-white/5',
-                fixed && 'bg-transparent shadow-none border-0 p-0 rounded-none'
+                'pointer-events-auto flex flex-nowrap items-center justify-center gap-0.5 sm:gap-1 bg-[#1a1b26] p-1 sm:p-1.5 rounded-2xl shadow-[0_18px_40px_rgba(0,0,0,0.45)] border border-white/5 shrink-0',
+                fixed && 'bg-transparent shadow-none border-0 p-0 rounded-none shrink-0'
             )}
         >
             {!fixed && (
                 <div
                     onPointerDown={(e) => dragControls.start(e)}
-                    className="p-2 text-slate-500 hover:text-white cursor-grab active:cursor-grabbing border-r border-white/10"
+                    className="p-1.5 sm:p-2 text-slate-500 hover:text-white cursor-grab active:cursor-grabbing border-r border-white/10"
                     title="Taşı"
                     aria-label="Araç çubuğunu taşı"
                 >
-                    <GripVertical className="w-[18px] h-[18px]" />
+                    <GripVertical className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                 </div>
             )}
 
-                <div className="flex items-center gap-0.5 px-1.5 border-white/10 border-r">
+                <div className="flex items-center gap-0.5 px-1 sm:px-1.5 border-white/10 border-r shrink-0">
                     {/* Seçim, Kalem, Fosforlu, Silgi */}
                     {['select', 'pencil', 'highlighter', 'eraser'].map((toolId) => {
                         const tool = MAIN_TOOLS.find((t) => t.id === toolId);
@@ -632,13 +637,13 @@ export function DrawingToolbar({
                                 aria-label={tool.label}
                                 aria-pressed={isActive}
                                 className={cn(
-                                    'p-2 rounded-lg transition-all duration-200 group relative',
+                                    'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
                                     isActive
                                         ? 'bg-[#2d3045] text-white'
                                         : 'text-slate-400 hover:text-white hover:bg-white/5'
                                 )}
                             >
-                                <tool.icon className="w-[18px] h-[18px]" />
+                                <tool.icon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                                 {isActive && (
                                     <motion.div
                                         layoutId="activeTool"
@@ -656,7 +661,7 @@ export function DrawingToolbar({
                         aria-label="Şekiller"
                         aria-expanded={panel === 'shapes'}
                         className={cn(
-                            'p-2 rounded-lg transition-all duration-200 relative',
+                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 relative',
                             isShapeTool
                                 ? 'bg-[#2d3045] text-indigo-400'
                                 : 'text-slate-400 hover:text-white hover:bg-white/5',
@@ -664,7 +669,7 @@ export function DrawingToolbar({
                         )}
                         title="Şekiller"
                     >
-                        <Shapes className="w-[18px] h-[18px]" />
+                        <Shapes className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         {isShapeTool && (
                             <div className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full border border-[#1a1b26]" />
                         )}
@@ -684,13 +689,13 @@ export function DrawingToolbar({
                                 aria-label={tool.label}
                                 aria-pressed={isActive}
                                 className={cn(
-                                    'p-2 rounded-lg transition-all duration-200 group relative',
+                                    'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
                                     isActive
                                         ? 'bg-[#2d3045] text-white'
                                         : 'text-slate-400 hover:text-white hover:bg-white/5'
                                 )}
                             >
-                                <tool.icon className="w-[18px] h-[18px]" />
+                                <tool.icon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                                 {isActive && (
                                     <motion.div
                                         layoutId="activeTool"
@@ -702,55 +707,174 @@ export function DrawingToolbar({
                     })}
                 </div>
 
-                {/* Hızlı Kalem Slotları: 3 Kalem (Siyah, Mavi, Kırmızı) + 1 Fosforlu (Sarı) */}
-                <div className="flex items-center gap-1 px-1.5 border-white/10 border-r" title="Hızlı Kalem Slotları">
-                    {DEFAULT_QUICK_PENS.map((qp) => {
-                        const isCurrent =
-                            config.tool === qp.tool &&
-                            config.color.toLowerCase() === qp.color.toLowerCase();
-                        return (
+                {/* Metin Aracı seçiliyken GoodNotes standardı Metin Format Çubuğu; Kalem modundayken Hızlı Kalemler */}
+                {config.tool === 'text' ? (
+                    <div className="flex items-center gap-1.5 px-2 border-white/10 border-r" title="Metin Biçimlendirme">
+                        {/* Font Ailesi */}
+                        <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10">
+                            {[
+                                { id: 'sans', label: 'Sans' },
+                                { id: 'serif', label: 'Serif' },
+                                { id: 'mono', label: 'Mono' },
+                                { id: 'cursive', label: 'Yazı' },
+                            ].map((f) => (
+                                <button
+                                    key={f.id}
+                                    type="button"
+                                    className={cn(
+                                        'px-2 py-0.5 text-xs rounded transition-all font-medium',
+                                        (config.fontFamily || 'sans') === f.id
+                                            ? 'bg-sky-500 text-white font-semibold'
+                                            : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                    )}
+                                    onClick={() => setConfig({ ...config, fontFamily: f.id })}
+                                >
+                                    {f.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Boyut Stepper */}
+                        <div className="flex items-center gap-0.5 bg-white/5 px-1 py-0.5 rounded-lg border border-white/10">
                             <button
-                                key={qp.id}
                                 type="button"
-                                onClick={() => {
+                                title="Yazı Boyutunu Küçült"
+                                aria-label="Yazı Boyutunu Küçült"
+                                className="p-1 text-slate-300 hover:text-white rounded hover:bg-white/10"
+                                onClick={() =>
                                     setConfig({
                                         ...config,
-                                        tool: qp.tool,
-                                        color: qp.color,
-                                        width: qp.width,
-                                        penType: qp.tool === 'pencil' ? (config.penType || 'ballpoint') : undefined,
-                                    });
-                                }}
-                                title={`Hızlı: ${qp.name} (${qp.width}px)`}
-                                aria-label={qp.name}
-                                aria-pressed={isCurrent}
-                                className={cn(
-                                    'relative w-7 h-7 rounded-lg flex items-center justify-center transition-all',
-                                    isCurrent
-                                        ? 'bg-white/20 ring-2 ring-white/70 shadow-sm scale-105'
-                                        : 'hover:bg-white/10 hover:scale-105 opacity-80 hover:opacity-100'
-                                )}
+                                        width: Math.max(12, (config.width && config.width >= 10 ? config.width : 22) - 2),
+                                    })
+                                }
                             >
-                                {qp.tool === 'highlighter' ? (
-                                    <div
-                                        className="w-3.5 h-2 rounded-sm shadow-sm"
-                                        style={{ backgroundColor: qp.color }}
-                                    />
-                                ) : (
-                                    <div
-                                        className="w-3 h-3 rounded-full border border-white/40 shadow-sm"
-                                        style={{ backgroundColor: qp.color }}
-                                    />
-                                )}
-                                {isCurrent && (
-                                    <span className="absolute -bottom-0.5 w-1 h-1 bg-white rounded-full shadow" />
-                                )}
+                                <Minus className="w-3 h-3" />
                             </button>
-                        );
-                    })}
-                </div>
+                            <span className="text-xs font-bold text-sky-400 px-1 min-w-[20px] text-center">
+                                {config.width && config.width >= 10 ? config.width : 22}
+                            </span>
+                            <button
+                                type="button"
+                                title="Yazı Boyutunu Büyüt"
+                                aria-label="Yazı Boyutunu Büyüt"
+                                className="p-1 text-slate-300 hover:text-white rounded hover:bg-white/10"
+                                onClick={() =>
+                                    setConfig({
+                                        ...config,
+                                        width: Math.min(72, (config.width && config.width >= 10 ? config.width : 22) + 2),
+                                    })
+                                }
+                            >
+                                <Plus className="w-3 h-3" />
+                            </button>
+                        </div>
 
-                <div className="flex items-center gap-1 px-1.5 border-white/10 border-r">
+                        {/* Kalın & İtalik */}
+                        <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10">
+                            <button
+                                type="button"
+                                title="Kalın (Bold)"
+                                aria-label="Kalın"
+                                className={cn(
+                                    'p-1 rounded transition-all',
+                                    config.bold ? 'bg-sky-500 text-white font-bold' : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                )}
+                                onClick={() => setConfig({ ...config, bold: !config.bold })}
+                            >
+                                <Bold className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                title="İtalik"
+                                aria-label="İtalik"
+                                className={cn(
+                                    'p-1 rounded transition-all',
+                                    config.italic ? 'bg-sky-500 text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                )}
+                                onClick={() => setConfig({ ...config, italic: !config.italic })}
+                            >
+                                <Italic className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+
+                        {/* Yaslama */}
+                        <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10">
+                            {[
+                                { id: 'left', icon: AlignLeft, title: 'Sola Yasla' },
+                                { id: 'center', icon: AlignCenter, title: 'Ortala' },
+                                { id: 'right', icon: AlignRight, title: 'Sağa Yasla' },
+                            ].map((a) => {
+                                const Icon = a.icon;
+                                const active = (config.textAlign || 'left') === a.id;
+                                return (
+                                    <button
+                                        key={a.id}
+                                        type="button"
+                                        title={a.title}
+                                        aria-label={a.title}
+                                        className={cn(
+                                            'p-1 rounded transition-all',
+                                            active ? 'bg-sky-500 text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                        )}
+                                        onClick={() => setConfig({ ...config, textAlign: a.id as 'left' | 'center' | 'right' })}
+                                    >
+                                        <Icon className="w-3.5 h-3.5" />
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ) : (
+                    /* Hızlı Kalem Slotları: 3 Kalem (Siyah, Mavi, Kırmızı) + 1 Fosforlu (Sarı) */
+                    <div className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 border-white/10 border-r shrink-0" title="Hızlı Kalem Slotları">
+                        {DEFAULT_QUICK_PENS.map((qp) => {
+                            const isCurrent =
+                                config.tool === qp.tool &&
+                                config.color.toLowerCase() === qp.color.toLowerCase();
+                            return (
+                                <button
+                                    key={qp.id}
+                                    type="button"
+                                    onClick={() => {
+                                        setConfig({
+                                            ...config,
+                                            tool: qp.tool,
+                                            color: qp.color,
+                                            width: qp.width,
+                                            penType: qp.tool === 'pencil' ? (config.penType || 'ballpoint') : undefined,
+                                        });
+                                    }}
+                                    title={`Hızlı: ${qp.name} (${qp.width}px)`}
+                                    aria-label={qp.name}
+                                    aria-pressed={isCurrent}
+                                    className={cn(
+                                        'relative w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center transition-all',
+                                        isCurrent
+                                            ? 'bg-white/20 ring-2 ring-white/70 shadow-sm scale-105'
+                                            : 'hover:bg-white/10 hover:scale-105 opacity-80 hover:opacity-100'
+                                    )}
+                                >
+                                    {qp.tool === 'highlighter' ? (
+                                        <div
+                                            className="w-3.5 h-2 rounded-sm shadow-sm"
+                                            style={{ backgroundColor: qp.color }}
+                                        />
+                                    ) : (
+                                        <div
+                                            className="w-3 h-3 rounded-full border border-white/40 shadow-sm"
+                                            style={{ backgroundColor: qp.color }}
+                                        />
+                                    )}
+                                    {isCurrent && (
+                                        <span className="absolute -bottom-0.5 w-1 h-1 bg-white rounded-full shadow" />
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+
+                <div className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 border-white/10 border-r shrink-0">
                     {/* Ölçü aracı: tahtada cetvelle düz çizgi çekmek için. */}
                     <button
                         type="button"
@@ -768,23 +892,23 @@ export function DrawingToolbar({
                         aria-pressed={!!config.ruler}
                         title={`Ölçü aracı: ${RULER_LABELS[config.ruler ?? 'off']} (değiştirmek için tıklayın)`}
                         className={cn(
-                            'p-2 rounded-lg transition-all relative',
+                            'p-1.5 sm:p-2 rounded-lg transition-all relative',
                             config.ruler
                                 ? 'bg-emerald-600/30 text-emerald-300 ring-1 ring-emerald-500/40'
                                 : 'text-slate-400 hover:text-white hover:bg-white/5'
                         )}
                     >
                         {config.ruler === 'protractor' ? (
-                            <Compass className="w-[18px] h-[18px]" />
+                            <Compass className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         ) : config.ruler === 'setsquare' ? (
-                            <Triangle className="w-[18px] h-[18px]" />
+                            <Triangle className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         ) : (
-                            <Ruler className="w-[18px] h-[18px]" />
+                            <Ruler className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         )}
                     </button>
                 </div>
 
-                <div className="flex items-center gap-1 px-1.5 border-white/10 border-r">
+                <div className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 border-white/10 border-r shrink-0">
                     {/* Yalnızca renk: kalem ucu/kalınlık aracın kendi panelinde. */}
                     <button
                         type="button"
@@ -793,46 +917,46 @@ export function DrawingToolbar({
                         aria-expanded={panel === 'colors'}
                         title="Renk paleti"
                         className={cn(
-                            'p-1.5 rounded-lg transition-all',
+                            'p-1 sm:p-1.5 rounded-lg transition-all',
                             panel === 'colors' ? 'bg-white/10' : 'hover:bg-white/5'
                         )}
                     >
                         <span
-                            className="block w-[20px] h-[20px] rounded-md border-2 border-white/50 shadow-inner"
+                            className="block w-[18px] h-[18px] sm:w-[20px] sm:h-[20px] rounded-md border-2 border-white/50 shadow-inner"
                             style={{ backgroundColor: config.color }}
                         />
                     </button>
                 </div>
 
-                <div className="flex items-center gap-1 px-1.5 border-white/10 border-r">
+                <div className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 border-white/10 border-r shrink-0">
                     <button
                         type="button"
                         onClick={() => onCommand('UNDO_DRAWING')}
                         disabled={canUndo === false}
                         aria-label="Geri Al"
-                        className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                        className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
                         title="Geri Al"
                     >
-                        <Undo className="w-[18px] h-[18px]" />
+                        <Undo className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                     </button>
                     <button
                         type="button"
                         onClick={() => onCommand('REDO_DRAWING')}
                         disabled={canRedo === false}
                         aria-label="İleri Al"
-                        className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                        className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
                         title="İleri Al"
                     >
-                        <Redo className="w-[18px] h-[18px]" />
+                        <Redo className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                     </button>
                     <button
                         type="button"
                         onClick={() => onCommand('CLEAR_DRAWING')}
                         aria-label="Çizimi Temizle"
-                        className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                        className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all"
                         title="Temizle"
                     >
-                        <Trash2 className="w-[18px] h-[18px]" />
+                        <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                     </button>
                     {setShowWhiteboard && (
                         <button
@@ -853,7 +977,7 @@ export function DrawingToolbar({
                     )}
                 </div>
 
-                <div className="flex items-center gap-1 px-1.5">
+                <div className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 shrink-0">
                     {onOpenLibrary && (
                         <button
                             type="button"
@@ -861,7 +985,7 @@ export function DrawingToolbar({
                             aria-label="Kütüphane (K)"
                             aria-pressed={isLibraryOpen}
                             className={cn(
-                                'px-2.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 font-bold text-[12px] shadow-sm relative group',
+                                'px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl transition-all flex items-center gap-1.5 font-bold text-[12px] shadow-sm relative group',
                                 isLibraryOpen
                                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white ring-2 ring-indigo-400/70 shadow-indigo-500/30'
                                     : 'bg-indigo-500/20 hover:bg-indigo-500/35 text-indigo-300 hover:text-white border border-indigo-500/30 hover:border-indigo-400/50'
@@ -869,7 +993,7 @@ export function DrawingToolbar({
                             title="Kütüphane (Matematik & Fen Nesneleri, 3D Modeller, Canlı Simülasyonlar) [K]"
                         >
                             <BookOpen className="w-[15px] h-[15px] text-indigo-300 group-hover:text-white transition-colors" />
-                            <span className="font-semibold tracking-wide text-xs">Kütüphane</span>
+                            <span className="font-semibold tracking-wide text-xs hidden lg:inline">Kütüphane</span>
                             <Sparkles className="w-2.5 h-2.5 text-amber-300 animate-pulse" />
                         </button>
                     )}
@@ -880,14 +1004,14 @@ export function DrawingToolbar({
                             aria-label="Laboratuvar ve branş araçları"
                             aria-expanded={showLab}
                             className={cn(
-                                'p-2 rounded-xl transition-all relative group',
+                                'p-1.5 sm:p-2 rounded-xl transition-all relative group',
                                 showLab
                                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-white/20'
                                     : 'text-slate-400 hover:text-purple-300 hover:bg-purple-500/10'
                             )}
                             title="Ders & Dinamik Branş Araçları (Pergel, GeoGebra, Hesap Makinesi, 3D vb.)"
                         >
-                            <FlaskConical className="w-[18px] h-[18px] group-hover:scale-110 transition-transform" />
+                            <FlaskConical className="w-4 h-4 sm:w-[18px] sm:h-[18px] group-hover:scale-110 transition-transform" />
                             <span className="absolute -top-1 -right-1 flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
@@ -901,7 +1025,7 @@ export function DrawingToolbar({
                             aria-label="Kütüphane (K)"
                             aria-expanded={showMath}
                             className={cn(
-                                'px-2.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 font-bold text-[12px] shadow-sm relative group',
+                                'px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl transition-all flex items-center gap-1.5 font-bold text-[12px] shadow-sm relative group',
                                 showMath
                                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white ring-2 ring-indigo-400/70 shadow-indigo-500/30'
                                     : 'bg-indigo-500/20 hover:bg-indigo-500/35 text-indigo-300 hover:text-white border border-indigo-500/30 hover:border-indigo-400/50'
@@ -909,7 +1033,7 @@ export function DrawingToolbar({
                             title="Kütüphane (Matematik & Fen Nesneleri, 3D Modeller, Canlı Simülasyonlar) [K]"
                         >
                             <BookOpen className="w-[15px] h-[15px] text-indigo-300 group-hover:text-white transition-colors" />
-                            <span className="font-semibold tracking-wide text-xs">Kütüphane</span>
+                            <span className="font-semibold tracking-wide text-xs hidden lg:inline">Kütüphane</span>
                             <Sparkles className="w-2.5 h-2.5 text-amber-300 animate-pulse" />
                         </button>
                     )}
@@ -931,13 +1055,13 @@ export function DrawingToolbar({
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={isInsertingImage}
                                 aria-label="Sayfaya fotoğraf ekle"
-                                className="p-2 rounded-lg text-slate-400 hover:text-sky-300 hover:bg-sky-400/10 transition-all disabled:opacity-40"
+                                className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-sky-300 hover:bg-sky-400/10 transition-all disabled:opacity-40"
                                 title="Fotoğraf Ekle"
                             >
                                 {isInsertingImage ? (
-                                    <Loader2 className="w-[18px] h-[18px] animate-spin" />
+                                    <Loader2 className="w-4 h-4 sm:w-[18px] sm:h-[18px] animate-spin" />
                                 ) : (
-                                    <ImagePlus className="w-[18px] h-[18px]" />
+                                    <ImagePlus className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                                 )}
                             </button>
                         </>
@@ -949,14 +1073,14 @@ export function DrawingToolbar({
                             aria-label="Metin kutusu ekle"
                             aria-pressed={isTextBoxMode}
                             className={cn(
-                                'p-2 rounded-lg transition-all',
+                                'p-1.5 sm:p-2 rounded-lg transition-all hidden lg:block',
                                 isTextBoxMode
                                     ? 'bg-amber-500 text-white'
                                     : 'text-slate-400 hover:text-white hover:bg-white/5'
                             )}
                             title="Metin Kutusu Ekle"
                         >
-                            <StickyNote className="w-[18px] h-[18px]" />
+                            <StickyNote className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         </button>
                     )}
                     {onScreenshot && (
@@ -964,10 +1088,10 @@ export function DrawingToolbar({
                             type="button"
                             onClick={onScreenshot}
                             aria-label="Çizimi PNG olarak indir"
-                            className="p-2 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 transition-all"
+                            className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 transition-all"
                             title="Çizimi PNG Olarak İndir"
                         >
-                            <Camera className="w-[18px] h-[18px]" />
+                            <Camera className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         </button>
                     )}
                     {(onBgColorChange || onPaperChange) && (
@@ -977,7 +1101,7 @@ export function DrawingToolbar({
                             aria-label="Sayfa ve arka plan ayarları"
                             aria-expanded={showExtras}
                             className={cn(
-                                'p-2 rounded-lg transition-all relative',
+                                'p-1.5 sm:p-2 rounded-lg transition-all relative',
                                 showExtras
                                     ? 'bg-white/10 text-white'
                                     : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -985,7 +1109,7 @@ export function DrawingToolbar({
                             title="Sayfa Şablonu ve Zemin Rengi"
                         >
                             <div
-                                className="w-[18px] h-[18px] rounded-full border-2 border-white/40"
+                                className="w-4 h-4 sm:w-[18px] sm:h-[18px] rounded-full border-2 border-white/40"
                                 style={{ backgroundColor: bgColor || '#ffffff' }}
                             />
                         </button>
@@ -997,13 +1121,13 @@ export function DrawingToolbar({
                         type="button"
                         onClick={cycleDensity}
                         aria-label={`Araç çubuğu boyutu: ${TOOLBAR_DENSITY_LABELS[density]}`}
-                        className="p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all"
+                        className="p-1.5 sm:p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all hidden lg:block"
                         title={`Araç çubuğu boyutu: ${TOOLBAR_DENSITY_LABELS[density]} (değiştirmek için tıklayın)`}
                     >
                         {density === 'large' ? (
-                            <Minimize2 className="w-[18px] h-[18px]" />
+                            <Minimize2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         ) : (
-                            <Maximize2 className="w-[18px] h-[18px]" />
+                            <Maximize2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         )}
                     </button>
 
@@ -1013,13 +1137,13 @@ export function DrawingToolbar({
                             type="button"
                             onClick={toggleDock}
                             aria-label={dockPosition === 'bottom' ? 'Araç çubuğunu üste sabitle' : 'Araç çubuğunu alta sabitle'}
-                            className="p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all"
+                            className="p-1.5 sm:p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all"
                             title={dockPosition === 'bottom' ? 'Üste Sabitle' : 'Alta Sabitle'}
                         >
                             {dockPosition === 'bottom' ? (
-                                <PanelTop className="w-[18px] h-[18px]" />
+                                <PanelTop className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                             ) : (
-                                <PanelBottom className="w-[18px] h-[18px]" />
+                                <PanelBottom className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                             )}
                         </button>
                     )}
@@ -1027,15 +1151,15 @@ export function DrawingToolbar({
 
                 {/* Fixed (GoodNotes) modunda zoom kontrolleri çubuğun sağında yer alır */}
                 {fixed && onZoomIn && onZoomOut && (
-                    <div className="flex items-center gap-0.5 px-1.5 border-l border-white/10 shrink-0" role="group" aria-label="Yakınlaştırma">
+                    <div className="flex items-center gap-0.5 px-1 sm:px-1.5 border-l border-white/10 shrink-0" role="group" aria-label="Yakınlaştırma">
                         <button
                             type="button"
                             onClick={onZoomOut}
                             aria-label="Uzaklaştır"
                             title="Uzaklaştır"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                            className="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
                         >
-                            <Minus className="w-4 h-4" />
+                            <Minus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
                         {onZoomFit && (
                             <button
@@ -1043,9 +1167,9 @@ export function DrawingToolbar({
                                 onClick={onZoomFit}
                                 aria-label="Sayfaya sığdır"
                                 title="Sayfaya sığdır"
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                                className="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
                             >
-                                <Scan className="w-4 h-4" />
+                                <Scan className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                             </button>
                         )}
                         <button
@@ -1053,7 +1177,7 @@ export function DrawingToolbar({
                             onClick={onZoomReset}
                             aria-label="Yakınlaştırmayı sıfırla"
                             title="%100'e dön"
-                            className="min-w-[40px] px-1 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white hover:bg-white/10 transition-all tabular-nums"
+                            className="min-w-[34px] sm:min-w-[40px] px-0.5 sm:px-1 py-0.5 sm:py-1 rounded-lg text-[10.5px] sm:text-[11px] font-bold text-slate-300 hover:text-white hover:bg-white/10 transition-all tabular-nums"
                         >
                             %{Math.round((zoom ?? 1) * 100)}
                         </button>
@@ -1062,9 +1186,9 @@ export function DrawingToolbar({
                             onClick={onZoomIn}
                             aria-label="Yakınlaştır"
                             title="Yakınlaştır"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                            className="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
                         >
-                            <Plus className="w-4 h-4" />
+                            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
                     </div>
                 )}
@@ -1076,13 +1200,13 @@ export function DrawingToolbar({
             ref={rootRef}
             role="toolbar"
             aria-label="Çizim araçları"
-            className="relative w-full z-[5000] bg-[#161722] border-b border-white/10 px-2 py-1 flex items-center justify-center flex-shrink-0 shadow-sm"
+            className="relative w-full z-[5000] bg-[#161722] border-b border-white/10 flex flex-col flex-shrink-0 shadow-sm"
         >
-            <div className="w-full flex items-center justify-center relative">
-                <div className="absolute top-full left-0 right-0 z-[5001] pointer-events-none">
-                    {popovers}
-                </div>
+            <div className="w-full overflow-x-auto no-scrollbar py-1 px-1 sm:px-2 flex items-center justify-start md:justify-center touch-pan-x">
                 {strip}
+            </div>
+            <div className="absolute top-full left-0 right-0 z-[5001] pointer-events-none">
+                {popovers}
             </div>
         </div>
     ) : (

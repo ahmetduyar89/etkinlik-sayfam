@@ -1354,6 +1354,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             panMode="viewport"
                             pageBox={pageBox}
                             onViewChange={handleViewChange}
+                            onConfigChange={(patch) => setConfig((prev) => ({ ...prev, ...patch }))}
                         />
                         <TextBoxLayer
                             boxes={currentBoxes}
