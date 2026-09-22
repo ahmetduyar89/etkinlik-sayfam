@@ -1,4 +1,3 @@
-import { useSession } from '../../contexts/SessionContext';
 // src/components/common/Navbar.tsx — İÇERİK MERKEZİ (Ünite Rafı + Ders Modu)
 // Üst başlık = marka + sekmeler + GENİŞ ARAMA (Ctrl+K) + Ders Modu + "Yeni İçerik".
 // Arama state'i App.tsx'te yaşar; buraya props ile gelir.
@@ -30,7 +29,6 @@ export const Navbar = forwardRef<HTMLInputElement, NavbarProps>(function Navbar(
     { search, onSearchChange, onAdd, view, onViewChange, isLessonMode, onToggleLessonMode, onOpenTree, onExitToPortal },
     searchRef
 ) {
-    const { role } = useSession();
     const isContent = view === 'content';
     return (
         <header className="bg-white font-sans top-0 sticky z-[100] border-b border-outline-variant shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
@@ -79,7 +77,6 @@ export const Navbar = forwardRef<HTMLInputElement, NavbarProps>(function Navbar(
                     ]).map((tab) => (
                         <button
                             key={tab.id}
-                            aria-label={tab.label}
                             onClick={() => onViewChange(tab.id)}
                             aria-current={view === tab.id ? 'page' : undefined}
                             className={cn(
@@ -162,9 +159,8 @@ export const Navbar = forwardRef<HTMLInputElement, NavbarProps>(function Navbar(
                 </button>
 
                 {/* Yeni İçerik + avatar */}
-                {isContent && role === 'admin' && (
+                {isContent && (
                     <button
-                        aria-label="Yeni içerik"
                         onClick={onAdd}
                         className="flex-shrink-0 inline-flex items-center gap-2 bg-primary text-white h-12 px-[18px] rounded-[14px] text-sm font-semibold shadow-[0_4px_12px_rgba(99,102,241,0.28)] hover:-translate-y-0.5 hover:brightness-105 transition-all"
                     >

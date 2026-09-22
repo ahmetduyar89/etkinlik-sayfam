@@ -1,4 +1,3 @@
-import { studentLink } from '../../lib/classroomScope';
 // src/components/activities/ActivityQrModal.tsx — Öğrenci linkini QR olarak göster
 // Derste tahtaya yansıtılıp öğrencilerin kendi cihazlarından okutması içindir.
 // Link üretimi `handleCopyLink` ile birebir aynıdır.
@@ -16,7 +15,7 @@ interface ActivityQrModalProps {
 
 export function ActivityQrModal({ activity, onClose }: ActivityQrModalProps) {
     // Link üretimi App.tsx'teki `handleCopyLink` ile birebir aynıdır.
-    const link = studentLink('student', activity.id);
+    const link = `${window.location.origin}${window.location.pathname}?view=student&id=${activity.id}`;
     const [copied, setCopied] = useState(false);
     const [failed, setFailed] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);

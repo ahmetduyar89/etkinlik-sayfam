@@ -1198,7 +1198,6 @@ export function DrawingToolbar({
     const bar = fixed ? (
         <div
             ref={rootRef}
-            data-drawing-toolbar="true"
             role="toolbar"
             aria-label="Çizim araçları"
             className="relative w-full z-[5000] bg-[#161722] border-b border-white/10 flex flex-col flex-shrink-0 shadow-sm"
@@ -1206,14 +1205,13 @@ export function DrawingToolbar({
             <div className="w-full overflow-x-auto no-scrollbar py-1 px-1 sm:px-2 flex items-center justify-start md:justify-center touch-pan-x">
                 {strip}
             </div>
-            <div data-drawing-toolbar="true" className="absolute top-full left-0 right-0 z-[5001] pointer-events-none">
+            <div className="absolute top-full left-0 right-0 z-[5001] pointer-events-none">
                 {popovers}
             </div>
         </div>
     ) : (
         <motion.div
             ref={rootRef}
-            data-drawing-toolbar="true"
             key={dockPosition}
             drag
             dragControls={dragControls}
@@ -1226,7 +1224,7 @@ export function DrawingToolbar({
                 dockPosition === 'bottom' ? 'bottom-6' : 'top-6'
             )}
         >
-            <div data-drawing-toolbar="true" className="flex flex-col items-center relative">
+            <div className="flex flex-col items-center relative">
                 {popovers}
                 {strip}
             </div>

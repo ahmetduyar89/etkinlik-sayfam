@@ -1,7 +1,3 @@
-import { getBytes, ref, uploadBytes } from 'firebase/storage';
-import { storage, saveDocById } from './firebase';
-import { classroomId } from './classroomScope';
-const cloudPath = (id: string) => classroomId ? `classrooms/${classroomId}/pdfs/${id}` : `pdfs/${id}`;
 // src/lib/pdfStorage.ts
 // PDF dosyalarını IndexedDB'de saklamak ve Mozilla PDF.js ile sayfaları işlemek için ortak yardımcılar.
 
@@ -32,16 +28,13 @@ export function openPdfDB(): Promise<IDBDatabase> {
 }
 
 export async function savePdfToDB(id: string, name: string, data: ArrayBuffer): Promise<void> {
-    if (data.byteLength > 25 * 1024 * 1024) throw new Error('PDF en fazla 25 MB olabilir.');
-    await uploadBytes(ref(storage, cloudPath(id)), data, { contentType: 'application/pdf' });
-    await saveDocById('pdf_files', id, { name, updated_at: new Date().toISOString() });
     const db = await openPdfDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(DB_STORE, 'readwrite');
         const store = tx.objectStore(DB_STORE);
-        store.put({ id, name, data, updatedAt: Date.now() });
-        tx.oncomplete = () => { db.close(); resolve(); };
-        tx.onerror = () => { db.close(); reject(tx.error); };
+        const req = store.put({ id, name, data, updatedAt: Date.now() });
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
     });
 }
 
@@ -135,13 +128,7 @@ export async function getPdfDocument(id: string, data?: ArrayBuffer): Promise<an
         const pdfjs = await ensurePdfjsLoaded();
         let buffer: ArrayBuffer | null | undefined = data;
         if (!buffer) {
-            // Fetch cloud first: a cached PDF may have been replaced on another device.
-            try { buffer = await getBytes(ref(storage, cloudPath(id)), 25 * 1024 * 1024); }
-            catch (error) {
-                // Permission failures must not reveal a cached private PDF on shared devices.
-                if ((error as { code?: string }).code === 'storage/unauthorized') throw error;
-                buffer = await loadPdfFromDB(id);
-            }
+            buffer = await loadPdfFromDB(id);
         }
         if (!buffer) {
             throw new Error('PDF verisi bulunamadı');
@@ -150,7 +137,6 @@ export async function getPdfDocument(id: string, data?: ArrayBuffer): Promise<an
         return loadingTask.promise;
     })();
 
-    loadPromise.catch(() => { docCache.delete(id); });
     docCache.set(id, loadPromise);
     return loadPromise;
 }

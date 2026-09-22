@@ -1,10 +1,41 @@
-import { signOut } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+// src/utils/auth.ts — Basit şifre kilidi yardımcıları
+// NOT: Tamamen tarayıcıda çalışan basit bir kilittir; şifre sayfa kaynağında
+// görülebilir. Gerçek koruma için ileride sunucu tarafı doğrulama gerekir.
 
-export async function lockApp(): Promise<void> {
-    await signOut(auth);
-    try { localStorage.removeItem('etkinlik_giris'); } catch { /* legacy cleanup */ }
-    window.location.assign('/');
+// Şifre ortam değişkeniyle değiştirilebilir; yoksa varsayılan kullanılır.
+export const APP_PASSWORD = import.meta.env.VITE_APP_PASSWORD || '951852';
+export const AUTH_STORAGE_KEY = 'etkinlik_giris';
+
+/** Kayıtlı giriş bilgisi (localStorage kapalıysa null). */
+export function readStoredAuth(): string | null {
+    try {
+        return window.localStorage.getItem(AUTH_STORAGE_KEY);
+    } catch {
+        return null;
+    }
+}
+
+/** Şifre değişirse eski girişler otomatik geçersiz olsun diye değeri karşılaştırırız. */
+export function isAuthenticated(): boolean {
+    return readStoredAuth() === APP_PASSWORD;
+}
+
+export function saveAuth(): void {
+    try {
+        window.localStorage.setItem(AUTH_STORAGE_KEY, APP_PASSWORD);
+    } catch {
+        // Kaydedilemezse de bu oturum için giriş yapılmış sayılır.
+    }
+}
+
+/** Çıkış yap: kaydı sil ve giriş ekranına dön. */
+export function lockApp(): void {
+    try {
+        window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    } catch {
+        // Yoksay.
+    }
+    window.location.reload();
 }
 
 /**

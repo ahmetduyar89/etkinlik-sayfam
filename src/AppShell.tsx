@@ -21,20 +21,9 @@ import { PortalHome } from './components/portal/PortalHome';
 import { findModule, findModuleByView } from './constants/portal';
 import { goToSection, sectionFromLocation, type Section } from './lib/navigation';
 import { isChessLink, isStudentLink } from './utils/auth';
-import { ClassroomDashboard } from './components/classrooms/ClassroomDashboard';
-import { ClassroomWorkspace } from './components/classrooms/ClassroomWorkspace';
-import { classroomId } from './lib/classroomScope';
-import { useSession } from './contexts/SessionContext';
 import type { MainView } from './types';
 
 export default function AppShell() {
-    const { role } = useSession();
-    if (isStudentLink() || isChessLink()) return <AppShellContent />;
-    if (classroomId) return <ClassroomWorkspace><AppShellContent /></ClassroomWorkspace>;
-    if (role === 'admin' && new URLSearchParams(window.location.search).get('workspace') === 'library') return <><div className="bg-[#142c36] px-5 py-3 text-white text-sm"><a href="/">← Sınıflarım</a><span className="ml-6">Ortak arşiv · Önceki içerikler ve defterler</span></div><AppShellContent /></>;
-    return <ClassroomDashboard />;
-}
-function AppShellContent() {
     const [section, setSection] = useState<Section>(sectionFromLocation);
 
     // Tarayıcının geri/ileri tuşları ve goToSection() aynı olayı tetikler.
@@ -57,7 +46,7 @@ function AppShellContent() {
     // yoktur — çocuk bağlantıya dokunur, adını yazar ve oynar.
     if (isChessLink()) return <ChessArena />;
 
-    if (section === 'portal' && !classroomId) {
+    if (section === 'portal') {
         return <PortalHome onOpenInternal={goToSection} />;
     }
 

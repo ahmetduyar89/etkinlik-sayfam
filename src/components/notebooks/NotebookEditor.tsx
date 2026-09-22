@@ -1,4 +1,3 @@
-import { discardNotebookDraft } from './notebookContent';
 // src/components/notebooks/NotebookEditor.tsx
 // Tam ekran defter / beyaz tahta editörü.
 // Üstte kendi şeridi (başlık, kağıt deseni, zemin rengi, sayfa gezintisi),
@@ -102,7 +101,7 @@ interface NotebookEditorProps {
     onMetaChange: (patch: Partial<Notebook>) => void;
 }
 
-type SaveState = 'idle' | 'saving' | 'saved' | 'pending';
+type SaveState = 'idle' | 'saving' | 'saved';
 
 /** Otomatik kaydı durduran engelin sebebi. */
 type SaveBlock = 'full' | 'load' | 'conflict' | null;
@@ -155,7 +154,6 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     /** Kaydedilmemiş değişiklik var mı (kapanış uyarısı için). */
     const dirtyRef = React.useRef(false);
     const savingRef = React.useRef(false);
-    const saveTaskRef = React.useRef<Promise<void> | null>(null);
     const editRevisionRef = React.useRef(0);
     /** Elimizdeki içeriğin sürümü; başka cihazdaki kayıt bunu ileri taşır. */
     const revRef = React.useRef(0);
@@ -256,14 +254,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         (async () => {
             let pages: NotebookPage[] = [emptyPage()];
             try {
-                const content = await loadNotebookPages(notebook.id, true);
+                const content = await loadNotebookPages(notebook.id);
                 pages = content.pages;
-                if (content.isLocalDraft && alive) {
-                    dirtyRef.current = true;
-                    setSaveState('pending');
-                    toast.info('Cihazdaki kaydedilmemiş defter çalışması geri yüklendi.');
-                    window.setTimeout(() => scheduleSaveRef.current?.(), 500);
-                }
                 // Okunan parça sayısı bilinsin ki defter küçüldüğünde artan
                 // parçalar ilk kayıtta silinsin.
                 chunksRef.current = new Array<string>(content.chunkCount).fill('');
@@ -318,93 +310,77 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     }, []);
 
     const save = React.useCallback(async () => {
-        if (saveTaskRef.current) return saveTaskRef.current;
-        const task = (async () => {
-            // İçerik okunamadıysa yazmak defteri silmek olurdu.
-            if (saveBlockRef.current === 'load') return;
-            // Çakışma kullanıcı seçim yapana kadar her 1,2 saniyede bir yeniden
-            // denenmesin; yalnızca "benim sürümüm kalsın" denince yazılır.
-            if (saveBlockRef.current === 'conflict' && !forceSaveRef.current) return;
-            const savedRevision = editRevisionRef.current;
-            savingRef.current = true;
-            const pages = collectPages();
-            setSaveState('saving');
-            try {
-                // İçerik 1 MiB'lık doküman sınırını aşarsa parçalara bölünerek
-                // yazılır; defter büyüdükçe kayıt durmaz.
-                const force = forceSaveRef.current;
-                forceSaveRef.current = false;
-                const result = await saveNotebookPages(notebook.id, pages, {
-                    previous: chunksRef.current,
-                    baseRev: revRef.current,
-                    force,
-                });
-                chunksRef.current = result.parts;
-                revRef.current = result.rev;
-                dirtyRef.current = editRevisionRef.current !== savedRevision;
-                setSaveBlock(null);
-                saveBlockRef.current = null;
-                fullWarnedRef.current = false;
-                conflictWarnedRef.current = false;
-                // Sayfa sayısı ve sürüm, üst veri dokümanına aynı işlem içinde
-                // yazıldı; burada ayrıca güncellemeye gerek yok.
-                setSaveState(dirtyRef.current ? 'pending' : 'saved');
-                if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
-                savedTimerRef.current = window.setTimeout(() => { if (!dirtyRef.current) setSaveState('idle'); }, 2000);
-            } catch (e) {
-                setSaveState('pending');
-                if (e instanceof NotebookConflictError) {
-                    // Ortak çizim sürerken çakışma beklenen bir durumdur: iki
-                    // taraf da aynı operasyonları uyguladığı için içerikler
-                    // aynıdır, kaydı sunucudaki sürümün üstüne yazmak yeterli.
-                    if (Date.now() - collabAtRef.current < 20000) {
-                        revRef.current = e.serverRev;
-                        forceSaveRef.current = true;
-                        scheduleSaveRef.current?.();
-                        return;
-                    }
-                    // Ortak çizim yoksa defter başka bir cihazda ayrıca
-                    // düzenlenmiş demektir; hangi sürümün kalacağına kullanıcı
-                    // şerideki rozetten karar verir.
-                    setSaveBlock('conflict');
-                    saveBlockRef.current = 'conflict';
-                    if (conflictWarnedRef.current) return;
-                    conflictWarnedRef.current = true;
-                    toast.error(
-                        'Bu defter başka bir cihazda da değiştirildi. Değişiklikleriniz kaydedilmedi; şeritteki uyarıdan seçim yapın.'
-                    );
+        // İçerik okunamadıysa yazmak defteri silmek olurdu.
+        if (saveBlockRef.current === 'load') return;
+        // Çakışma kullanıcı seçim yapana kadar her 1,2 saniyede bir yeniden
+        // denenmesin; yalnızca "benim sürümüm kalsın" denince yazılır.
+        if (saveBlockRef.current === 'conflict' && !forceSaveRef.current) return;
+        const pages = collectPages();
+        setSaveState('saving');
+        try {
+            // İçerik 1 MiB'lık doküman sınırını aşarsa parçalara bölünerek
+            // yazılır; defter büyüdükçe kayıt durmaz.
+            const force = forceSaveRef.current;
+            forceSaveRef.current = false;
+            const result = await saveNotebookPages(notebook.id, pages, {
+                previous: chunksRef.current,
+                baseRev: revRef.current,
+                force,
+            });
+            chunksRef.current = result.parts;
+            revRef.current = result.rev;
+            dirtyRef.current = false;
+            setSaveBlock(null);
+            saveBlockRef.current = null;
+            fullWarnedRef.current = false;
+            conflictWarnedRef.current = false;
+            // Sayfa sayısı ve sürüm, üst veri dokümanına aynı işlem içinde
+            // yazıldı; burada ayrıca güncellemeye gerek yok.
+            setSaveState('saved');
+            if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
+            savedTimerRef.current = window.setTimeout(() => setSaveState('idle'), 2000);
+        } catch (e) {
+            setSaveState('idle');
+            if (e instanceof NotebookConflictError) {
+                // Ortak çizim sürerken çakışma beklenen bir durumdur: iki
+                // taraf da aynı operasyonları uyguladığı için içerikler
+                // aynıdır, kaydı sunucudaki sürümün üstüne yazmak yeterli.
+                if (Date.now() - collabAtRef.current < 20000) {
+                    revRef.current = e.serverRev;
+                    forceSaveRef.current = true;
+                    scheduleSaveRef.current?.();
                     return;
                 }
-                if (!(e instanceof NotebookTooLargeError)) {
-                    toast.error(firestoreErrorMessage(e, 'Defter kaydedilemedi.'));
-                    return;
-                }
-                setSaveBlock('full');
-                saveBlockRef.current = 'full';
-                // Yazmaya devam edildikçe otomatik kayıt saniyede bir denenir;
-                // uyarı yalnızca sınır ilk aşıldığında çıkar.
-                if (fullWarnedRef.current) return;
-                fullWarnedRef.current = true;
-                const { imageBytes } = measurePages(pages);
+                // Ortak çizim yoksa defter başka bir cihazda ayrıca
+                // düzenlenmiş demektir; hangi sürümün kalacağına kullanıcı
+                // şerideki rozetten karar verir.
+                setSaveBlock('conflict');
+                saveBlockRef.current = 'conflict';
+                if (conflictWarnedRef.current) return;
+                conflictWarnedRef.current = true;
                 toast.error(
-                    imageBytes * 2 > e.bytes
-                        ? 'Defter doldu: yerin çoğunu fotoğraflar kaplıyor. Kaydedebilmek için birkaç fotoğrafı silin.'
-                        : 'Defter doldu: çizim verisi sınıra ulaştı. Kaydedebilmek için bazı sayfaları silin ya da kalanını yeni bir deftere çizin.'
+                    'Bu defter başka bir cihazda da değiştirildi. Değişiklikleriniz kaydedilmedi; şeritteki uyarıdan seçim yapın.'
                 );
+                return;
             }
-        })();
-        saveTaskRef.current = task;
-        try { await task; } finally { saveTaskRef.current = null; savingRef.current = false; }
+            if (!(e instanceof NotebookTooLargeError)) {
+                toast.error(firestoreErrorMessage(e, 'Defter kaydedilemedi.'));
+                return;
+            }
+            setSaveBlock('full');
+            saveBlockRef.current = 'full';
+            // Yazmaya devam edildikçe otomatik kayıt saniyede bir denenir;
+            // uyarı yalnızca sınır ilk aşıldığında çıkar.
+            if (fullWarnedRef.current) return;
+            fullWarnedRef.current = true;
+            const { imageBytes } = measurePages(pages);
+            toast.error(
+                imageBytes * 2 > e.bytes
+                    ? 'Defter doldu: yerin çoğunu fotoğraflar kaplıyor. Kaydedebilmek için birkaç fotoğrafı silin.'
+                    : 'Defter doldu: çizim verisi sınıra ulaştı. Kaydedebilmek için bazı sayfaları silin ya da kalanını yeni bir deftere çizin.'
+            );
+        }
     }, [collectPages, notebook.id, toast]);
-
-    React.useEffect(() => {
-        const retry = () => { if (dirtyRef.current) void save(); };
-        const beforeUnload = (e: BeforeUnloadEvent) => { if (dirtyRef.current) { e.preventDefault(); e.returnValue = ''; } };
-        const timer = window.setInterval(() => { if (navigator.onLine && dirtyRef.current && !saveBlockRef.current) void save(); }, 15000);
-        window.addEventListener('online', retry);
-        window.addEventListener('beforeunload', beforeUnload);
-        return () => { clearInterval(timer); window.removeEventListener('online', retry); window.removeEventListener('beforeunload', beforeUnload); };
-    }, [save]);
 
     // ── Ortak çizim ──────────────────────────────────────────────────
     // Anlık görüntü saniyeler arayla yazılır; o kadar beklemek "aynı anda
@@ -468,7 +444,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         const timer = window.setInterval(() => {
             if (Date.now() - collabAtRef.current <= 20000) return;
             setCollab(false);
-            if (!dirtyRef.current && !canvasRef.current?.isBusy()) void applyRemoteRef.current?.();
+            if (!dirtyRef.current) void applyRemoteRef.current?.();
         }, 5000);
         return () => window.clearInterval(timer);
     }, [collab]);
@@ -479,11 +455,9 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     // doküman üzerinden duyulur, ağır sayfa verisi ancak gerekince indirilir.
     const applyRemote = React.useCallback(async () => {
         if (applyingRef.current) return;
-        if (canvasRef.current?.isBusy()) return;
         applyingRef.current = true;
         try {
             const content = await loadNotebookPages(notebook.id);
-            await discardNotebookDraft(notebook.id);
             const strokes = content.pages.map((p) => p.strokes);
             const page = canvasRef.current?.getCurrentPage() ?? 0;
             canvasRef.current?.loadPages(strokes);
@@ -529,7 +503,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         if (remoteTimerRef.current) window.clearTimeout(remoteTimerRef.current);
         remoteTimerRef.current = window.setTimeout(() => {
             remoteTimerRef.current = null;
-            if (!dirtyRef.current && !canvasRef.current?.isBusy()) void applyRemote();
+            if (!dirtyRef.current) void applyRemote();
         }, 1500);
     }, [applyRemote, isLoading, notebook.content_rev, notebook.content_writer]);
 
@@ -546,8 +520,6 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const scheduleSave = React.useCallback(() => {
         if (isLoading) return;
         dirtyRef.current = true;
-        editRevisionRef.current++;
-        setSaveState('pending');
         if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
         /**
          * Kalem kağıttayken kaydetme.
@@ -615,10 +587,6 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             window.clearTimeout(saveTimerRef.current);
             saveTimerRef.current = null;
             await save();
-        }
-        if (dirtyRef.current && !saveBlockRef.current) {
-            await save();
-            if (dirtyRef.current) { toast.error('Son değişiklikler henüz buluta kaydedilmedi. Bağlantıyı kontrol edin; defter açık tutuldu.'); return; }
         }
         // Kayıt engelliyken kapanış sessizce veri kaybettirmesin.
         if (saveBlockRef.current && dirtyRef.current) {
@@ -1362,14 +1330,14 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     ) : (
                         <span
                             className="hidden md:flex items-center gap-1 text-[11.5px] font-medium text-white/80 px-1"
-                            title={saveState === 'saving' ? 'Kaydediliyor…' : saveState === 'saved' ? 'Değişiklikler kaydedildi' : saveState === 'pending' ? 'Buluta kaydedilmeyi bekliyor' : 'Buluta otomatik kaydedilir'}
+                            title={saveState === 'saving' ? 'Kaydediliyor…' : saveState === 'saved' ? 'Değişiklikler kaydedildi' : 'Buluta otomatik kaydedilir'}
                         >
                             {saveState === 'saving' ? (
                                 <>
                                     <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
                                     <span className="hidden lg:inline">Kaydediliyor…</span>
                                 </>
-                            ) : saveState === 'pending' ? (<span className="text-amber-200">Kayıt bekleniyor</span>) : saveState === 'saved' ? (
+                            ) : saveState === 'saved' ? (
                                 <>
                                     <Check className="w-3.5 h-3.5 text-emerald-300" />
                                     <span className="hidden lg:inline">Kaydedildi</span>

@@ -1,5 +1,3 @@
-import { useClassroom, belongsToClass } from './contexts/ClassroomContext';
-import { studentLink } from './lib/classroomScope';
 // src/App.tsx — İÇERİK MERKEZİ: Ünite Rafı + Ders Modu
 // ─────────────────────────────────────────────────────────────────────
 // Bu dosya, mevcut App.tsx'in TÜM MANTIĞINI korur (Firebase sync, filtreler,
@@ -354,7 +352,6 @@ interface AppProps {
 }
 
 export default function App({ onExitToPortal, view: viewProp, onViewChange }: AppProps = {}) {
-    const classroom = useClassroom();
     const params = new URLSearchParams(window.location.search);
     const isStudentView = params.get('view') === 'student' && !!params.get('id');
     const studentId = params.get('id');
@@ -371,13 +368,12 @@ export default function App({ onExitToPortal, view: viewProp, onViewChange }: Ap
         },
         [onViewChange]
     );
-    const [allActivities, setActivities] = useState<Activity[]>([]);
-    const activities = useMemo(() => allActivities.filter(a => belongsToClass(a, classroom)), [allActivities, classroom]);
+    const [activities, setActivities] = useState<Activity[]>([]);
     const [units, setUnits] = useState<Unit[]>([]);
     const [folders, setFolders] = useState<DriveFolder[]>([]);
     const [search, setSearch] = useState('');
     const debouncedSearch = useDebounce(search, 200);
-    const [previewId, setPreviewId] = useState<string | null>(() => params.get('activity'));
+    const [previewId, setPreviewId] = useState<string | null>(null);
     const [showResultsId, setShowResultsId] = useState<string | null>(null);
     const [qrActivityId, setQrActivityId] = useState<string | null>(null);
     const [folderActivityId, setFolderActivityId] = useState<string | null>(null);
@@ -457,7 +453,7 @@ export default function App({ onExitToPortal, view: viewProp, onViewChange }: Ap
             }
             setActivities(list);
             setIsLoading(false);
-        }, () => { setIsLoading(false); toast.error('İçerikler yüklenemedi. Bağlantınızı kontrol edin.'); });
+        });
         return () => unsub();
     }, []);
 
@@ -494,10 +490,9 @@ export default function App({ onExitToPortal, view: viewProp, onViewChange }: Ap
     }, []);
 
     useEffect(() => {
-        if (isStudentView || sharedNotebookId) return;
         const unsub = foldersHandler.sync((data) => {
             const list = data && data.length > 0 ? [...data] : [];
-            for (const df of (!classroom || classroom.grade_level === '10' ? DEFAULT_GEOMETRI_FOLDERS : [])) {
+            for (const df of DEFAULT_GEOMETRI_FOLDERS) {
                 if (!list.some((f) => f.id === df.id || (f.name === df.name && f.parent_id === df.parent_id))) {
                     list.push(df);
                 }
@@ -673,7 +668,7 @@ export default function App({ onExitToPortal, view: viewProp, onViewChange }: Ap
     }, [fullscreen, markOpened]);
 
     const handleCopyLink = useCallback(async (act: Activity) => {
-        const link = studentLink('student', act.id);
+        const link = `${window.location.origin}${window.location.pathname}?view=student&id=${act.id}`;
         if (await copyText(link)) toast.success('Öğrenci giriş linki kopyalandı.');
         else toast.error('Tarayıcı panoya erişemedi. Bağlantıyı QR penceresinden elle kopyalayabilirsin.');
     }, [toast]);
@@ -991,7 +986,7 @@ export default function App({ onExitToPortal, view: viewProp, onViewChange }: Ap
                 />
             )}
 
-            {currentPreview && <ActivityPreviewModal activity={currentPreview} onClose={() => { setPreviewId(null); const url = new URL(window.location.href); url.searchParams.delete('activity'); window.history.replaceState(null, '', url); }} />}
+            {currentPreview && <ActivityPreviewModal activity={currentPreview} onClose={() => setPreviewId(null)} />}
         </div>
     );
 }
