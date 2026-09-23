@@ -75,6 +75,17 @@ function setRole(next) {
   render();
 }
 
+// URL üzerinden sınıf parametresi geldiyse (?classId=...) o sınıfı otomatik aktif yap
+try {
+  const urlParams = new URLSearchParams(window.location.search);
+  const targetClassId = urlParams.get("classId");
+  if (targetClassId && classroom.getClass(targetClassId)) {
+    classroom.setActiveClass(targetClassId);
+  }
+} catch {
+  // yoksay
+}
+
 // Eski tek profilli kayıt öğretmen profiline taşınır; uygulama öğrenci
 // modunda kapatıldıysa son seçilen öğrencinin profili yeniden açılır.
 useRoleProfile();

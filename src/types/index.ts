@@ -682,3 +682,6 @@ export interface NotebookContent {
     chunk?: string;
     updated_at?: string;
 }
+
+export * from './classroom';
+

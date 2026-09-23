@@ -42,5 +42,10 @@ service cloud.firestore {
         match /chess_rooms/{document=**} {
             allow read, write: if true;
         }
+
+        // Sınıf Yönetimi: sınıflar, atanan içerikler ve öğrenci listeleri
+        match /classes/{document=**} {
+            allow read, write: if true;
+        }
     }
 }
