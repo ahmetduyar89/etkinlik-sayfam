@@ -431,6 +431,8 @@ export interface DrawConfig {
     bold?: boolean;
     /** Metin aracı varsayılan italik. */
     italic?: boolean;
+    /** Kalem çizgi akıcılığı / titreme engelleme düzeyi. */
+    streamlineLevel?: 'natural' | 'smooth' | 'calligraphy';
 }
 
 /** Serbest çizgi deseni. */

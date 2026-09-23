@@ -30,6 +30,7 @@ const PEN_TIPS: { id: PenType; label: string; icon: React.ComponentType<{ classN
     { id: 'ballpoint', label: 'Tükenmez', icon: PenTool },
     { id: 'fountain', label: 'Dolma', icon: Feather },
     { id: 'brush', label: 'Fırça', icon: Brush },
+    { id: 'marker', label: 'Keçeli', icon: Sparkles },
 ];
 
 const PEN_PRESETS = [1.5, 3, 5, 8];
@@ -91,7 +92,7 @@ export function ToolSettingsPanel({
                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1.5">
                                 Kalem Ucu
                             </span>
-                            <div className="grid grid-cols-3 gap-1 bg-white/[0.04] p-1 rounded-xl border border-white/10">
+                            <div className="grid grid-cols-4 gap-1 bg-white/[0.04] p-1 rounded-xl border border-white/10">
                                 {PEN_TIPS.map((tip) => {
                                     const active = penType === tip.id;
                                     const Icon = tip.icon;
@@ -167,6 +168,53 @@ export function ToolSettingsPanel({
                             className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-white/10 rounded-lg"
                         />
                     </div>
+
+                    {/* Yazı Akıcılığı / Titreme Engelleme (GoodNotes Stabilizatör) */}
+                    {!isHighlighter && (
+                        <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                    Yazı Akıcılığı (GoodNotes)
+                                </span>
+                                <span className="text-[10px] text-indigo-400 font-medium">
+                                    {config.streamlineLevel === 'natural'
+                                        ? 'Doğal'
+                                        : config.streamlineLevel === 'calligraphy'
+                                        ? 'Kaligrafi'
+                                        : 'Akıcı (Önerilen)'}
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1 bg-white/[0.04] p-1 rounded-xl border border-white/10 text-center">
+                                {[
+                                    { id: 'natural', label: 'Doğal' },
+                                    { id: 'smooth', label: 'Akıcı' },
+                                    { id: 'calligraphy', label: 'Kaligrafi' },
+                                ].map((lvl) => {
+                                    const active = (config.streamlineLevel ?? 'smooth') === lvl.id;
+                                    return (
+                                        <button
+                                            key={lvl.id}
+                                            type="button"
+                                            onClick={() =>
+                                                setConfig({
+                                                    ...config,
+                                                    streamlineLevel: lvl.id as 'natural' | 'smooth' | 'calligraphy',
+                                                })
+                                            }
+                                            className={cn(
+                                                'py-1.5 rounded-lg text-xs font-semibold transition-all',
+                                                active
+                                                    ? 'bg-indigo-600 text-white shadow-sm'
+                                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                            )}
+                                        >
+                                            {lvl.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Akıllı Kalem (Şekil Tanıma) */}
                     {!isHighlighter && (

@@ -4,7 +4,7 @@
 // Bileşenden ayrı tutulur; hem tuval hem de sayfa küçük resimleri aynı
 // çizim mantığını kullanır.
 
-import { drawVariableStroke, getPenProfile } from './penEngine';
+import { drawVariableStroke, renderFreehandStroke, getPenProfile } from './penEngine';
 import { drawLibraryObject } from './libraryObjects';
 import { getImage } from './imageStore';
 import type { BoundingBox, Point, Stroke } from '../../types';
@@ -1041,15 +1041,15 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, 
     }
 
     if (s.tool === 'pencil') {
-        // Desenli veya standart tükenmez kalem sabit ve pürüzsüz kalınlıkta çizer
-        if (dashed || (s.penType ?? 'ballpoint') === 'ballpoint') {
+        // Kesikli/noktalı desenler yol çizimini kullanır
+        if (dashed) {
             drawSmoothPath(tCtx, s.points, s.width || 2);
             tCtx.restore();
             return;
         }
-        // Kalem ucuna göre değişken kalınlık (dolma kalem / fırça / keçeli).
+        // GoodNotes ve Notability kalitesinde akıcı ve kaligrafik serbest çizim
         tCtx.globalAlpha *= getPenProfile(s.penType).alpha;
-        drawVariableStroke(tCtx, s, s.width || 2);
+        renderFreehandStroke(tCtx, s, s.width || 2);
         tCtx.restore();
         return;
     }

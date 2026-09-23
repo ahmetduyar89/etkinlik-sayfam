@@ -22,7 +22,7 @@ import {
     Trash2,
 } from 'lucide-react';
 import { DRAWING_COLORS, HANDLE_CURSORS } from '../../constants/drawing';
-import { samplePressure, smoothTowards } from './penEngine';
+import { filterHookArtifact, getPenProfile, samplePressure, smoothTowards } from './penEngine';
 import { adjustSnappedShape, recognizeShape, snapAngle } from './shapeRecognizer';
 import { recognizeEquation } from './equationRecognizer';
 import {
@@ -357,6 +357,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const isDrawingRef = React.useRef(false);
         /** Kalem baskısını gerçek hızdan üretmek için son nokta zamanı. */
         const lastPointTimeRef = React.useRef(0);
+        /** Hız sıçramalarını yumuşatmak için hareketli ortalama hızı (px/ms). */
+        const lastVelocityRef = React.useRef(0.4);
         const resizeFrameRef = React.useRef<number | null>(null);
         /** Çizim sürerken gelen yeniden boyutlandırma isteği (sonra uygulanır). */
         const pendingResizeRef = React.useRef(false);
@@ -2762,6 +2764,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                   ? snapPoint({ x, y })
                   : { x, y };
             lastPointTimeRef.current = performance.now();
+            lastVelocityRef.current = 0.4;
             if (config.tool === 'pencil') {
                 // İlk noktada hız bilgisi yok; orta hızla başla.
                 first.p = samplePressure(e.pressure, e.pointerType, 0.5, undefined, config.penType);
@@ -3027,26 +3030,39 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 const last = stroke.points[stroke.points.length - 1];
                 if (!last) break;
                 const rawStep = Math.hypot(raw.x - last.x, raw.y - last.y);
-                const minStepPx = 0.8;
+                const minStepPx = 0.6;
                 if (rawStep * viewRef.current.scale < minStepPx) continue;
 
                 // Dokunmatik tahtaların sinyal gürültüsünü süz: yavaş
                 // hareketlerde yumuşat, hızlı hareketlerde olduğu gibi bırak.
+                const baseStreamline = getPenProfile(stroke.penType).streamline;
+                const levelMultiplier =
+                    config.streamlineLevel === 'natural'
+                        ? 0.5
+                        : config.streamlineLevel === 'calligraphy'
+                        ? 1.35
+                        : 1.0;
+                const streamlineFactor = Math.min(0.85, baseStreamline * levelMultiplier);
+
                 const point: Point = rulerEdgeRef.current
                     ? { x: raw.x, y: raw.y }
-                    : smoothTowards(last, raw, rawStep * viewRef.current.scale);
+                    : smoothTowards(last, raw, rawStep * viewRef.current.scale, streamlineFactor);
                 const step = Math.hypot(point.x - last.x, point.y - last.y);
 
                 if (stroke.tool === 'pencil') {
-                    // Hız = ekranda alınan yol / geçen süre. Sadece mesafeye
-                    // bakmak işaretçi olay sıklığını hız sanmak olurdu.
+                    // Hız = ekranda alınan yol / geçen süre.
                     const now = performance.now();
                     const elapsed = Math.max(1, now - lastPointTimeRef.current);
                     lastPointTimeRef.current = now;
+                    const instantV = (step * viewRef.current.scale) / elapsed;
+                    // Hız sıçramalarını üstel hareketli ortalama ile süz
+                    const smoothedV = lastVelocityRef.current * 0.35 + instantV * 0.65;
+                    lastVelocityRef.current = smoothedV;
+
                     point.p = samplePressure(
                         sample.pressure,
                         sample.pointerType,
-                        (step * viewRef.current.scale) / elapsed,
+                        smoothedV,
                         last.p,
                         stroke.penType
                     );
@@ -3245,6 +3261,11 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         };
                         snapped = true;
                     }
+                }
+
+                if (!snapped && stroke.tool === 'pencil') {
+                    // Kalemi tahtadan kaldırırken oluşan son çengel/kanca sapmalarını temizle
+                    stroke.points = filterHookArtifact(stroke.points);
                 }
 
                 if (config.ephemeral && (stroke.tool === 'pencil' || stroke.tool === 'highlighter')) {

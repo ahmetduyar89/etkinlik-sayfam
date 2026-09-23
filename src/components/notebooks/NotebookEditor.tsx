@@ -191,6 +191,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         fillEnabled: false,
         stampIcon: '⭐',
         penType: 'fountain',
+        streamlineLevel: 'smooth',
         snapShapes: false,
         snapAngle: false,
         eraserMode: 'pixel',
