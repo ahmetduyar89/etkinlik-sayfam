@@ -21,6 +21,35 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const appsDir = path.join(root, 'apps');
 const distDir = path.join(root, 'dist');
 
+async function localEnv() {
+    const values = {};
+    for (const name of ['.env', '.env.local']) {
+        try {
+            const body = await readFile(path.join(root, name), 'utf8');
+            for (const line of body.split(/\r?\n/)) {
+                const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+                if (!match) continue;
+                values[match[1]] = match[2].replace(/^(['"])(.*)\1$/, '$2');
+            }
+        } catch {
+            // Yerel env dosyaları zorunlu değildir; CI değerleri process.env'den gelir.
+        }
+    }
+    return values;
+}
+
+const fileEnv = await localEnv();
+const envValue = (key) => process.env[key] || fileEnv[key] || '';
+
+const firebasePublicConfig = {
+    apiKey: envValue('VITE_FIREBASE_API_KEY'),
+    authDomain: envValue('VITE_FIREBASE_AUTH_DOMAIN'),
+    projectId: envValue('VITE_FIREBASE_PROJECT_ID'),
+    storageBucket: envValue('VITE_FIREBASE_STORAGE_BUCKET'),
+    messagingSenderId: envValue('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+    appId: envValue('VITE_FIREBASE_APP_ID'),
+};
+
 if (!existsSync(appsDir)) {
     console.log('[copy-apps] apps/ klasörü yok, atlanıyor.');
     process.exit(0);
@@ -116,6 +145,16 @@ for (const folder of folders) {
     // Portala dönüş yolu yalnızca yayındaki kopyaya yazılır; apps/ altındaki
     // kaynak klasör el değmemiş kalır.
     if (hasIndex) await geriBaglantisiEkle(path.join(to, 'index.html'), folder.name);
+
+    // Statik Satranç uygulaması Vite'ın import.meta.env alanına erişemez.
+    // Yalnızca Firebase'in zaten herkese açık web yapılandırmasını üretiriz;
+    // güvenlik anahtarla değil Authentication + Firestore Rules ile sağlanır.
+    if (folder.name === 'satranc') {
+        await writeFile(
+            path.join(to, 'firebase-config.json'),
+            JSON.stringify(firebasePublicConfig)
+        );
+    }
 }
 
 // GitHub Pages tek sayfalık uygulamalar için yönlendirme yapmaz: /etkinlikler

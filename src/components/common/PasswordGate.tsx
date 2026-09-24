@@ -5,10 +5,12 @@
 // atanmış etkinlikleri, deneyleri ve satrancı içeren sınıf panosu açılır.
 // ─────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
+import { onAuthStateChanged, signInWithEmailAndPassword } from 'firebase/auth';
 import { Lock, Eye, EyeOff, School, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import {
     APP_PASSWORD,
+    FIREBASE_ADMIN_EMAIL,
     AUTH_STORAGE_KEY,
     SESSION_STORAGE_KEY,
     isAuthenticated,
@@ -16,6 +18,7 @@ import {
     isStudentLink,
     saveSession,
 } from '../../utils/auth';
+import { auth } from '../../lib/firebase';
 import { fetchAllClasses, syncClassesToChess } from '../../lib/classrooms';
 
 interface PasswordGateProps {
@@ -25,7 +28,9 @@ interface PasswordGateProps {
 type LoginTab = 'admin' | 'class';
 
 export function PasswordGate({ children }: PasswordGateProps) {
-    const [isUnlocked, setIsUnlocked] = useState(isAuthenticated);
+    const secureAdminEnabled = Boolean(FIREBASE_ADMIN_EMAIL);
+    const [isUnlocked, setIsUnlocked] = useState(() => secureAdminEnabled ? false : isAuthenticated());
+    const [authReady, setAuthReady] = useState(() => !secureAdminEnabled);
     const [tab, setTab] = useState<LoginTab>('admin');
 
     // Admin form fields
@@ -50,12 +55,44 @@ export function PasswordGate({ children }: PasswordGateProps) {
         return () => window.removeEventListener('storage', onStorage);
     }, []);
 
+    // Firebase yönetici girişi etkinse yalnızca doğrulanmış Firebase oturumu
+    // admin panelini açabilir. Yerel oturum kaydı tek başına yeterli değildir.
+    useEffect(() => {
+        if (!secureAdminEnabled) return;
+        return onAuthStateChanged(auth, (user) => {
+            if (user) {
+                saveSession({ role: 'admin', username: user.email || 'admin' });
+                setIsUnlocked(true);
+            } else {
+                setIsUnlocked(false);
+            }
+            setAuthReady(true);
+        });
+    }, [secureAdminEnabled]);
+
     const handleAdminSubmit = useCallback(
-        (e: React.FormEvent) => {
+        async (e: React.FormEvent) => {
             e.preventDefault();
             setError(null);
 
             const trimmed = adminPassword.trim();
+            if (secureAdminEnabled) {
+                if (!trimmed) {
+                    setError('Yönetici şifresini girin.');
+                    return;
+                }
+                setIsLoading(true);
+                try {
+                    const credential = await signInWithEmailAndPassword(auth, FIREBASE_ADMIN_EMAIL, trimmed);
+                    saveSession({ role: 'admin', username: credential.user.email || 'admin' });
+                    setIsUnlocked(true);
+                } catch {
+                    setError('Yönetici şifresi hatalı veya oturum açılamadı.');
+                } finally {
+                    setIsLoading(false);
+                }
+                return;
+            }
             if (trimmed !== APP_PASSWORD) {
                 setError('Yönetici şifresi hatalı, tekrar deneyin.');
                 return;
@@ -64,7 +101,7 @@ export function PasswordGate({ children }: PasswordGateProps) {
             saveSession({ role: 'admin', username: 'admin' });
             setIsUnlocked(true);
         },
-        [adminPassword]
+        [adminPassword, secureAdminEnabled]
     );
 
     const handleClassSubmit = useCallback(
@@ -102,7 +139,7 @@ export function PasswordGate({ children }: PasswordGateProps) {
                     username: matched.username,
                 });
                 setIsUnlocked(true);
-            } catch (err: any) {
+            } catch (err: unknown) {
                 console.error('Giriş doğrulama hatası:', err);
                 setError('Giriş yapılırken bir sorun oluştu.');
             } finally {
@@ -111,6 +148,14 @@ export function PasswordGate({ children }: PasswordGateProps) {
         },
         [classUsername, classPassword]
     );
+
+    if (!authReady && !isStudentLink() && !isChessLink()) {
+        return (
+            <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center text-slate-500">
+                <Loader2 className="h-6 w-6 animate-spin" aria-label="Oturum kontrol ediliyor" />
+            </div>
+        );
+    }
 
     if (isUnlocked || isStudentLink() || isChessLink()) return <>{children}</>;
 

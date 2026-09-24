@@ -45,6 +45,22 @@ salon açıldığında temizlenir.
 kuralları yeniden yayınlamanız gerekir.** Yayınlanmazsa salon boş görünür ve masa
 kurulamaz; bilgisayara karşı oyun bundan etkilenmez, o ağa hiç bağlanmaz.
 
+## Online Satranç Sınıf Yönetimi
+
+Sınıf turnuvaları, maçlar ve öğrenci gelişimleri için dört kimlik doğrulamalı
+koleksiyon kullanılır:
+
+| Koleksiyon          | İçerik                                       |
+| ------------------- | -------------------------------------------- |
+| `chess_matches`     | Sınıf maçları ve turnuva masa sonuçları      |
+| `chess_tournaments` | Turnuvalar, turlar ve eşleşmeler             |
+| `chess_progress`    | Öğrenci/sınıf XP, ders ve bulmaca ilerlemesi |
+| `chess_sync`        | Sınıf cihazlarının son senkron bilgisi       |
+
+Bu koleksiyonlar `request.auth != null` ister. Öğretmen hesabının kurulumu ve
+eski cihaz verilerinin aktarımı için [`ONLINE-SATRANC-KURULUM.md`](./ONLINE-SATRANC-KURULUM.md)
+belgesini izleyin.
+
 ## Kuralları güncelleme
 
 ### Yol 1 — Firebase Konsolu (en pratik)
@@ -67,9 +83,8 @@ firebase deploy --only firestore:rules --project interaktif-etkinliklerim
 
 ## Güvenlik notu
 
-Uygulamada Firebase Authentication yok; giriş yalnızca tarayıcıda çalışan basit
-bir şifre kilidiyle sağlanıyor. Bu yüzden kurallar açık erişim verir: adresi ve
-proje anahtarını bilen biri bu koleksiyonları okuyup yazabilir. Bu, mevcut
-`activities` koleksiyonunun bugünkü durumuyla aynıdır. Gerçek koruma için
-Firebase Authentication eklenip kurallardaki `if true` koşulları
-`if request.auth != null` ile değiştirilmelidir.
+Online Satranç yönetim koleksiyonları Firebase Authentication ile korunur.
+Mevcut içerik, defter ve `classes` koleksiyonları eski sınıf girişleriyle
+uyumluluk için hâlâ açık erişim kullanmaktadır. Bunların da rol bazlı kurallara
+taşınması ayrı bir güvenlik geçişidir; yeni öğrenci gelişim verileri açık
+koleksiyonlara yazılmaz.

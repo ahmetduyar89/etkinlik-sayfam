@@ -1,12 +1,20 @@
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
 
 // `apps/` altındaki statik projeleri (satranç, deneyler…) geliştirme sunucusunda
 // da yayınla. Yayın sırasında aynı işi scripts/copy-apps.mjs yapar.
-function serveApps(): Plugin {
+function serveApps(env: Record<string, string>): Plugin {
   const appsDir = path.resolve(__dirname, 'apps')
+  const firebasePublicConfig = () => ({
+    apiKey: env.VITE_FIREBASE_API_KEY || '',
+    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || '',
+    projectId: env.VITE_FIREBASE_PROJECT_ID || '',
+    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || '',
+    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: env.VITE_FIREBASE_APP_ID || '',
+  })
   const MIME: Record<string, string> = {
     '.html': 'text/html; charset=utf-8',
     '.js': 'text/javascript; charset=utf-8',
@@ -35,6 +43,13 @@ function serveApps(): Plugin {
         const rel = url.replace(/^\/+/, '')
         if (!rel) return next()
 
+        if (rel === 'satranc/firebase-config.json') {
+          res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          res.setHeader('Cache-Control', 'no-store')
+          res.end(JSON.stringify(firebasePublicConfig()))
+          return
+        }
+
         const name = rel.split('/')[0]
         // Yol gerçekten bir proje klasörüyle başlamıyorsa Vite'a bırak.
         if (!fs.existsSync(path.join(appsDir, name))) return next()
@@ -54,9 +69,11 @@ function serveApps(): Plugin {
   }
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, __dirname, '')
+  return {
   base: '/',
-  plugins: [react(), serveApps()],
+  plugins: [react(), serveApps(env)],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -84,4 +101,5 @@ export default defineConfig({
       },
     },
   },
+  }
 })

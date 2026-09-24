@@ -1,5 +1,8 @@
 // src/utils/auth.ts — Rol bazlı kimlik doğrulama ve oturum yardımcıları
 // ─────────────────────────────────────────────────────────────────────
+
+import { signOut } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 // Sistemde iki tür oturum vardır:
 // 1. 'admin': Tüm içerikleri, defterleri, deneyleri görebilen ve sınıfları
 //    yönetebilen yönetici / öğretmen oturumu.
@@ -9,6 +12,7 @@
 
 export const APP_ADMIN_USER = (import.meta.env.VITE_APP_ADMIN_USER || 'admin').toLowerCase().trim();
 export const APP_PASSWORD = import.meta.env.VITE_APP_PASSWORD || '951852';
+export const FIREBASE_ADMIN_EMAIL = (import.meta.env.VITE_FIREBASE_ADMIN_EMAIL || '').trim();
 export const AUTH_STORAGE_KEY = 'etkinlik_giris';
 export const SESSION_STORAGE_KEY = 'etkinlik_oturum';
 
@@ -86,7 +90,11 @@ export function lockApp(): void {
     } catch {
         // Yoksay
     }
-    window.location.href = '/';
+    // Firebase oturumu yoksa signOut güvenle tamamlanır. Yönlendirmeyi finally
+    // içinde yapmak, bağlantı sorunu olsa bile kullanıcının çıkabilmesini sağlar.
+    void signOut(auth).finally(() => {
+        window.location.href = '/';
+    });
 }
 
 /**

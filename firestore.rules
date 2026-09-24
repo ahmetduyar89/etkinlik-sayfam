@@ -1,13 +1,15 @@
 rules_version = '2';
 
-// Bu uygulamada Firebase Authentication kullanılmıyor; giriş, tarayıcıda
-// çalışan basit bir şifre kilidiyle sağlanıyor. Bu nedenle kurallar,
-// uygulamanın kullandığı koleksiyonlara açık erişim verir — adresi bilen
-// herkes bu koleksiyonları okuyup yazabilir. Daha sıkı bir koruma isteniyorsa
-// Firebase Authentication eklenip aşağıdaki koşullar `request.auth != null`
-// ile değiştirilmelidir.
+// Yeni Satranç yönetim koleksiyonları Firebase Authentication gerektirir.
+// Eski içerik/defter/sınıf koleksiyonları geriye dönük uyumluluk nedeniyle
+// şimdilik mevcut açık kurallarını korur; bunlar ayrı bir geçişte rol bazlı
+// kurallara taşınacaktır.
 service cloud.firestore {
     match /databases/{database}/documents {
+
+        function signedIn() {
+            return request.auth != null;
+        }
 
         // İçerik merkezi
         match /activities/{document=**} {
@@ -46,6 +48,23 @@ service cloud.firestore {
         // Sınıf Yönetimi: sınıflar, atanan içerikler ve öğrenci listeleri
         match /classes/{document=**} {
             allow read, write: if true;
+        }
+
+        // Satranç okul kayıtları öğrenci adı ve gelişim bilgisi içerir.
+        // Bu koleksiyonlar yalnızca Firebase Authentication ile açılmış
+        // öğretmen oturumlarına açıktır. Sınıf bazlı roller eklendiğinde bu
+        // koşul custom claim içindeki classId ile daha da daraltılabilir.
+        match /chess_matches/{document=**} {
+            allow read, write: if signedIn();
+        }
+        match /chess_tournaments/{document=**} {
+            allow read, write: if signedIn();
+        }
+        match /chess_progress/{document=**} {
+            allow read, write: if signedIn();
+        }
+        match /chess_sync/{document=**} {
+            allow read, write: if signedIn();
         }
     }
 }

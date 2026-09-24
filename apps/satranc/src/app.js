@@ -28,6 +28,7 @@ import { ReportsPage } from "./pages/ReportsPage.js";
 import { DailyPracticePage } from "./pages/DailyPracticePage.js";
 import { GameArchivePage } from "./pages/GameArchivePage.js";
 import { classroom } from "./services/ClassroomService.js";
+import { startCloudSync } from "./services/CloudSyncService.js";
 
 const progress = new ProgressService();
 const sound = new SoundService(progress);
@@ -57,7 +58,8 @@ function selectedStudent() {
 
 function useRoleProfile() {
   if (role === "teacher") {
-    progress.switchProfile("teacher", "Öğretmen");
+    const active = classroom.activeClass;
+    progress.switchProfile(active ? `class:${active.id}` : "teacher", active ? `${active.name} Sınıfı` : "Öğretmen");
     return;
   }
   const student = selectedStudent();
@@ -332,12 +334,18 @@ function bump(node, text) {
 // syncTopbar güncel referansları kullanır.
 progress.onChange(syncTopbar);
 classroom.onChange(() => {
+  if (role === "teacher") useRoleProfile();
   syncClassPicker();
   syncStudentPicker();
 });
 
 onRouteChange(render);
 render();
+
+// Hosted sürümde doğrulanmış öğretmen oturumu varsa yerel kayıtları bulutla
+// eşitle. Başarısızlık uygulamayı durdurmaz; sınıf içindeki çevrimdışı akış
+// her zaman kullanılabilir kalır.
+void startCloudSync({ classroom, progress });
 
 // Çevrimdışı önbellek yalnızca http/https üzerinden anlamlıdır.
 // Tek dosya sürümü file:// ile açıldığında service worker zaten kaydedilemez;
