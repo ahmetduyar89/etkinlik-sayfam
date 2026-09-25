@@ -36,7 +36,13 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby={titleId}
-                    className="fixed inset-0 z-[200] flex items-center justify-center px-4"
+                    // z-13000: çizim tuvalinin (4000/4001), araç çubuklarının ve
+                    // taşınabilir araçların (11500) ÜSTÜNDE. Önceden 200'dü ve
+                    // tuvalin altında kalıyordu — tuval üstünde açılan modallara
+                    // tıklanamıyor, tıklamalar kaleme gidip sayfaya çizik atıyordu.
+                    // Onay/soru pencereleri (19000/19500) ve bildirimler (20000)
+                    // bir modalın içinden açılabildiği için onların altında kalır.
+                    className="fixed inset-0 z-[13000] flex items-center justify-center px-4"
                 >
                     <motion.div
                         initial={{ opacity: 0 }}

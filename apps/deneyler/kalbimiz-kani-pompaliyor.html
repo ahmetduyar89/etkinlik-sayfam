@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kalbimiz Kanı Pompalıyor: Kalp Pompası Modeli - Küçük Mucitler</title>
+
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- GSAP Animation Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            paper: '#fffdfa',
+            ink: '#182b4d',
+            sun: '#facc15',
+            sky: '#38bdf8',
+            blood: '#e11d48',
+            bloodDark: '#9f1239',
+            dough: '#f59e0b',
+            straw: '#0284c7'
+          },
+          fontFamily: {
+            display: ['"Baloo 2"', 'cursive'],
+            body: ['Nunito', 'sans-serif']
+          },
+          borderWidth: {
+            '3': '3px'
+          },
+          boxShadow: {
+            card: '0 8px 0 #182b4d',
+            'card-sm': '0 4px 0 #182b4d',
+            'card-lg': '0 12px 0 #182b4d',
+            'card-pressed': '0 2px 0 #182b4d'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fff1f2;
+      color: #182b4d;
+    }
+    .display {
+      font-family: 'Baloo 2', cursive;
+      font-weight: 800;
+    }
+    .chunky {
+      border: 3px solid #182b4d;
+      border-radius: 1.25rem;
+      box-shadow: 0 6px 0 #182b4d;
+    }
+    .pushable {
+      border: 3px solid #182b4d;
+      border-radius: 1rem;
+      box-shadow: 0 4px 0 #182b4d;
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+      cursor: pointer;
+    }
+    .pushable:active:not(:disabled) {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #182b4d;
+    }
+    .pushable:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    /* Ritmik Kalp Çarpması Işıltısı */
+    @keyframes heartGlow {
+      0%, 100% { filter: drop-shadow(0 0 4px rgba(225, 29, 72, 0.4)); }
+      50% { filter: drop-shadow(0 0 14px rgba(225, 29, 72, 0.9)); }
+    }
+    .heart-glow {
+      animation: heartGlow 1.2s infinite ease-in-out;
+    }
+
+    /* Sıvı Dalgası */
+    @keyframes liquidWave {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+    }
+    .liquid-wave {
+      animation: liquidWave 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-3 sm:p-6 select-none">
+
+  <!-- Üst Başlık ve Gezinme Çubuğu -->
+  <header class="max-w-6xl mx-auto w-full mb-4 flex flex-wrap items-center justify-between gap-3 bg-white p-3 sm:p-4 chunky">
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="pushable px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-ink text-xs sm:text-sm font-black flex items-center gap-1.5" title="Portala Dön">
+        <span>🔙</span> <span>Portala Dön</span>
+      </a>
+      <div>
+        <h1 class="display text-lg sm:text-2xl text-ink leading-tight flex items-center gap-2">
+          <span>🫀</span> <span>Kalbimiz Kanı Pompalıyor: Kalp Pompası Modeli</span>
+        </h1>
+        <p class="text-xs text-gray-500 font-bold hidden sm:block">
+          Şişe, 2 pipet, balon ve hamurla bir kalp modeli kur! Balon zarına bas ve kanın nasıl pompalandığını keşfet! 🩸
+        </p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <!-- Mod Değiştirme Butonları -->
+      <div class="flex bg-gray-100 p-1 rounded-xl border-2 border-ink text-xs font-black">
+        <button id="btnTabPump" class="px-2.5 sm:px-3 py-1 rounded-lg bg-rose-400 text-white border-2 border-ink shadow-sm flex items-center gap-1">
+          <span>🫀</span> <span>Deney Masası</span>
+        </button>
+        <button id="btnTabAnatomy" class="px-2.5 sm:px-3 py-1 rounded-lg hover:bg-white text-gray-700 flex items-center gap-1">
+          <span>🩻</span> <span>Gerçek Kalp</span>
+        </button>
+        <button id="btnTabMission" class="px-2.5 sm:px-3 py-1 rounded-lg hover:bg-white text-gray-700 flex items-center gap-1">
+          <span>🎯</span> <span>Dedektif</span>
+        </button>
+        <button id="btnTabQuiz" class="px-2.5 sm:px-3 py-1 rounded-lg hover:bg-white text-gray-700 flex items-center gap-1">
+          <span>📝</span> <span>Quiz</span>
+        </button>
+      </div>
+
+      <!-- Ses Aç/Kapat Butonu -->
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1" title="Sesi Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Ana İçerik Bölgesi -->
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <!-- SOL PANEL: KALP POMPASI DENEY SAHNESİ (7 Sütun) -->
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      
+      <!-- 1. GÖRÜNÜM: KALP POMPASI DENEY MASASI -->
+      <section id="viewPump" class="chunky bg-white p-4 sm:p-5 flex flex-col items-center relative overflow-hidden">
+        
+        <!-- Üst Bilgi ve Canlı Sensörler (Nabız BPM, Pompalanan Kan, Basınç) -->
+        <div class="w-full flex items-center justify-between border-b-2 border-dashed border-rose-200 pb-2 mb-2 min-h-[44px]">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl p-1 bg-rose-100 rounded-lg border border-ink">🩸</span>
+            <div>
+              <h2 class="display text-base sm:text-lg font-black text-ink">Kalp Pompası Düzeneği</h2>
+              <span class="text-[11px] font-bold text-gray-500 block">Balon zarına parmağınla basarak kalbi kas ve kanı fışkırt!</span>
+            </div>
+          </div>
+          
+          <!-- Canlı Sensör Rozetleri -->
+          <div class="flex items-center gap-2">
+            <!-- Nabız BPM -->
+            <div class="px-2.5 py-1 bg-rose-50 border-2 border-ink rounded-xl text-xs font-black text-ink flex items-center gap-1.5">
+              <span>💓 Nabız:</span>
+              <span id="bpmDisplay" class="text-rose-600 text-sm font-black tabular-nums">0</span>
+              <span class="text-[10px] text-gray-500">BPM</span>
+            </div>
+            <!-- Pompalanan Hacim -->
+            <div class="px-2.5 py-1 bg-sky-50 border-2 border-ink rounded-xl text-xs font-black text-ink flex items-center gap-1.5">
+              <span>🧪 Kan:</span>
+              <span id="volumeDisplay" class="text-sky-700 text-sm font-black tabular-nums">0</span>
+              <span class="text-[10px] text-gray-500">ml</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- İpucu Rozeti -->
+        <div id="tipBanner" class="w-full bg-rose-50/80 px-3 py-1.5 rounded-xl border-2 border-ink text-xs font-black text-rose-950 flex items-center justify-between mb-2 shadow-sm">
+          <div class="flex items-center gap-1.5 truncate">
+            <span id="tipIcon">👇</span>
+            <span id="tipText">Aşağıdaki kırmızı balon zarına tıkla veya "Kalbi Sıkıştır" butonuna bas!</span>
+          </div>
+          <span class="hidden sm:inline px-2 py-0.5 bg-white text-rose-800 text-[10px] rounded border border-ink font-mono font-bold">
+            SPACE TUŞU DESTEĞİ
+          </span>
+        </div>
+
+        <!-- DENEY LABORATUVARI SVG ÇALIŞMA ALANI (Şişe, 2 Pipet, Gergin Balon Zarı, Hamur Boğumu, Ölçü Beheri) -->
+        <div class="relative w-full max-w-[460px] aspect-[420/380] bg-gradient-to-b from-sky-50 via-rose-50/40 to-amber-50 rounded-2xl border-3 border-ink shadow-inner overflow-hidden flex items-center justify-center p-2">
+          
+          <!-- Zemin Çizgisi ve Masa Tablası -->
+          <div class="absolute bottom-0 left-0 right-0 h-10 bg-amber-100 border-t-2 border-ink/40"></div>
+
+          <svg id="pumpSvg" viewBox="0 0 420 360" class="w-full h-full overflow-visible">
+            
+            <defs>
+              <!-- Cam Yansıma Filtresi -->
+              <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>
+                <stop offset="30%" stop-color="#ffffff" stop-opacity="0.1"/>
+                <stop offset="70%" stop-color="#ffffff" stop-opacity="0.05"/>
+                <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.2"/>
+              </linearGradient>
+
+              <!-- Kırmızı Kan Sıvısı Degrade -->
+              <linearGradient id="bloodGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#f43f5e"/>
+                <stop offset="100%" stop-color="#be123c"/>
+              </linearGradient>
+
+              <!-- Balon Zarı Degrade -->
+              <linearGradient id="balloonGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#fb7185"/>
+                <stop offset="100%" stop-color="#e11d48"/>
+              </linearGradient>
+            </defs>
+
+            <!-- 1. MASA YÜZEYİ VE GÖLGELER -->
+            <ellipse cx="160" cy="325" rx="75" ry="12" fill="#cbd5e1" opacity="0.6" />
+            <ellipse cx="330" cy="325" rx="45" ry="8" fill="#cbd5e1" opacity="0.5" />
+
+            <!-- 2. SAĞDAKİ KAN TOPLAMA KABI / BEHER (Vücut Damarlarını Temsil Eder) -->
+            <g id="beakerGroup" transform="translate(290, 200)">
+              <!-- Beher Cam Gövde -->
+              <path d="M 0 30 L 8 120 Q 8 124 16 124 L 64 124 Q 72 124 72 120 L 80 30 Z" 
+                    fill="url(#glassGrad)" stroke="#182b4d" stroke-width="3" stroke-linejoin="round" />
+              <!-- Beher İçindeki Toplanan Sıvı -->
+              <path id="beakerLiquid" d="M 10 122 L 10 122 Q 40 120 70 122 L 70 122 Z" 
+                    fill="url(#bloodGrad)" opacity="0.9" />
+              <!-- Beher Ölçü Çizgileri -->
+              <line x1="16" y1="50" x2="28" y2="50" stroke="#182b4d" stroke-width="1.8" opacity="0.5" />
+              <line x1="15" y1="70" x2="25" y2="70" stroke="#182b4d" stroke-width="1.8" opacity="0.5" />
+              <line x1="14" y1="90" x2="26" y2="90" stroke="#182b4d" stroke-width="1.8" opacity="0.5" />
+              <line x1="13" y1="110" x2="23" y2="110" stroke="#182b4d" stroke-width="1.8" opacity="0.5" />
+              <!-- Beher Etiketi -->
+              <text x="40" y="142" text-anchor="middle" font-size="10" font-weight="900" fill="#182b4d" font-family="'Baloo 2'">
+                🩸 Vücut / Kap
+              </text>
+            </g>
+
+            <!-- 3. ŞİŞE İÇİNDEKİ KIRMIZI KAN SIVISI -->
+            <g id="jarLiquidGroup">
+              <!-- Sıvı Kütlesi (Şişenin alt 2/3'ünü doldurur) -->
+              <path id="jarLiquid" d="M 105 210 C 105 295 110 320 160 320 C 210 320 215 295 215 210 Z" 
+                    fill="url(#bloodGrad)" opacity="0.92" />
+              <!-- Sıvı Üst Yüzey Dalgalanması -->
+              <ellipse id="liquidSurface" cx="160" cy="210" rx="54" ry="8" fill="#fda4af" opacity="0.8" />
+              
+              <!-- Sıvı İçindeki Minik Oksijen Kabarcıkları -->
+              <circle cx="140" cy="250" r="3" fill="#ffffff" opacity="0.6" class="liquid-wave" />
+              <circle cx="175" cy="270" r="4" fill="#ffffff" opacity="0.5" class="liquid-wave" />
+              <circle cx="155" cy="290" r="2.5" fill="#ffffff" opacity="0.7" class="liquid-wave" />
+            </g>
+
+            <!-- 4. PİPETLER (2 ADET: BİRİ DIŞARI KAN TAŞIYAN SAYDAM ÇIKIŞ PİPETİ, DİĞERİ KAPAKÇIKLI GİRİŞ PİPETİ) -->
+
+            <!-- PİPET 1: ÇIKIŞ PİPETİ (AORT DAMARI - Şişe tabanından behere uzanan saydam tüp) -->
+            <g id="outputStrawGroup">
+              <!-- Pipet Dış Sınır Çizgisi (Gövde Çerçevesi) -->
+              <path d="M 145 305 L 145 140 Q 145 115 170 115 L 290 115 Q 315 115 325 140 L 330 220" 
+                    fill="none" stroke="#0f172a" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" opacity="0.45" />
+              
+              <!-- Pipet Saydam Plastik Lümeni (Şeffaf / Açık Cam Rengi İç Kanal) -->
+              <path d="M 145 305 L 145 140 Q 145 115 170 115 L 290 115 Q 315 115 325 140 L 330 220" 
+                    fill="none" stroke="#e0f2fe" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.65" />
+
+              <!-- PİPET İÇİ KAN SÜTUNU (GÖZLEMLENEBİLİR KAN HAREKETİ) -->
+              <path id="strawBloodColumn" d="M 145 305 L 145 140 Q 145 115 170 115 L 290 115 Q 315 115 325 140 L 330 220" 
+                    fill="none" stroke="#e11d48" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+
+              <!-- PİPET İÇİ AKAN ALYUVARLAR VE NABIZ DALGASI (Sistolde İleriye Fırlar) -->
+              <path id="strawBloodFlowAnim" d="M 145 305 L 145 140 Q 145 115 170 115 L 290 115 Q 315 115 325 140 L 330 220" 
+                    fill="none" stroke="#9f1239" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" 
+                    stroke-dasharray="14 12" opacity="0" />
+
+              <!-- Pipet Ön Yüzey Parlaklığı / Saydam Cam Yansıması -->
+              <path d="M 145 305 L 145 140 Q 145 115 170 115 L 290 115 Q 315 115 325 140 L 330 220" 
+                    fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.75" />
+
+              <!-- Pipet Akordeon Boğumu (Kıvrım Yeri) -->
+              <g transform="translate(286, 109)">
+                <line x1="0" y1="1" x2="0" y2="11" stroke="#0284c7" stroke-width="2" opacity="0.7" />
+                <line x1="4" y1="0" x2="4" y2="12" stroke="#0284c7" stroke-width="2" opacity="0.7" />
+                <line x1="8" y1="0" x2="8" y2="12" stroke="#0284c7" stroke-width="2" opacity="0.7" />
+                <line x1="12" y1="1" x2="12" y2="11" stroke="#0284c7" stroke-width="2" opacity="0.7" />
+              </g>
+
+              <!-- Pipet İçi Akış Yönü Gösterge Rozeti (Sistolde Parlar) -->
+              <g id="flowIndicatorBadge" opacity="0" transform="translate(192, 94)">
+                <rect x="0" y="-11" width="70" height="17" rx="8" fill="#e11d48" stroke="#ffffff" stroke-width="2" />
+                <text x="35" y="1" text-anchor="middle" font-size="9" font-weight="900" fill="#ffffff" font-family="'Baloo 2'">Kan Akışı ➔</text>
+              </g>
+            </g>
+
+            <!-- PİPETTEN FIŞKIRAN KAN AKINTISI (Kasılma anında görünür) -->
+            <g id="bloodJetGroup" opacity="0">
+              <path id="bloodStream" d="M 330 220 Q 332 250 330 290" 
+                    fill="none" stroke="#e11d48" stroke-width="6" stroke-linecap="round" stroke-dasharray="8 4" />
+              <!-- Fışkıran Damlalar -->
+              <circle cx="328" cy="245" r="4" fill="#e11d48" />
+              <circle cx="333" cy="265" r="3" fill="#e11d48" />
+              <circle cx="329" cy="285" r="4.5" fill="#e11d48" />
+              <!-- Sıçrama Halesi -->
+              <ellipse cx="330" cy="295" rx="8" ry="3" fill="#fda4af" />
+            </g>
+
+            <!-- PİPET 2: GİRİŞ / TEK YÖNLÜ VALF PİPETİ (Sol taraftaki kısa hava / kapakçık pipeti) -->
+            <g id="valveStrawGroup">
+              <!-- Pipet Dış Çeperi -->
+              <path d="M 175 190 L 175 125 Q 175 105 160 95 L 135 85" 
+                    fill="none" stroke="#0f172a" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" opacity="0.45" />
+              <!-- Pipet Saydam Plastik Lümeni -->
+              <path d="M 175 190 L 175 125 Q 175 105 160 95 L 135 85" 
+                    fill="none" stroke="#e0f2fe" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.65" />
+              <!-- Pipet Ön Yansıması -->
+              <path d="M 175 190 L 175 125 Q 175 105 160 95 L 135 85" 
+                    fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.75" />
+              
+              <!-- Pipet Ucundaki Balon Parçası (Tek Yönlü Kalp Kapakçığı Modeli) -->
+              <g id="strawValveFlap" transform="translate(135, 85)">
+                <ellipse cx="-4" cy="-2" rx="8" ry="6" fill="#f43f5e" stroke="#182b4d" stroke-width="2" />
+                <path d="M -9 -2 Q -4 3 1 -2" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" />
+                <text id="valveStatusText" x="-4" y="-10" text-anchor="middle" font-size="8" font-weight="900" fill="#9f1239" font-family="'Baloo 2'">Kapakçık</text>
+              </g>
+            </g>
+
+            <!-- 5. SAYDAM CAM ŞİŞE / KAVANOZ GÖVDESİ -->
+            <path d="
+              M 130 145 
+              L 130 165 
+              C 130 185 102 205 102 235 
+              L 102 295 
+              C 102 315 115 324 160 324 
+              C 205 324 218 315 218 295 
+              L 218 235 
+              C 218 205 190 185 190 165 
+              L 190 145 
+              Z" 
+              fill="url(#glassGrad)" stroke="#182b4d" stroke-width="4" stroke-linejoin="round" />
+
+            <!-- Şişe Cam Işıltısı -->
+            <path d="M 112 225 L 112 300" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.7" />
+
+            <!-- 6. OYUN HAMURU BOĞUMU (Şişe Ağzındaki Pipetlerin Etrafını Hava Sızdırmaz Kapatır) -->
+            <g id="playDoughGroup">
+              <!-- Hamur Halka Yığını -->
+              <ellipse cx="160" cy="148" rx="34" ry="10" fill="#f59e0b" stroke="#182b4d" stroke-width="3" />
+              <ellipse cx="160" cy="144" rx="30" ry="8" fill="#fbbf24" stroke="#182b4d" stroke-width="2.5" />
+              <!-- Hamur Parmak İzleri / Boğumları -->
+              <circle cx="145" cy="146" r="3" fill="#d97706" opacity="0.6" />
+              <circle cx="175" cy="146" r="3.5" fill="#d97706" opacity="0.6" />
+              <text x="160" y="162" text-anchor="middle" font-size="8" font-weight="900" fill="#78350f" font-family="'Baloo 2'">
+                🟡 Sızdırmaz Hamur
+              </text>
+            </g>
+
+            <!-- 7. GERGİN BALON ZARI (DİYAFRAM / KALP KASI POMPASI) -->
+            <!-- Çocuk buraya basınca aşağı çöker, bırakınca yukarı kalkar! -->
+            <g id="balloonMembraneGroup" class="cursor-pointer">
+              <!-- Alt Gergin Zar / Esneme Yayı -->
+              <path id="balloonDome" d="M 132 142 Q 160 120 188 142 Z" 
+                    fill="url(#balloonGrad)" stroke="#182b4d" stroke-width="3.5" stroke-linejoin="round" />
+              <!-- Balon Boğaz Düğümü / Çekme Lastiği -->
+              <ellipse cx="160" cy="128" rx="8" ry="4" fill="#fb7185" stroke="#182b4d" stroke-width="2" />
+              
+              <!-- Tıklama İpucu Parmağı -->
+              <g id="fingerPointer" transform="translate(160, 95)">
+                <circle cx="0" cy="0" r="14" fill="#fef08a" stroke="#182b4d" stroke-width="2" opacity="0.9" />
+                <text x="0" y="5" text-anchor="middle" font-size="14">👇</text>
+              </g>
+            </g>
+
+            <!-- 8. DÜZENEK BİLEŞEN ETİKETLERİ -->
+            <!-- Şişe = Kalp Odacığı -->
+            <g transform="translate(100, 260)">
+              <rect x="-85" y="-12" width="80" height="24" rx="6" fill="#ffffff" stroke="#182b4d" stroke-width="2" />
+              <text x="-45" y="4" text-anchor="middle" font-size="9" font-weight="900" fill="#182b4d" font-family="'Baloo 2'">🧴 Şişe (Kalp)</text>
+              <line x1="-5" y1="0" x2="10" y2="0" stroke="#182b4d" stroke-width="1.8" stroke-dasharray="3 2" />
+            </g>
+
+            <!-- Pipet = Aort Damarı -->
+            <g transform="translate(260, 80)">
+              <rect x="-10" y="-12" width="95" height="24" rx="6" fill="#ffffff" stroke="#182b4d" stroke-width="2" />
+              <text x="37" y="4" text-anchor="middle" font-size="9" font-weight="900" fill="#0284c7" font-family="'Baloo 2'">🥤 Pipet (Damar)</text>
+              <line x1="15" y1="12" x2="20" y2="35" stroke="#182b4d" stroke-width="1.8" stroke-dasharray="3 2" />
+            </g>
+
+          </svg>
+
+        </div>
+
+        <!-- AKSİYON VE POMPALAMA KONTROLLERİ -->
+        <div class="w-full grid grid-cols-1 sm:grid-cols-12 gap-2 mt-3">
+          
+          <!-- BÜYÜK POMPALA / SIKIŞTIR BUTONU (5 Sütun) -->
+          <button id="btnPumpOnce" class="sm:col-span-6 pushable py-3 bg-rose-500 hover:bg-rose-600 text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-card">
+            <span class="text-xl animate-pulse">💓</span>
+            <span>Kalbi Sıkıştır / Pompala!</span>
+          </button>
+
+          <!-- OTOMATİK RİTİM BUTONLARI (7 Sütun) -->
+          <div class="sm:col-span-6 grid grid-cols-3 gap-1.5">
+            <button id="btnResting" class="pushable py-2 bg-emerald-100 hover:bg-emerald-200 text-ink text-xs font-black flex flex-col items-center">
+              <span>🧘 Dinlenme</span>
+              <span class="text-[10px] text-emerald-800 font-bold">72 BPM</span>
+            </button>
+            <button id="btnWalking" class="pushable py-2 bg-amber-100 hover:bg-amber-200 text-ink text-xs font-black flex flex-col items-center">
+              <span>🚶 Yürüyüş</span>
+              <span class="text-[10px] text-amber-800 font-bold">95 BPM</span>
+            </button>
+            <button id="btnRunning" class="pushable py-2 bg-rose-200 hover:bg-rose-300 text-ink text-xs font-black flex flex-col items-center">
+              <span>🏃 Koşu!</span>
+              <span class="text-[10px] text-rose-800 font-bold">140 BPM</span>
+            </button>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- 2. GÖRÜNÜM: GERÇEK İNSAN KALBİ İLE KARŞILAŞTIRMA (Sekme 2) -->
+      <section id="viewAnatomy" class="chunky bg-slate-900 p-4 sm:p-5 flex flex-col gap-3 relative hidden text-white">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-rose-800 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">🩻</span>
+            <div>
+              <h2 class="display text-base sm:text-lg font-black text-rose-300">Model vs Gerçek Kalp Karşılaştırması</h2>
+              <span class="text-[11px] text-rose-200/80 font-bold">Yaptığımız ev yapımı model ile gerçek kalbin çalışma prensibini eşleştir!</span>
+            </div>
+          </div>
+          <span class="px-2.5 py-0.5 bg-rose-950 border border-rose-500 rounded-full text-xs font-bold text-rose-400">
+            Biyolojik Anatomi
+          </span>
+        </div>
+
+        <!-- Yan Yana Eşleştirme Kartları -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          
+          <!-- Ev Yapımı Model -->
+          <div class="bg-slate-800/90 rounded-2xl border-2 border-rose-500/50 p-3.5 space-y-2.5">
+            <h3 class="display text-sm text-rose-400 flex items-center gap-1.5 border-b border-slate-700 pb-1.5">
+              <span>🧴</span> <span>Ev Yapımı Model Parçaları</span>
+            </h3>
+            <ul class="text-xs space-y-2 text-gray-200 font-semibold">
+              <li class="flex items-start gap-2">
+                <span class="text-rose-400 font-bold">1. Şişe / Kavanoz:</span>
+                <span>Kanın toplandığı ve pompalandığı <b>Kalp Karıncığı</b>.</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-rose-400 font-bold">2. Gerilmiş Balon Zarı:</span>
+                <span>Kasılıp basınca yol açan güçlü <b>Kalp Kası (Miyokard)</b>.</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-rose-400 font-bold">3. Çıkış Pipeti:</span>
+                <span>Kanı tüm vücuda ulaştıran ana atardamar <b>(Aort Damarı)</b>.</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-rose-400 font-bold">4. Pipet Ucundaki Balon:</span>
+                <span>Kanın geri kaçmasını engelleyen <b>Kalp Kapakçığı (Valf)</b>.</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Gerçek İnsan Kalbi -->
+          <div class="bg-slate-800/90 rounded-2xl border-2 border-cyan-500/50 p-3.5 space-y-2.5">
+            <h3 class="display text-sm text-cyan-400 flex items-center gap-1.5 border-b border-slate-700 pb-1.5">
+              <span>🫀</span> <span>Gerçek Kalbin 4 Odacığı & Görevi</span>
+            </h3>
+            <div class="text-xs space-y-2 text-gray-200 font-semibold">
+              <p class="leading-relaxed">
+                İnsan kalbi 4 odacıktan oluşur: <b>2 Kulakçık (üstte)</b> ve <b>2 Karıncık (altta)</b>.
+              </p>
+              <div class="p-2 bg-slate-900 rounded-xl border border-slate-700 space-y-1">
+                <p><b class="text-cyan-300">Sistol (Kasılma):</b> Kalp kasılır, kapakçıklar açılır ve kan fışkırarak damarlara basılır.</p>
+                <p><b class="text-cyan-300">Diyastol (Gevşeme):</b> Kalp gevşer, kapakçıklar kapanır ve odacıklar tekrar yeni kanla dolar.</p>
+              </div>
+              <p class="text-[11px] text-amber-300 font-bold">
+                💡 Tıpkı modelimizdeki gibi, kalbimiz de mekanik bir su pompası mantığıyla çalışır!
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- 3. GÖRÜNÜM: NABIZ DEDEKTİFİ GÖREVLERİ (Sekme 3) -->
+      <section id="viewMission" class="chunky bg-emerald-50 p-4 sm:p-5 flex flex-col gap-3 relative hidden">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-emerald-300 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">🕵️‍♂️</span>
+            <h2 class="display text-lg font-black text-ink">Nabız ve Kalp Dedektifi</h2>
+          </div>
+          <span id="missionBadge" class="px-3 py-1 bg-emerald-200 border-2 border-ink rounded-full text-xs font-black">
+            Görev: 1 / 3
+          </span>
+        </div>
+
+        <div id="missionBox" class="bg-white p-4 rounded-xl border-2 border-ink shadow-sm space-y-3">
+          <div class="flex items-center gap-3">
+            <span class="text-3xl p-2 bg-emerald-100 rounded-xl border border-ink">🎯</span>
+            <div>
+              <span class="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">GÖREV HEDEFİ</span>
+              <h3 id="missionTitle" class="display text-base sm:text-lg text-ink">
+                "İlk Kanı Pompala! Balon zarına 5 kez basarak damarlara ilk kan akışını başlat."
+              </h3>
+            </div>
+          </div>
+
+          <div class="w-full bg-gray-100 rounded-full h-4 border-2 border-ink overflow-hidden">
+            <div id="missionProgressBar" class="bg-emerald-400 h-full transition-all duration-300 w-0"></div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs font-black text-gray-600">
+            <span id="missionProgressText">İlerleme: 0 / 5 Atış</span>
+            <button id="btnDoMissionPump" class="pushable px-4 py-1.5 bg-emerald-400 hover:bg-emerald-300 text-ink text-xs font-black">
+              Şimdi Pompala! 💓
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. GÖRÜNÜM: DEĞERLENDİRME TESTİ (Sekme 4) -->
+      <section id="viewQuiz" class="chunky bg-purple-50 p-4 sm:p-5 flex flex-col gap-3 relative hidden">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-purple-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">📝</span>
+            <h2 class="display text-lg font-black text-ink">Kalp ve Dolaşım Sınavı</h2>
+          </div>
+          <span id="quizScoreBadge" class="px-3 py-1 bg-purple-200 border-2 border-ink rounded-full text-xs font-black">
+            Skor: 0 / 5
+          </span>
+        </div>
+
+        <div id="quizContainer" class="bg-white p-4 rounded-xl border-2 border-ink shadow-sm space-y-3">
+          <div class="flex items-start justify-between gap-2">
+            <h3 id="quizQuestion" class="display text-sm sm:text-base text-ink">
+              1. Kalbimizin bir pompa gibi çalışarak tüm vücuda dağıttığı sıvı hangisidir?
+            </h3>
+            <span id="quizNum" class="shrink-0 px-2 py-0.5 bg-purple-100 text-purple-900 border border-ink rounded-md text-xs font-bold">1/5</span>
+          </div>
+
+          <div id="quizAnswers" class="flex flex-col gap-2 pt-1">
+            <!-- Dinamik doldurulur -->
+          </div>
+
+          <div id="quizFeedback" class="hidden p-2.5 rounded-lg border text-xs font-black text-center">
+            <!-- Geri bildirim -->
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+
+    <!-- SAĞ PANEL: BİLGİ KARTLARI VE KALP İSTATİSTİKLERİ (5 Sütun) -->
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      
+      <!-- 1. KALP İSTATİSTİK SAYACI -->
+      <div class="chunky bg-white p-4 flex flex-col gap-3">
+        <div class="flex items-center gap-2 border-b-2 border-dashed border-gray-200 pb-2">
+          <span class="text-xl">📊</span>
+          <h3 class="display text-base font-black text-ink">Kalbin Canlı Performansı</h3>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-center">
+          <div class="p-3 bg-rose-50 rounded-xl border-2 border-ink">
+            <span class="text-[10px] font-bold text-gray-500 uppercase block">Toplam Atış</span>
+            <span id="totalPumpsText" class="display text-2xl font-black text-rose-600 tabular-nums">0</span>
+            <span class="text-[10px] font-bold text-rose-900 block">Kez Pompalandı</span>
+          </div>
+          <div class="p-3 bg-sky-50 rounded-xl border-2 border-ink">
+            <span class="text-[10px] font-bold text-gray-500 uppercase block">Pompalanan Kan</span>
+            <span id="totalVolumeText" class="display text-2xl font-black text-sky-600 tabular-nums">0.0</span>
+            <span class="text-[10px] font-bold text-sky-900 block">Litre Kan</span>
+          </div>
+        </div>
+
+        <!-- Kalp Sağlığı Notu -->
+        <div class="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-xs font-bold text-amber-950 flex items-center gap-2">
+          <span class="text-xl">🏃‍♂️</span>
+          <span>Egzersiz yaptığımızda kaslarımızın daha çok oksijene ihtiyacı olur; bu yüzden kalbimiz daha hızlı pompalar!</span>
+        </div>
+      </div>
+
+      <!-- 2. MODEL PARÇALARININ ANLAMI BİLGİ KARTI -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 border-b-2 border-dashed border-gray-200 pb-2 mb-2">
+          <span class="text-xl">🔬</span>
+          <h3 class="display text-base font-black text-ink">Neden Bu Malzemeleri Kullandık?</h3>
+        </div>
+
+        <div class="space-y-2 text-xs font-bold text-gray-700">
+          <div class="p-2 bg-rose-50/70 rounded-lg border border-rose-200">
+            <span class="text-rose-800 font-extrabold">🎈 Balon Zarı = Kalp Kası:</span>
+            <p class="text-gray-600 font-semibold leading-tight mt-0.5">
+              Elastik yapısı sayesinde bastırdığında çöker, bıraktığında eski haline döner. Kalp kası da her atışta böyle kasılıp gevşer!
+            </p>
+          </div>
+          <div class="p-2 bg-sky-50/70 rounded-lg border border-sky-200">
+            <span class="text-sky-800 font-extrabold">🥤 2 Pipet = Atardamar & Valf:</span>
+            <p class="text-gray-600 font-semibold leading-tight mt-0.5">
+              Pipetler kanın kontrollü çıkış borusudur. Ucundaki kesik balon ise kanın geri şişeye akmasını engelleyen tek yönlü kapakçıktır.
+            </p>
+          </div>
+          <div class="p-2 bg-amber-50/70 rounded-lg border border-amber-200">
+            <span class="text-amber-800 font-extrabold">🟡 Hamur = Sızdırmazlık (Hava Basıncı):</span>
+            <p class="text-gray-600 font-semibold leading-tight mt-0.5">
+              Şişenin ağzından hava kaçarsa basınç oluşamaz ve kan pipetten yukarı tırmanamaz. Hamur tam bir yalıtım sağlar!
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. EVDE VE SINIFTA NASIL YAPILIR? -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 border-b-2 border-dashed border-gray-200 pb-2 mb-2">
+          <span class="text-xl">🎒</span>
+          <h3 class="display text-base font-black text-ink">Adım Adım Deney Rehberi</h3>
+        </div>
+        <ol class="text-xs text-gray-700 font-bold space-y-1.5 leading-snug list-decimal list-inside">
+          <li>Kavanoza yarıya kadar su doldur ve kırmızı gıda boyası ekle.</li>
+          <li>Balonun boynunu makasla kesip geniş kısmını şişenin ağzına ger.</li>
+          <li>Kürdanla balona 2 küçük delik aç ve pipetleri içeri sok.</li>
+          <li>Pipetlerin etrafını oyun hamuruyla sımsıkı kapat.</li>
+          <li>Balonun ortasına parmağınla ritmik olarak bas ve kanı fışkırt!</li>
+        </ol>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- JAVASCRIPT: SES MOTORU, POMPALAMA FİZİĞİ, GÖREVLER VE QUIZ -->
+  <script>
+    // --- 1. WEB AUDIO API SES SENTEZLEYİCİ ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    let isSoundEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    const Sound = {
+      // Kalp Atışı (Derin Çift Vuruş: Güm-Güm!)
+      heartbeat: function() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const now = audioCtx.currentTime;
+
+        // 1. Vuruş (Mitral & Triküspit - Lub)
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(85, now);
+        osc1.frequency.exponentialRampToValueAtTime(32, now + 0.12);
+        gain1.gain.setValueAtTime(0.45, now);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.12);
+
+        // 2. Vuruş (Aort & Pulmoner - Dub)
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(115, now + 0.16);
+        osc2.frequency.exponentialRampToValueAtTime(38, now + 0.28);
+        gain2.gain.setValueAtTime(0.35, now + 0.16);
+        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+        osc2.connect(gain2);
+        gain2.connect(audioCtx.destination);
+        osc2.start(now + 0.16);
+        osc2.stop(now + 0.28);
+      },
+
+      // Pipetten Sıvı Fışkırma Sesi (Squirrrt / Hiss)
+      squirt: function() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const now = audioCtx.currentTime;
+
+        // Beyaz Gürültü Filtresiyle Sıvı Sesi
+        const bufferSize = audioCtx.sampleRate * 0.15;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+        }
+
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1200, now);
+        filter.frequency.exponentialRampToValueAtTime(400, now + 0.15);
+        filter.Q.setValueAtTime(3, now);
+
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        noise.start(now);
+      },
+
+      snap: function() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(500, now);
+        osc.frequency.exponentialRampToValueAtTime(900, now + 0.08);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      },
+
+      error: function() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(140, now + 0.2);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.2);
+      },
+
+      fanfare: function() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const notes = [261.63, 329.63, 392.00, 523.25];
+        notes.forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          const t = audioCtx.currentTime + (idx * 0.1);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.2, t);
+          gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(t);
+          osc.stop(t + 0.25);
+        });
+      }
+    };
+
+    // Ses Aç/Kapat Butonu
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    soundToggle.addEventListener('click', () => {
+      isSoundEnabled = !isSoundEnabled;
+      soundIcon.textContent = isSoundEnabled ? '🔊' : '🔇';
+      if (isSoundEnabled) Sound.snap();
+    });
+
+
+    // --- 2. KALP POMPASI FİZİK MOTORU & SİMÜLASYON DURUMU ---
+    const State = {
+      totalPumps: 0,
+      totalVolumeMl: 0,
+      bpm: 0,
+      autoTimer: null,
+      autoMode: 'manual', // 'manual', 'resting', 'walking', 'running'
+      isPumping: false,
+      lastPumpTime: 0
+    };
+
+    // Elementler
+    const balloonMembraneGroup = document.getElementById('balloonMembraneGroup');
+    const balloonDome = document.getElementById('balloonDome');
+    const bloodJetGroup = document.getElementById('bloodJetGroup');
+    const beakerLiquid = document.getElementById('beakerLiquid');
+    const bpmDisplay = document.getElementById('bpmDisplay');
+    const volumeDisplay = document.getElementById('volumeDisplay');
+    const totalPumpsText = document.getElementById('totalPumpsText');
+    const totalVolumeText = document.getElementById('totalVolumeText');
+    const btnPumpOnce = document.getElementById('btnPumpOnce');
+    const tipBanner = document.getElementById('tipBanner');
+    const tipIcon = document.getElementById('tipIcon');
+    const tipText = document.getElementById('tipText');
+    const strawValveFlap = document.getElementById('strawValveFlap');
+    const valveStatusText = document.getElementById('valveStatusText');
+    const strawBloodColumn = document.getElementById('strawBloodColumn');
+    const strawBloodFlowAnim = document.getElementById('strawBloodFlowAnim');
+    const flowIndicatorBadge = document.getElementById('flowIndicatorBadge');
+
+    // Pipet İçi Sıvı Dinamiği Hesaplaması
+    let strawTotalLength = 450;
+    try {
+      if (strawBloodColumn && typeof strawBloodColumn.getTotalLength === 'function') {
+        const measured = strawBloodColumn.getTotalLength();
+        if (measured > 0) strawTotalLength = measured;
+      }
+    } catch(e) {}
+    
+    // Şişedeki sıvı yüzeyi y=210, pipet tabanı y=305 (305-210 = 95px)
+    const strawRestingFill = 95;
+    const restingDashOffset = Math.max(0, strawTotalLength - strawRestingFill);
+
+    // Başlangıç pipet kan doluluk durumu (Sadece şişedeki sıvı seviyesine kadar dolu)
+    function initStrawBlood() {
+      if (strawBloodColumn) {
+        strawBloodColumn.style.strokeDasharray = `${strawTotalLength} ${strawTotalLength}`;
+        strawBloodColumn.style.strokeDashoffset = restingDashOffset;
+      }
+      if (strawBloodFlowAnim) {
+        strawBloodFlowAnim.style.strokeDasharray = "14 12";
+        strawBloodFlowAnim.style.strokeDashoffset = "0";
+      }
+    }
+    initStrawBlood();
+
+    // Otomatik Nabız Butonları
+    const btnResting = document.getElementById('btnResting');
+    const btnWalking = document.getElementById('btnWalking');
+    const btnRunning = document.getElementById('btnRunning');
+
+    // Tekil Pompalama Fonksiyonu (Kasılma & Sıvı Fışkırtma)
+    function triggerPump(manualBpm = null) {
+      if (State.isPumping && !manualBpm) return;
+      State.isPumping = true;
+
+      // Sayaç artışı
+      State.totalPumps++;
+      State.totalVolumeMl += 70; // Her atışta yaklaşık 70 ml kan (biyolojik gerçek oran)
+
+      // Nabız hesabı
+      const now = Date.now();
+      if (manualBpm) {
+        State.bpm = manualBpm;
+      } else if (State.lastPumpTime > 0) {
+        const deltaSec = (now - State.lastPumpTime) / 1000;
+        if (deltaSec > 0.1 && deltaSec < 3.0) {
+          State.bpm = Math.round(60 / deltaSec);
+        } else {
+          State.bpm = 75;
+        }
+      } else {
+        State.bpm = 72;
+      }
+      State.lastPumpTime = now;
+
+      // Ekranları Güncelle
+      bpmDisplay.textContent = State.bpm;
+      volumeDisplay.textContent = State.totalVolumeMl;
+      totalPumpsText.textContent = State.totalPumps;
+      totalVolumeText.textContent = (State.totalVolumeMl / 1000).toFixed(2);
+
+      // Sesler
+      Sound.heartbeat();
+      setTimeout(() => Sound.squirt(), 90);
+
+      // İpucu Metni
+      tipIcon.textContent = '🩸';
+      tipText.textContent = `SİSTOL! Kalp kasıldı, ${State.bpm} BPM nabızla 70 ml kan damara pompalandı!`;
+
+      // Pipet İçindeki Kan Hareketi: Kan sütunu şişeden tepeye ve uca doğru hızla fırlar!
+      if (strawBloodColumn) {
+        gsap.killTweensOf(strawBloodColumn);
+        gsap.to(strawBloodColumn, {
+          strokeDashoffset: 0,
+          duration: 0.16,
+          ease: "power2.out"
+        });
+      }
+
+      // Pipet içi alyuvar ve akım darbesi
+      if (strawBloodFlowAnim) {
+        gsap.killTweensOf(strawBloodFlowAnim);
+        strawBloodFlowAnim.setAttribute('opacity', '0.95');
+        gsap.fromTo(strawBloodFlowAnim,
+          { strokeDashoffset: 0 },
+          { strokeDashoffset: -180, duration: 0.35, ease: "linear" }
+        );
+      }
+
+      // Akış yönü gösterge rozeti belirir
+      if (flowIndicatorBadge) {
+        gsap.killTweensOf(flowIndicatorBadge);
+        gsap.to(flowIndicatorBadge, { opacity: 1, duration: 0.1 });
+      }
+
+      if (valveStatusText) {
+        valveStatusText.textContent = "KAPALI";
+        valveStatusText.setAttribute('fill', '#991b1b');
+      }
+
+      // 1. AŞAMA: Balon Zarı Aşağı Çöker (Basınç Artışı)
+      gsap.to(balloonDome, {
+        attr: { d: "M 132 142 Q 160 160 188 142 Z" },
+        duration: 0.12,
+        ease: "power2.out",
+        onComplete: () => {
+          // 2. AŞAMA: Pipetten Behere Kan Fışkırır
+          bloodJetGroup.setAttribute('opacity', '1');
+          
+          // Valf kapanır (Geri kaçışı önler)
+          gsap.to(strawValveFlap, { rotation: 18, transformOrigin: 'center', duration: 0.1 });
+
+          // Beherdeki sıvı yükselir (Maksimum 120 yüksekliğe kadar)
+          const fillRatio = Math.min(State.totalVolumeMl / 2500, 1);
+          const newY = 122 - (fillRatio * 80);
+          beakerLiquid.setAttribute('d', `M 10 122 L 10 ${newY} Q 40 ${newY - 3} 70 ${newY} L 70 122 Z`);
+
+          // 3. AŞAMA: Balon Zarı Eski Haline Yaylanır (Diyastol - Gevşeme)
+          setTimeout(() => {
+            gsap.to(balloonDome, {
+              attr: { d: "M 132 142 Q 160 120 188 142 Z" },
+              duration: 0.25,
+              ease: "elastic.out(1.2, 0.4)"
+            });
+            bloodJetGroup.setAttribute('opacity', '0');
+            gsap.to(strawValveFlap, { rotation: 0, duration: 0.15 });
+
+            if (valveStatusText) {
+              valveStatusText.textContent = "Kapakçık";
+              valveStatusText.setAttribute('fill', '#9f1239');
+            }
+
+            // Pipet içi kan sütunu dinlenme seviyesine geri çekilir
+            if (strawBloodColumn) {
+              gsap.to(strawBloodColumn, {
+                strokeDashoffset: restingDashOffset,
+                duration: 0.32,
+                ease: "power2.out"
+              });
+            }
+            if (strawBloodFlowAnim) {
+              gsap.to(strawBloodFlowAnim, { opacity: 0, duration: 0.2 });
+            }
+            if (flowIndicatorBadge) {
+              gsap.to(flowIndicatorBadge, { opacity: 0, duration: 0.2 });
+            }
+
+            State.isPumping = false;
+          }, 200);
+        }
+      });
+
+      // Dedektif İlerlemesi Kontrolü
+      if (typeof handleMissionPump === 'function') {
+        handleMissionPump();
+      }
+
+      // 1000 ml Kutlaması
+      if (State.totalVolumeMl === 700 || State.totalVolumeMl === 1400) {
+        if (window.confetti) {
+          confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+        }
+      }
+    }
+
+    // Tıklama Olayları
+    balloonMembraneGroup.addEventListener('click', () => {
+      stopAutoPulse();
+      triggerPump();
+    });
+
+    btnPumpOnce.addEventListener('click', () => {
+      stopAutoPulse();
+      triggerPump();
+    });
+
+    // Klavye Space Tuşu Desteği
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && State.currentTab === 'pump') {
+        e.preventDefault();
+        stopAutoPulse();
+        triggerPump();
+      }
+    });
+
+    // Otomatik Nabız Modları (Dinlenme, Yürüme, Koşma)
+    function setAutoPulse(bpm, modeName, btnEl) {
+      stopAutoPulse();
+      State.autoMode = modeName;
+
+      [btnResting, btnWalking, btnRunning].forEach(b => {
+        b.classList.remove('ring-2', 'ring-ink', 'scale-105');
+      });
+      btnEl.classList.add('ring-2', 'ring-ink', 'scale-105');
+
+      const intervalMs = (60 / bpm) * 1000;
+      triggerPump(bpm);
+      State.autoTimer = setInterval(() => {
+        triggerPump(bpm);
+      }, intervalMs);
+    }
+
+    function stopAutoPulse() {
+      if (State.autoTimer) {
+        clearInterval(State.autoTimer);
+        State.autoTimer = null;
+      }
+      State.autoMode = 'manual';
+      [btnResting, btnWalking, btnRunning].forEach(b => {
+        b.classList.remove('ring-2', 'ring-ink', 'scale-105');
+      });
+    }
+
+    btnResting.addEventListener('click', () => setAutoPulse(72, 'resting', btnResting));
+    btnWalking.addEventListener('click', () => setAutoPulse(95, 'walking', btnWalking));
+    btnRunning.addEventListener('click', () => setAutoPulse(140, 'running', btnRunning));
+
+
+    // --- 3. DEDEKTİF GÖREVLERİ MOTORU ---
+    const Missions = [
+      {
+        title: 'İlk Kanı Pompala!',
+        desc: 'Kalp modeline 5 kez ritmik basarak damarlara ilk kan akışını başlat.',
+        target: 5,
+        unit: 'Atış'
+      },
+      {
+        title: 'Koşu Egzersizi Nabzı!',
+        desc: 'Koşu butonuna bas veya hızlı basarak nabzını 120 BPM üzerine çıkar.',
+        target: 15,
+        unit: 'Atış'
+      },
+      {
+        title: 'Yarım Litre Kan Dolaşımı!',
+        desc: 'Toplam 500 ml kanı vücut kabına pompalamayı başar.',
+        target: 30,
+        unit: 'Atış'
+      }
+    ];
+
+    let currentMissionIdx = 0;
+    let missionPumpCount = 0;
+    const missionBadge = document.getElementById('missionBadge');
+    const missionTitle = document.getElementById('missionTitle');
+    const missionProgressBar = document.getElementById('missionProgressBar');
+    const missionProgressText = document.getElementById('missionProgressText');
+    const btnDoMissionPump = document.getElementById('btnDoMissionPump');
+
+    function loadMission(idx) {
+      if (idx >= Missions.length) {
+        missionTitle.textContent = '🎉 TEBRİKLER! Tüm kalp ve nabız görevlerini başarıyla tamamladın!';
+        missionProgressText.textContent = 'Bütün görevler tamamlandı! 🏆';
+        missionProgressBar.style.width = '100%';
+        btnDoMissionPump.style.display = 'none';
+        Sound.fanfare();
+        if (window.confetti) confetti({ particleCount: 70, spread: 75, origin: { y: 0.6 } });
+        return;
+      }
+
+      const m = Missions[idx];
+      missionBadge.textContent = `Görev: ${idx + 1} / ${Missions.length}`;
+      missionTitle.textContent = `"${m.title} ${m.desc}"`;
+      missionPumpCount = 0;
+      updateMissionProgress();
+    }
+
+    function updateMissionProgress() {
+      const m = Missions[currentMissionIdx];
+      if (!m) return;
+      const pct = Math.min((missionPumpCount / m.target) * 100, 100);
+      missionProgressBar.style.width = `${pct}%`;
+      missionProgressText.textContent = `İlerleme: ${missionPumpCount} / ${m.target} ${m.unit}`;
+
+      if (missionPumpCount >= m.target) {
+        Sound.fanfare();
+        currentMissionIdx++;
+        setTimeout(() => loadMission(currentMissionIdx), 1000);
+      }
+    }
+
+    function handleMissionPump() {
+      if (currentMissionIdx < Missions.length) {
+        missionPumpCount++;
+        updateMissionProgress();
+      }
+    }
+
+    btnDoMissionPump.addEventListener('click', () => {
+      triggerPump();
+    });
+
+
+    // --- 4. BİLGİ QUIZ'İ MOTORU ---
+    const QuizList = [
+      {
+        q: '1. Kalbimizin bir su pompası gibi çalışarak tüm vücudumuza pompaladığı sıvı hangisidir?',
+        opts: ['Safra', 'Kan', 'Mide Asidi', 'Tükürük'],
+        correct: 1,
+        exp: 'Kalp, oksijen ve besin taşıyan kanı damarlarımız yoluyla tüm vücuda pompalar.'
+      },
+      {
+        q: '2. Deney modelimizde şişenin ağzına gerdiğimiz balon zarı gerçek kalbimizin hangi bölümünü temsil eder?',
+        opts: ['Kalp Kası', 'Aort Damarı', 'Akciğer', 'Kaburga Kemiği'],
+        correct: 0,
+        exp: 'Elastik balon zarı, kasılıp gevşeyerek basınç üreten güçlü kalp kasını temsil eder.'
+      },
+      {
+        q: '3. Modeldeki pipetin ucuna taktığımız balon parçası ve kalbimizdeki kapakçıkların temel görevi nedir?',
+        opts: ['Kanı ısıtmak', 'Kanın geri kaçmasını engellemek', 'Kanı süzmek', 'Nefes almak'],
+        correct: 1,
+        exp: 'Kalp kapakçıkları tek yönlü valf gibi çalışarak kanın geriye kaçmasını engeller.'
+      },
+      {
+        q: '4. Koştuğumuzda veya spor yaptığımızda nabzımızın hızlanmasının temel sebebi nedir?',
+        opts: ['Kaslarımızın daha çok oksijene ihtiyaç duyması', 'Midemizin acıkması', 'Vücudun uyumak istemesi', 'Havanın soğuması'],
+        correct: 0,
+        exp: 'Egzersiz sırasında kaslarımız daha fazla oksijen tüketir; kalp de kanı daha hızlı pompalar.'
+      },
+      {
+        q: '5. Pipetlerin etrafına sardığımız oyun hamuru deneyde neyi sağlamaktadır?',
+        opts: ['Şişeyi süslemeyi', 'Hava sızdırmazlığını sağlayarak basınç oluşturmayı', 'Suyu kırmızıya boyamayı', 'Pipetleri eritip yapıştırmayı'],
+        correct: 1,
+        exp: 'Hamur hava sızdırmazlığı sağlar; böylece balon basıldığında oluşan basınç sıvıyı pipetten fışkırtır.'
+      }
+    ];
+
+    let quizIndex = 0;
+    let quizScore = 0;
+    const quizQuestionEl = document.getElementById('quizQuestion');
+    const quizNumEl = document.getElementById('quizNum');
+    const quizAnswersEl = document.getElementById('quizAnswers');
+    const quizFeedbackEl = document.getElementById('quizFeedback');
+    const quizScoreBadge = document.getElementById('quizScoreBadge');
+
+    function loadQuiz(idx) {
+      if (idx >= QuizList.length) {
+        quizQuestionEl.textContent = '🎉 Sınav Tamamlandı!';
+        quizAnswersEl.innerHTML = `
+          <div class="text-center py-4">
+            <span class="text-4xl block mb-2">🏅</span>
+            <p class="font-black text-ink text-base">Tebrikler! 5 soruda ${quizScore} doğru yaptın!</p>
+            <p class="text-xs text-gray-600 font-bold mt-1">Kalp ve dolaşım konusunu harika öğrendin!</p>
+            <button onclick="quizIndex=0; quizScore=0; loadQuiz(0);" class="pushable mt-4 px-4 py-2 bg-purple-400 text-ink text-xs font-black">
+              Testi Tekrar Çöz 🔄
+            </button>
+          </div>
+        `;
+        quizFeedbackEl.classList.add('hidden');
+        Sound.fanfare();
+        if (window.confetti) confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
+        return;
+      }
+
+      const q = QuizList[idx];
+      quizNumEl.textContent = `${idx + 1}/${QuizList.length}`;
+      quizQuestionEl.textContent = q.q;
+      quizScoreBadge.textContent = `Skor: ${quizScore} / ${QuizList.length}`;
+      quizFeedbackEl.classList.add('hidden');
+
+      quizAnswersEl.innerHTML = '';
+      q.opts.forEach((opt, optIdx) => {
+        const btn = document.createElement('button');
+        btn.className = 'pushable p-2.5 bg-white hover:bg-purple-100 text-ink font-bold text-xs text-left flex items-center gap-2';
+        btn.innerHTML = `<span class="w-6 h-6 rounded-full bg-purple-100 border border-ink flex items-center justify-center font-black text-[11px]">${String.fromCharCode(65 + optIdx)}</span> <span>${opt}</span>`;
+        btn.addEventListener('click', () => checkQuiz(optIdx, q.correct, q.exp));
+        quizAnswersEl.appendChild(btn);
+      });
+    }
+
+    function checkQuiz(selectedIdx, correctIdx, exp) {
+      const btns = quizAnswersEl.querySelectorAll('button');
+      btns.forEach(b => b.disabled = true);
+
+      quizFeedbackEl.classList.remove('hidden', 'bg-emerald-100', 'border-emerald-400', 'text-emerald-900', 'bg-rose-100', 'border-rose-400', 'text-rose-900');
+
+      if (selectedIdx === correctIdx) {
+        quizScore++;
+        Sound.snap();
+        quizFeedbackEl.classList.add('bg-emerald-100', 'border-emerald-400', 'text-emerald-900');
+        quizFeedbackEl.textContent = `✅ Harika! ${exp}`;
+      } else {
+        Sound.error();
+        quizFeedbackEl.classList.add('bg-rose-100', 'border-rose-400', 'text-rose-900');
+        quizFeedbackEl.textContent = `❌ Yanlış! ${exp}`;
+      }
+
+      quizScoreBadge.textContent = `Skor: ${quizScore} / ${QuizList.length}`;
+
+      setTimeout(() => {
+        quizIndex++;
+        loadQuiz(quizIndex);
+      }, 1800);
+    }
+
+
+    // --- 5. SEKME YÖNETİMİ ---
+    const btnTabPump = document.getElementById('btnTabPump');
+    const btnTabAnatomy = document.getElementById('btnTabAnatomy');
+    const btnTabMission = document.getElementById('btnTabMission');
+    const btnTabQuiz = document.getElementById('btnTabQuiz');
+
+    const viewPump = document.getElementById('viewPump');
+    const viewAnatomy = document.getElementById('viewAnatomy');
+    const viewMission = document.getElementById('viewMission');
+    const viewQuiz = document.getElementById('viewQuiz');
+
+    function switchTab(tab) {
+      State.currentTab = tab;
+
+      [btnTabPump, btnTabAnatomy, btnTabMission, btnTabQuiz].forEach(b => {
+        b.classList.remove('bg-rose-400', 'text-white', 'border-2', 'border-ink', 'shadow-sm');
+        b.classList.add('hover:bg-white', 'text-gray-700');
+      });
+
+      [viewPump, viewAnatomy, viewMission, viewQuiz].forEach(v => v.classList.add('hidden'));
+
+      if (tab === 'pump') {
+        btnTabPump.classList.add('bg-rose-400', 'text-white', 'border-2', 'border-ink', 'shadow-sm');
+        btnTabPump.classList.remove('hover:bg-white', 'text-gray-700');
+        viewPump.classList.remove('hidden');
+      } else if (tab === 'anatomy') {
+        btnTabAnatomy.classList.add('bg-rose-400', 'text-white', 'border-2', 'border-ink', 'shadow-sm');
+        btnTabAnatomy.classList.remove('hover:bg-white', 'text-gray-700');
+        viewAnatomy.classList.remove('hidden');
+      } else if (tab === 'mission') {
+        btnTabMission.classList.add('bg-rose-400', 'text-white', 'border-2', 'border-ink', 'shadow-sm');
+        btnTabMission.classList.remove('hover:bg-white', 'text-gray-700');
+        viewMission.classList.remove('hidden');
+        loadMission(currentMissionIdx);
+      } else if (tab === 'quiz') {
+        btnTabQuiz.classList.add('bg-rose-400', 'text-white', 'border-2', 'border-ink', 'shadow-sm');
+        btnTabQuiz.classList.remove('hover:bg-white', 'text-gray-700');
+        viewQuiz.classList.remove('hidden');
+        loadQuiz(quizIndex);
+      }
+      Sound.snap();
+    }
+
+    btnTabPump.addEventListener('click', () => switchTab('pump'));
+    btnTabAnatomy.addEventListener('click', () => switchTab('anatomy'));
+    btnTabMission.addEventListener('click', () => switchTab('mission'));
+    btnTabQuiz.addEventListener('click', () => switchTab('quiz'));
+
+    // Başlangıç yüklemeleri
+    loadMission(0);
+    loadQuiz(0);
+  </script>
+</body>
+</html>

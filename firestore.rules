@@ -1,0 +1,101 @@
+rules_version = '2';
+
+// Yeni Satranç yönetim koleksiyonları Firebase Authentication gerektirir.
+// Parolalı öğretmen bütün kayıtları yönetir; anonim sınıf oturumu yalnızca
+// kendi cihazının oluşturduğu kayıtları okuyup değiştirebilir.
+// Eski içerik/defter/sınıf koleksiyonları geriye dönük uyumluluk nedeniyle
+// şimdilik mevcut açık kurallarını korur; bunlar ayrı bir geçişte rol bazlı
+// kurallara taşınacaktır.
+service cloud.firestore {
+    match /databases/{database}/documents {
+
+        function signedIn() {
+            return request.auth != null;
+        }
+
+        function teacher() {
+            return signedIn()
+                && request.auth.token.firebase.sign_in_provider != 'anonymous';
+        }
+
+        function ownsExistingChessRecord() {
+            return signedIn() && resource.data.ownerUid == request.auth.uid;
+        }
+
+        function createsOwnedChessRecord() {
+            return signedIn() && request.resource.data.ownerUid == request.auth.uid;
+        }
+
+        function keepsChessOwnership() {
+            return ownsExistingChessRecord()
+                && request.resource.data.ownerUid == request.auth.uid;
+        }
+
+        // İçerik merkezi
+        match /activities/{document=**} {
+            allow read, write: if true;
+        }
+        match /units/{document=**} {
+            allow read, write: if true;
+        }
+        match /submissions/{document=**} {
+            allow read, write: if true;
+        }
+
+        // Defterlerim: klasörler, defter üst verisi ve sayfa içerikleri
+        match /folders/{document=**} {
+            allow read, write: if true;
+        }
+        match /notebooks/{document=**} {
+            allow read, write: if true;
+        }
+        match /notebook_content/{document=**} {
+            allow read, write: if true;
+        }
+        // Ortak çizimin canlı işlem akışı (geçici kayıtlar)
+        match /notebook_ops/{document=**} {
+            allow read, write: if true;
+        }
+
+        // Canlı Satranç masaları: her masa dört haneli koduyla tek bir
+        // dokümandır. Oyuncular giriş yapmaz, adlarını yazıp oynar; bu yüzden
+        // diğer koleksiyonlar gibi açıktır. Masada kişisel veri tutulmaz —
+        // yalnızca oyuncunun yazdığı ad ve hamleler.
+        match /chess_rooms/{document=**} {
+            allow read, write: if true;
+        }
+
+        // Sınıf Yönetimi: sınıflar, atanan içerikler ve öğrenci listeleri
+        match /classes/{document=**} {
+            allow read, write: if true;
+        }
+
+        // Satranç okul kayıtları öğrenci adı ve gelişim bilgisi içerir.
+        // E-posta/parolalı öğretmen tüm kayıtları görür. Anonim sınıf oturumu
+        // yalnızca ownerUid alanı kendi uid'si olan kayıtlarla çalışabilir.
+        match /chess_matches/{document=**} {
+            allow read, write: if teacher();
+            allow read, delete: if ownsExistingChessRecord();
+            allow create: if createsOwnedChessRecord();
+            allow update: if keepsChessOwnership();
+        }
+        match /chess_tournaments/{document=**} {
+            allow read, write: if teacher();
+            allow read, delete: if ownsExistingChessRecord();
+            allow create: if createsOwnedChessRecord();
+            allow update: if keepsChessOwnership();
+        }
+        match /chess_progress/{document=**} {
+            allow read, write: if teacher();
+            allow read, delete: if ownsExistingChessRecord();
+            allow create: if createsOwnedChessRecord();
+            allow update: if keepsChessOwnership();
+        }
+        match /chess_sync/{document=**} {
+            allow read, write: if teacher();
+            allow read, delete: if ownsExistingChessRecord();
+            allow create: if createsOwnedChessRecord();
+            allow update: if keepsChessOwnership();
+        }
+    }
+}

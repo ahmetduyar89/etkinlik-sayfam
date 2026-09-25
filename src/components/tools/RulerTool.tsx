@@ -28,25 +28,33 @@ export function RulerTool({ onClose }: RulerToolProps) {
     const svgH = 52;
 
     return (
-        <motion.div
-            drag
-            dragControls={dragControls}
-            dragListener={false}
-            dragMomentum={false}
-            dragElastic={0}
-            className="fixed z-[11500] pointer-events-auto select-none"
-            style={{
-                top: 180,
-                left: 80,
-                touchAction: 'none',
-                transformOrigin: 'center center',
-                transform: vertical ? 'rotate(90deg)' : 'none',
-            }}
-        >
-            <div
-                onPointerDown={(e) => dragControls.start(e)}
-                className="cursor-grab active:cursor-grabbing relative"
+        <div className="fixed inset-0 z-[11500] pointer-events-none flex items-center justify-center p-4 overflow-hidden">
+            <motion.div
+                drag
+                dragControls={dragControls}
+                dragListener={false}
+                dragMomentum={false}
+                dragElastic={0}
+                className="pointer-events-auto select-none"
+                style={{
+                    touchAction: 'none',
+                }}
             >
+                <div
+                    style={{
+                        transformOrigin: 'center center',
+                        transform: vertical ? 'rotate(90deg)' : 'none',
+                        transition: 'transform 0.2s ease',
+                    }}
+                >
+                    <div
+                        onPointerDown={(e) => {
+                            if ((e.target as HTMLElement).closest('button')) return;
+                            e.preventDefault();
+                            dragControls.start(e);
+                        }}
+                        className="cursor-grab active:cursor-grabbing relative"
+                    >
                 <svg
                     width={svgW}
                     height={svgH}
@@ -115,6 +123,8 @@ export function RulerTool({ onClose }: RulerToolProps) {
                     </button>
                 </div>
             </div>
-        </motion.div>
+        </div>
+    </motion.div>
+</div>
     );
 }
