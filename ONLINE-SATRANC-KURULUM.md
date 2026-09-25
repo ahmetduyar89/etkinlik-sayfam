@@ -7,8 +7,10 @@ kurulum yapılmalıdır.
 ## 1. Öğretmen hesabı oluştur
 
 Firebase Console'da proje içinden **Authentication → Sign-in method** bölümüne
-girip **Email/Password** yöntemini etkinleştir. Ardından **Users** ekranında
-öğretmen/admin için bir e-posta ve parola oluştur.
+girip hem **Email/Password** hem de **Anonymous (Anonim)** yöntemini etkinleştir.
+Anonim yöntem sınıf ekranlarının parola saklamadan yalnızca kendi cihaz
+kayıtlarını gönderebilmesini sağlar. Ardından **Users** ekranında öğretmen/admin
+için bir e-posta ve parola oluştur.
 
 Bu e-posta adresini yayın ortamına ekle:
 
@@ -28,8 +30,9 @@ olduğundan emin ol. Sonra:
 firebase deploy --only firestore:rules --project interaktif-etkinliklerim
 ```
 
-Yeni koleksiyonlar yalnızca Firebase oturumu açmış kullanıcı tarafından
-okunabilir ve yazılabilir:
+Yeni koleksiyonların tamamını yalnızca e-posta/parolayla giriş yapan öğretmen
+okuyabilir. Sınıf ekranında açılan anonim oturum ise yalnızca kendi oluşturduğu
+kayıtları okuyup değiştirebilir:
 
 - `chess_matches`
 - `chess_tournaments`
@@ -46,9 +49,10 @@ herkese açık web yapılandırması vardır; yönetici parolası bulunmaz.
 
 Her sınıf bilgisayarında bir kez:
 
-1. Atölye ana sayfasında öğretmen hesabıyla giriş yap.
+1. Atölye ana sayfasında ilgili sınıf hesabıyla giriş yap.
 2. **Satranç Eğitimi** bölümünü aç.
-3. Sayfa açıldığında o tarayıcıdaki maçlar, turnuvalar ve öğrenci profilleri
+3. Üst çubukta **Buluta kaydediliyor** yazısını kontrol et. Sayfa açıldığında
+   o tarayıcıdaki maçlar, turnuvalar ve öğrenci profilleri
    otomatik olarak buluta eklenir.
 
 İlk aktarım bulutta bulunan aynı kimlikli bir kaydın üzerine yazmaz. Sonraki

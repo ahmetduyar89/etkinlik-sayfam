@@ -1,6 +1,8 @@
 rules_version = '2';
 
 // Yeni Satranç yönetim koleksiyonları Firebase Authentication gerektirir.
+// Parolalı öğretmen bütün kayıtları yönetir; anonim sınıf oturumu yalnızca
+// kendi cihazının oluşturduğu kayıtları okuyup değiştirebilir.
 // Eski içerik/defter/sınıf koleksiyonları geriye dönük uyumluluk nedeniyle
 // şimdilik mevcut açık kurallarını korur; bunlar ayrı bir geçişte rol bazlı
 // kurallara taşınacaktır.
@@ -9,6 +11,24 @@ service cloud.firestore {
 
         function signedIn() {
             return request.auth != null;
+        }
+
+        function teacher() {
+            return signedIn()
+                && request.auth.token.firebase.sign_in_provider != 'anonymous';
+        }
+
+        function ownsExistingChessRecord() {
+            return signedIn() && resource.data.ownerUid == request.auth.uid;
+        }
+
+        function createsOwnedChessRecord() {
+            return signedIn() && request.resource.data.ownerUid == request.auth.uid;
+        }
+
+        function keepsChessOwnership() {
+            return ownsExistingChessRecord()
+                && request.resource.data.ownerUid == request.auth.uid;
         }
 
         // İçerik merkezi
@@ -51,20 +71,31 @@ service cloud.firestore {
         }
 
         // Satranç okul kayıtları öğrenci adı ve gelişim bilgisi içerir.
-        // Bu koleksiyonlar yalnızca Firebase Authentication ile açılmış
-        // öğretmen oturumlarına açıktır. Sınıf bazlı roller eklendiğinde bu
-        // koşul custom claim içindeki classId ile daha da daraltılabilir.
+        // E-posta/parolalı öğretmen tüm kayıtları görür. Anonim sınıf oturumu
+        // yalnızca ownerUid alanı kendi uid'si olan kayıtlarla çalışabilir.
         match /chess_matches/{document=**} {
-            allow read, write: if signedIn();
+            allow read, write: if teacher();
+            allow read, delete: if ownsExistingChessRecord();
+            allow create: if createsOwnedChessRecord();
+            allow update: if keepsChessOwnership();
         }
         match /chess_tournaments/{document=**} {
-            allow read, write: if signedIn();
+            allow read, write: if teacher();
+            allow read, delete: if ownsExistingChessRecord();
+            allow create: if createsOwnedChessRecord();
+            allow update: if keepsChessOwnership();
         }
         match /chess_progress/{document=**} {
-            allow read, write: if signedIn();
+            allow read, write: if teacher();
+            allow read, delete: if ownsExistingChessRecord();
+            allow create: if createsOwnedChessRecord();
+            allow update: if keepsChessOwnership();
         }
         match /chess_sync/{document=**} {
-            allow read, write: if signedIn();
+            allow read, write: if teacher();
+            allow read, delete: if ownsExistingChessRecord();
+            allow create: if createsOwnedChessRecord();
+            allow update: if keepsChessOwnership();
         }
     }
 }

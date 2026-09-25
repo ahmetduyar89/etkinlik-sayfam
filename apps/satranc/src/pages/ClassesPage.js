@@ -139,7 +139,7 @@ export function ClassesPage({ sound, progress }) {
         el("h2", { className: "class-card-title", text: "Yedek" }),
         el("p", {
           className: "class-hint",
-          text: "Sınıflar, maçlar ve öğrenci ilerlemeleri yalnızca bu bilgisayarda durur. Başka bilgisayara taşımak ya da güvenceye almak için yedek dosyası al."
+          text: "Çevrimdışıyken kayıtlar bu bilgisayarda korunur; bağlantı gelince buluta aktarılır. Ayrıca başka bilgisayara elle taşımak için yedek dosyası alabilirsin."
         }),
         el("div", { className: "class-row-buttons" }, [
           el("button", {

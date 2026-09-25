@@ -11,6 +11,7 @@ import { INITIAL_CLASSES } from '../constants/initialClasses';
 const CLASSES_COLLECTION = 'classes';
 const LOCAL_CACHE_KEY = 'etkinlik_siniflar_cache';
 const CHESS_STORAGE_KEY = 'satranc-okulu-siniflar';
+const CHESS_PROGRESS_KEY = 'satranc-okulu-progress';
 
 /** Yerel önbellekteki sınıfları oku (boşsa INITIAL_CLASSES döner) */
 export function getCachedClasses(): ClassRoom[] {
@@ -126,6 +127,8 @@ export function syncClassesToChess(classes: ClassRoom[], activeClassId?: string)
             }
         }
 
+        const oldClasses = Array.isArray(chessData.classes) ? chessData.classes : [];
+
         // Bizdeki sınıfları Satranç formatına dönüştür / birleştir
         const converted = classes.map((c) => ({
             id: c.id,
@@ -137,9 +140,90 @@ export function syncClassesToChess(classes: ClassRoom[], activeClassId?: string)
             })),
         }));
 
+        // Firestore'da yeniden oluşturulan bir sınıfın/öğrencinin kimliği
+        // değişmiş olabilir. Yereldeki eski turnuva ve maçları ad üzerinden
+        // yeni kadroya bağlayarak kayıtların sahipsiz kalmasını önleriz.
+        const normalized = (value: unknown) => String(value || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLocaleLowerCase('tr');
+        const classIdMap = new Map<string, string>();
+        const studentIdMap = new Map<string, string>();
+
+        for (const oldClass of oldClasses) {
+            const nextClass = converted.find((item) => item.id === oldClass?.id)
+                || converted.find((item) => normalized(item.name) === normalized(oldClass?.name));
+            if (!nextClass || !oldClass?.id) continue;
+            classIdMap.set(oldClass.id, nextClass.id);
+            for (const oldStudent of oldClass.students || []) {
+                const nextStudent = nextClass.students.find((item) => item.id === oldStudent?.id)
+                    || nextClass.students.find((item) => normalized(item.name) === normalized(oldStudent?.name));
+                if (nextStudent && oldStudent?.id) studentIdMap.set(oldStudent.id, nextStudent.id);
+            }
+        }
+
+        const remapStudent = (id: unknown) => studentIdMap.get(String(id || '')) || id;
+        chessData.matches = chessData.matches.map((match: any) => ({
+            ...match,
+            classId: classIdMap.get(match.classId) || match.classId,
+            whiteId: remapStudent(match.whiteId),
+            blackId: remapStudent(match.blackId),
+        }));
+        chessData.tournaments = chessData.tournaments.map((tournament: any) => ({
+            ...tournament,
+            classId: classIdMap.get(tournament.classId) || tournament.classId,
+            playerIds: Array.isArray(tournament.playerIds)
+                ? tournament.playerIds.map(remapStudent)
+                : tournament.playerIds,
+            withdrawn: Array.isArray(tournament.withdrawn)
+                ? tournament.withdrawn.map(remapStudent)
+                : tournament.withdrawn,
+            rounds: Array.isArray(tournament.rounds)
+                ? tournament.rounds.map((round: any[]) => round.map((board: any) => ({
+                    ...board,
+                    whiteId: remapStudent(board?.whiteId),
+                    blackId: remapStudent(board?.blackId),
+                })))
+                : [],
+        }));
+
+        // Öğrenci ve sınıf ilerleme profilleri ayrı anahtarda tutulur. Kimlik
+        // değişiminde XP/rozet/ders kayıtlarını da aynı eşlemeyle taşı.
+        try {
+            const progressRaw = localStorage.getItem(CHESS_PROGRESS_KEY);
+            const progressData = progressRaw ? JSON.parse(progressRaw) : null;
+            if (progressData?.profiles && typeof progressData.profiles === 'object') {
+                const profileIdMap = new Map<string, string>();
+                for (const [oldId, nextId] of classIdMap) {
+                    if (oldId !== nextId) profileIdMap.set(`class:${oldId}`, `class:${nextId}`);
+                }
+                for (const [oldId, nextId] of studentIdMap) {
+                    if (oldId !== nextId) profileIdMap.set(`student:${oldId}`, `student:${nextId}`);
+                }
+                for (const [oldProfileId, nextProfileId] of profileIdMap) {
+                    if (progressData.profiles[oldProfileId] && !progressData.profiles[nextProfileId]) {
+                        progressData.profiles[nextProfileId] = progressData.profiles[oldProfileId];
+                    }
+                    if (progressData.profileNames?.[oldProfileId] && !progressData.profileNames[nextProfileId]) {
+                        progressData.profileNames[nextProfileId] = progressData.profileNames[oldProfileId];
+                    }
+                    delete progressData.profiles[oldProfileId];
+                    if (progressData.profileNames) delete progressData.profileNames[oldProfileId];
+                    if (progressData.activeProfileId === oldProfileId) {
+                        progressData.activeProfileId = nextProfileId;
+                    }
+                }
+                localStorage.setItem(CHESS_PROGRESS_KEY, JSON.stringify(progressData));
+            }
+        } catch {
+            // Bozuk/eski ilerleme kaydı satranç sınıf aktarımını engellemesin.
+        }
+
         chessData.classes = converted;
         if (activeClassId) {
             chessData.activeClassId = activeClassId;
+        } else if (classIdMap.has(chessData.activeClassId)) {
+            chessData.activeClassId = classIdMap.get(chessData.activeClassId);
         } else if (!chessData.activeClassId && converted.length > 0) {
             chessData.activeClassId = converted[0].id;
         }

@@ -6,7 +6,7 @@
  * önbellekten servis eder. Böylece sınıfta internet olmasa da platform açılır.
  */
 
-const CACHE_NAME = "satranc-okulu-v32";
+const CACHE_NAME = "satranc-okulu-v33";
 
 /** Uygulamanın açılması için gereken çekirdek dosyalar. */
 const APP_SHELL = [

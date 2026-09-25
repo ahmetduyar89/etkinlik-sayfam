@@ -154,11 +154,35 @@ let xpStat = null;
 let starStat = null;
 let classPicker = null;
 let studentPicker = null;
+let cloudStatusNode = null;
+let cloudStatus = { status: "connecting", detail: "Bulut bağlantısı kuruluyor." };
+
+const cloudLabels = {
+  connecting: "Bağlanıyor",
+  online: "Buluta kaydediliyor",
+  offline: "Çevrimdışı",
+  "signed-out": "Bulut kapalı",
+  error: "Senkronizasyon hatası"
+};
+
+function syncCloudStatus() {
+  if (!cloudStatusNode) return;
+  cloudStatusNode.className = `cloud-status ${cloudStatus.status}`;
+  cloudStatusNode.textContent = `● ${cloudLabels[cloudStatus.status] || "Bulut durumu"}`;
+  cloudStatusNode.title = cloudStatus.detail || cloudStatusNode.textContent;
+}
+
+window.addEventListener("satranc-cloud-status", (event) => {
+  cloudStatus = event.detail || cloudStatus;
+  syncCloudStatus();
+});
 
 function renderTopbar() {
   const collapsed = Boolean(progress.state.settings.navCollapsed);
   xpStat = el("div", { className: "top-stat", text: `XP ${progress.state.xp}` });
   starStat = el("div", { className: "top-stat", text: `★ ${progress.state.stars}` });
+  cloudStatusNode = el("div", { className: "cloud-status", role: "status" });
+  syncCloudStatus();
   return el("header", { className: "topbar" }, [
     // Menüyü aç/kapa — tercih kaydedilir, sayfalar arası korunur.
     el("button", {
@@ -191,6 +215,7 @@ function renderTopbar() {
       })
     ]),
     role === "teacher" ? renderClassPicker() : renderStudentPicker(),
+    cloudStatusNode,
     xpStat,
     starStat,
     el("button", { className: "icon-button", type: "button", title: "Ayarlar", onClick: () => navigate("settings"), html: icon("settings") })

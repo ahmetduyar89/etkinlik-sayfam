@@ -41,6 +41,8 @@ interface CloudProgress {
 interface SyncDevice {
     id: string;
     classIds?: string[];
+    activeClassId?: string;
+    anonymous?: boolean;
     lastSeenAt?: { toDate?: () => Date };
 }
 
@@ -81,6 +83,11 @@ export function ChessAdminDashboard({ onBack }: { onBack: () => void }) {
     const cloud = useCloudChess();
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const selected = classes.find((item) => item.id === selectedId) || null;
+    const activeDevices = cloud.devices.filter((device) => {
+        if (!device.anonymous) return false;
+        const seen = device.lastSeenAt?.toDate?.();
+        return seen && Date.now() - seen.getTime() < 150_000;
+    }).length;
 
     return (
         <div className="min-h-screen bg-[#f6f7fb] text-slate-900">
@@ -92,8 +99,8 @@ export function ChessAdminDashboard({ onBack }: { onBack: () => void }) {
                     <div className="h-6 w-px bg-slate-200" />
                     <Crown className="h-5 w-5 text-amber-500" />
                     <strong className="text-[17px]">Satranç Yönetimi</strong>
-                    <span className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${cloud.error ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                        <Cloud className="h-3.5 w-3.5" /> {cloud.error ? 'Kurulum bekliyor' : 'Canlı'}
+                    <span className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${cloud.error || !activeDevices ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                        <Cloud className="h-3.5 w-3.5" /> {cloud.error ? 'Kurulum bekliyor' : activeDevices ? `${activeDevices} sınıf cihazı bağlı` : 'Sınıf bağlantısı bekleniyor'}
                     </span>
                 </div>
             </header>
@@ -134,7 +141,7 @@ function ClassStatusCard({ item, cloud, onOpen }: { item: ClassRoom; cloud: Retu
     const weeks = course?.progress?.completedLessons?.filter((id) => /^week-\d+$/.test(id)).length || 0;
     const active = tournaments.find((tournament) => !tournament.finished);
     const lastSync = cloud.devices
-        .filter((device) => device.classIds?.includes(item.id))
+        .filter((device) => device.anonymous && device.activeClassId === item.id)
         .map((device) => device.lastSeenAt?.toDate?.())
         .filter((date): date is Date => Boolean(date))
         .sort((a, b) => b.getTime() - a.getTime())[0];
