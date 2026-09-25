@@ -13,18 +13,34 @@ import {
     ChevronLeft,
     ChevronRight,
     Cloud,
+    FileDown,
+    FileText,
+    FileUp,
+    Image as ImageIcon,
     LayoutTemplate,
     Layers,
     Loader2,
     Plus,
+    Printer,
+    QrCode,
     Redo2,
     Save,
+    Scissors,
+    Share2,
     Trash2,
     Undo2,
+    Unlink,
     Users,
-    FileText,
 } from 'lucide-react';
+import {
+    buildMultiPagePdf,
+    canvasToJpegBytes,
+    downloadFile,
+    printCanvases,
+    type PageImageInput,
+} from '../../utils/pdfExport';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
+import { useSurfaceTint } from '../../utils/surfaceTint';
 import { DrawingToolbar } from '../drawing/DrawingToolbar';
 import { TextBoxLayer } from '../tools/TextBoxLayer';
 import { usePrompt } from '../common/PromptDialog';
@@ -33,6 +49,7 @@ import { useConfirm } from '../common/ConfirmDialog';
 import { cn } from '../../utils/cn';
 import { BG_COLORS } from '../../constants/drawing';
 import { PAPER_STYLES, paperBackground } from './paper';
+import { PAGE_SIZES, pageDims } from '../../constants/pageSizes';
 import { PageThumbnails } from './PageThumbnails';
 import { importImageFile } from '../drawing/imageStore';
 import { measurePages } from './pageCodec';
@@ -70,6 +87,7 @@ import type {
     Notebook,
     NotebookOp,
     NotebookPage,
+    PageSize,
     PaperStyle,
     Stroke,
     TextBoxData,
@@ -102,6 +120,15 @@ const PAPER_GROUPS = PAPER_STYLES.reduce<
 
 export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEditorProps) {
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
+
+    // Defter tam ekran açılır; kurulu uygulamada saat/pil şeridi üst şeridin
+    // rengini alsın, araya beyaz bir bant girmesin.
+    useSurfaceTint('#6366f1');
+    /** Bağlı PDF sayfasının işlenmiş tuvali — PNG çıktısında arka plan olur. */
+    const pdfCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
+    const handlePdfCanvas = React.useCallback((c: HTMLCanvasElement | null) => {
+        pdfCanvasRef.current = c;
+    }, []);
     const prompt = usePrompt();
     const toast = useToast();
     const confirm = useConfirm();
@@ -126,6 +153,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const chunksRef = React.useRef<string[]>([]);
     /** Kaydedilmemiş değişiklik var mı (kapanış uyarısı için). */
     const dirtyRef = React.useRef(false);
+    const savingRef = React.useRef(false);
+    const editRevisionRef = React.useRef(0);
     /** Elimizdeki içeriğin sürümü; başka cihazdaki kayıt bunu ileri taşır. */
     const revRef = React.useRef(0);
     /** Çakışmada kullanıcı "benimkini kaydet" dedi: sonraki kayıt zorlanır. */
@@ -149,6 +178,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const boxTimerRef = React.useRef<number | null>(null);
 
     const [title, setTitle] = React.useState(notebook.title);
+    const [pageSize, setPageSize] = React.useState<PageSize>(notebook.page_size ?? 'free');
     const [paper, setPaper] = React.useState<PaperStyle>(
         notebook.paper || (notebook.kind === 'whiteboard' ? 'blank' : 'grid')
     );
@@ -161,6 +191,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         fillEnabled: false,
         stampIcon: '⭐',
         penType: 'fountain',
+        streamlineLevel: 'smooth',
         snapShapes: false,
         snapAngle: false,
         eraserMode: 'pixel',
@@ -193,6 +224,10 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const [showLinearGraph, setShowLinearGraph] = React.useState(false);
     const [showMathFormula, setShowMathFormula] = React.useState(false);
     const [showPdfViewer, setShowPdfViewer] = React.useState(false);
+    const [showPdfMenu, setShowPdfMenu] = React.useState(false);
+    const [showExportMenu, setShowExportMenu] = React.useState(false);
+    const [isExporting, setIsExporting] = React.useState(false);
+    const [exportProgress, setExportProgress] = React.useState('');
 
     const handleSelectTool = (toolId: string) => {
         if (toolId === 'compass') setShowCompass(true);
@@ -246,6 +281,16 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             setBoxesByPage(pages.map((p) => p.boxes));
             setPageInfo({ current: 0, total: pages.length });
             setIsLoading(false);
+            // Sayfa ölçüsü tanımlıysa defter açılırken sayfanın tamamı
+            // görünsün; yakınlaştırma yine serbesttir. PDF bağlı defterlerde
+            // ölçü PDF'ten gelir; kutusu olmayan eski defterlerde görünüme
+            // hiç dokunulmaz (eskiden olduğu gibi açılır).
+            const openBox = notebook.pdf_id
+                ? notebook.pdf_box ?? null
+                : pageDims(notebook.page_size);
+            window.setTimeout(() => {
+                if (openBox) canvasRef.current?.fitPage();
+            }, 80);
         })();
         return () => {
             alive = false;
@@ -477,11 +522,27 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         if (isLoading) return;
         dirtyRef.current = true;
         if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+        /**
+         * Kalem kağıttayken kaydetme.
+         *
+         * Kayıt, bütün sayfaları kopyalayıp JSON'a çevirir; bu iş ana iş
+         * parçacığını yüz milisaniyelerce kilitleyebilir. Çizimin ortasına
+         * denk geldiğinde işaretçi olayları birikir ve çizgi kalemin
+         * gerisinde kalıp sıçrar. Hareket bitene kadar beklenir.
+         */
+        const deadline = Date.now() + 6000;
+        const runWhenIdle = () => {
+            saveTimerRef.current = null;
+            // Erteleme sonsuza kadar sürmesin: bir işaretçi olayı düşerse
+            // (tarayıcı "pointerup" göndermezse) defter yine de kaydedilir.
+            if (canvasRef.current?.isBusy() && Date.now() < deadline) {
+                saveTimerRef.current = window.setTimeout(runWhenIdle, 350);
+                return;
+            }
+            void save();
+        };
         saveTimerRef.current = window.setTimeout(
-            () => {
-                saveTimerRef.current = null;
-                void save();
-            },
+            runWhenIdle,
             // Ortak çizimde canlılığı işlem akışı sağlar; anlık görüntü daha
             // seyrek yazılır, iki cihaz birbirini sürekli tetiklemesin.
             Date.now() - collabAtRef.current < 20000 ? 3000 : 1200
@@ -778,6 +839,148 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         }
     };
 
+    const handleUnlinkPdf = () => {
+        if (!notebook.pdf_id) return;
+        if (
+            !window.confirm(
+                'Bağlı PDF belgesini kaldırmak istediğinizden emin misiniz?\n(Sayfalarınız ve çizimleriniz korunacaktır)'
+            )
+        )
+            return;
+        onMetaChange({
+            pdf_id: undefined,
+            pdf_name: undefined,
+            pdf_total_pages: undefined,
+            pdf_box: undefined,
+        });
+        setShowPdfMenu(false);
+        toast.success('PDF bağlantısı kaldırıldı. Sayfalarınız korunuyor.');
+    };
+
+    const handleExportPdf = async (allPages: boolean) => {
+        try {
+            setIsExporting(true);
+            setExportProgress(allPages ? 'Sayfalar taranıyor…' : 'Sayfa hazırlanıyor…');
+            setShowExportMenu(false);
+
+            let pdfDoc: any = null;
+            if (notebook.pdf_id) {
+                try {
+                    pdfDoc = await getPdfDocument(notebook.pdf_id);
+                } catch (err) {
+                    console.warn('Bağlı PDF yüklenemedi:', err);
+                }
+            }
+
+            const pagesToExport = allPages
+                ? Array.from({ length: pageInfo.total }, (_, i) => i)
+                : [pageInfo.current];
+
+            const renderedPages: PageImageInput[] = [];
+
+            for (let idx = 0; idx < pagesToExport.length; idx++) {
+                const pageIndex = pagesToExport[idx];
+                setExportProgress(
+                    allPages
+                        ? `Sayfa ${idx + 1} / ${pagesToExport.length} hazırlanıyor…`
+                        : 'Sayfa işleniyor…'
+                );
+
+                let pdfBgCanvas: HTMLCanvasElement | null = null;
+                if (pdfDoc && pageIndex < pdfDoc.numPages) {
+                    try {
+                        const page = await pdfDoc.getPage(pageIndex + 1);
+                        const unscaled = page.getViewport({ scale: 1 });
+                        const targetW = pdfBox ? pdfBox.w : (pageDims(pageSize)?.w ?? 1200);
+                        const fitScale = targetW / unscaled.width;
+                        const viewport = page.getViewport({ scale: fitScale * 2 });
+                        const c = document.createElement('canvas');
+                        c.width = viewport.width;
+                        c.height = viewport.height;
+                        const ctx = c.getContext('2d');
+                        if (ctx) {
+                            await page.render({ canvasContext: ctx, viewport }).promise;
+                            pdfBgCanvas = c;
+                        }
+                    } catch (e) {
+                        console.warn(`PDF sayfa ${pageIndex + 1} render edilemedi:`, e);
+                    }
+                }
+
+                const pageCanvas = canvasRef.current?.renderPageToCanvas(
+                    pageIndex,
+                    false,
+                    bgColor,
+                    paper,
+                    pdfBgCanvas
+                );
+
+                if (pageCanvas) {
+                    const imgData = await canvasToJpegBytes(pageCanvas, 0.92);
+                    renderedPages.push({
+                        width: imgData.width,
+                        height: imgData.height,
+                        jpegBytes: imgData.bytes,
+                    });
+                }
+            }
+
+            if (renderedPages.length === 0) {
+                toast.error('Dışa aktarılacak sayfa bulunamadı.');
+                setIsExporting(false);
+                return;
+            }
+
+            setExportProgress('PDF belgesi derleniyor…');
+            const pdfBlob = buildMultiPagePdf(renderedPages);
+            const fileName = allPages
+                ? `${title || 'Defter'}.pdf`
+                : `${title || 'Defter'}_Sayfa_${pageInfo.current + 1}.pdf`;
+
+            downloadFile(pdfBlob, fileName);
+            toast.success(
+                allPages
+                    ? `Defter ${renderedPages.length} sayfa olarak PDF indirildi.`
+                    : `Sayfa ${pageInfo.current + 1} PDF olarak indirildi.`
+            );
+        } catch (err: any) {
+            console.error('PDF dışa aktarım hatası:', err);
+            toast.error('PDF oluşturulamadı: ' + (err?.message || 'Bilinmeyen hata'));
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    const handleExportPng = () => {
+        try {
+            canvasRef.current?.screenshot(true, bgColor, paper, pdfCanvasRef.current);
+            toast.success('Sayfa görseli (PNG) indirildi.');
+        } catch (err: any) {
+            toast.error('Görsel kaydedilemedi: ' + (err?.message || 'Hata'));
+        } finally {
+            setShowExportMenu(false);
+        }
+    };
+
+    const handlePrint = () => {
+        try {
+            const c = canvasRef.current?.renderPageToCanvas(
+                pageInfo.current,
+                false,
+                bgColor,
+                paper,
+                pdfCanvasRef.current
+            );
+            if (c) {
+                printCanvases([c]);
+            }
+        } catch (err: any) {
+            toast.error('Yazdırma başlatılamadı: ' + (err?.message || 'Hata'));
+        } finally {
+            setShowExportMenu(false);
+        }
+    };
+
     const handleTitleCommit = () => {
         const clean = title.trim() || (notebook.kind === 'whiteboard' ? 'Adsız beyaz tahta' : 'Adsız defter');
         setTitle(clean);
@@ -795,10 +998,24 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     }, [showPages, isLoading, pageInfo, saveState, boxesByPage]);
 
     const currentPaper = PAPER_STYLES.find((p) => p.id === paper);
+    const currentPageSize = PAGE_SIZES.find((p) => p.id === pageSize);
+    // Sayfa kutusu: PDF bağlıysa PDF sayfası, değilse seçilen kağıt ölçüsü.
+    const hasPdf = !!notebook.pdf_id;
+    const pdfBox = hasPdf ? notebook.pdf_box ?? null : null;
+    // PDF bağlı defterlerde sayfayı PDF belirler; kağıt ölçüsü uygulanmaz.
+    // Eski defterlerde PDF kutusu kayıtlı olmadığı için sayfa sınırı çizilmez.
+    const pageBox = hasPdf ? pdfBox : pageDims(pageSize);
 
     const changePaper = (next: PaperStyle) => {
         setPaper(next);
         onMetaChange({ paper: next });
+    };
+
+    const changePageSize = (next: PageSize) => {
+        setPageSize(next);
+        onMetaChange({ page_size: next });
+        // Yeni ölçüde sayfanın tamamı görünsün.
+        window.setTimeout(() => canvasRef.current?.fitPage(), 60);
     };
 
     const changeBg = (next: string) => {
@@ -808,157 +1025,300 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
 
     return (
         <div className="fixed inset-0 z-[9000] flex flex-col bg-surface-container-low">
-            {/* Üst şerit */}
+            {/* Üst şerit - Belge ve Dışa Aktarma Başlığı */}
             <header
                 className={cn(
-                    'flex items-center gap-3 px-3 sm:px-5 py-2.5 bg-primary text-white shadow-[0_2px_10px_rgba(15,23,42,0.18)] flex-shrink-0',
+                    'flex items-center justify-between px-3 sm:px-4 py-2 bg-primary text-white shadow-[0_2px_10px_rgba(15,23,42,0.18)] flex-shrink-0 relative z-[6000]',
                     presenting && 'hidden'
                 )}
             >
-                <button
-                    onClick={handleClose}
-                    title="Defterlerime dön"
-                    aria-label="Defterlerime dön"
-                    className="p-2 rounded-xl hover:bg-white/15 transition-colors"
-                >
-                    <ArrowLeft className="w-[18px] h-[18px]" />
-                </button>
-
-                <input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    onBlur={handleTitleCommit}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                    }}
-                    aria-label="Defter adı"
-                    className="min-w-0 flex-shrink bg-white/10 hover:bg-white/15 focus:bg-white/20 rounded-xl px-3 py-1.5 text-[14px] font-semibold outline-none border border-transparent focus:border-white/40 transition-colors w-[180px] sm:w-[260px]"
-                />
-
-                <span className="hidden md:inline text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-white/15">
-                    {notebook.kind === 'whiteboard' ? 'Beyaz Tahta' : 'Not Defteri'}
-                </span>
-
-                {notebook.pdf_id && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/25 border border-rose-300/30 text-white text-[11.5px] font-semibold shadow-sm">
-                        <FileText className="w-3.5 h-3.5 text-rose-200" />
-                        <span className="max-w-[130px] sm:max-w-[200px] truncate">
-                            {notebook.pdf_name || 'PDF Belgesi'}
-                        </span>
-                    </span>
-                )}
-
-                {/* Kağıt şablonu */}
-                <div className="relative hidden sm:block ml-1">
+                {/* Sol: Geri düğmesi, Başlık, Defter türü */}
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <button
-                        onClick={() => setShowPaperMenu((v) => !v)}
-                        aria-haspopup="menu"
-                        aria-expanded={showPaperMenu}
-                        title="Sayfa şablonu"
-                        className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-xl px-2.5 py-1.5 text-[12.5px] font-semibold transition-colors"
+                        onClick={handleClose}
+                        title="Defterlerime dön"
+                        aria-label="Defterlerime dön"
+                        className="p-1.5 sm:p-2 rounded-xl hover:bg-white/15 transition-colors shrink-0"
                     >
-                        <LayoutTemplate className="w-4 h-4" />
-                        <span className="hidden md:inline">{currentPaper?.label ?? 'Şablon'}</span>
-                        <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+                        <ArrowLeft className="w-[18px] h-[18px]" />
                     </button>
 
-                    {showPaperMenu && (
-                        <>
-                            <div
-                                className="fixed inset-0 z-[9100]"
-                                onClick={() => setShowPaperMenu(false)}
-                                aria-hidden="true"
-                            />
-                            <div
-                                role="menu"
-                                aria-label="Sayfa şablonu"
-                                className="absolute left-0 top-[calc(100%+8px)] z-[9200] w-[268px] max-h-[70vh] overflow-y-auto bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2"
-                            >
-                                {PAPER_GROUPS.map((group) => (
-                                    <div key={group.label} className="mb-1.5 last:mb-0">
-                                        <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-                                            {group.label}
-                                        </p>
-                                        {group.items.map((item) => (
-                                            <button
-                                                key={item.id}
-                                                role="menuitemradio"
-                                                aria-checked={paper === item.id}
-                                                onClick={() => {
-                                                    changePaper(item.id);
-                                                    setShowPaperMenu(false);
-                                                }}
-                                                className={cn(
-                                                    'w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl text-left transition-colors',
-                                                    paper === item.id
-                                                        ? 'bg-primary/10'
-                                                        : 'hover:bg-surface-container-high'
-                                                )}
-                                            >
-                                                <span
-                                                    className="w-9 h-9 rounded-lg border border-outline-variant shrink-0"
-                                                    style={paperBackground(item.id, '#ffffff')}
-                                                    aria-hidden="true"
-                                                />
-                                                <span className="min-w-0">
-                                                    <span className="block text-[12.5px] font-bold leading-tight">
-                                                        {item.label}
-                                                    </span>
-                                                    <span className="block text-[11px] text-on-surface-variant leading-tight truncate">
-                                                        {item.hint}
-                                                    </span>
-                                                </span>
-                                                {paper === item.id && (
-                                                    <Check className="w-4 h-4 text-primary ml-auto shrink-0" />
-                                                )}
-                                            </button>
-                                        ))}
-                                    </div>
-                                ))}
-                            </div>
-                        </>
-                    )}
+                    <input
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        onBlur={handleTitleCommit}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                        }}
+                        aria-label="Defter adı"
+                        className="bg-white/10 hover:bg-white/15 focus:bg-white/20 rounded-xl px-2.5 sm:px-3 py-1.5 text-[13.5px] sm:text-[14px] font-semibold outline-none border border-transparent focus:border-white/40 transition-colors w-[130px] sm:w-[220px] md:w-[260px] truncate"
+                    />
+
+                    <span className="hidden lg:inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/15 shrink-0">
+                        {notebook.kind === 'whiteboard' ? 'Beyaz Tahta' : 'Not Defteri'}
+                    </span>
                 </div>
 
-                {/* Zemin rengi */}
-                <div className="hidden xl:flex items-center gap-1.5 ml-1">
-                    {BG_COLORS.map((b) => (
-                        <button
-                            key={b.color}
-                            onClick={() => changeBg(b.color)}
-                            title={b.label}
-                            aria-label={`Zemin rengi: ${b.label}`}
-                            className={cn(
-                                'w-5 h-5 rounded-full border-2 transition-transform hover:scale-110',
-                                bgColor === b.color ? 'border-white scale-110' : 'border-white/30'
-                            )}
-                            style={{ backgroundColor: b.color }}
-                        />
-                    ))}
-                </div>
-
-                <div className="ml-auto flex items-center gap-1.5">
-                    {/* Ortak çizim: başka bir cihaz da bu deftere yazıyor */}
+                {/* Sağ: PDF Menüsü, Dışa Aktarma & Paylaşma, Geri/İleri, Otomatik Kayıt, Kaydet */}
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                    {/* Ortak çizim bildirimi */}
                     {collab && (
                         <span
-                            className="hidden sm:flex items-center gap-1.5 text-[12px] font-semibold text-white bg-emerald-600/90 rounded-lg px-2 py-1"
+                            className="hidden xl:flex items-center gap-1.5 text-[11.5px] font-semibold text-white bg-emerald-600/90 rounded-lg px-2 py-1"
                             title="Bu deftere başka bir cihazdan da çiziliyor; değişiklikler anında paylaşılıyor."
                         >
-                            <Users className="w-3.5 h-3.5" /> Birlikte çiziliyor
+                            <Users className="w-3.5 h-3.5" /> Birlikte
                         </span>
                     )}
+
+                    {/* PDF Menüsü Dropdown */}
+                    <div className="relative">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowPdfMenu((v) => !v);
+                                setShowExportMenu(false);
+                            }}
+                            aria-haspopup="menu"
+                            aria-expanded={showPdfMenu}
+                            className={cn(
+                                'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[12.5px] font-semibold transition-colors',
+                                notebook.pdf_id
+                                    ? 'bg-rose-500/25 border border-rose-300/30 text-rose-100 hover:bg-rose-500/35'
+                                    : 'bg-white/10 hover:bg-white/20 text-white'
+                            )}
+                            title={notebook.pdf_id ? `Bağlı PDF: ${notebook.pdf_name || 'PDF'}` : 'PDF İşlemleri'}
+                        >
+                            <FileText className={cn('w-3.5 h-3.5', notebook.pdf_id ? 'text-rose-200' : 'text-white')} />
+                            <span className="max-w-[100px] sm:max-w-[140px] truncate">
+                                {notebook.pdf_id ? (notebook.pdf_name || 'PDF') : 'PDF'}
+                            </span>
+                            {notebook.pdf_id && notebook.pdf_total_pages && (
+                                <span className="text-[11px] opacity-75 hidden sm:inline">
+                                    · {notebook.pdf_total_pages} sf
+                                </span>
+                            )}
+                            <ChevronDown className="w-3.5 h-3.5 opacity-70 ml-0.5" />
+                        </button>
+
+                        {showPdfMenu && (
+                            <>
+                                <div
+                                    className="fixed inset-0 z-[9100]"
+                                    onClick={() => setShowPdfMenu(false)}
+                                    aria-hidden="true"
+                                />
+                                <div
+                                    role="menu"
+                                    aria-label="PDF Menüsü"
+                                    className="absolute right-0 sm:left-0 sm:right-auto top-[calc(100%+8px)] z-[9200] w-[280px] bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
+                                >
+                                    {notebook.pdf_id ? (
+                                        <>
+                                            <div className="px-2.5 py-2 mb-1 bg-rose-500/10 rounded-xl border border-rose-200/50">
+                                                <div className="flex items-center gap-2 text-rose-700 font-bold text-[12.5px]">
+                                                    <FileText className="w-4 h-4 shrink-0" />
+                                                    <span className="truncate">{notebook.pdf_name || 'PDF Belgesi'}</span>
+                                                </div>
+                                                <p className="text-[11px] text-rose-600/80 mt-0.5">
+                                                    {notebook.pdf_total_pages ? `${notebook.pdf_total_pages} sayfa bağlı (GoodNotes Modu)` : 'PDF sayfaları bağlı'}
+                                                </p>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setShowPdfMenu(false);
+                                                    pdfAttachInputRef.current?.click();
+                                                }}
+                                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                                            >
+                                                <FileUp className="w-4 h-4 text-primary shrink-0" />
+                                                <div>
+                                                    <div>PDF Belgesini Değiştir</div>
+                                                    <div className="text-[10.5px] font-normal text-on-surface-variant">Yeni bir dosya yükleyip bağlayın</div>
+                                                </div>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={handleUnlinkPdf}
+                                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                                            >
+                                                <Unlink className="w-4 h-4 shrink-0" />
+                                                <div>
+                                                    <div>PDF Bağlantısını Kaldır</div>
+                                                    <div className="text-[10.5px] font-normal text-red-500/80">Çizimleriniz korunur, arka plan kalkar</div>
+                                                </div>
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowPdfMenu(false);
+                                                pdfAttachInputRef.current?.click();
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                                        >
+                                            <FileUp className="w-4 h-4 text-primary shrink-0" />
+                                            <div>
+                                                <div>PDF Belgesi Bağla</div>
+                                                <div className="text-[10.5px] font-normal text-on-surface-variant">GoodNotes modu: PDF sayfalarının üzerine not alın</div>
+                                            </div>
+                                        </button>
+                                    )}
+
+                                    <div className="h-px bg-outline-variant my-1.5" />
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowPdfMenu(false);
+                                            setShowPdfViewer(true);
+                                        }}
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                                    >
+                                        <Scissors className="w-4 h-4 text-amber-600 shrink-0" />
+                                        <div>
+                                            <div>PDF & Soru Kırpıcı</div>
+                                            <div className="text-[10.5px] font-normal text-on-surface-variant">MEB veya diğer PDF'lerden soru kesip sayfaya yapıştırın</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Paylaş & Dışa Aktar Menüsü Dropdown */}
+                    <div className="relative">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowExportMenu((v) => !v);
+                                setShowPdfMenu(false);
+                            }}
+                            aria-haspopup="menu"
+                            aria-expanded={showExportMenu}
+                            className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-xl px-2.5 py-1.5 text-[12.5px] font-semibold transition-colors"
+                            title="Dışa Aktar ve Paylaş"
+                        >
+                            <Share2 className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Dışa Aktar</span>
+                            <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+                        </button>
+
+                        {showExportMenu && (
+                            <>
+                                <div
+                                    className="fixed inset-0 z-[9100]"
+                                    onClick={() => setShowExportMenu(false)}
+                                    aria-hidden="true"
+                                />
+                                <div
+                                    role="menu"
+                                    aria-label="Dışa Aktarma Menüsü"
+                                    className="absolute right-0 top-[calc(100%+8px)] z-[9200] w-[270px] bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
+                                >
+                                    <p className="px-2.5 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                                        PDF Dışa Aktarma
+                                    </p>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleExportPdf(true)}
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                                    >
+                                        <FileDown className="w-4 h-4 text-rose-600 shrink-0" />
+                                        <div>
+                                            <div>Tüm Defteri PDF Olarak İndir</div>
+                                            <div className="text-[10.5px] font-normal text-on-surface-variant">
+                                                {pageInfo.total} sayfanın tamamı tek bir PDF belgesinde
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleExportPdf(false)}
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                                    >
+                                        <FileText className="w-4 h-4 text-rose-500 shrink-0" />
+                                        <div>
+                                            <div>Bu Sayfayı PDF İndir</div>
+                                            <div className="text-[10.5px] font-normal text-on-surface-variant">
+                                                Yalnızca mevcut sayfa ({pageInfo.current + 1}. sayfa)
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    <div className="h-px bg-outline-variant my-1.5" />
+                                    <p className="px-2.5 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                                        Görsel & Yazdırma
+                                    </p>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleExportPng}
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                                    >
+                                        <ImageIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+                                        <div>
+                                            <div>Sayfayı Görsel (PNG) İndir</div>
+                                            <div className="text-[10.5px] font-normal text-on-surface-variant">Mevcut sayfanın ekran görüntüsü</div>
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={handlePrint}
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                                    >
+                                        <Printer className="w-4 h-4 text-indigo-600 shrink-0" />
+                                        <div>
+                                            <div>Sayfayı Yazdır</div>
+                                            <div className="text-[10.5px] font-normal text-on-surface-variant">Yazıcıya veya kağıda doğrudan baskı</div>
+                                        </div>
+                                    </button>
+
+                                    <div className="h-px bg-outline-variant my-1.5" />
+                                    <p className="px-2.5 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                                        Öğrenci Paylaşımı
+                                    </p>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowExportMenu(false);
+                                            setShowQr(true);
+                                        }}
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                                    >
+                                        <QrCode className="w-4 h-4 text-amber-600 shrink-0" />
+                                        <div>
+                                            <div>Öğrenciye Gönder (QR Kod)</div>
+                                            <div className="text-[10.5px] font-normal text-on-surface-variant">Akıllı tahtadan öğrencilere canlı paylaşım</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    <div className="w-px h-4 bg-white/20 mx-0.5" />
+
                     {/* Kayıt durumu */}
                     {saveBlock === 'conflict' ? (
                         <button
                             onClick={() => void resolveConflict()}
                             title="Defter başka bir cihazda da değişti; hangi sürümün kalacağını seçin."
-                            className="flex items-center gap-1.5 text-[12px] font-semibold text-white bg-red-600 rounded-lg px-2 py-1 hover:bg-red-500 transition-colors"
+                            className="flex items-center gap-1.5 text-[11.5px] font-semibold text-white bg-red-600 rounded-lg px-2 py-1 hover:bg-red-500 transition-colors"
                         >
-                            <AlertTriangle className="w-3.5 h-3.5" /> Başka cihazda değişti — seçin
+                            <AlertTriangle className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Çakışma</span>
                         </button>
                     ) : saveBlock ? (
                         <span
-                            className="flex items-center gap-1.5 text-[12px] font-semibold text-white bg-red-600 rounded-lg px-2 py-1"
+                            className="flex items-center gap-1.5 text-[11.5px] font-semibold text-white bg-red-600 rounded-lg px-2 py-1"
                             title={
                                 saveBlock === 'full'
                                     ? 'Defter azami boyuta ulaştı; otomatik kayıt durdu.'
@@ -966,146 +1326,290 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             }
                         >
                             <AlertTriangle className="w-3.5 h-3.5" />
-                            {saveBlock === 'full' ? 'Defter dolu — kaydedilmiyor' : 'Kayıt durduruldu'}
+                            <span className="hidden sm:inline">{saveBlock === 'full' ? 'Dolu' : 'Durduruldu'}</span>
                         </span>
                     ) : (
-                        <span className="hidden sm:flex items-center gap-1.5 text-[12px] font-semibold text-white/85 px-2">
+                        <span
+                            className="hidden md:flex items-center gap-1 text-[11.5px] font-medium text-white/80 px-1"
+                            title={saveState === 'saving' ? 'Kaydediliyor…' : saveState === 'saved' ? 'Değişiklikler kaydedildi' : 'Buluta otomatik kaydedilir'}
+                        >
                             {saveState === 'saving' ? (
                                 <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Kaydediliyor…
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                                    <span className="hidden lg:inline">Kaydediliyor…</span>
                                 </>
                             ) : saveState === 'saved' ? (
                                 <>
-                                    <Check className="w-3.5 h-3.5" /> Kaydedildi
+                                    <Check className="w-3.5 h-3.5 text-emerald-300" />
+                                    <span className="hidden lg:inline">Kaydedildi</span>
                                 </>
                             ) : (
                                 <>
-                                    <Cloud className="w-3.5 h-3.5" /> Otomatik kayıt
+                                    <Cloud className="w-3.5 h-3.5 text-white/70" />
+                                    <span className="hidden lg:inline">Kayıtlı</span>
                                 </>
                             )}
                         </span>
                     )}
 
-                    <button
-                        onClick={handleUndo}
-                        disabled={!history.canUndo}
-                        title="Geri al (Ctrl+Z)"
-                        aria-label="Geri al"
-                        className="p-2 rounded-xl hover:bg-white/15 transition-colors disabled:opacity-35 disabled:hover:bg-transparent"
-                    >
-                        <Undo2 className="w-[18px] h-[18px]" />
-                    </button>
-                    <button
-                        onClick={handleRedo}
-                        disabled={!history.canRedo}
-                        title="İleri al (Ctrl+Shift+Z)"
-                        aria-label="İleri al"
-                        className="p-2 rounded-xl hover:bg-white/15 transition-colors disabled:opacity-35 disabled:hover:bg-transparent"
-                    >
-                        <Redo2 className="w-[18px] h-[18px]" />
-                    </button>
-                    <button
-                        onClick={() => canvasRef.current?.screenshot(true, bgColor, paper)}
-                        title="Sayfayı görsel olarak indir"
-                        aria-label="Sayfayı görsel olarak indir"
-                        className="p-2 rounded-xl hover:bg-white/15 transition-colors"
-                    >
-                        <Camera className="w-[18px] h-[18px]" />
-                    </button>
+                    {/* Geri / İleri */}
+                    <div className="flex items-center">
+                        <button
+                            onClick={handleUndo}
+                            disabled={!history.canUndo}
+                            title="Geri al (Ctrl+Z)"
+                            aria-label="Geri al"
+                            className="p-1.5 rounded-lg hover:bg-white/15 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                        >
+                            <Undo2 className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={handleRedo}
+                            disabled={!history.canRedo}
+                            title="İleri al (Ctrl+Shift+Z)"
+                            aria-label="İleri al"
+                            className="p-1.5 rounded-lg hover:bg-white/15 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                        >
+                            <Redo2 className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    {/* Kaydet butonu */}
                     <button
                         onClick={() => void save()}
-                        className="inline-flex items-center gap-1.5 bg-white text-primary px-3 py-2 rounded-xl text-[13px] font-bold hover:brightness-95 transition"
+                        className="inline-flex items-center gap-1.5 bg-white text-primary px-3 py-1.5 rounded-xl text-[12.5px] font-bold hover:bg-white/95 active:scale-95 transition shadow-sm"
                     >
-                        <Save className="w-4 h-4 hidden sm:inline" /> Kaydet
+                        <Save className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Kaydet</span>
                     </button>
                 </div>
             </header>
 
-            {/* Sayfa şeridi */}
+            {/* İkincil Şerit - Sayfa Gezintisi, Kağıt Şablonu & Ders Sunum Araçları */}
             <div
                 className={cn(
-                    'flex items-center justify-center gap-2 py-1.5 bg-white border-b border-outline-variant flex-shrink-0',
+                    'flex items-center justify-between px-3 sm:px-4 py-1.5 bg-white dark:bg-surface-container border-b border-outline-variant flex-shrink-0 relative z-[5500] text-[12.5px]',
                     presenting && 'hidden'
                 )}
             >
-                <button
-                    onClick={() => setShowPages((v) => !v)}
-                    aria-pressed={showPages}
-                    title="Sayfa küçük resimleri"
-                    className={cn(
-                        'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12.5px] font-semibold transition-colors',
-                        showPages
-                            ? 'bg-primary/10 text-primary'
-                            : 'text-on-surface-variant hover:bg-surface-container-high'
-                    )}
-                >
-                    <Layers className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Sayfalar</span>
-                </button>
-                <div className="w-px h-4 bg-outline-variant mx-1" />
-                <button
-                    onClick={() => canvasRef.current?.prevPage()}
-                    disabled={pageInfo.current === 0}
-                    aria-label="Önceki sayfa"
-                    className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30"
-                >
-                    <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                    type="button"
-                    onClick={handleJumpToPage}
-                    title="Sayfaya zıpla (tıklayın)"
-                    className="text-[12.5px] font-bold text-on-surface tabular-nums px-2 py-0.5 rounded-md hover:bg-surface-container-high transition-colors cursor-pointer border border-transparent hover:border-outline-variant"
-                >
-                    Sayfa {pageInfo.current + 1} / {pageInfo.total}
-                </button>
-                <button
-                    onClick={() => canvasRef.current?.nextPage()}
-                    disabled={pageInfo.current >= pageInfo.total - 1}
-                    aria-label="Sonraki sayfa"
-                    className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30"
-                >
-                    <ChevronRight className="w-4 h-4" />
-                </button>
-                <div className="w-px h-4 bg-outline-variant mx-1" />
-                <button
-                    onClick={handleAddPage}
-                    title="Yeni sayfa"
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12.5px] font-semibold text-emerald-600 hover:bg-emerald-50"
-                >
-                    <Plus className="w-3.5 h-3.5" /> Sayfa
-                </button>
-                {pageInfo.total > 1 && (
+                {/* Sol: Sayfalar paneli butonu, Sayfa gezintisi, Sayfa Ekle / Sil */}
+                <div className="flex items-center gap-1 sm:gap-1.5">
                     <button
-                        onClick={() => void handleDeletePage()}
-                        title="Bu sayfayı sil"
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12.5px] font-semibold text-red-500 hover:bg-red-50"
+                        onClick={() => setShowPages((v) => !v)}
+                        aria-pressed={showPages}
+                        title="Sayfa küçük resimleri"
+                        className={cn(
+                            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors',
+                            showPages
+                                ? 'bg-primary/10 text-primary'
+                                : 'text-on-surface-variant hover:bg-surface-container-high'
+                        )}
                     >
-                        <Trash2 className="w-3.5 h-3.5" /> Sil
+                        <Layers className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Sayfalar</span>
                     </button>
-                )}
-                <div className="w-px h-4 bg-outline-variant mx-1" />
-                <LessonModeToolbar
-                    overlay={overlay}
-                    onOverlayChange={setOverlay}
-                    presenting={presenting}
-                    onPresentingChange={setPresenting}
-                    onShare={() => setShowQr(true)}
-                    onOpenPdf={() => setShowPdfViewer(true)}
-                    fullscreenTarget={stageRef}
-                />
-                <div className="w-px h-4 bg-outline-variant mx-1" />
-                <button
-                    type="button"
-                    onClick={() => pdfAttachInputRef.current?.click()}
-                    title={notebook.pdf_id ? 'PDF belgesini değiştir / yeni dosya bağla' : 'PDF belgesi bağla (GoodNotes tarzı)'}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12.5px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-colors"
-                >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span className="hidden xl:inline">
-                        {notebook.pdf_id ? 'PDF Değiştir' : 'PDF Bağla'}
-                    </span>
-                </button>
+
+                    <div className="w-px h-4 bg-outline-variant mx-0.5" />
+
+                    <button
+                        onClick={() => canvasRef.current?.prevPage()}
+                        disabled={pageInfo.current === 0}
+                        aria-label="Önceki sayfa"
+                        className="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 transition-colors"
+                    >
+                        <ChevronLeft className="w-4 h-4" />
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={handleJumpToPage}
+                        title="Sayfaya git (tıklayın)"
+                        className="text-[12px] font-bold text-on-surface tabular-nums px-2 py-0.5 rounded-md hover:bg-surface-container-high transition-colors cursor-pointer border border-transparent hover:border-outline-variant"
+                    >
+                        {pageInfo.current + 1} / {pageInfo.total}
+                    </button>
+
+                    <button
+                        onClick={() => canvasRef.current?.nextPage()}
+                        disabled={pageInfo.current >= pageInfo.total - 1}
+                        aria-label="Sonraki sayfa"
+                        className="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 transition-colors"
+                    >
+                        <ChevronRight className="w-4 h-4" />
+                    </button>
+
+                    <div className="w-px h-4 bg-outline-variant mx-0.5" />
+
+                    <button
+                        onClick={handleAddPage}
+                        title="Yeni sayfa ekle"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
+                    >
+                        <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Sayfa</span>
+                    </button>
+
+                    {pageInfo.total > 1 && (
+                        <button
+                            onClick={() => void handleDeletePage()}
+                            title="Bu sayfayı sil"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Sil</span>
+                        </button>
+                    )}
+                </div>
+
+                {/* Orta: Kağıt Şablonu & Zemin Rengi */}
+                <div className="flex items-center gap-2">
+                    {/* Kağıt şablonu dropdown */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowPaperMenu((v) => !v)}
+                            aria-haspopup="menu"
+                            aria-expanded={showPaperMenu}
+                            title="Sayfa şablonu ve boyutu"
+                            className="inline-flex items-center gap-1.5 bg-surface-container-low hover:bg-surface-container px-2.5 py-1 rounded-lg border border-outline-variant text-[12px] font-medium text-on-surface transition-colors"
+                        >
+                            <LayoutTemplate className="w-3.5 h-3.5 text-primary" />
+                            <span className="hidden md:inline">
+                                {currentPaper?.label ?? 'Şablon'}
+                                {pageSize !== 'free' && currentPageSize
+                                    ? ` · ${currentPageSize.label}`
+                                    : ''}
+                            </span>
+                            <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
+                        </button>
+
+                        {showPaperMenu && (
+                            <>
+                                <div
+                                    className="fixed inset-0 z-[9100]"
+                                    onClick={() => setShowPaperMenu(false)}
+                                    aria-hidden="true"
+                                />
+                                <div
+                                    role="menu"
+                                    aria-label="Sayfa şablonu"
+                                    className="absolute left-1/2 -translate-x-1/2 top-[calc(100%+8px)] z-[9200] w-[268px] max-h-[70vh] overflow-y-auto bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
+                                >
+                                    <div className="mb-2">
+                                        <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                                            Sayfa Boyutu
+                                        </p>
+                                        {hasPdf && (
+                                            <p className="px-2 pb-1.5 text-[11px] text-on-surface-variant leading-tight">
+                                                {pdfBox
+                                                    ? 'Bu defterde sayfa, bağlı PDF sayfasının ölçüsündedir.'
+                                                    : 'PDF bağlı defter: sayfa ölçüsü PDF yerleşiminden gelir.'}
+                                            </p>
+                                        )}
+                                        <div
+                                            className={cn(
+                                                'grid grid-cols-2 gap-1',
+                                                hasPdf && 'opacity-40 pointer-events-none'
+                                            )}
+                                        >
+                                            {PAGE_SIZES.map((size) => (
+                                                <button
+                                                    key={size.id}
+                                                    role="menuitemradio"
+                                                    aria-checked={pageSize === size.id}
+                                                    title={size.hint}
+                                                    onClick={() => {
+                                                        changePageSize(size.id);
+                                                        setShowPaperMenu(false);
+                                                    }}
+                                                    className={cn(
+                                                        'px-2 py-1.5 rounded-lg text-left transition-colors border',
+                                                        pageSize === size.id
+                                                            ? 'bg-primary/10 border-primary/40'
+                                                            : 'border-transparent hover:bg-surface-container-high'
+                                                    )}
+                                                >
+                                                    <span className="block text-[12px] font-bold leading-tight">
+                                                        {size.label}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="h-px bg-outline-variant my-2" />
+                                    </div>
+
+                                    {PAPER_GROUPS.map((group) => (
+                                        <div key={group.label} className="mb-1.5 last:mb-0">
+                                            <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                                                {group.label}
+                                            </p>
+                                            {group.items.map((item) => (
+                                                <button
+                                                    key={item.id}
+                                                    role="menuitemradio"
+                                                    aria-checked={paper === item.id}
+                                                    onClick={() => {
+                                                        changePaper(item.id);
+                                                        setShowPaperMenu(false);
+                                                    }}
+                                                    className={cn(
+                                                        'w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl text-left transition-colors',
+                                                        paper === item.id
+                                                            ? 'bg-primary/10'
+                                                            : 'hover:bg-surface-container-high'
+                                                    )}
+                                                >
+                                                    <span
+                                                        className="w-8 h-8 rounded-lg border border-outline-variant shrink-0"
+                                                        style={paperBackground(item.id, bgColor)}
+                                                        aria-hidden="true"
+                                                    />
+                                                    <span className="min-w-0">
+                                                        <span className="block text-[12px] font-bold leading-tight">
+                                                            {item.label}
+                                                        </span>
+                                                        <span className="block text-[10.5px] text-on-surface-variant leading-tight truncate">
+                                                            {item.hint}
+                                                        </span>
+                                                    </span>
+                                                    {paper === item.id && (
+                                                        <Check className="w-4 h-4 text-primary ml-auto shrink-0" />
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Zemin renkleri */}
+                    <div className="hidden sm:flex items-center gap-1 ml-0.5">
+                        {BG_COLORS.map((b) => (
+                            <button
+                                key={b.color}
+                                onClick={() => changeBg(b.color)}
+                                title={b.label}
+                                aria-label={`Zemin rengi: ${b.label}`}
+                                className={cn(
+                                    'w-4 h-4 sm:w-5 sm:h-5 rounded-full border transition-transform hover:scale-110 shadow-xs',
+                                    bgColor === b.color ? 'border-primary ring-2 ring-primary/30 scale-110' : 'border-outline-variant/60'
+                                )}
+                                style={{ backgroundColor: b.color }}
+                            />
+                        ))}
+                    </div>
+                </div>
+
+                {/* Sağ: Ders & Sunum Modu Araçları (Spot, Perde, Sunum, Tam Ekran) */}
+                <div className="flex items-center gap-1">
+                    <LessonModeToolbar
+                        overlay={overlay}
+                        onOverlayChange={setOverlay}
+                        presenting={presenting}
+                        onPresentingChange={setPresenting}
+                        fullscreenTarget={stageRef}
+                    />
+                </div>
+
+                {/* Gizli PDF Dosya Seçici */}
                 <input
                     ref={pdfAttachInputRef}
                     type="file"
@@ -1115,8 +1619,47 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 />
             </div>
 
+            {/* GoodNotes Tarzı Sabit Çizim Araç Çubuğu */}
+            {!presenting && (
+                <DrawingToolbar
+                    fixed
+                    onCommand={(type) => {
+                        if (type === 'UNDO_DRAWING') handleUndo();
+                        if (type === 'REDO_DRAWING') handleRedo();
+                        if (type === 'CLEAR_DRAWING') {
+                            canvasRef.current?.clear();
+                            scheduleSave();
+                        }
+                    }}
+                    config={config}
+                    setConfig={setConfig}
+                    bgColor={bgColor}
+                    onBgColorChange={changeBg}
+                    paper={paper}
+                    onPaperChange={changePaper}
+                    onScreenshot={() =>
+                        canvasRef.current?.screenshot(true, bgColor, paper, pdfCanvasRef.current)
+                    }
+                    isTextBoxMode={isTextBoxMode}
+                    onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
+                    onInsertMath={handleInsertMath}
+                    canUndo={history.canUndo}
+                    canRedo={history.canRedo}
+                    onInsertImages={(files) => void handleInsertImages(files)}
+                    isInsertingImage={isInsertingImage}
+                    zoom={view.scale}
+                    onZoomIn={() => canvasRef.current?.zoomBy(1.25)}
+                    onZoomOut={() => canvasRef.current?.zoomBy(0.8)}
+                    onZoomReset={() => canvasRef.current?.resetView()}
+                    onZoomFit={
+                        pageBox ? () => canvasRef.current?.fitPage() : undefined
+                    }
+                    onSelectTool={handleSelectTool}
+                />
+            )}
+
             {/* Çalışma alanı */}
-            <div ref={stageRef} className="flex-1 min-h-0 flex bg-background">
+            <div ref={stageRef} className="flex-1 min-h-0 flex bg-background relative z-0">
                 <PageThumbnails
                     open={showPages && !presenting}
                     onClose={() => setShowPages(false)}
@@ -1124,7 +1667,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     boxesByPage={boxesByPage}
                     paper={paper}
                     bgColor={bgColor}
-                    canvasSize={canvasSize}
+                    canvasSize={pageBox ?? canvasSize}
                     current={pageInfo.current}
                     pdfId={notebook.pdf_id}
                     onSelect={(i) => canvasRef.current?.goToPage(i)}
@@ -1135,10 +1678,32 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 />
 
                 <div className="flex-1 min-w-0 relative overflow-hidden">
-                <div
-                    className="absolute inset-0"
-                    style={paperBackground(paper, bgColor, view, canvasSize)}
-                />
+                {/* Kağıt katmanı. Sayfa ölçüsü tanımlıysa desen ekranın değil
+                    SAYFANIN kutusuna oturur: Cornell, soru/cevap ve deney
+                    raporu gibi bölmeli şablonlar artık yakınlaştırınca da
+                    içerikle birlikte hareket eder. */}
+                {pageBox ? (
+                    <div
+                        className="absolute shadow-[0_8px_30px_rgba(15,23,42,0.18)] ring-1 ring-black/10"
+                        style={{
+                            left: view.tx,
+                            top: view.ty,
+                            width: pageBox.w * view.scale,
+                            height: pageBox.h * view.scale,
+                            ...paperBackground(
+                                paper,
+                                bgColor,
+                                { scale: view.scale, tx: 0, ty: 0 },
+                                pageBox
+                            ),
+                        }}
+                    />
+                ) : (
+                    <div
+                        className="absolute inset-0"
+                        style={paperBackground(paper, bgColor, view, canvasSize)}
+                    />
+                )}
 
                 {/* GoodNotes Tarzı Doğrudan PDF Sayfası */}
                 {notebook.pdf_id && (
@@ -1148,6 +1713,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         pageNumber={pageInfo.current + 1}
                         view={view}
                         canvasSize={canvasSize}
+                        box={pdfBox}
+                        onCanvasReady={handlePdfCanvas}
                     />
                 )}
 
@@ -1174,19 +1741,15 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             }
                             onPageChange={(current, total) => setPageInfo({ current, total })}
                             panMode="viewport"
+                            pageBox={pageBox}
                             onViewChange={handleViewChange}
-                            onRequestText={() =>
-                                prompt({
-                                    title: 'Metin ekle',
-                                    placeholder: 'Yazı girin',
-                                    confirmLabel: 'Ekle',
-                                })
-                            }
+                            onConfigChange={(patch) => setConfig((prev) => ({ ...prev, ...patch }))}
                         />
                         <TextBoxLayer
                             boxes={currentBoxes}
                             enabled={isTextBoxMode}
                             view={view}
+                            pageBox={pageBox}
                             onAdd={(b) => updateCurrentBoxes((list) => [...list, b])}
                             onUpdate={(id, upd) =>
                                 updateCurrentBoxes((list) =>
@@ -1239,35 +1802,20 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 </div>
             </div>
 
-            {/* Çizim araç çubuğu (sürüklenebilir) — sunum modunda gizlenir. */}
-            {!presenting && (
-            <DrawingToolbar
-                onCommand={(type) => {
-                    if (type === 'UNDO_DRAWING') handleUndo();
-                    if (type === 'REDO_DRAWING') handleRedo();
-                    if (type === 'CLEAR_DRAWING') {
-                        canvasRef.current?.clear();
-                        scheduleSave();
-                    }
-                }}
-                config={config}
-                setConfig={setConfig}
-                bgColor={bgColor}
-                onBgColorChange={changeBg}
-                onScreenshot={() => canvasRef.current?.screenshot(true, bgColor, paper)}
-                isTextBoxMode={isTextBoxMode}
-                onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
-                onInsertMath={handleInsertMath}
-                canUndo={history.canUndo}
-                canRedo={history.canRedo}
-                onInsertImages={(files) => void handleInsertImages(files)}
-                isInsertingImage={isInsertingImage}
-                zoom={view.scale}
-                onZoomIn={() => canvasRef.current?.zoomBy(1.25)}
-                onZoomOut={() => canvasRef.current?.zoomBy(0.8)}
-                onZoomReset={() => canvasRef.current?.resetView()}
-                onSelectTool={handleSelectTool}
-            />
+            {/* Dışa Aktarma İlerleme Modalı */}
+            {isExporting && (
+                <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-surface-container rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-outline-variant flex flex-col items-center text-center">
+                        <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-3.5">
+                            <Loader2 className="w-7 h-7 animate-spin" />
+                        </div>
+                        <h3 className="text-base font-bold text-on-surface">PDF Dışa Aktarılıyor</h3>
+                        <p className="text-sm text-on-surface-variant mt-1.5 mb-4">{exportProgress}</p>
+                        <div className="w-full bg-surface-container-high rounded-full h-2 overflow-hidden">
+                            <div className="bg-primary h-full rounded-full animate-pulse w-3/4 transition-all duration-300" />
+                        </div>
+                    </div>
+                </div>
             )}
 
             {showQr && <NotebookQrModal notebook={notebook} onClose={() => setShowQr(false)} />}

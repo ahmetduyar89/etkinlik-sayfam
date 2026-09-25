@@ -16,7 +16,7 @@
 //       Defterlerim → 'notebooks'). Kabuk gerisini halleder.
 // ─────────────────────────────────────────────────────────────────────
 import type { LucideIcon } from 'lucide-react';
-import { Crown, FlaskConical, LayoutGrid, NotebookPen, Swords } from 'lucide-react';
+import { BarChart3, BookOpen, Bot, Coins, Crown, Dna, FlaskConical, Globe, LayoutGrid, Music, NotebookPen, Orbit, Puzzle, Shapes, Swords } from 'lucide-react';
 import type { MainView } from '../types';
 
 export type ModuleKind = 'internal' | 'static';
@@ -56,6 +56,21 @@ export interface PortalModule {
 }
 
 export const PORTAL_MODULES: PortalModule[] = [
+    {
+        id: 'satranc-yonetim',
+        title: 'Satranç Yönetimi',
+        description: 'Sınıfların seviyelerini, öğrenci ilerlemelerini ve turnuva sonuçlarını anlık izleyin; ilgili sınıfı tek tıkla yönetin.',
+        meta: 'Canlı rapor · Turnuva yönetimi',
+        icon: BarChart3,
+        accent: {
+            icon: 'from-emerald-500 to-teal-600',
+            strip: 'from-emerald-400 via-teal-400 to-cyan-300',
+            glow: 'rgba(16, 185, 129, 0.28)',
+        },
+        kind: 'internal',
+        href: '/satranc-yonetim',
+        status: 'ready',
+    },
     {
         id: 'etkinlikler',
         title: 'Etkinlikler',
@@ -136,6 +151,150 @@ export const PORTAL_MODULES: PortalModule[] = [
         },
         kind: 'static',
         href: '/deneyler/',
+        status: 'ready',
+    },
+    {
+        id: 'gunes-sistemi',
+        title: '3D Güneş Sistemi Planetaryumu',
+        description:
+            '14 ayrı keşif istasyonu: 3D Planetaryum, NASA Eyes (Güneş, Dünya, ISS, Asteroit, Ötegezegen), Solar System Scope, 100K Yıldız, Ventusky, Earth Nullschool, The Size of Space, 3D Mevsimler, Asteroid Launcher ve Space Elevator.',
+        meta: '14 Modül · Planetaryum · NASA Eyes · Solar Scope · Ventusky · 3D Mevsimler',
+        icon: Orbit,
+        accent: {
+            icon: 'from-sky-500 to-indigo-600',
+            strip: 'from-sky-400 via-indigo-400 to-purple-400',
+            glow: 'rgba(56, 189, 248, 0.32)',
+        },
+        kind: 'static',
+        href: '/gunes-sistemi/',
+        status: 'ready',
+    },
+    {
+        id: 'akil-oyunlari',
+        title: 'Matematiksel Akıl Oyunları',
+        description:
+            'Mantıksal akıl yürütme ve problem çözme atölyesi: Hanoi Kuleleri, KenKen, Untangle, Sihirli Kareler, Chomp, Monty Hall, Kakuro, Kripto-Aritmetik, Dört Renk, Lazer ve daha fazlası.',
+        meta: '17 Akıl Oyunu · Algoritma · Strateji',
+        icon: Puzzle,
+        accent: {
+            icon: 'from-violet-500 to-fuchsia-600',
+            strip: 'from-violet-400 via-fuchsia-400 to-pink-300',
+            glow: 'rgba(168, 85, 247, 0.3)',
+        },
+        kind: 'static',
+        href: '/akil-oyunlari/',
+        status: 'ready',
+    },
+    {
+        id: 'kodlama',
+        title: 'Kodlama Parkı',
+        description:
+            'Görsel blok kodlama, 12 seviyeli labirent algoritması, Turtle geometrisi ve adım adım hata ayıklama atölyesi.',
+        meta: '12 Seviye · Blok Kodlama · Turtle Çizim',
+        icon: Bot,
+        accent: {
+            icon: 'from-blue-500 to-indigo-600',
+            strip: 'from-blue-400 via-indigo-400 to-cyan-300',
+            glow: 'rgba(59, 130, 246, 0.3)',
+        },
+        kind: 'static',
+        href: '/kodlama/',
+        status: 'ready',
+    },
+    {
+        id: 'insan-vucudu',
+        title: 'İnsan Vücudu Atlası',
+        description:
+            'İnteraktif 3D anatomi keşfi: İskelet ve organ katmanları, canlı atan kalp ve kan dolaşımı simülasyonu, sanal biyoloji mikroskobu.',
+        meta: '3D Anatomi · Canlı Kalp BPM · Sanal Mikroskop',
+        icon: Dna,
+        accent: {
+            icon: 'from-rose-500 to-pink-600',
+            strip: 'from-rose-400 via-pink-400 to-red-300',
+            glow: 'rgba(244, 63, 94, 0.3)',
+        },
+        kind: 'static',
+        href: '/insan-vucudu/',
+        status: 'ready',
+    },
+    {
+        id: 'geometri',
+        title: 'Dinamik GeoLaboratuvar',
+        description:
+            'Görsel geometri atölyesi: İnteraktif çivili Geoboard tahtası, açıölçer (iletki) atölyesi, 3D prizma açınım katlama, fraktal üretici ve Mathigon Polypad sanal matematik tuvali.',
+        meta: 'Geoboard · Mathigon Polypad · 3D Açınım · Fraktal',
+        icon: Shapes,
+        accent: {
+            icon: 'from-amber-500 to-orange-600',
+            strip: 'from-amber-400 via-orange-400 to-yellow-300',
+            glow: 'rgba(245, 158, 11, 0.3)',
+        },
+        kind: 'static',
+        href: '/geometri/',
+        status: 'ready',
+    },
+    {
+        id: 'muzik',
+        title: 'Akustik & Müzik Atölyesi',
+        description:
+            'Ses fiziği ve enstrüman laboratuvarı: Sanal piyano ve davul kiti, canlı ses dalgası osiloskopu ve 16 adımlı ritim sekanslayıcı.',
+        meta: 'Synthesizer · Canlı Osiloskop · 16-Step Beat',
+        icon: Music,
+        accent: {
+            icon: 'from-purple-500 to-pink-600',
+            strip: 'from-purple-400 via-pink-400 to-fuchsia-300',
+            glow: 'rgba(168, 85, 247, 0.3)',
+        },
+        kind: 'static',
+        href: '/muzik/',
+        status: 'ready',
+    },
+    {
+        id: 'turkce',
+        title: 'Sözcük Avcıları & Dil Parkı',
+        description:
+            'Türkçe ve dil becerileri: 5 harfli Sözcük Avı (Wordle & Anagram), TDK İmla Arenası, Noktalama Masalı ve Deyimler Dedektifi.',
+        meta: 'Sözcük Avı · TDK İmla · Deyimler Dedektifi',
+        icon: BookOpen,
+        accent: {
+            icon: 'from-teal-500 to-emerald-600',
+            strip: 'from-teal-400 via-emerald-400 to-cyan-300',
+            glow: 'rgba(20, 184, 166, 0.3)',
+        },
+        kind: 'static',
+        href: '/turkce/',
+        status: 'ready',
+    },
+    {
+        id: 'tarih-atlasi',
+        title: 'Zaman Kapsülü & Tarih Atlası',
+        description:
+            'Tarih ve coğrafya kaşifi: Göbeklitepe\'den Cumhuriyet\'e interaktif zaman çizelgesi, 7 bölge Türkiye kültür haritası ve İpek Yolu kervanı.',
+        meta: 'Tarihsel Zaman Çizelgesi · Kültür Haritası · İpek Yolu',
+        icon: Globe,
+        accent: {
+            icon: 'from-amber-600 to-yellow-600',
+            strip: 'from-amber-400 via-yellow-400 to-orange-300',
+            glow: 'rgba(217, 119, 6, 0.3)',
+        },
+        kind: 'static',
+        href: '/tarih-atlasi/',
+        status: 'ready',
+    },
+    {
+        id: 'finans-pazar',
+        title: 'Küçük Girişimciler Pazarı',
+        description:
+            'Finansal okuryazarlık ve cebir: Market kasası para üstü hesaplama, denge terazisi ile denklem çözme ve limonata standı bütçe simülasyonu.',
+        meta: 'Kasa Para Üstü · Cebir Terazisi · Bütçe Yönetimi',
+        icon: Coins,
+        accent: {
+            icon: 'from-emerald-500 to-teal-600',
+            strip: 'from-emerald-400 via-teal-400 to-cyan-300',
+            glow: 'rgba(16, 185, 129, 0.3)',
+        },
+        kind: 'static',
+        href: '/finans-pazar/',
         status: 'ready',
     },
 ];

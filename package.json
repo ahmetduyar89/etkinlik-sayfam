@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/copy-apps.mjs",
-    "build:check": "tsc && vite build && node scripts/copy-apps.mjs",
+    "build": "node scripts/export-dna-lesson.mjs && vite build && node scripts/copy-apps.mjs",
+    "build:check": "tsc && node scripts/export-dna-lesson.mjs && vite build && node scripts/copy-apps.mjs",
+    "export:dna": "node scripts/export-dna-lesson.mjs",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"

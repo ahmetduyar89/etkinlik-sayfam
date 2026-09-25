@@ -28,6 +28,15 @@
   box-shadow: 8px 0 32px rgba(66, 60, 125, 0.07);
 }
 
+.nav-section-title {
+  margin: 0.55rem 0.7rem 0.05rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 /* Panel görünümü: beyaz kart + ince çizgi + yumuşak gölge. */
 .topbar, .welcome-panel, .page-hero, .info-card, .lesson-card,
 .side-panel, .settings-panel, .stat, .quiz-box, .puzzle-card, .badge-card {
@@ -124,6 +133,33 @@
   margin-bottom: 1.1rem;
 }
 
+.role-switch {
+  display: inline-flex;
+  padding: 0.2rem;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 2px solid var(--line);
+}
+
+.role-switch button {
+  min-height: 2.15rem;
+  padding: 0 0.8rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.role-switch button.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--grape), var(--sky));
+  box-shadow: 0 3px 8px rgba(90, 58, 210, 0.2);
+}
+
 .top-stat, .icon-button {
   min-height: 2.6rem;
   display: inline-flex;
@@ -138,6 +174,26 @@
   font-weight: 900;
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
+
+.cloud-status {
+  min-height: 2.2rem;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  border: 2px solid #cbd5e1;
+  border-radius: 999px;
+  color: #475569;
+  background: #f8fafc;
+  font-size: 0.72rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.cloud-status.online { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
+.cloud-status.connecting { color: #6d28d9; background: #f5f3ff; border-color: #ddd6fe; }
+.cloud-status.offline,
+.cloud-status.signed-out,
+.cloud-status.error { color: #b45309; background: #fffbeb; border-color: #fde68a; }
 
 /* XP ve yıldız rozetleri: soldan sağa iki neşeli renk. */
 .top-stat:nth-of-type(1) {
@@ -258,6 +314,34 @@
   margin-top: 1.1rem;
 }
 
+.home-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.home-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 5.2rem;
+  padding: 0.85rem;
+  border-radius: var(--r-lg);
+  border: 2px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  text-align: left;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.home-shortcut:hover { transform: translateY(-2px); border-color: var(--primary); }
+.home-shortcut .icon { width: 2.25rem; height: 2.25rem; flex: 0 0 auto; color: var(--primary); }
+.home-shortcut span { display: grid; gap: 0.15rem; min-width: 0; }
+.home-shortcut strong { font-size: 0.92rem; }
+.home-shortcut small { color: var(--muted); font-weight: 700; line-height: 1.25; }
+
 .split {
   display: grid;
   grid-template-columns: minmax(18rem, 0.9fr) minmax(18rem, 1.1fr);
@@ -304,13 +388,21 @@
   .brand { display: none; }
   /* Alt çubuk moduna geçince imza satırı gizlenir; ana sayfadaki kart kalır. */
   .nav-credit { display: none; }
+  .nav-section-title { display: none; }
   .nav-link { min-width: 3.9rem; justify-content: center; padding: 0.4rem; }
   .nav-link span { display: none; }
   .nav-link.active { background: var(--tone-soft); color: var(--tone); }
   .nav-link.active .icon { color: #fff; background: var(--tone); }
   .content-shell { padding: 0.75rem 0.75rem 5.5rem; }
   .welcome-panel, .split { grid-template-columns: 1fr; }
+  .home-shortcuts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .welcome-panel::after, .page-hero::after { font-size: 7rem; opacity: 0.7; }
+}
+
+@media (max-width: 560px) {
+  .topbar { flex-wrap: wrap; }
+  .role-switch { order: 2; }
+  .home-shortcuts { grid-template-columns: 1fr; }
 }
 
 /* ================================================================== *
@@ -332,7 +424,8 @@
 /* Daralmış menüde yazılar gizlenir, simgeler ortalanır. */
 .app-shell.nav-collapsed .nav-link span,
 .app-shell.nav-collapsed .brand span,
-.app-shell.nav-collapsed .nav-credit { display: none; }
+.app-shell.nav-collapsed .nav-credit,
+.app-shell.nav-collapsed .nav-section-title { display: none; }
 
 .app-shell.nav-collapsed .nav-link,
 .app-shell.nav-collapsed .brand {

@@ -6,9 +6,8 @@
  * öğretmen her ders açtığında doğrudan o haftanın planına girebilir.
  */
 
-import { el, percent } from "../utils/dom.js";
+import { el } from "../utils/dom.js";
 import { navigate } from "../utils/router.js";
-import { navItems } from "../data/lessons.js";
 import { weeklyPlan, unitOf, totalWeeks } from "../data/weeklyPlan.js";
 import { overallProgress } from "../data/curriculum.js";
 import { ProgressRing } from "../components/ProgressRing.js";
@@ -16,7 +15,7 @@ import { icon } from "../components/Icon.js";
 import { symbolHTML } from "../components/PieceGlyph.js";
 import { stat } from "./pageUtils.js";
 
-export function HomePage({ progress, sound }) {
+export function HomePage({ progress, sound, role = "teacher" }) {
   const done = progress.state.completedLessons;
   const overall = overallProgress(done);
 
@@ -29,7 +28,12 @@ export function HomePage({ progress, sound }) {
   return el("main", { className: "home-page page" }, [
     el("section", { className: "welcome-panel" }, [
       el("div", { className: "welcome-copy" }, [
-        el("span", { className: "eyebrow", text: "1-4. sınıflar için · 36 haftalık program" }),
+        el("span", {
+          className: "eyebrow",
+          text: role === "student"
+            ? `${progress.activeProfileName} · 36 haftalık program`
+            : "1-4. sınıflar için · 36 haftalık program"
+        }),
         el("h1", { text: "Satranç Eğitimi" }),
         el("p", { text: "Taşları tanı, taktikleri keşfet, bulmacaları çöz ve bilgisayara karşı güvenle oyna." }),
         el("div", { className: "hero-actions" }, [
@@ -75,12 +79,19 @@ export function HomePage({ progress, sound }) {
       })
     ]),
 
-    el("section", { className: "menu-grid" }, navItems.slice(1).map(([route, title, iconName]) =>
+    el("section", { className: "home-shortcuts", "aria-label": "Hızlı başlangıç" }, [
+      ["plan", "Derse devam et", "36 haftalık program", "book"],
+      ["daily", "Bugünkü çalışmam", "Sana özel 5 bulmaca", "sparkles"],
+      ["play", "Oyun oyna", "Bilgisayara karşı dene", "bot"],
+      role === "teacher"
+        ? ["reports", "Sınıf raporu", "Maç ve turnuva özeti", "chart"]
+        : ["profile", "Gelişimim", "XP, rozet ve başarılar", "user"]
+    ].map(([route, title, description, iconName]) =>
       el("button", {
-        className: "menu-tile",
+        className: "home-shortcut",
         type: "button",
         onClick: () => { sound.play("click"); navigate(route); },
-        html: `${icon(iconName)}<span>${title}</span>`
+        html: `${icon(iconName)}<span><strong>${title}</strong><small>${description}</small></span>`
       })
     )),
 

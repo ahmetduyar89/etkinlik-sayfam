@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useFirestore } from '../../lib/firebase';
 import { savePdfToDB, getPdfDocument } from '../../lib/pdfStorage';
+import { pdfBoxFromPoints } from '../../constants/pageSizes';
 import { cn } from '../../utils/cn';
 import { copyText } from '../../utils/clipboard';
 import { Modal } from '../common/Modal';
@@ -241,6 +242,9 @@ export function NotebooksView() {
                 kind,
                 parent_id: currentFolderId,
                 paper: isWb ? 'blank' : 'grid',
+                // Yeni defterler A4 yatay başlar: hem çıktıya hem tahtanın
+                // oranına yakın. Eski defterler sınırsız kalır.
+                page_size: 'a4l',
                 bg_color: '#ffffff',
                 page_count: 1,
                 updated_at: new Date().toISOString(),
@@ -270,9 +274,14 @@ export function NotebooksView() {
             // IndexedDB'ye yerel olarak kaydet (sıfır Firestore kotası)
             await savePdfToDB(pdfId, file.name, buffer);
 
-            // Sayfa sayısını dinamik algıla
+            // Sayfa sayısını ve ilk sayfanın ölçüsünü algıla
             const doc = await getPdfDocument(pdfId, buffer);
             const numPages = doc.numPages || 1;
+            // Sayfa kutusu PDF'in kendi punto ölçüsünden bir kez hesaplanır;
+            // böylece defter hangi ekranda açılırsa açılsın aynı boyutta durur.
+            const firstPage = await doc.getPage(1);
+            const pt = firstPage.getViewport({ scale: 1 });
+            const pdf_box = pdfBoxFromPoints(pt.width, pt.height);
 
             // GoodNotes tarzı defteri oluştur
             const ref = await notebooksHandler.add({
@@ -285,6 +294,7 @@ export function NotebooksView() {
                 pdf_id: pdfId,
                 pdf_name: file.name,
                 pdf_total_pages: numPages,
+                pdf_box,
                 updated_at: new Date().toISOString(),
             });
 

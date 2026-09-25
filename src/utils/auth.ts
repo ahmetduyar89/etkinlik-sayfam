@@ -1,41 +1,100 @@
-// src/utils/auth.ts — Basit şifre kilidi yardımcıları
-// NOT: Tamamen tarayıcıda çalışan basit bir kilittir; şifre sayfa kaynağında
-// görülebilir. Gerçek koruma için ileride sunucu tarafı doğrulama gerekir.
+// src/utils/auth.ts — Rol bazlı kimlik doğrulama ve oturum yardımcıları
+// ─────────────────────────────────────────────────────────────────────
 
-// Şifre ortam değişkeniyle değiştirilebilir; yoksa varsayılan kullanılır.
+import { signOut } from 'firebase/auth';
+import { auth } from '../lib/firebase';
+// Sistemde iki tür oturum vardır:
+// 1. 'admin': Tüm içerikleri, defterleri, deneyleri görebilen ve sınıfları
+//    yönetebilen yönetici / öğretmen oturumu.
+// 2. 'class': Belirli bir sınıfa ait kullanıcı adı/şifre ile açılan ve yalnızca
+//    o sınıfa tanımlanmış çalışmaları (satranç, deney, defter vb.) gösteren oturum.
+// ─────────────────────────────────────────────────────────────────────
+
+export const APP_ADMIN_USER = (import.meta.env.VITE_APP_ADMIN_USER || 'admin').toLowerCase().trim();
 export const APP_PASSWORD = import.meta.env.VITE_APP_PASSWORD || '951852';
+export const FIREBASE_ADMIN_EMAIL = (import.meta.env.VITE_FIREBASE_ADMIN_EMAIL || '').trim();
 export const AUTH_STORAGE_KEY = 'etkinlik_giris';
+export const SESSION_STORAGE_KEY = 'etkinlik_oturum';
 
-/** Kayıtlı giriş bilgisi (localStorage kapalıysa null). */
-export function readStoredAuth(): string | null {
+export type AuthSession =
+    | { role: 'admin'; username: string }
+    | { role: 'class'; classId: string; className: string; username: string };
+
+/** Kayıtlı oturum bilgisini döner */
+export function getSession(): AuthSession | null {
     try {
-        return window.localStorage.getItem(AUTH_STORAGE_KEY);
+        const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && (parsed.role === 'admin' || parsed.role === 'class')) {
+                return parsed as AuthSession;
+            }
+        }
     } catch {
-        return null;
+        // yoksay
     }
+
+    // Geriye dönük uyumluluk: Eski şifreli giriş varsa admin say
+    try {
+        if (window.localStorage.getItem(AUTH_STORAGE_KEY) === APP_PASSWORD) {
+            return { role: 'admin', username: APP_ADMIN_USER };
+        }
+    } catch {
+        // yoksay
+    }
+
+    return null;
 }
 
-/** Şifre değişirse eski girişler otomatik geçersiz olsun diye değeri karşılaştırırız. */
+/** Oturum var mı? */
 export function isAuthenticated(): boolean {
-    return readStoredAuth() === APP_PASSWORD;
+    return getSession() !== null;
 }
 
-export function saveAuth(): void {
+/** Yönetici (Admin / Öğretmen) oturumu mu? */
+export function isAdmin(): boolean {
+    const session = getSession();
+    return session?.role === 'admin';
+}
+
+/** Sınıf oturumu mu? */
+export function isClassSession(): boolean {
+    const session = getSession();
+    return session?.role === 'class';
+}
+
+/** Oturumu kaydet */
+export function saveSession(session: AuthSession): void {
     try {
-        window.localStorage.setItem(AUTH_STORAGE_KEY, APP_PASSWORD);
-    } catch {
-        // Kaydedilemezse de bu oturum için giriş yapılmış sayılır.
+        window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+        if (session.role === 'admin') {
+            window.localStorage.setItem(AUTH_STORAGE_KEY, APP_PASSWORD);
+        } else {
+            window.localStorage.removeItem(AUTH_STORAGE_KEY);
+        }
+    } catch (e) {
+        console.warn('Oturum kaydedilemedi:', e);
     }
 }
 
-/** Çıkış yap: kaydı sil ve giriş ekranına dön. */
+/** Geriye dönük uyumlu admin kaydetme */
+export function saveAuth(): void {
+    saveSession({ role: 'admin', username: APP_ADMIN_USER });
+}
+
+/** Çıkış yap: tüm oturumu temizle ve giriş ekranına dön */
 export function lockApp(): void {
     try {
+        window.localStorage.removeItem(SESSION_STORAGE_KEY);
         window.localStorage.removeItem(AUTH_STORAGE_KEY);
     } catch {
-        // Yoksay.
+        // Yoksay
     }
-    window.location.reload();
+    // Firebase oturumu yoksa signOut güvenle tamamlanır. Yönlendirmeyi finally
+    // içinde yapmak, bağlantı sorunu olsa bile kullanıcının çıkabilmesini sağlar.
+    void signOut(auth).finally(() => {
+        window.location.href = '/';
+    });
 }
 
 /**
@@ -51,10 +110,6 @@ export function isStudentLink(): boolean {
 
 /**
  * Canlı Satranç bağlantısı (?view=satranc[&oda=1234]).
- *
- * Bu sayfa da şifre istemez: çocuk bağlantıya dokunur, adını yazar ve oynar.
- * Öğretmen panosuna açılan bir kapı DEĞİLDİR — yalnızca satranç masalarını
- * gösterir, içerik merkezine geçiş vermez.
  */
 export function isChessLink(): boolean {
     return new URLSearchParams(window.location.search).get('view') === 'satranc';

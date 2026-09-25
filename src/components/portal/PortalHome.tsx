@@ -6,12 +6,16 @@
 // Kartların içeriği `src/constants/portal.ts` içindeki kayıt defterinden
 // gelir; yeni bir çalışma eklemek için bu dosyaya dokunmaya gerek yoktur.
 // ─────────────────────────────────────────────────────────────────────
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Lock, Sparkles } from 'lucide-react';
+import { ArrowRight, Lock, Sparkles, School, Crown } from 'lucide-react';
 import { PORTAL_MODULES, type PortalModule } from '../../constants/portal';
 import { cn } from '../../utils/cn';
 import { InstallAppButton } from '../common/InstallAppButton';
 import { lockApp } from '../../utils/auth';
+import { ClassManagerModal } from '../classrooms/ClassManagerModal';
+import { useClassrooms } from '../../lib/classrooms';
+import type { ClassRoom } from '../../types';
 
 /** Kartlar sırayla belirsin; sayfa tek seferde "yapışmasın". */
 const listVariants = {
@@ -27,10 +31,13 @@ const cardVariants = {
 interface PortalHomeProps {
     /** Uygulama içinde yaşayan bir bölüm açılacağında çağrılır. */
     onOpenInternal: (id: string) => void;
+    onPreviewClass?: (classItem: ClassRoom) => void;
 }
 
-export function PortalHome({ onOpenInternal }: PortalHomeProps) {
+export function PortalHome({ onOpenInternal, onPreviewClass }: PortalHomeProps) {
     const hazirSayisi = PORTAL_MODULES.filter((m) => m.status === 'ready').length;
+    const { classes } = useClassrooms();
+    const [isClassModalOpen, setIsClassModalOpen] = useState(false);
 
     return (
         <div className="relative min-h-screen overflow-hidden bg-[#f6f7fb] font-sans">
@@ -45,7 +52,27 @@ export function PortalHome({ onOpenInternal }: PortalHomeProps) {
                         <span className="hidden border-l border-slate-200 pl-3 text-[13px] font-medium text-slate-500 sm:inline">
                             Atölye
                         </span>
+                        <span className="hidden lg:inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200/80 px-2 py-0.5 rounded-full text-[11px] font-bold">
+                            <Crown className="w-3 h-3 text-amber-600" />
+                            Öğretmen / Admin
+                        </span>
                         <div className="flex-1" />
+
+                        {/* Sınıflarım Butonu */}
+                        <button
+                            type="button"
+                            onClick={() => setIsClassModalOpen(true)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-[13px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 shadow-sm transition-all active:scale-[0.98]"
+                        >
+                            <School className="h-4 w-4" />
+                            <span>Sınıflarım</span>
+                            {classes.length > 0 && (
+                                <span className="bg-indigo-600 text-white text-[10.5px] px-1.5 py-0.5 rounded-full font-extrabold ml-0.5 leading-none">
+                                    {classes.length}
+                                </span>
+                            )}
+                        </button>
+
                         <InstallAppButton />
                         <button
                             type="button"
@@ -58,6 +85,12 @@ export function PortalHome({ onOpenInternal }: PortalHomeProps) {
                         </button>
                     </div>
                 </header>
+
+                <ClassManagerModal
+                    isOpen={isClassModalOpen}
+                    onClose={() => setIsClassModalOpen(false)}
+                    onSwitchToClass={onPreviewClass}
+                />
 
                 <main className="mx-auto max-w-[1240px] px-5 pb-16 pt-12 sm:px-8 sm:pt-16">
                     <motion.div

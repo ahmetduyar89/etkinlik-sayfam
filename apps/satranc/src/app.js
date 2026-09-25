@@ -1,6 +1,6 @@
 import { el, clear } from "./utils/dom.js";
 import { currentRoute, navigate, onRouteChange } from "./utils/router.js";
-import { navItems } from "./data/lessons.js";
+import { navGroups } from "./data/lessons.js";
 import { ProgressService } from "./services/ProgressService.js";
 import { SoundService } from "./audio/SoundService.js";
 import { icon } from "./components/Icon.js";
@@ -24,17 +24,82 @@ import { ProfilePage } from "./pages/ProfilePage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
 import { ClassesPage } from "./pages/ClassesPage.js";
 import { TournamentPage } from "./pages/TournamentPage.js";
+import { ReportsPage } from "./pages/ReportsPage.js";
+import { DailyPracticePage } from "./pages/DailyPracticePage.js";
+import { GameArchivePage } from "./pages/GameArchivePage.js";
 import { classroom } from "./services/ClassroomService.js";
+import { startCloudSync } from "./services/CloudSyncService.js";
 
 const progress = new ProgressService();
 const sound = new SoundService(progress);
 const root = document.querySelector("#app");
+const ROLE_KEY = "satranc-okulu-role";
+const STUDENT_KEY = "satranc-okulu-active-student";
+const TEACHER_ROUTES = ["siniflar", "turnuva", "reports"];
+
+function readRole() {
+  try {
+    return localStorage.getItem(ROLE_KEY) === "student" ? "student" : "teacher";
+  } catch {
+    return "teacher";
+  }
+}
+
+let role = readRole();
+
+function readStudentId() {
+  try { return localStorage.getItem(STUDENT_KEY) || ""; } catch { return ""; }
+}
+
+function selectedStudent() {
+  const id = readStudentId();
+  return classroom.students(classroom.state.activeClassId).find((student) => student.id === id) || null;
+}
+
+function useRoleProfile() {
+  if (role === "teacher") {
+    const active = classroom.activeClass;
+    progress.switchProfile(active ? `class:${active.id}` : "teacher", active ? `${active.name} Sınıfı` : "Öğretmen");
+    return;
+  }
+  const student = selectedStudent();
+  progress.switchProfile(student ? `student:${student.id}` : "guest", student?.name || "Misafir Öğrenci");
+}
+
+function setRole(next) {
+  role = next === "student" ? "student" : "teacher";
+  try { localStorage.setItem(ROLE_KEY, role); } catch { /* Kısıtlı tarayıcıda oturumluk çalışır. */ }
+  useRoleProfile();
+  if (role === "student" && TEACHER_ROUTES.includes(currentRoute())) {
+    navigate("home");
+    return;
+  }
+  render();
+}
+
+// URL üzerinden sınıf parametresi geldiyse (?classId=...) o sınıfı otomatik aktif yap
+try {
+  const urlParams = new URLSearchParams(window.location.search);
+  const targetClassId = urlParams.get("classId");
+  if (targetClassId && classroom.getClass(targetClassId)) {
+    classroom.setActiveClass(targetClassId);
+  }
+} catch {
+  // yoksay
+}
+
+// Eski tek profilli kayıt öğretmen profiline taşınır; uygulama öğrenci
+// modunda kapatıldıysa son seçilen öğrencinin profili yeniden açılır.
+useRoleProfile();
 
 const pages = {
   home: HomePage,
   plan: PlanPage,
   siniflar: ClassesPage,
   turnuva: TournamentPage,
+  reports: ReportsPage,
+  daily: DailyPracticePage,
+  games: GameArchivePage,
   learn: LearnPage,
   board: BoardPage,
   pieces: PiecesPage,
@@ -55,17 +120,22 @@ const pages = {
 function renderNav(route) {
   return el("nav", { className: "side-nav", "aria-label": "Ana menü" }, [
     el("button", { className: "brand", type: "button", onClick: () => navigate("home"), html: `${icon("crown")}<span>Satranç Eğitimi</span>` }),
-    ...navItems.map(([id, label, iconName]) =>
-      el("button", {
-        className: `nav-link ${route === id ? "active" : ""}`,
-        type: "button",
-        onClick: () => {
-          sound.play("click");
-          navigate(id);
-        },
-        html: `${icon(iconName)}<span>${label}</span>`
-      })
-    ),
+    ...navGroups
+      .filter((group) => group.roles.includes(role))
+      .flatMap((group) => [
+        group.title ? el("p", { className: "nav-section-title", text: group.title }) : null,
+        ...group.items.map(([id, label, iconName]) =>
+          el("button", {
+            className: `nav-link ${route === id ? "active" : ""}`,
+            type: "button",
+            onClick: () => {
+              sound.play("click");
+              navigate(id);
+            },
+            html: `${icon(iconName)}<span>${label}</span>`
+          })
+        )
+      ]),
     // Menünün en altındaki imza — her ekranda görünür ama içeriği gölgelemez.
     el("footer", { className: "nav-credit" }, [
       el("span", { className: "credit-line", text: "Hazırlayan" }),
@@ -83,11 +153,36 @@ function renderNav(route) {
 let xpStat = null;
 let starStat = null;
 let classPicker = null;
+let studentPicker = null;
+let cloudStatusNode = null;
+let cloudStatus = { status: "connecting", detail: "Bulut bağlantısı kuruluyor." };
+
+const cloudLabels = {
+  connecting: "Bağlanıyor",
+  online: "Buluta kaydediliyor",
+  offline: "Çevrimdışı",
+  "signed-out": "Bulut kapalı",
+  error: "Senkronizasyon hatası"
+};
+
+function syncCloudStatus() {
+  if (!cloudStatusNode) return;
+  cloudStatusNode.className = `cloud-status ${cloudStatus.status}`;
+  cloudStatusNode.textContent = `● ${cloudLabels[cloudStatus.status] || "Bulut durumu"}`;
+  cloudStatusNode.title = cloudStatus.detail || cloudStatusNode.textContent;
+}
+
+window.addEventListener("satranc-cloud-status", (event) => {
+  cloudStatus = event.detail || cloudStatus;
+  syncCloudStatus();
+});
 
 function renderTopbar() {
   const collapsed = Boolean(progress.state.settings.navCollapsed);
   xpStat = el("div", { className: "top-stat", text: `XP ${progress.state.xp}` });
   starStat = el("div", { className: "top-stat", text: `★ ${progress.state.stars}` });
+  cloudStatusNode = el("div", { className: "cloud-status", role: "status" });
+  syncCloudStatus();
   return el("header", { className: "topbar" }, [
     // Menüyü aç/kapa — tercih kaydedilir, sayfalar arası korunur.
     el("button", {
@@ -103,11 +198,65 @@ function renderTopbar() {
       },
       html: icon(collapsed ? "menuOpen" : "menuClose")
     }),
-    renderClassPicker(),
+    el("div", { className: "role-switch", "aria-label": "Kullanım modu" }, [
+      el("button", {
+        className: role === "student" ? "active" : "",
+        type: "button",
+        text: "Öğrenci",
+        "aria-pressed": String(role === "student"),
+        onClick: () => setRole("student")
+      }),
+      el("button", {
+        className: role === "teacher" ? "active" : "",
+        type: "button",
+        text: "Öğretmen",
+        "aria-pressed": String(role === "teacher"),
+        onClick: () => setRole("teacher")
+      })
+    ]),
+    role === "teacher" ? renderClassPicker() : renderStudentPicker(),
+    cloudStatusNode,
     xpStat,
     starStat,
     el("button", { className: "icon-button", type: "button", title: "Ayarlar", onClick: () => navigate("settings"), html: icon("settings") })
   ]);
+}
+
+/** Öğrenci modunda seçili sınıftan kimin ilerlemesinin açılacağını belirler. */
+function renderStudentPicker() {
+  studentPicker = el("select", {
+    className: "class-picker-select student-picker-select",
+    "aria-label": "Öğrenci profili",
+    onChange: (event) => {
+      if (event.target.value === "__manage") {
+        setRole("teacher");
+        navigate("siniflar");
+        return;
+      }
+      try { localStorage.setItem(STUDENT_KEY, event.target.value); } catch { /* Oturumluk seçim. */ }
+      const student = classroom.findStudent(event.target.value);
+      progress.switchProfile(student ? `student:${student.id}` : "guest", student?.name || "Misafir Öğrenci");
+      sound.play("click");
+      render();
+    }
+  });
+  syncStudentPicker();
+  return el("label", { className: "class-picker student-picker", title: "Öğrenci profili" }, [
+    el("span", { className: "class-picker-emoji", text: "🙂" }),
+    studentPicker
+  ]);
+}
+
+function syncStudentPicker() {
+  if (!studentPicker) return;
+  const students = classroom.students(classroom.state.activeClassId);
+  const selected = selectedStudent();
+  studentPicker.replaceChildren(
+    el("option", { value: "", text: students.length ? "Öğrenci seç" : "Misafir Öğrenci" }),
+    ...students.map((student) => el("option", { value: student.id, text: student.name })),
+    el("option", { value: "__manage", text: "＋ Öğrencileri yönet…" })
+  );
+  studentPicker.value = selected?.id || "";
 }
 
 /**
@@ -153,6 +302,10 @@ function syncClassPicker() {
 
 function render() {
   const route = pages[currentRoute()] ? currentRoute() : "home";
+  if (role === "student" && TEACHER_ROUTES.includes(route)) {
+    navigate("home");
+    return;
+  }
   document.body.classList.toggle("high-contrast", progress.state.settings.contrast);
   document.body.classList.toggle("reduced-motion", !progress.state.settings.motion);
   // Menü kapalıyken kabuk dar sütuna geçer; sayfa içeriği genişler.
@@ -162,7 +315,7 @@ function render() {
   clear(root);
   const content = el("div", { className: "content-shell" }, [
     renderTopbar(),
-    pages[route]({ progress, sound, rerender: render })
+    pages[route]({ progress, sound, rerender: render, role })
   ]);
   root.append(renderNav(route), content);
   reveal(content);
@@ -205,10 +358,19 @@ function bump(node, text) {
 // Abonelik BİR KEZ kurulur; render() her sayfa geçişinde yeni düğümler üretse de
 // syncTopbar güncel referansları kullanır.
 progress.onChange(syncTopbar);
-classroom.onChange(syncClassPicker);
+classroom.onChange(() => {
+  if (role === "teacher") useRoleProfile();
+  syncClassPicker();
+  syncStudentPicker();
+});
 
 onRouteChange(render);
 render();
+
+// Hosted sürümde doğrulanmış öğretmen oturumu varsa yerel kayıtları bulutla
+// eşitle. Başarısızlık uygulamayı durdurmaz; sınıf içindeki çevrimdışı akış
+// her zaman kullanılabilir kalır.
+void startCloudSync({ classroom, progress });
 
 // Çevrimdışı önbellek yalnızca http/https üzerinden anlamlıdır.
 // Tek dosya sürümü file:// ile açıldığında service worker zaten kaydedilemez;
