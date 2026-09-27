@@ -146,30 +146,19 @@ export async function startCloudSync({ classroom, progress }) {
     if (session?.role === "class") sessionClassId = session.classId || null;
   } catch { /* Eski veya bozuk portal oturumu yok sayılır. */ }
 
-  const ownedKey = (value) => anonymous ? `${encodeURIComponent(user.uid)}--${value}` : value;
-  const matchDoc = (item) => item._cloudDocId || ownedKey(key(item.classId, item.id));
-  const tournamentDoc = (item) => item._cloudDocId || ownedKey(key(item.classId, item.id));
-  const visibleCollection = (name) => anonymous
-    ? query(collection(db, name), where("ownerUid", "==", user.uid))
-    : collection(db, name);
+  const docKey = (classId, localId) => key(classId, localId);
+  const matchDoc = (item) => item._cloudDocId || docKey(item.classId, item.id);
+  const tournamentDoc = (item) => item._cloudDocId || docKey(item.classId, item.id);
+  const progressDoc = (classId, profileId) => docKey(classId, profileId);
+  const visibleCollection = (name) => collection(db, name);
   const cloudData = (item) => {
     const { _cloudDocId, ...data } = clean(item);
     return data;
   };
 
-  async function writeRecord(collectionName, id, data, initial) {
+  async function writeRecord(collectionName, id, data, _initial) {
     const ref = doc(db, collectionName, id);
-    if (!initial) return setDoc(ref, data);
-    // Anonim sınıf oturumunun doküman kimliği uid ile ad alanına ayrılır;
-    // başka cihazla çakışmaz. Var olmayan dokümanı önce okumak güvenlik
-    // kurallarınca reddedileceği için doğrudan oluştur/güncelle yapılır.
-    if (anonymous) return setDoc(ref, data);
-    // İlk göçte bulutta daha önce oluşmuş bir kaydın üzerine eski sınıf
-    // bilgisayarı verisini yazma. Yalnızca eksik dokümanı oluştur.
-    return runTransaction(db, async (transaction) => {
-      const snapshot = await transaction.get(ref);
-      if (!snapshot.exists()) transaction.set(ref, data);
-    });
+    return setDoc(ref, data, { merge: true });
   }
 
   async function pushClassroom(initial = false) {
@@ -179,17 +168,26 @@ export async function startCloudSync({ classroom, progress }) {
     const nextMatches = new Set(matches.map(matchDoc));
     const nextTournaments = new Set(tournaments.map(tournamentDoc));
 
+    const deletes = [];
+    if (!initial) {
+      for (const id of knownMatches) {
+        if (!nextMatches.has(id)) deletes.push(deleteDoc(doc(db, "chess_matches", id)));
+      }
+      for (const id of knownTournaments) {
+        if (!nextTournaments.has(id)) deletes.push(deleteDoc(doc(db, "chess_tournaments", id)));
+      }
+    }
+
     await Promise.all([
       ...matches.map((item) => writeRecord("chess_matches", matchDoc(item), {
-        ...cloudData(item), localId: item.id, ownerUid: item.ownerUid || user.uid,
+        ...cloudData(item), localId: item.id, ownerUid: item.ownerUid || user?.uid || "shared",
         deviceId: device, syncedAt: serverTimestamp()
       }, initial)),
       ...tournaments.map((item) => writeRecord("chess_tournaments", tournamentDoc(item), {
-        ...cloudData(item), localId: item.id, ownerUid: item.ownerUid || user.uid,
+        ...cloudData(item), localId: item.id, ownerUid: item.ownerUid || user?.uid || "shared",
         deviceId: device, syncedAt: serverTimestamp()
       }, initial)),
-      ...[...knownMatches].filter((id) => !nextMatches.has(id)).map((id) => deleteDoc(doc(db, "chess_matches", id))),
-      ...[...knownTournaments].filter((id) => !nextTournaments.has(id)).map((id) => deleteDoc(doc(db, "chess_tournaments", id)))
+      ...deletes
     ]);
     knownMatches = nextMatches;
     knownTournaments = nextTournaments;
@@ -201,12 +199,12 @@ export async function startCloudSync({ classroom, progress }) {
     for (const [profileId, value] of Object.entries(progress.store.profiles || {})) {
       const classId = classIdForProfile(classroom, profileId);
       if (!classId) continue;
-      writes.push(writeRecord("chess_progress", ownedKey(key(classId, profileId)), {
+      writes.push(writeRecord("chess_progress", progressDoc(classId, profileId), {
         classId,
         profileId,
         profileName: progress.store.profileNames?.[profileId] || "Öğrenci",
         progress: clean(value),
-        ownerUid: user.uid,
+        ownerUid: user?.uid || "shared",
         deviceId: device,
         syncedAt: serverTimestamp()
       }, initial));
@@ -214,11 +212,11 @@ export async function startCloudSync({ classroom, progress }) {
     await Promise.all(writes);
   }
 
-  const syncRef = doc(db, "chess_sync", ownedKey(device));
+  const syncRef = doc(db, "chess_sync", `${sessionClassId ? encodeURIComponent(sessionClassId) + "--" : ""}${encodeURIComponent(device)}`);
   const writeHeartbeat = () => setDoc(syncRef, {
     deviceId: device,
-    userId: user.uid,
-    ownerUid: user.uid,
+    userId: user?.uid || "anonymous",
+    ownerUid: user?.uid || "anonymous",
     anonymous,
     classIds: classroom.classes.map((item) => item.id),
     activeClassId: sessionClassId || classroom.state.activeClassId || null,
@@ -226,8 +224,7 @@ export async function startCloudSync({ classroom, progress }) {
     userAgent: navigator.userAgent.slice(0, 180)
   }, { merge: true });
 
-  // İlk işlem yereldeki eski kayıtları yüklemektir. Böylece sınıf bilgisayarında
-  // yıllardır duran turnuvalar ilk bağlantıda kaybolmadan buluta taşınır.
+  // İlk işlem yereldeki eski kayıtları yüklemektir.
   try {
     await pushClassroom(true);
     await pushProgress(true);
@@ -244,8 +241,16 @@ export async function startCloudSync({ classroom, progress }) {
       const { localId, deviceId: _device, syncedAt: _synced, ...item } = data;
       return { ...item, id: localId || item.id, _cloudDocId: snap.id };
     }).filter((item) => item.id && item.classId);
+
     applyingRemote = true;
-    classroom.state.matches = remote;
+    const matchMap = new Map();
+    for (const m of classroom.state.matches || []) {
+      if (m?.id) matchMap.set(m.id, m);
+    }
+    for (const r of remote) {
+      matchMap.set(r.id, r);
+    }
+    classroom.state.matches = Array.from(matchMap.values());
     classroom.save();
     knownMatches = new Set(snapshot.docs.map((snap) => snap.id));
     applyingRemote = false;
@@ -258,8 +263,16 @@ export async function startCloudSync({ classroom, progress }) {
       const { localId, deviceId: _device, syncedAt: _synced, ...item } = data;
       return { ...item, id: localId || item.id, _cloudDocId: snap.id };
     }).filter((item) => item.id && item.classId);
+
     applyingRemote = true;
-    classroom.state.tournaments = remote;
+    const tourMap = new Map();
+    for (const t of classroom.state.tournaments || []) {
+      if (t?.id) tourMap.set(t.id, t);
+    }
+    for (const r of remote) {
+      tourMap.set(r.id, r);
+    }
+    classroom.state.tournaments = Array.from(tourMap.values());
     classroom.save();
     knownTournaments = new Set(snapshot.docs.map((snap) => snap.id));
     applyingRemote = false;

@@ -14,6 +14,7 @@ import {
     Maximize2,
     CheckCircle2,
     Play,
+    Plus,
 } from 'lucide-react';
 import { PORTAL_MODULES, type PortalModule } from '../../constants/portal';
 import { EXPERIMENTS_CATALOG, findExperimentByFile } from '../../constants/experiments';
@@ -34,7 +35,7 @@ export function ClassroomDashboard({
     onOpenInternalModule,
     onReturnToAdmin,
 }: ClassroomDashboardProps) {
-    const { classes } = useClassrooms();
+    const { classes, updateClass } = useClassrooms();
     const session = getSession();
 
     // Aktif sınıfı bul: prop olarak geldiyse onu kullan, yoksa oturumdan bul
@@ -102,6 +103,37 @@ export function ClassroomDashboard({
     // Defter aç
     const handleOpenNotebook = (nbId: string) => {
         window.location.href = `/?view=notebook&id=${nbId}`;
+    };
+
+    const [isCreatingNotebook, setIsCreatingNotebook] = useState(false);
+
+    // Bu sınıf adına doğrudan yeni ders defteri oluşturup aç
+    const handleCreateLessonNotebook = async () => {
+        if (!activeClass || isCreatingNotebook) return;
+        setIsCreatingNotebook(true);
+        try {
+            const todayStr = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+            const title = `${activeClass.name} - ${todayStr} Dersi`;
+            const now = new Date().toISOString();
+            const newDoc = await notebooksHandler.add({
+                title,
+                paper: 'grid',
+                page_count: 1,
+                created_at: now,
+                updated_at: now,
+            });
+            if (newDoc && newDoc.id) {
+                const currentNotebooks = activeClass.assignedNotebooks || [];
+                await updateClass(activeClass.id, {
+                    assignedNotebooks: [...currentNotebooks, newDoc.id],
+                });
+                window.location.href = `/?view=notebook&id=${newDoc.id}`;
+            }
+        } catch (err) {
+            console.error('Ders defteri oluşturulamadı:', err);
+        } finally {
+            setIsCreatingNotebook(false);
+        }
     };
 
     // Eğer oturum admin ise ama sınıf önizleniyorsa
@@ -371,21 +403,47 @@ export function ClassroomDashboard({
                     </section>
                 )}
 
-                {/* BÖLÜM 3: SINIF DEFTERLERİ */}
-                {assignedNotebookList.length > 0 && (
-                    <section className="mb-12">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <BookOpen className="w-5 h-5 text-violet-600" />
-                                <h3 className="text-[19px] font-extrabold text-slate-900 tracking-tight">
-                                    Sınıf Ders Defterleri
-                                </h3>
-                            </div>
+                {/* BÖLÜM 3: SINIF DEFTERLERİ & BEYAZ TAHTA */}
+                <section className="mb-12">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                        <div className="flex items-center gap-2">
+                            <BookOpen className="w-5 h-5 text-violet-600" />
+                            <h3 className="text-[19px] font-extrabold text-slate-900 tracking-tight">
+                                Sınıf Ders Defterleri & Beyaz Tahta
+                            </h3>
                             <span className="text-[12.5px] font-semibold text-violet-700 bg-violet-50 px-2.5 py-1 rounded-full border border-violet-200">
                                 {assignedNotebookList.length} Defter
                             </span>
                         </div>
+                        <button
+                            type="button"
+                            onClick={handleCreateLessonNotebook}
+                            disabled={isCreatingNotebook}
+                            className="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 active:scale-[0.98] text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-sm transition-all"
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>{isCreatingNotebook ? 'Defter Açılıyor…' : 'Bu Sınıf İçin Yeni Ders Defteri Aç'}</span>
+                        </button>
+                    </div>
 
+                    {assignedNotebookList.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-violet-200 bg-violet-50/40 p-8 text-center">
+                            <BookOpen className="w-10 h-10 text-violet-400 mx-auto mb-2" />
+                            <h4 className="text-base font-bold text-slate-800">Henüz bu sınıf için ders defteri oluşturulmadı</h4>
+                            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
+                                Akıllı tahtada ders anlatırken, soru çözerken veya çizim yaparken "Yeni Ders Defteri Aç" butonuna basarak doğrudan bu sınıfın altına kaydedebilirsiniz.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={handleCreateLessonNotebook}
+                                disabled={isCreatingNotebook}
+                                className="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition"
+                            >
+                                <Plus className="w-4 h-4" />
+                                <span>{isCreatingNotebook ? 'Oluşturuluyor…' : 'Ders Defteri Başlat'}</span>
+                            </button>
+                        </div>
+                    ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {assignedNotebookList.map((nb) => (
                                 <div
@@ -414,8 +472,8 @@ export function ClassroomDashboard({
                                 </div>
                             ))}
                         </div>
-                    </section>
-                )}
+                    )}
+                </section>
 
                 {/* BÖLÜM 4: ÖĞRENCİ LİSTESİ */}
                 {activeClass.students && activeClass.students.length > 0 && (

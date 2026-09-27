@@ -84,9 +84,8 @@ export function ChessAdminDashboard({ onBack }: { onBack: () => void }) {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const selected = classes.find((item) => item.id === selectedId) || null;
     const activeDevices = cloud.devices.filter((device) => {
-        if (!device.anonymous) return false;
         const seen = device.lastSeenAt?.toDate?.();
-        return seen && Date.now() - seen.getTime() < 150_000;
+        return seen && Date.now() - seen.getTime() < 600_000;
     }).length;
 
     return (
@@ -250,6 +249,32 @@ function ClassDetail({ item, cloud, onClose }: { item: ClassRoom; cloud: ReturnT
                     <Metric icon={Swords} label="Toplam maç" value={String(matches.length)} />
                     <Metric icon={Trophy} label="Turnuva" value={`${tournaments.filter((t) => t.finished).length}/${tournaments.length} tamamlandı`} />
                 </div>
+
+                {tournaments.length > 0 && (
+                    <div className="mt-6 border-t border-slate-100 pt-5">
+                        <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+                            <Trophy className="h-4 w-4 text-amber-500" /> Sınıf Turnuvaları ({tournaments.length})
+                        </h3>
+                        <div className="grid gap-2.5 sm:grid-cols-2">
+                            {tournaments.map((t) => (
+                                <div key={t.id} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 flex items-center justify-between">
+                                    <div>
+                                        <div className="font-bold text-[13.5px] text-slate-900">{t.name}</div>
+                                        <div className="text-xs text-slate-500 mt-0.5">
+                                            {t.rounds?.length || 0} tur · {t.finished ? 'Tamamlandı' : 'Devam ediyor'}
+                                        </div>
+                                    </div>
+                                    <a
+                                        href={chessUrl(item.id, `turnuva?id=${encodeURIComponent(t.localId || t.id)}`)}
+                                        className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 text-xs font-bold shadow-sm transition"
+                                    >
+                                        Turnuvayı Aç
+                                    </a>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </section>
         </div>
     );
