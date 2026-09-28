@@ -14,7 +14,6 @@ import App from './App';
 import { ChessArena } from './components/chess/ChessArena';
 import { PortalHome } from './components/portal/PortalHome';
 import { ClassroomDashboard } from './components/classrooms/ClassroomDashboard';
-import { ChessAdminDashboard } from './components/chess/ChessAdminDashboard';
 import { ClassAdminDashboard } from './components/classrooms/ClassAdminDashboard';
 import { findModule, findModuleByView } from './constants/portal';
 import { goToSection, sectionFromLocation, type Section } from './lib/navigation';
@@ -68,15 +67,10 @@ export default function AppShell() {
     }
 
     // Normal Admin (Öğretmen) Paneli
-    if (section === 'satranc-yonetim') {
-        return <ChessAdminDashboard onBack={() => goToSection('portal')} />;
-    }
-
     if (section === 'siniflar') {
         return (
             <ClassAdminDashboard
                 onBack={() => goToSection('portal')}
-                onOpenChessReports={() => goToSection('satranc-yonetim')}
                 onPreviewClass={(classRoom) => {
                     setPreviewClass(classRoom);
                     goToSection('portal');

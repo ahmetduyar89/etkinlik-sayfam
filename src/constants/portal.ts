@@ -16,7 +16,7 @@
 //       Defterlerim → 'notebooks'). Kabuk gerisini halleder.
 // ─────────────────────────────────────────────────────────────────────
 import type { LucideIcon } from 'lucide-react';
-import { BarChart3, BookOpen, Bot, Coins, Crown, Dna, FlaskConical, Globe, LayoutGrid, Music, NotebookPen, Orbit, Puzzle, School, Shapes, Swords } from 'lucide-react';
+import { BookOpen, Bot, Coins, Crown, Dna, FlaskConical, Globe, LayoutGrid, Music, NotebookPen, Orbit, Puzzle, School, Shapes, Swords } from 'lucide-react';
 import type { MainView } from '../types';
 
 export type ModuleKind = 'internal' | 'static';
@@ -69,21 +69,6 @@ export const PORTAL_MODULES: PortalModule[] = [
         },
         kind: 'internal',
         href: '/siniflar',
-        status: 'ready',
-    },
-    {
-        id: 'satranc-yonetim',
-        title: 'Satranç Yönetimi',
-        description: 'Sınıfların seviyelerini, öğrenci ilerlemelerini ve turnuva sonuçlarını anlık izleyin; ilgili sınıfı tek tıkla yönetin.',
-        meta: 'Canlı rapor · Turnuva yönetimi',
-        icon: BarChart3,
-        accent: {
-            icon: 'from-emerald-500 to-teal-600',
-            strip: 'from-emerald-400 via-teal-400 to-cyan-300',
-            glow: 'rgba(16, 185, 129, 0.28)',
-        },
-        kind: 'internal',
-        href: '/satranc-yonetim',
         status: 'ready',
     },
     {

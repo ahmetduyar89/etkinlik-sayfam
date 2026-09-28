@@ -8,7 +8,6 @@ import {
     Check,
     ArrowLeft,
     Users,
-    Key,
     ExternalLink,
     FlaskConical,
     Sparkles,
@@ -33,9 +32,10 @@ interface ClassManagerModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSwitchToClass?: (classItem: ClassRoom) => void;
+    initialClass?: ClassRoom | null;
 }
 
-export function ClassManagerModal({ isOpen, onClose, onSwitchToClass }: ClassManagerModalProps) {
+export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialClass }: ClassManagerModalProps) {
     const { classes, loading, addClass, updateClass, removeClass } = useClassrooms();
     const toast = useToast();
     const confirm = useConfirm();
@@ -94,6 +94,16 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass }: ClassMan
         setAssignedNotebooks(c.assignedNotebooks || []);
         setView('form');
     };
+
+    useEffect(() => {
+        if (!isOpen) return;
+        if (initialClass) {
+            startEdit(initialClass);
+        } else {
+            setView('list');
+            setEditingClass(null);
+        }
+    }, [isOpen, initialClass]);
 
     // Yeni sınıf eklemeyi başlat
     const startNew = () => {
@@ -555,7 +565,7 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass }: ClassMan
                                     </label>
                                     <input
                                         type="text"
-                                        required
+                                        required={!editingClass || !editingClass.credentialConfigured}
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         placeholder={editingClass?.credentialConfigured ? 'Değiştirmek istemiyorsanız boş bırakın' : 'En az 6 karakter'}
