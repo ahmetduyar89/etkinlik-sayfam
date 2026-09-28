@@ -68,9 +68,22 @@ export function PasswordGate({ children }: PasswordGateProps) {
             }
             const token = await user.getIdTokenResult().catch(() => null);
             const role = token?.claims.role;
-            if (role === 'teacher' || user.email === FIREBASE_ADMIN_EMAIL) {
+            if (role === 'teacher') {
                 saveSession({ role: 'admin', username: user.email || 'admin' });
                 setIsUnlocked(true);
+            } else if (user.email === FIREBASE_ADMIN_EMAIL) {
+                // Eski veya yeni açılmış öğretmen oturumunda özel rol henüz token'a
+                // yansımamış olabilir. Paneli açmadan önce rolü kurup token'ı yenile;
+                // aksi halde Firestore dinleyicileri eski yetkiyle başlayıp kalıcı
+                // "insufficient permissions" hatası gösterebilir.
+                try {
+                    await bootstrapTeacherRole();
+                    saveSession({ role: 'admin', username: user.email || 'admin' });
+                    setIsUnlocked(true);
+                } catch (error) {
+                    console.error('Öğretmen rolü hazırlanamadı:', error);
+                    setIsUnlocked(false);
+                }
             } else if (role === 'class' && typeof token?.claims.classId === 'string') {
                 // Sınıf adı giriş anında yerel oturuma yazılır. Token yalnızca
                 // rol ve classId bilgisini doğrular; asla admin oturumu üretmez.

@@ -71,13 +71,19 @@ export function useCloudChess() {
     const [devices, setDevices] = useState<SyncDevice[]>([]);
     const [presence, setPresence] = useState<LivePresence[]>([]);
     const [liveGames, setLiveGames] = useState<LiveGame[]>([]);
-    const [error, setError] = useState<string | null>(null);
+    const [collectionErrors, setCollectionErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
         const watch = <T extends { id: string }>(name: string, setter: (items: T[]) => void) =>
             onSnapshot(collection(db, name), (snapshot) => {
                 setter(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as T)));
-            }, (reason) => setError(reason.message));
+                setCollectionErrors((current) => {
+                    if (!current[name]) return current;
+                    const next = { ...current };
+                    delete next[name];
+                    return next;
+                });
+            }, (reason) => setCollectionErrors((current) => ({ ...current, [name]: reason.message })));
 
         const stops = [
             watch<CloudMatch>('chess_matches', setMatches),
@@ -89,6 +95,11 @@ export function useCloudChess() {
         ];
         return () => stops.forEach((stop) => stop());
     }, []);
+
+    const failedCollections = Object.keys(collectionErrors);
+    const error = failedCollections.length > 0
+        ? `${failedCollections.join(', ')}: ${collectionErrors[failedCollections[0]]}`
+        : null;
 
     return { matches, tournaments, progress, devices, presence, liveGames, error };
 }
