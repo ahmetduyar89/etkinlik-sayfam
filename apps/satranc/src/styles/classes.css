@@ -333,6 +333,31 @@
 .tour-field.wide { grid-column: 1 / -1; }
 .tour-rounds-input { width: 100%; }
 
+.tour-option {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: var(--panel-2);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.tour-option input {
+  flex: 0 0 auto;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.1rem;
+  accent-color: var(--primary);
+}
+
+.tour-option-copy { display: grid; gap: 0.15rem; }
+.tour-option-copy strong { font-size: 0.88rem; }
+.tour-option-copy small { color: var(--muted); line-height: 1.35; }
+
 .tour-check-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .tour-check-head .class-hint { margin-right: auto; }
 

@@ -181,7 +181,16 @@ function renderTopbar() {
   const collapsed = Boolean(progress.state.settings.navCollapsed);
   xpStat = el("div", { className: "top-stat", text: `XP ${progress.state.xp}` });
   starStat = el("div", { className: "top-stat", text: `★ ${progress.state.stars}` });
-  cloudStatusNode = el("div", { className: "cloud-status", role: "status" });
+  cloudStatusNode = el("div", {
+    className: "cloud-status",
+    role: "status",
+    style: "cursor: pointer;",
+    onClick: () => {
+      if (cloudStatus.detail) {
+        window.alert(`Bulut Durumu: ${cloudLabels[cloudStatus.status] || cloudStatus.status}\n\nDetay: ${cloudStatus.detail}`);
+      }
+    }
+  });
   syncCloudStatus();
   return el("header", { className: "topbar" }, [
     // Menüyü aç/kapa — tercih kaydedilir, sayfalar arası korunur.

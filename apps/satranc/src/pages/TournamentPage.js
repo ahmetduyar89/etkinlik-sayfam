@@ -81,6 +81,11 @@ export function TournamentPage({ sound }) {
       value: String(suggestedRounds(chosen.size)),
       "aria-label": "Tur sayısı"
     });
+    const moveHintsInput = el("input", {
+      type: "checkbox",
+      checked: "",
+      "aria-describedby": "tour-move-hints-note"
+    });
     const countNote = el("span", { className: "class-hint" });
     const updateCount = () => {
       countNote.textContent = `${chosen.size} oyuncu · önerilen ${suggestedRounds(chosen.size)} tur` +
@@ -124,6 +129,16 @@ export function TournamentPage({ sound }) {
           : el("div", { className: "tour-form" }, [
               el("label", { className: "tour-field" }, [el("span", { text: "Turnuva adı" }), nameInput]),
               el("label", { className: "tour-field short" }, [el("span", { text: "Tur sayısı" }), roundsInput]),
+              el("label", { className: "tour-option wide" }, [
+                moveHintsInput,
+                el("span", { className: "tour-option-copy" }, [
+                  el("strong", { text: "Hamle yardımını göster" }),
+                  el("small", {
+                    id: "tour-move-hints-note",
+                    text: "Taşa dokunulduğunda gidebileceği kareleri nokta ve halkalarla gösterir. Kapatırsanız oyuncular hamleleri kendileri bulur."
+                  })
+                ])
+              ]),
               el("div", { className: "tour-field wide" }, [
                 el("div", { className: "tour-check-head" }, [
                   el("span", { text: "Katılanlar" }),
@@ -147,6 +162,7 @@ export function TournamentPage({ sound }) {
                     classId: item.id,
                     name: nameInput.value,
                     rounds: roundsInput.value,
+                    showMoveHints: moveHintsInput.checked,
                     playerIds: students.filter((student) => chosen.has(student.id)).map((student) => student.id)
                   });
                   classroom.pairNextRound(t.id);

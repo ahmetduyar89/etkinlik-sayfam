@@ -897,6 +897,9 @@ export function DuelPage({ sound }) {
       chess,
       orientation: side || singleOrientation,
       interactive: phase === "play",
+      // Eski turnuvalarda alan bulunmaz; onlar önceki davranışla yardım açık
+      // çalışmaya devam eder. Turnuva dışındaki iki kişilik oyun da değişmez.
+      showLegalTargets: !tourBoard || tourBoard.tournament.showMoveHints !== false,
       onSquareClick: (square) => {
         if (phase === "setup") paint(square);
         else nudge(side, square);

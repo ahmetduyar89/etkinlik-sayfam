@@ -38,6 +38,7 @@ const PROMOTION_CHOICES = [
  * @param {boolean} options.interactive Oyuncu hamle yapabilir mi.
  * @param {(square:string) => void} options.onSquareClick Serbest kare tıklaması (ders modu).
  * @param {boolean} options.coordinates Kenar koordinatları gösterilsin mi.
+ * @param {boolean} options.showLegalTargets Seçilen taşın gidebileceği kareler gösterilsin mi.
  */
 export function ChessBoard({
   chess,
@@ -45,7 +46,8 @@ export function ChessBoard({
   orientation = "w",
   interactive = true,
   onSquareClick = null,
-  coordinates = true
+  coordinates = true,
+  showLegalTargets = true
 } = {}) {
   let selected = null;
   let legalTargets = [];
@@ -397,7 +399,10 @@ export function ChessBoard({
 
       parts.node.classList.toggle("goal", marks.includes(name));
 
-      const isTarget = legalTargets.includes(name);
+      // Hamle yapabilmek için yasal hedefleri her zaman hesaplarız. Turnuva
+      // yardımı kapalıysa yalnızca nokta/halka görsellerini gizleriz; tıklama
+      // ve sürükle-bırak davranışı değişmez.
+      const isTarget = showLegalTargets && legalTargets.includes(name);
       parts.node.classList.toggle("target", isTarget);
       parts.node.classList.toggle("target-capture", isTarget && Boolean(piece));
 

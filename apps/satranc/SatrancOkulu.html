@@ -15,7 +15,7 @@
 
   Otomatik üretilmiştir (tools/build-tek-dosya.mjs). Elle düzenlemeyin;
   değişiklikleri src/ altında yapıp aracı yeniden çalıştırın.
-  Üretim tarihi: 2026-09-24
+  Üretim tarihi: 2026-09-27
 -->
 <style>
 /* ===== src/styles/base.css ===== */
@@ -333,6 +333,26 @@ body.high-contrast { background-image: none; }
   font-weight: 900;
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
+
+.cloud-status {
+  min-height: 2.2rem;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  border: 2px solid #cbd5e1;
+  border-radius: 999px;
+  color: #475569;
+  background: #f8fafc;
+  font-size: 0.72rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.cloud-status.online { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
+.cloud-status.connecting { color: #6d28d9; background: #f5f3ff; border-color: #ddd6fe; }
+.cloud-status.offline,
+.cloud-status.signed-out,
+.cloud-status.error { color: #b45309; background: #fffbeb; border-color: #fde68a; }
 
 /* XP ve yıldız rozetleri: soldan sağa iki neşeli renk. */
 .top-stat:nth-of-type(1) {
@@ -5531,6 +5551,31 @@ body.focus-mode .duel-panel { padding: 0.7rem; }
 .tour-field { display: grid; gap: 0.3rem; font-size: 0.8rem; font-weight: 800; color: var(--muted); }
 .tour-field.wide { grid-column: 1 / -1; }
 .tour-rounds-input { width: 100%; }
+
+.tour-option {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: var(--panel-2);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.tour-option input {
+  flex: 0 0 auto;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.1rem;
+  accent-color: var(--primary);
+}
+
+.tour-option-copy { display: grid; gap: 0.15rem; }
+.tour-option-copy strong { font-size: 0.88rem; }
+.tour-option-copy small { color: var(--muted); line-height: 1.35; }
 
 .tour-check-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .tour-check-head .class-hint { margin-right: auto; }
@@ -11238,6 +11283,7 @@ const PROMOTION_CHOICES = [
  * @param {boolean} options.interactive Oyuncu hamle yapabilir mi.
  * @param {(square:string) => void} options.onSquareClick Serbest kare tıklaması (ders modu).
  * @param {boolean} options.coordinates Kenar koordinatları gösterilsin mi.
+ * @param {boolean} options.showLegalTargets Seçilen taşın gidebileceği kareler gösterilsin mi.
  */
 function ChessBoard({
   chess,
@@ -11245,7 +11291,8 @@ function ChessBoard({
   orientation = "w",
   interactive = true,
   onSquareClick = null,
-  coordinates = true
+  coordinates = true,
+  showLegalTargets = true
 } = {}) {
   let selected = null;
   let legalTargets = [];
@@ -11597,7 +11644,10 @@ function ChessBoard({
 
       parts.node.classList.toggle("goal", marks.includes(name));
 
-      const isTarget = legalTargets.includes(name);
+      // Hamle yapabilmek için yasal hedefleri her zaman hesaplarız. Turnuva
+      // yardımı kapalıysa yalnızca nokta/halka görsellerini gizleriz; tıklama
+      // ve sürükle-bırak davranışı değişmez.
+      const isTarget = showLegalTargets && legalTargets.includes(name);
       parts.node.classList.toggle("target", isTarget);
       parts.node.classList.toggle("target-capture", isTarget && Boolean(piece));
 
@@ -49987,7 +50037,7 @@ class ClassroomService {
     return this.state.tournaments.find((t) => t.id === id) || null;
   }
 
-  createTournament({ classId, name, rounds, playerIds }) {
+  createTournament({ classId, name, rounds, playerIds, showMoveHints = true }) {
     if (!this.getClass(classId) || playerIds.length < 2) return null;
     // Başlangıç sırası (seed) kurada belirlenir: öğrencilerin reytingi yok ve
     // alfabetik sıra hep aynı çocukları ilk turda karşılaştırırdı.
@@ -49998,6 +50048,7 @@ class ClassroomService {
       name: String(name || "").trim().slice(0, 40) || "Sınıf Turnuvası",
       createdAt: new Date().toISOString(),
       plannedRounds: Math.max(1, Math.min(20, Number(rounds) || 1)),
+      showMoveHints: showMoveHints !== false,
       playerIds: seeded,
       withdrawn: [],
       rounds: [],
@@ -51123,6 +51174,9 @@ function DuelPage({ sound }) {
       chess,
       orientation: side || singleOrientation,
       interactive: phase === "play",
+      // Eski turnuvalarda alan bulunmaz; onlar önceki davranışla yardım açık
+      // çalışmaya devam eder. Turnuva dışındaki iki kişilik oyun da değişmez.
+      showLegalTargets: !tourBoard || tourBoard.tournament.showMoveHints !== false,
       onSquareClick: (square) => {
         if (phase === "setup") paint(square);
         else nudge(side, square);
@@ -52831,7 +52885,7 @@ function ClassesPage({ sound, progress }) {
         el("h2", { className: "class-card-title", text: "Yedek" }),
         el("p", {
           className: "class-hint",
-          text: "Sınıflar, maçlar ve öğrenci ilerlemeleri yalnızca bu bilgisayarda durur. Başka bilgisayara taşımak ya da güvenceye almak için yedek dosyası al."
+          text: "Çevrimdışıyken kayıtlar bu bilgisayarda korunur; bağlantı gelince buluta aktarılır. Ayrıca başka bilgisayara elle taşımak için yedek dosyası alabilirsin."
         }),
         el("div", { className: "class-row-buttons" }, [
           el("button", {
@@ -53357,6 +53411,11 @@ function TournamentPage({ sound }) {
       value: String(suggestedRounds(chosen.size)),
       "aria-label": "Tur sayısı"
     });
+    const moveHintsInput = el("input", {
+      type: "checkbox",
+      checked: "",
+      "aria-describedby": "tour-move-hints-note"
+    });
     const countNote = el("span", { className: "class-hint" });
     const updateCount = () => {
       countNote.textContent = `${chosen.size} oyuncu · önerilen ${suggestedRounds(chosen.size)} tur` +
@@ -53400,6 +53459,16 @@ function TournamentPage({ sound }) {
           : el("div", { className: "tour-form" }, [
               el("label", { className: "tour-field" }, [el("span", { text: "Turnuva adı" }), nameInput]),
               el("label", { className: "tour-field short" }, [el("span", { text: "Tur sayısı" }), roundsInput]),
+              el("label", { className: "tour-option wide" }, [
+                moveHintsInput,
+                el("span", { className: "tour-option-copy" }, [
+                  el("strong", { text: "Hamle yardımını göster" }),
+                  el("small", {
+                    id: "tour-move-hints-note",
+                    text: "Taşa dokunulduğunda gidebileceği kareleri nokta ve halkalarla gösterir. Kapatırsanız oyuncular hamleleri kendileri bulur."
+                  })
+                ])
+              ]),
               el("div", { className: "tour-field wide" }, [
                 el("div", { className: "tour-check-head" }, [
                   el("span", { text: "Katılanlar" }),
@@ -53423,6 +53492,7 @@ function TournamentPage({ sound }) {
                     classId: item.id,
                     name: nameInput.value,
                     rounds: roundsInput.value,
+                    showMoveHints: moveHintsInput.checked,
                     playerIds: students.filter((student) => chosen.has(student.id)).map((student) => student.id)
                   });
                   classroom.pairNextRound(t.id);
@@ -54248,6 +54318,41 @@ function classIdForProfile(classroom, profileId) {
   return classroom.classes.find((item) => item.students.some((student) => student.id === studentId))?.id || null;
 }
 
+function repairOrphanedClassIds(classroom) {
+  const classIds = new Set(classroom.classes.map((item) => item.id));
+  const classByStudent = new Map();
+  for (const item of classroom.classes) {
+    for (const student of item.students || []) classByStudent.set(student.id, item.id);
+  }
+
+  const inferClassId = (studentIds) => {
+    const candidates = [...new Set(studentIds.map((id) => classByStudent.get(id)).filter(Boolean))];
+    return candidates.length === 1 ? candidates[0] : null;
+  };
+
+  let changed = false;
+  for (const match of classroom.state.matches || []) {
+    if (classIds.has(match.classId)) continue;
+    const inferred = inferClassId([match.whiteId, match.blackId]);
+    if (inferred) {
+      match.classId = inferred;
+      changed = true;
+    }
+  }
+  for (const tournament of classroom.state.tournaments || []) {
+    if (classIds.has(tournament.classId)) continue;
+    const boardIds = (tournament.rounds || []).flatMap((round) =>
+      (round || []).flatMap((board) => [board?.whiteId, board?.blackId])
+    );
+    const inferred = inferClassId([...(tournament.playerIds || []), ...boardIds].filter(Boolean));
+    if (inferred) {
+      tournament.classId = inferred;
+      changed = true;
+    }
+  }
+  if (changed) classroom.save();
+}
+
 async function startCloudSync({ classroom, progress }) {
   if (!location.protocol.startsWith("http")) return () => {};
   announce("connecting");
@@ -54263,40 +54368,59 @@ async function startCloudSync({ classroom, progress }) {
 
   const { auth, db, storeSdk } = firebase;
   if (!auth.currentUser) {
-    announce("signed-out", "Bulut kaydı için Atölye öğretmen girişi gerekir.");
-    return () => {};
+    try {
+      const authSdk = await import(`${SDK}/firebase-auth.js`);
+      await authSdk.signInAnonymously(auth);
+    } catch (error) {
+      console.warn("[bulut] sınıf oturumu açılamadı:", error);
+      announce("signed-out", "Sınıf bulut oturumu açılamadı. Firebase'de Anonim giriş etkinleştirilmelidir.");
+      return () => {};
+    }
   }
+
+  repairOrphanedClassIds(classroom);
 
   const {
     collection,
     deleteDoc,
     doc,
     onSnapshot,
+    query,
     runTransaction,
     serverTimestamp,
-    setDoc
+    setDoc,
+    where
   } = storeSdk;
 
   let applyingRemote = false;
   let classroomTimer = 0;
   let progressTimer = 0;
+  let heartbeatTimer = 0;
   let knownMatches = new Set();
   let knownTournaments = new Set();
   const stops = [];
   const device = deviceId();
+  const user = auth.currentUser;
+  const anonymous = user?.isAnonymous === true;
+  let sessionClassId = null;
+  try {
+    const session = JSON.parse(localStorage.getItem("etkinlik_oturum"));
+    if (session?.role === "class") sessionClassId = session.classId || null;
+  } catch { /* Eski veya bozuk portal oturumu yok sayılır. */ }
 
-  const matchDoc = (item) => key(item.classId, item.id);
-  const tournamentDoc = (item) => key(item.classId, item.id);
+  const docKey = (classId, localId) => key(classId, localId);
+  const matchDoc = (item) => item._cloudDocId || docKey(item.classId, item.id);
+  const tournamentDoc = (item) => item._cloudDocId || docKey(item.classId, item.id);
+  const progressDoc = (classId, profileId) => docKey(classId, profileId);
+  const visibleCollection = (name) => collection(db, name);
+  const cloudData = (item) => {
+    const { _cloudDocId, ...data } = clean(item);
+    return data;
+  };
 
-  async function writeRecord(collectionName, id, data, initial) {
+  async function writeRecord(collectionName, id, data, _initial) {
     const ref = doc(db, collectionName, id);
-    if (!initial) return setDoc(ref, data);
-    // İlk göçte bulutta daha önce oluşmuş bir kaydın üzerine eski sınıf
-    // bilgisayarı verisini yazma. Yalnızca eksik dokümanı oluştur.
-    return runTransaction(db, async (transaction) => {
-      const snapshot = await transaction.get(ref);
-      if (!snapshot.exists()) transaction.set(ref, data);
-    });
+    return setDoc(ref, data, { merge: true });
   }
 
   async function pushClassroom(initial = false) {
@@ -54306,15 +54430,26 @@ async function startCloudSync({ classroom, progress }) {
     const nextMatches = new Set(matches.map(matchDoc));
     const nextTournaments = new Set(tournaments.map(tournamentDoc));
 
+    const deletes = [];
+    if (!initial) {
+      for (const id of knownMatches) {
+        if (!nextMatches.has(id)) deletes.push(deleteDoc(doc(db, "chess_matches", id)));
+      }
+      for (const id of knownTournaments) {
+        if (!nextTournaments.has(id)) deletes.push(deleteDoc(doc(db, "chess_tournaments", id)));
+      }
+    }
+
     await Promise.all([
       ...matches.map((item) => writeRecord("chess_matches", matchDoc(item), {
-        ...clean(item), localId: item.id, deviceId: device, syncedAt: serverTimestamp()
+        ...cloudData(item), localId: item.id, ownerUid: item.ownerUid || user?.uid || "shared",
+        deviceId: device, syncedAt: serverTimestamp()
       }, initial)),
       ...tournaments.map((item) => writeRecord("chess_tournaments", tournamentDoc(item), {
-        ...clean(item), localId: item.id, deviceId: device, syncedAt: serverTimestamp()
+        ...cloudData(item), localId: item.id, ownerUid: item.ownerUid || user?.uid || "shared",
+        deviceId: device, syncedAt: serverTimestamp()
       }, initial)),
-      ...[...knownMatches].filter((id) => !nextMatches.has(id)).map((id) => deleteDoc(doc(db, "chess_matches", id))),
-      ...[...knownTournaments].filter((id) => !nextTournaments.has(id)).map((id) => deleteDoc(doc(db, "chess_tournaments", id)))
+      ...deletes
     ]);
     knownMatches = nextMatches;
     knownTournaments = nextTournaments;
@@ -54326,11 +54461,12 @@ async function startCloudSync({ classroom, progress }) {
     for (const [profileId, value] of Object.entries(progress.store.profiles || {})) {
       const classId = classIdForProfile(classroom, profileId);
       if (!classId) continue;
-      writes.push(writeRecord("chess_progress", key(classId, profileId), {
+      writes.push(writeRecord("chess_progress", progressDoc(classId, profileId), {
         classId,
         profileId,
         profileName: progress.store.profileNames?.[profileId] || "Öğrenci",
         progress: clean(value),
+        ownerUid: user?.uid || "shared",
         deviceId: device,
         syncedAt: serverTimestamp()
       }, initial));
@@ -54338,53 +54474,74 @@ async function startCloudSync({ classroom, progress }) {
     await Promise.all(writes);
   }
 
-  // İlk işlem yereldeki eski kayıtları yüklemektir. Böylece sınıf bilgisayarında
-  // yıllardır duran turnuvalar ilk bağlantıda kaybolmadan buluta taşınır.
+  const syncRef = doc(db, "chess_sync", `${sessionClassId ? encodeURIComponent(sessionClassId) + "--" : ""}${encodeURIComponent(device)}`);
+  const writeHeartbeat = () => setDoc(syncRef, {
+    deviceId: device,
+    userId: user?.uid || "anonymous",
+    ownerUid: user?.uid || "anonymous",
+    anonymous,
+    classIds: classroom.classes.map((item) => item.id),
+    activeClassId: sessionClassId || classroom.state.activeClassId || null,
+    lastSeenAt: serverTimestamp(),
+    userAgent: navigator.userAgent.slice(0, 180)
+  }, { merge: true });
+
+  // İlk işlem yereldeki eski kayıtları yüklemektir.
   try {
     await pushClassroom(true);
     await pushProgress(true);
-    await setDoc(doc(db, "chess_sync", device), {
-      deviceId: device,
-      userId: auth.currentUser.uid,
-      classIds: classroom.classes.map((item) => item.id),
-      lastSeenAt: serverTimestamp(),
-      userAgent: navigator.userAgent.slice(0, 180)
-    }, { merge: true });
+    await writeHeartbeat();
   } catch (error) {
     console.warn("[bulut] ilk aktarım başarısız:", error);
     announce("error", error.message || "İlk aktarım tamamlanamadı.");
     return () => {};
   }
 
-  stops.push(onSnapshot(collection(db, "chess_matches"), (snapshot) => {
+  stops.push(onSnapshot(visibleCollection("chess_matches"), (snapshot) => {
     const remote = snapshot.docs.map((snap) => {
       const data = snap.data();
       const { localId, deviceId: _device, syncedAt: _synced, ...item } = data;
-      return { ...item, id: localId || item.id };
+      return { ...item, id: localId || item.id, _cloudDocId: snap.id };
     }).filter((item) => item.id && item.classId);
+
     applyingRemote = true;
-    classroom.state.matches = remote;
+    const matchMap = new Map();
+    for (const m of classroom.state.matches || []) {
+      if (m?.id) matchMap.set(m.id, m);
+    }
+    for (const r of remote) {
+      matchMap.set(r.id, r);
+    }
+    classroom.state.matches = Array.from(matchMap.values());
     classroom.save();
     knownMatches = new Set(snapshot.docs.map((snap) => snap.id));
     applyingRemote = false;
     announce("online");
   }, (error) => announce("error", error.message)));
 
-  stops.push(onSnapshot(collection(db, "chess_tournaments"), (snapshot) => {
+  stops.push(onSnapshot(visibleCollection("chess_tournaments"), (snapshot) => {
     const remote = snapshot.docs.map((snap) => {
       const data = snap.data();
       const { localId, deviceId: _device, syncedAt: _synced, ...item } = data;
-      return { ...item, id: localId || item.id };
+      return { ...item, id: localId || item.id, _cloudDocId: snap.id };
     }).filter((item) => item.id && item.classId);
+
     applyingRemote = true;
-    classroom.state.tournaments = remote;
+    const tourMap = new Map();
+    for (const t of classroom.state.tournaments || []) {
+      if (t?.id) tourMap.set(t.id, t);
+    }
+    for (const r of remote) {
+      tourMap.set(r.id, r);
+    }
+    classroom.state.tournaments = Array.from(tourMap.values());
     classroom.save();
     knownTournaments = new Set(snapshot.docs.map((snap) => snap.id));
     applyingRemote = false;
     announce("online");
   }, (error) => announce("error", error.message)));
 
-  stops.push(onSnapshot(collection(db, "chess_progress"), (snapshot) => {
+  stops.push(onSnapshot(visibleCollection("chess_progress"), (snapshot) => {
     applyingRemote = true;
     for (const snap of snapshot.docs) {
       const data = snap.data();
@@ -54409,10 +54566,15 @@ async function startCloudSync({ classroom, progress }) {
     progressTimer = window.setTimeout(() => void pushProgress().catch((error) => announce("error", error.message)), 450);
   }));
 
+  heartbeatTimer = window.setInterval(() => {
+    void writeHeartbeat().catch((error) => announce("error", error.message));
+  }, 60_000);
+
   announce("online");
   return () => {
     window.clearTimeout(classroomTimer);
     window.clearTimeout(progressTimer);
+    window.clearInterval(heartbeatTimer);
     for (const stop of stops) stop();
   };
 }
@@ -54576,11 +54738,44 @@ let xpStat = null;
 let starStat = null;
 let classPicker = null;
 let studentPicker = null;
+let cloudStatusNode = null;
+let cloudStatus = { status: "connecting", detail: "Bulut bağlantısı kuruluyor." };
+
+const cloudLabels = {
+  connecting: "Bağlanıyor",
+  online: "Buluta kaydediliyor",
+  offline: "Çevrimdışı",
+  "signed-out": "Bulut kapalı",
+  error: "Senkronizasyon hatası"
+};
+
+function syncCloudStatus() {
+  if (!cloudStatusNode) return;
+  cloudStatusNode.className = `cloud-status ${cloudStatus.status}`;
+  cloudStatusNode.textContent = `● ${cloudLabels[cloudStatus.status] || "Bulut durumu"}`;
+  cloudStatusNode.title = cloudStatus.detail || cloudStatusNode.textContent;
+}
+
+window.addEventListener("satranc-cloud-status", (event) => {
+  cloudStatus = event.detail || cloudStatus;
+  syncCloudStatus();
+});
 
 function renderTopbar() {
   const collapsed = Boolean(progress.state.settings.navCollapsed);
   xpStat = el("div", { className: "top-stat", text: `XP ${progress.state.xp}` });
   starStat = el("div", { className: "top-stat", text: `★ ${progress.state.stars}` });
+  cloudStatusNode = el("div", {
+    className: "cloud-status",
+    role: "status",
+    style: "cursor: pointer;",
+    onClick: () => {
+      if (cloudStatus.detail) {
+        window.alert(`Bulut Durumu: ${cloudLabels[cloudStatus.status] || cloudStatus.status}\n\nDetay: ${cloudStatus.detail}`);
+      }
+    }
+  });
+  syncCloudStatus();
   return el("header", { className: "topbar" }, [
     // Menüyü aç/kapa — tercih kaydedilir, sayfalar arası korunur.
     el("button", {
@@ -54613,6 +54808,7 @@ function renderTopbar() {
       })
     ]),
     role === "teacher" ? renderClassPicker() : renderStudentPicker(),
+    cloudStatusNode,
     xpStat,
     starStat,
     el("button", { className: "icon-button", type: "button", title: "Ayarlar", onClick: () => navigate("settings"), html: icon("settings") })
