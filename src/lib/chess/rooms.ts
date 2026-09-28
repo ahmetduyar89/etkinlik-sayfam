@@ -41,7 +41,10 @@ export type RoomKind = 'acik' | 'ozel';
 /** Bir koltukta oturan oyuncu. */
 export interface Seat {
     id: string;
+    studentId: string;
     name: string;
+    /** Doğrulanmış öğrencinin sınıfı; sonuç doğru sınıf raporuna bağlanır. */
+    classId: string;
     /** Oyuncu "Hazırım" dedi mi? İki taraf da hazır olunca oyun başlar. */
     ready: boolean;
     /** Son yaşam sinyali (ms). Sekmesi kapananlar listeden böyle düşer. */
@@ -252,7 +255,9 @@ export class RoomError extends Error {}
  */
 export async function createRoom(options: {
     id: string;
+    studentId: string;
     name: string;
+    classId: string;
     kind: RoomKind;
     timeControl: TimeControlId;
     /** Kuran oyuncunun rengi; 'rastgele' ise para atılır. */
@@ -271,7 +276,7 @@ export async function createRoom(options: {
                 // Yalnızca terk edilmiş masaların kodu yeniden kullanılabilir.
                 if (isFresh(existing)) return null;
             }
-            const seat: Seat = { id: options.id, name: options.name, ready: false, seen: Date.now() };
+            const seat: Seat = { id: options.id, studentId: options.studentId, name: options.name, classId: options.classId, ready: false, seen: Date.now() };
             const base = emptyRoom(code, options.kind, newClock(options.timeControl));
             const payload = { ...base, [color === 'w' ? 'white' : 'black']: seat };
             tx.set(ref, payload);
@@ -287,14 +292,14 @@ export async function createRoom(options: {
  *  - Oyuncu zaten oturuyorsa yalnızca adı ve yaşam sinyali tazelenir.
  *  - Boş koltuk yoksa izleyici olarak açılır (masa dokümanı değişmez).
  */
-export async function joinRoom(code: string, id: string, name: string): Promise<ChessRoom> {
+export async function joinRoom(code: string, id: string, studentId: string, name: string, classId: string): Promise<ChessRoom> {
     const room = await editRoom(code, (current) => {
         const mine = seatColor(current, id);
         if (mine) {
             const seat: Seat = { ...seatOf(current, mine)!, name, seen: Date.now() };
             return mine === 'w' ? { white: seat } : { black: seat };
         }
-        const seat: Seat = { id, name, ready: false, seen: Date.now() };
+        const seat: Seat = { id, studentId, name, classId, ready: false, seen: Date.now() };
         if (!current.white) return { white: seat };
         if (!current.black) return { black: seat };
         return null; // Masa dolu: izleyici olarak devam.

@@ -28,7 +28,9 @@ import {
 
 interface ChessLobbyProps {
     playerId: string;
+    studentId: string;
     playerName: string;
+    classId: string;
     onOpenRoom: (code: string) => void;
     onPlayBot: () => void;
     onChangeName: () => void;
@@ -36,7 +38,9 @@ interface ChessLobbyProps {
 
 export function ChessLobby({
     playerId,
+    studentId,
     playerName,
+    classId,
     onOpenRoom,
     onPlayBot,
     onChangeName,
@@ -86,7 +90,9 @@ export function ChessLobby({
         try {
             const room = await createRoom({
                 id: playerId,
+                studentId,
                 name: playerName,
+                classId,
                 kind,
                 timeControl,
                 color,
@@ -97,7 +103,7 @@ export function ChessLobby({
         } finally {
             setBusy(false);
         }
-    }, [playerId, playerName, kind, timeControl, color, onOpenRoom, toast]);
+    }, [playerId, studentId, playerName, classId, kind, timeControl, color, onOpenRoom, toast]);
 
     const handleJoinByCode = useCallback(async () => {
         const code = joinCode.replace(/\D/g, '').slice(0, 4);
@@ -138,7 +144,7 @@ export function ChessLobby({
                     onClick={onChangeName}
                     className="rounded-xl border border-outline-variant bg-surface px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:text-on-surface"
                 >
-                    Adı değiştir
+                    Öğrenci değiştir
                 </button>
             </header>
 

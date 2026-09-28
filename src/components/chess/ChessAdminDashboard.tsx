@@ -46,6 +46,23 @@ interface SyncDevice {
     lastSeenAt?: { toDate?: () => Date };
 }
 
+interface LivePresence {
+    id: string;
+    studentId: string;
+    studentName?: string;
+    classId: string;
+    lastSeenAt?: { toDate?: () => Date };
+}
+
+interface LiveGame {
+    id: string;
+    whiteClassId?: string;
+    blackClassId?: string;
+    whiteName?: string;
+    blackName?: string;
+    result?: string;
+}
+
 const levelOf = (xp = 0) => Math.floor(xp / 120) + 1;
 const pointsText = (points: number) => Number.isInteger(points) ? String(points) : `${Math.floor(points)}½`;
 
@@ -54,6 +71,8 @@ function useCloudChess() {
     const [tournaments, setTournaments] = useState<CloudTournament[]>([]);
     const [progress, setProgress] = useState<CloudProgress[]>([]);
     const [devices, setDevices] = useState<SyncDevice[]>([]);
+    const [presence, setPresence] = useState<LivePresence[]>([]);
+    const [liveGames, setLiveGames] = useState<LiveGame[]>([]);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -67,11 +86,13 @@ function useCloudChess() {
             watch<CloudTournament>('chess_tournaments', setTournaments),
             watch<CloudProgress>('chess_progress', setProgress),
             watch<SyncDevice>('chess_sync', setDevices),
+            watch<LivePresence>('liveChessPresence', setPresence),
+            watch<LiveGame>('liveChessGames', setLiveGames),
         ];
         return () => stops.forEach((stop) => stop());
     }, []);
 
-    return { matches, tournaments, progress, devices, error };
+    return { matches, tournaments, progress, devices, presence, liveGames, error };
 }
 
 function chessUrl(classId: string, route: string) {
@@ -87,6 +108,10 @@ export function ChessAdminDashboard({ onBack }: { onBack: () => void }) {
         const seen = device.lastSeenAt?.toDate?.();
         return seen && Date.now() - seen.getTime() < 600_000;
     }).length;
+    const onlineStudents = cloud.presence.filter((item) => {
+        const seen = item.lastSeenAt?.toDate?.();
+        return seen && Date.now() - seen.getTime() < 90_000;
+    }).length;
 
     return (
         <div className="min-h-screen bg-[#f6f7fb] text-slate-900">
@@ -99,7 +124,7 @@ export function ChessAdminDashboard({ onBack }: { onBack: () => void }) {
                     <Crown className="h-5 w-5 text-amber-500" />
                     <strong className="text-[17px]">Satranç Yönetimi</strong>
                     <span className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${cloud.error || !activeDevices ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                        <Cloud className="h-3.5 w-3.5" /> {cloud.error ? 'Kurulum bekliyor' : activeDevices ? `${activeDevices} sınıf cihazı bağlı` : 'Sınıf bağlantısı bekleniyor'}
+                        <Cloud className="h-3.5 w-3.5" /> {cloud.error ? 'Kurulum bekliyor' : `${activeDevices} sınıf cihazı · ${onlineStudents} öğrenci çevrimiçi`}
                     </span>
                 </div>
             </header>
@@ -139,6 +164,10 @@ function ClassStatusCard({ item, cloud, onOpen }: { item: ClassRoom; cloud: Retu
     const course = cloud.progress.find((profile) => profile.classId === item.id && profile.profileId === `class:${item.id}`);
     const weeks = course?.progress?.completedLessons?.filter((id) => /^week-\d+$/.test(id)).length || 0;
     const active = tournaments.find((tournament) => !tournament.finished);
+    const online = cloud.presence.filter((presence) => {
+        const seen = presence.lastSeenAt?.toDate?.();
+        return presence.classId === item.id && seen && Date.now() - seen.getTime() < 90_000;
+    }).length;
     const lastSync = cloud.devices
         .filter((device) => device.anonymous && device.activeClassId === item.id)
         .map((device) => device.lastSeenAt?.toDate?.())
@@ -162,6 +191,7 @@ function ClassStatusCard({ item, cloud, onOpen }: { item: ClassRoom; cloud: Retu
                 <Metric icon={Crown} label="Ort. seviye" value={profiles.length ? avgLevel.toFixed(1) : '—'} />
                 <Metric icon={Swords} label="Maç" value={String(matches.length)} />
                 <Metric icon={Trophy} label="Turnuva" value={String(tournaments.length)} />
+                <Metric icon={Users} label="Çevrimiçi" value={String(online)} />
             </div>
             <div className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
                 {active
@@ -186,6 +216,7 @@ function Metric({ icon: Icon, label, value }: { icon: typeof Crown; label: strin
 function ClassDetail({ item, cloud, onClose }: { item: ClassRoom; cloud: ReturnType<typeof useCloudChess>; onClose: () => void }) {
     const matches = cloud.matches.filter((match) => match.classId === item.id);
     const tournaments = cloud.tournaments.filter((tournament) => tournament.classId === item.id);
+    const liveGames = cloud.liveGames.filter((game) => game.whiteClassId === item.id || game.blackClassId === item.id);
     const progressByStudent = new Map(
         cloud.progress
             .filter((profile) => profile.classId === item.id && profile.profileId.startsWith('student:'))
@@ -248,6 +279,7 @@ function ClassDetail({ item, cloud, onClose }: { item: ClassRoom; cloud: ReturnT
                     <Metric icon={Users} label="Öğrenci" value={String(item.students?.length || 0)} />
                     <Metric icon={Swords} label="Toplam maç" value={String(matches.length)} />
                     <Metric icon={Trophy} label="Turnuva" value={`${tournaments.filter((t) => t.finished).length}/${tournaments.length} tamamlandı`} />
+                    <Metric icon={Cloud} label="Canlı satranç" value={String(liveGames.length)} />
                 </div>
 
                 {tournaments.length > 0 && (

@@ -6,16 +6,13 @@
 // Kartların içeriği `src/constants/portal.ts` içindeki kayıt defterinden
 // gelir; yeni bir çalışma eklemek için bu dosyaya dokunmaya gerek yoktur.
 // ─────────────────────────────────────────────────────────────────────
-import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Lock, Sparkles, School, Crown } from 'lucide-react';
 import { PORTAL_MODULES, type PortalModule } from '../../constants/portal';
 import { cn } from '../../utils/cn';
 import { InstallAppButton } from '../common/InstallAppButton';
 import { lockApp } from '../../utils/auth';
-import { ClassManagerModal } from '../classrooms/ClassManagerModal';
 import { useClassrooms } from '../../lib/classrooms';
-import type { ClassRoom } from '../../types';
 
 /** Kartlar sırayla belirsin; sayfa tek seferde "yapışmasın". */
 const listVariants = {
@@ -31,13 +28,11 @@ const cardVariants = {
 interface PortalHomeProps {
     /** Uygulama içinde yaşayan bir bölüm açılacağında çağrılır. */
     onOpenInternal: (id: string) => void;
-    onPreviewClass?: (classItem: ClassRoom) => void;
 }
 
-export function PortalHome({ onOpenInternal, onPreviewClass }: PortalHomeProps) {
+export function PortalHome({ onOpenInternal }: PortalHomeProps) {
     const hazirSayisi = PORTAL_MODULES.filter((m) => m.status === 'ready').length;
     const { classes } = useClassrooms();
-    const [isClassModalOpen, setIsClassModalOpen] = useState(false);
 
     return (
         <div className="relative min-h-screen overflow-hidden bg-[#f6f7fb] font-sans">
@@ -61,7 +56,7 @@ export function PortalHome({ onOpenInternal, onPreviewClass }: PortalHomeProps) 
                         {/* Sınıflarım Butonu */}
                         <button
                             type="button"
-                            onClick={() => setIsClassModalOpen(true)}
+                            onClick={() => onOpenInternal('siniflar')}
                             className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-[13px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 shadow-sm transition-all active:scale-[0.98]"
                         >
                             <School className="h-4 w-4" />
@@ -85,12 +80,6 @@ export function PortalHome({ onOpenInternal, onPreviewClass }: PortalHomeProps) 
                         </button>
                     </div>
                 </header>
-
-                <ClassManagerModal
-                    isOpen={isClassModalOpen}
-                    onClose={() => setIsClassModalOpen(false)}
-                    onSwitchToClass={onPreviewClass}
-                />
 
                 <main className="mx-auto max-w-[1240px] px-5 pb-16 pt-12 sm:px-8 sm:pt-16">
                     <motion.div

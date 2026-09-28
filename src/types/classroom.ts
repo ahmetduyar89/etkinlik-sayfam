@@ -3,13 +3,18 @@
 export interface ClassStudent {
     id: string;
     name: string;
+    /** Okul genelinde benzersiz öğrenci numarası; canlı öğrenci girişi bununla yapılır. */
+    schoolNumber?: string;
+    active?: boolean;
 }
 
 export interface ClassRoom {
     id: string;
     name: string;                   // örn: "4-A", "3-B", "Özel Ders - Can"
     username: string;               // örn: "4a" (küçük harf, boşluksuz)
-    password: string;               // örn: "1234"
+    credentialConfigured?: boolean;
+    /** @deprecated Parola artık sınıf belgesinde tutulmaz; yalnızca eski kayıt geçişi içindir. */
+    password?: string;
     grade?: string;                 // örn: "4"
     description?: string;
     assignedModules: string[];      // Portal modül kimlikleri (örn: ['satranc', 'deneyler', 'defterlerim'])

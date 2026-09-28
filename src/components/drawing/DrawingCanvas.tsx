@@ -925,7 +925,6 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             emitPage();
             notifyHistory();
             redraw();
-            // eslint-disable-next-line react-hooks/exhaustive-deps
         }, [commitStrokes, emitPage, notifyHistory, redraw]);
 
         const doRedo = React.useCallback(() => {
@@ -939,7 +938,6 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             emitPage();
             notifyHistory();
             redraw();
-            // eslint-disable-next-line react-hooks/exhaustive-deps
         }, [commitStrokes, emitPage, notifyHistory, redraw]);
 
         const commitInlineText = React.useCallback(

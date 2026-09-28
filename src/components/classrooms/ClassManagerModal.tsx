@@ -5,8 +5,6 @@ import {
     Plus,
     Trash2,
     Edit3,
-    Eye,
-    EyeOff,
     Check,
     ArrowLeft,
     Users,
@@ -28,7 +26,6 @@ import {
 import { PORTAL_MODULES } from '../../constants/portal';
 import { EXPERIMENTS_CATALOG } from '../../constants/experiments';
 import { useFirestore } from '../../lib/firebase';
-import { saveSession } from '../../utils/auth';
 import type { ClassRoom, ClassStudent, Notebook } from '../../types';
 import { cn } from '../../utils/cn';
 
@@ -84,21 +81,14 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass }: ClassMan
     const [assignedNotebooks, setAssignedNotebooks] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
-    // Şifreleri kartlarda gizle/göster
-    const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({});
-
-    const togglePasswordVisibility = (id: string) => {
-        setRevealedPasswords((prev) => ({ ...prev, [id]: !prev[id] }));
-    };
-
     // Düzenlemeyi başlat
     const startEdit = (c: ClassRoom) => {
         setEditingClass(c);
         setName(c.name);
         setUsername(c.username);
-        setPassword(c.password);
+        setPassword('');
         setGrade(c.grade || '');
-        setStudentsRaw((c.students || []).map((s) => s.name).join('\n'));
+        setStudentsRaw((c.students || []).map((s) => s.schoolNumber ? `${s.schoolNumber}\t${s.name}` : s.name).join('\n'));
         setAssignedModules(c.assignedModules || ['satranc', 'deneyler']);
         setAssignedExperiments(c.assignedExperiments || []);
         setAssignedNotebooks(c.assignedNotebooks || []);
@@ -126,11 +116,21 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass }: ClassMan
             .split('\n')
             .map((line) => line.trim())
             .filter((line) => line.length > 0)
-            .map((line, idx) => ({
-                id: `st_${idx + 1}_${line.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-                name: line,
-            }));
-    }, [studentsRaw]);
+            .map((line, idx) => {
+                const match = line.match(/^(\d{1,20})\s*(?:\t|\||-|;)\s*(.+)$/);
+                const schoolNumber = match?.[1] || '';
+                const name = (match?.[2] || line).trim();
+                const existing = editingClass?.students?.find((student) =>
+                    (schoolNumber && student.schoolNumber === schoolNumber) || student.name === name
+                );
+                return {
+                    id: existing?.id || `st_${idx + 1}_${name.toLocaleLowerCase('tr').replace(/[^a-z0-9]/g, '')}`,
+                    name,
+                    schoolNumber: schoolNumber || undefined,
+                    active: existing?.active !== false,
+                };
+            });
+    }, [studentsRaw, editingClass]);
 
     // Modül seçimi aç/kapat
     const toggleModule = (modId: string) => {
@@ -168,8 +168,8 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass }: ClassMan
             toast.error('Lütfen geçerli bir kullanıcı adı girin.');
             return;
         }
-        if (!cleanPass) {
-            toast.error('Lütfen bir şifre belirleyin.');
+        if ((!editingClass || !editingClass.credentialConfigured) && cleanPass.length < 6) {
+            toast.error('Yeni sınıf için en az 6 karakterli bir şifre belirleyin.');
             return;
         }
 
@@ -187,7 +187,7 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass }: ClassMan
             const payload = {
                 name: trimmedName,
                 username: cleanUser,
-                password: cleanPass,
+                password: cleanPass || undefined,
                 grade: grade.trim() || undefined,
                 students: parsedStudents,
                 assignedModules,
@@ -232,12 +232,6 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass }: ClassMan
 
     // Sınıf olarak aç / önizle
     const handleOpenAsClass = (c: ClassRoom) => {
-        saveSession({
-            role: 'class',
-            classId: c.id,
-            className: c.name,
-            username: c.username,
-        });
         onClose();
         if (onSwitchToClass) {
             onSwitchToClass(c);
@@ -404,7 +398,6 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass }: ClassMan
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {classes.map((c) => {
-                                    const isRevealed = revealedPasswords[c.id];
                                     const studentCount = c.students?.length || 0;
                                     const moduleCount = c.assignedModules?.length || 0;
                                     const expCount = c.assignedExperiments?.length || 0;
@@ -462,21 +455,10 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass }: ClassMan
                                                                 {c.username}
                                                             </span>
                                                         </div>
-                                                        <div>
-                                                            <span className="text-slate-400 font-medium">Şifre: </span>
-                                                            <span className="font-mono font-bold text-slate-700 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                                                                {isRevealed ? c.password : '••••••'}
-                                                            </span>
-                                                        </div>
+                                                        <span className={cn('font-semibold', c.credentialConfigured ? 'text-emerald-700' : 'text-amber-700')}>
+                                                            {c.credentialConfigured ? 'Güvenli giriş hazır' : 'Giriş şifresi kurulmalı'}
+                                                        </span>
                                                     </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => togglePasswordVisibility(c.id)}
-                                                        className="text-slate-400 hover:text-slate-600 p-0.5"
-                                                        title={isRevealed ? 'Şifreyi gizle' : 'Şifreyi göster'}
-                                                    >
-                                                        {isRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                                                    </button>
                                                 </div>
 
                                                 {/* İstatistikler */}
@@ -547,7 +529,7 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass }: ClassMan
                                     </label>
                                     <input
                                         type="text"
-                                        required
+                                        required={!editingClass || !editingClass.credentialConfigured}
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
                                         placeholder="Örn: 4-A"
@@ -576,7 +558,7 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass }: ClassMan
                                         required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="Örn: 1234"
+                                        placeholder={editingClass?.credentialConfigured ? 'Değiştirmek istemiyorsanız boş bırakın' : 'En az 6 karakter'}
                                         className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-[14px] font-mono outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                                     />
                                 </div>
@@ -595,13 +577,13 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass }: ClassMan
                                 </span>
                             </div>
                             <p className="text-[12px] text-slate-500">
-                                Öğrenci isimlerini her satıra bir öğrenci gelecek şekilde yazabilir veya e-Okul / Excel listesinden doğrudan kopyalayıp yapıştırabilirsiniz:
+                                Her satıra önce öğrenci numarasını, sonra ad soyadı yazın. Excel'den iki sütunu doğrudan yapıştırabilirsiniz. Numarasız eski kayıtlar korunur ancak canlı satranca giremez.
                             </p>
                             <textarea
                                 rows={5}
                                 value={studentsRaw}
                                 onChange={(e) => setStudentsRaw(e.target.value)}
-                                placeholder="Ahmet Yılmaz&#10;Zeynep Kaya&#10;Mehmet Demir&#10;Elif Şahin"
+                                placeholder="1024&#9;Ahmet Yılmaz&#10;1025&#9;Zeynep Kaya"
                                 className="w-full bg-white border border-slate-200 rounded-xl p-3 text-[13.5px] font-sans leading-relaxed outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                             />
                         </div>

@@ -117,9 +117,10 @@ export function ClassroomDashboard({
             const now = new Date().toISOString();
             const newDoc = await notebooksHandler.add({
                 title,
+                kind: 'notebook',
+                parent_id: null,
                 paper: 'grid',
                 page_count: 1,
-                created_at: now,
                 updated_at: now,
             });
             if (newDoc && newDoc.id) {

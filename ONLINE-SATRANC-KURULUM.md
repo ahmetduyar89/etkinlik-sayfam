@@ -1,76 +1,53 @@
-# Online Satranç Yönetimi — İlk Kurulum
+# Online Satranç Yönetimi — Kurulum
 
-Kod tarafı çevrimdışı kayıtları koruyarak Firestore'a senkron olacak şekilde
-hazırdır. Canlı kullanımı açmak için Firebase tarafında aşağıdaki tek seferlik
-kurulum yapılmalıdır.
+Güncel mimari ve veri geçişi için [`SISTEM-MIMARISI.md`](./SISTEM-MIMARISI.md)
+belgesindeki yayın sırasını izleyin.
 
-## 1. Öğretmen hesabı oluştur
+## Firebase hazırlığı
 
-Firebase Console'da proje içinden **Authentication → Sign-in method** bölümüne
-girip hem **Email/Password** hem de **Anonymous (Anonim)** yöntemini etkinleştir.
-Anonim yöntem sınıf ekranlarının parola saklamadan yalnızca kendi cihaz
-kayıtlarını gönderebilmesini sağlar. Ardından **Users** ekranında öğretmen/admin
-için bir e-posta ve parola oluştur.
+1. Firebase Authentication içinde **Email/Password** yöntemini etkinleştirin.
+2. Öğretmen hesabını Firebase Authentication kullanıcıları arasına ekleyin.
+3. Functions yayınında `TEACHER_EMAIL` istendiğinde bu hesabın e-postasını girin.
+4. Anonymous Authentication bu yeni sistem için gerekli değildir.
 
-Bu e-posta adresini yayın ortamına ekle:
+## Sunucu işlevleri
 
-```env
-VITE_FIREBASE_ADMIN_EMAIL=ogretmen@example.com
-```
+| İşlev | Görevi |
+| --- | --- |
+| `bootstrapTeacher` | Doğrulanmış öğretmen hesabına öğretmen rolü verir |
+| `saveClass` | Sınıfı, öğrenci numaralarını ve özetlenmiş parolayı kaydeder |
+| `deleteClass` | Sınıfın özel giriş ve öğrenci dizin kayıtlarını temizler |
+| `loginClass` | Sınıf parolasını sunucuda doğrular ve sınıf tokenı üretir |
+| `loginStudent` | Öğrenci numarasını sunucuda doğrular ve öğrenci tokenı üretir |
+| `archiveLiveChessGame` | Biten canlı oyunu öğrenci ve sınıf raporlarına kaydeder |
 
-Parola `.env` dosyasına yazılmaz. Öğretmen giriş ekranında girilir ve Firebase
-tarafından doğrulanır.
-
-## 2. Firestore kurallarını yayınla
-
-Önce öğretmen hesabının ve `VITE_FIREBASE_ADMIN_EMAIL` değişkeninin hazır
-olduğundan emin ol. Sonra:
+İşlevleri yayınlama:
 
 ```bash
-firebase deploy --only firestore:rules --project interaktif-etkinliklerim
+firebase deploy --only functions
 ```
 
-Yeni koleksiyonların tamamını yalnızca e-posta/parolayla giriş yapan öğretmen
-okuyabilir. Sınıf ekranında açılan anonim oturum ise yalnızca kendi oluşturduğu
-kayıtları okuyup değiştirebilir:
+## Sınıf geçişi
 
-- `chess_matches`
-- `chess_tournaments`
-- `chess_progress`
-- `chess_sync`
+Yeni kurallar yayınlanmadan önce öğretmen hesabıyla siteye girin. **Sınıflar**
+sayfasında her sınıfı düzenleyerek:
 
-## 3. Siteyi yeniden yayınla
+- En az 6 karakterli sınıf şifresi belirleyin.
+- Öğrenci listesini `öğrenci numarası<TAB>ad soyad` biçiminde kaydedin.
+- Kartta “Güvenli giriş hazır” durumunu doğrulayın.
 
-Netlify/Vite derlemesi `/satranc/firebase-config.json` dosyasını mevcut
-`VITE_FIREBASE_*` değerlerinden otomatik üretir. Bu dosyada yalnızca Firebase'in
-herkese açık web yapılandırması vardır; yönetici parolası bulunmaz.
+Ardından kuralları yayınlayın:
 
-## 4. Eski kayıtları aktar
+```bash
+firebase deploy --only firestore:rules
+```
 
-Her sınıf bilgisayarında bir kez:
+## Kontrol listesi
 
-1. Atölye ana sayfasında ilgili sınıf hesabıyla giriş yap.
-2. **Satranç Eğitimi** bölümünü aç.
-3. Üst çubukta **Buluta kaydediliyor** yazısını kontrol et. Sayfa açıldığında
-   o tarayıcıdaki maçlar, turnuvalar ve öğrenci profilleri
-   otomatik olarak buluta eklenir.
-
-İlk aktarım bulutta bulunan aynı kimlikli bir kaydın üzerine yazmaz. Sonraki
-değişiklikler iki yönlü ve anlık senkronlanır. İnternet yoksa uygulama yerel
-kayıtla çalışmaya devam eder; bağlantı geldiğinde değişiklikleri gönderir.
-
-## 5. Kontrol
-
-Admin ana sayfasından **Satranç Yönetimi** kartını aç. Her sınıfta:
-
-- senkronlanan öğrenci profilleri,
-- 36 haftalık program ilerlemesi,
-- XP/seviye,
-- maç ve turnuva sayıları,
-- devam eden turnuva ve son cihaz senkronu
-
-canlı görünmelidir.
-
-> Not: Mevcut `classes`, içerik ve defter koleksiyonları eski sınıf girişleriyle
-> uyumluluk için henüz açık kuralları kullanmaktadır. Satranç öğrenci gelişim
-> kayıtları ise yeni kimlik doğrulamalı koleksiyonlarda tutulur.
+- Öğretmen girişi Atölye ve Sınıflar sayfasını açıyor.
+- Sınıf hesabı yalnız kendi sınıf çalışma alanını açıyor.
+- Satranç dersi doğru sınıf listesiyle açılıyor.
+- Sınıf maçları ve turnuvaları Satranç Yönetimi ekranına geliyor.
+- Canlı satranç öğrenci numarası istiyor.
+- Biten canlı oyun ilgili sınıfın maç sayısına ekleniyor.
+- Firestore istemciden `classCredentials` ve `studentLookup` okumayı reddediyor.

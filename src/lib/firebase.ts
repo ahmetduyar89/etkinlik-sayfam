@@ -18,7 +18,8 @@ import {
     runTransaction,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAuth } from 'firebase/auth';
+import { getAuth, signInWithCustomToken } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -31,10 +32,76 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const functions = getFunctions(app, 'europe-west1');
 export const db = initializeFirestore(app, {
     ignoreUndefinedProperties: true,
 });
 export const storage = getStorage(app);
+
+interface ClassLoginResult {
+    token: string;
+    classId: string;
+    className: string;
+    username: string;
+}
+
+interface StudentLoginResult {
+    token: string;
+    classId: string;
+    studentId: string;
+    studentName: string;
+}
+
+/** Sınıf parolasını sunucuda doğrular ve sınıfa sınırlandırılmış Firebase oturumu açar. */
+export async function signInClass(username: string, password: string): Promise<Omit<ClassLoginResult, 'token'>> {
+    const call = httpsCallable<{ username: string; password: string }, ClassLoginResult>(functions, 'loginClass');
+    const { data } = await call({ username, password });
+    await signInWithCustomToken(auth, data.token);
+    const { token: _token, ...session } = data;
+    return session;
+}
+
+/** Öğrenci numarasını sunucuda doğrular ve öğrenciye sınırlandırılmış oturum açar. */
+export async function signInStudent(schoolNumber: string): Promise<Omit<StudentLoginResult, 'token'>> {
+    const call = httpsCallable<{ schoolNumber: string }, StudentLoginResult>(functions, 'loginStudent');
+    const { data } = await call({ schoolNumber });
+    await signInWithCustomToken(auth, data.token);
+    const { token: _token, ...session } = data;
+    return session;
+}
+
+/** Öğretmen hesabına güvenlik rolünü tanımlar; tekrar çağrılması güvenlidir. */
+export async function bootstrapTeacherRole(): Promise<void> {
+    const call = httpsCallable<Record<string, never>, { ok: boolean }>(functions, 'bootstrapTeacher');
+    await call({});
+    await auth.currentUser?.getIdToken(true);
+}
+
+export interface SecureClassInput {
+    id?: string;
+    name: string;
+    username: string;
+    password?: string;
+    grade?: string;
+    description?: string;
+    assignedModules: string[];
+    assignedNotebooks: string[];
+    assignedActivities: string[];
+    assignedExperiments: string[];
+    students: Array<{ id: string; name: string; schoolNumber?: string; active?: boolean }>;
+}
+
+/** Sınıfı, özel kimlik bilgilerini Firestore belgesine yazmadan kaydeder. */
+export async function saveClassSecure(input: SecureClassInput): Promise<string> {
+    const call = httpsCallable<SecureClassInput, { id: string }>(functions, 'saveClass');
+    const { data } = await call(input);
+    return data.id;
+}
+
+export async function deleteClassSecure(id: string): Promise<void> {
+    const call = httpsCallable<{ id: string }, { ok: boolean }>(functions, 'deleteClass');
+    await call({ id });
+}
 
 export interface FirestoreHandler<T extends { id: string }> {
     sync: (onUpdate: (data: T[]) => void, onError?: (e: Error) => void) => () => void;

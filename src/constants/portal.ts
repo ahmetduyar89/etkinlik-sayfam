@@ -16,7 +16,7 @@
 //       Defterlerim → 'notebooks'). Kabuk gerisini halleder.
 // ─────────────────────────────────────────────────────────────────────
 import type { LucideIcon } from 'lucide-react';
-import { BarChart3, BookOpen, Bot, Coins, Crown, Dna, FlaskConical, Globe, LayoutGrid, Music, NotebookPen, Orbit, Puzzle, Shapes, Swords } from 'lucide-react';
+import { BarChart3, BookOpen, Bot, Coins, Crown, Dna, FlaskConical, Globe, LayoutGrid, Music, NotebookPen, Orbit, Puzzle, School, Shapes, Swords } from 'lucide-react';
 import type { MainView } from '../types';
 
 export type ModuleKind = 'internal' | 'static';
@@ -56,6 +56,21 @@ export interface PortalModule {
 }
 
 export const PORTAL_MODULES: PortalModule[] = [
+    {
+        id: 'siniflar',
+        title: 'Sınıflar',
+        description: 'Sınıf kartlarını, öğrenci numaralarını, güvenli giriş bilgilerini ve sınıfa atanmış çalışmaları tek merkezden yönetin.',
+        meta: 'Öğrenci listesi · Sınıf girişi',
+        icon: School,
+        accent: {
+            icon: 'from-indigo-500 to-violet-600',
+            strip: 'from-indigo-400 via-violet-400 to-fuchsia-300',
+            glow: 'rgba(99, 102, 241, 0.28)',
+        },
+        kind: 'internal',
+        href: '/siniflar',
+        status: 'ready',
+    },
     {
         id: 'satranc-yonetim',
         title: 'Satranç Yönetimi',

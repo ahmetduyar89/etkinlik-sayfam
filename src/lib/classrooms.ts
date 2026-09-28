@@ -1,7 +1,9 @@
 // src/lib/classrooms.ts — Sınıflar, Öğrenci Kadroları ve İçerik Atama Servisi
 import { useEffect, useState, useCallback } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
+import { deleteClassSecure, saveClassSecure } from './firebase';
+import { getSession } from '../utils/auth';
 import type { ClassRoom, ClassStudent } from '../types/classroom';
 // @ts-expect-error JavaScript module without type declaration
 import { CLASS_ROSTER } from '../../apps/satranc/src/data/classRoster.js';
@@ -18,26 +20,25 @@ export function getCachedClasses(): ClassRoom[] {
     try {
         const raw = localStorage.getItem(LOCAL_CACHE_KEY);
         if (!raw) {
-            setCachedClasses(INITIAL_CLASSES);
-            syncClassesToChess(INITIAL_CLASSES);
-            return INITIAL_CLASSES;
+            return [];
         }
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
+            const safe = parsed.map(({ password: _legacyPassword, ...classRoom }) => classRoom) as ClassRoom[];
+            setCachedClasses(safe);
+            return safe;
         }
-        setCachedClasses(INITIAL_CLASSES);
-        syncClassesToChess(INITIAL_CLASSES);
-        return INITIAL_CLASSES;
+        return [];
     } catch {
-        return INITIAL_CLASSES;
+        return [];
     }
 }
 
 /** Sınıfları yerel önbelleğe kaydet */
 export function setCachedClasses(classes: ClassRoom[]): void {
     try {
-        localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(classes));
+        const safe = classes.map(({ password: _legacyPassword, ...classRoom }) => classRoom);
+        localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(safe));
     } catch (e) {
         console.warn('Sınıf önbelleği kaydedilemedi:', e);
     }
@@ -46,23 +47,7 @@ export function setCachedClasses(classes: ClassRoom[]): void {
 /** Başlangıç sınıflarını (Satranç okul listesi) Firestore'a kaydet */
 export async function seedInitialClasses(): Promise<void> {
     try {
-        const now = new Date().toISOString();
-        const promises = INITIAL_CLASSES.map((cls) => {
-            const docRef = doc(db, CLASSES_COLLECTION, cls.id);
-            return updateDoc(docRef, {
-                ...cls,
-                updated_at: now,
-            }).catch(() => {
-                // If doc doesn't exist, create it via setDoc
-                import('firebase/firestore').then(({ setDoc }) =>
-                    setDoc(docRef, {
-                        ...cls,
-                        created_at: now,
-                        updated_at: now,
-                    })
-                );
-            });
-        });
+        const promises = INITIAL_CLASSES.map((cls) => saveClassSecure(cls));
         await Promise.allSettled(promises);
         setCachedClasses(INITIAL_CLASSES);
         syncClassesToChess(INITIAL_CLASSES);
@@ -75,11 +60,7 @@ export async function seedInitialClasses(): Promise<void> {
 export async function fetchAllClasses(): Promise<ClassRoom[]> {
     try {
         const snap = await getDocs(collection(db, CLASSES_COLLECTION));
-        if (snap.empty) {
-            // Firestore boşsa başlangıç sınıflarını yükle
-            void seedInitialClasses();
-            return INITIAL_CLASSES;
-        }
+        if (snap.empty) return [];
         const list: ClassRoom[] = snap.docs.map((d) => ({
             id: d.id,
             ...(d.data() as Omit<ClassRoom, 'id'>),
@@ -89,7 +70,7 @@ export async function fetchAllClasses(): Promise<ClassRoom[]> {
         return list;
     } catch (e) {
         console.warn('Firestore sınıfları çekilemedi, önbelleğe bakılıyor:', e);
-        return getCachedClasses();
+            return getCachedClasses();
     }
 }
 
@@ -294,19 +275,15 @@ export async function importFromSatrancLocalStorage(): Promise<{ added: number; 
                 name: s.name,
             }));
 
-        const now = new Date().toISOString();
-        await addDoc(collection(db, CLASSES_COLLECTION), {
+        await saveClassSecure({
             name: trimmedName,
             username: cleanUser,
-            password: '1234',
             grade: trimmedName.match(/\d+/)?.[0] || undefined,
             students,
             assignedModules: ['satranc', 'deneyler', 'akil-oyunlari'],
             assignedExperiments: ['basit-pusula.html', 'isildayan-devre.html', 'termometre.html'],
             assignedNotebooks: [],
             assignedActivities: [],
-            created_at: now,
-            updated_at: now,
         });
 
         added++;
@@ -412,19 +389,15 @@ export async function importFromSatrancEncryptedRoster(password: string): Promis
             name: s.name,
         }));
 
-        const now = new Date().toISOString();
-        await addDoc(collection(db, CLASSES_COLLECTION), {
+        await saveClassSecure({
             name: trimmedName,
             username: cleanUser,
-            password: '1234',
             grade: trimmedName.match(/\d+/)?.[0] || undefined,
             students,
             assignedModules: ['satranc', 'deneyler', 'akil-oyunlari'],
             assignedExperiments: ['basit-pusula.html', 'isildayan-devre.html', 'termometre.html'],
             assignedNotebooks: [],
             assignedActivities: [],
-            created_at: now,
-            updated_at: now,
         });
 
         added++;
@@ -445,34 +418,37 @@ export function useClassrooms() {
     useEffect(() => {
         let unsubscribe = () => {};
         try {
-            const colRef = collection(db, CLASSES_COLLECTION);
-            unsubscribe = onSnapshot(
-                colRef,
-                (snapshot) => {
-                    if (snapshot.empty) {
-                        // Eğer Firestore boşsa, başlangıç sınıflarını (satranç kadroları) otomatik yükle
-                        void seedInitialClasses();
-                        setClasses(INITIAL_CLASSES);
-                        setCachedClasses(INITIAL_CLASSES);
-                        syncClassesToChess(INITIAL_CLASSES);
-                        setLoading(false);
-                        return;
-                    }
-                    const list: ClassRoom[] = snapshot.docs.map((docSnap) => ({
-                        id: docSnap.id,
-                        ...(docSnap.data() as Omit<ClassRoom, 'id'>),
-                    }));
+            const apply = (list: ClassRoom[]) => {
                     setClasses(list);
                     setCachedClasses(list);
                     syncClassesToChess(list);
                     setLoading(false);
-                },
-                (err) => {
+            };
+            const onError = (err: Error) => {
                     console.error('Sınıflar canlı izleme hatası:', err);
                     setError(err.message);
                     setLoading(false);
-                }
-            );
+            };
+            const session = getSession();
+            if (session?.role === 'class') {
+                unsubscribe = onSnapshot(
+                    doc(db, CLASSES_COLLECTION, session.classId),
+                    (snapshot) => apply(snapshot.exists() ? [{
+                        id: snapshot.id,
+                        ...(snapshot.data() as Omit<ClassRoom, 'id'>),
+                    }] : []),
+                    onError
+                );
+            } else {
+                unsubscribe = onSnapshot(
+                    collection(db, CLASSES_COLLECTION),
+                    (snapshot) => apply(snapshot.docs.map((docSnap) => ({
+                        id: docSnap.id,
+                        ...(docSnap.data() as Omit<ClassRoom, 'id'>),
+                    }))),
+                    onError
+                );
+            }
         } catch (e: any) {
             setError(e?.message || 'Bilinmeyen hata');
             setLoading(false);
@@ -481,48 +457,29 @@ export function useClassrooms() {
         return () => unsubscribe();
     }, []);
 
-    // Otomatik içe aktarım: Eğer sınıflar hala boşsa INITIAL_CLASSES yükle
-    useEffect(() => {
-        if (!loading && classes.length === 0) {
-            void seedInitialClasses();
-            setClasses(INITIAL_CLASSES);
-        }
-    }, [loading, classes.length]);
-
     const addClass = useCallback(
         async (data: Omit<ClassRoom, 'id' | 'created_at' | 'updated_at'>) => {
-            const now = new Date().toISOString();
-            const cleanUsername = data.username.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '');
-            const docData = {
-                ...data,
-                username: cleanUsername,
-                created_at: now,
-                updated_at: now,
-            };
-            const docRef = await addDoc(collection(db, CLASSES_COLLECTION), docData);
-            return docRef.id;
+            return saveClassSecure({ ...data, password: data.password });
         },
         []
     );
 
     const updateClass = useCallback(
         async (id: string, data: Partial<Omit<ClassRoom, 'id' | 'created_at'>>) => {
-            const docRef = doc(db, CLASSES_COLLECTION, id);
-            const updatePayload: Record<string, unknown> = {
+            const current = classes.find((item) => item.id === id);
+            if (!current) throw new Error('Sınıf bulunamadı.');
+            await saveClassSecure({
+                ...current,
                 ...data,
-                updated_at: new Date().toISOString(),
-            };
-            if (typeof data.username === 'string') {
-                updatePayload.username = data.username.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '');
-            }
-            await updateDoc(docRef, updatePayload);
+                id,
+                password: data.password,
+            });
         },
-        []
+        [classes]
     );
 
     const removeClass = useCallback(async (id: string) => {
-        const docRef = doc(db, CLASSES_COLLECTION, id);
-        await deleteDoc(docRef);
+        await deleteClassSecure(id);
     }, []);
 
     return {

@@ -150,7 +150,11 @@ export async function startCloudSync({ classroom, progress }) {
   const matchDoc = (item) => item._cloudDocId || docKey(item.classId, item.id);
   const tournamentDoc = (item) => item._cloudDocId || docKey(item.classId, item.id);
   const progressDoc = (classId, profileId) => docKey(classId, profileId);
-  const visibleCollection = (name) => collection(db, name);
+  // Sınıf oturumu yalnız kendi classId alanını dinler. Öğretmen oturumu bütün
+  // sınıfları görebilir; Firestore kuralları da aynı sınırı zorunlu kılar.
+  const visibleCollection = (name) => sessionClassId
+    ? query(collection(db, name), where('classId', '==', sessionClassId))
+    : collection(db, name);
   const cloudData = (item) => {
     const { _cloudDocId, ...data } = clean(item);
     return data;
@@ -163,8 +167,10 @@ export async function startCloudSync({ classroom, progress }) {
 
   async function pushClassroom(initial = false) {
     if (applyingRemote) return;
-    const matches = classroom.state.matches.filter((item) => item?.id && item?.classId);
-    const tournaments = classroom.state.tournaments.filter((item) => item?.id && item?.classId);
+    const matches = classroom.state.matches.filter((item) =>
+      item?.id && item?.classId && (!sessionClassId || item.classId === sessionClassId));
+    const tournaments = classroom.state.tournaments.filter((item) =>
+      item?.id && item?.classId && (!sessionClassId || item.classId === sessionClassId));
     const nextMatches = new Set(matches.map(matchDoc));
     const nextTournaments = new Set(tournaments.map(tournamentDoc));
 
@@ -198,7 +204,7 @@ export async function startCloudSync({ classroom, progress }) {
     const writes = [];
     for (const [profileId, value] of Object.entries(progress.store.profiles || {})) {
       const classId = classIdForProfile(classroom, profileId);
-      if (!classId) continue;
+      if (!classId || (sessionClassId && classId !== sessionClassId)) continue;
       writes.push(writeRecord("chess_progress", progressDoc(classId, profileId), {
         classId,
         profileId,
@@ -214,11 +220,12 @@ export async function startCloudSync({ classroom, progress }) {
 
   const syncRef = doc(db, "chess_sync", `${sessionClassId ? encodeURIComponent(sessionClassId) + "--" : ""}${encodeURIComponent(device)}`);
   const writeHeartbeat = () => setDoc(syncRef, {
+    classId: sessionClassId || classroom.state.activeClassId || null,
     deviceId: device,
     userId: user?.uid || "anonymous",
     ownerUid: user?.uid || "anonymous",
     anonymous,
-    classIds: classroom.classes.map((item) => item.id),
+    classIds: sessionClassId ? [sessionClassId] : classroom.classes.map((item) => item.id),
     activeClassId: sessionClassId || classroom.state.activeClassId || null,
     lastSeenAt: serverTimestamp(),
     userAgent: navigator.userAgent.slice(0, 180)

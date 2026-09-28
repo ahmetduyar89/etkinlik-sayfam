@@ -14,12 +14,13 @@ import {
     AUTH_STORAGE_KEY,
     SESSION_STORAGE_KEY,
     isAuthenticated,
+    getSession,
     isChessLink,
     isStudentLink,
     saveSession,
 } from '../../utils/auth';
 import { auth } from '../../lib/firebase';
-import { fetchAllClasses, syncClassesToChess } from '../../lib/classrooms';
+import { bootstrapTeacherRole, signInClass } from '../../lib/firebase';
 
 interface PasswordGateProps {
     children: React.ReactNode;
@@ -59,10 +60,22 @@ export function PasswordGate({ children }: PasswordGateProps) {
     // admin panelini açabilir. Yerel oturum kaydı tek başına yeterli değildir.
     useEffect(() => {
         if (!secureAdminEnabled) return;
-        return onAuthStateChanged(auth, (user) => {
-            if (user) {
+        return onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                setIsUnlocked(false);
+                setAuthReady(true);
+                return;
+            }
+            const token = await user.getIdTokenResult().catch(() => null);
+            const role = token?.claims.role;
+            if (role === 'teacher' || user.email === FIREBASE_ADMIN_EMAIL) {
                 saveSession({ role: 'admin', username: user.email || 'admin' });
                 setIsUnlocked(true);
+            } else if (role === 'class' && typeof token?.claims.classId === 'string') {
+                // Sınıf adı giriş anında yerel oturuma yazılır. Token yalnızca
+                // rol ve classId bilgisini doğrular; asla admin oturumu üretmez.
+                const session = getSession();
+                setIsUnlocked(session?.role === 'class' && session.classId === token.claims.classId);
             } else {
                 setIsUnlocked(false);
             }
@@ -84,6 +97,7 @@ export function PasswordGate({ children }: PasswordGateProps) {
                 setIsLoading(true);
                 try {
                     const credential = await signInWithEmailAndPassword(auth, FIREBASE_ADMIN_EMAIL, trimmed);
+                    await bootstrapTeacherRole();
                     saveSession({ role: 'admin', username: credential.user.email || 'admin' });
                     setIsUnlocked(true);
                 } catch {
@@ -119,23 +133,11 @@ export function PasswordGate({ children }: PasswordGateProps) {
 
             setIsLoading(true);
             try {
-                const classes = await fetchAllClasses();
-                const matched = classes.find(
-                    (c) => c.username?.toLowerCase() === u && c.password === p
-                );
-
-                if (!matched) {
-                    setError('Sınıf kullanıcı adı veya şifre hatalı.');
-                    setIsLoading(false);
-                    return;
-                }
-
-                // Sınıfı Satranç'ta aktif olarak işaretle ve oturumu başlat
-                syncClassesToChess(classes, matched.id);
+                const matched = await signInClass(u, p);
                 saveSession({
                     role: 'class',
-                    classId: matched.id,
-                    className: matched.name,
+                    classId: matched.classId,
+                    className: matched.className,
                     username: matched.username,
                 });
                 setIsUnlocked(true);

@@ -10,6 +10,14 @@
 
 const ID_KEY = 'satranc_oyuncu_id';
 const NAME_KEY = 'satranc_oyuncu_ad';
+const STUDENT_KEY = 'satranc_ogrenci_oturumu';
+
+export interface ChessStudentSession {
+    studentId: string;
+    studentName: string;
+    classId: string;
+    schoolNumber: string;
+}
 
 /** Tarayıcıda saklanan kalıcı oyuncu kimliği; yoksa üretilir. */
 export function playerId(): string {
@@ -42,6 +50,33 @@ export function savePlayerName(name: string): void {
         window.localStorage.setItem(NAME_KEY, name);
     } catch {
         // Yoksay: ad zaten bu oturumda bellekte tutuluyor.
+    }
+}
+
+export function readStudentSession(): ChessStudentSession | null {
+    try {
+        const raw = window.localStorage.getItem(STUDENT_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as ChessStudentSession;
+        return parsed.studentId && parsed.classId && parsed.studentName ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+export function saveStudentSession(session: ChessStudentSession): void {
+    window.localStorage.setItem(STUDENT_KEY, JSON.stringify(session));
+    savePlayerName(session.studentName);
+    window.localStorage.setItem(ID_KEY, session.studentId);
+}
+
+export function clearStudentSession(): void {
+    try {
+        window.localStorage.removeItem(STUDENT_KEY);
+        window.localStorage.removeItem(NAME_KEY);
+        window.localStorage.removeItem(ID_KEY);
+    } catch {
+        // Oturum belleği kapalıysa sayfa durumu yine temizlenir.
     }
 }
 

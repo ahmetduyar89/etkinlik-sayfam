@@ -37,9 +37,9 @@ Canlı Satranç (`…/?view=satranc`) tek bir koleksiyon kullanır:
 | `chess_rooms` | Masalar: `chess_rooms/{dörtHaneliKod}` — oyuncular, hamleler, saat |
 
 Her masa TEK bir dokümandır; iki cihaz da onu canlı dinler, biri hamle
-yazdığında diğerinin tahtası anında güncellenir. Masada kişisel veri tutulmaz —
-yalnızca oyuncunun kendi yazdığı ad ve oynanan hamleler. Terk edilen masalar
-salon açıldığında temizlenir.
+yazdığında diğerinin tahtası anında güncellenir. Oyuncu adı, doğrulanmış öğrenci
+kimliği, sınıf kimliği ve hamleler tutulur; öğrenci numarası masa belgesine
+yazılmaz. Terk edilen masalar salon açıldığında temizlenir.
 
 **`chess_rooms` yeni bir koleksiyondur: Canlı Satranç'ın çalışması için aşağıdaki
 kuralları yeniden yayınlamanız gerekir.** Yayınlanmazsa salon boş görünür ve masa
@@ -83,8 +83,9 @@ firebase deploy --only firestore:rules --project interaktif-etkinliklerim
 
 ## Güvenlik notu
 
-Online Satranç yönetim koleksiyonları Firebase Authentication ile korunur.
-Mevcut içerik, defter ve `classes` koleksiyonları eski sınıf girişleriyle
-uyumluluk için hâlâ açık erişim kullanmaktadır. Bunların da rol bazlı kurallara
-taşınması ayrı bir güvenlik geçişidir; yeni öğrenci gelişim verileri açık
-koleksiyonlara yazılmaz.
+Sınıf, öğrenci ve satranç koleksiyonları Firebase Authentication rolleri ve
+`classId` sınırıyla korunur. Sınıf parolaları ile öğrenci numarası dizini istemciye
+kapalıdır. Ders paylaşım bağlantılarının çalışması için etkinlik ve defter
+içerikleri okunabilir kalır; bu alanlara yazma yetkisi öğretmen/sınıf rolüyle
+sınırlandırılmıştır. Geçiş sırası için [`SISTEM-MIMARISI.md`](./SISTEM-MIMARISI.md)
+belgesini izleyin.
