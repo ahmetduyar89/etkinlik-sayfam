@@ -86,6 +86,10 @@ export function TournamentPage({ sound }) {
       checked: "",
       "aria-describedby": "tour-move-hints-note"
     });
+    const touchMoveInput = el("input", {
+      type: "checkbox",
+      "aria-describedby": "tour-touch-move-note"
+    });
     const countNote = el("span", { className: "class-hint" });
     const updateCount = () => {
       countNote.textContent = `${chosen.size} oyuncu · önerilen ${suggestedRounds(chosen.size)} tur` +
@@ -139,6 +143,16 @@ export function TournamentPage({ sound }) {
                   })
                 ])
               ]),
+              el("label", { className: "tour-option wide" }, [
+                touchMoveInput,
+                el("span", { className: "tour-option-copy" }, [
+                  el("strong", { text: "Dokunulan taşı oynama zorunluluğu" }),
+                  el("small", {
+                    id: "tour-touch-move-note",
+                    text: "Öğrenci yasal hamlesi olan bir taşa dokunduğunda başka bir taş seçemez; o taşla hamle yapmak zorundadır."
+                  })
+                ])
+              ]),
               el("div", { className: "tour-field wide" }, [
                 el("div", { className: "tour-check-head" }, [
                   el("span", { text: "Katılanlar" }),
@@ -163,6 +177,7 @@ export function TournamentPage({ sound }) {
                     name: nameInput.value,
                     rounds: roundsInput.value,
                     showMoveHints: moveHintsInput.checked,
+                    requireTouchMove: touchMoveInput.checked,
                     playerIds: students.filter((student) => chosen.has(student.id)).map((student) => student.id)
                   });
                   classroom.pairNextRound(t.id);

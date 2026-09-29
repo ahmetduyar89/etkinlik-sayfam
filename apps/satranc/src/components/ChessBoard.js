@@ -39,6 +39,7 @@ const PROMOTION_CHOICES = [
  * @param {(square:string) => void} options.onSquareClick Serbest kare tıklaması (ders modu).
  * @param {boolean} options.coordinates Kenar koordinatları gösterilsin mi.
  * @param {boolean} options.showLegalTargets Seçilen taşın gidebileceği kareler gösterilsin mi.
+ * @param {boolean} options.touchMoveRequired Dokunulan taşın oynanması zorunlu mu.
  */
 export function ChessBoard({
   chess,
@@ -47,7 +48,8 @@ export function ChessBoard({
   interactive = true,
   onSquareClick = null,
   coordinates = true,
-  showLegalTargets = true
+  showLegalTargets = true,
+  touchMoveRequired = false
 } = {}) {
   let selected = null;
   let legalTargets = [];
@@ -248,6 +250,14 @@ export function ChessBoard({
       return;
     }
 
+    // Dokunulan taş kuralı açıksa, yasal hamlesi bulunan ilk taş seçildikten
+    // sonra oyuncu başka bir taşa geçemez. Yasal hamlesi olmayan bir taş
+    // oyuncuyu kilitlemez; gerçek kuralda da oynanamayacak taş zorunlu değildir.
+    if (touchMoveRequired && selected && legalTargets.length > 0) {
+      render();
+      return;
+    }
+
     // Kendi taşına tıklandıysa seçimi oraya taşı.
     if (piece && piece.color === chess.turnColor()) {
       selectSquare(square);
@@ -268,6 +278,11 @@ export function ChessBoard({
       event.preventDefault();
       return;
     }
+    if (touchMoveRequired && selected && legalTargets.length > 0 && selected !== square) {
+      event.preventDefault();
+      render();
+      return;
+    }
     dragFrom = square;
     selectSquare(square);
     event.dataTransfer.effectAllowed = "move";
@@ -281,7 +296,7 @@ export function ChessBoard({
     if (!from || !interactive) return;
     if (legalTargets.includes(square)) attemptMove(from, square);
     else {
-      clearSelection();
+      if (!(touchMoveRequired && selected && legalTargets.length > 0)) clearSelection();
       render();
     }
   }
@@ -356,7 +371,7 @@ export function ChessBoard({
           onClick: () => {
             pendingPromotion = null;
             overlay.hidden = true;
-            clearSelection();
+            if (!touchMoveRequired) clearSelection();
             render();
           }
         })
@@ -499,6 +514,18 @@ export function ChessBoard({
     setInteractive(value) {
       interactive = value;
       if (!value) clearSelection();
+      render();
+    },
+
+    /** Dokunulan taş kuralını oyun sırasında açar ya da kapatır. */
+    setTouchMoveRequired(value) {
+      touchMoveRequired = Boolean(value);
+      render();
+    },
+
+    /** Seçilen taşın yasal hedef noktalarını gösterir ya da gizler. */
+    setShowLegalTargets(value) {
+      showLegalTargets = Boolean(value);
       render();
     },
 

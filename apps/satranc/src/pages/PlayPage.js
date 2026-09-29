@@ -47,6 +47,8 @@ export function PlayPage({ progress, sound }) {
   let resultRecorded = false;
   let rewardGranted = false;
   let currentGameId = newGameId();
+  let showMoveHints = true;
+  let touchMoveRequired = false;
 
   function newGameId() {
     return `game-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -204,6 +206,8 @@ export function PlayPage({ progress, sound }) {
   const board = ChessBoard({
     chess: game.chess,
     orientation: "w",
+    showLegalTargets: showMoveHints,
+    touchMoveRequired,
     onMove: (move) => {
       handlePlayerMove(move);
       // Hamleyi motora biz uyguluyoruz; bileşen kendi kendine ilerletmesin.
@@ -798,6 +802,44 @@ export function PlayPage({ progress, sound }) {
   timeButtonsContainer.append(...timeButtons);
   timeNote.textContent = timeHint();
 
+  function assistanceOption({ input, title, note }) {
+    return el("label", { className: "play-assistance-option" }, [
+      input,
+      el("span", { className: "play-assistance-copy" }, [
+        el("strong", { text: title }),
+        el("small", { text: note })
+      ])
+    ]);
+  }
+
+  const assistanceOptions = el("div", { className: "play-assistance-options" }, [
+    assistanceOption({
+      input: el("input", {
+        type: "checkbox",
+        checked: "",
+        onChange: (event) => {
+          showMoveHints = event.target.checked;
+          board.setShowLegalTargets(showMoveHints);
+          sound.play("click");
+        }
+      }),
+      title: "Hamle yardımını göster",
+      note: "Seçilen taşın gidebileceği kareleri nokta ve halkalarla gösterir."
+    }),
+    assistanceOption({
+      input: el("input", {
+        type: "checkbox",
+        onChange: (event) => {
+          touchMoveRequired = event.target.checked;
+          board.setTouchMoveRequired(touchMoveRequired);
+          sound.play("click");
+        }
+      }),
+      title: "Dokunulan taşı oynama zorunluluğu",
+      note: "Yasal hamlesi olan bir taşa dokununca o taşla hamle yapmak zorundasın."
+    })
+  ]);
+
   const settingsBody = el("div", { className: "play-settings-body" }, [
     el("label", { className: "panel-label", text: "Zorluk" }),
     el("div", { className: "segmented" }, levelButtons),
@@ -806,7 +848,9 @@ export function PlayPage({ progress, sound }) {
     el("label", { className: "panel-label", text: "Satranç saati" }),
     timeButtonsContainer,
     customTimeBox,
-    timeNote
+    timeNote,
+    el("label", { className: "panel-label", text: "Yardım ve kurallar" }),
+    assistanceOptions
   ]);
 
   const settingsBox = el("details", { className: "play-settings" }, [

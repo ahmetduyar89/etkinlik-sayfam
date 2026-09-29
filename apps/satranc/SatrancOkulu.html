@@ -15,7 +15,7 @@
 
   Otomatik üretilmiştir (tools/build-tek-dosya.mjs). Elle düzenlemeyin;
   değişiklikleri src/ altında yapıp aracı yeniden çalıştırın.
-  Üretim tarihi: 2026-09-27
+  Üretim tarihi: 2026-09-29
 -->
 <style>
 /* ===== src/styles/base.css ===== */
@@ -2773,6 +2773,34 @@ body.focus-mode .play-board .cb-stage {
 .play-settings .seg-button strong { font-size: 0.78rem; }
 .play-settings .seg-button small { font-size: 0.72rem; }
 
+.play-assistance-options {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.play-assistance-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.56);
+  cursor: pointer;
+}
+
+.play-assistance-option input {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.08rem;
+  accent-color: var(--primary);
+}
+
+.play-assistance-copy { display: grid; gap: 0.08rem; }
+.play-assistance-copy strong { font-size: 0.78rem; }
+.play-assistance-copy small { color: var(--muted); font-size: 0.7rem; line-height: 1.3; }
+
 
 
 /* --- Daha sıkı durum ve öğretmen kutusu --- */
@@ -3171,6 +3199,39 @@ body.focus-mode .duel-panel { padding: 0.7rem; }
   margin: 0;
   font-size: 1rem;
 }
+
+.duel-assistance-options {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.duel-assistance-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.55rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.56);
+  cursor: pointer;
+}
+
+.duel-assistance-option input {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: 0.1rem;
+  accent-color: var(--primary);
+}
+
+.duel-assistance-option:has(input:disabled) {
+  cursor: default;
+  opacity: 0.78;
+}
+
+.duel-assistance-copy { display: grid; gap: 0.1rem; }
+.duel-assistance-copy strong { font-size: 0.82rem; }
+.duel-assistance-copy small { color: var(--muted); font-size: 0.72rem; line-height: 1.35; }
 
 /* --- Kurulum: ipucu satırı --- */
 
@@ -11284,6 +11345,7 @@ const PROMOTION_CHOICES = [
  * @param {(square:string) => void} options.onSquareClick Serbest kare tıklaması (ders modu).
  * @param {boolean} options.coordinates Kenar koordinatları gösterilsin mi.
  * @param {boolean} options.showLegalTargets Seçilen taşın gidebileceği kareler gösterilsin mi.
+ * @param {boolean} options.touchMoveRequired Dokunulan taşın oynanması zorunlu mu.
  */
 function ChessBoard({
   chess,
@@ -11292,7 +11354,8 @@ function ChessBoard({
   interactive = true,
   onSquareClick = null,
   coordinates = true,
-  showLegalTargets = true
+  showLegalTargets = true,
+  touchMoveRequired = false
 } = {}) {
   let selected = null;
   let legalTargets = [];
@@ -11493,6 +11556,14 @@ function ChessBoard({
       return;
     }
 
+    // Dokunulan taş kuralı açıksa, yasal hamlesi bulunan ilk taş seçildikten
+    // sonra oyuncu başka bir taşa geçemez. Yasal hamlesi olmayan bir taş
+    // oyuncuyu kilitlemez; gerçek kuralda da oynanamayacak taş zorunlu değildir.
+    if (touchMoveRequired && selected && legalTargets.length > 0) {
+      render();
+      return;
+    }
+
     // Kendi taşına tıklandıysa seçimi oraya taşı.
     if (piece && piece.color === chess.turnColor()) {
       selectSquare(square);
@@ -11513,6 +11584,11 @@ function ChessBoard({
       event.preventDefault();
       return;
     }
+    if (touchMoveRequired && selected && legalTargets.length > 0 && selected !== square) {
+      event.preventDefault();
+      render();
+      return;
+    }
     dragFrom = square;
     selectSquare(square);
     event.dataTransfer.effectAllowed = "move";
@@ -11526,7 +11602,7 @@ function ChessBoard({
     if (!from || !interactive) return;
     if (legalTargets.includes(square)) attemptMove(from, square);
     else {
-      clearSelection();
+      if (!(touchMoveRequired && selected && legalTargets.length > 0)) clearSelection();
       render();
     }
   }
@@ -11601,7 +11677,7 @@ function ChessBoard({
           onClick: () => {
             pendingPromotion = null;
             overlay.hidden = true;
-            clearSelection();
+            if (!touchMoveRequired) clearSelection();
             render();
           }
         })
@@ -11744,6 +11820,18 @@ function ChessBoard({
     setInteractive(value) {
       interactive = value;
       if (!value) clearSelection();
+      render();
+    },
+
+    /** Dokunulan taş kuralını oyun sırasında açar ya da kapatır. */
+    setTouchMoveRequired(value) {
+      touchMoveRequired = Boolean(value);
+      render();
+    },
+
+    /** Seçilen taşın yasal hedef noktalarını gösterir ya da gizler. */
+    setShowLegalTargets(value) {
+      showLegalTargets = Boolean(value);
       render();
     },
 
@@ -48723,6 +48811,8 @@ function PlayPage({ progress, sound }) {
   let resultRecorded = false;
   let rewardGranted = false;
   let currentGameId = newGameId();
+  let showMoveHints = true;
+  let touchMoveRequired = false;
 
   function newGameId() {
     return `game-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -48880,6 +48970,8 @@ function PlayPage({ progress, sound }) {
   const board = ChessBoard({
     chess: game.chess,
     orientation: "w",
+    showLegalTargets: showMoveHints,
+    touchMoveRequired,
     onMove: (move) => {
       handlePlayerMove(move);
       // Hamleyi motora biz uyguluyoruz; bileşen kendi kendine ilerletmesin.
@@ -49474,6 +49566,44 @@ function PlayPage({ progress, sound }) {
   timeButtonsContainer.append(...timeButtons);
   timeNote.textContent = timeHint();
 
+  function assistanceOption({ input, title, note }) {
+    return el("label", { className: "play-assistance-option" }, [
+      input,
+      el("span", { className: "play-assistance-copy" }, [
+        el("strong", { text: title }),
+        el("small", { text: note })
+      ])
+    ]);
+  }
+
+  const assistanceOptions = el("div", { className: "play-assistance-options" }, [
+    assistanceOption({
+      input: el("input", {
+        type: "checkbox",
+        checked: "",
+        onChange: (event) => {
+          showMoveHints = event.target.checked;
+          board.setShowLegalTargets(showMoveHints);
+          sound.play("click");
+        }
+      }),
+      title: "Hamle yardımını göster",
+      note: "Seçilen taşın gidebileceği kareleri nokta ve halkalarla gösterir."
+    }),
+    assistanceOption({
+      input: el("input", {
+        type: "checkbox",
+        onChange: (event) => {
+          touchMoveRequired = event.target.checked;
+          board.setTouchMoveRequired(touchMoveRequired);
+          sound.play("click");
+        }
+      }),
+      title: "Dokunulan taşı oynama zorunluluğu",
+      note: "Yasal hamlesi olan bir taşa dokununca o taşla hamle yapmak zorundasın."
+    })
+  ]);
+
   const settingsBody = el("div", { className: "play-settings-body" }, [
     el("label", { className: "panel-label", text: "Zorluk" }),
     el("div", { className: "segmented" }, levelButtons),
@@ -49482,7 +49612,9 @@ function PlayPage({ progress, sound }) {
     el("label", { className: "panel-label", text: "Satranç saati" }),
     timeButtonsContainer,
     customTimeBox,
-    timeNote
+    timeNote,
+    el("label", { className: "panel-label", text: "Yardım ve kurallar" }),
+    assistanceOptions
   ]);
 
   const settingsBox = el("details", { className: "play-settings" }, [
@@ -50037,7 +50169,7 @@ class ClassroomService {
     return this.state.tournaments.find((t) => t.id === id) || null;
   }
 
-  createTournament({ classId, name, rounds, playerIds, showMoveHints = true }) {
+  createTournament({ classId, name, rounds, playerIds, showMoveHints = true, requireTouchMove = false }) {
     if (!this.getClass(classId) || playerIds.length < 2) return null;
     // Başlangıç sırası (seed) kurada belirlenir: öğrencilerin reytingi yok ve
     // alfabetik sıra hep aynı çocukları ilk turda karşılaştırırdı.
@@ -50049,6 +50181,7 @@ class ClassroomService {
       createdAt: new Date().toISOString(),
       plannedRounds: Math.max(1, Math.min(20, Number(rounds) || 1)),
       showMoveHints: showMoveHints !== false,
+      requireTouchMove: requireTouchMove === true,
       playerIds: seeded,
       withdrawn: [],
       rounds: [],
@@ -50415,6 +50548,10 @@ function DuelPage({ sound }) {
     names.b = classroom.studentName(players.b);
   }
   const tourBoard = tourCtx && tourCtx.board.blackId !== null ? tourCtx : null;
+  // Turnuva kuralları oluşturma ekranında belirlenir. Serbest iki kişilik
+  // oyunda öğretmen bu iki yardımı kurulum panelinden değiştirebilir.
+  let showMoveHints = !tourBoard || tourBoard.tournament.showMoveHints !== false;
+  let touchMoveRequired = tourBoard?.tournament.requireTouchMove === true;
 
   let savedMatch = null; // bu oyunun kaydı; oyun geri alınırsa silinir
   let tourRecorded = false; // turnuva masasına bir kez yazılır
@@ -51176,7 +51313,8 @@ function DuelPage({ sound }) {
       interactive: phase === "play",
       // Eski turnuvalarda alan bulunmaz; onlar önceki davranışla yardım açık
       // çalışmaya devam eder. Turnuva dışındaki iki kişilik oyun da değişmez.
-      showLegalTargets: !tourBoard || tourBoard.tournament.showMoveHints !== false,
+      showLegalTargets: showMoveHints,
+      touchMoveRequired,
       onSquareClick: (square) => {
         if (phase === "setup") paint(square);
         else nudge(side, square);
@@ -51667,6 +51805,55 @@ function DuelPage({ sound }) {
 
   const recordNote = el("p", { className: "duel-record-note" });
 
+  function assistanceOption({ input, title, note }) {
+    return el("label", { className: "duel-assistance-option" }, [
+      input,
+      el("span", { className: "duel-assistance-copy" }, [
+        el("strong", { text: title }),
+        el("small", { text: note })
+      ])
+    ]);
+  }
+
+  const moveHintsInput = el("input", {
+    type: "checkbox",
+    checked: showMoveHints ? "" : null,
+    disabled: tourBoard ? "" : null,
+    onChange: (event) => {
+      showMoveHints = event.target.checked;
+      for (const seat of seats) seat.api.setShowLegalTargets(showMoveHints);
+      sound.play("click");
+    }
+  });
+
+  const touchMoveInput = el("input", {
+    type: "checkbox",
+    checked: touchMoveRequired ? "" : null,
+    disabled: tourBoard ? "" : null,
+    onChange: (event) => {
+      touchMoveRequired = event.target.checked;
+      for (const seat of seats) seat.api.setTouchMoveRequired(touchMoveRequired);
+      sound.play("click");
+    }
+  });
+
+  const assistanceOptions = el("div", { className: "duel-assistance-options" }, [
+    assistanceOption({
+      input: moveHintsInput,
+      title: "Hamle yardımını göster",
+      note: tourBoard
+        ? "Bu seçenek turnuva oluşturulurken belirlendi."
+        : "Seçilen taşın gidebileceği kareleri nokta ve halkalarla gösterir."
+    }),
+    assistanceOption({
+      input: touchMoveInput,
+      title: "Dokunulan taşı oynama zorunluluğu",
+      note: tourBoard
+        ? "Bu kural turnuva oluşturulurken belirlendi."
+        : "Yasal hamlesi olan bir taşa dokunulunca başka taş seçilemez."
+    })
+  ]);
+
   /** Sonucun nereye kaydedileceğini söyler. */
   function updateRecordNote() {
     const active = classroom.activeClass;
@@ -51768,6 +51955,8 @@ function DuelPage({ sound }) {
     timeButtonsContainer,
     customTimeBox,
     timeNote,
+    el("label", { className: "panel-label", text: "Yardım ve kurallar" }),
+    assistanceOptions,
     el("label", { className: "panel-label", text: tourBoard ? "Turnuva masası" : "Oyuncular" }),
     el("div", { className: "duel-names" }, [playerPicker("w"), playerPicker("b")]),
     recordNote,
@@ -53416,6 +53605,10 @@ function TournamentPage({ sound }) {
       checked: "",
       "aria-describedby": "tour-move-hints-note"
     });
+    const touchMoveInput = el("input", {
+      type: "checkbox",
+      "aria-describedby": "tour-touch-move-note"
+    });
     const countNote = el("span", { className: "class-hint" });
     const updateCount = () => {
       countNote.textContent = `${chosen.size} oyuncu · önerilen ${suggestedRounds(chosen.size)} tur` +
@@ -53469,6 +53662,16 @@ function TournamentPage({ sound }) {
                   })
                 ])
               ]),
+              el("label", { className: "tour-option wide" }, [
+                touchMoveInput,
+                el("span", { className: "tour-option-copy" }, [
+                  el("strong", { text: "Dokunulan taşı oynama zorunluluğu" }),
+                  el("small", {
+                    id: "tour-touch-move-note",
+                    text: "Öğrenci yasal hamlesi olan bir taşa dokunduğunda başka bir taş seçemez; o taşla hamle yapmak zorundadır."
+                  })
+                ])
+              ]),
               el("div", { className: "tour-field wide" }, [
                 el("div", { className: "tour-check-head" }, [
                   el("span", { text: "Katılanlar" }),
@@ -53493,6 +53696,7 @@ function TournamentPage({ sound }) {
                     name: nameInput.value,
                     rounds: roundsInput.value,
                     showMoveHints: moveHintsInput.checked,
+                    requireTouchMove: touchMoveInput.checked,
                     playerIds: students.filter((student) => chosen.has(student.id)).map((student) => student.id)
                   });
                   classroom.pairNextRound(t.id);
@@ -54412,7 +54616,11 @@ async function startCloudSync({ classroom, progress }) {
   const matchDoc = (item) => item._cloudDocId || docKey(item.classId, item.id);
   const tournamentDoc = (item) => item._cloudDocId || docKey(item.classId, item.id);
   const progressDoc = (classId, profileId) => docKey(classId, profileId);
-  const visibleCollection = (name) => collection(db, name);
+  // Sınıf oturumu yalnız kendi classId alanını dinler. Öğretmen oturumu bütün
+  // sınıfları görebilir; Firestore kuralları da aynı sınırı zorunlu kılar.
+  const visibleCollection = (name) => sessionClassId
+    ? query(collection(db, name), where('classId', '==', sessionClassId))
+    : collection(db, name);
   const cloudData = (item) => {
     const { _cloudDocId, ...data } = clean(item);
     return data;
@@ -54425,8 +54633,10 @@ async function startCloudSync({ classroom, progress }) {
 
   async function pushClassroom(initial = false) {
     if (applyingRemote) return;
-    const matches = classroom.state.matches.filter((item) => item?.id && item?.classId);
-    const tournaments = classroom.state.tournaments.filter((item) => item?.id && item?.classId);
+    const matches = classroom.state.matches.filter((item) =>
+      item?.id && item?.classId && (!sessionClassId || item.classId === sessionClassId));
+    const tournaments = classroom.state.tournaments.filter((item) =>
+      item?.id && item?.classId && (!sessionClassId || item.classId === sessionClassId));
     const nextMatches = new Set(matches.map(matchDoc));
     const nextTournaments = new Set(tournaments.map(tournamentDoc));
 
@@ -54460,7 +54670,7 @@ async function startCloudSync({ classroom, progress }) {
     const writes = [];
     for (const [profileId, value] of Object.entries(progress.store.profiles || {})) {
       const classId = classIdForProfile(classroom, profileId);
-      if (!classId) continue;
+      if (!classId || (sessionClassId && classId !== sessionClassId)) continue;
       writes.push(writeRecord("chess_progress", progressDoc(classId, profileId), {
         classId,
         profileId,
@@ -54476,11 +54686,12 @@ async function startCloudSync({ classroom, progress }) {
 
   const syncRef = doc(db, "chess_sync", `${sessionClassId ? encodeURIComponent(sessionClassId) + "--" : ""}${encodeURIComponent(device)}`);
   const writeHeartbeat = () => setDoc(syncRef, {
+    classId: sessionClassId || classroom.state.activeClassId || null,
     deviceId: device,
     userId: user?.uid || "anonymous",
     ownerUid: user?.uid || "anonymous",
     anonymous,
-    classIds: classroom.classes.map((item) => item.id),
+    classIds: sessionClassId ? [sessionClassId] : classroom.classes.map((item) => item.id),
     activeClassId: sessionClassId || classroom.state.activeClassId || null,
     lastSeenAt: serverTimestamp(),
     userAgent: navigator.userAgent.slice(0, 180)
