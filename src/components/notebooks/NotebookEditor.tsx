@@ -5,8 +5,10 @@
 // otomatik kaydedilir (yazma sonrası ~1.2 sn beklenir).
 import React from 'react';
 import {
+    Activity,
     AlertTriangle,
     ArrowLeft,
+    Bookmark,
     Camera,
     Check,
     ChevronDown,
@@ -19,13 +21,16 @@ import {
     Image as ImageIcon,
     LayoutTemplate,
     Layers,
+    ListTree,
     Loader2,
     Plus,
     Printer,
     QrCode,
     Redo2,
+    RotateCw,
     Save,
     Scissors,
+    Search,
     Share2,
     Trash2,
     Undo2,
@@ -43,6 +48,9 @@ import { DrawingCanvas } from '../drawing/DrawingCanvas';
 import { useSurfaceTint } from '../../utils/surfaceTint';
 import { DrawingToolbar } from '../drawing/DrawingToolbar';
 import { TextBoxLayer } from '../tools/TextBoxLayer';
+import { PDFWorkspaceSearchModal } from '../pdf/PDFWorkspaceSearchModal';
+import { PDFOutlineModal } from '../pdf/PDFOutlineModal';
+import { PDFDebugOverlay } from '../pdf/PDFDebugOverlay';
 import { usePrompt } from '../common/PromptDialog';
 import { useToast } from '../common/ToastProvider';
 import { useConfirm } from '../common/ConfirmDialog';
@@ -78,7 +86,7 @@ import { LinearGraphTool } from '../tools/LinearGraphTool';
 import { MathFormulaTool } from '../tools/MathFormulaTool';
 import { PdfViewerTool } from '../tools/PdfViewerTool';
 import { PdfPageBackground } from './PdfPageBackground';
-import { savePdfToDB, getPdfDocument } from '../../lib/pdfStorage';
+import { savePdfToDB, getPdfDocument, loadPdfFromDB, uploadPdfToCloud } from '../../lib/pdfStorage';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
@@ -228,6 +236,50 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const [showExportMenu, setShowExportMenu] = React.useState(false);
     const [isExporting, setIsExporting] = React.useState(false);
     const [exportProgress, setExportProgress] = React.useState('');
+
+    const [pdfDocInstance, setPdfDocInstance] = React.useState<any>(null);
+    const [isPdfMissing, setIsPdfMissing] = React.useState(false);
+    const [showSearchModal, setShowSearchModal] = React.useState(false);
+    const [showOutlineModal, setShowOutlineModal] = React.useState(false);
+    const [showPdfDebug, setShowPdfDebug] = React.useState(false);
+
+    // Çoklu cihaz bulut eşitlemesi:
+    // Bu cihazda PDF varsa ve henüz buluta yüklenmemişse arka planda Firebase Storage'a yükle
+    React.useEffect(() => {
+        if (notebook.pdf_id && !notebook.pdf_url) {
+            loadPdfFromDB(notebook.pdf_id).then((buffer) => {
+                if (buffer) {
+                    uploadPdfToCloud(notebook.pdf_id!, notebook.pdf_name || 'belge.pdf', buffer).then(({ url, path }) => {
+                        if (url) {
+                            onMetaChange({ pdf_url: url, pdf_storage_path: path });
+                        }
+                    });
+                }
+            });
+        }
+    }, [notebook.pdf_id, notebook.pdf_url, notebook.pdf_name, onMetaChange]);
+
+    const handleToggleBookmark = (pageNum: number) => {
+        const curBookmarks = notebook.pdf_bookmarks || [];
+        const nextBookmarks = curBookmarks.includes(pageNum)
+            ? curBookmarks.filter((p) => p !== pageNum)
+            : [...curBookmarks, pageNum].sort((a, b) => a - b);
+        onMetaChange({ pdf_bookmarks: nextBookmarks });
+        toast.info(curBookmarks.includes(pageNum) ? `Sayfa ${pageNum} yer imlerinden çıkarıldı.` : `Sayfa ${pageNum} yer imlerine eklendi.`);
+    };
+
+    const handleRotatePage = (pageNum: number) => {
+        const curRotations = notebook.pdf_rotations || {};
+        const cur = curRotations[pageNum] || 0;
+        const next = (cur + 90) % 360;
+        const nextRotations = { ...curRotations, [pageNum]: next };
+        onMetaChange({ pdf_rotations: nextRotations });
+        toast.info(`Sayfa ${pageNum} ${next}° döndürüldü.`);
+    };
+
+    const handleRotateCurrentPage = () => {
+        handleRotatePage(pageInfo.current + 1);
+    };
 
     const handleSelectTool = (toolId: string) => {
         if (toolId === 'compass') setShowCompass(true);
@@ -833,6 +885,15 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 pdf_total_pages: numPages,
                 page_count: Math.max(pageInfo.total, numPages),
             });
+
+            // Buluta yükleme (Tüm cihazlarda anında açılabilmesi için)
+            uploadPdfToCloud(pdfId, file.name, buffer).then(({ url, path }) => {
+                if (url) {
+                    onMetaChange({ pdf_url: url, pdf_storage_path: path });
+                    toast.success('PDF bulut ile eşitlendi, tüm cihazlarınızda hazır.');
+                }
+            });
+
             toast.success(`"${file.name}" deftere bağlandı (${numPages} sayfa).`);
         } catch (err: any) {
             toast.error('PDF eklenemedi: ' + (err?.message || 'Hata'));
@@ -866,7 +927,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             let pdfDoc: any = null;
             if (notebook.pdf_id) {
                 try {
-                    pdfDoc = await getPdfDocument(notebook.pdf_id);
+                    pdfDoc = await getPdfDocument(notebook.pdf_id, undefined, notebook.pdf_url);
                 } catch (err) {
                     console.warn('Bağlı PDF yüklenemedi:', err);
                 }
@@ -880,6 +941,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
 
             for (let idx = 0; idx < pagesToExport.length; idx++) {
                 const pageIndex = pagesToExport[idx];
+                const pageRotation = notebook.pdf_rotations?.[pageIndex + 1] || 0;
                 setExportProgress(
                     allPages
                         ? `Sayfa ${idx + 1} / ${pagesToExport.length} hazırlanıyor…`
@@ -893,7 +955,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         const unscaled = page.getViewport({ scale: 1 });
                         const targetW = pdfBox ? pdfBox.w : (pageDims(pageSize)?.w ?? 1200);
                         const fitScale = targetW / unscaled.width;
-                        const viewport = page.getViewport({ scale: fitScale * 2 });
+                        const targetRot = ((page.rotate || 0) + pageRotation) % 360;
+                        const viewport = page.getViewport({ scale: fitScale * 2, rotation: targetRot });
                         const c = document.createElement('canvas');
                         c.width = viewport.width;
                         c.height = viewport.height;
@@ -921,6 +984,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         width: imgData.width,
                         height: imgData.height,
                         jpegBytes: imgData.bytes,
+                        rotation: pageRotation,
                     });
                 }
             }
@@ -1437,6 +1501,80 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         <ChevronRight className="w-4 h-4" />
                     </button>
 
+                    {/* Yer İmi (Bookmark) Ekle / Kaldır */}
+                    <button
+                        type="button"
+                        onClick={() => handleToggleBookmark(pageInfo.current + 1)}
+                        title={
+                            notebook.pdf_bookmarks?.includes(pageInfo.current + 1)
+                                ? 'Bu sayfa yer imlerinde (kaldırmak için tıklayın)'
+                                : 'Bu sayfayı yer imlerine ekle'
+                        }
+                        className={cn(
+                            'p-1.5 rounded-lg transition-colors',
+                            notebook.pdf_bookmarks?.includes(pageInfo.current + 1)
+                                ? 'text-amber-500 bg-amber-500/10 hover:bg-amber-500/20'
+                                : 'text-on-surface-variant hover:text-amber-500 hover:bg-surface-container-high'
+                        )}
+                    >
+                        <Bookmark
+                            className={cn(
+                                'w-3.5 h-3.5',
+                                notebook.pdf_bookmarks?.includes(pageInfo.current + 1) && 'fill-amber-400'
+                            )}
+                        />
+                    </button>
+
+                    {/* Sayfayı 90° Döndür */}
+                    <button
+                        type="button"
+                        onClick={handleRotateCurrentPage}
+                        title="Bu sayfayı 90° saat yönünde döndür"
+                        className="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors"
+                    >
+                        <RotateCw className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* PDF Arama & Bölümler & Tanı Paneli */}
+                    {notebook.pdf_id && (
+                        <>
+                            <div className="w-px h-4 bg-outline-variant mx-0.5" />
+                            <button
+                                type="button"
+                                onClick={() => setShowSearchModal(true)}
+                                title="PDF İçinde Ara (Metin Arama)"
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30 transition-colors"
+                            >
+                                <Search className="w-3.5 h-3.5" />
+                                <span className="hidden md:inline">Ara</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setShowOutlineModal(true)}
+                                title="İçindekiler / Bölümler"
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-colors"
+                            >
+                                <ListTree className="w-3.5 h-3.5" />
+                                <span className="hidden md:inline">Bölümler</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setShowPdfDebug((v) => !v)}
+                                title="PDF Tanı & Performans Paneli (FPS, Zoom, Koordinat)"
+                                className={cn(
+                                    'p-1.5 rounded-lg transition-colors',
+                                    showPdfDebug
+                                        ? 'text-emerald-500 bg-emerald-500/10'
+                                        : 'text-on-surface-variant hover:text-emerald-500 hover:bg-surface-container-high'
+                                )}
+                            >
+                                <Activity className="w-3.5 h-3.5" />
+                            </button>
+                        </>
+                    )}
+
                     <div className="w-px h-4 bg-outline-variant mx-0.5" />
 
                     <button
@@ -1670,6 +1808,11 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     canvasSize={pageBox ?? canvasSize}
                     current={pageInfo.current}
                     pdfId={notebook.pdf_id}
+                    pdfUrl={notebook.pdf_url}
+                    bookmarks={notebook.pdf_bookmarks || []}
+                    onToggleBookmark={handleToggleBookmark}
+                    rotations={notebook.pdf_rotations || {}}
+                    onRotatePage={handleRotatePage}
                     onSelect={(i) => canvasRef.current?.goToPage(i)}
                     onAdd={handleAddPage}
                     onDuplicate={handleDuplicatePage}
@@ -1710,11 +1853,16 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     <PdfPageBackground
                         pdfId={notebook.pdf_id}
                         pdfName={notebook.pdf_name}
+                        pdfUrl={notebook.pdf_url}
+                        rotation={notebook.pdf_rotations?.[pageInfo.current + 1] || 0}
                         pageNumber={pageInfo.current + 1}
                         view={view}
                         canvasSize={canvasSize}
                         box={pdfBox}
                         onCanvasReady={handlePdfCanvas}
+                        onCloudUrlReady={(url, path) => onMetaChange({ pdf_url: url, pdf_storage_path: path })}
+                        onDocLoaded={(doc) => setPdfDocInstance(doc)}
+                        onMissingChange={(missing) => setIsPdfMissing(missing)}
                     />
                 )}
 
@@ -1902,6 +2050,40 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     }}
                 />
             )}
+
+            {/* PDF Metin Arama Modalı */}
+            <PDFWorkspaceSearchModal
+                open={showSearchModal}
+                onClose={() => setShowSearchModal(false)}
+                pdfDoc={pdfDocInstance}
+                currentPage={pageInfo.current + 1}
+                onJumpToPage={(p) => canvasRef.current?.goToPage(p - 1)}
+            />
+
+            {/* PDF İçindekiler / Bölümler Modalı */}
+            <PDFOutlineModal
+                open={showOutlineModal}
+                onClose={() => setShowOutlineModal(false)}
+                pdfDoc={pdfDocInstance}
+                currentPage={pageInfo.current + 1}
+                onJumpToPage={(p) => canvasRef.current?.goToPage(p - 1)}
+            />
+
+            {/* PDF Tanı & Performans Paneli (Diagnostics Debug Overlay) */}
+            <PDFDebugOverlay
+                visible={showPdfDebug}
+                onClose={() => setShowPdfDebug(false)}
+                pageIndex={pageInfo.current}
+                totalPages={pageInfo.total}
+                view={view}
+                canvasSize={canvasSize}
+                pageBox={pdfBox}
+                rotation={notebook.pdf_rotations?.[pageInfo.current + 1] || 0}
+                annotationCount={thumbPages[pageInfo.current]?.length || 0}
+                isCloudSynced={Boolean(notebook.pdf_url)}
+                isPdfMissing={isPdfMissing}
+                pdfName={notebook.pdf_name}
+            />
         </div>
     );
 }

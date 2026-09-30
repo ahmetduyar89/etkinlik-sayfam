@@ -698,6 +698,14 @@ export interface Notebook {
      * onlar eski yerleşimle açılır.
      */
     pdf_box?: { w: number; h: number };
+    /** Bulut PDF dosyasının indirme bağlantısı (Firebase Storage veya harici URL - Her cihazda erişim) */
+    pdf_url?: string;
+    /** Firebase Storage yolu */
+    pdf_storage_path?: string;
+    /** PDF sayfa döndürme açıları (1 tabanlı sayfa numarası -> derece: 0, 90, 180, 270) */
+    pdf_rotations?: Record<number, number>;
+    /** PDF yer imleri (1 tabanlı sayfa numaraları dizisi) */
+    pdf_bookmarks?: number[];
     /**
      * Sayfa içeriğinin sürüm numarası. Her kayıtta artar; editör ve
      * görüntüleyici bu küçük üst veri dokümanını dinleyerek içeriğin başka

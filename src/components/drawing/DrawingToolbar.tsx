@@ -602,9 +602,9 @@ export function DrawingToolbar({
     const isSelect = config.tool === 'select';
 
     const mainToolsTier1 = (
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center w-full max-w-[1280px] px-2 sm:px-4 py-1 mx-auto gap-2">
-            {/* Sol: Sürükleme Tutamacı */}
-            <div className="flex items-center justify-start min-w-0">
+        <div className="grid grid-cols-[auto_1fr_auto] items-center w-full max-w-[1400px] px-2 sm:px-4 py-1 mx-auto gap-2">
+            {/* Sol: Sürükleme Tutamacı & Goodnotes Geri / İleri Al Kapsülü */}
+            <div className="flex items-center justify-start gap-1.5 min-w-0 shrink-0">
                 {!fixed && (
                     <div
                         onPointerDown={(e) => dragControls.start(e)}
@@ -614,6 +614,27 @@ export function DrawingToolbar({
                         <GripVertical className="w-4 h-4" />
                     </div>
                 )}
+                <div className="flex items-center bg-[#1e2030]/90 border border-white/10 rounded-2xl p-0.5 shadow-sm shrink-0">
+                    <button
+                        type="button"
+                        onClick={() => onCommand('UNDO_DRAWING')}
+                        disabled={canUndo === false}
+                        title="Geri Al (Ctrl+Z)"
+                        className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-25 disabled:hover:bg-transparent"
+                    >
+                        <Undo className="w-4 h-4" />
+                    </button>
+                    <div className="w-px h-3.5 bg-white/10 mx-0.5" />
+                    <button
+                        type="button"
+                        onClick={() => onCommand('REDO_DRAWING')}
+                        disabled={canRedo === false}
+                        title="İleri Al (Ctrl+Shift+Z)"
+                        className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-25 disabled:hover:bg-transparent"
+                    >
+                        <Redo className="w-4 h-4" />
+                    </button>
+                </div>
             </div>
 
             {/* Orta Kapsül: Birincil Araçlar (Taşma yapmaz, tam ortalanmış Goodnotes kapsülü) */}
@@ -901,6 +922,27 @@ export function DrawingToolbar({
                         </button>
                     </div>
                 )}
+                {/* Sağ: Yoğunluk / Boyut Değiştirici (Çift Oklu Büyütme/Küçültme) & Dock Butonu */}
+                <div className="flex items-center gap-1 pl-1 ml-1 border-l border-white/10 shrink-0">
+                    <button
+                        type="button"
+                        onClick={cycleDensity}
+                        title={`Araç Çubuğu Boyutu: ${TOOLBAR_DENSITY_LABELS[density]} (Büyütmek/küçültmek için tıklayın)`}
+                        className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all flex items-center justify-center"
+                    >
+                        {density === 'large' ? <Minimize2 className="w-3.5 h-3.5 text-sky-400" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                    </button>
+                    {!fixed && (
+                        <button
+                            type="button"
+                            onClick={toggleDock}
+                            title={dockPosition === 'bottom' ? 'Üste Sabitle' : 'Alta Sabitle'}
+                            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                        >
+                            {dockPosition === 'bottom' ? <PanelTop className="w-3.5 h-3.5" /> : <PanelBottom className="w-3.5 h-3.5" />}
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -908,33 +950,19 @@ export function DrawingToolbar({
     /* ------------------------------------------------------------- */
     /* 2. TIER 2: GOODNOTES 6 BAĞLAMSAL ŞERİT (Contextual Sub-Bar)   */
     /* ------------------------------------------------------------- */
-    const contextualBar = (
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center w-full max-w-[1280px] px-2 sm:px-4 py-1 mx-auto gap-2">
-            {/* Sol: Goodnotes İmzası Geri Al / İleri Al Kapsülü */}
-            <div className="flex items-center justify-start min-w-0">
-                <div className="flex items-center bg-[#1e2030]/90 border border-white/10 rounded-2xl p-0.5 shadow-sm shrink-0">
-                    <button
-                        type="button"
-                        onClick={() => onCommand('UNDO_DRAWING')}
-                        disabled={canUndo === false}
-                        title="Geri Al (Ctrl+Z)"
-                        className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-25 disabled:hover:bg-transparent"
-                    >
-                        <Undo className="w-4 h-4" />
-                    </button>
-                    <div className="w-px h-3.5 bg-white/10 mx-0.5" />
-                    <button
-                        type="button"
-                        onClick={() => onCommand('REDO_DRAWING')}
-                        disabled={canRedo === false}
-                        title="İleri Al (Ctrl+Shift+Z)"
-                        className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-25 disabled:hover:bg-transparent"
-                    >
-                        <Redo className="w-4 h-4" />
-                    </button>
-                </div>
-            </div>
+    const hasContextualContent = Boolean(
+        isPen ||
+        isEraser ||
+        isHighlighter ||
+        isShapeTool ||
+        isTape ||
+        isText ||
+        isLasso ||
+        (config.ruler && !isPen && !isEraser && !isShapeTool && !isHighlighter && !isTape && !isText && !isLasso)
+    );
 
+    const contextualBar = hasContextualContent ? (
+        <div className="flex items-center justify-center w-full max-w-[1280px] px-2 sm:px-4 py-1 mx-auto">
             {/* Orta: Aktif Araca Göre Dinamik Olarak Değişen Goodnotes Bağlamsal Kapsülü (Tam ortalanmış) */}
             <div className="flex items-center justify-center min-w-0">
                 {/* A. KALEM AKTİFKEN (Goodnotes Pen Contextual Bar) */}
@@ -1620,30 +1648,8 @@ export function DrawingToolbar({
                     </motion.div>
                 )}
             </div>
-
-            {/* Sağ: Yoğunluk / Dock Değiştirici */}
-            <div className="flex items-center justify-end gap-1 shrink-0">
-                <button
-                    type="button"
-                    onClick={cycleDensity}
-                    title={`Araç çubuğu boyutu: ${TOOLBAR_DENSITY_LABELS[density]}`}
-                    className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-white/5 transition-all hidden lg:block"
-                >
-                    {density === 'large' ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-                </button>
-                {!fixed && (
-                    <button
-                        type="button"
-                        onClick={toggleDock}
-                        title={dockPosition === 'bottom' ? 'Üste Sabitle' : 'Alta Sabitle'}
-                        className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-white/5 transition-all"
-                    >
-                        {dockPosition === 'bottom' ? <PanelTop className="w-3.5 h-3.5" /> : <PanelBottom className="w-3.5 h-3.5" />}
-                    </button>
-                )}
-            </div>
         </div>
-    );
+    ) : null;
 
     /* ------------------------------------------------------------- */
     /* 3. BİRLEŞİK İKİ KATMANLI RENDER                               */

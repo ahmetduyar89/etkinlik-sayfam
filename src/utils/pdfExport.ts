@@ -7,6 +7,7 @@ export interface PageImageInput {
     width: number;
     height: number;
     jpegBytes: Uint8Array;
+    rotation?: number;
 }
 
 /**
@@ -103,9 +104,10 @@ export function buildMultiPagePdf(pages: PageImageInput[]): Blob {
         const ptH = Number((595.28 * (pg.height / (pg.width || 1))).toFixed(2));
 
         // Sayfa Objesi
+        const rotStr = pg.rotation ? ` /Rotate ${pg.rotation}` : '';
         offsets[pageNum] = byteOffset;
         writeString(
-            `${pageNum} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${ptW} ${ptH}] /Contents ${contentNum} 0 R /Resources << /XObject << /Im1 ${imgNum} 0 R >> >> >>\nendobj\n`
+            `${pageNum} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${ptW} ${ptH}]${rotStr} /Contents ${contentNum} 0 R /Resources << /XObject << /Im1 ${imgNum} 0 R >> >> >>\nendobj\n`
         );
 
         // İçerik Akışı (Resmi sayfaya 100% ölçekle yay)

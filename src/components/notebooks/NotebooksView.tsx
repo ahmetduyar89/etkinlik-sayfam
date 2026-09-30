@@ -25,7 +25,7 @@ import {
     Loader2,
 } from 'lucide-react';
 import { useFirestore } from '../../lib/firebase';
-import { savePdfToDB, getPdfDocument } from '../../lib/pdfStorage';
+import { savePdfToDB, getPdfDocument, uploadPdfToCloud } from '../../lib/pdfStorage';
 import { pdfBoxFromPoints } from '../../constants/pageSizes';
 import { cn } from '../../utils/cn';
 import { copyText } from '../../utils/clipboard';
@@ -296,6 +296,16 @@ export function NotebooksView() {
                 pdf_total_pages: numPages,
                 pdf_box,
                 updated_at: new Date().toISOString(),
+            });
+
+            // Buluta yükleme (Tüm cihazlarda otomatik görünür olması için)
+            uploadPdfToCloud(pdfId, file.name, buffer).then(({ url, path }) => {
+                if (url) {
+                    notebooksHandler.update(ref.id, {
+                        pdf_url: url,
+                        pdf_storage_path: path,
+                    });
+                }
             });
 
             toast.success(`"${file.name}" başarıyla açıldı (${numPages} sayfa).`);

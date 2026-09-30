@@ -2,16 +2,19 @@
 // GoodNotes tarzı PDF sayfa arka plan katmanı.
 // Aktif PDF sayfasını DrawingCanvas'ın altına yüksek çözünürlükte çizer;
 // yakınlaştırma ve kaydırma (Viewport) ile birebir senkronize çalışır.
+// Çoklu cihaz (cross-device) bulut desteği ve yerel IndexedDB önbellekleme içerir.
 
 import React from 'react';
-import { FileUp, Loader2, AlertCircle } from 'lucide-react';
+import { FileUp, Loader2, AlertCircle, DownloadCloud, Cloud } from 'lucide-react';
 import type { Viewport } from '../../types';
-import { getPdfDocument, savePdfToDB } from '../../lib/pdfStorage';
+import { getPdfDocument, savePdfToDB, uploadPdfToCloud } from '../../lib/pdfStorage';
 import { useToast } from '../common/ToastProvider';
 
 interface PdfPageBackgroundProps {
     pdfId: string;
     pdfName?: string;
+    pdfUrl?: string;
+    rotation?: number; // 0, 90, 180, 270
     pageNumber: number; // 1-based index (1, 2, 3...)
     view: Viewport;
     canvasSize: { w: number; h: number };
@@ -24,11 +27,16 @@ interface PdfPageBackgroundProps {
     /** İşlenmiş sayfa tuvalini dışarı verir (PNG çıktısına PDF de girsin). */
     onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
     onRebindSuccess?: () => void;
+    onCloudUrlReady?: (url: string, path: string) => void;
+    onDocLoaded?: (doc: any) => void;
+    onMissingChange?: (missing: boolean) => void;
 }
 
 export function PdfPageBackground({
     pdfId,
     pdfName = 'PDF Belgesi',
+    pdfUrl,
+    rotation = 0,
     pageNumber,
     view,
     canvasSize,
@@ -36,11 +44,15 @@ export function PdfPageBackground({
     onPageDimensions,
     onCanvasReady,
     onRebindSuccess,
+    onCloudUrlReady,
+    onDocLoaded,
+    onMissingChange,
 }: PdfPageBackgroundProps) {
     const toast = useToast();
     const [isLoading, setIsLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
     const [missingInDb, setMissingInDb] = React.useState(false);
+    const [downloadProgress, setDownloadProgress] = React.useState<number | null>(null);
     const [pageSize, setPageSize] = React.useState<{ w: number; h: number } | null>(null);
     const [rendering, setRendering] = React.useState(false);
 
@@ -53,24 +65,39 @@ export function PdfPageBackground({
     const pdfDocRef = React.useRef<any>(null);
     const lastRenderedPageRef = React.useRef<number>(-1);
 
-    // PDF Dokümanını yükle
+    // PDF Dokümanını yükle (Yerel IndexedDB veya Bulut Bağlantısından)
     React.useEffect(() => {
         let isMounted = true;
         setIsLoading(true);
         setError(null);
         setMissingInDb(false);
+        setDownloadProgress(null);
 
         (async () => {
             try {
-                const doc = await getPdfDocument(pdfId);
+                const doc = await getPdfDocument(
+                    pdfId,
+                    undefined,
+                    pdfUrl,
+                    (ratio) => {
+                        if (isMounted) {
+                            setDownloadProgress(Math.round(ratio * 100));
+                        }
+                    }
+                );
                 if (!isMounted) return;
                 pdfDocRef.current = doc;
                 setIsLoading(false);
+                setDownloadProgress(null);
+                onDocLoaded?.(doc);
+                onMissingChange?.(false);
             } catch (err: any) {
                 if (!isMounted) return;
                 setIsLoading(false);
-                if (err?.message?.includes('PDF verisi bulunamadı')) {
+                setDownloadProgress(null);
+                if (err?.message?.includes('PDF verisi bulunamadı') || err?.message?.includes('buluttan indirilemedi')) {
                     setMissingInDb(true);
+                    onMissingChange?.(true);
                 } else {
                     setError('PDF dokümanı yüklenemedi: ' + (err?.message || 'Bilinmeyen hata'));
                 }
@@ -80,7 +107,7 @@ export function PdfPageBackground({
         return () => {
             isMounted = false;
         };
-    }, [pdfId]);
+    }, [pdfId, pdfUrl, onDocLoaded, onMissingChange]);
 
     // Sayfayı render et
     const renderPage = React.useCallback(
@@ -103,15 +130,6 @@ export function PdfPageBackground({
                 const baseW = unscaledViewport.width;
                 const baseH = unscaledViewport.height;
 
-                // Sayfanın dünya ölçüsü.
-                //
-                // Yeni defterlerde ölçü PDF'in kendi punto boyutundan bir kez
-                // hesaplanıp defterle saklanır; pencereyle değişmez.
-                //
-                // Eski defterlerde (kutu yok) ESKİ FORMÜL aynen korunur. Bu
-                // formül pencere genişliğine bağlıdır ve doğru değildir, ama
-                // mevcut notlar ona göre konmuştur: değiştirmek, dar pencerede
-                // çalışan öğretmenin notlarını kağıttan kaydırırdı.
                 const targetWorldW = box
                     ? box.w
                     : Math.max(
@@ -131,10 +149,11 @@ export function PdfPageBackground({
                     return;
                 }
 
-                // Yüksek DPI keskinliği (özellikle yazılar için Retina netliği)
+                // Yüksek DPI keskinliği (Retina netliği ve zoom keskinliği)
                 const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-                const renderScale = fitScale * Math.max(1, Math.min(view.scale, 2)) * dpr;
-                const viewport = page.getViewport({ scale: renderScale });
+                const renderScale = fitScale * Math.max(1, Math.min(view.scale, 2.5)) * dpr;
+                const targetRotation = ((page.rotate || 0) + (rotation || 0)) % 360;
+                const viewport = page.getViewport({ scale: renderScale, rotation: targetRotation });
 
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
@@ -163,15 +182,15 @@ export function PdfPageBackground({
                 setRendering(false);
             }
         },
-        [box, canvasSize.w, view.scale, onPageDimensions]
+        [box, canvasSize.w, view.scale, rotation, onPageDimensions]
     );
 
-    // Sayfa numarası veya doküman değiştiğinde çiz
+    // Sayfa numarası, dönüş açısı veya doküman değiştiğinde çiz
     React.useEffect(() => {
         if (!isLoading && pdfDocRef.current) {
             void renderPage(pageNumber);
         }
-    }, [isLoading, pageNumber, renderPage]);
+    }, [isLoading, pageNumber, rotation, renderPage]);
 
     // Yakınlaştırma (zoom) bittiğinde daha yüksek çözünürlük için debounced yeniden çizim
     React.useEffect(() => {
@@ -184,23 +203,65 @@ export function PdfPageBackground({
         return () => clearTimeout(timer);
     }, [view.scale, pageNumber, isLoading, renderPage]);
 
-    // Başka bir cihazda açıldığında dosyayı yeniden bağlama
+    // Başka bir cihazda açıldığında dosyayı yeniden bağlama ve bulut ile eşitleme
     const handleRebindFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         try {
+            setIsLoading(true);
             const buffer = await file.arrayBuffer();
             await savePdfToDB(pdfId, file.name, buffer);
             setMissingInDb(false);
+            onMissingChange?.(false);
             const doc = await getPdfDocument(pdfId, buffer);
             pdfDocRef.current = doc;
+            setIsLoading(false);
             void renderPage(pageNumber);
             toast.success('PDF bu cihaza bağlandı.');
             onRebindSuccess?.();
+            onDocLoaded?.(doc);
+
+            // Arka planda Firebase Storage'a yükleyerek diğer tüm cihazlar için de hazırla!
+            uploadPdfToCloud(pdfId, file.name, buffer).then(({ url, path }) => {
+                if (url) {
+                    onCloudUrlReady?.(url, path);
+                    toast.success('PDF bulut ile eşitlendi, diğer tüm cihazlarda açılmaya hazır.');
+                }
+            });
         } catch {
+            setIsLoading(false);
             toast.error('PDF dosyası okunamadı.');
         }
     };
+
+    // Buluttan indirme durumu göstergesi
+    if (downloadProgress !== null) {
+        return (
+            <div className="absolute inset-0 flex items-center justify-center bg-surface-container-lowest/75 backdrop-blur-sm z-10 p-6 pointer-events-auto">
+                <div className="max-w-sm w-full bg-[#1e2030] text-white p-6 rounded-2xl border border-white/10 shadow-2xl text-center space-y-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-sky-500/20 text-sky-400 flex items-center justify-center mx-auto animate-pulse">
+                        <DownloadCloud className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h3 className="text-sm font-bold text-white">PDF Buluttan Eşitleniyor</h3>
+                        <p className="text-xs text-slate-300 mt-1">
+                            <span className="font-semibold text-sky-400">{pdfName}</span> dokümanı bu cihaza aktarılıyor…
+                        </p>
+                    </div>
+                    <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden">
+                        <div
+                            className="bg-sky-500 h-full transition-all duration-200 rounded-full"
+                            style={{ width: `${Math.max(5, downloadProgress)}%` }}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                        <span className="flex items-center gap-1"><Cloud className="w-3 h-3 text-sky-400" /> Bulut Bağlantısı</span>
+                        <span className="font-bold text-sky-400">%{downloadProgress}</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (missingInDb) {
         return (
@@ -210,17 +271,17 @@ export function PdfPageBackground({
                         <AlertCircle className="w-6 h-6" />
                     </div>
                     <div>
-                        <h3 className="text-base font-bold text-on-surface">PDF Dosyası Eksik</h3>
+                        <h3 className="text-base font-bold text-on-surface">PDF Dosyasını Bağlayın</h3>
                         <p className="text-xs text-on-surface-variant mt-1">
-                            Bu defter <span className="font-semibold text-primary">{pdfName}</span> dokümanına bağlıdır. Güvenlik ve gizlilik gereği orijinal PDF yalnızca ilk yüklendiği cihazda tutulur.
+                            Bu defter <span className="font-semibold text-primary">{pdfName}</span> dokümanına bağlıdır.
                         </p>
                         <p className="text-[11px] text-slate-400 mt-2">
-                            Bu cihazda da çalışmak için lütfen aynı PDF dosyasını seçin.
+                            PDF dosyasını bir kez seçtiğinizde dosya bulut ile eşitlenecek ve sonraki girişlerde tüm cihazlarınızda otomatik olarak açılacaktır.
                         </p>
                     </div>
                     <label className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary/90 cursor-pointer shadow-md transition-all">
                         <FileUp className="w-4 h-4" />
-                        <span>PDF Dosyasını Seç & Bağla</span>
+                        <span>PDF Dosyasını Seç & Buluta Eşitle</span>
                         <input
                             type="file"
                             accept="application/pdf"
@@ -241,9 +302,7 @@ export function PdfPageBackground({
         );
     }
 
-    // Sayfa konumu. Yeni defterlerde sayfa orijine oturur (çizim katmanının
-    // sayfa kutusuyla birebir aynı yer); eski defterlerde eski konum korunur
-    // ki mevcut notlar kaymasın.
+    // Sayfa konumu
     const worldX = box ? 0 : 40;
     const worldY = box ? 0 : 24;
 
