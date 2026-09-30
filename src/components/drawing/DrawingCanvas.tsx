@@ -154,6 +154,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const [strokes, setStrokes] = React.useState<Stroke[]>([]);
         const currentStrokeRef = React.useRef<Stroke | null>(null);
         const holdTimerRef = React.useRef<number | null>(null);
+        const holdAnchorRef = React.useRef<Point | null>(null);
         const heldShapeRef = React.useRef<{
             originalStroke: Stroke;
             snappedShape: { tool: DrawingTool; points: Point[] };
@@ -164,6 +165,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 window.clearTimeout(holdTimerRef.current);
                 holdTimerRef.current = null;
             }
+            holdAnchorRef.current = null;
         }, []);
 
         const [selectedIdxs, setSelectedIdxs] = React.useState<number[]>([]);
@@ -2882,6 +2884,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 tapeHidden: config.tool === 'tape' ? true : undefined,
                 points: [first],
             };
+            holdAnchorRef.current = { x: first.x, y: first.y };
             activeStrokeBBRef.current = { x1: first.x, y1: first.y, x2: first.x, y2: first.y };
         };
 
@@ -3119,6 +3122,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
 
             if (inkPointerRef.current !== e.pointerId) return;
+            if (heldShapeRef.current) return;
 
             // Serbest çizim: tarayıcının kareye sıkıştırdığı ARA noktalar da
             // Serbest çizim: çizgi parça parça kesikli görünmesin diye
@@ -3219,11 +3223,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
 
             // Kalem modunda "Çiz ve Bekle": yalnızca akıllı kalem açıkken.
-            // Her zaman açık olması, uzun bir eğri çizerken duraksayan
-            // öğretmenin çizimini habersizce şekle çeviriyordu.
+            // Mikro titremelerde zamanlayıcı sıfırlanmaz, kullanıcı kalemi sabit tutunca şekil kusursuzca oturur.
             if (stroke.tool === 'pencil' && config.snapShapes) {
-                cancelHoldTimer();
-                holdTimerRef.current = window.setTimeout(() => {
+                const curPt = stroke.points[stroke.points.length - 1];
+                const anchor = holdAnchorRef.current;
+                const distFromAnchor = anchor && curPt ? Math.hypot(curPt.x - anchor.x, curPt.y - anchor.y) : Infinity;
+
+                const triggerHold = () => {
                     if (!isDrawingRef.current || !currentStrokeRef.current) return;
                     const cur = currentStrokeRef.current;
                     if (cur.points.length >= 4) {
@@ -3258,7 +3264,15 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                             }
                         }
                     }
-                }, 400);
+                };
+
+                if (distFromAnchor > 12) {
+                    if (curPt) holdAnchorRef.current = { x: curPt.x, y: curPt.y };
+                    cancelHoldTimer();
+                    holdTimerRef.current = window.setTimeout(triggerHold, 320);
+                } else if (!holdTimerRef.current) {
+                    holdTimerRef.current = window.setTimeout(triggerHold, 320);
+                }
             }
         };
 

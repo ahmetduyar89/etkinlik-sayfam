@@ -192,7 +192,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         stampIcon: '⭐',
         penType: 'fountain',
         streamlineLevel: 'smooth',
-        snapShapes: false,
+        snapShapes: true,
         snapAngle: false,
         eraserMode: 'pixel',
     });

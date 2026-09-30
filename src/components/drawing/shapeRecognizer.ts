@@ -94,7 +94,16 @@ export function recognizeShape(rawPoints: Point[]): RecognizedShape | null {
     if (len < 1e-6) return null;
 
     const gap = dist(start, end);
-    const closed = gap < Math.max(diag * 0.32, 26);
+    let minGap = gap;
+    const checkCountStart = Math.min(pts.length, Math.max(5, Math.floor(pts.length * 0.25)));
+    for (let i = 0; i < checkCountStart; i++) {
+        minGap = Math.min(minGap, dist(pts[i], end));
+    }
+    const checkCountEnd = Math.max(0, pts.length - checkCountStart);
+    for (let i = checkCountEnd; i < pts.length; i++) {
+        minGap = Math.min(minGap, dist(start, pts[i]));
+    }
+    const closed = minGap < Math.max(diag * 0.40, 36);
 
     // ── Açık şekiller: Düz çizgi veya Ok (Arrow) ──────────────────────
     if (!closed) {
@@ -157,7 +166,7 @@ export function recognizeShape(rawPoints: Point[]): RecognizedShape | null {
     const aspect = bb.w && bb.h ? Math.max(bb.w, bb.h) / Math.min(bb.w, bb.h) : 99;
 
     // Daire / Elips: merkeze uzaklık istikrarlı ve en-boy oranı dengeli.
-    if (rDev < 0.22 && aspect < 1.45) {
+    if (rDev < 0.30 && aspect < 1.55) {
         // En-boy oranı birbirine çok yakınsa kusursuz daire
         return {
             tool: 'circle',
@@ -169,15 +178,15 @@ export function recognizeShape(rawPoints: Point[]): RecognizedShape | null {
     }
 
     // Basık çember / Elips tespiti
-    if (aspect >= 1.25 && aspect <= 4.5) {
+    if (aspect >= 1.25 && aspect <= 5.0) {
         const rx = bb.w / 2;
         const ry = bb.h / 2;
-        if (rx > 12 && ry > 12) {
+        if (rx > 10 && ry > 10) {
             const normDists = pts.map((p) => Math.hypot((p.x - cx) / rx, (p.y - cy) / ry));
             const normMean = normDists.reduce((s, d) => s + d, 0) / normDists.length;
             const normDev =
                 Math.sqrt(normDists.reduce((s, d) => s + (d - normMean) ** 2, 0) / normDists.length);
-            if (normDev < 0.24 && normMean > 0.70 && normMean < 1.30) {
+            if (normDev < 0.32 && normMean > 0.65 && normMean < 1.35) {
                 return {
                     tool: 'ellipse',
                     points: [
@@ -230,23 +239,25 @@ export function recognizeShape(rawPoints: Point[]): RecognizedShape | null {
         };
     }
 
-    // Baklava / Eşkenar Dörtgen (Diamond) veya Dikdörtgen / Kare: 4 veya 5 köşe
-    if (cornerCount === 4 || cornerCount === 5) {
+    // Baklava / Eşkenar Dörtgen (Diamond) veya Dikdörtgen / Kare: 4 ila 8 köşe
+    if (cornerCount >= 4 && cornerCount <= 8) {
         // 4 köşenin konumlarına bak: Kenar ortalarına yakınsa baklava (diamond)
-        const cPts = corners.slice(0, 4);
-        const nearTopMid = cPts.some(c => Math.abs(c.y - bb.y1) < bb.h * 0.22 && Math.abs(c.x - cx) < bb.w * 0.28);
-        const nearBotMid = cPts.some(c => Math.abs(c.y - bb.y2) < bb.h * 0.22 && Math.abs(c.x - cx) < bb.w * 0.28);
-        const nearLeftMid = cPts.some(c => Math.abs(c.x - bb.x1) < bb.w * 0.22 && Math.abs(c.y - cy) < bb.h * 0.28);
-        const nearRightMid = cPts.some(c => Math.abs(c.x - bb.x2) < bb.w * 0.22 && Math.abs(c.y - cy) < bb.h * 0.28);
+        if (cornerCount <= 5) {
+            const cPts = corners.slice(0, 4);
+            const nearTopMid = cPts.some(c => Math.abs(c.y - bb.y1) < bb.h * 0.22 && Math.abs(c.x - cx) < bb.w * 0.28);
+            const nearBotMid = cPts.some(c => Math.abs(c.y - bb.y2) < bb.h * 0.22 && Math.abs(c.x - cx) < bb.w * 0.28);
+            const nearLeftMid = cPts.some(c => Math.abs(c.x - bb.x1) < bb.w * 0.22 && Math.abs(c.y - cy) < bb.h * 0.28);
+            const nearRightMid = cPts.some(c => Math.abs(c.x - bb.x2) < bb.w * 0.22 && Math.abs(c.y - cy) < bb.h * 0.28);
 
-        if (nearTopMid && nearBotMid && nearLeftMid && nearRightMid) {
-            return {
-                tool: 'diamond',
-                points: [
-                    { x: bb.x1, y: bb.y1 },
-                    { x: bb.x2, y: bb.y2 },
-                ],
-            };
+            if (nearTopMid && nearBotMid && nearLeftMid && nearRightMid) {
+                return {
+                    tool: 'diamond',
+                    points: [
+                        { x: bb.x1, y: bb.y1 },
+                        { x: bb.x2, y: bb.y2 },
+                    ],
+                };
+            }
         }
 
         // Eğer en ve boy birbirine çok yakınsa kareye kilitle
@@ -269,6 +280,41 @@ export function recognizeShape(rawPoints: Point[]): RecognizedShape | null {
                 { x: bb.x2, y: bb.y2 },
             ],
         };
+    }
+
+    // Çok köşeli veya yuvarlatılmış köşeli serbest elle çizilmiş dikdörtgen/kutu kontrolü (örn. formül kutusu)
+    if (bb.w > 24 && bb.h > 18) {
+        const perim = 2 * (bb.w + bb.h);
+        const perimRatio = len / perim;
+        if (perimRatio >= 0.72 && perimRatio <= 1.38) {
+            const cornerTol = Math.max(diag * 0.36, 28);
+            const hasTL = pts.some((p) => dist(p, { x: bb.x1, y: bb.y1 }) < cornerTol);
+            const hasTR = pts.some((p) => dist(p, { x: bb.x2, y: bb.y1 }) < cornerTol);
+            const hasBR = pts.some((p) => dist(p, { x: bb.x2, y: bb.y2 }) < cornerTol);
+            const hasBL = pts.some((p) => dist(p, { x: bb.x1, y: bb.y2 }) < cornerTol);
+
+            if (hasTL && hasTR && hasBR && hasBL) {
+                if (Math.abs(bb.w - bb.h) / Math.max(bb.w, bb.h) < 0.18) {
+                    const side = (bb.w + bb.h) / 2;
+                    const hx = (bb.x1 + bb.x2) / 2;
+                    const hy = (bb.y1 + bb.y2) / 2;
+                    return {
+                        tool: 'rect',
+                        points: [
+                            { x: hx - side / 2, y: hy - side / 2 },
+                            { x: hx + side / 2, y: hy + side / 2 },
+                        ],
+                    };
+                }
+                return {
+                    tool: 'rect',
+                    points: [
+                        { x: bb.x1, y: bb.y1 },
+                        { x: bb.x2, y: bb.y2 },
+                    ],
+                };
+            }
+        }
     }
 
     // Yıldız tespiti: 5 uçlu yıldız (yaklaşık 8–12 köşe ve 5 belirgin yarıçap tepesi)

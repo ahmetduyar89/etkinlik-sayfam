@@ -54,6 +54,7 @@ import {
     Eye,
     EyeOff,
     Palette,
+    Hand,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, MathObject, PaperStyle, RulerKind } from '../../types';
@@ -601,19 +602,23 @@ export function DrawingToolbar({
     const isSelect = config.tool === 'select';
 
     const mainToolsTier1 = (
-        <div className="flex items-center justify-between w-full max-w-[1200px] px-2 py-1 mx-auto gap-1 sm:gap-2">
-            {!fixed && (
-                <div
-                    onPointerDown={(e) => dragControls.start(e)}
-                    className="p-1.5 text-slate-500 hover:text-white cursor-grab active:cursor-grabbing border-r border-white/10 shrink-0"
-                    title="Taşı"
-                >
-                    <GripVertical className="w-4 h-4" />
-                </div>
-            )}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center w-full max-w-[1280px] px-2 sm:px-4 py-1 mx-auto gap-2">
+            {/* Sol: Sürükleme Tutamacı */}
+            <div className="flex items-center justify-start min-w-0">
+                {!fixed && (
+                    <div
+                        onPointerDown={(e) => dragControls.start(e)}
+                        className="p-1.5 text-slate-500 hover:text-white cursor-grab active:cursor-grabbing border-r border-white/10 shrink-0"
+                        title="Taşı"
+                    >
+                        <GripVertical className="w-4 h-4" />
+                    </div>
+                )}
+            </div>
 
-            {/* Orta Kapsül: Birincil Araçlar (Taşma yapmaz, kompakt Goodnotes kapsülü) */}
-            <div className="flex items-center bg-[#1e2030]/80 border border-white/10 rounded-2xl p-1 shadow-md shrink-0 gap-0.5 sm:gap-1">
+            {/* Orta Kapsül: Birincil Araçlar (Taşma yapmaz, tam ortalanmış Goodnotes kapsülü) */}
+            <div className="flex items-center justify-center">
+                <div className="flex items-center bg-[#1e2030]/80 border border-white/10 rounded-2xl p-1 shadow-md shrink-0 gap-0.5 sm:gap-1">
                 {/* 1. Seçim (V) */}
                 <button
                     type="button"
@@ -764,12 +769,13 @@ export function DrawingToolbar({
                         isPan ? 'bg-[#2f334d] text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
                     )}
                 >
-                    <MousePointer2 className="w-4 h-4 sm:w-[18px] sm:h-[18px] opacity-70" />
+                    <Hand className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                 </button>
+            </div>
             </div>
 
             {/* Sağ Yardımcılar: Kütüphane, Dinamik Laboratuvar, Fotoğraf, Zoom */}
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center justify-end gap-1 shrink-0">
                 {onOpenLibrary && (
                     <button
                         type="button"
@@ -900,32 +906,34 @@ export function DrawingToolbar({
     /* 2. TIER 2: GOODNOTES 6 BAĞLAMSAL ŞERİT (Contextual Sub-Bar)   */
     /* ------------------------------------------------------------- */
     const contextualBar = (
-        <div className="flex items-center justify-between w-full max-w-[1200px] px-2 py-1 mx-auto gap-2">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center w-full max-w-[1280px] px-2 sm:px-4 py-1 mx-auto gap-2">
             {/* Sol: Goodnotes İmzası Geri Al / İleri Al Kapsülü */}
-            <div className="flex items-center bg-[#1e2030]/90 border border-white/10 rounded-2xl p-0.5 shadow-sm shrink-0">
-                <button
-                    type="button"
-                    onClick={() => onCommand('UNDO_DRAWING')}
-                    disabled={canUndo === false}
-                    title="Geri Al (Ctrl+Z)"
-                    className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-25 disabled:hover:bg-transparent"
-                >
-                    <Undo className="w-4 h-4" />
-                </button>
-                <div className="w-px h-3.5 bg-white/10 mx-0.5" />
-                <button
-                    type="button"
-                    onClick={() => onCommand('REDO_DRAWING')}
-                    disabled={canRedo === false}
-                    title="İleri Al (Ctrl+Shift+Z)"
-                    className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-25 disabled:hover:bg-transparent"
-                >
-                    <Redo className="w-4 h-4" />
-                </button>
+            <div className="flex items-center justify-start min-w-0">
+                <div className="flex items-center bg-[#1e2030]/90 border border-white/10 rounded-2xl p-0.5 shadow-sm shrink-0">
+                    <button
+                        type="button"
+                        onClick={() => onCommand('UNDO_DRAWING')}
+                        disabled={canUndo === false}
+                        title="Geri Al (Ctrl+Z)"
+                        className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-25 disabled:hover:bg-transparent"
+                    >
+                        <Undo className="w-4 h-4" />
+                    </button>
+                    <div className="w-px h-3.5 bg-white/10 mx-0.5" />
+                    <button
+                        type="button"
+                        onClick={() => onCommand('REDO_DRAWING')}
+                        disabled={canRedo === false}
+                        title="İleri Al (Ctrl+Shift+Z)"
+                        className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-25 disabled:hover:bg-transparent"
+                    >
+                        <Redo className="w-4 h-4" />
+                    </button>
+                </div>
             </div>
 
-            {/* Orta: Aktif Araca Göre Dinamik Olarak Değişen Goodnotes Bağlamsal Kapsülü */}
-            <div className="flex items-center justify-center flex-1 min-w-0">
+            {/* Orta: Aktif Araca Göre Dinamik Olarak Değişen Goodnotes Bağlamsal Kapsülü (Tam ortalanmış) */}
+            <div className="flex items-center justify-center min-w-0">
                 {/* A. KALEM AKTİFKEN (Goodnotes Pen Contextual Bar) */}
                 {isPen && (
                     <motion.div
@@ -972,6 +980,25 @@ export function DrawingToolbar({
                                 );
                             })}
                         </div>
+
+                        {/* Goodnotes İmzası: Şekil Tanıma (Çiz ve Bekle) Butonu */}
+                        <button
+                            type="button"
+                            onClick={() => setConfig({ ...config, snapShapes: !config.snapShapes })}
+                            title={config.snapShapes ? 'Otomatik Şekil Tanıma (Çiz ve Bekle) Açık' : 'Otomatik Şekil Tanıma Kapalı (Açmak için tıklayın)'}
+                            className={cn(
+                                'flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold transition-all shrink-0',
+                                config.snapShapes
+                                    ? 'bg-emerald-500/25 text-emerald-300 ring-1 ring-emerald-500/50 shadow-sm'
+                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            )}
+                        >
+                            <Shapes className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Şekil</span>
+                            {config.snapShapes && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+                            )}
+                        </button>
 
                         <div className="w-px h-4 bg-white/10 shrink-0" />
 
@@ -1242,6 +1269,70 @@ export function DrawingToolbar({
                                     : 'Düz'}
                             </span>
                         </button>
+
+                        <div className="w-px h-4 bg-white/10 shrink-0" />
+
+                        {/* Goodnotes İmzası: 3 Kalınlık Çizgisi */}
+                        <div className="flex items-center gap-1.5 shrink-0" title="Şekil Çizgi Kalınlığı">
+                            {[
+                                { width: 2, label: 'İnce', h: 1.5 },
+                                { width: 4, label: 'Orta', h: 3 },
+                                { width: 7, label: 'Kalın', h: 5 },
+                            ].map((sz) => {
+                                const isCurrent = Math.abs(config.width - sz.width) <= 0.6;
+                                return (
+                                    <button
+                                        key={sz.label}
+                                        type="button"
+                                        onClick={() => setConfig({ ...config, width: sz.width })}
+                                        title={`${sz.label} (${sz.width}px)`}
+                                        className={cn(
+                                            'w-7 h-6 rounded-lg flex items-center justify-center transition-all',
+                                            isCurrent
+                                                ? 'bg-white/20 ring-1 ring-white/60 shadow-xs'
+                                                : 'hover:bg-white/10 opacity-70 hover:opacity-100'
+                                        )}
+                                    >
+                                        <span
+                                            className="rounded-full bg-white transition-all"
+                                            style={{ width: 12, height: sz.h }}
+                                        />
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div className="w-px h-4 bg-white/10 shrink-0" />
+
+                        {/* Şekil Renkleri */}
+                        <div className="flex items-center gap-1.5 shrink-0" title="Şekil Rengi">
+                            {GOODNOTES_PEN_COLORS.map((clr) => {
+                                const active = config.color.toLowerCase() === clr.toLowerCase();
+                                return (
+                                    <button
+                                        key={clr}
+                                        type="button"
+                                        onClick={() => setConfig({ ...config, color: clr })}
+                                        className={cn(
+                                            'w-5 h-5 rounded-full transition-transform border border-white/20',
+                                            active
+                                                ? 'ring-2 ring-white ring-offset-1 ring-offset-[#1a1b26] scale-110 shadow-sm'
+                                                : 'hover:scale-105 opacity-85 hover:opacity-100'
+                                        )}
+                                        style={{ backgroundColor: clr }}
+                                    />
+                                );
+                            })}
+                            <button
+                                type="button"
+                                onClick={toggleColors}
+                                title="Özel Renk Seçici"
+                                className="w-5 h-5 rounded-full border border-white/40 flex items-center justify-center hover:scale-105 transition-transform"
+                                style={{ backgroundColor: config.color }}
+                            >
+                                <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
+                            </button>
+                        </div>
                     </motion.div>
                 )}
 
@@ -1525,7 +1616,7 @@ export function DrawingToolbar({
             </div>
 
             {/* Sağ: Yoğunluk / Dock Değiştirici */}
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center justify-end gap-1 shrink-0">
                 <button
                     type="button"
                     onClick={cycleDensity}
