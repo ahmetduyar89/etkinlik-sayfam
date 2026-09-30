@@ -1,4 +1,3 @@
-import { InkToolMemory } from './InkEngine/toolMemory';
 import React from 'react';
 import { AnimatePresence, motion, useDragControls } from 'framer-motion';
 import {
@@ -11,7 +10,6 @@ import {
     Plus,
     Redo,
     Shapes,
-    Sigma,
     Sparkles,
     StickyNote,
     Trash2,
@@ -44,10 +42,22 @@ import {
     Eraser,
     Lasso,
     RectangleHorizontal,
+    ChevronDown,
+    Check,
+    Square,
+    Circle,
+    Diamond,
+    Star,
+    MoveRight,
+    RotateCcw,
+    SlidersHorizontal,
+    Eye,
+    EyeOff,
+    Palette,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, MathObject, PaperStyle, RulerKind } from '../../types';
-import { BG_COLORS, DEFAULT_QUICK_PENS, MAIN_TOOLS, SHAPE_TOOL_IDS } from '../../constants/drawing';
+import { BG_COLORS, SHAPE_TOOL_IDS } from '../../constants/drawing';
 import {
     TOOLBAR_DENSITY_LABELS,
     useToolbarScale,
@@ -58,6 +68,7 @@ import {
     type ToolSettingsSection,
 } from './ToolSettingsPanel';
 import { ColorPalettePanel } from './ColorPalettePanel';
+import { InkToolMemory } from './InkEngine/toolMemory';
 
 export type ToolbarCommand =
     | 'UNDO_DRAWING'
@@ -81,27 +92,21 @@ interface DrawingToolbarProps {
     onTextBoxModeToggle?: () => void;
     onOpenLibrary?: () => void;
     isLibraryOpen?: boolean;
-    /** Matematik kütüphanesinden seçilen nesneyi sayfaya ekler. */
     onInsertMath?: (math: MathObject) => void;
     canUndo?: boolean;
     canRedo?: boolean;
-    /** Seçilen fotoğraf dosyalarını sayfaya ekler. */
     onInsertImages?: (files: FileList | File[]) => void;
-    /** Fotoğraf işlenirken düğmede bekleme göstergesi çıkar. */
     isInsertingImage?: boolean;
-    /** Yakınlaştırma kontrolleri (yalnızca defter/beyaz tahtada). */
     zoom?: number;
     onZoomIn?: () => void;
     onZoomOut?: () => void;
     onZoomReset?: () => void;
-    /** Görünümü sayfaya sığdırır (yalnızca sayfa ölçüsü tanımlıysa). */
     onZoomFit?: () => void;
     onSelectTool?: (toolId: string) => void;
 }
 
-type PanelId = 'settings' | 'shapes' | 'colors' | 'math' | 'lab' | 'extras';
+type PanelId = 'settings' | 'shapes' | 'colors' | 'math' | 'lab' | 'extras' | 'penType' | 'eraserMode' | 'penWidth';
 
-/** Ölçü aracı düğmesinin ipucu metinleri. */
 const RULER_LABELS: Record<RulerKind | 'off', string> = {
     off: 'Kapalı',
     ruler: 'Cetvel',
@@ -109,7 +114,6 @@ const RULER_LABELS: Record<RulerKind | 'off', string> = {
     protractor: 'Açıölçer',
 };
 
-/** Hangi aracın hangi ayar grubunu açacağı. Seç/kement/el ayarsızdır. */
 function sectionForTool(tool: DrawingTool): ToolSettingsSection | null {
     if (tool === 'pencil' || tool === 'highlighter') return 'pen';
     if (tool === 'eraser') return 'eraser';
@@ -117,14 +121,23 @@ function sectionForTool(tool: DrawingTool): ToolSettingsSection | null {
     return null;
 }
 
-const TOOL_SHORTCUTS: Record<string, string> = {
-    pencil: 'P',
-    eraser: 'E',
-    highlighter: 'H',
-    laser: 'L',
-    text: 'T',
-    select: 'V',
+const PEN_NAMES: Record<string, string> = {
+    ballpoint: 'Tükenmez',
+    fountain: 'Dolma',
+    brush: 'Fırça',
+    calligraphy: 'Kaligrafi',
+    graphite: 'Kurşun',
 };
+
+// Goodnotes signature standard palette
+const GOODNOTES_PEN_COLORS = ['#0f172a', '#2563eb', '#dc2626', '#16a34a', '#d97706'];
+const GOODNOTES_HIGHLIGHTER_COLORS = ['#fef08a', '#bbf7d0', '#bae6fd', '#fbcfe8', '#fed7aa'];
+const GOODNOTES_TAPE_COLORS = [
+    { id: '#facc15', label: 'Sarı' },
+    { id: '#f472b6', label: 'Pembe' },
+    { id: '#60a5fa', label: 'Mavi' },
+    { id: '#4ade80', label: 'Yeşil' },
+];
 
 export function DrawingToolbar({
     onCommand,
@@ -155,10 +168,13 @@ export function DrawingToolbar({
     onSelectTool,
 }: DrawingToolbarProps) {
     const toolMemoryRef = React.useRef(new InkToolMemory());
-    React.useEffect(() => { toolMemoryRef.current.remember(config); }, [config]);
+    React.useEffect(() => {
+        toolMemoryRef.current.remember(config);
+    }, [config]);
+
     const fileInputRef = React.useRef<HTMLInputElement>(null);
-    /** Aynı anda tek bir açılır panel görünür. */
     const [panel, setPanel] = React.useState<PanelId | null>(null);
+    const [penWidthSliderOpen, setPenWidthSliderOpen] = React.useState(false);
     const [dockPosition, setDockPosition] = React.useState<'bottom' | 'top'>(() => {
         try {
             return (localStorage.getItem('notebook_toolbar_dock') as 'bottom' | 'top') || 'bottom';
@@ -182,7 +198,7 @@ export function DrawingToolbar({
     const dragControls = useDragControls();
     const barRef = React.useRef<HTMLDivElement>(null);
     const rootRef = React.useRef<HTMLDivElement>(null);
-    const { scale, density, cycleDensity } = useToolbarScale(barRef);
+    const { density, cycleDensity } = useToolbarScale(barRef);
 
     const showMath = panel === 'math';
     const showLab = panel === 'lab';
@@ -190,52 +206,18 @@ export function DrawingToolbar({
 
     const openOnly = (which: PanelId | null) => setPanel(which);
 
-    const isShapeTool =
-        SHAPE_TOOL_IDS.includes(config.tool) || config.tool === 'stamp';
-
-    /**
-     * Şekil düğmesi, seçili araç ne olursa olsun şekil ayarlarını açar.
-     * Seç/kement/el gibi ayarsız araçlarda renk düğmesi kalem ayarlarını
-     * gösterir; renk ve kalınlık bir sonraki çizim için geçerli olur.
-     */
+    const isShapeTool = SHAPE_TOOL_IDS.includes(config.tool) || config.tool === 'stamp';
     const settingsSection: ToolSettingsSection =
         panel === 'shapes' ? 'shape' : sectionForTool(config.tool) ?? 'pen';
     const settingsOpen = panel === 'settings' || panel === 'shapes';
 
-    const toggleColors = () =>
-        setPanel((prev) => (prev === 'colors' ? null : 'colors'));
+    const toggleColors = () => setPanel((prev) => (prev === 'colors' ? null : 'colors'));
 
     /**
-     * GoodNotes & Notability standardı:
-     * - Pasif bir araca tıklandığında araç seçilir ve açık panel kapatılır.
-     * - Halihazırda seçili olan araca 2. kez tıklandığında (çift tıklama/toggle)
-     *   o araca ait ayar paneli açılır/kapanır.
+     * Goodnotes & Notability aracı seçimi:
+     * - Cetvel (ruler) seçili araç değişimlerinde KORUNUR.
+     * - Aktif araca tekrar tıklandığında ayar paneli açılır/kapanır.
      */
-    const isPenActive = config.tool === 'pencil' && config.penType !== 'graphite';
-    const isGraphiteActive = config.tool === 'pencil' && config.penType === 'graphite';
-
-    const handlePenClick = (mode: 'ink' | 'graphite') => {
-        if (mode === 'graphite') {
-            if (isGraphiteActive) {
-                setPanel((prev) => (prev === 'settings' ? null : 'settings'));
-            } else {
-                setConfig({ ...config, tool: 'pencil', penType: 'graphite' });
-                setPanel(null);
-            }
-        } else {
-            if (isPenActive) {
-                setPanel((prev) => (prev === 'settings' ? null : 'settings'));
-            } else {
-                setConfig({
-                    ...config,
-                    tool: 'pencil',
-                    penType: config.penType === 'graphite' ? 'ballpoint' : (config.penType ?? 'ballpoint'),
-                });
-                setPanel(null);
-            }
-        }
-    };
-
     const selectTool = (tool: DrawingTool) => {
         if (config.tool === tool) {
             const section = sectionForTool(tool);
@@ -243,34 +225,54 @@ export function DrawingToolbar({
                 setPanel((prev) => (prev === 'settings' ? null : 'settings'));
             }
         } else {
-            setConfig(toolMemoryRef.current.select(config, tool));
+            const next = toolMemoryRef.current.select(config, tool);
+            // KURAL: Cetvel açıkken araç değişirse cetvel ASLA kapanmaz.
+            if (config.ruler) {
+                next.ruler = config.ruler;
+            }
+            setConfig(next);
             setPanel(null);
+            setPenWidthSliderOpen(false);
         }
     };
 
-    const handleShapesClick = () => {
-        if (isShapeTool) {
-            setPanel((prev) => (prev === 'shapes' ? null : 'shapes'));
-        } else {
-            setConfig({ ...config, tool: 'rect' });
-            setPanel('shapes');
-        }
+    /** Kalem ucu değiştirme */
+    const changePenType = (penType: DrawConfig['penType']) => {
+        setConfig({
+            ...config,
+            tool: 'pencil',
+            penType,
+        });
+        setPanel(null);
     };
 
-    /** Panelden şekil seçilince panel açık kalsın (art arda deneme yapılabilsin). */
-    const selectShapeTool = (tool: DrawingTool) => setConfig({ ...config, tool });
+    /** Şekil aracı değiştirme */
+    const selectShape = (tool: DrawingTool) => {
+        setConfig({ ...config, tool });
+    };
 
-    // Tahtaya dokunulduğunda açık panel kapanır; çizim alanını kapatmasın.
+    /** Cetvel döngüsü */
+    const cycleRuler = () => {
+        const order: (RulerKind | null)[] = [null, 'ruler', 'setsquare', 'protractor'];
+        const at = order.indexOf(config.ruler ?? null);
+        const nextRuler = order[(at + 1) % order.length];
+        setConfig({ ...config, ruler: nextRuler });
+    };
+
+    // Dışarı tıklandığında açık popover'ları kapat
     React.useEffect(() => {
-        if (!panel) return;
+        if (!panel && !penWidthSliderOpen) return;
         const onPointerDown = (e: PointerEvent) => {
-            if (!rootRef.current?.contains(e.target as Node)) setPanel(null);
+            if (!rootRef.current?.contains(e.target as Node)) {
+                setPanel(null);
+                setPenWidthSliderOpen(false);
+            }
         };
         document.addEventListener('pointerdown', onPointerDown, true);
         return () => document.removeEventListener('pointerdown', onPointerDown, true);
-    }, [panel]);
+    }, [panel, penWidthSliderOpen]);
 
-    // Çizim modu klavye kısayolları (P: Kalem, E: Silgi, H: Fosforlu, L: Lazer, S: Şekiller, K: Kütüphane)
+    // Klavye kısayolları
     React.useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -279,36 +281,27 @@ export function DrawingToolbar({
             if (target?.isContentEditable) return;
 
             const key = e.key.toLowerCase();
-            if (key === 'p') {
-                selectTool('pencil');
-            } else if (key === 'e') {
-                selectTool('eraser');
-            } else if (key === 'h') {
-                selectTool('highlighter');
-            } else if (key === 's') {
-                handleShapesClick();
-            } else if (key === 'v') {
-                selectTool('select');
-            } else if (key === 't') {
-                selectTool('text');
-            } else if (key === 'l' && !e.shiftKey) {
-                selectTool('sun');
-            } else if (key === 'k') {
-                if (onOpenLibrary) {
-                    onOpenLibrary();
-                } else if (onInsertMath) {
-                    openOnly(panel === 'math' ? null : 'math');
-                }
+            if (key === 'p') selectTool('pencil');
+            else if (key === 'e') selectTool('eraser');
+            else if (key === 'h') selectTool('highlighter');
+            else if (key === 's') selectTool('rect');
+            else if (key === 'v') selectTool('select');
+            else if (key === 't') selectTool('text');
+            else if (key === 'l' && !e.shiftKey) selectTool('sun');
+            else if (key === 'k') {
+                if (onOpenLibrary) onOpenLibrary();
+                else if (onInsertMath) openOnly(panel === 'math' ? null : 'math');
             }
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [panel, config, isShapeTool, onInsertMath, onOpenLibrary]);
+    }, [panel, config, onInsertMath, onOpenLibrary]);
 
+    // Popover paneller
     const popovers = (
         <>
             {onInsertMath && (
-                <div className={cn('pointer-events-none z-[5001]', fixed ? 'absolute top-1 left-1/2 -translate-x-1/2' : 'relative')}>
+                <div className={cn('pointer-events-none z-[5001]', fixed ? 'absolute top-2 left-1/2 -translate-x-1/2' : 'relative')}>
                     <ObjectLibraryPanel
                         open={showMath}
                         onClose={() => setPanel(null)}
@@ -320,7 +313,7 @@ export function DrawingToolbar({
 
             <AnimatePresence>
                 {panel === 'colors' && (
-                    <div className={cn('pointer-events-none z-[5001]', fixed ? 'absolute top-1 left-24 sm:left-48' : 'relative')}>
+                    <div className={cn('pointer-events-none z-[5001]', fixed ? 'absolute top-2 left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-48' : 'relative')}>
                         <ColorPalettePanel config={config} setConfig={setConfig} />
                     </div>
                 )}
@@ -328,12 +321,12 @@ export function DrawingToolbar({
 
             <AnimatePresence>
                 {settingsOpen && (
-                    <div className={cn('pointer-events-none z-[5001]', fixed ? (settingsSection === 'shape' ? 'absolute top-1 left-20 sm:left-44' : 'absolute top-1 left-4 sm:left-14') : 'relative')}>
+                    <div className={cn('pointer-events-none z-[5001]', fixed ? 'absolute top-2 left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-24' : 'relative')}>
                         <ToolSettingsPanel
                             section={settingsSection}
                             config={config}
                             setConfig={setConfig}
-                            onSelectShapeTool={selectShapeTool}
+                            onSelectShapeTool={selectShape}
                             onPickStamp={(emoji) => {
                                 setConfig({ ...config, tool: 'stamp', stampIcon: emoji });
                                 setPanel(null);
@@ -344,8 +337,41 @@ export function DrawingToolbar({
             </AnimatePresence>
 
             <AnimatePresence>
+                {penWidthSliderOpen && (
+                    <div className={cn('pointer-events-none z-[5001]', fixed ? 'absolute top-2 left-1/2 -translate-x-1/2' : 'relative')}>
+                        <motion.div
+                            initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                            className="pointer-events-auto flex flex-col gap-2 p-3 rounded-2xl bg-[#1a1b26]/95 backdrop-blur-xl border border-white/10 shadow-2xl w-64 text-slate-200"
+                            onPointerDown={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between text-xs font-semibold">
+                                <span>Kalınlık Ayarı</span>
+                                <span className="text-sky-400 font-bold">{config.width}px</span>
+                            </div>
+                            <input
+                                type="range"
+                                min={config.tool === 'highlighter' ? 4 : 0.5}
+                                max={config.tool === 'highlighter' ? 48 : 24}
+                                step={0.5}
+                                value={config.width}
+                                onChange={(e) => setConfig({ ...config, width: Number(e.target.value) })}
+                                className="w-full accent-sky-500 cursor-pointer"
+                            />
+                            <div className="flex justify-between text-[10px] text-slate-400">
+                                <span>İnce</span>
+                                <span>Orta</span>
+                                <span>Kalın</span>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
                 {showLab && (
-                    <div className={cn('pointer-events-none z-[5001]', fixed ? 'absolute top-1 right-12 sm:right-40' : 'relative')}>
+                    <div className={cn('pointer-events-none z-[5001]', fixed ? 'absolute top-2 right-4 sm:right-24' : 'relative')}>
                         <motion.div
                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -353,201 +379,159 @@ export function DrawingToolbar({
                             className="pointer-events-auto flex flex-col gap-2.5 max-h-[68vh] overflow-y-auto bg-[#161826]/95 backdrop-blur-xl p-3.5 rounded-2xl border border-indigo-500/30 shadow-2xl w-[min(94vw,560px)]"
                             onPointerDown={(e) => e.stopPropagation()}
                         >
-                        <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                            <div className="flex items-center gap-2">
-                                <div className="p-1.5 rounded-lg bg-indigo-600/30 text-indigo-400">
-                                    <FlaskConical className="w-4 h-4" />
+                            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-1.5 rounded-lg bg-indigo-600/30 text-indigo-400">
+                                        <FlaskConical className="w-4 h-4" />
+                                    </div>
+                                    <span className="text-xs font-bold text-white uppercase tracking-wider">
+                                        Dinamik Laboratuvar & Branş Araçları
+                                    </span>
                                 </div>
-                                <span className="text-xs font-bold text-white uppercase tracking-wider">
-                                    Dinamik Laboratuvar & Matematik Araçları
+                                <span className="text-[10px] text-indigo-300 font-semibold bg-indigo-500/20 px-2 py-0.5 rounded-full border border-indigo-500/30">
+                                    Canlı Deney
                                 </span>
                             </div>
-                            <span className="text-[10px] text-indigo-300 font-semibold bg-indigo-500/20 px-2 py-0.5 rounded-full border border-indigo-500/30">
-                                Canlı Deney
-                            </span>
-                        </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onSelectTool?.('moleculeBuilder');
-                                    setPanel(null);
-                                }}
-                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-indigo-600/25 border border-white/10 hover:border-indigo-500/50 text-left transition-all group"
-                            >
-                                <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500/30 to-purple-500/30 text-indigo-300 shrink-0 group-hover:scale-110 transition-transform">
-                                    <Atom className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <span className="block text-xs font-bold text-white group-hover:text-indigo-200">
-                                        Molekül İnşa Laboratuvarı
-                                    </span>
-                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
-                                        PhET standardı kovalent bağ, manyetik kenetlenme & 3D model
-                                    </span>
-                                </div>
-                            </button>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onSelectTool?.('moleculeBuilder');
+                                        setPanel(null);
+                                    }}
+                                    className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-indigo-600/25 border border-white/10 hover:border-indigo-500/50 text-left transition-all group"
+                                >
+                                    <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500/30 to-purple-500/30 text-indigo-300 shrink-0 group-hover:scale-110 transition-transform">
+                                        <Atom className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs font-bold text-white group-hover:text-indigo-200">
+                                            Molekül İnşa Laboratuvarı
+                                        </span>
+                                        <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                            PhET standardı kovalent bağ, manyetik kenetlenme & 3D model
+                                        </span>
+                                    </div>
+                                </button>
 
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onSelectTool?.('simpleMachines');
-                                    setPanel(null);
-                                }}
-                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-indigo-600/25 border border-white/10 hover:border-indigo-500/50 text-left transition-all group"
-                            >
-                                <div className="p-2 rounded-lg bg-amber-500/20 text-amber-300 shrink-0 group-hover:scale-110 transition-transform">
-                                    <Scale className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <span className="block text-xs font-bold text-white group-hover:text-indigo-200">
-                                        Basit Makineler Laboratuvarı
-                                    </span>
-                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
-                                        Kaldıraç, makara, palanga, eğik düzlem ve çıkrık simülasyonu
-                                    </span>
-                                </div>
-                            </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onSelectTool?.('simpleMachines');
+                                        setPanel(null);
+                                    }}
+                                    className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-indigo-600/25 border border-white/10 hover:border-indigo-500/50 text-left transition-all group"
+                                >
+                                    <div className="p-2 rounded-lg bg-amber-500/20 text-amber-300 shrink-0 group-hover:scale-110 transition-transform">
+                                        <Scale className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs font-bold text-white group-hover:text-indigo-200">
+                                            Basit Makineler Laboratuvarı
+                                        </span>
+                                        <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                            Kaldıraç, makara, palanga, eğik düzlem ve çıkrık
+                                        </span>
+                                    </div>
+                                </button>
 
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onSelectTool?.('dnaGenetics');
-                                    setPanel(null);
-                                }}
-                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-purple-600/25 border border-white/10 hover:border-purple-500/50 text-left transition-all group"
-                            >
-                                <div className="p-2 rounded-lg bg-purple-500/20 text-purple-300 shrink-0 group-hover:scale-110 transition-transform">
-                                    <Dna className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <span className="block text-xs font-bold text-white group-hover:text-purple-200">
-                                        DNA, Genetik & Çaprazlama
-                                    </span>
-                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
-                                        Punnett karesi, fenotip oranları ve nükleotid bulmacası
-                                    </span>
-                                </div>
-                            </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onSelectTool?.('dnaGenetics');
+                                        setPanel(null);
+                                    }}
+                                    className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-purple-600/25 border border-white/10 hover:border-purple-500/50 text-left transition-all group"
+                                >
+                                    <div className="p-2 rounded-lg bg-purple-500/20 text-purple-300 shrink-0 group-hover:scale-110 transition-transform">
+                                        <Dna className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs font-bold text-white group-hover:text-purple-200">
+                                            DNA, Genetik & Çaprazlama
+                                        </span>
+                                        <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                            Punnett karesi, fenotip oranları ve nükleotid bulmacası
+                                        </span>
+                                    </div>
+                                </button>
 
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onSelectTool?.('linearGraph');
-                                    setPanel(null);
-                                }}
-                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-blue-600/25 border border-white/10 hover:border-blue-500/50 text-left transition-all group"
-                            >
-                                <div className="p-2 rounded-lg bg-blue-500/20 text-blue-300 shrink-0 group-hover:scale-110 transition-transform">
-                                    <TrendingUp className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <span className="block text-xs font-bold text-white group-hover:text-blue-200">
-                                        Doğrusal Denklem & Grafik Damgası
-                                    </span>
-                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
-                                        y = mx + n doğrusu, eğim dik üçgeni ve eksen kesişimleri
-                                    </span>
-                                </div>
-                            </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onSelectTool?.('linearGraph');
+                                        setPanel(null);
+                                    }}
+                                    className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-blue-600/25 border border-white/10 hover:border-blue-500/50 text-left transition-all group"
+                                >
+                                    <div className="p-2 rounded-lg bg-blue-500/20 text-blue-300 shrink-0 group-hover:scale-110 transition-transform">
+                                        <TrendingUp className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs font-bold text-white group-hover:text-blue-200">
+                                            Doğrusal Denklem & Grafik Damgası
+                                        </span>
+                                        <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                            y = mx + n doğrusu, eğim dik üçgeni ve kesişimler
+                                        </span>
+                                    </div>
+                                </button>
 
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onSelectTool?.('mathFormula');
-                                    setPanel(null);
-                                }}
-                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-emerald-600/25 border border-white/10 hover:border-emerald-500/50 text-left transition-all group"
-                            >
-                                <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-300 shrink-0 group-hover:scale-110 transition-transform">
-                                    <Type className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <span className="block text-xs font-bold text-white group-hover:text-emerald-200">
-                                        Formül & LaTeX Editörü
-                                    </span>
-                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
-                                        Kesirler, karekök, üs ve kimyasal reaksiyon okları
-                                    </span>
-                                </div>
-                            </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onSelectTool?.('mathFormula');
+                                        setPanel(null);
+                                    }}
+                                    className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-emerald-600/25 border border-white/10 hover:border-emerald-500/50 text-left transition-all group"
+                                >
+                                    <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-300 shrink-0 group-hover:scale-110 transition-transform">
+                                        <Type className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs font-bold text-white group-hover:text-emerald-200">
+                                            Formül & LaTeX Editörü
+                                        </span>
+                                        <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                            Kesirler, karekök, üs ve kimyasal reaksiyon okları
+                                        </span>
+                                    </div>
+                                </button>
 
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onSelectTool?.('geogebra');
-                                    setPanel(null);
-                                }}
-                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-indigo-600/25 border border-white/10 hover:border-indigo-500/50 text-left transition-all group"
-                            >
-                                <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-300 shrink-0 group-hover:scale-110 transition-transform">
-                                    <Sparkles className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <span className="block text-xs font-bold text-white group-hover:text-indigo-200">
-                                        GeoGebra Studio
-                                    </span>
-                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
-                                        Klasik Geometri, Fonksiyonlar, 3D Geometri ve CAS
-                                    </span>
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onSelectTool?.('3dStation');
-                                    setPanel(null);
-                                }}
-                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-teal-600/25 border border-white/10 hover:border-teal-500/50 text-left transition-all group"
-                            >
-                                <div className="p-2 rounded-lg bg-teal-500/20 text-teal-300 shrink-0 group-hover:scale-110 transition-transform">
-                                    <FlaskConical className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <span className="block text-xs font-bold text-white group-hover:text-teal-200">
-                                        3D Fen & Katı Cisim İstasyonu
-                                    </span>
-                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
-                                        Katı açınımları, 3D mevsimler, atom modeli ve DNA
-                                    </span>
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onSelectTool?.('pdfViewer');
-                                    setPanel(null);
-                                }}
-                                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-rose-600/25 border border-white/10 hover:border-rose-500/50 text-left transition-all group"
-                            >
-                                <div className="p-2 rounded-lg bg-rose-500/20 text-rose-300 shrink-0 group-hover:scale-110 transition-transform">
-                                    <FileText className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <span className="block text-xs font-bold text-white group-hover:text-rose-200">
-                                        PDF Kitap & Soru Kırpıcı
-                                    </span>
-                                    <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
-                                        MEB kitaplarından veya testlerden soru kırpıp tahtaya yapıştır
-                                    </span>
-                                </div>
-                            </button>
-                        </div>
-                    </motion.div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onSelectTool?.('geogebra');
+                                        setPanel(null);
+                                    }}
+                                    className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.04] hover:bg-indigo-600/25 border border-white/10 hover:border-indigo-500/50 text-left transition-all group"
+                                >
+                                    <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-300 shrink-0 group-hover:scale-110 transition-transform">
+                                        <Sparkles className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs font-bold text-white group-hover:text-indigo-200">
+                                            GeoGebra Studio
+                                        </span>
+                                        <span className="block text-[10.5px] text-slate-400 leading-tight mt-0.5">
+                                            Klasik Geometri, Fonksiyonlar, 3D Geometri ve CAS
+                                        </span>
+                                    </div>
+                                </button>
+                            </div>
+                        </motion.div>
                     </div>
                 )}
             </AnimatePresence>
 
             <AnimatePresence>
                 {showExtras && (onBgColorChange || onPaperChange) && (
-                    <div className={cn('pointer-events-none z-[5001]', fixed ? 'absolute top-1 right-4 sm:right-16' : 'relative')}>
+                    <div className={cn('pointer-events-none z-[5001]', fixed ? 'absolute top-2 right-4 sm:right-24' : 'relative')}>
                         <motion.div
-                            initial={{ opacity: 0, y: dockPosition === 'top' ? -10 : 10, scale: 0.95 }}
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: dockPosition === 'top' ? -10 : 10, scale: 0.95 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
                             className="pointer-events-auto flex flex-col gap-2.5 bg-[#1a1b26]/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 shadow-2xl max-w-[95vw]"
                             onPointerDown={(e) => e.stopPropagation()}
                         >
@@ -562,51 +546,17 @@ export function DrawingToolbar({
                                                 key={color}
                                                 type="button"
                                                 role="radio"
-                                                aria-checked={(bgColor || '#ffffff') === color}
+                                                aria-checked={bgColor === color}
                                                 onClick={() => onBgColorChange(color)}
                                                 className={cn(
-                                                    'w-6 h-6 rounded-full border-2 transition-all hover:scale-110 shrink-0 shadow-sm',
-                                                    (bgColor || '#ffffff') === color
-                                                        ? 'border-indigo-400 ring-2 ring-indigo-400/40 scale-110'
-                                                        : 'border-white/20'
+                                                    'w-5 h-5 rounded-full border transition-all',
+                                                    bgColor === color
+                                                        ? 'border-indigo-400 ring-2 ring-indigo-400/50 scale-110'
+                                                        : 'border-white/30 hover:scale-105'
                                                 )}
                                                 style={{ backgroundColor: color }}
                                                 title={label}
-                                                aria-label={label}
                                             />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {onPaperChange && (
-                                <div className="flex items-center gap-2 pt-1 border-t border-white/10">
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0 w-16">
-                                        Şablon
-                                    </span>
-                                    <div className="flex items-center gap-1 flex-wrap">
-                                        {[
-                                            { id: 'blank', label: 'Düz' },
-                                            { id: 'grid', label: 'Kareli' },
-                                            { id: 'lined', label: 'Çizgili' },
-                                            { id: 'dotted', label: 'Noktalı' },
-                                            { id: 'graph_mm', label: 'Milimetrik' },
-                                            { id: 'coordinate', label: 'Koordinat' },
-                                            { id: 'isometric', label: 'İzometrik' },
-                                        ].map((p) => (
-                                            <button
-                                                key={p.id}
-                                                type="button"
-                                                onClick={() => onPaperChange(p.id as PaperStyle)}
-                                                className={cn(
-                                                    'px-2.5 py-1 rounded-lg text-xs font-semibold transition-all',
-                                                    (paper || 'blank') === p.id
-                                                        ? 'bg-indigo-600 text-white shadow-sm'
-                                                        : 'text-slate-300 hover:text-white hover:bg-white/10'
-                                                )}
-                                            >
-                                                {p.label}
-                                            </button>
                                         ))}
                                     </div>
                                 </div>
@@ -625,7 +575,6 @@ export function DrawingToolbar({
                                             ? 'bg-emerald-600/90 text-white shadow-sm'
                                             : 'bg-white/5 text-slate-400 hover:text-slate-200'
                                     )}
-                                    title={config.snapToGrid ? 'Izgaraya yapışma açık' : 'Izgaraya yapışma kapalı'}
                                 >
                                     <Grid className="w-3.5 h-3.5" />
                                     <span>{config.snapToGrid ? 'Açık' : 'Kapalı'}</span>
@@ -638,245 +587,803 @@ export function DrawingToolbar({
         </>
     );
 
-    const strip = (
-        <div
-            ref={barRef}
-            className={cn(
-                'pointer-events-auto flex flex-nowrap items-center justify-center gap-0.5 sm:gap-1 bg-[#1a1b26] p-1 sm:p-1.5 rounded-2xl shadow-[0_18px_40px_rgba(0,0,0,0.45)] border border-white/5 shrink-0',
-                fixed && 'bg-transparent shadow-none border-0 p-0 rounded-none shrink-0'
-            )}
-        >
+    /* ------------------------------------------------------------- */
+    /* 1. TIER 1: ANA ARAÇ ÇUBUĞU (Kompakt, Taşmayan Goodnotes Kapsülü) */
+    /* ------------------------------------------------------------- */
+    const isPen = config.tool === 'pencil';
+    const isEraser = config.tool === 'eraser';
+    const isHighlighter = config.tool === 'highlighter';
+    const isLasso = config.tool === 'lasso';
+    const isTape = config.tool === 'tape';
+    const isText = config.tool === 'text';
+    const isLaser = config.tool === 'sun';
+    const isPan = config.tool === 'pan';
+    const isSelect = config.tool === 'select';
+
+    const mainToolsTier1 = (
+        <div className="flex items-center justify-between w-full max-w-[1200px] px-2 py-1 mx-auto gap-1 sm:gap-2">
             {!fixed && (
                 <div
                     onPointerDown={(e) => dragControls.start(e)}
-                    className="p-1.5 sm:p-2 text-slate-500 hover:text-white cursor-grab active:cursor-grabbing border-r border-white/10"
+                    className="p-1.5 text-slate-500 hover:text-white cursor-grab active:cursor-grabbing border-r border-white/10 shrink-0"
                     title="Taşı"
-                    aria-label="Araç çubuğunu taşı"
                 >
-                    <GripVertical className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                    <GripVertical className="w-4 h-4" />
                 </div>
             )}
 
-                <div className="flex items-center gap-0.5 px-1 sm:px-1.5 border-white/10 border-r shrink-0">
-                    {/* 1. Seçim Aracı */}
+            {/* Orta Kapsül: Birincil Araçlar (Taşma yapmaz, kompakt Goodnotes kapsülü) */}
+            <div className="flex items-center bg-[#1e2030]/80 border border-white/10 rounded-2xl p-1 shadow-md shrink-0 gap-0.5 sm:gap-1">
+                {/* 1. Seçim (V) */}
+                <button
+                    type="button"
+                    onClick={() => selectTool('select')}
+                    title="Seç & Düzenle (V)"
+                    className={cn(
+                        'p-2 rounded-xl transition-all relative',
+                        isSelect ? 'bg-[#2f334d] text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                >
+                    <MousePointer2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                </button>
+
+                {/* 2. Kalem (P) - Tükenmez/Dolma/Fırça/Kurşun kapsayıcı */}
+                <button
+                    type="button"
+                    onClick={() => selectTool('pencil')}
+                    title="Kalem (P) - Ayarlar için tekrar tıklayın"
+                    className={cn(
+                        'p-2 rounded-xl transition-all relative group',
+                        isPen ? 'bg-[#2f334d] text-sky-300 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                >
+                    <PenTool className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                    <span
+                        className="absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full border border-[#1a1b26]"
+                        style={{ backgroundColor: config.color }}
+                    />
+                </button>
+
+                {/* 3. Silgi (E) */}
+                <button
+                    type="button"
+                    onClick={() => selectTool('eraser')}
+                    title="Silgi (E)"
+                    className={cn(
+                        'p-2 rounded-xl transition-all relative',
+                        isEraser ? 'bg-[#2f334d] text-rose-300 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                >
+                    <Eraser className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                </button>
+
+                {/* 4. Fosforlu Kalem (H) */}
+                <button
+                    type="button"
+                    onClick={() => selectTool('highlighter')}
+                    title="Fosforlu Kalem (H)"
+                    className={cn(
+                        'p-2 rounded-xl transition-all relative',
+                        isHighlighter ? 'bg-[#2f334d] text-yellow-300 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                >
+                    <Highlighter className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                </button>
+
+                {/* 5. Şekiller (S) */}
+                <button
+                    type="button"
+                    onClick={() => selectTool(isShapeTool ? config.tool : 'rect')}
+                    title="Şekiller (S)"
+                    className={cn(
+                        'p-2 rounded-xl transition-all relative',
+                        isShapeTool ? 'bg-[#2f334d] text-indigo-300 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                >
+                    <Shapes className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                </button>
+
+                {/* 6. Kement (Lasso) */}
+                <button
+                    type="button"
+                    onClick={() => selectTool('lasso')}
+                    title="Kement (Çoklu Seçim)"
+                    className={cn(
+                        'p-2 rounded-xl transition-all relative',
+                        isLasso ? 'bg-[#2f334d] text-purple-300 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                >
+                    <Lasso className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                </button>
+
+                {/* 7. Çalışma Bandı (Tape - Active Recall) */}
+                <button
+                    type="button"
+                    onClick={() => selectTool('tape')}
+                    title="Çalışma Bandı (Active Recall)"
+                    className={cn(
+                        'p-2 rounded-xl transition-all relative',
+                        isTape ? 'bg-[#2f334d] text-amber-400 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                >
+                    <RectangleHorizontal className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                </button>
+
+                {/* 8. Metin (T) */}
+                <button
+                    type="button"
+                    onClick={() => selectTool('text')}
+                    title="Metin (T)"
+                    className={cn(
+                        'p-2 rounded-xl transition-all relative',
+                        isText ? 'bg-[#2f334d] text-emerald-300 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                >
+                    <Type className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                </button>
+
+                {/* 9. Cetvel & Gönye (Ruler) */}
+                <button
+                    type="button"
+                    onClick={cycleRuler}
+                    title={`Ölçü Aracı: ${RULER_LABELS[config.ruler ?? 'off']} (tıklayarak değiştirin)`}
+                    className={cn(
+                        'p-2 rounded-xl transition-all relative',
+                        config.ruler ? 'bg-indigo-600/40 text-indigo-300 ring-1 ring-indigo-400/50 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                >
+                    {config.ruler === 'protractor' ? (
+                        <Compass className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                    ) : config.ruler === 'setsquare' ? (
+                        <Triangle className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                    ) : (
+                        <Ruler className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                    )}
+                </button>
+
+                {/* 10. Lazer (L) */}
+                <button
+                    type="button"
+                    onClick={() => selectTool('sun')}
+                    title="Lazer İşaretçi (L)"
+                    className={cn(
+                        'p-2 rounded-xl transition-all relative',
+                        isLaser ? 'bg-[#2f334d] text-rose-400 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                >
+                    <Sparkles className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                </button>
+
+                {/* 11. El / Kaydır (Pan) */}
+                <button
+                    type="button"
+                    onClick={() => selectTool('pan')}
+                    title="Kaydır / El"
+                    className={cn(
+                        'p-2 rounded-xl transition-all relative',
+                        isPan ? 'bg-[#2f334d] text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                >
+                    <MousePointer2 className="w-4 h-4 sm:w-[18px] sm:h-[18px] opacity-70" />
+                </button>
+            </div>
+
+            {/* Sağ Yardımcılar: Kütüphane, Dinamik Laboratuvar, Fotoğraf, Zoom */}
+            <div className="flex items-center gap-1 shrink-0">
+                {onOpenLibrary && (
                     <button
                         type="button"
-                        onClick={() => selectTool('select')}
-                        title="Seç & Düzenle (V)"
-                        aria-label="Seç & Düzenle"
-                        aria-pressed={config.tool === 'select'}
+                        onClick={onOpenLibrary}
+                        title="Kütüphane (K)"
                         className={cn(
-                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
-                            config.tool === 'select'
-                                ? 'bg-[#2d3045] text-white'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            'p-2 rounded-xl transition-all flex items-center gap-1.5',
+                            isLibraryOpen ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'
                         )}
                     >
-                        <MousePointer2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        {config.tool === 'select' && (
-                            <motion.div
-                                layoutId="activeTool"
-                                className="absolute inset-0 border-2 border-emerald-500/50 rounded-lg pointer-events-none"
-                            />
-                        )}
+                        <BookOpen className="w-4 h-4" />
+                        <span className="text-xs font-semibold hidden xl:inline">Kütüphane</span>
                     </button>
+                )}
 
-                    {/* 2. Yazı Kalemi (Tükenmez / Dolma / Fırça / Kaligrafi) */}
+                {onSelectTool && (
                     <button
                         type="button"
-                        onClick={() => handlePenClick('ink')}
-                        title="Yazı Kalemi (P) - Ayarlar için tekrar tıklayın"
-                        aria-label="Yazı Kalemi"
-                        aria-pressed={isPenActive}
+                        onClick={() => openOnly(showLab ? null : 'lab')}
+                        title="Laboratuvar & Branş Araçları"
                         className={cn(
-                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
-                            isPenActive
-                                ? 'bg-[#2d3045] text-white'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            'p-2 rounded-xl transition-all relative',
+                            showLab ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-purple-300 hover:bg-purple-500/10'
                         )}
                     >
-                        <PenTool className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        {isPenActive && (
-                            <motion.div
-                                layoutId="activeTool"
-                                className="absolute inset-0 border-2 border-emerald-500/50 rounded-lg pointer-events-none"
-                            />
-                        )}
+                        <FlaskConical className="w-4 h-4" />
                     </button>
+                )}
 
-                    {/* 3. Kurşun Kalem (Grafit, Gölgelendirme & Eğime Duyarlı) */}
+                {onInsertImages && (
+                    <>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={(e) => {
+                                if (e.target.files?.length) onInsertImages(e.target.files);
+                                e.target.value = '';
+                            }}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isInsertingImage}
+                            title="Fotoğraf Ekle"
+                            className="p-2 rounded-xl text-slate-400 hover:text-sky-300 hover:bg-sky-400/10 transition-all disabled:opacity-40"
+                        >
+                            {isInsertingImage ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <ImagePlus className="w-4 h-4" />
+                            )}
+                        </button>
+                    </>
+                )}
+
+                {setShowWhiteboard && (
                     <button
                         type="button"
-                        onClick={() => handlePenClick('graphite')}
-                        title="Kurşun Kalem (Grafit & Gölgelendirme)"
-                        aria-label="Kurşun Kalem"
-                        aria-pressed={isGraphiteActive}
+                        onClick={() => onCommand('TOGGLE_WHITEBOARD')}
+                        title="Yazı Tahtası"
                         className={cn(
-                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
-                            isGraphiteActive
-                                ? 'bg-[#2d3045] text-amber-300'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            'p-2 rounded-xl transition-all',
+                            showWhiteboard ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'
                         )}
                     >
-                        <PencilIcon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        {isGraphiteActive && (
-                            <motion.div
-                                layoutId="activeTool"
-                                className="absolute inset-0 border-2 border-amber-500/50 rounded-lg pointer-events-none"
-                            />
-                        )}
+                        <Grid className="w-4 h-4" />
                     </button>
+                )}
 
-                    {/* 4. Fosforlu Kalem */}
+                {onScreenshot && (
                     <button
                         type="button"
-                        onClick={() => selectTool('highlighter')}
-                        title="Fosforlu Kalem (H)"
-                        aria-label="Fosforlu Kalem"
-                        aria-pressed={config.tool === 'highlighter'}
-                        className={cn(
-                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
-                            config.tool === 'highlighter'
-                                ? 'bg-[#2d3045] text-yellow-300'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
-                        )}
+                        onClick={onScreenshot}
+                        title="Sayfayı PNG Olarak İndir"
+                        className="p-2 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 transition-all"
                     >
-                        <Highlighter className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        {config.tool === 'highlighter' && (
-                            <motion.div
-                                layoutId="activeTool"
-                                className="absolute inset-0 border-2 border-yellow-500/50 rounded-lg pointer-events-none"
-                            />
-                        )}
+                        <Camera className="w-4 h-4" />
                     </button>
+                )}
 
-                    {/* 5. Silgi */}
-                    <button
-                        type="button"
-                        onClick={() => selectTool('eraser')}
-                        title="Silgi (E)"
-                        aria-label="Silgi"
-                        aria-pressed={config.tool === 'eraser'}
-                        className={cn(
-                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
-                            config.tool === 'eraser'
-                                ? 'bg-[#2d3045] text-rose-300'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
-                        )}
-                    >
-                        <Eraser className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        {config.tool === 'eraser' && (
-                            <motion.div
-                                layoutId="activeTool"
-                                className="absolute inset-0 border-2 border-rose-500/50 rounded-lg pointer-events-none"
-                            />
-                        )}
-                    </button>
-
-                    {/* 6. Şekiller */}
-                    <button
-                        type="button"
-                        onClick={handleShapesClick}
-                        aria-label="Şekiller (S)"
-                        aria-expanded={panel === 'shapes'}
-                        className={cn(
-                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 relative',
-                            isShapeTool
-                                ? 'bg-[#2d3045] text-indigo-400'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5',
-                            panel === 'shapes' ? 'bg-white/10 text-white' : ''
-                        )}
-                        title="Şekiller (S)"
-                    >
-                        <Shapes className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        {isShapeTool && (
-                            <div className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full border border-[#1a1b26]" />
-                        )}
-                    </button>
-
-                    {/* 7. Kement */}
-                    <button
-                        type="button"
-                        onClick={() => selectTool('lasso')}
-                        title="Kement (Çoklu Seçim)"
-                        aria-label="Kement"
-                        aria-pressed={config.tool === 'lasso'}
-                        className={cn(
-                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
-                            config.tool === 'lasso'
-                                ? 'bg-[#2d3045] text-sky-400'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
-                        )}
-                    >
-                        <Lasso className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        {config.tool === 'lasso' && (
-                            <motion.div
-                                layoutId="activeTool"
-                                className="absolute inset-0 border-2 border-sky-500/50 rounded-lg pointer-events-none"
-                            />
-                        )}
-                    </button>
-
-                    {/* 8. Çalışma Bandı (Tape) */}
-                    <button
-                        type="button"
-                        onClick={() => selectTool('tape')}
-                        title="Çalışma Bandı (Kapat / Aç - Active Recall)"
-                        aria-label="Çalışma Bandı"
-                        aria-pressed={config.tool === 'tape'}
-                        className={cn(
-                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
-                            config.tool === 'tape'
-                                ? 'bg-[#2d3045] text-amber-400'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
-                        )}
-                    >
-                        <RectangleHorizontal className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        {config.tool === 'tape' && (
-                            <motion.div
-                                layoutId="activeTool"
-                                className="absolute inset-0 border-2 border-amber-500/50 rounded-lg pointer-events-none"
-                            />
-                        )}
-                    </button>
-
-                    {/* 9. Metin, Lazer, El */}
-                    {['text', 'sun', 'pan'].map((toolId) => {
-                        const tool = MAIN_TOOLS.find((t) => t.id === toolId);
-                        if (!tool) return null;
-                        const isActive = config.tool === tool.id;
-                        return (
+                {/* Zoom Kontrolleri (Fixed modunda) */}
+                {fixed && onZoomIn && onZoomOut && (
+                    <div className="flex items-center gap-0.5 pl-1 ml-1 border-l border-white/10" role="group" aria-label="Yakınlaştırma">
+                        <button
+                            type="button"
+                            onClick={onZoomOut}
+                            title="Uzaklaştır"
+                            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+                        >
+                            <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        {onZoomFit && (
                             <button
-                                key={tool.id}
                                 type="button"
-                                onClick={() => selectTool(tool.id)}
-                                title={tool.label}
-                                aria-label={tool.label}
-                                aria-pressed={isActive}
-                                className={cn(
-                                    'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
-                                    isActive
-                                        ? 'bg-[#2d3045] text-white'
-                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
-                                )}
+                                onClick={onZoomFit}
+                                title="Sayfaya Sığdır"
+                                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
                             >
-                                <tool.icon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                                {isActive && (
-                                    <motion.div
-                                        layoutId="activeTool"
-                                        className="absolute inset-0 border-2 border-emerald-500/50 rounded-lg pointer-events-none"
-                                    />
-                                )}
+                                <Scan className="w-3.5 h-3.5" />
                             </button>
-                        );
-                    })}
-                </div>
+                        )}
+                        <button
+                            type="button"
+                            onClick={onZoomReset}
+                            title="%100"
+                            className="px-1 text-[11px] font-bold text-slate-300 hover:text-white tabular-nums"
+                        >
+                            %{Math.round((zoom ?? 1) * 100)}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onZoomIn}
+                            title="Yakınlaştır"
+                            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 
-                {/* Metin Aracı seçiliyken GoodNotes standardı Metin Format Çubuğu; Kalem modundayken Hızlı Kalemler */}
-                {config.tool === 'text' ? (
-                    <div className="flex items-center gap-1.5 px-2 border-white/10 border-r" title="Metin Biçimlendirme">
-                        {/* Font Ailesi */}
-                        <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10">
+    /* ------------------------------------------------------------- */
+    /* 2. TIER 2: GOODNOTES 6 BAĞLAMSAL ŞERİT (Contextual Sub-Bar)   */
+    /* ------------------------------------------------------------- */
+    const contextualBar = (
+        <div className="flex items-center justify-between w-full max-w-[1200px] px-2 py-1 mx-auto gap-2">
+            {/* Sol: Goodnotes İmzası Geri Al / İleri Al Kapsülü */}
+            <div className="flex items-center bg-[#1e2030]/90 border border-white/10 rounded-2xl p-0.5 shadow-sm shrink-0">
+                <button
+                    type="button"
+                    onClick={() => onCommand('UNDO_DRAWING')}
+                    disabled={canUndo === false}
+                    title="Geri Al (Ctrl+Z)"
+                    className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-25 disabled:hover:bg-transparent"
+                >
+                    <Undo className="w-4 h-4" />
+                </button>
+                <div className="w-px h-3.5 bg-white/10 mx-0.5" />
+                <button
+                    type="button"
+                    onClick={() => onCommand('REDO_DRAWING')}
+                    disabled={canRedo === false}
+                    title="İleri Al (Ctrl+Shift+Z)"
+                    className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-25 disabled:hover:bg-transparent"
+                >
+                    <Redo className="w-4 h-4" />
+                </button>
+            </div>
+
+            {/* Orta: Aktif Araca Göre Dinamik Olarak Değişen Goodnotes Bağlamsal Kapsülü */}
+            <div className="flex items-center justify-center flex-1 min-w-0">
+                {/* A. KALEM AKTİFKEN (Goodnotes Pen Contextual Bar) */}
+                {isPen && (
+                    <motion.div
+                        key="pen-context"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center bg-[#1e2030]/90 border border-white/10 rounded-2xl px-2 py-1 shadow-sm gap-2 sm:gap-3 max-w-full overflow-x-auto no-scrollbar"
+                    >
+                        {/* Kalem Türü Seçici Dropdown Butonu */}
+                        <button
+                            type="button"
+                            onClick={() => setPanel((p) => (p === 'settings' ? null : 'settings'))}
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium text-xs transition-colors shrink-0"
+                            title="Kalem Ayarları & Uç Seçimi"
+                        >
+                            <PenTool className="w-3.5 h-3.5 text-sky-400" />
+                            <span>{PEN_NAMES[config.penType ?? 'ballpoint'] || 'Tükenmez'}</span>
+                            <ChevronDown className="w-3 h-3 text-slate-400" />
+                        </button>
+
+                        {/* Hızlı 3 Kalem Ucu (Goodnotes 3 quick pens) */}
+                        <div className="flex items-center gap-1 shrink-0">
+                            {[
+                                { id: 'ballpoint', label: 'Tükenmez' },
+                                { id: 'fountain', label: 'Dolma' },
+                                { id: 'brush', label: 'Fırça' },
+                                { id: 'graphite', label: 'Kurşun' },
+                            ].map((p) => {
+                                const active = (config.penType ?? 'ballpoint') === p.id;
+                                return (
+                                    <button
+                                        key={p.id}
+                                        type="button"
+                                        onClick={() => changePenType(p.id as any)}
+                                        className={cn(
+                                            'px-2 py-1 rounded-lg text-[11px] font-semibold transition-all',
+                                            active
+                                                ? 'bg-sky-500/20 text-sky-300 ring-1 ring-sky-500/50'
+                                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                        )}
+                                    >
+                                        {p.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div className="w-px h-4 bg-white/10 shrink-0" />
+
+                        {/* Goodnotes İmzası: 3 Kalınlık Çizgisi (- ━ ━━) */}
+                        <div className="flex items-center gap-1.5 shrink-0" title="Kalınlık Önayarları">
+                            {[
+                                { width: 2, label: 'İnce', h: 1.5 },
+                                { width: 4, label: 'Orta', h: 3 },
+                                { width: 7, label: 'Kalın', h: 5 },
+                            ].map((sz) => {
+                                const isCurrent = Math.abs(config.width - sz.width) <= 0.6;
+                                return (
+                                    <button
+                                        key={sz.label}
+                                        type="button"
+                                        onClick={() => {
+                                            if (isCurrent) setPenWidthSliderOpen((o) => !o);
+                                            else setConfig({ ...config, width: sz.width });
+                                        }}
+                                        title={`${sz.label} (${sz.width}px) - Değiştirmek için tekrar tıklayın`}
+                                        className={cn(
+                                            'w-8 h-6 rounded-lg flex items-center justify-center transition-all',
+                                            isCurrent
+                                                ? 'bg-white/20 ring-1 ring-white/60 shadow-xs'
+                                                : 'hover:bg-white/10 opacity-70 hover:opacity-100'
+                                        )}
+                                    >
+                                        <span
+                                            className="rounded-full bg-white transition-all"
+                                            style={{ width: 14, height: sz.h }}
+                                        />
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div className="w-px h-4 bg-white/10 shrink-0" />
+
+                        {/* Goodnotes Renk Noktaları (3-5 nokta + Palet Düğmesi) */}
+                        <div className="flex items-center gap-1.5 shrink-0" title="Mürekkep Renkleri">
+                            {GOODNOTES_PEN_COLORS.map((clr) => {
+                                const active = config.color.toLowerCase() === clr.toLowerCase();
+                                return (
+                                    <button
+                                        key={clr}
+                                        type="button"
+                                        onClick={() => setConfig({ ...config, color: clr })}
+                                        className={cn(
+                                            'w-5 h-5 rounded-full transition-transform border border-white/20',
+                                            active
+                                                ? 'ring-2 ring-white ring-offset-1 ring-offset-[#1a1b26] scale-110 shadow-sm'
+                                                : 'hover:scale-105 opacity-85 hover:opacity-100'
+                                        )}
+                                        style={{ backgroundColor: clr }}
+                                    />
+                                );
+                            })}
+                            <button
+                                type="button"
+                                onClick={toggleColors}
+                                title="Özel Renk Seçici"
+                                className="w-5 h-5 rounded-full border border-white/40 flex items-center justify-center hover:scale-105 transition-transform"
+                                style={{ backgroundColor: config.color }}
+                            >
+                                <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+
+                {/* B. SİLGİ AKTİFKEN (Goodnotes Eraser Contextual Bar) */}
+                {isEraser && (
+                    <motion.div
+                        key="eraser-context"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center bg-[#1e2030]/90 border border-white/10 rounded-2xl px-2 py-1 shadow-sm gap-2 sm:gap-3"
+                    >
+                        {/* Silgi Modu (Çizgi Silgisi vs Piksel Silgisi) */}
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setConfig({
+                                    ...config,
+                                    eraserMode: config.eraserMode === 'stroke' ? 'pixel' : 'stroke',
+                                })
+                            }
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium text-xs transition-colors shrink-0"
+                            title="Silgi Modu (Tıklayarak değiştirin)"
+                        >
+                            <Eraser className="w-3.5 h-3.5 text-rose-400" />
+                            <span>{config.eraserMode === 'stroke' ? 'Çizgi Silgisi' : 'Piksel Silgisi'}</span>
+                            <ChevronDown className="w-3 h-3 text-slate-400" />
+                        </button>
+
+                        {/* Goodnotes: Kaleme Otomatik Geri Dön Switchi */}
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setConfig({
+                                    ...config,
+                                    autoSwitchBackEraser: !config.autoSwitchBackEraser,
+                                })
+                            }
+                            className={cn(
+                                'flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all shrink-0',
+                                config.autoSwitchBackEraser
+                                    ? 'bg-rose-500/20 text-rose-300 ring-1 ring-rose-500/40'
+                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            )}
+                            title="Silme bittiğinde otomatik önceki kaleme geri dön"
+                        >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Kaleme Dön</span>
+                        </button>
+
+                        <div className="w-px h-4 bg-white/10 shrink-0" />
+
+                        {/* Goodnotes 3 Dairesel Silgi Boyutu: Küçük, Orta, Büyük */}
+                        <div className="flex items-center gap-2 shrink-0" title="Silgi Boyutu">
+                            {[
+                                { size: 10, label: 'Küçük', r: 3 },
+                                { size: 22, label: 'Orta', r: 5 },
+                                { size: 38, label: 'Büyük', r: 7.5 },
+                            ].map((sz) => {
+                                const isCurrent = Math.abs((config.width || 22) - sz.size) <= 5;
+                                return (
+                                    <button
+                                        key={sz.label}
+                                        type="button"
+                                        onClick={() => setConfig({ ...config, width: sz.size })}
+                                        title={`${sz.label} Silgi (${sz.size}px)`}
+                                        className={cn(
+                                            'w-7 h-7 rounded-full flex items-center justify-center transition-all',
+                                            isCurrent
+                                                ? 'border-2 border-sky-400 bg-sky-400/20 shadow-xs scale-105'
+                                                : 'border border-white/30 hover:border-white/60 hover:scale-105'
+                                        )}
+                                    >
+                                        <span
+                                            className="rounded-full bg-white/90"
+                                            style={{ width: sz.r * 2, height: sz.r * 2 }}
+                                        />
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div className="w-px h-4 bg-white/10 shrink-0" />
+
+                        {/* Çizimi Temizle Düğmesi */}
+                        <button
+                            type="button"
+                            onClick={() => onCommand('CLEAR_DRAWING')}
+                            className="flex items-center gap-1 px-2 py-1 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-400/15 transition-colors shrink-0"
+                            title="Tüm Çizimi Temizle"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Temizle</span>
+                        </button>
+                    </motion.div>
+                )}
+
+                {/* C. ŞEKİLLER AKTİFKEN (Goodnotes Shapes Contextual Bar) */}
+                {isShapeTool && (
+                    <motion.div
+                        key="shapes-context"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center bg-[#1e2030]/90 border border-white/10 rounded-2xl px-2 py-1 shadow-sm gap-2 sm:gap-3 max-w-full overflow-x-auto no-scrollbar"
+                    >
+                        {/* Goodnotes: Çiz ve Bekle (Draw & Hold) Otomatik Tanıma Toggle */}
+                        <button
+                            type="button"
+                            onClick={() => setConfig({ ...config, snapShapes: !config.snapShapes })}
+                            className={cn(
+                                'flex items-center gap-1.5 px-2 py-1 rounded-xl text-xs font-semibold transition-all shrink-0',
+                                config.snapShapes
+                                    ? 'bg-emerald-600/30 text-emerald-300 ring-1 ring-emerald-500/50'
+                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            )}
+                            title="Çizip bekleyince otomatik kusursuz şekle dönüştür"
+                        >
+                            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                            <span className="hidden sm:inline">Çiz & Bekle</span>
+                        </button>
+
+                        <div className="w-px h-4 bg-white/10 shrink-0" />
+
+                        {/* Hızlı 2D Şekil İkonları */}
+                        <div className="flex items-center gap-1 shrink-0">
+                            {[
+                                { id: 'line', icon: Minus, label: 'Doğru' },
+                                { id: 'arrow', icon: MoveRight, label: 'Ok' },
+                                { id: 'rect', icon: Square, label: 'Dikdörtgen' },
+                                { id: 'circle', icon: Circle, label: 'Daire' },
+                                { id: 'triangle', icon: Triangle, label: 'Üçgen' },
+                                { id: 'diamond', icon: Diamond, label: 'Baklava' },
+                                { id: 'star', icon: Star, label: 'Yıldız' },
+                            ].map((sh) => {
+                                const Icon = sh.icon;
+                                const active = config.tool === sh.id;
+                                return (
+                                    <button
+                                        key={sh.id}
+                                        type="button"
+                                        onClick={() => selectShape(sh.id as any)}
+                                        title={sh.label}
+                                        className={cn(
+                                            'p-1.5 rounded-lg transition-all',
+                                            active
+                                                ? 'bg-indigo-600 text-white shadow-xs'
+                                                : 'text-slate-400 hover:text-white hover:bg-white/10'
+                                        )}
+                                    >
+                                        <Icon className="w-4 h-4" />
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div className="w-px h-4 bg-white/10 shrink-0" />
+
+                        {/* Dolgu Modu (Yok / Saydam / Opak) */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const modes: ('none' | 'transparent' | 'solid')[] = ['none', 'transparent', 'solid'];
+                                const cur = config.shapeFillMode ?? (config.fillEnabled ? 'solid' : 'none');
+                                const next = modes[(modes.indexOf(cur) + 1) % modes.length];
+                                setConfig({
+                                    ...config,
+                                    shapeFillMode: next,
+                                    fillEnabled: next !== 'none',
+                                });
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-white transition-colors shrink-0"
+                            title="Şekil Dolgu Modu"
+                        >
+                            <span>Dolgu:</span>
+                            <span className="text-sky-300 font-bold">
+                                {config.shapeFillMode === 'solid'
+                                    ? 'Opak'
+                                    : config.shapeFillMode === 'transparent'
+                                    ? 'Saydam'
+                                    : 'Yok'}
+                            </span>
+                        </button>
+
+                        {/* Kenarlık Deseni (Düz / Kesikli / Noktalı) */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const styles: ('solid' | 'dashed' | 'dotted')[] = ['solid', 'dashed', 'dotted'];
+                                const cur = config.shapeBorderStyle ?? 'solid';
+                                const next = styles[(styles.indexOf(cur) + 1) % styles.length];
+                                setConfig({ ...config, shapeBorderStyle: next, dash: next });
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-white transition-colors shrink-0"
+                            title="Kenarlık Deseni"
+                        >
+                            <span>Kenar:</span>
+                            <span className="text-indigo-300 font-bold">
+                                {config.shapeBorderStyle === 'dashed'
+                                    ? 'Kesikli'
+                                    : config.shapeBorderStyle === 'dotted'
+                                    ? 'Noktalı'
+                                    : 'Düz'}
+                            </span>
+                        </button>
+                    </motion.div>
+                )}
+
+                {/* D. FOSFORLU KALEM AKTİFKEN */}
+                {isHighlighter && (
+                    <motion.div
+                        key="highlighter-context"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center bg-[#1e2030]/90 border border-white/10 rounded-2xl px-2 py-1 shadow-sm gap-2 sm:gap-3 max-w-full overflow-x-auto no-scrollbar"
+                    >
+                        {/* Düz Çizgi Otomatik Kilitleme */}
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setConfig({
+                                    ...config,
+                                    highlighterAutoStraight: !config.highlighterAutoStraight,
+                                })
+                            }
+                            className={cn(
+                                'flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all shrink-0',
+                                config.highlighterAutoStraight
+                                    ? 'bg-yellow-500/20 text-yellow-300 ring-1 ring-yellow-500/50'
+                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            )}
+                            title="Çizerken düz çizgiye otomatik hizala"
+                        >
+                            <Ruler className="w-3.5 h-3.5" />
+                            <span>Düz Çizgi</span>
+                        </button>
+
+                        <div className="w-px h-4 bg-white/10 shrink-0" />
+
+                        {/* Fosforlu Kalınlıkları */}
+                        <div className="flex items-center gap-1.5 shrink-0" title="Fosforlu Kalınlıkları">
+                            {[
+                                { width: 10, label: 'İnce', h: 3 },
+                                { width: 18, label: 'Orta', h: 5 },
+                                { width: 30, label: 'Kalın', h: 7 },
+                            ].map((sz) => {
+                                const isCurrent = Math.abs(config.width - sz.width) <= 2;
+                                return (
+                                    <button
+                                        key={sz.label}
+                                        type="button"
+                                        onClick={() => setConfig({ ...config, width: sz.width })}
+                                        title={`${sz.label} (${sz.width}px)`}
+                                        className={cn(
+                                            'w-8 h-6 rounded-lg flex items-center justify-center transition-all',
+                                            isCurrent
+                                                ? 'bg-white/20 ring-1 ring-white/60 shadow-xs'
+                                                : 'hover:bg-white/10 opacity-70 hover:opacity-100'
+                                        )}
+                                    >
+                                        <span
+                                            className="rounded-sm bg-yellow-300/80"
+                                            style={{ width: 14, height: sz.h }}
+                                        />
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div className="w-px h-4 bg-white/10 shrink-0" />
+
+                        {/* Fosforlu Renkleri */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            {GOODNOTES_HIGHLIGHTER_COLORS.map((clr) => {
+                                const active = config.color.toLowerCase() === clr.toLowerCase();
+                                return (
+                                    <button
+                                        key={clr}
+                                        type="button"
+                                        onClick={() => setConfig({ ...config, color: clr })}
+                                        className={cn(
+                                            'w-5 h-5 rounded-full transition-transform border border-white/20',
+                                            active
+                                                ? 'ring-2 ring-white ring-offset-1 ring-offset-[#1a1b26] scale-110 shadow-sm'
+                                                : 'hover:scale-105 opacity-85 hover:opacity-100'
+                                        )}
+                                        style={{ backgroundColor: clr }}
+                                    />
+                                );
+                            })}
+                        </div>
+                    </motion.div>
+                )}
+
+                {/* E. ÇALIŞMA BANDI (TAPE) AKTİFKEN */}
+                {isTape && (
+                    <motion.div
+                        key="tape-context"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center bg-[#1e2030]/90 border border-white/10 rounded-2xl px-2 py-1 shadow-sm gap-2 sm:gap-3"
+                    >
+                        {/* Tümünü Göster / Gizle */}
+                        <button
+                            type="button"
+                            onClick={() => setConfig({ ...config, tapeHidden: !config.tapeHidden })}
+                            className={cn(
+                                'flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all shrink-0',
+                                config.tapeHidden
+                                    ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40'
+                                    : 'bg-white/5 text-slate-300 hover:text-white'
+                            )}
+                        >
+                            {config.tapeHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            <span>{config.tapeHidden ? 'Tüm Bantları Kapat' : 'Tüm Bantları Göster'}</span>
+                        </button>
+
+                        <div className="w-px h-4 bg-white/10 shrink-0" />
+
+                        {/* Bant Renkleri */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            {GOODNOTES_TAPE_COLORS.map((t) => (
+                                <button
+                                    key={t.id}
+                                    type="button"
+                                    onClick={() => setConfig({ ...config, color: t.id })}
+                                    title={t.label}
+                                    className={cn(
+                                        'w-5 h-5 rounded-md border border-white/20 transition-transform',
+                                        config.color === t.id ? 'ring-2 ring-white scale-110' : 'hover:scale-105'
+                                    )}
+                                    style={{ backgroundColor: t.id }}
+                                />
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+
+                {/* F. METİN ARACI AKTİFKEN */}
+                {isText && (
+                    <motion.div
+                        key="text-context"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center bg-[#1e2030]/90 border border-white/10 rounded-2xl px-2 py-1 shadow-sm gap-2 max-w-full overflow-x-auto no-scrollbar"
+                    >
+                        <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10 shrink-0">
                             {[
                                 { id: 'sans', label: 'Sans' },
                                 { id: 'serif', label: 'Serif' },
@@ -890,7 +1397,7 @@ export function DrawingToolbar({
                                         'px-2 py-0.5 text-xs rounded transition-all font-medium',
                                         (config.fontFamily || 'sans') === f.id
                                             ? 'bg-sky-500 text-white font-semibold'
-                                            : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                            : 'text-slate-300 hover:text-white'
                                     )}
                                     onClick={() => setConfig({ ...config, fontFamily: f.id })}
                                 >
@@ -900,501 +1407,155 @@ export function DrawingToolbar({
                         </div>
 
                         {/* Boyut Stepper */}
-                        <div className="flex items-center gap-0.5 bg-white/5 px-1 py-0.5 rounded-lg border border-white/10">
+                        <div className="flex items-center gap-0.5 bg-white/5 px-1 py-0.5 rounded-lg border border-white/10 shrink-0">
                             <button
                                 type="button"
-                                title="Yazı Boyutunu Küçült"
-                                aria-label="Yazı Boyutunu Küçült"
-                                className="p-1 text-slate-300 hover:text-white rounded hover:bg-white/10"
-                                onClick={() =>
-                                    setConfig({
-                                        ...config,
-                                        width: Math.max(12, (config.width && config.width >= 10 ? config.width : 22) - 2),
-                                    })
-                                }
+                                className="p-1 text-slate-300 hover:text-white"
+                                onClick={() => setConfig({ ...config, width: Math.max(12, (config.width || 22) - 2) })}
                             >
                                 <Minus className="w-3 h-3" />
                             </button>
                             <span className="text-xs font-bold text-sky-400 px-1 min-w-[20px] text-center">
-                                {config.width && config.width >= 10 ? config.width : 22}
+                                {config.width || 22}
                             </span>
                             <button
                                 type="button"
-                                title="Yazı Boyutunu Büyüt"
-                                aria-label="Yazı Boyutunu Büyüt"
-                                className="p-1 text-slate-300 hover:text-white rounded hover:bg-white/10"
-                                onClick={() =>
-                                    setConfig({
-                                        ...config,
-                                        width: Math.min(72, (config.width && config.width >= 10 ? config.width : 22) + 2),
-                                    })
-                                }
+                                className="p-1 text-slate-300 hover:text-white"
+                                onClick={() => setConfig({ ...config, width: Math.min(72, (config.width || 22) + 2) })}
                             >
                                 <Plus className="w-3 h-3" />
                             </button>
                         </div>
 
-                        {/* Kalın & İtalik */}
-                        <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10">
+                        {/* Stil & Hizalama */}
+                        <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10 shrink-0">
                             <button
                                 type="button"
-                                title="Kalın (Bold)"
-                                aria-label="Kalın"
-                                className={cn(
-                                    'p-1 rounded transition-all',
-                                    config.bold ? 'bg-sky-500 text-white font-bold' : 'text-slate-300 hover:text-white hover:bg-white/10'
-                                )}
+                                className={cn('p-1 rounded', config.bold ? 'bg-sky-500 text-white font-bold' : 'text-slate-300 hover:text-white')}
                                 onClick={() => setConfig({ ...config, bold: !config.bold })}
                             >
                                 <Bold className="w-3.5 h-3.5" />
                             </button>
                             <button
                                 type="button"
-                                title="İtalik"
-                                aria-label="İtalik"
-                                className={cn(
-                                    'p-1 rounded transition-all',
-                                    config.italic ? 'bg-sky-500 text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'
-                                )}
+                                className={cn('p-1 rounded', config.italic ? 'bg-sky-500 text-white' : 'text-slate-300 hover:text-white')}
                                 onClick={() => setConfig({ ...config, italic: !config.italic })}
                             >
                                 <Italic className="w-3.5 h-3.5" />
                             </button>
                         </div>
 
-                        {/* Yaslama */}
-                        <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10">
+                        <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/10 shrink-0">
                             {[
-                                { id: 'left', icon: AlignLeft, title: 'Sola Yasla' },
-                                { id: 'center', icon: AlignCenter, title: 'Ortala' },
-                                { id: 'right', icon: AlignRight, title: 'Sağa Yasla' },
+                                { id: 'left', icon: AlignLeft },
+                                { id: 'center', icon: AlignCenter },
+                                { id: 'right', icon: AlignRight },
                             ].map((a) => {
                                 const Icon = a.icon;
-                                const active = (config.textAlign || 'left') === a.id;
                                 return (
                                     <button
                                         key={a.id}
                                         type="button"
-                                        title={a.title}
-                                        aria-label={a.title}
-                                        className={cn(
-                                            'p-1 rounded transition-all',
-                                            active ? 'bg-sky-500 text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'
-                                        )}
-                                        onClick={() => setConfig({ ...config, textAlign: a.id as 'left' | 'center' | 'right' })}
+                                        className={cn('p-1 rounded', (config.textAlign || 'left') === a.id ? 'bg-sky-500 text-white' : 'text-slate-300 hover:text-white')}
+                                        onClick={() => setConfig({ ...config, textAlign: a.id as any })}
                                     >
                                         <Icon className="w-3.5 h-3.5" />
                                     </button>
                                 );
                             })}
                         </div>
-                    </div>
-                ) : (
-                    <>
-                    {/* Hızlı Kalem Slotları: 3 Kalem (Siyah, Mavi, Kırmızı) + 1 Fosforlu (Sarı) */}
-                    <div className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 border-white/10 border-r shrink-0" title="Hızlı Kalem Slotları">
-                        {DEFAULT_QUICK_PENS.map((qp) => {
-                            const isCurrent =
-                                config.tool === qp.tool &&
-                                config.color.toLowerCase() === qp.color.toLowerCase();
-                            return (
-                                <button
-                                    key={qp.id}
-                                    type="button"
-                                    onClick={() => {
-                                        setConfig({
-                                            ...config,
-                                            tool: qp.tool,
-                                            color: qp.color,
-                                            width: qp.width,
-                                            penType: qp.tool === 'pencil' ? (config.penType || 'ballpoint') : undefined,
-                                        });
-                                    }}
-                                    title={`Hızlı: ${qp.name} (${qp.width}px)`}
-                                    aria-label={qp.name}
-                                    aria-pressed={isCurrent}
-                                    className={cn(
-                                        'relative w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center transition-all',
-                                        isCurrent
-                                            ? 'bg-white/20 ring-2 ring-white/70 shadow-sm scale-105'
-                                            : 'hover:bg-white/10 hover:scale-105 opacity-80 hover:opacity-100'
-                                    )}
-                                >
-                                    {qp.tool === 'highlighter' ? (
-                                        <div
-                                            className="w-3.5 h-2 rounded-sm shadow-sm"
-                                            style={{ backgroundColor: qp.color }}
-                                        />
-                                    ) : (
-                                        <div
-                                            className="w-3 h-3 rounded-full border border-white/40 shadow-sm"
-                                            style={{ backgroundColor: qp.color }}
-                                        />
-                                    )}
-                                    {isCurrent && (
-                                        <span className="absolute -bottom-0.5 w-1 h-1 bg-white rounded-full shadow" />
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    {/* Hızlı Kalınlık Slotları (GoodNotes 3 önayarı: İnce, Orta, Kalın) */}
-                    <div className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 border-white/10 border-r shrink-0" title="Hızlı Kalınlık">
-                        {[
-                            { label: 'İnce', width: config.tool === 'highlighter' ? 10 : 2 },
-                            { label: 'Orta', width: config.tool === 'highlighter' ? 18 : 4 },
-                            { label: 'Kalın', width: config.tool === 'highlighter' ? 30 : 8 },
-                        ].map((sz) => {
-                            const isCurrent = Math.abs(config.width - sz.width) <= 0.5;
-                            return (
-                                <button
-                                    key={sz.label}
-                                    type="button"
-                                    onClick={() => setConfig({ ...config, width: sz.width })}
-                                    title={`${sz.label} (${sz.width}px)`}
-                                    aria-label={sz.label}
-                                    aria-pressed={isCurrent}
-                                    className={cn(
-                                        'w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center transition-all',
-                                        isCurrent
-                                            ? 'bg-white/20 ring-2 ring-white/70 shadow-sm scale-105'
-                                            : 'hover:bg-white/10 hover:scale-105 opacity-70 hover:opacity-100'
-                                    )}
-                                >
-                                    <span
-                                        className="rounded-full bg-white shadow-sm"
-                                        style={{
-                                            width: sz.label === 'İnce' ? 3 : sz.label === 'Orta' ? 5 : 8,
-                                            height: sz.label === 'İnce' ? 3 : sz.label === 'Orta' ? 5 : 8,
-                                        }}
-                                    />
-                                </button>
-                            );
-                        })}
-                    </div>
-                    </>
+                    </motion.div>
                 )}
 
-                <div className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 border-white/10 border-r shrink-0">
-                    {/* Ölçü aracı: tahtada cetvelle düz çizgi çekmek için. */}
-                    <button
-                        type="button"
-                        onClick={() => {
-                            const order: (RulerKind | null)[] = [
-                                null,
-                                'ruler',
-                                'setsquare',
-                                'protractor',
-                            ];
-                            const at = order.indexOf(config.ruler ?? null);
-                            setConfig({ ...config, ruler: order[(at + 1) % order.length] });
-                        }}
-                        aria-label={`Ölçü aracı: ${RULER_LABELS[config.ruler ?? 'off']}`}
-                        aria-pressed={!!config.ruler}
-                        title={`Ölçü aracı: ${RULER_LABELS[config.ruler ?? 'off']} (değiştirmek için tıklayın)`}
-                        className={cn(
-                            'p-1.5 sm:p-2 rounded-lg transition-all relative',
-                            config.ruler
-                                ? 'bg-emerald-600/30 text-emerald-300 ring-1 ring-emerald-500/40'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
-                        )}
+                {/* G. KEMENT AKTİFKEN */}
+                {isLasso && (
+                    <motion.div
+                        key="lasso-context"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center bg-[#1e2030]/90 border border-white/10 rounded-2xl px-2 py-1 shadow-sm gap-2"
                     >
-                        {config.ruler === 'protractor' ? (
-                            <Compass className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        ) : config.ruler === 'setsquare' ? (
-                            <Triangle className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        ) : (
-                            <Ruler className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        )}
-                    </button>
-                </div>
+                        <span className="text-[11px] font-semibold text-slate-400">Kement Seçimi:</span>
+                        {[
+                            { id: 'handwriting', label: 'El Yazısı', key: 'lassoFilterHandwriting' },
+                            { id: 'shapes', label: 'Şekiller', key: 'lassoFilterShapes' },
+                            { id: 'text', label: 'Metin', key: 'lassoFilterText' },
+                            { id: 'images', label: 'Resimler', key: 'lassoFilterImages' },
+                        ].map((flt) => {
+                            const active = (config as any)[flt.key] !== false;
+                            return (
+                                <button
+                                    key={flt.id}
+                                    type="button"
+                                    onClick={() => setConfig({ ...config, [flt.key]: !active })}
+                                    className={cn(
+                                        'px-2 py-0.5 rounded-lg text-xs font-medium transition-all',
+                                        active ? 'bg-purple-600/30 text-purple-300 ring-1 ring-purple-500/40' : 'text-slate-400 hover:text-white'
+                                    )}
+                                >
+                                    {flt.label}
+                                </button>
+                            );
+                        })}
+                    </motion.div>
+                )}
 
-                <div className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 border-white/10 border-r shrink-0">
-                    {/* Yalnızca renk: kalem ucu/kalınlık aracın kendi panelinde. */}
-                    <button
-                        type="button"
-                        onClick={toggleColors}
-                        aria-label="Renk seçimi"
-                        aria-expanded={panel === 'colors'}
-                        title="Renk paleti"
-                        className={cn(
-                            'p-1 sm:p-1.5 rounded-lg transition-all',
-                            panel === 'colors' ? 'bg-white/10' : 'hover:bg-white/5'
-                        )}
+                {/* H. CETVEL AÇIKKEN BİLGİ VE HIZLI GEÇİŞ */}
+                {config.ruler && !isPen && !isEraser && !isShapeTool && !isHighlighter && !isTape && !isText && !isLasso && (
+                    <motion.div
+                        key="ruler-context"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center bg-[#1e2030]/90 border border-white/10 rounded-2xl px-2.5 py-1 shadow-sm gap-2"
                     >
-                        <span
-                            className="block w-[18px] h-[18px] sm:w-[20px] sm:h-[20px] rounded-md border-2 border-white/50 shadow-inner"
-                            style={{ backgroundColor: config.color }}
-                        />
-                    </button>
-                </div>
-
-                <div className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 border-white/10 border-r shrink-0">
-                    <button
-                        type="button"
-                        onClick={() => onCommand('UNDO_DRAWING')}
-                        disabled={canUndo === false}
-                        aria-label="Geri Al"
-                        className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
-                        title="Geri Al"
-                    >
-                        <Undo className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onCommand('REDO_DRAWING')}
-                        disabled={canRedo === false}
-                        aria-label="İleri Al"
-                        className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
-                        title="İleri Al"
-                    >
-                        <Redo className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onCommand('CLEAR_DRAWING')}
-                        aria-label="Çizimi Temizle"
-                        className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all"
-                        title="Temizle"
-                    >
-                        <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                    </button>
-                    {setShowWhiteboard && (
+                        <span className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
+                            <Ruler className="w-3.5 h-3.5" />
+                            {RULER_LABELS[config.ruler]} Açık
+                        </span>
+                        <div className="w-px h-3.5 bg-white/10" />
                         <button
                             type="button"
-                            onClick={() => onCommand('TOGGLE_WHITEBOARD')}
-                            aria-label="Yazı Tahtası"
-                            aria-pressed={showWhiteboard}
-                            className={cn(
-                                'p-2 rounded-lg transition-all',
-                                showWhiteboard
-                                    ? 'bg-emerald-600 text-white'
-                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            )}
-                            title="Yazı Tahtası"
+                            onClick={() => setConfig({ ...config, ruler: null })}
+                            className="text-xs text-rose-400 hover:underline px-1"
                         >
-                            <Grid className="w-[18px] h-[18px]" />
+                            Kapat
                         </button>
-                    )}
-                </div>
-
-                <div className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 shrink-0">
-                    {onOpenLibrary && (
-                        <button
-                            type="button"
-                            onClick={onOpenLibrary}
-                            aria-label="Kütüphane (K)"
-                            aria-pressed={isLibraryOpen}
-                            className={cn(
-                                'px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl transition-all flex items-center gap-1.5 font-bold text-[12px] shadow-sm relative group',
-                                isLibraryOpen
-                                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white ring-2 ring-indigo-400/70 shadow-indigo-500/30'
-                                    : 'bg-indigo-500/20 hover:bg-indigo-500/35 text-indigo-300 hover:text-white border border-indigo-500/30 hover:border-indigo-400/50'
-                            )}
-                            title="Kütüphane (Matematik & Fen Nesneleri, 3D Modeller, Canlı Simülasyonlar) [K]"
-                        >
-                            <BookOpen className="w-[15px] h-[15px] text-indigo-300 group-hover:text-white transition-colors" />
-                            <span className="font-semibold tracking-wide text-xs hidden lg:inline">Kütüphane</span>
-                            <Sparkles className="w-2.5 h-2.5 text-amber-300 animate-pulse" />
-                        </button>
-                    )}
-                    {onSelectTool && (
-                        <button
-                            type="button"
-                            onClick={() => openOnly(showLab ? null : 'lab')}
-                            aria-label="Laboratuvar ve branş araçları"
-                            aria-expanded={showLab}
-                            className={cn(
-                                'p-1.5 sm:p-2 rounded-xl transition-all relative group',
-                                showLab
-                                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-white/20'
-                                    : 'text-slate-400 hover:text-purple-300 hover:bg-purple-500/10'
-                            )}
-                            title="Ders & Dinamik Branş Araçları (Pergel, GeoGebra, Hesap Makinesi, 3D vb.)"
-                        >
-                            <FlaskConical className="w-4 h-4 sm:w-[18px] sm:h-[18px] group-hover:scale-110 transition-transform" />
-                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                            </span>
-                        </button>
-                    )}
-                    {onInsertMath && !onOpenLibrary && (
-                        <button
-                            type="button"
-                            onClick={() => openOnly(showMath ? null : 'math')}
-                            aria-label="Kütüphane (K)"
-                            aria-expanded={showMath}
-                            className={cn(
-                                'px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl transition-all flex items-center gap-1.5 font-bold text-[12px] shadow-sm relative group',
-                                showMath
-                                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white ring-2 ring-indigo-400/70 shadow-indigo-500/30'
-                                    : 'bg-indigo-500/20 hover:bg-indigo-500/35 text-indigo-300 hover:text-white border border-indigo-500/30 hover:border-indigo-400/50'
-                            )}
-                            title="Kütüphane (Matematik & Fen Nesneleri, 3D Modeller, Canlı Simülasyonlar) [K]"
-                        >
-                            <BookOpen className="w-[15px] h-[15px] text-indigo-300 group-hover:text-white transition-colors" />
-                            <span className="font-semibold tracking-wide text-xs hidden lg:inline">Kütüphane</span>
-                            <Sparkles className="w-2.5 h-2.5 text-amber-300 animate-pulse" />
-                        </button>
-                    )}
-                    {onInsertImages && (
-                        <>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*"
-                                multiple
-                                className="hidden"
-                                onChange={(e) => {
-                                    if (e.target.files?.length) onInsertImages(e.target.files);
-                                    e.target.value = '';
-                                }}
-                            />
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isInsertingImage}
-                                aria-label="Sayfaya fotoğraf ekle"
-                                className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-sky-300 hover:bg-sky-400/10 transition-all disabled:opacity-40"
-                                title="Fotoğraf Ekle"
-                            >
-                                {isInsertingImage ? (
-                                    <Loader2 className="w-4 h-4 sm:w-[18px] sm:h-[18px] animate-spin" />
-                                ) : (
-                                    <ImagePlus className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                                )}
-                            </button>
-                        </>
-                    )}
-                    {onTextBoxModeToggle && (
-                        <button
-                            type="button"
-                            onClick={onTextBoxModeToggle}
-                            aria-label="Metin kutusu ekle"
-                            aria-pressed={isTextBoxMode}
-                            className={cn(
-                                'p-1.5 sm:p-2 rounded-lg transition-all hidden lg:block',
-                                isTextBoxMode
-                                    ? 'bg-amber-500 text-white'
-                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            )}
-                            title="Metin Kutusu Ekle"
-                        >
-                            <StickyNote className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        </button>
-                    )}
-                    {onScreenshot && (
-                        <button
-                            type="button"
-                            onClick={onScreenshot}
-                            aria-label="Çizimi PNG olarak indir"
-                            className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 transition-all"
-                            title="Çizimi PNG Olarak İndir"
-                        >
-                            <Camera className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        </button>
-                    )}
-                    {(onBgColorChange || onPaperChange) && (
-                        <button
-                            type="button"
-                            onClick={() => openOnly(showExtras ? null : 'extras')}
-                            aria-label="Sayfa ve arka plan ayarları"
-                            aria-expanded={showExtras}
-                            className={cn(
-                                'p-1.5 sm:p-2 rounded-lg transition-all relative',
-                                showExtras
-                                    ? 'bg-white/10 text-white'
-                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            )}
-                            title="Sayfa Şablonu ve Zemin Rengi"
-                        >
-                            <div
-                                className="w-4 h-4 sm:w-[18px] sm:h-[18px] rounded-full border-2 border-white/40"
-                                style={{ backgroundColor: bgColor || '#ffffff' }}
-                            />
-                        </button>
-                    )}
-
-                    {/* Akıllı tahtada çubuk büyük duruyorsa kullanıcı buradan
-                        küçültür; tercih tarayıcıda saklanır. */}
-                    <button
-                        type="button"
-                        onClick={cycleDensity}
-                        aria-label={`Araç çubuğu boyutu: ${TOOLBAR_DENSITY_LABELS[density]}`}
-                        className="p-1.5 sm:p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all hidden lg:block"
-                        title={`Araç çubuğu boyutu: ${TOOLBAR_DENSITY_LABELS[density]} (değiştirmek için tıklayın)`}
-                    >
-                        {density === 'large' ? (
-                            <Minimize2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        ) : (
-                            <Maximize2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                        )}
-                    </button>
-
-                    {/* Üst / Alt sabitleme düğmesi */}
-                    {!fixed && (
-                        <button
-                            type="button"
-                            onClick={toggleDock}
-                            aria-label={dockPosition === 'bottom' ? 'Araç çubuğunu üste sabitle' : 'Araç çubuğunu alta sabitle'}
-                            className="p-1.5 sm:p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all"
-                            title={dockPosition === 'bottom' ? 'Üste Sabitle' : 'Alta Sabitle'}
-                        >
-                            {dockPosition === 'bottom' ? (
-                                <PanelTop className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                            ) : (
-                                <PanelBottom className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                            )}
-                        </button>
-                    )}
-                </div>
-
-                {/* Fixed (GoodNotes) modunda zoom kontrolleri çubuğun sağında yer alır */}
-                {fixed && onZoomIn && onZoomOut && (
-                    <div className="flex items-center gap-0.5 px-1 sm:px-1.5 border-l border-white/10 shrink-0" role="group" aria-label="Yakınlaştırma">
-                        <button
-                            type="button"
-                            onClick={onZoomOut}
-                            aria-label="Uzaklaştır"
-                            title="Uzaklaştır"
-                            className="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-                        >
-                            <Minus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        </button>
-                        {onZoomFit && (
-                            <button
-                                type="button"
-                                onClick={onZoomFit}
-                                aria-label="Sayfaya sığdır"
-                                title="Sayfaya sığdır"
-                                className="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-                            >
-                                <Scan className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                            </button>
-                        )}
-                        <button
-                            type="button"
-                            onClick={onZoomReset}
-                            aria-label="Yakınlaştırmayı sıfırla"
-                            title="%100'e dön"
-                            className="min-w-[34px] sm:min-w-[40px] px-0.5 sm:px-1 py-0.5 sm:py-1 rounded-lg text-[10.5px] sm:text-[11px] font-bold text-slate-300 hover:text-white hover:bg-white/10 transition-all tabular-nums"
-                        >
-                            %{Math.round((zoom ?? 1) * 100)}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onZoomIn}
-                            aria-label="Yakınlaştır"
-                            title="Yakınlaştır"
-                            className="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-                        >
-                            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        </button>
-                    </div>
+                    </motion.div>
                 )}
             </div>
+
+            {/* Sağ: Yoğunluk / Dock Değiştirici */}
+            <div className="flex items-center gap-1 shrink-0">
+                <button
+                    type="button"
+                    onClick={cycleDensity}
+                    title={`Araç çubuğu boyutu: ${TOOLBAR_DENSITY_LABELS[density]}`}
+                    className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-white/5 transition-all hidden lg:block"
+                >
+                    {density === 'large' ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                </button>
+                {!fixed && (
+                    <button
+                        type="button"
+                        onClick={toggleDock}
+                        title={dockPosition === 'bottom' ? 'Üste Sabitle' : 'Alta Sabitle'}
+                        className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-white/5 transition-all"
+                    >
+                        {dockPosition === 'bottom' ? <PanelTop className="w-3.5 h-3.5" /> : <PanelBottom className="w-3.5 h-3.5" />}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+
+    /* ------------------------------------------------------------- */
+    /* 3. BİRLEŞİK İKİ KATMANLI RENDER                               */
+    /* ------------------------------------------------------------- */
+    const toolbarLayout = (
+        <div ref={barRef} className="flex flex-col items-center w-full select-none">
+            {mainToolsTier1}
+            {contextualBar}
+        </div>
     );
 
     const bar = fixed ? (
@@ -1404,9 +1565,7 @@ export function DrawingToolbar({
             aria-label="Çizim araçları"
             className="relative w-full z-[5000] bg-[#161722] border-b border-white/10 flex flex-col flex-shrink-0 shadow-sm"
         >
-            <div className="w-full overflow-x-auto no-scrollbar py-1 px-1 sm:px-2 flex items-center justify-start md:justify-center touch-pan-x">
-                {strip}
-            </div>
+            {toolbarLayout}
             <div className="absolute top-full left-0 right-0 z-[5001] pointer-events-none">
                 {popovers}
             </div>
@@ -1426,9 +1585,9 @@ export function DrawingToolbar({
                 dockPosition === 'bottom' ? 'bottom-6' : 'top-6'
             )}
         >
-            <div className="flex flex-col items-center relative">
+            <div className="pointer-events-auto flex flex-col items-center relative bg-[#161722]/95 backdrop-blur-xl p-1 rounded-3xl border border-white/10 shadow-2xl">
                 {popovers}
-                {strip}
+                {toolbarLayout}
             </div>
         </motion.div>
     );
@@ -1437,8 +1596,6 @@ export function DrawingToolbar({
         <>
             {bar}
             {!fixed && onZoomIn && onZoomOut && (
-                // Yakınlaştırma, sürüklenebilir çubuğu şişirmemesi için
-                // ekranın sağ alt köşesinde ayrı durur.
                 <div
                     role="group"
                     aria-label="Yakınlaştırma"
@@ -1447,7 +1604,6 @@ export function DrawingToolbar({
                     <button
                         type="button"
                         onClick={onZoomOut}
-                        aria-label="Uzaklaştır"
                         title="Uzaklaştır"
                         className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
                     >
@@ -1457,7 +1613,6 @@ export function DrawingToolbar({
                         <button
                             type="button"
                             onClick={onZoomFit}
-                            aria-label="Sayfaya sığdır"
                             title="Sayfaya sığdır"
                             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
                         >
@@ -1467,7 +1622,6 @@ export function DrawingToolbar({
                     <button
                         type="button"
                         onClick={onZoomReset}
-                        aria-label="Yakınlaştırmayı sıfırla"
                         title="%100'e dön"
                         className="min-w-[44px] px-1 py-1 rounded-lg text-[11.5px] font-bold text-slate-300 hover:text-white hover:bg-white/10 transition-all tabular-nums"
                     >
@@ -1476,7 +1630,6 @@ export function DrawingToolbar({
                     <button
                         type="button"
                         onClick={onZoomIn}
-                        aria-label="Yakınlaştır"
                         title="Yakınlaştır"
                         className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all"
                     >

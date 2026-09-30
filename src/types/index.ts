@@ -485,6 +485,8 @@ export interface DrawConfig {
     circleToLasso?: boolean;
     /** Silgi boyutu ön ayarı. */
     eraserSize?: 'small' | 'medium' | 'large' | 'custom';
+    /** Çalışma bandı gizli/açık modu. */
+    tapeHidden?: boolean;
 }
 
 /** Serbest çizgi deseni. */

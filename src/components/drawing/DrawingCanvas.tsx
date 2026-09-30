@@ -1782,6 +1782,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const h = canvas ? canvas.height / dpr : 0;
             applyIdentity(oCtx);
             oCtx.clearRect(0, 0, w, h);
+            if (rulerRef.current) drawRuler(oCtx, rulerRef.current, viewRef.current);
             if (guides.x.length === 0 && guides.y.length === 0) return;
             const v = viewRef.current;
             oCtx.save();
@@ -2035,6 +2036,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const { w, h } = getCanvasSize();
             applyIdentity(oCtx);
             oCtx.clearRect(0, 0, w, h);
+            if (rulerRef.current) drawRuler(oCtx, rulerRef.current, viewRef.current);
             const v = viewRef.current;
             const c = toScreenPoint({ x, y }, v);
             oCtx.save();
@@ -2055,6 +2057,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const { w, h } = getCanvasSize();
             applyIdentity(oCtx);
             oCtx.clearRect(0, 0, w, h);
+            if (rulerRef.current) drawRuler(oCtx, rulerRef.current, viewRef.current);
             const v = viewRef.current;
             const c = toScreenPoint({ x, y }, v);
             oCtx.save();
@@ -2107,6 +2110,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (!oCtx) return;
             applyIdentity(oCtx);
             oCtx.clearRect(0, 0, w, h);
+            if (rulerRef.current) drawRuler(oCtx, rulerRef.current, viewRef.current);
             if (!poly || poly.length < 2) return;
             const v = viewRef.current;
             oCtx.save();
@@ -2136,6 +2140,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const { w, h } = getCanvasSize();
             applyIdentity(oCtx);
             oCtx.clearRect(0, 0, w, h);
+            if (rulerRef.current) drawRuler(oCtx, rulerRef.current, viewRef.current);
             applyView(oCtx);
 
             const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -2240,6 +2245,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const h = canvas ? canvas.height / dpr : 0;
             applyIdentity(oCtx);
             oCtx.clearRect(0, 0, w, h);
+            if (rulerRef.current) drawRuler(oCtx, rulerRef.current, viewRef.current);
             if (ephemeralRef.current.length === 0) {
                 ephemeralFrameRef.current = null;
                 return;
