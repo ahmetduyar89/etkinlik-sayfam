@@ -776,18 +776,21 @@ export function DrawingToolbar({
 
             {/* Sağ Yardımcılar: Kütüphane, Dinamik Laboratuvar, Fotoğraf, Zoom */}
             <div className="flex items-center justify-end gap-1 shrink-0">
-                {onOpenLibrary && (
+                {(onOpenLibrary || onInsertMath) && (
                     <button
                         type="button"
-                        onClick={onOpenLibrary}
+                        onClick={() => {
+                            if (onOpenLibrary) onOpenLibrary();
+                            else if (onInsertMath) openOnly(showMath ? null : 'math');
+                        }}
                         title="Kütüphane (K)"
                         className={cn(
                             'p-2 rounded-xl transition-all flex items-center gap-1.5',
-                            isLibraryOpen ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            (isLibraryOpen || showMath) ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
                         )}
                     >
                         <BookOpen className="w-4 h-4" />
-                        <span className="text-xs font-semibold hidden xl:inline">Kütüphane</span>
+                        <span className="text-xs font-semibold hidden md:inline">Kütüphane</span>
                     </button>
                 )}
 
@@ -1433,16 +1436,19 @@ export function DrawingToolbar({
                         {/* Tümünü Göster / Gizle */}
                         <button
                             type="button"
-                            onClick={() => setConfig({ ...config, tapeHidden: !config.tapeHidden })}
+                            onClick={() => {
+                                const nextHidden = config.tapeHidden === false ? true : false;
+                                setConfig({ ...config, tapeHidden: nextHidden });
+                            }}
                             className={cn(
                                 'flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all shrink-0',
-                                config.tapeHidden
+                                config.tapeHidden === false
                                     ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40'
                                     : 'bg-white/5 text-slate-300 hover:text-white'
                             )}
                         >
-                            {config.tapeHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                            <span>{config.tapeHidden ? 'Tüm Bantları Kapat' : 'Tüm Bantları Göster'}</span>
+                            {config.tapeHidden === false ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                            <span>{config.tapeHidden === false ? 'Tüm Bantları Kapat' : 'Tüm Bantları Göster'}</span>
                         </button>
 
                         <div className="w-px h-4 bg-white/10 shrink-0" />

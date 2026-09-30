@@ -734,6 +734,24 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
         }, [config.tool]);
 
+        const prevTapeHiddenRef = React.useRef(config.tapeHidden);
+        React.useEffect(() => {
+            if (config.tapeHidden !== undefined && prevTapeHiddenRef.current !== config.tapeHidden) {
+                prevTapeHiddenRef.current = config.tapeHidden;
+                let changed = false;
+                strokesRef.current.forEach((s) => {
+                    if (s.tool === 'tape' && s.tapeHidden !== config.tapeHidden) {
+                        s.tapeHidden = config.tapeHidden;
+                        changed = true;
+                    }
+                });
+                if (changed) {
+                    commitStrokes();
+                    redraw();
+                }
+            }
+        }, [config.tapeHidden, commitStrokes, redraw]);
+
         const toggleEraserTool = React.useCallback(() => {
             if (config.tool === 'eraser') {
                 onConfigChange?.({ tool: previousToolRef.current });
@@ -2731,6 +2749,22 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 redraw();
             }
 
+            if (config.tool === 'tape') {
+                const pickTolerance = 14 / viewRef.current.scale;
+                const candidates = candidatesIn({ x, y }, { x, y }, pickTolerance);
+                for (let i = strokesRef.current.length - 1; i >= 0; i--) {
+                    const hitStroke = strokesRef.current[i];
+                    if (hitStroke.tool === 'tape' && candidates.has(hitStroke) && strokeNearPoint(hitStroke, x, y, pickTolerance)) {
+                        pushHistory();
+                        hitStroke.tapeHidden = hitStroke.tapeHidden === false ? true : false;
+                        commitStrokes();
+                        emit({ type: 'update', page: currentPageRef.current, strokes: [hitStroke] });
+                        redraw();
+                        return;
+                    }
+                }
+            }
+
             if (config.tool === 'text') {
                 if (inlineText) {
                     commitInlineText();
@@ -2882,7 +2916,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 shapeBorderColor: config.shapeBorderColor,
                 shapeBorderStyle: config.shapeBorderStyle,
                 tapeHidden: config.tool === 'tape' ? true : undefined,
-                points: [first],
+                points: config.tool === 'tape' ? [first, first] : [first],
             };
             holdAnchorRef.current = { x: first.x, y: first.y };
             activeStrokeBBRef.current = { x1: first.x, y1: first.y, x2: first.x, y2: first.y };
@@ -3113,6 +3147,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 break;
                             }
                         }
+                    }
+                }
+
+                if (stroke.tool === 'tape' && !rulerHit) {
+                    if (Math.abs(end.y - start.y) < 14) {
+                        end = { x: end.x, y: start.y };
                     }
                 }
 
@@ -3433,6 +3473,17 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             cancelHoldTimer();
             if (isDrawingRef.current && currentStrokeRef.current) {
                 let stroke = currentStrokeRef.current;
+
+                if (stroke.tool === 'tape') {
+                    const p1 = stroke.points[0];
+                    const p2 = stroke.points[stroke.points.length - 1];
+                    if (!p1 || !p2 || Math.hypot(p2.x - p1.x, p2.y - p1.y) < 12) {
+                        isDrawingRef.current = false;
+                        currentStrokeRef.current = null;
+                        redraw();
+                        return;
+                    }
+                }
 
                 if (heldShapeRef.current) {
                     heldShapeRef.current = null;

@@ -10,7 +10,7 @@ import { getImage } from './imageStore';
 import type { BoundingBox, Point, Stroke } from '../../types';
 
 /** Kutusu birebir kullanılan (boşluk eklenmeyen) araçlar. */
-export const TIGHT_TOOLS = ['math', 'image', 'text'];
+export const TIGHT_TOOLS = ['math', 'image', 'text', 'tape'];
 
 export const SHAPE_TOOLS = [
     'rect',
@@ -129,6 +129,21 @@ export const maxHalfWidth = (s: Stroke): number => {
     return (base * getPenProfile(s.penType).max) / 2;
 };
 
+/** Çalışma bandı (Tape) geometrisini ve sınırlayıcı dikdörtgenini hesaplar. */
+export const getTapeRect = (p1: Point, p2: Point = p1, width: number = 4) => {
+    const tapeH = Math.max(22, (width || 4) * 4);
+    const pt1 = p1 || { x: 0, y: 0 };
+    const pt2 = p2 || pt1;
+    const diffY = Math.abs(pt2.y - pt1.y);
+    const midY = (pt1.y + pt2.y) / 2;
+    // Yatay yönde çekildiğinde (satır üstü) yüksekliği tapeH olarak çizgiye dikey ortalar
+    const y = diffY < tapeH ? midY - tapeH / 2 : Math.min(pt1.y, pt2.y);
+    const h = diffY < tapeH ? tapeH : diffY;
+    const x = Math.min(pt1.x, pt2.x);
+    const w = Math.max(Math.abs(pt2.x - pt1.x), 24);
+    return { x, y, w, h };
+};
+
 export const getBB = (s: Stroke): BoundingBox => {
     let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
     for (const point of s.points) {
@@ -164,13 +179,14 @@ export const getBB = (s: Stroke): BoundingBox => {
         y2 = y1 + textH;
     }
 
-    if (s.tool === 'tape' && s.points.length >= 2) {
-        const tapeH = Math.max(22, (s.width || 4) * 4);
-        if (y2 - y1 < tapeH) {
-            const midY = (y1 + y2) / 2;
-            y1 = midY - tapeH / 2;
-            y2 = midY + tapeH / 2;
-        }
+    if (s.tool === 'tape' && s.points.length >= 1) {
+        const p1 = s.points[0];
+        const p2 = s.points[s.points.length - 1] || p1;
+        const rect = getTapeRect(p1, p2, s.width);
+        x1 = rect.x;
+        y1 = rect.y;
+        x2 = rect.x + rect.w;
+        y2 = rect.y + rect.h;
     }
 
     // Döndürülmüş şekilde kutu, dönmüş köşelerin çevrelediği alandır.
@@ -912,6 +928,17 @@ export const strokeNearPoint = (s: Stroke, x: number, y: number, radius: number)
         }
         return false;
     }
+    if (s.tool === 'tape' && s.points.length >= 1) {
+        const p1 = s.points[0];
+        const p2 = s.points[s.points.length - 1] || p1;
+        const rect = getTapeRect(p1, p2, s.width);
+        return (
+            x >= rect.x - tolerance &&
+            x <= rect.x + rect.w + tolerance &&
+            y >= rect.y - tolerance &&
+            y <= rect.y + rect.h + tolerance
+        );
+    }
     return hitTest(s, x, y);
 };
 
@@ -1143,11 +1170,8 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, 
         drawPolygon(tCtx, s.points, s.fillEnabled, s.color);
     } else if (s.tool === 'tape') {
         const p1 = s.points[0];
-        const p2 = s.points[s.points.length - 1];
-        const x = Math.min(p1.x, p2.x);
-        const y = Math.min(p1.y, p2.y);
-        const w = Math.max(Math.abs(p2.x - p1.x), 24);
-        const h = Math.max(Math.abs(p2.y - p1.y), Math.max(22, (s.width || 4) * 4));
+        const p2 = s.points[s.points.length - 1] || p1;
+        const { x, y, w, h } = getTapeRect(p1, p2, s.width);
         const isHidden = s.tapeHidden !== false;
 
         tCtx.save();
@@ -1170,7 +1194,9 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, 
             tCtx.clip();
             tCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
             tCtx.lineWidth = 2.5;
-            for (let lx = x - h; lx < x + w + h; lx += 14) {
+            tCtx.beginPath();
+            const step = Math.max(14, Math.min(28, h / 3));
+            for (let lx = x - h; lx < x + w + h; lx += step) {
                 tCtx.moveTo(lx, y + h);
                 tCtx.lineTo(lx + h, y);
             }
