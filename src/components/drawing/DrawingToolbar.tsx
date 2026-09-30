@@ -1,3 +1,4 @@
+import { InkToolMemory } from './InkEngine/toolMemory';
 import React from 'react';
 import { AnimatePresence, motion, useDragControls } from 'framer-motion';
 import {
@@ -146,6 +147,8 @@ export function DrawingToolbar({
     onZoomFit,
     onSelectTool,
 }: DrawingToolbarProps) {
+    const toolMemoryRef = React.useRef(new InkToolMemory());
+    React.useEffect(() => { toolMemoryRef.current.remember(config); }, [config]);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     /** Aynı anda tek bir açılır panel görünür. */
     const [panel, setPanel] = React.useState<PanelId | null>(null);
@@ -208,7 +211,7 @@ export function DrawingToolbar({
                 setPanel((prev) => (prev === 'settings' ? null : 'settings'));
             }
         } else {
-            setConfig({ ...config, tool });
+            setConfig(toolMemoryRef.current.select(config, tool));
             setPanel(null);
         }
     };
@@ -268,7 +271,7 @@ export function DrawingToolbar({
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [panel, config.tool, isShapeTool, onInsertMath, onOpenLibrary]);
+    }, [panel, config, isShapeTool, onInsertMath, onOpenLibrary]);
 
     const popovers = (
         <>

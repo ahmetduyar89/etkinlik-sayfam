@@ -84,7 +84,8 @@ export type DrawingTool =
     | 'dashed';
 
 /** Kalem ucu karakteri: yazma hissini belirler. */
-export type PenType = 'ballpoint' | 'fountain' | 'brush' | 'marker';
+export type PenType = 'ballpoint' | 'fountain' | 'brush' | 'marker' | 'graphite';
+export type PressureSensitivity = 'soft' | 'normal' | 'firm';
 
 /** Silgi davranışı: piksel silgisi mi, çizgiyi komple silen silgi mi. */
 export type EraserMode = 'pixel' | 'stroke';
@@ -94,6 +95,12 @@ export interface Point {
     y: number;
     /** 0..1 arası uç baskısı; dolma/fırça kalemde kalınlığı belirler. */
     p?: number;
+    timestamp?: number;
+    pressure?: number;
+    velocity?: number;
+    tiltX?: number;
+    tiltY?: number;
+    twist?: number;
 }
 
 export interface BoundingBox {
@@ -119,6 +126,9 @@ export interface Stroke {
     stampIcon?: string;
     /** Serbest çizim kalemlerinde uç karakteri (varsayılan: ballpoint). */
     penType?: PenType;
+    pressureSensitivity?: PressureSensitivity;
+    inkVersion?: 2;
+    opacity?: number;
     /** `tool === 'math'` olduğunda çizilecek matematik nesnesi. */
     math?: MathObject;
     /** `tool === 'image'` olduğunda görselin data URL'i. */
@@ -407,6 +417,8 @@ export interface DrawConfig {
     stampIcon: string;
     /** Serbest çizim kaleminin ucu. */
     penType?: PenType;
+    pressureSensitivity?: PressureSensitivity;
+    highlighterOpacity?: number;
     /** Serbest çizilen şekli tanıyıp düzgün şekle çevir. */
     snapShapes?: boolean;
     /** Şekil/çizgi çizerken 15° açı kilidi. */

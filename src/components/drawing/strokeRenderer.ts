@@ -126,10 +126,11 @@ export const maxHalfWidth = (s: Stroke): number => {
 };
 
 export const getBB = (s: Stroke): BoundingBox => {
-    let x1 = Math.min(...s.points.map((p) => p.x));
-    let y1 = Math.min(...s.points.map((p) => p.y));
-    let x2 = Math.max(...s.points.map((p) => p.x));
-    let y2 = Math.max(...s.points.map((p) => p.y));
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    for (const point of s.points) {
+        x1 = Math.min(x1, point.x); y1 = Math.min(y1, point.y);
+        x2 = Math.max(x2, point.x); y2 = Math.max(y2, point.y);
+    }
 
     if (s.tool === 'circle' && s.points.length >= 2) {
         const p1 = s.points[0];
@@ -1026,7 +1027,7 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, 
         // Akıllı fosforlu: Açık renk kağıtta 'multiply' ile alttaki siyah yazıyı
         // soluklaştırmaz / grileştirmez. Koyu kağıtta 'screen' ile parlama sağlar.
         tCtx.globalCompositeOperation = isDarkBg ? 'screen' : 'multiply';
-        tCtx.globalAlpha = 0.45;
+        tCtx.globalAlpha = Math.max(0.2, Math.min(0.45, s.opacity ?? 0.45));
     }
     if (s.tool === 'dashed') tCtx.setLineDash([12, 6]);
 
@@ -1138,6 +1139,12 @@ function densify(
                 x: a.x + (b.x - a.x) * t,
                 y: a.y + (b.y - a.y) * t,
                 p: lerp(a.p, b.p, t),
+                timestamp: lerp(a.timestamp, b.timestamp, t),
+                pressure: lerp(a.pressure, b.pressure, t),
+                velocity: lerp(a.velocity, b.velocity, t),
+                tiltX: lerp(a.tiltX, b.tiltX, t),
+                tiltY: lerp(a.tiltY, b.tiltY, t),
+                twist: lerp(a.twist, b.twist, t),
             });
             synthetic.push(true);
         }
@@ -1153,7 +1160,8 @@ export function erasePixels(
     ay: number,
     bx: number,
     by: number,
-    radius: number
+    radius: number,
+    candidates?: ReadonlySet<Stroke>
 ): Stroke[] | null {
     let changed = false;
     const result: Stroke[] = [];
@@ -1165,7 +1173,7 @@ export function erasePixels(
     const maxY = Math.max(ay, by);
 
     for (const stroke of strokes) {
-        if (!TRIMMABLE_TOOLS.includes(stroke.tool)) {
+        if ((candidates && !candidates.has(stroke)) || !TRIMMABLE_TOOLS.includes(stroke.tool)) {
             result.push(stroke);
             continue;
         }

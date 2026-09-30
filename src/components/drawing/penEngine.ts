@@ -1,13 +1,9 @@
-// src/components/drawing/penEngine.ts
-// GoodNotes ve Notability kalitesinde akıcı, kaligrafik ve pürüzsüz tahta kalem motoru.
-//
-// GoodNotes ve Notability uygulamalarında el yazısının olağanüstü görünmesini sağlayan 4 temel unsur:
-// 1. Akıllı Giriş Sabitleyici (Streamline & Stabilizer): El titremelerini ve tahtanın sinyal gürültüsünü süzer.
-// 2. Organik Basınç ve Hız Dinamiği: Kalem hızlandıkça incelir, virajlarda ve duraklarda dolgunlaşır.
-// 3. Dinamik Sivriltme (Tapering): Harflerin küt kesilmesini önler; doğal el yazısı gibi zarifçe başlayıp biter.
-// 4. Kesintisiz Kontur Poligonu (Outline Mesh): Dönüşlerde kırılmayan, delik açmayan, tek parça pürüzsüz dolgu.
+// Shared pressure-aware stroke geometry and Canvas2D presentation.
+// Native PencilKit parity and device latency require separate hardware validation.
 
 import type { PenType, Point, Stroke } from '../../types';
+import { widthFactor, nibFactor } from './InkEngine/physics';
+import { renderGraphite } from './InkEngine/graphite';
 
 export interface PenProfile {
     id: PenType;
@@ -81,6 +77,12 @@ export const PEN_PROFILES: Record<PenType, PenProfile> = {
         capEnd: false,
         hint: 'Geniş kontrast, sanatsal kaligrafi ve dolgun başlıklar',
     },
+    graphite: {
+        id: 'graphite', label: 'Kurşun', min: 0.35, max: 2.4, alpha: 0.7,
+        smoothing: 0.4, thinning: 0.65, streamline: 0.4,
+        taperStart: 0.4, taperEnd: 0.8, capStart: true, capEnd: true,
+        hint: 'Basınca ve eğime duyarlı kurşun kalem',
+    },
     marker: {
         id: 'marker',
         label: 'Keçeli',
@@ -103,6 +105,7 @@ export const PEN_TYPES: ReadonlyArray<PenProfile> = [
     PEN_PROFILES.fountain,
     PEN_PROFILES.brush,
     PEN_PROFILES.marker,
+    PEN_PROFILES.graphite,
 ];
 
 export const getPenProfile = (pen?: PenType): PenProfile =>
@@ -134,7 +137,7 @@ export function samplePressure(
 ): number {
     const profile = getPenProfile(pen);
     const hasStylusPressure =
-        pointerType === 'pen' && pressure > 0 && Math.abs(pressure - 0.5) > 0.001;
+        pointerType === 'pen' && Number.isFinite(pressure) && pressure >= 0;
 
     let raw: number;
     if (hasStylusPressure) {
@@ -287,7 +290,8 @@ function getStrokePoints(rawPoints: Point[], penProfile: PenProfile): StrokePoin
 export function getStrokeOutlinePoints(
     rawPoints: Point[],
     baseWidth: number,
-    penType?: PenType
+    penType?: PenType,
+    options?: Pick<Stroke, 'inkVersion' | 'pressureSensitivity'>
 ): Point[] {
     const profile = getPenProfile(penType);
     const strokePoints = getStrokePoints(rawPoints, profile);
@@ -298,7 +302,7 @@ export function getStrokeOutlinePoints(
     // Tek nokta ise tam daire ucu dön
     if (count === 1) {
         const p = strokePoints[0].point;
-        const r = (baseWidth * profile.max) / 2;
+        const r = (baseWidth * (options?.inkVersion === 2 ? widthFactor(p, penType, options.pressureSensitivity) : profile.max)) / 2;
         const discPoints: Point[] = [];
         const steps = 16;
         for (let i = 0; i < steps; i++) {
@@ -308,6 +312,7 @@ export function getStrokeOutlinePoints(
         return discPoints;
     }
 
+    if (options?.inkVersion === 2) strokePoints[0].vector = strokePoints[1].vector;
     const totalLength = strokePoints[count - 1].runningLength;
     const taperStartDist = Math.max(1, baseWidth * profile.taperStart);
     const taperEndDist = Math.max(1, baseWidth * profile.taperEnd);
@@ -317,8 +322,11 @@ export function getStrokeOutlinePoints(
     for (let i = 0; i < count; i++) {
         const sp = strokePoints[i];
         // Basınç ve thinning etkisi
-        const factor = profile.min + (profile.max - profile.min) * (1 - profile.thinning * (1 - sp.pressure));
-        let r = Math.max(0.3, (baseWidth * factor) / 2);
+        const factor = options?.inkVersion === 2
+            ? widthFactor(sp.point, penType, options.pressureSensitivity)
+            : profile.min + (profile.max - profile.min) * (1 - profile.thinning * (1 - sp.pressure));
+        const nib = options?.inkVersion === 2 ? nibFactor(sp.point, sp.vector, penType) : 1;
+        let r = Math.max(0.3, (baseWidth * factor * nib) / 2);
 
         // Başlangıç sivriltmesi (taper start)
         if (sp.runningLength < taperStartDist) {
@@ -407,48 +415,46 @@ export function getStrokeOutlinePoints(
     return [...leftPts, ...endCap, ...rightPts.reverse(), ...startCap];
 }
 
-/**
- * GoodNotes ve Notability kalitesindeki kontur poligonunu pürüzsüz Bezier eğrileriyle
- * Canvas context'ine tek bir doldurma işlemiyle (`fill()`) çizer.
- *
- * Bu yöntem:
- * - Sıfır sarım hatası (winding number) üretir
- * - Karalamalarda veya kesişimlerde ASLA beyaz delik bırakmaz
- * - Başlangıç ve bitiş uçlarını doğal el yazısı gibi zarifçe sivriltir
- */
-export function renderFreehandStroke(
-    ctx: CanvasRenderingContext2D,
-    stroke: Stroke,
-    baseWidth: number
-): void {
-    if (!stroke.points || stroke.points.length === 0) return;
+/** Cached document-space paths shared by canvas, previews and export. */
+interface CachedInkPath {
+    points: Point[];
+    count: number;
+    width: number;
+    pen: Stroke['penType'];
+    version: Stroke['inkVersion'];
+    sensitivity: Stroke['pressureSensitivity'];
+    tail: Point | undefined;
+    path: Path2D;
+}
+// Completed strokes are immutable. Weak keys release paths with deleted documents/history.
+const inkPaths = new WeakMap<Stroke, CachedInkPath>();
 
-    const outline = getStrokeOutlinePoints(stroke.points, baseWidth, stroke.penType);
-    if (outline.length === 0) return;
-
-    if (outline.length < 3) {
-        ctx.beginPath();
-        const pt = stroke.points[0];
-        const r = Math.max(0.4, (baseWidth * getPenProfile(stroke.penType).max) / 2);
-        ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
-        ctx.fill();
-        return;
+export function getInkPath(stroke: Stroke, baseWidth: number): Path2D | null {
+    if (!stroke.points.length) return null;
+    const tail = stroke.points[stroke.points.length - 1];
+    const cached = inkPaths.get(stroke);
+    if (cached && cached.points === stroke.points && cached.count === stroke.points.length &&
+        cached.width === baseWidth && cached.pen === stroke.penType && cached.version === stroke.inkVersion &&
+        cached.sensitivity === stroke.pressureSensitivity && cached.tail === tail) return cached.path;
+    const outline = getStrokeOutlinePoints(stroke.points, baseWidth, stroke.penType, stroke);
+    if (!outline.length) return null;
+    const path = new Path2D();
+    path.moveTo(outline[0].x, outline[0].y);
+    for (let i = 0; i < outline.length; i++) {
+        const current = outline[i], next = outline[(i + 1) % outline.length];
+        path.quadraticCurveTo(current.x, current.y, (current.x + next.x) / 2, (current.y + next.y) / 2);
     }
+    path.closePath();
+    inkPaths.set(stroke, { points: stroke.points, count: stroke.points.length, width: baseWidth,
+        pen: stroke.penType, version: stroke.inkVersion, sensitivity: stroke.pressureSensitivity, tail, path });
+    return path;
+}
 
-    ctx.beginPath();
-    ctx.moveTo(outline[0].x, outline[0].y);
-
-    const len = outline.length;
-    for (let i = 0; i < len; i++) {
-        const curr = outline[i];
-        const next = outline[(i + 1) % len];
-        const midX = (curr.x + next.x) / 2;
-        const midY = (curr.y + next.y) / 2;
-        ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
-    }
-
-    ctx.closePath();
-    ctx.fill();
+export function renderFreehandStroke(ctx: CanvasRenderingContext2D, stroke: Stroke, baseWidth: number): void {
+    const path = getInkPath(stroke, baseWidth);
+    if (!path) return;
+    if (stroke.penType === 'graphite' && stroke.inkVersion === 2) renderGraphite(ctx, stroke, baseWidth, path);
+    else ctx.fill(path);
 }
 
 /**

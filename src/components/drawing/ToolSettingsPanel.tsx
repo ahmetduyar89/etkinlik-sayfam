@@ -1,4 +1,5 @@
 import React from 'react';
+import { PenPresets } from './InkEngine/PenPresets';
 import { motion } from 'framer-motion';
 import {
     Square,
@@ -31,6 +32,7 @@ const PEN_TIPS: { id: PenType; label: string; icon: React.ComponentType<{ classN
     { id: 'fountain', label: 'Dolma', icon: Feather },
     { id: 'brush', label: 'Fırça', icon: Brush },
     { id: 'marker', label: 'Keçeli', icon: Sparkles },
+    { id: 'graphite', label: 'Kurşun', icon: PenTool },
 ];
 
 const PEN_PRESETS = [1.5, 3, 5, 8];
@@ -86,13 +88,14 @@ export function ToolSettingsPanel({
             {/* 1. KALEM & FOSFORLU BÖLÜMÜ */}
             {section === 'pen' && (
                 <>
+                    <PenPresets config={config} setConfig={setConfig} />
                     {/* Kalem Ucu Seçimi (Sadece Kalemde) */}
                     {!isHighlighter && (
                         <div>
                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1.5">
                                 Kalem Ucu
                             </span>
-                            <div className="grid grid-cols-4 gap-1 bg-white/[0.04] p-1 rounded-xl border border-white/10">
+                            <div className="grid grid-cols-3 gap-1 bg-white/[0.04] p-1 rounded-xl border border-white/10">
                                 {PEN_TIPS.map((tip) => {
                                     const active = penType === tip.id;
                                     const Icon = tip.icon;
@@ -115,6 +118,26 @@ export function ToolSettingsPanel({
                                 })}
                             </div>
                         </div>
+                    )}
+
+                    {!isHighlighter ? (
+                        <label className="flex items-center justify-between text-xs">
+                            Basınç tepkisi
+                            <select aria-label="Basınç tepkisi" className="rounded-lg bg-slate-800 p-2"
+                                value={config.pressureSensitivity ?? 'normal'}
+                                onChange={e => setConfig({ ...config, pressureSensitivity: e.target.value as DrawConfig['pressureSensitivity'] })}>
+                                <option value="soft">Yumuşak</option>
+                                <option value="normal">Normal</option>
+                                <option value="firm">Sert</option>
+                            </select>
+                        </label>
+                    ) : (
+                        <label className="flex flex-col gap-2 text-xs">
+                            Opaklık: {Math.round((config.highlighterOpacity ?? 0.3) * 100)}%
+                            <input aria-label="Fosforlu opaklığı" type="range" min="0.2" max="0.4" step="0.01"
+                                value={config.highlighterOpacity ?? 0.3}
+                                onChange={e => setConfig({ ...config, highlighterOpacity: Number(e.target.value) })} />
+                        </label>
                     )}
 
                     {/* Kalınlık Seçimi */}
