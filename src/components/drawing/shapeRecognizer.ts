@@ -230,8 +230,25 @@ export function recognizeShape(rawPoints: Point[]): RecognizedShape | null {
         };
     }
 
-    // Dikdörtgen / Kare: 4 veya 5 köşe
+    // Baklava / Eşkenar Dörtgen (Diamond) veya Dikdörtgen / Kare: 4 veya 5 köşe
     if (cornerCount === 4 || cornerCount === 5) {
+        // 4 köşenin konumlarına bak: Kenar ortalarına yakınsa baklava (diamond)
+        const cPts = corners.slice(0, 4);
+        const nearTopMid = cPts.some(c => Math.abs(c.y - bb.y1) < bb.h * 0.22 && Math.abs(c.x - cx) < bb.w * 0.28);
+        const nearBotMid = cPts.some(c => Math.abs(c.y - bb.y2) < bb.h * 0.22 && Math.abs(c.x - cx) < bb.w * 0.28);
+        const nearLeftMid = cPts.some(c => Math.abs(c.x - bb.x1) < bb.w * 0.22 && Math.abs(c.y - cy) < bb.h * 0.28);
+        const nearRightMid = cPts.some(c => Math.abs(c.x - bb.x2) < bb.w * 0.22 && Math.abs(c.y - cy) < bb.h * 0.28);
+
+        if (nearTopMid && nearBotMid && nearLeftMid && nearRightMid) {
+            return {
+                tool: 'diamond',
+                points: [
+                    { x: bb.x1, y: bb.y1 },
+                    { x: bb.x2, y: bb.y2 },
+                ],
+            };
+        }
+
         // Eğer en ve boy birbirine çok yakınsa kareye kilitle
         if (Math.abs(bb.w - bb.h) / Math.max(bb.w, bb.h) < 0.18) {
             const side = (bb.w + bb.h) / 2;
@@ -252,6 +269,29 @@ export function recognizeShape(rawPoints: Point[]): RecognizedShape | null {
                 { x: bb.x2, y: bb.y2 },
             ],
         };
+    }
+
+    // Yıldız tespiti: 5 uçlu yıldız (yaklaşık 8–12 köşe ve 5 belirgin yarıçap tepesi)
+    if (cornerCount >= 8 && cornerCount <= 12 && rDev > 0.3) {
+        let peaks = 0;
+        const n = pts.length;
+        for (let i = 0; i < n; i++) {
+            const prevR = radii[(i - 1 + n) % n];
+            const currR = radii[i];
+            const nextR = radii[(i + 1) % n];
+            if (currR > prevR && currR > nextR && currR > rMean * 1.1) {
+                peaks++;
+            }
+        }
+        if (peaks >= 4 && peaks <= 6) {
+            return {
+                tool: 'star',
+                points: [
+                    { x: bb.x1, y: bb.y1 },
+                    { x: bb.x2, y: bb.y2 },
+                ],
+            };
+        }
     }
 
     // Çok köşeli ama dairesel forma yakınsa çembere çevir
@@ -344,7 +384,9 @@ export function adjustSnappedShape(
         shape.tool === 'rect' ||
         shape.tool === 'ellipse' ||
         shape.tool === 'triangle' ||
-        shape.tool === 'right_triangle'
+        shape.tool === 'right_triangle' ||
+        shape.tool === 'diamond' ||
+        shape.tool === 'star'
     ) {
         return {
             tool: shape.tool,

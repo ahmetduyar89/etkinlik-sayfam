@@ -37,6 +37,13 @@ import {
     AlignRight,
     Bold,
     Italic,
+    MousePointer2,
+    PenTool,
+    Pencil as PencilIcon,
+    Highlighter,
+    Eraser,
+    Lasso,
+    RectangleHorizontal,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, MathObject, PaperStyle, RulerKind } from '../../types';
@@ -204,6 +211,31 @@ export function DrawingToolbar({
      * - Halihazırda seçili olan araca 2. kez tıklandığında (çift tıklama/toggle)
      *   o araca ait ayar paneli açılır/kapanır.
      */
+    const isPenActive = config.tool === 'pencil' && config.penType !== 'graphite';
+    const isGraphiteActive = config.tool === 'pencil' && config.penType === 'graphite';
+
+    const handlePenClick = (mode: 'ink' | 'graphite') => {
+        if (mode === 'graphite') {
+            if (isGraphiteActive) {
+                setPanel((prev) => (prev === 'settings' ? null : 'settings'));
+            } else {
+                setConfig({ ...config, tool: 'pencil', penType: 'graphite' });
+                setPanel(null);
+            }
+        } else {
+            if (isPenActive) {
+                setPanel((prev) => (prev === 'settings' ? null : 'settings'));
+            } else {
+                setConfig({
+                    ...config,
+                    tool: 'pencil',
+                    penType: config.penType === 'graphite' ? 'ballpoint' : (config.penType ?? 'ballpoint'),
+                });
+                setPanel(null);
+            }
+        }
+    };
+
     const selectTool = (tool: DrawingTool) => {
         if (config.tool === tool) {
             const section = sectionForTool(tool);
@@ -626,42 +658,126 @@ export function DrawingToolbar({
             )}
 
                 <div className="flex items-center gap-0.5 px-1 sm:px-1.5 border-white/10 border-r shrink-0">
-                    {/* Seçim, Kalem, Fosforlu, Silgi */}
-                    {['select', 'pencil', 'highlighter', 'eraser'].map((toolId) => {
-                        const tool = MAIN_TOOLS.find((t) => t.id === toolId);
-                        if (!tool) return null;
-                        const isActive = config.tool === tool.id;
-                        return (
-                            <button
-                                key={tool.id}
-                                type="button"
-                                onClick={() => selectTool(tool.id)}
-                                title={tool.label}
-                                aria-label={tool.label}
-                                aria-pressed={isActive}
-                                className={cn(
-                                    'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
-                                    isActive
-                                        ? 'bg-[#2d3045] text-white'
-                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
-                                )}
-                            >
-                                <tool.icon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                                {isActive && (
-                                    <motion.div
-                                        layoutId="activeTool"
-                                        className="absolute inset-0 border-2 border-emerald-500/50 rounded-lg pointer-events-none"
-                                    />
-                                )}
-                            </button>
-                        );
-                    })}
+                    {/* 1. Seçim Aracı */}
+                    <button
+                        type="button"
+                        onClick={() => selectTool('select')}
+                        title="Seç & Düzenle (V)"
+                        aria-label="Seç & Düzenle"
+                        aria-pressed={config.tool === 'select'}
+                        className={cn(
+                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
+                            config.tool === 'select'
+                                ? 'bg-[#2d3045] text-white'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        )}
+                    >
+                        <MousePointer2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                        {config.tool === 'select' && (
+                            <motion.div
+                                layoutId="activeTool"
+                                className="absolute inset-0 border-2 border-emerald-500/50 rounded-lg pointer-events-none"
+                            />
+                        )}
+                    </button>
 
-                    {/* Şekiller (GoodNotes standardı: Silgi ile Kement arasında) */}
+                    {/* 2. Yazı Kalemi (Tükenmez / Dolma / Fırça / Kaligrafi) */}
+                    <button
+                        type="button"
+                        onClick={() => handlePenClick('ink')}
+                        title="Yazı Kalemi (P) - Ayarlar için tekrar tıklayın"
+                        aria-label="Yazı Kalemi"
+                        aria-pressed={isPenActive}
+                        className={cn(
+                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
+                            isPenActive
+                                ? 'bg-[#2d3045] text-white'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        )}
+                    >
+                        <PenTool className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                        {isPenActive && (
+                            <motion.div
+                                layoutId="activeTool"
+                                className="absolute inset-0 border-2 border-emerald-500/50 rounded-lg pointer-events-none"
+                            />
+                        )}
+                    </button>
+
+                    {/* 3. Kurşun Kalem (Grafit, Gölgelendirme & Eğime Duyarlı) */}
+                    <button
+                        type="button"
+                        onClick={() => handlePenClick('graphite')}
+                        title="Kurşun Kalem (Grafit & Gölgelendirme)"
+                        aria-label="Kurşun Kalem"
+                        aria-pressed={isGraphiteActive}
+                        className={cn(
+                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
+                            isGraphiteActive
+                                ? 'bg-[#2d3045] text-amber-300'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        )}
+                    >
+                        <PencilIcon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                        {isGraphiteActive && (
+                            <motion.div
+                                layoutId="activeTool"
+                                className="absolute inset-0 border-2 border-amber-500/50 rounded-lg pointer-events-none"
+                            />
+                        )}
+                    </button>
+
+                    {/* 4. Fosforlu Kalem */}
+                    <button
+                        type="button"
+                        onClick={() => selectTool('highlighter')}
+                        title="Fosforlu Kalem (H)"
+                        aria-label="Fosforlu Kalem"
+                        aria-pressed={config.tool === 'highlighter'}
+                        className={cn(
+                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
+                            config.tool === 'highlighter'
+                                ? 'bg-[#2d3045] text-yellow-300'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        )}
+                    >
+                        <Highlighter className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                        {config.tool === 'highlighter' && (
+                            <motion.div
+                                layoutId="activeTool"
+                                className="absolute inset-0 border-2 border-yellow-500/50 rounded-lg pointer-events-none"
+                            />
+                        )}
+                    </button>
+
+                    {/* 5. Silgi */}
+                    <button
+                        type="button"
+                        onClick={() => selectTool('eraser')}
+                        title="Silgi (E)"
+                        aria-label="Silgi"
+                        aria-pressed={config.tool === 'eraser'}
+                        className={cn(
+                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
+                            config.tool === 'eraser'
+                                ? 'bg-[#2d3045] text-rose-300'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        )}
+                    >
+                        <Eraser className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                        {config.tool === 'eraser' && (
+                            <motion.div
+                                layoutId="activeTool"
+                                className="absolute inset-0 border-2 border-rose-500/50 rounded-lg pointer-events-none"
+                            />
+                        )}
+                    </button>
+
+                    {/* 6. Şekiller */}
                     <button
                         type="button"
                         onClick={handleShapesClick}
-                        aria-label="Şekiller"
+                        aria-label="Şekiller (S)"
                         aria-expanded={panel === 'shapes'}
                         className={cn(
                             'p-1.5 sm:p-2 rounded-lg transition-all duration-200 relative',
@@ -670,7 +786,7 @@ export function DrawingToolbar({
                                 : 'text-slate-400 hover:text-white hover:bg-white/5',
                             panel === 'shapes' ? 'bg-white/10 text-white' : ''
                         )}
-                        title="Şekiller"
+                        title="Şekiller (S)"
                     >
                         <Shapes className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         {isShapeTool && (
@@ -678,8 +794,54 @@ export function DrawingToolbar({
                         )}
                     </button>
 
-                    {/* Kement, Metin, Lazer, El */}
-                    {['lasso', 'text', 'sun', 'pan'].map((toolId) => {
+                    {/* 7. Kement */}
+                    <button
+                        type="button"
+                        onClick={() => selectTool('lasso')}
+                        title="Kement (Çoklu Seçim)"
+                        aria-label="Kement"
+                        aria-pressed={config.tool === 'lasso'}
+                        className={cn(
+                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
+                            config.tool === 'lasso'
+                                ? 'bg-[#2d3045] text-sky-400'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        )}
+                    >
+                        <Lasso className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                        {config.tool === 'lasso' && (
+                            <motion.div
+                                layoutId="activeTool"
+                                className="absolute inset-0 border-2 border-sky-500/50 rounded-lg pointer-events-none"
+                            />
+                        )}
+                    </button>
+
+                    {/* 8. Çalışma Bandı (Tape) */}
+                    <button
+                        type="button"
+                        onClick={() => selectTool('tape')}
+                        title="Çalışma Bandı (Kapat / Aç - Active Recall)"
+                        aria-label="Çalışma Bandı"
+                        aria-pressed={config.tool === 'tape'}
+                        className={cn(
+                            'p-1.5 sm:p-2 rounded-lg transition-all duration-200 group relative',
+                            config.tool === 'tape'
+                                ? 'bg-[#2d3045] text-amber-400'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        )}
+                    >
+                        <RectangleHorizontal className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                        {config.tool === 'tape' && (
+                            <motion.div
+                                layoutId="activeTool"
+                                className="absolute inset-0 border-2 border-amber-500/50 rounded-lg pointer-events-none"
+                            />
+                        )}
+                    </button>
+
+                    {/* 9. Metin, Lazer, El */}
+                    {['text', 'sun', 'pan'].map((toolId) => {
                         const tool = MAIN_TOOLS.find((t) => t.id === toolId);
                         if (!tool) return null;
                         const isActive = config.tool === tool.id;
@@ -828,7 +990,8 @@ export function DrawingToolbar({
                         </div>
                     </div>
                 ) : (
-                    /* Hızlı Kalem Slotları: 3 Kalem (Siyah, Mavi, Kırmızı) + 1 Fosforlu (Sarı) */
+                    <>
+                    {/* Hızlı Kalem Slotları: 3 Kalem (Siyah, Mavi, Kırmızı) + 1 Fosforlu (Sarı) */}
                     <div className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 border-white/10 border-r shrink-0" title="Hızlı Kalem Slotları">
                         {DEFAULT_QUICK_PENS.map((qp) => {
                             const isCurrent =
@@ -875,6 +1038,42 @@ export function DrawingToolbar({
                             );
                         })}
                     </div>
+
+                    {/* Hızlı Kalınlık Slotları (GoodNotes 3 önayarı: İnce, Orta, Kalın) */}
+                    <div className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 border-white/10 border-r shrink-0" title="Hızlı Kalınlık">
+                        {[
+                            { label: 'İnce', width: config.tool === 'highlighter' ? 10 : 2 },
+                            { label: 'Orta', width: config.tool === 'highlighter' ? 18 : 4 },
+                            { label: 'Kalın', width: config.tool === 'highlighter' ? 30 : 8 },
+                        ].map((sz) => {
+                            const isCurrent = Math.abs(config.width - sz.width) <= 0.5;
+                            return (
+                                <button
+                                    key={sz.label}
+                                    type="button"
+                                    onClick={() => setConfig({ ...config, width: sz.width })}
+                                    title={`${sz.label} (${sz.width}px)`}
+                                    aria-label={sz.label}
+                                    aria-pressed={isCurrent}
+                                    className={cn(
+                                        'w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center transition-all',
+                                        isCurrent
+                                            ? 'bg-white/20 ring-2 ring-white/70 shadow-sm scale-105'
+                                            : 'hover:bg-white/10 hover:scale-105 opacity-70 hover:opacity-100'
+                                    )}
+                                >
+                                    <span
+                                        className="rounded-full bg-white shadow-sm"
+                                        style={{
+                                            width: sz.label === 'İnce' ? 3 : sz.label === 'Orta' ? 5 : 8,
+                                            height: sz.label === 'İnce' ? 3 : sz.label === 'Orta' ? 5 : 8,
+                                        }}
+                                    />
+                                </button>
+                            );
+                        })}
+                    </div>
+                    </>
                 )}
 
                 <div className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 border-white/10 border-r shrink-0">

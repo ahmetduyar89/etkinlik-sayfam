@@ -1806,7 +1806,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         };
 
         /** Silgi ucunun yarıçapı (dünya birimi). İmleç de bu daireyi çizer. */
-        const eraserRadius = () => Math.max(6, config.width * 5);
+        const eraserRadius = () => {
+            if (config.eraserSize === 'small') return 12;
+            if (config.eraserSize === 'medium') return 24;
+            if (config.eraserSize === 'large') return 48;
+            return Math.max(6, config.width * 5);
+        };
 
         /**
          * İşaretçi olayının taşıdığı ARA örnekler.
@@ -2663,6 +2668,14 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     if (!candidates.has(strokesRef.current[i]) || !isSelectable(strokesRef.current[i])) continue;
                     if (strokeNearPoint(strokesRef.current[i], x, y, pickTolerance)) {
                         const hitStroke = strokesRef.current[i];
+                        if (hitStroke.tool === 'tape') {
+                            pushHistory();
+                            hitStroke.tapeHidden = hitStroke.tapeHidden === false ? true : false;
+                            commitStrokes();
+                            emit({ type: 'update', page: currentPageRef.current, strokes: [hitStroke] });
+                            redraw();
+                            return;
+                        }
                         const isDoubleTextClick =
                             hitStroke.tool === 'text' &&
                             lastTextClickRef.current.idx === i &&
@@ -2832,7 +2845,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (firstRulerHit) rulerEdgeRef.current = firstRulerHit.edge;
             const first: Point = firstRulerHit
                 ? { x: firstRulerHit.point.x, y: firstRulerHit.point.y }
-                : SHAPE_TOOLS.includes(config.tool)
+                : (SHAPE_TOOLS.includes(config.tool) || config.tool === 'tape')
                   ? snapPoint({ x, y })
                   : { x, y };
             inkInputRef.current = new InkInput(config.streamlineLevel === 'natural' ? 0.5 : config.streamlineLevel === 'calligraphy' ? 1.35 : 1, inkDebugEnabled && legacyInkRef.current);
@@ -2855,6 +2868,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 pressureSensitivity: config.pressureSensitivity ?? 'normal',
                 opacity: config.tool === 'highlighter' ? config.highlighterOpacity ?? 0.3 : undefined,
                 dash: config.dash && config.dash !== 'solid' ? config.dash : undefined,
+                calligraphyAngle: config.calligraphyAngle,
+                shapeFillMode: config.shapeFillMode,
+                shapeFillOpacity: config.shapeFillOpacity,
+                shapeBorderColor: config.shapeBorderColor,
+                shapeBorderStyle: config.shapeBorderStyle,
+                tapeHidden: config.tool === 'tape' ? true : undefined,
                 points: [first],
             };
             activeStrokeBBRef.current = { x1: first.x, y1: first.y, x2: first.x, y2: first.y };
@@ -2943,10 +2962,21 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
 
             if (config.tool === 'lasso' && isDrawingRef.current && lassoRef.current) {
-                const last = lassoRef.current[lassoRef.current.length - 1];
-                if (Math.hypot(x - last.x, y - last.y) * viewRef.current.scale >= 3) {
-                    lassoRef.current.push({ x, y });
+                if (config.lassoMode === 'rect') {
+                    const startP = lassoRef.current[0];
+                    lassoRef.current = [
+                        startP,
+                        { x, y: startP.y },
+                        { x, y },
+                        { x: startP.x, y },
+                    ];
                     drawLassoPreview();
+                } else {
+                    const last = lassoRef.current[lassoRef.current.length - 1];
+                    if (Math.hypot(x - last.x, y - last.y) * viewRef.current.scale >= 3) {
+                        lassoRef.current.push({ x, y });
+                        drawLassoPreview();
+                    }
                 }
                 return;
             }
@@ -3035,7 +3065,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
             if (!stroke.points.length) return;
 
-            if (SHAPE_TOOLS.includes(stroke.tool)) {
+            if (SHAPE_TOOLS.includes(stroke.tool) || stroke.tool === 'tape') {
                 // Şekiller yalnızca başlangıç ve bitiş noktasıyla tanımlanır.
                 const oldBB = getBB(stroke);
                 const start = stroke.points[0];
@@ -3118,6 +3148,21 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
                 const last = stroke.points[stroke.points.length - 1];
                 if (!last) break;
+
+                // Fosforlu düz çizgi modu: Kullanıcı yatay veya dikey yönde çiziyorsa ekseni kilitle
+                if (stroke.tool === 'highlighter' && config.highlighterAutoStraight && stroke.points.length >= 3) {
+                    const startP = stroke.points[0];
+                    const dx = Math.abs(raw.x - startP.x);
+                    const dy = Math.abs(raw.y - startP.y);
+                    if (dx > 20 || dy > 20) {
+                        if (dx > dy * 2.2) {
+                            raw = { ...raw, y: startP.y };
+                        } else if (dy > dx * 2.2) {
+                            raw = { ...raw, x: startP.x };
+                        }
+                    }
+                }
+
                 const point = inkInputRef.current.sample(sample, raw, stroke.penType, !!rulerEdgeRef.current);
                 if (!point) continue;
                 stroke.points.push(point);
@@ -3282,7 +3327,19 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     const bounds = poly.reduce((bb, p) => ({ x1: Math.min(bb.x1, p.x), y1: Math.min(bb.y1, p.y), x2: Math.max(bb.x2, p.x), y2: Math.max(bb.y2, p.y) }), { x1: Infinity, y1: Infinity, x2: -Infinity, y2: -Infinity });
                     const candidates = spatialIndexRef.current.query(strokesRef.current, bounds);
                     strokesRef.current.forEach((s, i) => {
-                        if (candidates.has(s) && isSelectable(s) && strokeInPolygon(s, poly)) picked.push(i);
+                        if (candidates.has(s) && isSelectable(s)) {
+                            const isHandwriting = s.tool === 'pencil' || s.tool === 'highlighter';
+                            const isShape = SHAPE_TOOLS.includes(s.tool) || s.tool === 'polygon' || s.tool === 'tape';
+                            const isText = s.tool === 'text';
+                            const isImage = s.tool === 'image';
+
+                            if (isHandwriting && config.lassoFilterHandwriting === false) return;
+                            if (isShape && config.lassoFilterShapes === false) return;
+                            if (isText && config.lassoFilterText === false) return;
+                            if (isImage && config.lassoFilterImages === false) return;
+
+                            if (strokeInPolygon(s, poly)) picked.push(i);
+                        }
                     });
                     if (picked.length) setSelection(picked);
                 }
@@ -3343,6 +3400,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     erasedIdsRef.current = [];
                 }
                 clearOverlay();
+                if (config.autoSwitchBackEraser && previousToolRef.current && previousToolRef.current !== 'eraser') {
+                    onConfigChange?.({ tool: previousToolRef.current });
+                }
                 return;
             }
             if (config.tool === 'sun') {

@@ -5,6 +5,7 @@ export const TOOL_PHYSICS: Record<PenType, { min: number; max: number; velocity:
     ballpoint: { min: 0.8, max: 1.15, velocity: 0.03, tilt: 0 },
     fountain: { min: 0.25, max: 1.85, velocity: 0.22, tilt: 0.12 },
     brush: { min: 0.15, max: 2.8, velocity: 0.3, tilt: 0.5 },
+    calligraphy: { min: 0.2, max: 2.3, velocity: 0.15, tilt: 0.3 },
     marker: { min: 0.92, max: 1.08, velocity: 0, tilt: 0 },
     graphite: { min: 0.35, max: 2.4, velocity: 0.08, tilt: 0.85 },
 };
@@ -21,7 +22,7 @@ export function widthFactor(point: Point, pen: PenType = 'ballpoint', sensitivit
 /** Support radius of an elliptical nib along the stroke normal.
  * Supports Apple Pencil tilt, azimuth, and Apple Pencil Pro barrel roll (twist). */
 export function nibFactor(point: Point, tangent: { x: number; y: number }, pen?: PenType): number {
-    if (pen !== 'fountain' && pen !== 'brush') return 1;
+    if (pen !== 'fountain' && pen !== 'brush' && pen !== 'calligraphy') return 1;
     const tilt = Math.hypot(point.tiltX ?? 0, point.tiltY ?? 0);
     // If twist is provided (Apple Pencil Pro barrel roll: 0..359 deg), use it;
     // otherwise fallback to tilt orientation or default 45-deg calligraphic angle.
@@ -34,6 +35,6 @@ export function nibFactor(point: Point, tangent: { x: number; y: number }, pen?:
     const normalX = -tangent.y, normalY = tangent.x;
     const major = normalX * Math.cos(angle) + normalY * Math.sin(angle);
     const minor = -normalX * Math.sin(angle) + normalY * Math.cos(angle);
-    const eccentricity = pen === 'brush' ? 0.75 : 0.65;
+    const eccentricity = pen === 'calligraphy' ? 0.35 : pen === 'brush' ? 0.75 : 0.65;
     return Math.hypot(major, minor * eccentricity);
 }

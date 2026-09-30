@@ -18,6 +18,8 @@ export const SHAPE_TOOLS = [
     'ellipse',
     'triangle',
     'right_triangle',
+    'diamond',
+    'star',
     'polygon',
     'cube',
     'rect_prism',
@@ -46,6 +48,8 @@ const ROTATION_FIELD_TOOLS = [
     'ellipse',
     'triangle',
     'right_triangle',
+    'diamond',
+    'star',
     'cube',
     'rect_prism',
     'tri_prism',
@@ -158,6 +162,15 @@ export const getBB = (s: Stroke): BoundingBox => {
         y1 = s.points[0].y;
         x2 = x1 + textW;
         y2 = y1 + textH;
+    }
+
+    if (s.tool === 'tape' && s.points.length >= 2) {
+        const tapeH = Math.max(22, (s.width || 4) * 4);
+        if (y2 - y1 < tapeH) {
+            const midY = (y1 + y2) / 2;
+            y1 = midY - tapeH / 2;
+            y2 = midY + tapeH / 2;
+        }
     }
 
     // Döndürülmüş şekilde kutu, dönmüş köşelerin çevrelediği alandır.
@@ -638,12 +651,25 @@ const drawShape = (
     y1: number,
     x2: number,
     y2: number,
-    fill?: boolean
+    fill?: boolean,
+    fillMode?: 'none' | 'solid' | 'transparent',
+    fillOpacity?: number,
+    borderStyle?: string,
+    borderColor?: string
 ) => {
+    if (borderColor) {
+        tCtx.strokeStyle = borderColor;
+    }
+    if (borderStyle === 'dashed') {
+        tCtx.setLineDash([8, 6]);
+    } else if (borderStyle === 'dotted') {
+        tCtx.setLineDash([2, 5]);
+    }
+
     if (
         ['cube', 'rect_prism', 'tri_prism', 'pyramid', 'cylinder', 'cone', 'sphere'].includes(tool)
     ) {
-        draw3DShape(tCtx, tool, x1, y1, x2, y2, fill);
+        draw3DShape(tCtx, tool, x1, y1, x2, y2, fill || fillMode === 'solid' || fillMode === 'transparent');
         return;
     }
 
@@ -663,6 +689,28 @@ const drawShape = (
         const cx = (x1 + x2) / 2;
         const cy = (y1 + y2) / 2;
         tCtx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    } else if (tool === 'diamond') {
+        const mx = (x1 + x2) / 2;
+        const my = (y1 + y2) / 2;
+        tCtx.moveTo(mx, y1);
+        tCtx.lineTo(x2, my);
+        tCtx.lineTo(mx, y2);
+        tCtx.lineTo(x1, my);
+        tCtx.closePath();
+    } else if (tool === 'star') {
+        const cx = (x1 + x2) / 2;
+        const cy = (y1 + y2) / 2;
+        const R = Math.max(4, Math.min(Math.abs(x2 - x1), Math.abs(y2 - y1)) / 2);
+        const r = R * 0.42;
+        const points = 5;
+        const step = Math.PI / points;
+        tCtx.moveTo(cx, cy - R);
+        for (let i = 0; i < 2 * points; i++) {
+            const rad = i % 2 === 0 ? R : r;
+            const angle = -Math.PI / 2 + i * step;
+            tCtx.lineTo(cx + rad * Math.cos(angle), cy + rad * Math.sin(angle));
+        }
+        tCtx.closePath();
     } else if (tool === 'triangle') {
         tCtx.moveTo((x1 + x2) / 2, y1);
         tCtx.lineTo(x2, y2);
@@ -707,11 +755,20 @@ const drawShape = (
         tCtx.restore();
         return;
     }
-    if (fill && !['line', 'dashed', 'arrow', 'double_arrow'].includes(tool)) {
-        tCtx.save();
-        tCtx.globalAlpha = 0.2;
-        tCtx.fill();
-        tCtx.restore();
+
+    const canFill = !['line', 'dashed', 'arrow', 'double_arrow'].includes(tool);
+    if (canFill) {
+        if (fillMode === 'solid') {
+            tCtx.save();
+            tCtx.globalAlpha = 1;
+            tCtx.fill();
+            tCtx.restore();
+        } else if (fillMode === 'transparent' || (!fillMode && fill)) {
+            tCtx.save();
+            tCtx.globalAlpha = fillOpacity ?? 0.22;
+            tCtx.fill();
+            tCtx.restore();
+        }
     }
     tCtx.stroke();
 };
@@ -1084,10 +1141,74 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, 
         tCtx.fillText(s.stampIcon || '', s.points[0].x, s.points[0].y);
     } else if (s.tool === 'polygon') {
         drawPolygon(tCtx, s.points, s.fillEnabled, s.color);
+    } else if (s.tool === 'tape') {
+        const p1 = s.points[0];
+        const p2 = s.points[s.points.length - 1];
+        const x = Math.min(p1.x, p2.x);
+        const y = Math.min(p1.y, p2.y);
+        const w = Math.max(Math.abs(p2.x - p1.x), 24);
+        const h = Math.max(Math.abs(p2.y - p1.y), Math.max(22, (s.width || 4) * 4));
+        const isHidden = s.tapeHidden !== false;
+
+        tCtx.save();
+        if (isHidden) {
+            // Study tape is covering content (Active recall active)
+            tCtx.fillStyle = s.color || '#fef08a';
+            tCtx.beginPath();
+            if (tCtx.roundRect) tCtx.roundRect(x, y, w, h, 4);
+            else tCtx.rect(x, y, w, h);
+            tCtx.fill();
+
+            tCtx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+            tCtx.lineWidth = 1;
+            tCtx.stroke();
+
+            // Diagonal ridges across the tape strip
+            tCtx.save();
+            tCtx.beginPath();
+            tCtx.rect(x, y, w, h);
+            tCtx.clip();
+            tCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            tCtx.lineWidth = 2.5;
+            for (let lx = x - h; lx < x + w + h; lx += 14) {
+                tCtx.moveTo(lx, y + h);
+                tCtx.lineTo(lx + h, y);
+            }
+            tCtx.stroke();
+            tCtx.restore();
+        } else {
+            // Study tape is revealed (uncovered to check answer)
+            tCtx.fillStyle = s.color || '#fef08a';
+            tCtx.globalAlpha = 0.2;
+            tCtx.beginPath();
+            if (tCtx.roundRect) tCtx.roundRect(x, y, w, h, 4);
+            else tCtx.rect(x, y, w, h);
+            tCtx.fill();
+
+            tCtx.globalAlpha = 0.7;
+            tCtx.setLineDash([4, 4]);
+            tCtx.strokeStyle = s.color || '#ca8a04';
+            tCtx.lineWidth = 1.5;
+            tCtx.stroke();
+        }
+        tCtx.restore();
+        return;
     } else {
         const p1 = s.points[0];
         const p2 = s.points[s.points.length - 1];
-        drawShape(tCtx, s.tool, p1.x, p1.y, p2.x, p2.y, s.fillEnabled);
+        drawShape(
+            tCtx,
+            s.tool,
+            p1.x,
+            p1.y,
+            p2.x,
+            p2.y,
+            s.fillEnabled,
+            s.shapeFillMode,
+            s.shapeFillOpacity,
+            s.shapeBorderStyle,
+            s.shapeBorderColor
+        );
     }
     tCtx.restore();
 };

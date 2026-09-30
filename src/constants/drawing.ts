@@ -21,6 +21,8 @@ import {
     Cylinder,
     Cone,
     Globe,
+    Diamond,
+    Star,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -113,6 +115,8 @@ export const SHAPE_TOOL_IDS: DrawingTool[] = [
     'ellipse',
     'triangle',
     'right_triangle',
+    'diamond',
+    'star',
     'polygon',
     'cube',
     'rect_prism',
@@ -138,6 +142,8 @@ export const make2DShapeTools = (
     ...(EllipseIcon ? [{ id: 'ellipse' as DrawingTool, Svg: EllipseIcon, label: 'Elips' }] : []),
     { id: 'triangle', Icon: Triangle, label: 'Üçgen' },
     ...(RightTriangleIcon ? [{ id: 'right_triangle' as DrawingTool, Svg: RightTriangleIcon, label: 'Dik Üçgen' }] : []),
+    { id: 'diamond', Icon: Diamond, label: 'Baklava (Eşkenar)' },
+    { id: 'star', Icon: Star, label: 'Yıldız' },
     { id: 'polygon', Icon: Pentagon, label: 'Noktalarla Çokgen (A-B-C)' },
     { id: 'line', Svg: SolidLineIcon, label: 'Çizgi' },
     { id: 'arrow', Icon: MoveRight, label: 'Ok' },

@@ -81,10 +81,13 @@ export type DrawingTool =
     | 'line'
     | 'arrow'
     | 'double_arrow'
-    | 'dashed';
+    | 'dashed'
+    | 'diamond'
+    | 'star'
+    | 'tape';
 
 /** Kalem ucu karakteri: yazma hissini belirler. */
-export type PenType = 'ballpoint' | 'fountain' | 'brush' | 'marker' | 'graphite';
+export type PenType = 'ballpoint' | 'fountain' | 'brush' | 'calligraphy' | 'marker' | 'graphite';
 export type PressureSensitivity = 'soft' | 'normal' | 'firm';
 
 /** Silgi davranışı: piksel silgisi mi, çizgiyi komple silen silgi mi. */
@@ -155,6 +158,13 @@ export interface Stroke {
     bold?: boolean;
     /** İtalik metin */
     italic?: boolean;
+    /** Çalışma bandı: kapalı mı (gizli) yoksa açılmış mı (görünür) */
+    tapeHidden?: boolean;
+    calligraphyAngle?: number;
+    shapeFillMode?: 'none' | 'solid' | 'transparent';
+    shapeFillOpacity?: number;
+    shapeBorderColor?: string;
+    shapeBorderStyle?: DashStyle;
 }
 
 /** Çalışma alanının yakınlaştırma ve kaydırma durumu. */
@@ -445,6 +455,36 @@ export interface DrawConfig {
     italic?: boolean;
     /** Kalem çizgi akıcılığı / titreme engelleme düzeyi. */
     streamlineLevel?: 'natural' | 'smooth' | 'calligraphy';
+    /** Kaligrafi kalemi uç açısı (derece, varsayılan 45). */
+    calligraphyAngle?: number;
+    /** Fosforlu kalemde düz çizgiye otomatik hizalama. */
+    highlighterAutoStraight?: boolean;
+    /** Silme bittiğinde otomatik önceki kaleme geri dön. */
+    autoSwitchBackEraser?: boolean;
+    /** Şekil dolgu modu (yok, opak, yarı saydam). */
+    shapeFillMode?: 'none' | 'solid' | 'transparent';
+    /** Şekil dolgu opaklığı (0..1). */
+    shapeFillOpacity?: number;
+    /** Şekil kenarlık rengi. */
+    shapeBorderColor?: string;
+    /** Şekil kenarlık deseni. */
+    shapeBorderStyle?: DashStyle;
+    /** Kement filtresi: el yazısı seçilsin mi. */
+    lassoFilterHandwriting?: boolean;
+    /** Kement filtresi: şekiller seçilsin mi. */
+    lassoFilterShapes?: boolean;
+    /** Kement filtresi: metin kutuları seçilsin mi. */
+    lassoFilterText?: boolean;
+    /** Kement filtresi: fotoğraflar seçilsin mi. */
+    lassoFilterImages?: boolean;
+    /** Kement seçim kipi (serbest veya dikdörtgen). */
+    lassoMode?: 'freeform' | 'rect';
+    /** Karalayarak silme jesti. */
+    smartScribbleErase?: boolean;
+    /** Daire içine alıp bekleme ile kemente geçiş. */
+    circleToLasso?: boolean;
+    /** Silgi boyutu ön ayarı. */
+    eraserSize?: 'small' | 'medium' | 'large' | 'custom';
 }
 
 /** Serbest çizgi deseni. */

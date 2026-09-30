@@ -12,6 +12,8 @@ import {
     Feather,
     Brush,
     Sparkles,
+    Diamond,
+    Star,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { DrawConfig, DrawingTool, EraserMode, PenType } from '../../types';
@@ -31,6 +33,7 @@ const PEN_TIPS: { id: PenType; label: string; icon: React.ComponentType<{ classN
     { id: 'ballpoint', label: 'Tükenmez', icon: PenTool },
     { id: 'fountain', label: 'Dolma', icon: Feather },
     { id: 'brush', label: 'Fırça', icon: Brush },
+    { id: 'calligraphy', label: 'Kaligrafi', icon: Sparkles },
     { id: 'marker', label: 'Keçeli', icon: Sparkles },
     { id: 'graphite', label: 'Kurşun', icon: PenTool },
 ];
@@ -58,6 +61,8 @@ const SHAPES_LIST: {
     { id: 'circle', label: 'Daire', Icon: Circle },
     { id: 'triangle', label: 'Üçgen', Icon: Triangle },
     { id: 'right_triangle', label: 'Dik Üçgen', Svg: RightTriangleIcon },
+    { id: 'diamond', label: 'Baklava', Icon: Diamond },
+    { id: 'star', label: 'Yıldız', Icon: Star },
     { id: 'line', label: 'Düz Çizgi', Svg: SolidLineIcon },
     { id: 'arrow', label: 'Ok', Icon: MoveRight },
     { id: 'double_arrow', label: 'Çift Ok', Icon: ArrowRightLeft },
@@ -121,23 +126,92 @@ export function ToolSettingsPanel({
                     )}
 
                     {!isHighlighter ? (
-                        <label className="flex items-center justify-between text-xs">
-                            Basınç tepkisi
-                            <select aria-label="Basınç tepkisi" className="rounded-lg bg-slate-800 p-2"
-                                value={config.pressureSensitivity ?? 'normal'}
-                                onChange={e => setConfig({ ...config, pressureSensitivity: e.target.value as DrawConfig['pressureSensitivity'] })}>
-                                <option value="soft">Yumuşak</option>
-                                <option value="normal">Normal</option>
-                                <option value="firm">Sert</option>
-                            </select>
-                        </label>
+                        <>
+                            <label className="flex items-center justify-between text-xs">
+                                Basınç tepkisi
+                                <select aria-label="Basınç tepkisi" className="rounded-lg bg-slate-800 p-2 text-slate-200 border border-white/10"
+                                    value={config.pressureSensitivity ?? 'normal'}
+                                    onChange={e => setConfig({ ...config, pressureSensitivity: e.target.value as DrawConfig['pressureSensitivity'] })}>
+                                    <option value="soft">Yumuşak</option>
+                                    <option value="normal">Normal</option>
+                                    <option value="firm">Sert</option>
+                                </select>
+                            </label>
+
+                            {penType === 'calligraphy' && (
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Kesik Uç Açısı</span>
+                                        <span className="text-xs font-bold text-indigo-400">{config.calligraphyAngle ?? 45}°</span>
+                                    </div>
+                                    <input
+                                        type="range" min={0} max={180} step={5}
+                                        value={config.calligraphyAngle ?? 45}
+                                        onChange={e => setConfig({ ...config, calligraphyAngle: Number(e.target.value) })}
+                                        className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-white/10 rounded-lg"
+                                    />
+                                </div>
+                            )}
+
+                            <div>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">
+                                    Çizgi Deseni
+                                </span>
+                                <div className="grid grid-cols-3 gap-1 bg-white/[0.04] p-1 rounded-xl border border-white/10 text-center">
+                                    {[
+                                        { id: 'solid', label: 'Düz' },
+                                        { id: 'dashed', label: 'Kesikli' },
+                                        { id: 'dotted', label: 'Noktalı' },
+                                    ].map((d) => (
+                                        <button
+                                            key={d.id}
+                                            type="button"
+                                            onClick={() => setConfig({ ...config, dash: d.id as any })}
+                                            className={cn(
+                                                'py-1 rounded-lg text-xs font-semibold transition-all',
+                                                (config.dash ?? 'solid') === d.id
+                                                    ? 'bg-indigo-600 text-white shadow-sm'
+                                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                            )}
+                                        >
+                                            {d.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
                     ) : (
-                        <label className="flex flex-col gap-2 text-xs">
-                            Opaklık: {Math.round((config.highlighterOpacity ?? 0.3) * 100)}%
-                            <input aria-label="Fosforlu opaklığı" type="range" min="0.2" max="0.4" step="0.01"
-                                value={config.highlighterOpacity ?? 0.3}
-                                onChange={e => setConfig({ ...config, highlighterOpacity: Number(e.target.value) })} />
-                        </label>
+                        <div className="flex flex-col gap-2.5">
+                            <label className="flex flex-col gap-1.5 text-xs">
+                                <div className="flex justify-between">
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Opaklık</span>
+                                    <span className="font-bold text-indigo-400">{Math.round((config.highlighterOpacity ?? 0.3) * 100)}%</span>
+                                </div>
+                                <input aria-label="Fosforlu opaklığı" type="range" min="0.2" max="0.4" step="0.01"
+                                    value={config.highlighterOpacity ?? 0.3}
+                                    onChange={e => setConfig({ ...config, highlighterOpacity: Number(e.target.value) })}
+                                    className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-white/10 rounded-lg" />
+                            </label>
+
+                            <button
+                                type="button"
+                                onClick={() => setConfig({ ...config, highlighterAutoStraight: !config.highlighterAutoStraight })}
+                                className={cn(
+                                    'w-full flex items-center justify-between p-2 rounded-xl border transition-all text-left',
+                                    config.highlighterAutoStraight
+                                        ? 'bg-indigo-600/20 border-indigo-500/50 text-white'
+                                        : 'bg-white/[0.03] border-white/10 text-slate-300 hover:bg-white/5'
+                                )}
+                            >
+                                <div>
+                                    <span className="block text-xs font-semibold leading-none">Düz Çizgiye Kilitle</span>
+                                    <span className="block text-[10px] text-slate-400 mt-0.5">Yatay/dikey çizgide otomatik düzleştir</span>
+                                </div>
+                                <div className={cn('w-7 h-4 rounded-full p-0.5 transition-colors', config.highlighterAutoStraight ? 'bg-indigo-600' : 'bg-white/20')}>
+                                    <div className={cn('w-3 h-3 rounded-full bg-white transition-transform', config.highlighterAutoStraight ? 'translate-x-3' : 'translate-x-0')} />
+                                </div>
+                            </button>
+                        </div>
                     )}
 
                     {/* Kalınlık Seçimi */}
@@ -363,6 +437,25 @@ export function ToolSettingsPanel({
                             className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-white/10 rounded-lg"
                         />
                     </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setConfig({ ...config, autoSwitchBackEraser: !config.autoSwitchBackEraser })}
+                        className={cn(
+                            'w-full flex items-center justify-between p-2.5 rounded-xl border transition-all text-left mt-1',
+                            config.autoSwitchBackEraser
+                                ? 'bg-indigo-600/20 border-indigo-500/50 text-white'
+                                : 'bg-white/[0.03] border-white/10 text-slate-300 hover:bg-white/5'
+                        )}
+                    >
+                        <div>
+                            <span className="block text-xs font-semibold leading-none">Otomatik Kaleme Dön</span>
+                            <span className="block text-[10px] text-slate-400 mt-0.5">Silme bittiğinde önceki araca geç</span>
+                        </div>
+                        <div className={cn('w-7 h-4 rounded-full p-0.5 transition-colors', config.autoSwitchBackEraser ? 'bg-indigo-600' : 'bg-white/20')}>
+                            <div className={cn('w-3 h-3 rounded-full bg-white transition-transform', config.autoSwitchBackEraser ? 'translate-x-3' : 'translate-x-0')} />
+                        </div>
+                    </button>
                 </>
             )}
 
@@ -373,7 +466,7 @@ export function ToolSettingsPanel({
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1.5">
                             2B Geometrik Şekiller
                         </span>
-                        <div className="grid grid-cols-4 gap-1.5">
+                        <div className="grid grid-cols-5 gap-1.5">
                             {SHAPES_LIST.map((shape) => {
                                 const active = config.tool === shape.id;
                                 const Icon = shape.Icon;
@@ -385,55 +478,92 @@ export function ToolSettingsPanel({
                                         onClick={() => onSelectShapeTool(shape.id)}
                                         title={shape.label}
                                         className={cn(
-                                            'h-10 rounded-xl border flex items-center justify-center transition-all',
+                                            'h-9 rounded-xl border flex items-center justify-center transition-all',
                                             active
                                                 ? 'bg-indigo-600 border-indigo-500 text-white shadow-md'
                                                 : 'bg-white/[0.04] border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
                                         )}
                                     >
-                                        {Icon ? <Icon className="w-5 h-5" /> : Svg ? <Svg /> : null}
+                                        {Icon ? <Icon className="w-4 h-4" /> : Svg ? <Svg /> : null}
                                     </button>
                                 );
                             })}
                         </div>
                     </div>
 
-                    <div className="pt-2 border-t border-white/10">
-                        <button
-                            type="button"
-                            onClick={() => setConfig({ ...config, fillEnabled: !config.fillEnabled })}
-                            className={cn(
-                                'w-full flex items-center justify-between p-2.5 rounded-xl border transition-all text-left',
-                                config.fillEnabled
-                                    ? 'bg-indigo-600/20 border-indigo-500/50 text-white'
-                                    : 'bg-white/[0.03] border-white/10 hover:bg-white/5 text-slate-300'
-                            )}
-                        >
-                            <div className="flex items-center gap-2">
-                                <PaintBucket className="w-4 h-4 text-indigo-400" />
-                                <div>
-                                    <span className="block text-xs font-semibold leading-none">
-                                        Şekil Dolgusu
-                                    </span>
-                                    <span className="block text-[10px] text-slate-400 mt-0.5">
-                                        İçini yarı saydam renkle doldur
-                                    </span>
-                                </div>
-                            </div>
-                            <div
-                                className={cn(
-                                    'w-8 h-4.5 rounded-full p-0.5 transition-colors relative',
-                                    config.fillEnabled ? 'bg-indigo-600' : 'bg-white/20'
-                                )}
-                            >
-                                <div
+                    {/* Şekil Dolgusu */}
+                    <div className="pt-2 border-t border-white/10 flex flex-col gap-2">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                            Şekil Dolgusu
+                        </span>
+                        <div className="grid grid-cols-3 gap-1 bg-white/[0.04] p-1 rounded-xl border border-white/10 text-center">
+                            {[
+                                { id: 'none', label: 'Yok' },
+                                { id: 'transparent', label: 'Saydam' },
+                                { id: 'solid', label: 'Opak' },
+                            ].map((m) => (
+                                <button
+                                    key={m.id}
+                                    type="button"
+                                    onClick={() => setConfig({
+                                        ...config,
+                                        shapeFillMode: m.id as any,
+                                        fillEnabled: m.id !== 'none',
+                                    })}
                                     className={cn(
-                                        'w-3.5 h-3.5 rounded-full bg-white transition-transform',
-                                        config.fillEnabled ? 'translate-x-3.5' : 'translate-x-0'
+                                        'py-1 rounded-lg text-xs font-semibold transition-all',
+                                        (config.shapeFillMode ?? (config.fillEnabled ? 'transparent' : 'none')) === m.id
+                                            ? 'bg-indigo-600 text-white shadow-sm'
+                                            : 'text-slate-400 hover:text-white hover:bg-white/5'
                                     )}
+                                >
+                                    {m.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {(config.shapeFillMode === 'transparent' || (!config.shapeFillMode && config.fillEnabled)) && (
+                            <label className="flex flex-col gap-1 text-xs">
+                                <div className="flex justify-between text-[10px] text-slate-400">
+                                    <span>Dolgu Opaklığı</span>
+                                    <span className="font-bold text-indigo-400">{Math.round((config.shapeFillOpacity ?? 0.25) * 100)}%</span>
+                                </div>
+                                <input
+                                    type="range" min={0.1} max={0.9} step={0.05}
+                                    value={config.shapeFillOpacity ?? 0.25}
+                                    onChange={e => setConfig({ ...config, shapeFillOpacity: Number(e.target.value) })}
+                                    className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-white/10 rounded-lg"
                                 />
-                            </div>
-                        </button>
+                            </label>
+                        )}
+                    </div>
+
+                    {/* Kenarlık Deseni */}
+                    <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">
+                            Kenarlık Deseni
+                        </span>
+                        <div className="grid grid-cols-3 gap-1 bg-white/[0.04] p-1 rounded-xl border border-white/10 text-center">
+                            {[
+                                { id: 'solid', label: 'Düz' },
+                                { id: 'dashed', label: 'Kesikli' },
+                                { id: 'dotted', label: 'Noktalı' },
+                            ].map((b) => (
+                                <button
+                                    key={b.id}
+                                    type="button"
+                                    onClick={() => setConfig({ ...config, shapeBorderStyle: b.id as any })}
+                                    className={cn(
+                                        'py-1 rounded-lg text-xs font-semibold transition-all',
+                                        (config.shapeBorderStyle ?? 'solid') === b.id
+                                            ? 'bg-indigo-600 text-white shadow-sm'
+                                            : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    )}
+                                >
+                                    {b.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     <div>
