@@ -17,18 +17,35 @@ const number = (value) => new Intl.NumberFormat("tr-TR").format(value);
 export function ReportsPage({ sound, progress }) {
   const active = classroom.activeClass;
 
+  let returnUrl = "/";
+  try {
+    const p = new URLSearchParams(window.location.search).get("returnTo");
+    if (p) returnUrl = decodeURIComponent(p);
+  } catch {
+    returnUrl = "/";
+  }
+  const isClassReturn = returnUrl.includes("siniflar");
+
   if (!active) {
     return pageShell("Sınıf Raporları", "Maç, katılım ve turnuva sonuçlarını tek ekranda gör.", [
       el("section", { className: "class-card class-welcome" }, [
         el("span", { className: "class-welcome-emoji", text: "📊" }),
         el("h2", { text: "Önce bir sınıf seç" }),
         el("p", { text: "Rapor oluşturmak için üst çubuktan bir sınıf seçebilir veya Sınıflarım bölümünde yeni sınıf oluşturabilirsin." }),
-        el("button", {
-          className: "primary",
-          type: "button",
-          text: "Sınıfları yönet",
-          onClick: () => { sound.play("click"); navigate("siniflar"); }
-        })
+        el("div", { style: "display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; margin-top: 1rem;" }, [
+          el("a", {
+            className: "ghost",
+            href: returnUrl,
+            style: "text-decoration: none; padding: 0.5rem 1rem; min-height: 2.5rem; font-size: 0.85rem; display: inline-flex; align-items: center;",
+            html: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg> ${isClassReturn ? "Sınıflara Dön" : "Atölye'ye Dön"}`
+          }),
+          el("button", {
+            className: "primary",
+            type: "button",
+            text: "Sınıfları yönet",
+            onClick: () => { sound.play("click"); navigate("siniflar"); }
+          })
+        ])
       ])
     ]);
   }
@@ -78,12 +95,21 @@ export function ReportsPage({ sound, progress }) {
           el("h2", { className: "class-card-title", text: "Öğrenci performansı" }),
           el("p", { className: "class-hint", text: "Sıralama toplam puan, galibiyet ve ada göre hesaplanır." })
         ]),
-        el("button", {
-          className: "ghost",
-          type: "button",
-          text: "Sınıf ayrıntıları",
-          onClick: () => { sound.play("click"); navigate("siniflar"); }
-        })
+        el("div", { style: "display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;" }, [
+          el("a", {
+            className: "primary",
+            href: returnUrl,
+            style: "text-decoration: none; padding: 0.45rem 0.95rem; min-height: 2.3rem; font-size: 0.8rem; display: inline-flex; align-items: center;",
+            title: isClassReturn ? "Sınıf merkezine dön" : "Atölye'ye dön",
+            html: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg> ${isClassReturn ? "Sınıflara Dön" : "Atölye'ye Dön"}`
+          }),
+          el("button", {
+            className: "ghost",
+            type: "button",
+            text: "Sınıf ayrıntıları",
+            onClick: () => { sound.play("click"); navigate("siniflar"); }
+          })
+        ])
       ]),
       standings.length
         ? el("div", { className: "report-list" }, standings.map((row, index) =>

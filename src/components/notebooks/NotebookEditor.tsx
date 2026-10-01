@@ -14,6 +14,7 @@ import {
     ChevronDown,
     ChevronLeft,
     ChevronRight,
+    ChevronUp,
     Cloud,
     FileDown,
     FileText,
@@ -23,7 +24,10 @@ import {
     Layers,
     ListTree,
     Loader2,
+    Maximize2,
+    Minimize2,
     Plus,
+    Tv,
     Printer,
     QrCode,
     Redo2,
@@ -192,18 +196,59 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     );
     const [bgColor, setBgColor] = React.useState(notebook.bg_color || '#ffffff');
 
-    const [config, setConfig] = React.useState<DrawConfig>({
-        tool: 'pencil',
-        color: '#000000',
-        width: 2,
-        fillEnabled: false,
-        stampIcon: '⭐',
-        penType: 'fountain',
-        streamlineLevel: 'smooth',
-        snapShapes: true,
-        snapAngle: false,
-        eraserMode: 'pixel',
+    const [config, setConfig] = React.useState<DrawConfig>(() => {
+        let savedPenType: any = 'marker';
+        let savedWidth = 4;
+        try {
+            const pt = localStorage.getItem('notebook_pen_type');
+            if (pt) savedPenType = pt;
+            const pw = localStorage.getItem('notebook_pen_width');
+            if (pw) savedWidth = parseFloat(pw) || 4;
+        } catch {}
+
+        return {
+            tool: 'pencil',
+            color: '#000000',
+            width: savedWidth,
+            fillEnabled: false,
+            stampIcon: '⭐',
+            penType: savedPenType,
+            streamlineLevel: 'smooth',
+            snapShapes: true,
+            snapAngle: false,
+            eraserMode: 'pixel',
+        };
     });
+
+    React.useEffect(() => {
+        try {
+            if (config.penType) localStorage.setItem('notebook_pen_type', config.penType);
+            if (config.width) localStorage.setItem('notebook_pen_width', String(config.width));
+        } catch {}
+    }, [config.penType, config.width]);
+
+    const [compactHeader, setCompactHeader] = React.useState<boolean>(() => {
+        try {
+            const saved = localStorage.getItem('notebook_compact_header');
+            if (saved !== null) return saved === 'true';
+            // Akıllı tahta veya geniş dokunmatik ekranlarda varsayılan kompakt mod
+            return window.innerWidth >= 1024 && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+        } catch {
+            return false;
+        }
+    });
+    const [hideHeader, setHideHeader] = React.useState<boolean>(false);
+
+    const toggleCompactHeader = () => {
+        setCompactHeader((prev) => {
+            const next = !prev;
+            try {
+                localStorage.setItem('notebook_compact_header', String(next));
+            } catch {}
+            return next;
+        });
+    };
+
     const [isTextBoxMode, setIsTextBoxMode] = React.useState(false);
 
     // ── Ders modu ─────────────────────────────────────────────────────
@@ -1087,15 +1132,612 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         onMetaChange({ bg_color: next });
     };
 
-    return (
-        <div className="fixed inset-0 z-[9000] flex flex-col bg-surface-container-low">
-            {/* Üst şerit - Belge ve Dışa Aktarma Başlığı */}
-            <header
+    const renderPdfDropdown = (compact = false) => (
+        <div className="relative">
+            <button
+                type="button"
+                onClick={() => {
+                    setShowPdfMenu((v) => !v);
+                    setShowExportMenu(false);
+                }}
+                aria-haspopup="menu"
+                aria-expanded={showPdfMenu}
                 className={cn(
-                    'flex items-center justify-between px-3 sm:px-4 py-2 bg-primary text-white shadow-[0_2px_10px_rgba(15,23,42,0.18)] flex-shrink-0 relative z-[6000]',
-                    presenting && 'hidden'
+                    'inline-flex items-center gap-1.5 rounded-xl font-semibold transition-colors',
+                    compact ? 'px-2 py-1 text-[11.5px]' : 'px-2.5 py-1.5 text-[12.5px]',
+                    notebook.pdf_id
+                        ? 'bg-rose-500/25 border border-rose-300/30 text-rose-100 hover:bg-rose-500/35'
+                        : 'bg-white/10 hover:bg-white/20 text-white'
+                )}
+                title={notebook.pdf_id ? `Bağlı PDF: ${notebook.pdf_name || 'PDF'}` : 'PDF İşlemleri'}
+            >
+                <FileText className={cn('w-3.5 h-3.5', notebook.pdf_id ? 'text-rose-200' : 'text-white')} />
+                <span className={compact ? 'max-w-[70px] truncate hidden sm:inline' : 'max-w-[100px] sm:max-w-[140px] truncate'}>
+                    {notebook.pdf_id ? (notebook.pdf_name || 'PDF') : 'PDF'}
+                </span>
+                {notebook.pdf_id && notebook.pdf_total_pages && !compact && (
+                    <span className="text-[11px] opacity-75 hidden sm:inline">
+                        · {notebook.pdf_total_pages} sf
+                    </span>
+                )}
+                <ChevronDown className="w-3.5 h-3.5 opacity-70 ml-0.5" />
+            </button>
+
+            {showPdfMenu && (
+                <>
+                    <div
+                        className="fixed inset-0 z-[9100]"
+                        onClick={() => setShowPdfMenu(false)}
+                        aria-hidden="true"
+                    />
+                    <div
+                        role="menu"
+                        aria-label="PDF Menüsü"
+                        className="absolute right-0 sm:left-0 sm:right-auto top-[calc(100%+8px)] z-[9200] w-[280px] bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
+                    >
+                        {notebook.pdf_id ? (
+                            <>
+                                <div className="px-2.5 py-2 mb-1 bg-rose-500/10 rounded-xl border border-rose-200/50">
+                                    <div className="flex items-center gap-2 text-rose-700 font-bold text-[12.5px]">
+                                        <FileText className="w-4 h-4 shrink-0" />
+                                        <span className="truncate">{notebook.pdf_name || 'PDF Belgesi'}</span>
+                                    </div>
+                                    <p className="text-[11px] text-rose-600/80 mt-0.5">
+                                        {notebook.pdf_total_pages ? `${notebook.pdf_total_pages} sayfa bağlı (GoodNotes Modu)` : 'PDF sayfaları bağlı'}
+                                    </p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowPdfMenu(false);
+                                        pdfAttachInputRef.current?.click();
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                                >
+                                    <FileUp className="w-4 h-4 text-primary shrink-0" />
+                                    <div>
+                                        <div>PDF Belgesini Değiştir</div>
+                                        <div className="text-[10.5px] font-normal text-on-surface-variant">Yeni bir dosya yükleyip bağlayın</div>
+                                    </div>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={handleUnlinkPdf}
+                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                                >
+                                    <Unlink className="w-4 h-4 shrink-0" />
+                                    <div>
+                                        <div>PDF Bağlantısını Kaldır</div>
+                                        <div className="text-[10.5px] font-normal text-red-500/80">Çizimleriniz korunur, arka plan kalkar</div>
+                                    </div>
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowPdfMenu(false);
+                                    pdfAttachInputRef.current?.click();
+                                }}
+                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                            >
+                                <FileUp className="w-4 h-4 text-primary shrink-0" />
+                                <div>
+                                    <div>PDF Belgesi Bağla</div>
+                                    <div className="text-[10.5px] font-normal text-on-surface-variant">GoodNotes modu: PDF sayfalarının üzerine not alın</div>
+                                </div>
+                            </button>
+                        )}
+
+                        <div className="h-px bg-outline-variant my-1.5" />
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowPdfMenu(false);
+                                setShowPdfViewer(true);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                        >
+                            <Scissors className="w-4 h-4 text-amber-600 shrink-0" />
+                            <div>
+                                <div>PDF & Soru Kırpıcı</div>
+                                <div className="text-[10.5px] font-normal text-on-surface-variant">MEB veya diğer PDF'lerden soru kesip sayfaya yapıştırın</div>
+                            </div>
+                        </button>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+
+    const renderExportDropdown = (compact = false) => (
+        <div className="relative">
+            <button
+                type="button"
+                onClick={() => {
+                    setShowExportMenu((v) => !v);
+                    setShowPdfMenu(false);
+                }}
+                aria-haspopup="menu"
+                aria-expanded={showExportMenu}
+                className={cn(
+                    'inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-xl font-semibold transition-colors',
+                    compact ? 'px-2 py-1 text-[11.5px]' : 'px-2.5 py-1.5 text-[12.5px]'
+                )}
+                title="Dışa Aktar ve Paylaş"
+            >
+                <Share2 className="w-3.5 h-3.5" />
+                <span className={compact ? 'hidden md:inline' : 'hidden sm:inline'}>Dışa Aktar</span>
+                <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+            </button>
+
+            {showExportMenu && (
+                <>
+                    <div
+                        className="fixed inset-0 z-[9100]"
+                        onClick={() => setShowExportMenu(false)}
+                        aria-hidden="true"
+                    />
+                    <div
+                        role="menu"
+                        aria-label="Dışa Aktarma Menüsü"
+                        className="absolute right-0 top-[calc(100%+8px)] z-[9200] w-[270px] bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
+                    >
+                        <p className="px-2.5 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                            PDF Dışa Aktarma
+                        </p>
+
+                        <button
+                            type="button"
+                            onClick={() => void handleExportPdf(true)}
+                            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                        >
+                            <FileDown className="w-4 h-4 text-rose-600 shrink-0" />
+                            <div>
+                                <div>Tüm Defteri PDF Olarak İndir</div>
+                                <div className="text-[10.5px] font-normal text-on-surface-variant">
+                                    {pageInfo.total} sayfanın tamamı tek bir PDF belgesinde
+                                </div>
+                            </div>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => void handleExportPdf(false)}
+                            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                        >
+                            <FileText className="w-4 h-4 text-rose-500 shrink-0" />
+                            <div>
+                                <div>Bu Sayfayı PDF İndir</div>
+                                <div className="text-[10.5px] font-normal text-on-surface-variant">
+                                    Yalnızca mevcut sayfa ({pageInfo.current + 1}. sayfa)
+                                </div>
+                            </div>
+                        </button>
+
+                        <div className="h-px bg-outline-variant my-1.5" />
+                        <p className="px-2.5 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                            Görsel & Yazdırma
+                        </p>
+
+                        <button
+                            type="button"
+                            onClick={handleExportPng}
+                            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                        >
+                            <ImageIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <div>
+                                <div>Sayfayı Görsel (PNG) İndir</div>
+                                <div className="text-[10.5px] font-normal text-on-surface-variant">Mevcut sayfanın ekran görüntüsü</div>
+                            </div>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handlePrint}
+                            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                        >
+                            <Printer className="w-4 h-4 text-indigo-600 shrink-0" />
+                            <div>
+                                <div>Sayfayı Yazdır</div>
+                                <div className="text-[10.5px] font-normal text-on-surface-variant">Yazıcıya veya kağıda doğrudan baskı</div>
+                            </div>
+                        </button>
+
+                        <div className="h-px bg-outline-variant my-1.5" />
+                        <p className="px-2.5 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                            Öğrenci Paylaşımı
+                        </p>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowExportMenu(false);
+                                setShowQr(true);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                        >
+                            <QrCode className="w-4 h-4 text-amber-600 shrink-0" />
+                            <div>
+                                <div>Öğrenciye Gönder (QR Kod)</div>
+                                <div className="text-[10.5px] font-normal text-on-surface-variant">Akıllı tahtadan öğrencilere canlı paylaşım</div>
+                            </div>
+                        </button>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+
+    const renderPaperDropdown = (compact = false) => (
+        <div className="relative">
+            <button
+                onClick={() => setShowPaperMenu((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={showPaperMenu}
+                title="Sayfa şablonu ve boyutu"
+                className={cn(
+                    'inline-flex items-center gap-1.5 rounded-lg border transition-colors',
+                    compact
+                        ? 'bg-white/10 hover:bg-white/20 border-white/20 px-2 py-0.5 text-[11.5px] text-white'
+                        : 'bg-surface-container-low hover:bg-surface-container px-2.5 py-1 border-outline-variant text-[12px] font-medium text-on-surface'
                 )}
             >
+                <LayoutTemplate className={cn('w-3.5 h-3.5', compact ? 'text-sky-300' : 'text-primary')} />
+                <span className="hidden md:inline">
+                    {currentPaper?.label ?? 'Şablon'}
+                    {pageSize !== 'free' && currentPageSize
+                        ? ` · ${currentPageSize.label}`
+                        : ''}
+                </span>
+                <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
+            </button>
+
+            {showPaperMenu && (
+                <>
+                    <div
+                        className="fixed inset-0 z-[9100]"
+                        onClick={() => setShowPaperMenu(false)}
+                        aria-hidden="true"
+                    />
+                    <div
+                        role="menu"
+                        aria-label="Sayfa şablonu"
+                        className="absolute left-1/2 -translate-x-1/2 top-[calc(100%+8px)] z-[9200] w-[268px] max-h-[70vh] overflow-y-auto bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
+                    >
+                        <div className="mb-2">
+                            <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                                Sayfa Boyutu
+                            </p>
+                            {hasPdf && (
+                                <p className="px-2 pb-1.5 text-[11px] text-on-surface-variant leading-tight">
+                                    {pdfBox
+                                        ? 'Bu defterde sayfa, bağlı PDF sayfasının ölçüsündedir.'
+                                        : 'PDF bağlı defter: sayfa ölçüsü PDF yerleşiminden gelir.'}
+                                </p>
+                            )}
+                            <div
+                                className={cn(
+                                    'grid grid-cols-2 gap-1',
+                                    hasPdf && 'opacity-40 pointer-events-none'
+                                )}
+                            >
+                                {PAGE_SIZES.map((size) => (
+                                    <button
+                                        key={size.id}
+                                        role="menuitemradio"
+                                        aria-checked={pageSize === size.id}
+                                        title={size.hint}
+                                        onClick={() => {
+                                            changePageSize(size.id);
+                                            setShowPaperMenu(false);
+                                        }}
+                                        className={cn(
+                                            'px-2 py-1.5 rounded-lg text-left transition-colors border',
+                                            pageSize === size.id
+                                                ? 'bg-primary/10 border-primary/40'
+                                                : 'border-transparent hover:bg-surface-container-high'
+                                        )}
+                                    >
+                                        <span className="block text-[12px] font-bold leading-tight">
+                                            {size.label}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="h-px bg-outline-variant my-2" />
+                        </div>
+
+                        {PAPER_GROUPS.map((group) => (
+                            <div key={group.label} className="mb-1.5 last:mb-0">
+                                <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                                    {group.label}
+                                </p>
+                                {group.items.map((item) => (
+                                    <button
+                                        key={item.id}
+                                        role="menuitemradio"
+                                        aria-checked={paper === item.id}
+                                        onClick={() => {
+                                            changePaper(item.id);
+                                            setShowPaperMenu(false);
+                                        }}
+                                        className={cn(
+                                            'w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl text-left transition-colors',
+                                            paper === item.id
+                                                ? 'bg-primary/10'
+                                                : 'hover:bg-surface-container-high'
+                                        )}
+                                    >
+                                        <span
+                                            className="w-8 h-8 rounded-lg border border-outline-variant shrink-0"
+                                            style={paperBackground(item.id, bgColor)}
+                                            aria-hidden="true"
+                                        />
+                                        <span className="min-w-0">
+                                            <span className="block text-[12px] font-bold leading-tight">
+                                                {item.label}
+                                            </span>
+                                            <span className="block text-[10.5px] text-on-surface-variant leading-tight truncate">
+                                                {item.hint}
+                                            </span>
+                                        </span>
+                                        {paper === item.id && (
+                                            <Check className="w-4 h-4 text-primary ml-auto shrink-0" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+
+    const renderCompactHeader = () => (
+        <header className="flex items-center justify-between px-2 sm:px-3 py-1 bg-primary text-white shadow-sm flex-shrink-0 relative z-[6000] text-xs h-[38px]">
+            {/* Sol: Geri + Başlık + Sayfalar + Sayfa Gezintisi */}
+            <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+                <button
+                    type="button"
+                    onClick={handleClose}
+                    title="Defterlerime dön"
+                    aria-label="Defterlerime dön"
+                    className="p-1 rounded-lg hover:bg-white/15 transition-colors shrink-0"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                </button>
+
+                <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    onBlur={handleTitleCommit}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                    }}
+                    aria-label="Defter adı"
+                    className="bg-white/10 hover:bg-white/15 focus:bg-white/20 rounded-lg px-2 py-0.5 text-[12px] font-semibold outline-none border border-transparent focus:border-white/40 transition-colors w-[100px] sm:w-[150px] truncate"
+                />
+
+                <div className="w-px h-3.5 bg-white/20 mx-0.5 shrink-0" />
+
+                {/* Sayfalar Çekmecesi */}
+                <button
+                    type="button"
+                    onClick={() => setShowPages((v) => !v)}
+                    title="Sayfa Küçük Resimleri"
+                    className={cn(
+                        'p-1 rounded-lg transition-colors shrink-0',
+                        showPages ? 'bg-white/25 text-white' : 'hover:bg-white/15 text-white/80'
+                    )}
+                >
+                    <Layers className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Sayfa Gezintisi & Ekleme */}
+                <div className="flex items-center gap-0.5 shrink-0 bg-white/10 rounded-lg px-0.5 py-0.5">
+                    <button
+                        type="button"
+                        onClick={() => canvasRef.current?.prevPage()}
+                        disabled={pageInfo.current === 0}
+                        title="Önceki Sayfa"
+                        className="p-0.5 rounded hover:bg-white/15 disabled:opacity-30 transition-colors"
+                    >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleJumpToPage}
+                        title="Sayfaya Git"
+                        className="px-1 text-[11px] font-bold tabular-nums hover:underline"
+                    >
+                        {pageInfo.current + 1}/{pageInfo.total}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => canvasRef.current?.nextPage()}
+                        disabled={pageInfo.current >= pageInfo.total - 1}
+                        title="Sonraki Sayfa"
+                        className="p-0.5 rounded hover:bg-white/15 disabled:opacity-30 transition-colors"
+                    >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleAddPage}
+                        title="Yeni Sayfa Ekle"
+                        className="p-0.5 rounded hover:bg-white/15 text-emerald-300 transition-colors"
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Orta: Kağıt Şablonu & Hızlı Zemin Renkleri */}
+            <div className="hidden md:flex items-center gap-2">
+                {renderPaperDropdown(true)}
+                <div className="flex items-center gap-1">
+                    {BG_COLORS.slice(0, 4).map((b) => (
+                        <button
+                            key={b.color}
+                            onClick={() => changeBg(b.color)}
+                            title={b.label}
+                            className={cn(
+                                'w-3.5 h-3.5 rounded-full border transition-transform hover:scale-110',
+                                bgColor === b.color ? 'border-white ring-1 ring-white/60 scale-110' : 'border-white/30'
+                            )}
+                            style={{ backgroundColor: b.color }}
+                        />
+                    ))}
+                </div>
+            </div>
+
+            {/* Sağ: Ders Sunum Araçları, PDF, Dışa Aktar, Geri/İleri, Kaydet, Mod Butonları */}
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                <LessonModeToolbar
+                    overlay={overlay}
+                    onOverlayChange={setOverlay}
+                    presenting={presenting}
+                    onPresentingChange={setPresenting}
+                    fullscreenTarget={stageRef}
+                />
+
+                <div className="w-px h-3.5 bg-white/20 mx-0.5 shrink-0" />
+
+                {renderPdfDropdown(true)}
+                {renderExportDropdown(true)}
+
+                {/* Geri / İleri */}
+                <div className="flex items-center">
+                    <button
+                        onClick={handleUndo}
+                        disabled={!history.canUndo}
+                        title="Geri Al"
+                        className="p-1 rounded-lg hover:bg-white/15 disabled:opacity-30 transition-colors"
+                    >
+                        <Undo2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        onClick={handleRedo}
+                        disabled={!history.canRedo}
+                        title="İleri Al"
+                        className="p-1 rounded-lg hover:bg-white/15 disabled:opacity-30 transition-colors"
+                    >
+                        <Redo2 className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+
+                {/* Kaydet */}
+                <button
+                    onClick={() => void save()}
+                    title="Kaydet"
+                    className="p-1 sm:px-2 sm:py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white font-semibold text-[11px] flex items-center gap-1 transition-colors"
+                >
+                    {saveState === 'saving' ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                        <Save className="w-3.5 h-3.5" />
+                    )}
+                    <span className="hidden lg:inline">Kaydet</span>
+                </button>
+
+                <div className="w-px h-3.5 bg-white/20 mx-0.5 shrink-0" />
+
+                {/* Standart 2 Satırlı Menüye Geç */}
+                <button
+                    type="button"
+                    onClick={toggleCompactHeader}
+                    title="Standart Menüye Geç (2 Satır)"
+                    className="p-1 rounded-lg hover:bg-white/15 text-white/80 hover:text-white transition-colors"
+                >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Tam Tuval - Üst Menüyü Gizle */}
+                <button
+                    type="button"
+                    onClick={() => setHideHeader(true)}
+                    title="Üst Menüyü Tamamen Gizle (Tam Tuval Alanı)"
+                    className="p-1 rounded-lg hover:bg-white/15 text-white/80 hover:text-white transition-colors"
+                >
+                    <ChevronUp className="w-3.5 h-3.5" />
+                </button>
+            </div>
+        </header>
+    );
+
+    return (
+        <div className="fixed inset-0 z-[9000] flex flex-col bg-surface-container-low">
+            {/* Tam Tuval / Üst Menü Gizli İken Yüzen Mini Menü Kapsülü */}
+            {hideHeader && !presenting && (
+                <div className="absolute top-2 left-3 z-[6500] flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md text-white border border-white/20 px-2.5 py-1 rounded-xl shadow-xl text-xs select-none">
+                    <button
+                        type="button"
+                        onClick={handleClose}
+                        title="Defterlerime dön"
+                        className="p-1 hover:bg-white/15 rounded-lg text-slate-300 hover:text-white transition-colors"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    <div className="w-px h-3.5 bg-white/20" />
+                    <button
+                        type="button"
+                        onClick={() => canvasRef.current?.prevPage()}
+                        disabled={pageInfo.current === 0}
+                        className="p-1 hover:bg-white/15 rounded-lg disabled:opacity-30 text-slate-300 hover:text-white"
+                    >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleJumpToPage}
+                        className="px-1.5 py-0.5 rounded text-[11px] font-bold tabular-nums hover:bg-white/15 text-white"
+                    >
+                        {pageInfo.current + 1} / {pageInfo.total}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => canvasRef.current?.nextPage()}
+                        disabled={pageInfo.current >= pageInfo.total - 1}
+                        className="p-1 hover:bg-white/15 rounded-lg disabled:opacity-30 text-slate-300 hover:text-white"
+                    >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleAddPage}
+                        title="Sayfa Ekle"
+                        className="p-1 hover:bg-white/15 rounded-lg text-emerald-400"
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="w-px h-3.5 bg-white/20" />
+                    <button
+                        type="button"
+                        onClick={() => setHideHeader(false)}
+                        title="Üst Menüyü Göster"
+                        className="flex items-center gap-1 px-2 py-0.5 hover:bg-white/15 rounded-lg font-medium text-sky-400 text-xs transition-colors"
+                    >
+                        <ChevronDown className="w-3.5 h-3.5" />
+                        <span>Menü</span>
+                    </button>
+                </div>
+            )}
+
+            {/* AKILLI TAHTA / KOMPAKT MOD (Tek Slim Satır) */}
+            {!hideHeader && !presenting && compactHeader && renderCompactHeader()}
+
+            {/* STANDART MOD (2 Satırlı Geniş Menü) */}
+            {!hideHeader && !presenting && !compactHeader && (
+                <>
+                    {/* Üst şerit - Belge ve Dışa Aktarma Başlığı */}
+                    <header
+                        className="flex items-center justify-between px-3 sm:px-4 py-2 bg-primary text-white shadow-[0_2px_10px_rgba(15,23,42,0.18)] flex-shrink-0 relative z-[6000]"
+                    >
                 {/* Sol: Geri düğmesi, Başlık, Defter türü */}
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <button
@@ -1135,239 +1777,11 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         </span>
                     )}
 
-                    {/* PDF Menüsü Dropdown */}
-                    <div className="relative">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setShowPdfMenu((v) => !v);
-                                setShowExportMenu(false);
-                            }}
-                            aria-haspopup="menu"
-                            aria-expanded={showPdfMenu}
-                            className={cn(
-                                'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[12.5px] font-semibold transition-colors',
-                                notebook.pdf_id
-                                    ? 'bg-rose-500/25 border border-rose-300/30 text-rose-100 hover:bg-rose-500/35'
-                                    : 'bg-white/10 hover:bg-white/20 text-white'
-                            )}
-                            title={notebook.pdf_id ? `Bağlı PDF: ${notebook.pdf_name || 'PDF'}` : 'PDF İşlemleri'}
-                        >
-                            <FileText className={cn('w-3.5 h-3.5', notebook.pdf_id ? 'text-rose-200' : 'text-white')} />
-                            <span className="max-w-[100px] sm:max-w-[140px] truncate">
-                                {notebook.pdf_id ? (notebook.pdf_name || 'PDF') : 'PDF'}
-                            </span>
-                            {notebook.pdf_id && notebook.pdf_total_pages && (
-                                <span className="text-[11px] opacity-75 hidden sm:inline">
-                                    · {notebook.pdf_total_pages} sf
-                                </span>
-                            )}
-                            <ChevronDown className="w-3.5 h-3.5 opacity-70 ml-0.5" />
-                        </button>
+                    {/* PDF Menüsü */}
+                    {renderPdfDropdown(false)}
 
-                        {showPdfMenu && (
-                            <>
-                                <div
-                                    className="fixed inset-0 z-[9100]"
-                                    onClick={() => setShowPdfMenu(false)}
-                                    aria-hidden="true"
-                                />
-                                <div
-                                    role="menu"
-                                    aria-label="PDF Menüsü"
-                                    className="absolute right-0 sm:left-0 sm:right-auto top-[calc(100%+8px)] z-[9200] w-[280px] bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
-                                >
-                                    {notebook.pdf_id ? (
-                                        <>
-                                            <div className="px-2.5 py-2 mb-1 bg-rose-500/10 rounded-xl border border-rose-200/50">
-                                                <div className="flex items-center gap-2 text-rose-700 font-bold text-[12.5px]">
-                                                    <FileText className="w-4 h-4 shrink-0" />
-                                                    <span className="truncate">{notebook.pdf_name || 'PDF Belgesi'}</span>
-                                                </div>
-                                                <p className="text-[11px] text-rose-600/80 mt-0.5">
-                                                    {notebook.pdf_total_pages ? `${notebook.pdf_total_pages} sayfa bağlı (GoodNotes Modu)` : 'PDF sayfaları bağlı'}
-                                                </p>
-                                            </div>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setShowPdfMenu(false);
-                                                    pdfAttachInputRef.current?.click();
-                                                }}
-                                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
-                                            >
-                                                <FileUp className="w-4 h-4 text-primary shrink-0" />
-                                                <div>
-                                                    <div>PDF Belgesini Değiştir</div>
-                                                    <div className="text-[10.5px] font-normal text-on-surface-variant">Yeni bir dosya yükleyip bağlayın</div>
-                                                </div>
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={handleUnlinkPdf}
-                                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-red-600 hover:bg-red-50 transition-colors"
-                                            >
-                                                <Unlink className="w-4 h-4 shrink-0" />
-                                                <div>
-                                                    <div>PDF Bağlantısını Kaldır</div>
-                                                    <div className="text-[10.5px] font-normal text-red-500/80">Çizimleriniz korunur, arka plan kalkar</div>
-                                                </div>
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setShowPdfMenu(false);
-                                                pdfAttachInputRef.current?.click();
-                                            }}
-                                            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
-                                        >
-                                            <FileUp className="w-4 h-4 text-primary shrink-0" />
-                                            <div>
-                                                <div>PDF Belgesi Bağla</div>
-                                                <div className="text-[10.5px] font-normal text-on-surface-variant">GoodNotes modu: PDF sayfalarının üzerine not alın</div>
-                                            </div>
-                                        </button>
-                                    )}
-
-                                    <div className="h-px bg-outline-variant my-1.5" />
-
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowPdfMenu(false);
-                                            setShowPdfViewer(true);
-                                        }}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
-                                    >
-                                        <Scissors className="w-4 h-4 text-amber-600 shrink-0" />
-                                        <div>
-                                            <div>PDF & Soru Kırpıcı</div>
-                                            <div className="text-[10.5px] font-normal text-on-surface-variant">MEB veya diğer PDF'lerden soru kesip sayfaya yapıştırın</div>
-                                        </div>
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
-
-                    {/* Paylaş & Dışa Aktar Menüsü Dropdown */}
-                    <div className="relative">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setShowExportMenu((v) => !v);
-                                setShowPdfMenu(false);
-                            }}
-                            aria-haspopup="menu"
-                            aria-expanded={showExportMenu}
-                            className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-xl px-2.5 py-1.5 text-[12.5px] font-semibold transition-colors"
-                            title="Dışa Aktar ve Paylaş"
-                        >
-                            <Share2 className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Dışa Aktar</span>
-                            <ChevronDown className="w-3.5 h-3.5 opacity-70" />
-                        </button>
-
-                        {showExportMenu && (
-                            <>
-                                <div
-                                    className="fixed inset-0 z-[9100]"
-                                    onClick={() => setShowExportMenu(false)}
-                                    aria-hidden="true"
-                                />
-                                <div
-                                    role="menu"
-                                    aria-label="Dışa Aktarma Menüsü"
-                                    className="absolute right-0 top-[calc(100%+8px)] z-[9200] w-[270px] bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
-                                >
-                                    <p className="px-2.5 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-                                        PDF Dışa Aktarma
-                                    </p>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => void handleExportPdf(true)}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
-                                    >
-                                        <FileDown className="w-4 h-4 text-rose-600 shrink-0" />
-                                        <div>
-                                            <div>Tüm Defteri PDF Olarak İndir</div>
-                                            <div className="text-[10.5px] font-normal text-on-surface-variant">
-                                                {pageInfo.total} sayfanın tamamı tek bir PDF belgesinde
-                                            </div>
-                                        </div>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => void handleExportPdf(false)}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
-                                    >
-                                        <FileText className="w-4 h-4 text-rose-500 shrink-0" />
-                                        <div>
-                                            <div>Bu Sayfayı PDF İndir</div>
-                                            <div className="text-[10.5px] font-normal text-on-surface-variant">
-                                                Yalnızca mevcut sayfa ({pageInfo.current + 1}. sayfa)
-                                            </div>
-                                        </div>
-                                    </button>
-
-                                    <div className="h-px bg-outline-variant my-1.5" />
-                                    <p className="px-2.5 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-                                        Görsel & Yazdırma
-                                    </p>
-
-                                    <button
-                                        type="button"
-                                        onClick={handleExportPng}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
-                                    >
-                                        <ImageIcon className="w-4 h-4 text-emerald-600 shrink-0" />
-                                        <div>
-                                            <div>Sayfayı Görsel (PNG) İndir</div>
-                                            <div className="text-[10.5px] font-normal text-on-surface-variant">Mevcut sayfanın ekran görüntüsü</div>
-                                        </div>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={handlePrint}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
-                                    >
-                                        <Printer className="w-4 h-4 text-indigo-600 shrink-0" />
-                                        <div>
-                                            <div>Sayfayı Yazdır</div>
-                                            <div className="text-[10.5px] font-normal text-on-surface-variant">Yazıcıya veya kağıda doğrudan baskı</div>
-                                        </div>
-                                    </button>
-
-                                    <div className="h-px bg-outline-variant my-1.5" />
-                                    <p className="px-2.5 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-                                        Öğrenci Paylaşımı
-                                    </p>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowExportMenu(false);
-                                            setShowQr(true);
-                                        }}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
-                                    >
-                                        <QrCode className="w-4 h-4 text-amber-600 shrink-0" />
-                                        <div>
-                                            <div>Öğrenciye Gönder (QR Kod)</div>
-                                            <div className="text-[10.5px] font-normal text-on-surface-variant">Akıllı tahtadan öğrencilere canlı paylaşım</div>
-                                        </div>
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
+                    {/* Dışa Aktar */}
+                    {renderExportDropdown(false)}
 
                     <div className="w-px h-4 bg-white/20 mx-0.5" />
 
@@ -1444,6 +1858,29 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         className="inline-flex items-center gap-1.5 bg-white text-primary px-3 py-1.5 rounded-xl text-[12.5px] font-bold hover:bg-white/95 active:scale-95 transition shadow-sm"
                     >
                         <Save className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Kaydet</span>
+                    </button>
+
+                    <div className="w-px h-4 bg-white/20 mx-0.5" />
+
+                    {/* Akıllı Tahta / Kompakt Mod Geçiş Butonu */}
+                    <button
+                        type="button"
+                        onClick={toggleCompactHeader}
+                        title="Akıllı Tahta / Kompakt Mod (Menüyü Tek Satıra İndir)"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[12px] font-semibold transition-colors shrink-0"
+                    >
+                        <Tv className="w-3.5 h-3.5 text-sky-300" />
+                        <span className="hidden md:inline">Kompakt</span>
+                    </button>
+
+                    {/* Üst Menüyü Gizle */}
+                    <button
+                        type="button"
+                        onClick={() => setHideHeader(true)}
+                        title="Üst Menüyü Gizle (Tam Tuval Alanı)"
+                        className="p-1.5 rounded-xl hover:bg-white/15 text-white/80 hover:text-white transition-colors shrink-0"
+                    >
+                        <ChevronUp className="w-4 h-4" />
                     </button>
                 </div>
             </header>
@@ -1599,124 +2036,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 {/* Orta: Kağıt Şablonu & Zemin Rengi */}
                 <div className="flex items-center gap-2">
                     {/* Kağıt şablonu dropdown */}
-                    <div className="relative">
-                        <button
-                            onClick={() => setShowPaperMenu((v) => !v)}
-                            aria-haspopup="menu"
-                            aria-expanded={showPaperMenu}
-                            title="Sayfa şablonu ve boyutu"
-                            className="inline-flex items-center gap-1.5 bg-surface-container-low hover:bg-surface-container px-2.5 py-1 rounded-lg border border-outline-variant text-[12px] font-medium text-on-surface transition-colors"
-                        >
-                            <LayoutTemplate className="w-3.5 h-3.5 text-primary" />
-                            <span className="hidden md:inline">
-                                {currentPaper?.label ?? 'Şablon'}
-                                {pageSize !== 'free' && currentPageSize
-                                    ? ` · ${currentPageSize.label}`
-                                    : ''}
-                            </span>
-                            <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
-                        </button>
-
-                        {showPaperMenu && (
-                            <>
-                                <div
-                                    className="fixed inset-0 z-[9100]"
-                                    onClick={() => setShowPaperMenu(false)}
-                                    aria-hidden="true"
-                                />
-                                <div
-                                    role="menu"
-                                    aria-label="Sayfa şablonu"
-                                    className="absolute left-1/2 -translate-x-1/2 top-[calc(100%+8px)] z-[9200] w-[268px] max-h-[70vh] overflow-y-auto bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
-                                >
-                                    <div className="mb-2">
-                                        <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-                                            Sayfa Boyutu
-                                        </p>
-                                        {hasPdf && (
-                                            <p className="px-2 pb-1.5 text-[11px] text-on-surface-variant leading-tight">
-                                                {pdfBox
-                                                    ? 'Bu defterde sayfa, bağlı PDF sayfasının ölçüsündedir.'
-                                                    : 'PDF bağlı defter: sayfa ölçüsü PDF yerleşiminden gelir.'}
-                                            </p>
-                                        )}
-                                        <div
-                                            className={cn(
-                                                'grid grid-cols-2 gap-1',
-                                                hasPdf && 'opacity-40 pointer-events-none'
-                                            )}
-                                        >
-                                            {PAGE_SIZES.map((size) => (
-                                                <button
-                                                    key={size.id}
-                                                    role="menuitemradio"
-                                                    aria-checked={pageSize === size.id}
-                                                    title={size.hint}
-                                                    onClick={() => {
-                                                        changePageSize(size.id);
-                                                        setShowPaperMenu(false);
-                                                    }}
-                                                    className={cn(
-                                                        'px-2 py-1.5 rounded-lg text-left transition-colors border',
-                                                        pageSize === size.id
-                                                            ? 'bg-primary/10 border-primary/40'
-                                                            : 'border-transparent hover:bg-surface-container-high'
-                                                    )}
-                                                >
-                                                    <span className="block text-[12px] font-bold leading-tight">
-                                                        {size.label}
-                                                    </span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                        <div className="h-px bg-outline-variant my-2" />
-                                    </div>
-
-                                    {PAPER_GROUPS.map((group) => (
-                                        <div key={group.label} className="mb-1.5 last:mb-0">
-                                            <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-                                                {group.label}
-                                            </p>
-                                            {group.items.map((item) => (
-                                                <button
-                                                    key={item.id}
-                                                    role="menuitemradio"
-                                                    aria-checked={paper === item.id}
-                                                    onClick={() => {
-                                                        changePaper(item.id);
-                                                        setShowPaperMenu(false);
-                                                    }}
-                                                    className={cn(
-                                                        'w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl text-left transition-colors',
-                                                        paper === item.id
-                                                            ? 'bg-primary/10'
-                                                            : 'hover:bg-surface-container-high'
-                                                    )}
-                                                >
-                                                    <span
-                                                        className="w-8 h-8 rounded-lg border border-outline-variant shrink-0"
-                                                        style={paperBackground(item.id, bgColor)}
-                                                        aria-hidden="true"
-                                                    />
-                                                    <span className="min-w-0">
-                                                        <span className="block text-[12px] font-bold leading-tight">
-                                                            {item.label}
-                                                        </span>
-                                                        <span className="block text-[10.5px] text-on-surface-variant leading-tight truncate">
-                                                            {item.hint}
-                                                        </span>
-                                                    </span>
-                                                    {paper === item.id && (
-                                                        <Check className="w-4 h-4 text-primary ml-auto shrink-0" />
-                                                    )}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </div>
+                    {renderPaperDropdown(false)}
 
                     {/* Zemin renkleri */}
                     <div className="hidden sm:flex items-center gap-1 ml-0.5">
@@ -1746,16 +2066,18 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         fullscreenTarget={stageRef}
                     />
                 </div>
-
-                {/* Gizli PDF Dosya Seçici */}
-                <input
-                    ref={pdfAttachInputRef}
-                    type="file"
-                    accept="application/pdf"
-                    onChange={handleAttachPdf}
-                    className="hidden"
-                />
             </div>
+        </>
+    )}
+
+    {/* Gizli PDF Dosya Seçici */}
+    <input
+        ref={pdfAttachInputRef}
+        type="file"
+        accept="application/pdf"
+        onChange={handleAttachPdf}
+        className="hidden"
+    />
 
             {/* GoodNotes Tarzı Sabit Çizim Araç Çubuğu */}
             {!presenting && (

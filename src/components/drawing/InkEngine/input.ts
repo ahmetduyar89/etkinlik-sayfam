@@ -40,8 +40,11 @@ export class InkInput {
     fork(): InkInput { return Object.assign(new InkInput(), this); }
 
     sample(event: PointerEvent, position: Point, pen?: PenType, constrained = false): Point | null {
-        if (this.raw && event.timeStamp <= this.time) return null;
-        const dt = this.raw ? Math.min(0.1, Math.max(0.001, (event.timeStamp - this.time) / 1000)) : 1 / 120;
+        // Pozisyon değişmediyse mükerrer örneği atla
+        if (this.raw && position.x === this.raw.x && position.y === this.raw.y) return null;
+        if (this.raw && event.timeStamp < this.time) return null;
+        const timeDiff = this.raw ? (event.timeStamp - this.time) / 1000 : 0;
+        const dt = this.raw ? Math.min(0.1, Math.max(0.002, timeDiff > 0 ? timeDiff : 1 / 120)) : 1 / 120;
         const vx = this.raw ? (position.x - this.raw.x) / dt : 0;
         const vy = this.raw ? (position.y - this.raw.y) / dt : 0;
         const da = alpha(INK_CONFIGURATION.derivativeCutoff, dt);

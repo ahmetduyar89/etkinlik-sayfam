@@ -35,14 +35,14 @@ export const PEN_PROFILES: Record<PenType, PenProfile> = {
     ballpoint: {
         id: 'ballpoint',
         label: 'Tükenmez',
-        min: 0.8,
-        max: 1.15,
+        min: 0.88,
+        max: 1.12,
         alpha: 1,
-        smoothing: 0.45,
-        thinning: 0.22,
-        streamline: 0.45,
-        taperStart: 0.4,
-        taperEnd: 1.2,
+        smoothing: 0.5,
+        thinning: 0.12,
+        streamline: 0.48,
+        taperStart: 0.15,
+        taperEnd: 0.25,
         capStart: true,
         capEnd: true,
         hint: 'GoodNotes tükenmez: Net, okunaklı, pürüzsüz ve dengeli hat',
@@ -100,18 +100,18 @@ export const PEN_PROFILES: Record<PenType, PenProfile> = {
     },
     marker: {
         id: 'marker',
-        label: 'Keçeli',
-        min: 0.92,
-        max: 1.08,
-        alpha: 0.8,
-        smoothing: 0.35,
-        thinning: 0.08,
-        streamline: 0.4,
-        taperStart: 0.1,
-        taperEnd: 0.8,
+        label: 'Tahta Kalemi',
+        min: 0.94,
+        max: 1.06,
+        alpha: 1,
+        smoothing: 0.52,
+        thinning: 0.05,
+        streamline: 0.5,
+        taperStart: 0.05,
+        taperEnd: 0.1,
         capStart: true,
         capEnd: true,
-        hint: 'Notability fineliner: Pürüzsüz, yuvarlak uçlu sabit akış',
+        hint: 'Akıllı tahta kalemi: Net, pürüzsüz, kırpmasız, tam örtücü ve tok hat',
     },
 };
 
@@ -153,7 +153,7 @@ export function samplePressure(
 ): number {
     const profile = getPenProfile(pen);
     const hasStylusPressure =
-        pointerType === 'pen' && Number.isFinite(pressure) && pressure >= 0;
+        pointerType === 'pen' && Number.isFinite(pressure) && pressure > 0 && pressure !== 0.5;
 
     let raw: number;
     if (hasStylusPressure) {
@@ -162,9 +162,9 @@ export function samplePressure(
         raw = p * p * (3 - 2 * p); // smoothstep
     } else {
         // Hız tabanlı baskı: hızlı hareket ederken incelir, yavaşlarken dolgunlaşır
+        // Akıllı tahtalarda geniş hareket alanı olduğu için aşırı incelmeyi sınırla
         const normalizedSpeed = clamp((speed - SLOW_SPEED) / (FAST_SPEED - SLOW_SPEED), 0, 1);
-        // Hızlı savurmalarda zarif incelme için karesel eğri
-        raw = 1 - Math.pow(normalizedSpeed, 1.3);
+        raw = clamp(1 - Math.pow(normalizedSpeed, 1.4) * 0.35, 0.65, 1);
     }
 
     const prev = previous ?? raw;

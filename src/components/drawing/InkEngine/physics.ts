@@ -2,11 +2,11 @@ import type { PenType, Point, PressureSensitivity } from '../../../types';
 
 export const PRESSURE_GAMMA: Record<PressureSensitivity, number> = { soft: 0.65, normal: 1, firm: 1.65 };
 export const TOOL_PHYSICS: Record<PenType, { min: number; max: number; velocity: number; tilt: number }> = {
-    ballpoint: { min: 0.8, max: 1.15, velocity: 0.03, tilt: 0 },
+    ballpoint: { min: 0.88, max: 1.12, velocity: 0.02, tilt: 0 },
     fountain: { min: 0.25, max: 1.85, velocity: 0.22, tilt: 0.12 },
     brush: { min: 0.15, max: 2.8, velocity: 0.3, tilt: 0.5 },
     calligraphy: { min: 0.2, max: 2.3, velocity: 0.15, tilt: 0.3 },
-    marker: { min: 0.92, max: 1.08, velocity: 0, tilt: 0 },
+    marker: { min: 0.94, max: 1.06, velocity: 0, tilt: 0 },
     graphite: { min: 0.35, max: 2.4, velocity: 0.08, tilt: 0.85 },
 };
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));

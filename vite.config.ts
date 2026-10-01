@@ -34,6 +34,38 @@ function serveApps(env: Record<string, string>): Plugin {
     '.woff2': 'font/woff2',
   }
 
+  const GERI_MARKER = 'data-atolye-geri'
+  const GERI_BAGLANTISI = `
+<a href="/" ${GERI_MARKER} title="Atölye'ye dön" aria-label="Atölye ana sayfasına dön">
+  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+  <span>Atölye</span>
+</a>
+<style>
+a[${GERI_MARKER}] {
+  position: fixed !important;
+  right: 14px !important;
+  bottom: 14px !important;
+  z-index: 2147483000 !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px 9px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff !important;
+  color: #334155 !important;
+  font: 600 13px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  text-decoration: none !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08), 0 12px 28px -14px rgba(15, 23, 42, 0.45);
+  transition: transform 160ms ease, color 160ms ease;
+}
+a[${GERI_MARKER}]:hover { color: #4f46e5 !important; transform: translateY(-1px); }
+a[${GERI_MARKER}]:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
+@media (max-width: 940px) { a[${GERI_MARKER}] { bottom: 84px !important; } }
+@media print { a[${GERI_MARKER}] { display: none !important; } }
+</style>
+`
+
   return {
     name: 'serve-apps',
     configureServer(server) {
@@ -61,6 +93,17 @@ function serveApps(env: Record<string, string>): Plugin {
           file = path.join(file, 'index.html')
         }
         if (!fs.existsSync(file)) return next()
+
+        if (file.endsWith('.html')) {
+          let html = fs.readFileSync(file, 'utf-8')
+          if (!html.includes('data-atolye-geri')) {
+            const kapanis = html.lastIndexOf('</body>')
+            html = kapanis === -1 ? html + GERI_BAGLANTISI : html.slice(0, kapanis) + GERI_BAGLANTISI + html.slice(kapanis)
+          }
+          res.setHeader('Content-Type', 'text/html; charset=utf-8')
+          res.end(html)
+          return
+        }
 
         res.setHeader('Content-Type', MIME[path.extname(file).toLowerCase()] || 'application/octet-stream')
         fs.createReadStream(file).pipe(res)

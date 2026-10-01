@@ -92,6 +92,28 @@ try {
 // modunda kapatıldıysa son seçilen öğrencinin profili yeniden açılır.
 useRoleProfile();
 
+export function getReturnNavigation() {
+  if (typeof window === "undefined" || window.location.protocol === "file:") {
+    return null;
+  }
+  let returnTo = "/";
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const param = urlParams.get("returnTo");
+    if (param) {
+      returnTo = decodeURIComponent(param);
+    }
+  } catch {
+    returnTo = "/";
+  }
+  const isClass = returnTo.includes("siniflar");
+  return {
+    url: returnTo,
+    label: isClass ? "Sınıflara Dön" : "Atölye'ye Dön",
+    title: isClass ? "Sınıf merkezine dön" : "Atölye ana sayfasına dön"
+  };
+}
+
 const pages = {
   home: HomePage,
   plan: PlanPage,
@@ -118,7 +140,16 @@ const pages = {
 };
 
 function renderNav(route) {
+  const returnNav = getReturnNavigation();
   return el("nav", { className: "side-nav", "aria-label": "Ana menü" }, [
+    returnNav
+      ? el("a", {
+          className: "side-return-link",
+          href: returnNav.url,
+          title: returnNav.title,
+          html: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span>${returnNav.label}</span>`
+        })
+      : null,
     el("button", { className: "brand", type: "button", onClick: () => navigate("home"), html: `${icon("crown")}<span>Satranç Eğitimi</span>` }),
     ...navGroups
       .filter((group) => group.roles.includes(role))
@@ -179,6 +210,7 @@ window.addEventListener("satranc-cloud-status", (event) => {
 
 function renderTopbar() {
   const collapsed = Boolean(progress.state.settings.navCollapsed);
+  const returnNav = getReturnNavigation();
   xpStat = el("div", { className: "top-stat", text: `XP ${progress.state.xp}` });
   starStat = el("div", { className: "top-stat", text: `★ ${progress.state.stars}` });
   cloudStatusNode = el("div", {
@@ -207,6 +239,15 @@ function renderTopbar() {
       },
       html: icon(collapsed ? "menuOpen" : "menuClose")
     }),
+    returnNav
+      ? el("a", {
+          className: "top-return-btn",
+          href: returnNav.url,
+          title: returnNav.title,
+          "aria-label": returnNav.title,
+          html: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span>${returnNav.label}</span>`
+        })
+      : null,
     el("div", { className: "role-switch", "aria-label": "Kullanım modu" }, [
       el("button", {
         className: role === "student" ? "active" : "",

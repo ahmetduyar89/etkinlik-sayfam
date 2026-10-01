@@ -46,7 +46,13 @@ async function loadFirebase() {
   const app = appSdk.getApps().length ? appSdk.getApp() : appSdk.initializeApp(config);
   const auth = authSdk.getAuth(app);
   if (typeof auth.authStateReady === "function") await auth.authStateReady();
-  return { auth, db: storeSdk.getFirestore(app), storeSdk };
+  let db;
+  try {
+    db = storeSdk.initializeFirestore(app, { ignoreUndefinedProperties: true });
+  } catch {
+    db = storeSdk.getFirestore(app);
+  }
+  return { auth, db, storeSdk };
 }
 
 function classIdForProfile(classroom, profileId) {
@@ -105,26 +111,64 @@ export async function startCloudSync({ classroom, progress }) {
   }
 
   const { auth, db, storeSdk } = firebase;
-  if (!auth.currentUser) {
+  if (typeof auth.authStateReady === "function") await auth.authStateReady();
+
+  const user = auth.currentUser;
+  let tokenClaims = {};
+  if (user) {
     try {
-      const authSdk = await import(`${SDK}/firebase-auth.js`);
-      await authSdk.signInAnonymously(auth);
-    } catch (error) {
-      console.warn("[bulut] sınıf oturumu açılamadı:", error);
-      announce("signed-out", "Sınıf bulut oturumu açılamadı. Firebase'de Anonim giriş etkinleştirilmelidir.");
-      return () => {};
+      const tokenResult = await user.getIdTokenResult();
+      tokenClaims = tokenResult.claims || {};
+    } catch (e) {
+      console.warn("[bulut] token okunamadı:", e);
     }
+  }
+
+  // 1. Firebase Auth token içindeki doğrulanmış classId (en yetkili kaynak)
+  let sessionClassId = null;
+  if (tokenClaims.role === "class" && typeof tokenClaims.classId === "string") {
+    sessionClassId = tokenClaims.classId;
+  }
+  // 2. Portal oturum kaydı
+  if (!sessionClassId) {
+    try {
+      const session = JSON.parse(localStorage.getItem("etkinlik_oturum"));
+      if (session?.role === "class") sessionClassId = session.classId || null;
+    } catch { /* yok say */ }
+  }
+  // 3. URL parametresi (?classId=...)
+  if (!sessionClassId) {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlClassId = urlParams.get("classId");
+      if (urlClassId) sessionClassId = urlClassId;
+    } catch { /* yok say */ }
+  }
+  // 4. Classroom aktif sınıfı
+  if (!sessionClassId && classroom.state.activeClassId) {
+    sessionClassId = classroom.state.activeClassId;
+  }
+
+  const isTeacherUser = tokenClaims.role === "teacher";
+  const isClassUser = tokenClaims.role === "class" || Boolean(sessionClassId);
+
+  // Doğrulanmış bir oturum yoksa veya anonimse hata fırlatmak yerine bulut senkronizasyonunu zararsızca durdururuz.
+  if (!user || user.isAnonymous) {
+    announce("signed-out", "Bulut senkronizasyonu için öğretmen veya sınıf oturumu gereklidir.");
+    return () => {};
+  }
+  if (!isTeacherUser && !sessionClassId) {
+    announce("signed-out", "Sınıf bilgisi bulunamadı; bulut senkronizasyonu bekletiliyor.");
+    return () => {};
   }
 
   repairOrphanedClassIds(classroom);
 
   const {
     collection,
-    deleteDoc,
     doc,
     onSnapshot,
     query,
-    runTransaction,
     serverTimestamp,
     setDoc,
     where
@@ -134,31 +178,52 @@ export async function startCloudSync({ classroom, progress }) {
   let classroomTimer = 0;
   let progressTimer = 0;
   let heartbeatTimer = 0;
-  let knownMatches = new Set();
-  let knownTournaments = new Set();
   const stops = [];
   const device = deviceId();
-  const user = auth.currentUser;
-  const anonymous = user?.isAnonymous === true;
-  let sessionClassId = null;
-  try {
-    const session = JSON.parse(localStorage.getItem("etkinlik_oturum"));
-    if (session?.role === "class") sessionClassId = session.classId || null;
-  } catch { /* Eski veya bozuk portal oturumu yok sayılır. */ }
 
   const docKey = (classId, localId) => key(classId, localId);
   const matchDoc = (item) => item._cloudDocId || docKey(item.classId, item.id);
   const tournamentDoc = (item) => item._cloudDocId || docKey(item.classId, item.id);
   const progressDoc = (classId, profileId) => docKey(classId, profileId);
-  // Sınıf oturumu yalnız kendi classId alanını dinler. Öğretmen oturumu bütün
-  // sınıfları görebilir; Firestore kuralları da aynı sınırı zorunlu kılar.
-  const visibleCollection = (name) => sessionClassId
-    ? query(collection(db, name), where('classId', '==', sessionClassId))
-    : collection(db, name);
+
+  const visibleCollection = (name) => {
+    if (sessionClassId) {
+      return query(collection(db, name), where("classId", "==", sessionClassId));
+    }
+    if (isTeacherUser) {
+      return collection(db, name);
+    }
+    return null;
+  };
+
   const cloudData = (item) => {
     const { _cloudDocId, ...data } = clean(item);
     return data;
   };
+
+  function serializeTournament(item) {
+    const data = clean(item);
+    // Firestore iç içe dizileri (nested arrays) desteklemez.
+    // rounds: [[board1], [board2]] yapısını nesne dizisine dönüştürürüz:
+    if (Array.isArray(data.rounds)) {
+      data.rounds = data.rounds.map((round, idx) => ({
+        roundNumber: idx + 1,
+        boards: Array.isArray(round) ? round : []
+      }));
+    }
+    return data;
+  }
+
+  function deserializeTournament(item) {
+    if (Array.isArray(item?.rounds)) {
+      item.rounds = item.rounds.map((r) => {
+        if (Array.isArray(r)) return r;
+        if (r && Array.isArray(r.boards)) return r.boards;
+        return [];
+      });
+    }
+    return item;
+  }
 
   async function writeRecord(collectionName, id, data, _initial) {
     const ref = doc(db, collectionName, id);
@@ -171,148 +236,149 @@ export async function startCloudSync({ classroom, progress }) {
       item?.id && item?.classId && (!sessionClassId || item.classId === sessionClassId));
     const tournaments = classroom.state.tournaments.filter((item) =>
       item?.id && item?.classId && (!sessionClassId || item.classId === sessionClassId));
-    const nextMatches = new Set(matches.map(matchDoc));
-    const nextTournaments = new Set(tournaments.map(tournamentDoc));
-
-    const deletes = [];
-    if (!initial) {
-      for (const id of knownMatches) {
-        if (!nextMatches.has(id)) deletes.push(deleteDoc(doc(db, "chess_matches", id)));
-      }
-      for (const id of knownTournaments) {
-        if (!nextTournaments.has(id)) deletes.push(deleteDoc(doc(db, "chess_tournaments", id)));
-      }
-    }
 
     await Promise.all([
       ...matches.map((item) => writeRecord("chess_matches", matchDoc(item), {
         ...cloudData(item), localId: item.id, ownerUid: item.ownerUid || user?.uid || "shared",
         deviceId: device, syncedAt: serverTimestamp()
-      }, initial)),
+      }, initial).catch((err) => console.warn(`[bulut] maç aktarılamadı (${item.id}):`, err))),
       ...tournaments.map((item) => writeRecord("chess_tournaments", tournamentDoc(item), {
-        ...cloudData(item), localId: item.id, ownerUid: item.ownerUid || user?.uid || "shared",
+        ...cloudData(serializeTournament(item)), localId: item.id, ownerUid: item.ownerUid || user?.uid || "shared",
         deviceId: device, syncedAt: serverTimestamp()
-      }, initial)),
-      ...deletes
+      }, initial).catch((err) => console.warn(`[bulut] turnuva aktarılamadı (${item.id}):`, err)))
     ]);
-    knownMatches = nextMatches;
-    knownTournaments = nextTournaments;
   }
 
   async function pushProgress(initial = false) {
     if (applyingRemote) return;
     const writes = [];
     for (const [profileId, value] of Object.entries(progress.store.profiles || {})) {
-      const classId = classIdForProfile(classroom, profileId);
+      const classId = classIdForProfile(classroom, profileId) || (profileId.startsWith(`class:${sessionClassId}`) ? sessionClassId : null);
       if (!classId || (sessionClassId && classId !== sessionClassId)) continue;
       writes.push(writeRecord("chess_progress", progressDoc(classId, profileId), {
         classId,
         profileId,
-        profileName: progress.store.profileNames?.[profileId] || "Öğrenci",
+        profileName: progress.store.profileNames?.[profileId] || (profileId.startsWith("class:") ? (classroom.activeClass?.name || "Sınıf") : "Öğrenci"),
         progress: clean(value),
         ownerUid: user?.uid || "shared",
         deviceId: device,
         syncedAt: serverTimestamp()
-      }, initial));
+      }, initial).catch((err) => console.warn(`[bulut] profil aktarılamadı (${profileId}):`, err)));
     }
     await Promise.all(writes);
   }
 
   const syncRef = doc(db, "chess_sync", `${sessionClassId ? encodeURIComponent(sessionClassId) + "--" : ""}${encodeURIComponent(device)}`);
   const writeHeartbeat = () => setDoc(syncRef, {
-    classId: sessionClassId || classroom.state.activeClassId || null,
+    classId: sessionClassId || (isTeacherUser ? (classroom.state.activeClassId || null) : null),
     deviceId: device,
     userId: user?.uid || "anonymous",
     ownerUid: user?.uid || "anonymous",
-    anonymous,
+    anonymous: Boolean(user?.isAnonymous),
     classIds: sessionClassId ? [sessionClassId] : classroom.classes.map((item) => item.id),
     activeClassId: sessionClassId || classroom.state.activeClassId || null,
     lastSeenAt: serverTimestamp(),
     userAgent: navigator.userAgent.slice(0, 180)
-  }, { merge: true });
+  }, { merge: true }).catch((err) => {
+    console.warn("[bulut] kalp atışı gönderilemedi:", err);
+  });
 
-  // İlk işlem yereldeki eski kayıtları yüklemektir.
+  // İlk işlem yereldeki kayıtları aktarmaktır
   try {
     await pushClassroom(true);
     await pushProgress(true);
     await writeHeartbeat();
   } catch (error) {
-    console.warn("[bulut] ilk aktarım başarısız:", error);
-    announce("error", error.message || "İlk aktarım tamamlanamadı.");
-    return () => {};
+    console.warn("[bulut] ilk aktarım uyarısı:", error);
   }
 
-  stops.push(onSnapshot(visibleCollection("chess_matches"), (snapshot) => {
-    const remote = snapshot.docs.map((snap) => {
-      const data = snap.data();
-      const { localId, deviceId: _device, syncedAt: _synced, ...item } = data;
-      return { ...item, id: localId || item.id, _cloudDocId: snap.id };
-    }).filter((item) => item.id && item.classId);
+  const matchesQuery = visibleCollection("chess_matches");
+  if (matchesQuery) {
+    stops.push(onSnapshot(matchesQuery, (snapshot) => {
+      const remote = snapshot.docs.map((snap) => {
+        const data = snap.data();
+        const { localId, deviceId: _device, syncedAt: _synced, ...item } = data;
+        return { ...item, id: localId || item.id, _cloudDocId: snap.id };
+      }).filter((item) => item.id && item.classId);
 
-    applyingRemote = true;
-    const matchMap = new Map();
-    for (const m of classroom.state.matches || []) {
-      if (m?.id) matchMap.set(m.id, m);
-    }
-    for (const r of remote) {
-      matchMap.set(r.id, r);
-    }
-    classroom.state.matches = Array.from(matchMap.values());
-    classroom.save();
-    knownMatches = new Set(snapshot.docs.map((snap) => snap.id));
-    applyingRemote = false;
-    announce("online");
-  }, (error) => announce("error", error.message)));
+      applyingRemote = true;
+      const matchMap = new Map();
+      for (const m of classroom.state.matches || []) {
+        if (m?.id) matchMap.set(m.id, m);
+      }
+      for (const r of remote) {
+        matchMap.set(r.id, r);
+      }
+      classroom.state.matches = Array.from(matchMap.values());
+      classroom.save();
+      applyingRemote = false;
+      announce("online");
+    }, (error) => {
+      console.warn("[bulut] maç dinleyici hatası:", error);
+      announce("error", error.message);
+    }));
+  }
 
-  stops.push(onSnapshot(visibleCollection("chess_tournaments"), (snapshot) => {
-    const remote = snapshot.docs.map((snap) => {
-      const data = snap.data();
-      const { localId, deviceId: _device, syncedAt: _synced, ...item } = data;
-      return { ...item, id: localId || item.id, _cloudDocId: snap.id };
-    }).filter((item) => item.id && item.classId);
+  const tournamentsQuery = visibleCollection("chess_tournaments");
+  if (tournamentsQuery) {
+    stops.push(onSnapshot(tournamentsQuery, (snapshot) => {
+      const remote = snapshot.docs.map((snap) => {
+        const data = deserializeTournament(snap.data());
+        const { localId, deviceId: _device, syncedAt: _synced, ...item } = data;
+        return { ...item, id: localId || item.id, _cloudDocId: snap.id };
+      }).filter((item) => item.id && item.classId);
 
-    applyingRemote = true;
-    const tourMap = new Map();
-    for (const t of classroom.state.tournaments || []) {
-      if (t?.id) tourMap.set(t.id, t);
-    }
-    for (const r of remote) {
-      tourMap.set(r.id, r);
-    }
-    classroom.state.tournaments = Array.from(tourMap.values());
-    classroom.save();
-    knownTournaments = new Set(snapshot.docs.map((snap) => snap.id));
-    applyingRemote = false;
-    announce("online");
-  }, (error) => announce("error", error.message)));
+      applyingRemote = true;
+      const tourMap = new Map();
+      for (const t of classroom.state.tournaments || []) {
+        if (t?.id) tourMap.set(t.id, t);
+      }
+      for (const r of remote) {
+        tourMap.set(r.id, r);
+      }
+      classroom.state.tournaments = Array.from(tourMap.values());
+      classroom.save();
+      applyingRemote = false;
+      announce("online");
+    }, (error) => {
+      console.warn("[bulut] turnuva dinleyici hatası:", error);
+      announce("error", error.message);
+    }));
+  }
 
-  stops.push(onSnapshot(visibleCollection("chess_progress"), (snapshot) => {
-    applyingRemote = true;
-    for (const snap of snapshot.docs) {
-      const data = snap.data();
-      if (!data.profileId || !data.progress) continue;
-      progress.store.profiles[data.profileId] = data.progress;
-      progress.store.profileNames[data.profileId] = data.profileName || "Öğrenci";
-    }
-    progress.state = progress.store.profiles[progress.activeProfileId] || progress.state;
-    progress.save();
-    applyingRemote = false;
-    announce("online");
-  }, (error) => announce("error", error.message)));
+  const progressQuery = visibleCollection("chess_progress");
+  if (progressQuery) {
+    stops.push(onSnapshot(progressQuery, (snapshot) => {
+      applyingRemote = true;
+      for (const snap of snapshot.docs) {
+        const data = snap.data();
+        if (!data.profileId || !data.progress) continue;
+        progress.store.profiles[data.profileId] = data.progress;
+        progress.store.profileNames[data.profileId] = data.profileName || "Öğrenci";
+      }
+      progress.state = progress.store.profiles[progress.activeProfileId] || progress.state;
+      progress.save();
+      applyingRemote = false;
+      announce("online");
+    }, (error) => {
+      console.warn("[bulut] ilerleme dinleyici hatası:", error);
+      announce("error", error.message);
+    }));
+  }
 
   stops.push(classroom.onChange(() => {
     if (applyingRemote) return;
     window.clearTimeout(classroomTimer);
-    classroomTimer = window.setTimeout(() => void pushClassroom().catch((error) => announce("error", error.message)), 450);
+    classroomTimer = window.setTimeout(() => void pushClassroom().catch((error) => console.warn("[bulut] sınıf eşitleme hatası:", error)), 450);
   }));
   stops.push(progress.onChange(() => {
     if (applyingRemote) return;
     window.clearTimeout(progressTimer);
-    progressTimer = window.setTimeout(() => void pushProgress().catch((error) => announce("error", error.message)), 450);
+    progressTimer = window.setTimeout(() => void pushProgress().catch((error) => console.warn("[bulut] ilerleme eşitleme hatası:", error)), 450);
   }));
 
   heartbeatTimer = window.setInterval(() => {
-    void writeHeartbeat().catch((error) => announce("error", error.message));
+    void writeHeartbeat();
   }, 60_000);
 
   announce("online");

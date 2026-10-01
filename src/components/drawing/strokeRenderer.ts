@@ -1022,6 +1022,9 @@ function drawSmoothPath(
     width: number
 ): void {
     if (points.length === 0) return;
+    tCtx.lineWidth = width;
+    tCtx.lineCap = 'round';
+    tCtx.lineJoin = 'round';
     if (points.length < 2) {
         tCtx.beginPath();
         tCtx.arc(points[0].x, points[0].y, width / 2, 0, Math.PI * 2);
@@ -1129,6 +1132,13 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, 
         // Kesikli/noktalı desenler yol çizimini kullanır
         if (dashed) {
             drawSmoothPath(tCtx, s.points, s.width || 2);
+            tCtx.restore();
+            return;
+        }
+        // Tahta Kalemi (Marker): Akıllı tahta için pürüzsüz, kırpmasız, tam örtücü ve stabil hat
+        if (s.penType === 'marker') {
+            tCtx.globalAlpha = 1.0;
+            drawSmoothPath(tCtx, s.points, s.width || 4);
             tCtx.restore();
             return;
         }

@@ -90,12 +90,13 @@ export function ClassroomDashboard({
     const [activeExperimentFile, setActiveExperimentFile] = useState<string | null>(null);
 
     // Satranç açıldığında sınıfı önceden ayarla
-    const handleOpenChess = (e: React.MouseEvent, mod: PortalModule) => {
+    const handleOpenChess = (e: React.MouseEvent, _mod: PortalModule) => {
         if (activeClass) {
             // Sınıfı Satranç yerel verisinde aktif yap
-            syncClassesToChess(classes, activeClass.id);
+            const listToSync = classes.some((c) => c.id === activeClass.id) ? classes : [activeClass, ...classes];
+            syncClassesToChess(listToSync, activeClass.id);
             // Satranç adresine yönlendir
-            window.location.href = `/satranc/?classId=${activeClass.id}`;
+            window.location.href = `/satranc/?classId=${encodeURIComponent(activeClass.id)}&returnTo=${encodeURIComponent('/')}`;
             e.preventDefault();
         }
     };

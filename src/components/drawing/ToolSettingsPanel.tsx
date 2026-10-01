@@ -30,15 +30,15 @@ interface ToolSettingsPanelProps {
 }
 
 const PEN_TIPS: { id: PenType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: 'marker', label: 'Tahta Kalemi', icon: Sparkles },
     { id: 'ballpoint', label: 'Tükenmez', icon: PenTool },
     { id: 'fountain', label: 'Dolma', icon: Feather },
     { id: 'brush', label: 'Fırça', icon: Brush },
     { id: 'calligraphy', label: 'Kaligrafi', icon: Sparkles },
-    { id: 'marker', label: 'Keçeli', icon: Sparkles },
     { id: 'graphite', label: 'Kurşun', icon: PenTool },
 ];
 
-const PEN_PRESETS = [1.5, 3, 5, 8];
+const PEN_PRESETS = [2, 4, 6, 10];
 const HIGHLIGHTER_PRESETS = [10, 16, 24, 32];
 const ERASER_PRESETS = [
     { value: 8, label: 'İnce' },

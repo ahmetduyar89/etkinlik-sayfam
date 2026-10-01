@@ -7,12 +7,11 @@
 // gelir; yeni bir çalışma eklemek için bu dosyaya dokunmaya gerek yoktur.
 // ─────────────────────────────────────────────────────────────────────
 import { motion } from 'framer-motion';
-import { ArrowRight, Lock, Sparkles, School, Crown } from 'lucide-react';
+import { ArrowRight, Lock, Sparkles, Crown } from 'lucide-react';
 import { PORTAL_MODULES, type PortalModule } from '../../constants/portal';
 import { cn } from '../../utils/cn';
 import { InstallAppButton } from '../common/InstallAppButton';
 import { lockApp } from '../../utils/auth';
-import { useClassrooms } from '../../lib/classrooms';
 
 /** Kartlar sırayla belirsin; sayfa tek seferde "yapışmasın". */
 const listVariants = {
@@ -32,7 +31,6 @@ interface PortalHomeProps {
 
 export function PortalHome({ onOpenInternal }: PortalHomeProps) {
     const hazirSayisi = PORTAL_MODULES.filter((m) => m.status === 'ready').length;
-    const { classes } = useClassrooms();
 
     return (
         <div className="relative min-h-screen overflow-hidden bg-[#f6f7fb] font-sans">
@@ -52,21 +50,6 @@ export function PortalHome({ onOpenInternal }: PortalHomeProps) {
                             Öğretmen / Admin
                         </span>
                         <div className="flex-1" />
-
-                        {/* Sınıflarım Butonu */}
-                        <button
-                            type="button"
-                            onClick={() => onOpenInternal('siniflar')}
-                            className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-[13px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 shadow-sm transition-all active:scale-[0.98]"
-                        >
-                            <School className="h-4 w-4" />
-                            <span>Sınıflarım</span>
-                            {classes.length > 0 && (
-                                <span className="bg-indigo-600 text-white text-[10.5px] px-1.5 py-0.5 rounded-full font-extrabold ml-0.5 leading-none">
-                                    {classes.length}
-                                </span>
-                            )}
-                        </button>
 
                         <InstallAppButton />
                         <button

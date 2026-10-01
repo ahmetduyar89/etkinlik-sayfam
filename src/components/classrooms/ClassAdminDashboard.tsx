@@ -15,7 +15,7 @@ interface ClassAdminDashboardProps {
 }
 
 const chessUrl = (classId: string, route: string) =>
-    `/satranc/?classId=${encodeURIComponent(classId)}#/${route}`;
+    `/satranc/?classId=${encodeURIComponent(classId)}&returnTo=${encodeURIComponent('/siniflar')}#/${route}`;
 
 export function ClassAdminDashboard({ onBack, onPreviewClass }: ClassAdminDashboardProps) {
     const { classes, loading, error } = useClassrooms();

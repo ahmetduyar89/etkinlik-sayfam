@@ -123,6 +123,7 @@ function sectionForTool(tool: DrawingTool): ToolSettingsSection | null {
 }
 
 const PEN_NAMES: Record<string, string> = {
+    marker: 'Tahta Kalemi',
     ballpoint: 'Tükenmez',
     fountain: 'Dolma',
     brush: 'Fırça',
@@ -189,6 +190,26 @@ export function DrawingToolbar({
             const next = prev === 'bottom' ? 'top' : 'bottom';
             try {
                 localStorage.setItem('notebook_toolbar_dock', next);
+            } catch {
+                /* no-op */
+            }
+            return next;
+        });
+    };
+
+    const [contextualCollapsed, setContextualCollapsed] = React.useState<boolean>(() => {
+        try {
+            return localStorage.getItem('notebook_contextual_collapsed') === 'true';
+        } catch {
+            return false;
+        }
+    });
+
+    const toggleContextual = () => {
+        setContextualCollapsed((prev) => {
+            const next = !prev;
+            try {
+                localStorage.setItem('notebook_contextual_collapsed', String(next));
             } catch {
                 /* no-op */
             }
@@ -601,6 +622,17 @@ export function DrawingToolbar({
     const isPan = config.tool === 'pan';
     const isSelect = config.tool === 'select';
 
+    const hasContextualContent = Boolean(
+        isPen ||
+        isEraser ||
+        isHighlighter ||
+        isShapeTool ||
+        isTape ||
+        isText ||
+        isLasso ||
+        (config.ruler && !isPen && !isEraser && !isShapeTool && !isHighlighter && !isTape && !isText && !isLasso)
+    );
+
     const mainToolsTier1 = (
         <div className="grid grid-cols-[auto_1fr_auto] items-center w-full max-w-[1400px] px-2 sm:px-4 py-1 mx-auto gap-2">
             {/* Sol: Sürükleme Tutamacı & Goodnotes Geri / İleri Al Kapsülü */}
@@ -942,6 +974,26 @@ export function DrawingToolbar({
                             {dockPosition === 'bottom' ? <PanelTop className="w-3.5 h-3.5" /> : <PanelBottom className="w-3.5 h-3.5" />}
                         </button>
                     )}
+                    {hasContextualContent && (
+                        <button
+                            type="button"
+                            onClick={toggleContextual}
+                            title={contextualCollapsed ? 'Alt Araç Menüsünü Aç' : 'Alt Araç Menüsünü Gizle'}
+                            className={cn(
+                                'p-1.5 rounded-xl transition-all flex items-center justify-center',
+                                contextualCollapsed
+                                    ? 'text-sky-400 bg-sky-500/10 hover:bg-sky-500/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-white/10'
+                            )}
+                        >
+                            <ChevronDown
+                                className={cn(
+                                    'w-3.5 h-3.5 transition-transform duration-200',
+                                    !contextualCollapsed && 'rotate-180'
+                                )}
+                            />
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
@@ -950,17 +1002,6 @@ export function DrawingToolbar({
     /* ------------------------------------------------------------- */
     /* 2. TIER 2: GOODNOTES 6 BAĞLAMSAL ŞERİT (Contextual Sub-Bar)   */
     /* ------------------------------------------------------------- */
-    const hasContextualContent = Boolean(
-        isPen ||
-        isEraser ||
-        isHighlighter ||
-        isShapeTool ||
-        isTape ||
-        isText ||
-        isLasso ||
-        (config.ruler && !isPen && !isEraser && !isShapeTool && !isHighlighter && !isTape && !isText && !isLasso)
-    );
-
     const contextualBar = hasContextualContent ? (
         <div className="flex items-center justify-center w-full max-w-[1280px] px-2 sm:px-4 py-1 mx-auto">
             {/* Orta: Aktif Araca Göre Dinamik Olarak Değişen Goodnotes Bağlamsal Kapsülü (Tam ortalanmış) */}
@@ -981,19 +1022,20 @@ export function DrawingToolbar({
                             title="Kalem Ayarları & Uç Seçimi"
                         >
                             <PenTool className="w-3.5 h-3.5 text-sky-400" />
-                            <span>{PEN_NAMES[config.penType ?? 'ballpoint'] || 'Tükenmez'}</span>
+                            <span>{PEN_NAMES[config.penType ?? 'marker'] || 'Tahta Kalemi'}</span>
                             <ChevronDown className="w-3 h-3 text-slate-400" />
                         </button>
 
-                        {/* Hızlı 3 Kalem Ucu (Goodnotes 3 quick pens) */}
+                        {/* Hızlı Kalem Uçları (Tahta Kalemi, Tükenmez, Dolma, Fırça, Kurşun) */}
                         <div className="flex items-center gap-1 shrink-0">
                             {[
+                                { id: 'marker', label: 'Tahta Kalemi' },
                                 { id: 'ballpoint', label: 'Tükenmez' },
                                 { id: 'fountain', label: 'Dolma' },
                                 { id: 'brush', label: 'Fırça' },
                                 { id: 'graphite', label: 'Kurşun' },
                             ].map((p) => {
-                                const active = (config.penType ?? 'ballpoint') === p.id;
+                                const active = (config.penType ?? 'marker') === p.id;
                                 return (
                                     <button
                                         key={p.id}
@@ -1036,9 +1078,9 @@ export function DrawingToolbar({
                         {/* Goodnotes İmzası: 3 Kalınlık Çizgisi (- ━ ━━) */}
                         <div className="flex items-center gap-1.5 shrink-0" title="Kalınlık Önayarları">
                             {[
-                                { width: 2, label: 'İnce', h: 1.5 },
-                                { width: 4, label: 'Orta', h: 3 },
-                                { width: 7, label: 'Kalın', h: 5 },
+                                { width: 3, label: 'İnce', h: 2 },
+                                { width: 6, label: 'Orta', h: 3.5 },
+                                { width: 10, label: 'Kalın', h: 5 },
                             ].map((sz) => {
                                 const isCurrent = Math.abs(config.width - sz.width) <= 0.6;
                                 return (
@@ -1657,7 +1699,7 @@ export function DrawingToolbar({
     const toolbarLayout = (
         <div ref={barRef} className="flex flex-col items-center w-full select-none">
             {mainToolsTier1}
-            {contextualBar}
+            {!contextualCollapsed && contextualBar}
         </div>
     );
 
