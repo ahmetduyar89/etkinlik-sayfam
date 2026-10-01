@@ -20,7 +20,7 @@ service cloud.firestore {
       return isOwnLiveSeat(data.white) || isOwnLiveSeat(data.black);
     }
     function belongsToOwnClass(data) {
-      return signedIn() && data != null && ('classId' in data) && data.classId == request.auth.token.classId;
+      return signedIn() && data.classId == request.auth.token.classId;
     }
 
     match /teachers/{teacherId} {

@@ -122,8 +122,18 @@ function ClassWorkspace({ item, cloud, onEdit, onPreview }: {
     const matches = cloud.matches.filter((match) => match.classId === item.id);
     const tournaments = cloud.tournaments.filter((tournament) => tournament.classId === item.id);
     const profiles = cloud.progress.filter((profile) => profile.classId === item.id && profile.profileId.startsWith('student:'));
-    const course = cloud.progress.find((profile) => profile.classId === item.id && profile.profileId === `class:${item.id}`);
-    const weeks = course?.progress?.completedLessons?.filter((id) => /^week-\d+$/.test(id)).length || 0;
+    const course = cloud.progress.find((profile) => profile.classId === item.id && (profile.profileId === `class:${item.id}` || profile.profileId === 'teacher' || profile.profileId === `class_${item.id}`));
+    const classCompletedWeeks = new Set<string>(
+        (course?.progress?.completedLessons || []).filter((id) => /^week-\d+$/.test(id))
+    );
+    cloud.progress
+        .filter((profile) => profile.classId === item.id)
+        .forEach((profile) => {
+            profile.progress?.completedLessons?.forEach((id) => {
+                if (/^week-\d+$/.test(id)) classCompletedWeeks.add(id);
+            });
+        });
+    const weeks = classCompletedWeeks.size;
     const liveGames = cloud.liveGames.filter((game) => game.whiteClassId === item.id || game.blackClassId === item.id);
     const online = cloud.presence.filter((presence) => {
         const seen = presence.lastSeenAt?.toDate?.();

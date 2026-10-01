@@ -167,12 +167,40 @@ export async function startCloudSync({ classroom, progress }) {
   const {
     collection,
     doc,
+    getDoc,
     onSnapshot,
     query,
     serverTimestamp,
     setDoc,
     where
   } = storeSdk;
+
+  if (sessionClassId && !classroom.getClass(sessionClassId) && typeof getDoc === "function") {
+    try {
+      const classSnap = await getDoc(doc(db, "classes", sessionClassId));
+      if (classSnap.exists()) {
+        const d = classSnap.data();
+        const newClass = {
+          id: classSnap.id,
+          name: d.name || "Sınıf",
+          students: (Array.isArray(d.students) ? d.students : []).map((s) => ({
+            id: s.id,
+            name: s.name,
+            removed: Boolean(s.removed)
+          }))
+        };
+        classroom.state.classes.push(newClass);
+        classroom.setActiveClass(sessionClassId);
+        classroom.save();
+      }
+    } catch (e) {
+      console.warn("[bulut] sınıf bilgisi çekilemedi:", e);
+    }
+  } else if (sessionClassId && classroom.getClass(sessionClassId)) {
+    if (classroom.state.activeClassId !== sessionClassId) {
+      classroom.setActiveClass(sessionClassId);
+    }
+  }
 
   let applyingRemote = false;
   let classroomTimer = 0;
@@ -208,7 +236,9 @@ export async function startCloudSync({ classroom, progress }) {
     if (Array.isArray(data.rounds)) {
       data.rounds = data.rounds.map((round, idx) => ({
         roundNumber: idx + 1,
-        boards: Array.isArray(round) ? round : []
+        boards: Array.isArray(round)
+          ? round
+          : (round && Array.isArray(round.boards) ? round.boards : [])
       }));
     }
     return data;
@@ -223,6 +253,40 @@ export async function startCloudSync({ classroom, progress }) {
       });
     }
     return item;
+  }
+
+  function mergeTournaments(local, remote) {
+    if (!local) return remote;
+    if (!remote) return local;
+
+    const localRounds = Array.isArray(local.rounds) ? local.rounds : [];
+    const remoteRounds = Array.isArray(remote.rounds) ? remote.rounds : [];
+
+    const countResults = (rounds) =>
+      rounds.reduce((acc, r) => acc + (Array.isArray(r) ? r.filter((b) => b?.matchId).length : 0), 0);
+
+    const localResults = countResults(localRounds);
+    const remoteResults = countResults(remoteRounds);
+
+    let chosenRounds;
+    if (localRounds.length > remoteRounds.length) {
+      chosenRounds = localRounds;
+    } else if (remoteRounds.length > localRounds.length) {
+      chosenRounds = remoteRounds;
+    } else if (localResults >= remoteResults) {
+      chosenRounds = localRounds;
+    } else {
+      chosenRounds = remoteRounds;
+    }
+
+    return {
+      ...remote,
+      ...local,
+      finished: Boolean(local.finished || remote.finished),
+      rounds: chosenRounds,
+      playerIds: Array.from(new Set([...(local.playerIds || []), ...(remote.playerIds || [])])),
+      _cloudDocId: remote._cloudDocId || local._cloudDocId
+    };
   }
 
   async function writeRecord(collectionName, id, data, _initial) {
@@ -251,9 +315,26 @@ export async function startCloudSync({ classroom, progress }) {
 
   async function pushProgress(initial = false) {
     if (applyingRemote) return;
+
+    if (sessionClassId) {
+      const classProfileId = `class:${sessionClassId}`;
+      const teacherProfile = progress.store.profiles?.teacher;
+      if (teacherProfile?.completedLessons?.length) {
+        if (!progress.store.profiles[classProfileId]) {
+          progress.store.profiles[classProfileId] = clean(teacherProfile);
+        } else {
+          const merged = new Set([
+            ...(progress.store.profiles[classProfileId].completedLessons || []),
+            ...(teacherProfile.completedLessons || [])
+          ]);
+          progress.store.profiles[classProfileId].completedLessons = Array.from(merged);
+        }
+      }
+    }
+
     const writes = [];
     for (const [profileId, value] of Object.entries(progress.store.profiles || {})) {
-      const classId = classIdForProfile(classroom, profileId) || (profileId.startsWith(`class:${sessionClassId}`) ? sessionClassId : null);
+      const classId = classIdForProfile(classroom, profileId) || (sessionClassId && profileId === `class:${sessionClassId}` ? sessionClassId : null);
       if (!classId || (sessionClassId && classId !== sessionClassId)) continue;
       writes.push(writeRecord("chess_progress", progressDoc(classId, profileId), {
         classId,
@@ -334,7 +415,8 @@ export async function startCloudSync({ classroom, progress }) {
         if (t?.id) tourMap.set(t.id, t);
       }
       for (const r of remote) {
-        tourMap.set(r.id, r);
+        const existing = tourMap.get(r.id);
+        tourMap.set(r.id, mergeTournaments(existing, r));
       }
       classroom.state.tournaments = Array.from(tourMap.values());
       classroom.save();

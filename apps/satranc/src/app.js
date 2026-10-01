@@ -77,10 +77,13 @@ function setRole(next) {
   render();
 }
 
-// URL üzerinden sınıf parametresi geldiyse (?classId=...) o sınıfı otomatik aktif yap
+// URL üzerinden veya portal oturumundan sınıf parametresi geldiyse o sınıfı otomatik aktif yap
 try {
-  const urlParams = new URLSearchParams(window.location.search);
-  const targetClassId = urlParams.get("classId");
+  let targetClassId = new URLSearchParams(window.location.search).get("classId");
+  if (!targetClassId) {
+    const session = JSON.parse(localStorage.getItem("etkinlik_oturum"));
+    if (session?.role === "class") targetClassId = session.classId;
+  }
   if (targetClassId && classroom.getClass(targetClassId)) {
     classroom.setActiveClass(targetClassId);
   }
