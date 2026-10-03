@@ -13,7 +13,7 @@
  */
 
 import { el } from "../utils/dom.js";
-import { routeParam } from "../utils/router.js";
+import { navigate, routeParam } from "../utils/router.js";
 import { Chess } from "../engine/Chess.js";
 import { ChessBoard } from "../components/ChessBoard.js";
 import { puzzles, puzzleCounts, themeCounts } from "../data/puzzles.js";
@@ -21,43 +21,21 @@ import { icon } from "../components/Icon.js";
 import { burst } from "../animations/effects.js";
 import { pageShell } from "./pageUtils.js";
 import { sanTr } from "../engine/Chess.js";
+import { PUZZLE_THEME_LABELS as THEME_LABELS, PUZZLE_THEME_NUDGES as THEME_NUDGE } from "../data/puzzleThemes.js";
 
 const LEVELS = ["Kolay", "Orta", "Zor"];
-
-/** Tema kodu → çocuğun göreceği ad. Sıra, tema seçicideki sırayı da belirler. */
-const THEME_LABELS = {
-  "mat-1": "Tek hamlede mat",
-  "mat-2": "İki hamlede mat",
-  koridor: "Koridor matı",
-  bogmaca: "Boğmaca matı",
-  terfi: "Terfi ile mat",
-  catal: "At çatalı",
-  sis: "Şiş",
-  acmaz: "Açmaz",
-  "cifte-sah": "Çifte şah",
-  askida: "Askıda taş"
-};
 
 /** "Tümü" seçeneği dahil tema listesi. */
 const THEME_KEYS = ["hepsi", ...Object.keys(THEME_LABELS)];
 
-/**
- * Yanlış hamlede temaya özel yönlendirme.
- * Genel "çözüm değil" cümlesi çocuğa yol göstermez; her tema kendi desenine
- * işaret eden bir ipucu verir.
- */
-const THEME_NUDGE = {
-  koridor: "Şahın önü kendi piyonlarıyla kapalı. Son yatayı boydan boya tarayan hamleyi ara.",
-  bogmaca: "Şah kendi taşlarıyla çevrili. Taşların üzerinden atlayabilen tek taş hangisi?",
-  terfi: "Son yataya bir adım kalan piyonu bul; oraya varınca yeni bir taşa dönüşür.",
-  catal: "Atının aynı anda İKİ hedefe saldırabileceği kareyi ara.",
-  sis: "Şah ile arkasındaki değerli taşı aynı hatta yakala, sonra şah çek.",
-  acmaz: "Siyah vezir şahıyla aynı hatta. O hattın arkasına geçersen vezir kıpırdayamaz.",
-  "cifte-sah": "Bir taşı oynatınca arkasındaki taşın yolu açılıyor mu? İki taş birden şah çeksin.",
-  askida: "Rakibin hiçbir taşının korumadığı taşı bul."
-};
-
 export function PuzzlesPage({ progress, sound }) {
+  const daily = routeParam("gunluk") === "1";
+  const dailyThemes = String(routeParam("temalar", ""))
+    .split(",")
+    .filter((key) => Object.hasOwn(THEME_LABELS, key));
+  if (dailyThemes.length === 0) dailyThemes.push("mat-1", "catal", "askida");
+  const dailyGoal = 5;
+  let dailySolved = Math.min(dailyGoal, progress.dailyCount());
   // Derin bağlantı: #/puzzles?seviye=Orta
   let level = LEVELS.includes(routeParam("seviye")) ? routeParam("seviye") : "Kolay";
   // Derin bağlantı: #/puzzles?tema=acmaz — öğretmen dersin konusuna uygun
@@ -69,6 +47,9 @@ export function PuzzlesPage({ progress, sound }) {
   let solvedThisPuzzle = false;
   let attempts = 0;
   let streak = 0;
+  let hintRecorded = false;
+  let solutionRecorded = false;
+  let nextButton = null;
 
   /* ---------------------------------------------------------------- *
    * Arayüz parçaları
@@ -98,6 +79,7 @@ export function PuzzlesPage({ progress, sound }) {
   const solutionLine = el("p", { className: "puzzle-solution", hidden: "" });
   const streakLine = el("strong", { text: "0" });
   const solvedLine = el("strong", { text: "0" });
+  const dailyLine = el("strong", { text: `${dailySolved}/${dailyGoal}` });
 
   const board = ChessBoard({
     chess: new Chess(),
@@ -120,7 +102,9 @@ export function PuzzlesPage({ progress, sound }) {
    * kısıtını gevşetir, temayı koruruz — çünkü seçilen KONU önemlidir.
    */
   function pickPuzzle() {
-    const byTheme = theme === "hepsi" ? puzzles : puzzles.filter((item) => item.theme === theme);
+    const targetTheme = daily ? dailyThemes[dailySolved % dailyThemes.length] : theme;
+    if (daily) theme = targetTheme;
+    const byTheme = targetTheme === "hepsi" ? puzzles : puzzles.filter((item) => item.theme === targetTheme);
     let pool = byTheme.filter((item) => item.level === level);
     if (pool.length === 0) pool = byTheme;
     if (pool.length === 0) pool = puzzles;
@@ -136,6 +120,8 @@ export function PuzzlesPage({ progress, sound }) {
     step = 0;
     attempts = 0;
     solvedThisPuzzle = false;
+    hintRecorded = false;
+    solutionRecorded = false;
 
     board.attach(chess);
     board.setOrientation(puzzle.side);
@@ -149,6 +135,10 @@ export function PuzzlesPage({ progress, sound }) {
     feedback.className = "puzzle-feedback";
     hintLine.hidden = true;
     solutionLine.hidden = true;
+    if (nextButton) {
+      nextButton.disabled = daily;
+      nextButton.innerHTML = `${icon("puzzle")} ${daily ? "Sıradaki" : "Yeni Bulmaca"}`;
+    }
     refreshStats();
   }
 
@@ -181,6 +171,7 @@ export function PuzzlesPage({ progress, sound }) {
     if (!correct) {
       attempts += 1;
       streak = 0;
+      progress.recordPuzzleAttempt(puzzle.theme, "wrong");
       sound.play("error");
       board.shake(move.from);
       setFeedback(wrongMessage(played, probe), "wrong");
@@ -228,7 +219,15 @@ export function PuzzlesPage({ progress, sound }) {
     // İpucu almadan ve hata yapmadan çözülen bulmaca seriyi büyütür.
     const clean = attempts === 0;
     if (clean) streak += 1;
+    progress.recordPuzzleAttempt(puzzle.theme, "solved");
     progress.solvePuzzle(puzzle.id);
+    if (daily) {
+      dailySolved = Math.min(dailyGoal, progress.recordDailyPuzzle());
+      if (nextButton) nextButton.disabled = false;
+      if (dailySolved >= dailyGoal && nextButton) {
+        nextButton.innerHTML = `${icon("sparkles")} Çalışmayı tamamla`;
+      }
+    }
 
     sound.play("badge");
     burst(feedback);
@@ -254,6 +253,7 @@ export function PuzzlesPage({ progress, sound }) {
   function refreshStats() {
     solvedLine.textContent = String(progress.state.solvedPuzzles.length);
     streakLine.textContent = String(streak);
+    dailyLine.textContent = `${dailySolved}/${dailyGoal}`;
   }
 
   /* ---------------------------------------------------------------- *
@@ -298,6 +298,10 @@ export function PuzzlesPage({ progress, sound }) {
       onClick: () => {
         sound.play("click");
         attempts += 1; // ipucu kullanınca seri korunmaz
+        if (!hintRecorded) {
+          hintRecorded = true;
+          progress.recordPuzzleAttempt(puzzle.theme, "hint");
+        }
         hintLine.hidden = false;
         hintLine.textContent = `💡 ${puzzle.hint}`;
         sound.speak(puzzle.hint);
@@ -330,6 +334,10 @@ export function PuzzlesPage({ progress, sound }) {
       onClick: () => {
         sound.play("click");
         attempts += 1;
+        if (!solutionRecorded) {
+          solutionRecorded = true;
+          progress.recordPuzzleAttempt(puzzle.theme, "hint");
+        }
         solutionLine.hidden = false;
         solutionLine.textContent = `Doğru hamle: ${sanTr(puzzle.solution)} — ${puzzle.explanation}`;
         sound.speak(`Doğru hamle ${sanTr(puzzle.solution)}. ${puzzle.explanation}`);
@@ -339,12 +347,16 @@ export function PuzzlesPage({ progress, sound }) {
         if (move) board.showHint(move.from, move.to);
       }
     }),
-    el("button", {
+    nextButton = el("button", {
       className: "primary",
       type: "button",
-      html: `${icon("puzzle")} Yeni Bulmaca`,
+      html: `${icon("puzzle")} ${daily ? "Sıradaki" : "Yeni Bulmaca"}`,
       onClick: () => {
         sound.play("click");
+        if (daily && dailySolved >= dailyGoal) {
+          navigate("daily");
+          return;
+        }
         loadPuzzle();
       }
     })
@@ -353,8 +365,10 @@ export function PuzzlesPage({ progress, sound }) {
   loadPuzzle();
 
   return pageShell(
-    "Bulmacalar",
-    `${puzzles.length} doğrulanmış satranç problemi. Her bulmacanın tek bir doğru çözümü var — sen bulabilir misin?`,
+    daily ? "Bugünkü Çalışmam" : "Bulmacalar",
+    daily
+      ? "Sana özel seçilen beş soruyu tamamla."
+      : `${puzzles.length} doğrulanmış satranç problemi. Her bulmacanın tek bir doğru çözümü var — sen bulabilir misin?`,
     [
       el("section", { className: "puzzle-layout" }, [
         el("div", { className: "puzzle-board" }, [board.element]),
@@ -364,15 +378,16 @@ export function PuzzlesPage({ progress, sound }) {
           goalLine,
           el("div", { className: "puzzle-stats" }, [
             el("div", { className: "stat" }, [solvedLine, el("span", { text: "Çözülen" })]),
-            el("div", { className: "stat" }, [streakLine, el("span", { text: "Seri" })])
+            el("div", { className: "stat" }, [streakLine, el("span", { text: "Seri" })]),
+            daily ? el("div", { className: "stat" }, [dailyLine, el("span", { text: "Bugün" })]) : null
           ]),
           feedback,
           hintLine,
           solutionLine,
-          el("label", { className: "panel-label", text: "Konu" }),
-          el("div", { className: "puzzle-themes" }, themeButtons),
-          el("label", { className: "panel-label", text: "Zorluk seviyesi" }),
-          el("div", { className: "segmented" }, levelButtons),
+          daily ? el("p", { className: "daily-session-note", text: "Konu ve zorluk, önceki çalışmalarına göre otomatik seçiliyor." }) : el("label", { className: "panel-label", text: "Konu" }),
+          daily ? null : el("div", { className: "puzzle-themes" }, themeButtons),
+          daily ? null : el("label", { className: "panel-label", text: "Zorluk seviyesi" }),
+          daily ? null : el("div", { className: "segmented" }, levelButtons),
           controls
         ])
       ])

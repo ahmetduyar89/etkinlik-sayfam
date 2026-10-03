@@ -34,6 +34,7 @@ import { OverlayTimer } from '../tools/OverlayTimer';
 import { PageNav } from '../tools/PageNav';
 import { usePrompt } from '../common/PromptDialog';
 import { useToast } from '../common/ToastProvider';
+import { useSurfaceTint } from '../../utils/surfaceTint';
 import type {
     Activity,
     DrawConfig,
@@ -122,6 +123,10 @@ export function ActivityPreviewModal({
     const [drawHistory, setDrawHistory] = React.useState({ canUndo: false, canRedo: false });
     const prompt = usePrompt();
     const toast = useToast();
+
+    // Tam ekran koyu yüzey: kurulu uygulamada saat/pil şeridi de aynı renge
+    // boyansın, ekranın üstünde beyaz bir bant kalmasın.
+    useSurfaceTint('#0f172a');
 
     const [formattedHtml, setFormattedHtml] = React.useState<string>('');
     const [isLoadingContent, setIsLoadingContent] = React.useState(true);
@@ -509,13 +514,6 @@ export function ActivityPreviewModal({
                                 }
                                 onHistoryChange={(canUndo, canRedo) =>
                                     setDrawHistory({ canUndo, canRedo })
-                                }
-                                onRequestText={() =>
-                                    prompt({
-                                        title: 'Metin ekle',
-                                        placeholder: 'Yazı girin',
-                                        confirmLabel: 'Ekle',
-                                    })
                                 }
                             />
                             <TextBoxLayer

@@ -42,11 +42,13 @@ import {
 interface ChessTableProps {
     code: string;
     playerId: string;
+    studentId: string;
     playerName: string;
+    classId: string;
     onExit: () => void;
 }
 
-export function ChessTable({ code, playerId, playerName, onExit }: ChessTableProps) {
+export function ChessTable({ code, playerId, studentId, playerName, classId, onExit }: ChessTableProps) {
     const [room, setRoom] = useState<ChessRoom | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export function ChessTable({ code, playerId, playerName, onExit }: ChessTablePro
     // Masaya katıl (koltuk boşsa otur), sonra canlı dinlemeye geç.
     useEffect(() => {
         let alive = true;
-        joinRoom(code, playerId, playerName)
+        joinRoom(code, playerId, studentId, playerName, classId)
             .then(() => alive && setLoading(false))
             .catch((e: Error) => {
                 if (!alive) return;
@@ -76,7 +78,7 @@ export function ChessTable({ code, playerId, playerName, onExit }: ChessTablePro
             alive = false;
             stop();
         };
-    }, [code, playerId, playerName]);
+    }, [code, playerId, studentId, playerName, classId]);
 
     const myColor: PieceColor | null = room ? seatColor(room, playerId) : null;
 

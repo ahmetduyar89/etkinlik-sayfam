@@ -2,14 +2,42 @@ import { defaultProgress } from "../models/progress.js";
 import { badges, badgeStatus } from "../data/badges.js";
 
 const KEY = "satranc-okulu-progress";
+const VERSION = 2;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function localDayKey(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Eski ya da eksik kaydı güncel ilerleme biçimine tamamlar. */
+function normalizeProgress(value) {
+  const raw = value && typeof value === "object" ? value : {};
+  return {
+    ...clone(defaultProgress),
+    ...raw,
+    completedLessons: Array.isArray(raw.completedLessons) ? raw.completedLessons : [],
+    solvedPuzzles: Array.isArray(raw.solvedPuzzles) ? raw.solvedPuzzles : [],
+    puzzleStats: raw.puzzleStats && typeof raw.puzzleStats === "object" ? raw.puzzleStats : {},
+    dailyPractice: raw.dailyPractice && typeof raw.dailyPractice === "object" ? raw.dailyPractice : {},
+    badges: Array.isArray(raw.badges) ? raw.badges : [],
+    games: { ...defaultProgress.games, ...(raw.games || {}) },
+    gamesArchive: Array.isArray(raw.gamesArchive)
+      ? raw.gamesArchive.filter((entry) => entry?.id && Array.isArray(entry.moves)).slice(0, 100)
+      : [],
+    miniGames: raw.miniGames && typeof raw.miniGames === "object" ? raw.miniGames : {},
+    settings: { ...defaultProgress.settings, ...(raw.settings || {}) }
+  };
+}
+
 export class ProgressService {
   constructor() {
-    this.state = this.load();
+    this.store = this.load();
+    this.activeProfileId = this.store.activeProfileId;
+    this.state = this.store.profiles[this.activeProfileId];
     /** Değişiklik dinleyicileri — bkz. onChange(). */
     this.listeners = new Set();
   }
@@ -53,10 +81,88 @@ export class ProgressService {
   load() {
     try {
       const stored = JSON.parse(localStorage.getItem(KEY));
-      return { ...clone(defaultProgress), ...stored, settings: { ...defaultProgress.settings, ...stored?.settings } };
+      if (stored?.version === VERSION && stored.profiles && typeof stored.profiles === "object") {
+        const profiles = Object.fromEntries(
+          Object.entries(stored.profiles).map(([id, value]) => [id, normalizeProgress(value)])
+        );
+        if (!profiles.teacher) profiles.teacher = normalizeProgress(null);
+        const activeProfileId = profiles[stored.activeProfileId] ? stored.activeProfileId : "teacher";
+        return {
+          version: VERSION,
+          activeProfileId,
+          profiles,
+          profileNames: stored.profileNames && typeof stored.profileNames === "object"
+            ? stored.profileNames
+            : { teacher: "Öğretmen" }
+        };
+      }
+
+      // Sürüm 1 tek profildi. Bütün mevcut ilerlemeyi öğretmen profiline
+      // taşıyarak hiçbir XP, rozet veya tamamlanan dersi kaybetmeyiz.
+      return {
+        version: VERSION,
+        activeProfileId: "teacher",
+        profiles: { teacher: normalizeProgress(stored) },
+        profileNames: { teacher: "Öğretmen" }
+      };
     } catch {
-      return clone(defaultProgress);
+      return {
+        version: VERSION,
+        activeProfileId: "teacher",
+        profiles: { teacher: normalizeProgress(null) },
+        profileNames: { teacher: "Öğretmen" }
+      };
     }
+  }
+
+  /** Aktif profili değiştirir; profil yoksa temiz bir kayıt oluşturur. */
+  switchProfile(id, name = "Öğrenci") {
+    const profileId = String(id || "guest");
+    if (!this.store.profiles[profileId]) {
+      this.store.profiles[profileId] = normalizeProgress(null);
+    }
+    this.store.profileNames[profileId] = String(name || "Öğrenci").slice(0, 40);
+    this.activeProfileId = profileId;
+    this.store.activeProfileId = profileId;
+    this.state = this.store.profiles[profileId];
+    this.save();
+  }
+
+  /** Raporlarda kullanılmak üzere bir profil kaydını salt okunur biçimde bulur. */
+  profile(id) {
+    return this.store.profiles[String(id)] || null;
+  }
+
+  get activeProfileName() {
+    return this.store.profileNames[this.activeProfileId] || "Öğrenci";
+  }
+
+  /** Sınıf yedeğine eklenebilen tüm profil verisi. */
+  exportData() {
+    return clone(this.store);
+  }
+
+  /** Yeni birleşik yedekten profilleri yükler; eski yedeklerde çağrılmaz. */
+  importData(data) {
+    if (!data || data.version !== VERSION || !data.profiles || typeof data.profiles !== "object") {
+      return false;
+    }
+    const profiles = Object.fromEntries(
+      Object.entries(data.profiles).map(([id, value]) => [id, normalizeProgress(value)])
+    );
+    if (!profiles.teacher) profiles.teacher = normalizeProgress(null);
+    this.store = {
+      version: VERSION,
+      activeProfileId: profiles[data.activeProfileId] ? data.activeProfileId : "teacher",
+      profiles,
+      profileNames: data.profileNames && typeof data.profileNames === "object"
+        ? { ...data.profileNames, teacher: data.profileNames.teacher || "Öğretmen" }
+        : { teacher: "Öğretmen" }
+    };
+    this.activeProfileId = this.store.activeProfileId;
+    this.state = this.store.profiles[this.activeProfileId];
+    this.save();
+    return true;
   }
 
   /**
@@ -69,8 +175,10 @@ export class ProgressService {
    * kötüdür — o yüzden sessizce devam eder ve bir kez uyarırız.
    */
   save() {
+    this.store.activeProfileId = this.activeProfileId;
+    this.store.profiles[this.activeProfileId] = this.state;
     try {
-      localStorage.setItem(KEY, JSON.stringify(this.state));
+      localStorage.setItem(KEY, JSON.stringify(this.store));
       this.storageBlocked = false;
     } catch {
       if (!this.storageBlocked) {
@@ -102,11 +210,52 @@ export class ProgressService {
     }
   }
 
+  /** Bulmaca temasındaki doğru, yanlış ve ipucu kullanımını kaydeder. */
+  recordPuzzleAttempt(theme, kind) {
+    this.state.puzzleStats ||= {};
+    const stats = this.state.puzzleStats[theme] || { solved: 0, wrong: 0, hints: 0, lastAt: null };
+    if (kind === "solved") stats.solved += 1;
+    else if (kind === "wrong") stats.wrong += 1;
+    else if (kind === "hint") stats.hints += 1;
+    stats.lastAt = new Date().toISOString();
+    this.state.puzzleStats[theme] = stats;
+    this.save();
+  }
+
+  /** Günlük çalışma içinde çözülen soru sayısını bugünün kaydına ekler. */
+  recordDailyPuzzle() {
+    this.state.dailyPractice ||= {};
+    const day = localDayKey();
+    this.state.dailyPractice[day] = (this.state.dailyPractice[day] || 0) + 1;
+    this.save();
+    return this.state.dailyPractice[day];
+  }
+
+  dailyCount(day = localDayKey()) {
+    return this.state.dailyPractice?.[day] || 0;
+  }
+
   finishGame(result) {
     this.state.games[result] += 1;
     this.state.xp += result === "won" ? 30 : 12;
     this.checkBadges();
     this.save();
+  }
+
+  /**
+   * Tamamlanmış bir bilgisayar oyununu aktif profil arşivine ekler.
+   * Aynı oyun geri alınıp yeniden tamamlanırsa kimliğine göre güncellenir.
+   */
+  saveGame(game) {
+    if (!game?.id || !Array.isArray(game.moves)) return false;
+    this.state.gamesArchive ||= [];
+    const safe = clone(game);
+    const existing = this.state.gamesArchive.findIndex((entry) => entry.id === safe.id);
+    if (existing >= 0) this.state.gamesArchive.splice(existing, 1);
+    this.state.gamesArchive.unshift(safe);
+    this.state.gamesArchive = this.state.gamesArchive.slice(0, 100);
+    this.save();
+    return true;
   }
 
   /**
@@ -150,6 +299,7 @@ export class ProgressService {
 
   reset() {
     this.state = clone(defaultProgress);
+    this.store.profiles[this.activeProfileId] = this.state;
     this.save();
   }
 

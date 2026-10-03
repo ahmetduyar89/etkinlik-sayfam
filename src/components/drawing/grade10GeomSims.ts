@@ -34,6 +34,7 @@ function drawText(
         align?: CanvasTextAlign;
         baseline?: CanvasTextBaseline;
         scale?: number;
+        size?: number;
         color?: string;
         halo?: boolean;
         bold?: boolean;
@@ -48,7 +49,7 @@ function drawText(
         bold = true,
     } = options;
 
-    const fs = Math.round(k.fs * scale);
+    const fs = options.size ? Math.round(options.size) : Math.round(k.fs * scale);
     k.c.save();
     k.c.font = `${bold ? '700' : '600'} ${fs}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
     k.c.textAlign = align;
@@ -155,10 +156,9 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
     c.clip();
 
     // Sağdaki Kart Boyutları (Geniş, ferah ve asla metin çakışması yapmaz)
-    const cardW = icon ? 0 : Math.min(270, Math.max(225, r.w * 0.44));
-    const cardH = Math.min(r.h - 22, 310);
+    const cardW = icon ? 0 : Math.min(285, Math.max(240, r.w * 0.45));
     const cardX = r.x + r.w - cardW - 12;
-    const cardY = r.y + 11;
+    const cardY = r.y + 10;
 
     // Üçgen koordinatları:
     // C köşesi ve "Karşı" etiketi ile kart arasında güvenli boşluk
@@ -195,6 +195,24 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
     // 1. SAĞDAKİ DETAYLI FORMÜL VE BİLGİ KARTI
     // ─────────────────────────────────────────────────────────────────────────
     if (!icon) {
+        // Kart içeriğinin dikey bütçesini hesaplayalım
+        const maxAllowedCardH = r.h - 20;
+        const headH = 30;
+        const showId = s.showIdentities === 1;
+
+        // 4 Oran satırı yüksekliği
+        const itemH = maxAllowedCardH < 265 ? 32 : 36;
+        const itemGap = 3;
+        const ratiosTotalH = 4 * itemH + 3 * itemGap; // 137..153px
+
+        // Özdeşlikler bölümü alanı
+        const canShowIdentities = showId && maxAllowedCardH >= 240;
+        const identitiesH = canShowIdentities ? (maxAllowedCardH < 280 ? 44 : 60) : 0;
+
+        // Kartın gerçek içeriğe tam oturan yüksekliği
+        const neededCardH = headH + 6 + ratiosTotalH + (canShowIdentities ? (6 + identitiesH) : 0) + 8;
+        const cardH = Math.min(maxAllowedCardH, neededCardH);
+
         c.save();
         // Kart Ana Gövdesi
         c.fillStyle = '#0f172a';
@@ -208,24 +226,34 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
         }
         c.fill();
         c.stroke();
+        // Kart içine klipleme: hiçbir metin kart sınırını ASLA aşamaz!
+        c.clip();
 
         // Kart Üst Başlık Şeridi
-        const headH = fs * 2.1;
         c.fillStyle = '#1e293b';
+        c.fillRect(cardX, cardY, cardW, headH);
+        c.strokeStyle = '#334155';
+        c.lineWidth = 1;
         c.beginPath();
-        if (typeof c.roundRect === 'function') {
-            c.roundRect(cardX, cardY, cardW, headH, [12, 12, 0, 0]);
-        } else {
-            c.rect(cardX, cardY, cardW, headH);
-        }
-        c.fill();
+        c.moveTo(cardX, cardY + headH);
+        c.lineTo(cardX + cardW, cardY + headH);
+        c.stroke();
 
-        // Başlık Metni
-        drawText(k, `TRİGONOMETRİK ORANLAR (α = ${s.angle.toFixed(0)}°)`, cardX + cardW / 2, cardY + headH / 2, {
-            align: 'center',
+        // Başlık: Sol tarafta "TRİGONOMETRİK ORANLAR", sağ tarafta açının rozeti
+        drawText(k, 'TRİGONOMETRİK ORANLAR', cardX + 12, cardY + headH / 2, {
+            align: 'left',
             color: '#38bdf8',
             halo: false,
-            scale: 0.82,
+            size: 11,
+            bold: true,
+        });
+
+        drawText(k, `α = ${s.angle.toFixed(0)}°`, cardX + cardW - 12, cardY + headH / 2, {
+            align: 'right',
+            color: '#f59e0b',
+            halo: false,
+            size: 11.5,
+            bold: true,
         });
 
         // 4 Temel Oran Veri Yapısı
@@ -235,7 +263,7 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
                 def: 'Karşı / Hip',
                 formula: `b / c = ${opp.toFixed(1)} / ${hyp.toFixed(1)}`,
                 val: sinV.toFixed(3),
-                col: '#38bdf8', // Mavi
+                col: '#38bdf8',
                 bg: 'rgba(56, 189, 248, 0.08)',
                 bdr: 'rgba(56, 189, 248, 0.22)',
             },
@@ -244,7 +272,7 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
                 def: 'Komşu / Hip',
                 formula: `a / c = ${adj.toFixed(1)} / ${hyp.toFixed(1)}`,
                 val: cosV.toFixed(3),
-                col: '#fb7185', // Gül/Pembe
+                col: '#fb7185',
                 bg: 'rgba(251, 113, 133, 0.08)',
                 bdr: 'rgba(251, 113, 133, 0.22)',
             },
@@ -253,7 +281,7 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
                 def: 'Karşı / Komşu',
                 formula: `b / a = ${opp.toFixed(1)} / ${adj.toFixed(1)}`,
                 val: tanV.toFixed(3),
-                col: '#fbbf24', // Kehribar/Sarı
+                col: '#fbbf24',
                 bg: 'rgba(251, 191, 36, 0.08)',
                 bdr: 'rgba(251, 191, 36, 0.22)',
             },
@@ -262,25 +290,21 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
                 def: 'Komşu / Karşı',
                 formula: `a / b = ${adj.toFixed(1)} / ${opp.toFixed(1)}`,
                 val: cotV.toFixed(3),
-                col: '#34d399', // Zümrüt Yeşil
+                col: '#34d399',
                 bg: 'rgba(52, 211, 153, 0.08)',
                 bdr: 'rgba(52, 211, 153, 0.22)',
             },
         ];
 
-        // 2 Satırlı, asla çakışmayan ferah oran satırları
-        const startY = cardY + headH + 8;
-        const identitiesSpace = s.showIdentities ? Math.min(84, cardH * 0.31) : 0;
-        const availableRatiosH = cardH - headH - identitiesSpace - 16;
-        const itemH = Math.min(44, Math.max(34, availableRatiosH / 4));
+        // 2 Satırlı, asla çakışmayan ferah oran kutucukları
+        const startY = cardY + headH + 6;
         const itemPadX = 8;
         const innerW = cardW - itemPadX * 2;
 
         ratioRows.forEach((item, idx) => {
-            const itemY = startY + idx * (itemH + 3);
+            const itemY = startY + idx * (itemH + itemGap);
             const itemX = cardX + itemPadX;
 
-            // Mini satır kutucuğu
             c.fillStyle = item.bg;
             c.strokeStyle = item.bdr;
             c.lineWidth = 1;
@@ -294,18 +318,20 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
             c.stroke();
 
             // 1. Satır: Fonksiyon Adı & Tanım (Solda), Sonuç Değeri (Sağda)
-            const row1Y = itemY + itemH * 0.32;
+            const row1Y = itemY + itemH * 0.33;
             drawText(k, `${item.name} = ${item.def}`, itemX + 8, row1Y, {
                 align: 'left',
                 color: item.col,
                 halo: false,
-                scale: 0.76,
+                size: 11,
+                bold: true,
             });
             drawText(k, `= ${item.val}`, itemX + innerW - 8, row1Y, {
                 align: 'right',
                 color: '#ffffff',
                 halo: false,
-                scale: 0.80,
+                size: 11.5,
+                bold: true,
             });
 
             // 2. Satır: Sembolik & Sayısal Kesir Gösterimi (Solda, hafif soluk)
@@ -314,14 +340,14 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
                 align: 'left',
                 color: '#94a3b8',
                 halo: false,
+                size: 9.5,
                 bold: false,
-                scale: 0.68,
             });
         });
 
         // Özdeşlikler ve Tümler Açı Bölümü
-        if (s.showIdentities && cardH >= 240) {
-            const sepY = startY + 4 * (itemH + 3) + 4;
+        if (canShowIdentities) {
+            const sepY = startY + ratiosTotalH + 4;
             c.strokeStyle = '#334155';
             c.lineWidth = 1;
             c.beginPath();
@@ -329,32 +355,61 @@ export const trigRatioRender: Renderer = (k: Ctx) => {
             c.lineTo(cardX + cardW - 10, sepY);
             c.stroke();
 
-            // Alt Bölüm Başlığı
-            const idTitleY = sepY + fs * 0.9;
-            drawText(k, 'TEMEL ÖZDEŞLİKLER (Maarif Modeli)', cardX + cardW / 2, idTitleY, {
-                align: 'center',
-                color: '#94a3b8',
-                halo: false,
-                scale: 0.68,
-            });
+            if (identitiesH >= 55) {
+                // Ferah mod: Başlık + 3 net satır
+                const titleY = sepY + 11;
+                drawText(k, 'TEMEL ÖZDEŞLİKLER (Maarif Modeli)', cardX + cardW / 2, titleY, {
+                    align: 'center',
+                    color: '#64748b',
+                    halo: false,
+                    size: 9,
+                    bold: true,
+                });
 
-            // Özdeşlik 1 & 2 (Piramit/Pill)
-            const id1Y = idTitleY + fs * 1.15;
-            drawText(k, 'sin²α + cos²α = 1.000 ✓    |    tan α · cot α = 1.000 ✓', cardX + cardW / 2, id1Y, {
-                align: 'center',
-                color: '#a7f3d0',
-                halo: false,
-                scale: 0.72,
-            });
+                const id1Y = titleY + 14;
+                drawText(k, 'sin²α + cos²α = 1.000 ✓', cardX + cardW / 2, id1Y, {
+                    align: 'center',
+                    color: '#a7f3d0',
+                    halo: false,
+                    size: 10.5,
+                    bold: true,
+                });
 
-            // Tümler Açı Bağıntısı (sin α = cos β)
-            const id2Y = id1Y + fs * 1.05;
-            if (id2Y < cardY + cardH - 8) {
-                drawText(k, `β = ${betaDeg.toFixed(0)}° (Tümler)  ⇒  sin(α) = cos(β) = ${sinV.toFixed(3)}`, cardX + cardW / 2, id2Y, {
+                const id2Y = id1Y + 13;
+                drawText(k, 'tan α · cot α = 1.000 ✓', cardX + cardW / 2, id2Y, {
+                    align: 'center',
+                    color: '#fde68a',
+                    halo: false,
+                    size: 10.5,
+                    bold: true,
+                });
+
+                const id3Y = id2Y + 13;
+                drawText(k, `β = ${betaDeg.toFixed(0)}° (Tümler) ⇒ sin α = cos β`, cardX + cardW / 2, id3Y, {
                     align: 'center',
                     color: '#c084fc',
                     halo: false,
-                    scale: 0.70,
+                    size: 9.5,
+                    bold: true,
+                });
+            } else {
+                // Kompakt mod: 2 satır
+                const id1Y = sepY + 13;
+                drawText(k, 'sin²α + cos²α = 1.000 ✓   |   tan α · cot α = 1', cardX + cardW / 2, id1Y, {
+                    align: 'center',
+                    color: '#a7f3d0',
+                    halo: false,
+                    size: 9.5,
+                    bold: true,
+                });
+
+                const id2Y = id1Y + 14;
+                drawText(k, `β = ${betaDeg.toFixed(0)}° (Tümler) ⇒ sin α = cos β = ${sinV.toFixed(3)}`, cardX + cardW / 2, id2Y, {
+                    align: 'center',
+                    color: '#c084fc',
+                    halo: false,
+                    size: 9.5,
+                    bold: true,
                 });
             }
         }
@@ -497,7 +552,7 @@ export const trigRatioSpec: SimSpec = {
         const rad = (s.angle * Math.PI) / 180;
         const cosV = Math.cos(rad);
 
-        const cardW = isIconSize(r) ? 0 : Math.min(270, Math.max(225, r.w * 0.44));
+        const cardW = isIconSize(r) ? 0 : Math.min(285, Math.max(240, r.w * 0.45));
         const cardX = r.x + r.w - cardW - 12;
 
         const padLeft = isIconSize(r) ? 10 : Math.max(28, r.w * 0.08);
@@ -564,7 +619,6 @@ const sineCosineState = (o: MathObject): SineCosineState => ({
 export const sineCosineRender: Renderer = (k: Ctx) => {
     const { r, c } = k;
     const s = sineCosineState(k.o);
-    const fs = Math.max(9, Math.min(18, Math.min(r.w, r.h) / 14));
     const icon = isIconSize(r);
 
     c.save();
@@ -572,10 +626,10 @@ export const sineCosineRender: Renderer = (k: Ctx) => {
     c.rect(r.x, r.y, r.w, r.h);
     c.clip();
 
-    // Üçgen köşeleri (Çevrel çemberin alt tarafta taşmasını engellemek için tabanı 0.66'ya çektik)
-    const A = { x: r.x + r.w * s.ax, y: r.y + r.h * s.ay };
-    const B = { x: r.x + r.w * 0.22, y: r.y + r.h * 0.66 };
-    const C_pt = { x: r.x + r.w * 0.78, y: r.y + r.h * 0.66 };
+    // Üçgen köşeleri (Çevrel çemberin ve alt kartın ferah kalması için tabanı 0.63'e çektik)
+    const A = { x: r.x + r.w * s.ax, y: r.y + r.h * Math.max(0.22, s.ay) };
+    const B = { x: r.x + r.w * 0.22, y: r.y + r.h * 0.63 };
+    const C_pt = { x: r.x + r.w * 0.78, y: r.y + r.h * 0.63 };
 
     // Kenar uzunlukları (piksel ve normalize birim)
     const dBC = Math.hypot(C_pt.x - B.x, C_pt.y - B.y);
@@ -587,10 +641,18 @@ export const sineCosineRender: Renderer = (k: Ctx) => {
     const b = dAC / unitScale;
     const cSide = dAB / unitScale;
 
-    // A açısı kosinüsü
+    // 3 Açının kosinüs ve derece hesaplamaları
     const cosA = clamp((b * b + cSide * cSide - a * a) / (2 * b * cSide), -1, 1);
     const angA = Math.acos(cosA);
     const degA = (angA * 180) / Math.PI;
+
+    const cosB = clamp((a * a + cSide * cSide - b * b) / (2 * a * cSide), -1, 1);
+    const angB = Math.acos(cosB);
+    const degB = (angB * 180) / Math.PI;
+
+    const cosC = clamp((a * a + b * b - cSide * cSide) / (2 * a * b), -1, 1);
+    const angC = Math.acos(cosC);
+    const degC = (angC * 180) / Math.PI;
 
     // Çevrel Çember Merkezi (O)
     const d2 = 2 * (A.x * (B.y - C_pt.y) + B.x * (C_pt.y - A.y) + C_pt.x * (A.y - B.y));
@@ -601,12 +663,21 @@ export const sineCosineRender: Renderer = (k: Ctx) => {
         O = { x: ux, y: uy, r: Math.hypot(A.x - ux, A.y - uy) };
     }
 
-    // Çevrel çember çizimi (Kutudan aşırı taşmayacak şekilde)
-    if (O && O.r < r.w * 0.75 && O.y + O.r <= r.y + r.h + 20 && !icon) {
+    // Sinüs değerleri ve Çevrel Çap (2R)
+    const sinA = Math.sin(angA);
+    const sinB = Math.sin(angB);
+    const sinC = Math.sin(angC);
+    const R = sinA > 0.05 ? a / (2 * sinA) : 0;
+    const diameter2R = 2 * R;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 1. ÇEVREL ÇEMBER VE YARIÇAP ÇİZİMİ
+    // ─────────────────────────────────────────────────────────────────────────
+    if (O && O.r < r.w * 0.75 && !icon) {
         c.beginPath();
         c.arc(O.x, O.y, O.r, 0, Math.PI * 2);
-        c.strokeStyle = 'rgba(16, 185, 129, 0.45)';
-        c.lineWidth = 1.6;
+        c.strokeStyle = 'rgba(16, 185, 129, 0.40)';
+        c.lineWidth = 1.5;
         c.setLineDash([5, 4]);
         c.stroke();
         c.setLineDash([]);
@@ -620,99 +691,239 @@ export const sineCosineRender: Renderer = (k: Ctx) => {
         c.lineWidth = 1.5;
         c.stroke();
 
-        drawText(k, 'O (Çevrel Merkez)', O.x + fs * 0.6, O.y - fs * 0.4, {
+        // O noktasından C köşesine yarıçap (R) kesikli çizgisi
+        c.beginPath();
+        c.moveTo(O.x, O.y);
+        c.lineTo(C_pt.x, C_pt.y);
+        c.strokeStyle = 'rgba(16, 185, 129, 0.65)';
+        c.lineWidth = 1.4;
+        c.setLineDash([3, 3]);
+        c.stroke();
+        c.setLineDash([]);
+
+        drawText(k, `R = ${R.toFixed(1)}`, (O.x + C_pt.x) / 2 + 6, (O.y + C_pt.y) / 2 - 4, {
             align: 'left',
             color: '#059669',
             halo: true,
-            scale: 0.8,
+            size: 10,
+            bold: true,
+        });
+
+        drawText(k, 'O (Çevrel M.)', O.x + 8, O.y + 4, {
+            align: 'left',
+            color: '#059669',
+            halo: true,
+            size: 10,
+            bold: true,
         });
     }
 
-    // Üçgen gövdesi
-    c.fillStyle = withAlpha(k.color, 0.09);
-    c.strokeStyle = k.color;
-    c.lineWidth = Math.max(2, k.lw);
+    // ─────────────────────────────────────────────────────────────────────────
+    // 2. ÜÇGEN GÖVDESİ VE KENARLAR (Renk Kodlu)
+    // ─────────────────────────────────────────────────────────────────────────
+    c.fillStyle = 'rgba(56, 189, 248, 0.08)';
     c.beginPath();
     c.moveTo(A.x, A.y);
     c.lineTo(B.x, B.y);
     c.lineTo(C_pt.x, C_pt.y);
     c.closePath();
     c.fill();
+
+    // a kenarı (BC) - Zümrüt Yeşili (#10b981)
+    c.strokeStyle = '#10b981';
+    c.lineWidth = Math.max(3, k.lw + 1);
+    c.beginPath();
+    c.moveTo(B.x, B.y);
+    c.lineTo(C_pt.x, C_pt.y);
+    c.stroke();
+
+    // b kenarı (AC) - Gül / Mercan Pembe (#f43f5e)
+    c.strokeStyle = '#f43f5e';
+    c.lineWidth = Math.max(3, k.lw + 1);
+    c.beginPath();
+    c.moveTo(A.x, A.y);
+    c.lineTo(C_pt.x, C_pt.y);
+    c.stroke();
+
+    // c kenarı (AB) - Parlak Mavi (#2563eb)
+    c.strokeStyle = '#2563eb';
+    c.lineWidth = Math.max(3, k.lw + 1);
+    c.beginPath();
+    c.moveTo(A.x, A.y);
+    c.lineTo(B.x, B.y);
+    c.stroke();
+
+    // 3 Açının yayları ve etiketleri
+    const arcRad = 26;
+    // A açısı yayı (Tepe - Turuncu/Kehribar)
+    c.beginPath();
+    c.arc(A.x, A.y, arcRad, Math.atan2(B.y - A.y, B.x - A.x), Math.atan2(C_pt.y - A.y, C_pt.x - A.x));
+    c.strokeStyle = '#f59e0b';
+    c.lineWidth = 2.2;
+    c.stroke();
+
+    // B açısı yayı (Mavi)
+    c.beginPath();
+    c.arc(B.x, B.y, arcRad, -Math.atan2(B.y - A.y, A.x - B.x), 0);
+    c.strokeStyle = '#38bdf8';
+    c.lineWidth = 2.0;
+    c.stroke();
+
+    // C açısı yayı (Gül Pembe)
+    c.beginPath();
+    c.arc(C_pt.x, C_pt.y, arcRad, Math.PI - Math.atan2(C_pt.y - A.y, C_pt.x - A.x), Math.PI);
+    c.strokeStyle = '#fb7185';
+    c.lineWidth = 2.0;
     c.stroke();
 
     // Köşe etiketleri
-    drawText(k, `A (${degA.toFixed(0)}°)`, A.x, A.y - fs * 0.9, {
-        align: 'center',
-        color: '#b45309',
-        halo: true,
-        scale: 0.95,
-    });
-    drawText(k, 'B', B.x - fs * 0.7, B.y + fs * 0.4, { align: 'right', halo: true, scale: 0.95 });
-    drawText(k, 'C', C_pt.x + fs * 0.7, C_pt.y + fs * 0.4, { align: 'left', halo: true, scale: 0.95 });
+    drawText(k, `A (${degA.toFixed(0)}°)`, A.x, A.y - 14, { align: 'center', color: '#b45309', halo: true, size: 12, bold: true });
+    drawText(k, `B (${degB.toFixed(0)}°)`, B.x - 12, B.y + 12, { align: 'right', color: '#0284c7', halo: true, size: 11, bold: true });
+    drawText(k, `C (${degC.toFixed(0)}°)`, C_pt.x + 12, C_pt.y + 12, { align: 'left', color: '#e11d48', halo: true, size: 11, bold: true });
 
     if (!icon) {
-        // Kenarlar
-        drawText(k, `a = ${a.toFixed(1)}`, (B.x + C_pt.x) / 2, B.y + fs * 1.1, {
-            align: 'center',
-            color: '#0f172a',
-            halo: true,
-            scale: 0.88,
-        });
-        drawText(k, `b = ${b.toFixed(1)}`, (A.x + C_pt.x) / 2 + fs * 0.7, (A.y + C_pt.y) / 2, {
-            align: 'left',
-            color: '#0f172a',
-            halo: true,
-            scale: 0.88,
-        });
-        drawText(k, `c = ${cSide.toFixed(1)}`, (A.x + B.x) / 2 - fs * 0.7, (A.y + B.y) / 2, {
-            align: 'right',
-            color: '#0f172a',
-            halo: true,
-            scale: 0.88,
-        });
+        // Kenar etiketleri
+        drawText(k, `a = ${a.toFixed(1)}`, (B.x + C_pt.x) / 2, B.y + 16, { align: 'center', color: '#059669', halo: true, size: 11.5, bold: true });
+        drawText(k, `b = ${b.toFixed(1)}`, (A.x + C_pt.x) / 2 + 14, (A.y + C_pt.y) / 2, { align: 'left', color: '#e11d48', halo: true, size: 11.5, bold: true });
+        drawText(k, `c = ${cSide.toFixed(1)}`, (A.x + B.x) / 2 - 14, (A.y + B.y) / 2, { align: 'right', color: '#1d4ed8', halo: true, size: 11.5, bold: true });
 
-        // Üst rozet: Kosinüs Teoremi durumu
+        // ─────────────────────────────────────────────────────────────────────
+        // 3. ÜST PANEL: KOSİNÜS TEOREMİ (Açık, Net, Sayısal Doğrulamalı)
+        // ─────────────────────────────────────────────────────────────────────
+        const topW = Math.min(540, r.w - 24);
+        const topH = 58;
+        const topX = r.x + (r.w - topW) / 2;
+        const topY = r.y + 6;
+
+        c.save();
+        c.fillStyle = '#0f172a';
+        c.strokeStyle = '#334155';
+        c.lineWidth = 1.5;
+        c.beginPath();
+        if (typeof c.roundRect === 'function') {
+            c.roundRect(topX, topY, topW, topH, 10);
+        } else {
+            c.rect(topX, topY, topW, topH);
+        }
+        c.fill();
+        c.stroke();
+        c.clip();
+
+        // 1. Satır: Formül ve Durum
         const a2 = (a * a).toFixed(1);
         const b2c2 = (b * b + cSide * cSide).toFixed(1);
+        const cosTerm = (2 * b * cSide * cosA).toFixed(1);
 
-        let badgeText = '';
-        let badgeBg = '#f1f5f9';
-        let badgeCol = '#0f172a';
-        let badgeBdr = '#cbd5e1';
+        drawText(k, '📐 KOSİNÜS TEOREMİ: a² = b² + c² − 2·b·c·cos(A)', topX + 12, topY + 12, {
+            align: 'left',
+            color: '#38bdf8',
+            halo: false,
+            size: 11,
+            bold: true,
+        });
 
+        // Sağ köşe durum etiketi
+        let stateTag = '';
+        let stateCol = '#a7f3d0';
         if (Math.abs(degA - 90) < 1.5) {
-            badgeText = `A = 90° (Tam Pisagor) ⇒ a² (${a2}) = b² + c² (${b2c2})`;
-            badgeBg = '#dbeafe';
-            badgeCol = '#1e40af';
-            badgeBdr = '#93c5fd';
+            stateTag = 'A = 90° (Tam Pisagor) ✓';
+            stateCol = '#93c5fd';
         } else if (degA < 90) {
-            badgeText = `Dar Açı (A = ${degA.toFixed(0)}°) ⇒ a² (${a2}) < b² + c² (${b2c2}) [Kosinüs Teoremi]`;
-            badgeBg = '#dcfce7';
-            badgeCol = '#166534';
-            badgeBdr = '#86efac';
+            stateTag = `Dar Açı (A = ${degA.toFixed(0)}°) ⇒ a² < b² + c²`;
+            stateCol = '#a7f3d0';
         } else {
-            badgeText = `Geniş Açı (A = ${degA.toFixed(0)}°) ⇒ a² (${a2}) > b² + c² (${b2c2}) [Kosinüs Teoremi]`;
-            badgeBg = '#fee2e2';
-            badgeCol = '#991b1b';
-            badgeBdr = '#fca5a5';
+            stateTag = `Geniş Açı (A = ${degA.toFixed(0)}°) ⇒ a² > b² + c²`;
+            stateCol = '#fca5a5';
         }
 
-        drawBadge(k, badgeText, r.x + r.w / 2, r.y + fs * 1.2, {
-            bgColor: badgeBg,
-            textColor: badgeCol,
-            borderColor: badgeBdr,
-            scale: 0.82,
+        drawText(k, stateTag, topX + topW - 12, topY + 12, {
+            align: 'right',
+            color: stateCol,
+            halo: false,
+            size: 10.5,
+            bold: true,
         });
 
-        // Alt rozet: Sinüs Teoremi ve Çevrel Çap 2R
-        const sinA = Math.sin(angA);
-        const R = sinA > 0.05 ? a / (2 * sinA) : 0;
-        drawBadge(k, `Sinüs Teoremi: a / sin(A) = 2R = ${(2 * R).toFixed(1)} br (Çap)`, r.x + r.w / 2, r.y + r.h - fs * 1.2, {
-            bgColor: '#ede9fe',
-            textColor: '#5b21b6',
-            borderColor: '#c4b5fd',
-            scale: 0.82,
+        // 2. Satır: Tam Sayısal Açılım
+        const formulaCalc = `${a2} = (${b.toFixed(1)})² + (${cSide.toFixed(1)})² − 2·(${b.toFixed(1)})·(${cSide.toFixed(1)})·cos(${degA.toFixed(0)}°)`;
+        drawText(k, formulaCalc, topX + 12, topY + 29, {
+            align: 'left',
+            color: '#cbd5e1',
+            halo: false,
+            size: 10,
+            bold: false,
         });
+
+        // 3. Satır: Sonuç Değer Doğrulaması
+        const evalCalc = `= ${b2c2} − (${cosTerm}) = ${a2} ✓  (Teorem Eksiksiz Sağlandı)`;
+        drawText(k, evalCalc, topX + 12, topY + 45, {
+            align: 'left',
+            color: '#34d399',
+            halo: false,
+            size: 10,
+            bold: true,
+        });
+        c.restore();
+
+        // ─────────────────────────────────────────────────────────────────────
+        // 4. ALT PANEL: SİNÜS TEOREMİ VE ÇEVREL ÇAP (2R)
+        // ─────────────────────────────────────────────────────────────────────
+        const botW = Math.min(540, r.w - 24);
+        const botH = 58;
+        const botX = r.x + (r.w - botW) / 2;
+        const botY = r.y + r.h - botH - 6;
+
+        c.save();
+        c.fillStyle = '#0f172a';
+        c.strokeStyle = '#334155';
+        c.lineWidth = 1.5;
+        c.beginPath();
+        if (typeof c.roundRect === 'function') {
+            c.roundRect(botX, botY, botW, botH, 10);
+        } else {
+            c.rect(botX, botY, botW, botH);
+        }
+        c.fill();
+        c.stroke();
+        c.clip();
+
+        // 1. Satır: Teorem Ana Formülü
+        drawText(k, '⭕ SİNÜS TEOREMİ: a / sin(A) = b / sin(B) = c / sin(C) = 2R', botX + 12, botY + 12, {
+            align: 'left',
+            color: '#c084fc',
+            halo: false,
+            size: 11,
+            bold: true,
+        });
+
+        drawText(k, `2R = ${diameter2R.toFixed(1)} br (Çap)`, botX + botW - 12, botY + 12, {
+            align: 'right',
+            color: '#fbbf24',
+            halo: false,
+            size: 11,
+            bold: true,
+        });
+
+        // 2. Satır: 3 Açı ve 3 Kenarın Eşzamanlı Oranları
+        const sineRatiosText = `${a.toFixed(1)} / sin(${degA.toFixed(0)}°) = ${b.toFixed(1)} / sin(${degB.toFixed(0)}°) = ${cSide.toFixed(1)} / sin(${degC.toFixed(0)}°) = ${diameter2R.toFixed(1)} ✓`;
+        drawText(k, sineRatiosText, botX + 12, botY + 29, {
+            align: 'left',
+            color: '#f8fafc',
+            halo: false,
+            size: 10.5,
+            bold: true,
+        });
+
+        // 3. Satır: Çevrel Çember Yarıçapı ve Çap Açıklaması
+        const circumText = `Çevrel Çember Yarıçapı: R = ${R.toFixed(1)} br   |   Çevrel Çap: 2R = ${diameter2R.toFixed(1)} br (Tüm Oranlar Eşittir)`;
+        drawText(k, circumText, botX + 12, botY + 45, {
+            align: 'left',
+            color: '#94a3b8',
+            halo: false,
+            size: 9.5,
+            bold: false,
+        });
+        c.restore();
     }
 
     c.restore();

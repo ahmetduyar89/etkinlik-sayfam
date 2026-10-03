@@ -146,6 +146,8 @@ interface TextBoxLayerProps {
     enabled: boolean;
     /** Çalışma alanının yakınlaştırma/kaydırma durumu. */
     view?: Viewport;
+    /** Tanımlıysa notlar ve yeni not girişleri bu sayfanın içinde kalır. */
+    pageBox?: { w: number; h: number } | null;
 }
 
 const IDENTITY_VIEW: Viewport = { scale: 1, tx: 0, ty: 0 };
@@ -157,14 +159,23 @@ export function TextBoxLayer({
     onAdd,
     enabled,
     view = IDENTITY_VIEW,
+    pageBox,
 }: TextBoxLayerProps) {
     const handleClick = (e: React.MouseEvent) => {
         if (!enabled) return;
         const rect = e.currentTarget.getBoundingClientRect();
+        const worldX = (e.clientX - rect.left - view.tx) / view.scale;
+        const worldY = (e.clientY - rect.top - view.ty) / view.scale;
+        if (
+            pageBox &&
+            (worldX < 0 || worldX > pageBox.w || worldY < 0 || worldY > pageBox.h)
+        ) {
+            return;
+        }
         onAdd({
             id: Date.now().toString(),
-            x: (e.clientX - rect.left - view.tx) / view.scale - 60,
-            y: (e.clientY - rect.top - view.ty) / view.scale - 20,
+            x: worldX - 60,
+            y: worldY - 20,
             text: '',
             color: '#fff9c4',
             fontSize: 15,
@@ -178,6 +189,13 @@ export function TextBoxLayer({
                 enabled ? 'pointer-events-auto cursor-text' : 'pointer-events-none'
             )}
             onClick={handleClick}
+            style={
+                pageBox
+                    ? {
+                          clipPath: `polygon(${view.tx}px ${view.ty}px, ${view.tx + pageBox.w * view.scale}px ${view.ty}px, ${view.tx + pageBox.w * view.scale}px ${view.ty + pageBox.h * view.scale}px, ${view.tx}px ${view.ty + pageBox.h * view.scale}px)`,
+                      }
+                    : undefined
+            }
         >
             {boxes.map((b) => (
                 <TextBoxItem

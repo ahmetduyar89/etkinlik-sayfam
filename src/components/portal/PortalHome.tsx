@@ -1,3 +1,4 @@
+import { QrLoginHelpButton } from '../common/QrLogin';
 // src/components/portal/PortalHome.tsx — ATÖLYE ANA SAYFASI
 // ─────────────────────────────────────────────────────────────────────
 // Aydınlık, eğitsel bir kapak: kareli defter dokusu üzerinde yumuşak renk
@@ -7,7 +8,7 @@
 // gelir; yeni bir çalışma eklemek için bu dosyaya dokunmaya gerek yoktur.
 // ─────────────────────────────────────────────────────────────────────
 import { motion } from 'framer-motion';
-import { ArrowRight, Lock, Sparkles } from 'lucide-react';
+import { ArrowRight, Lock, Sparkles, Crown } from 'lucide-react';
 import { PORTAL_MODULES, type PortalModule } from '../../constants/portal';
 import { cn } from '../../utils/cn';
 import { InstallAppButton } from '../common/InstallAppButton';
@@ -45,7 +46,13 @@ export function PortalHome({ onOpenInternal }: PortalHomeProps) {
                         <span className="hidden border-l border-slate-200 pl-3 text-[13px] font-medium text-slate-500 sm:inline">
                             Atölye
                         </span>
+                        <span className="hidden lg:inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200/80 px-2 py-0.5 rounded-full text-[11px] font-bold">
+                            <Crown className="w-3 h-3 text-amber-600" />
+                            Öğretmen / Admin
+                        </span>
                         <div className="flex-1" />
+
+                        <QrLoginHelpButton />
                         <InstallAppButton />
                         <button
                             type="button"

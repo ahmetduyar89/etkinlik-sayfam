@@ -307,7 +307,7 @@ export class ClassroomService {
     return this.state.tournaments.find((t) => t.id === id) || null;
   }
 
-  createTournament({ classId, name, rounds, playerIds }) {
+  createTournament({ classId, name, rounds, playerIds, showMoveHints = true, requireTouchMove = false }) {
     if (!this.getClass(classId) || playerIds.length < 2) return null;
     // Başlangıç sırası (seed) kurada belirlenir: öğrencilerin reytingi yok ve
     // alfabetik sıra hep aynı çocukları ilk turda karşılaştırırdı.
@@ -318,6 +318,8 @@ export class ClassroomService {
       name: String(name || "").trim().slice(0, 40) || "Sınıf Turnuvası",
       createdAt: new Date().toISOString(),
       plannedRounds: Math.max(1, Math.min(20, Number(rounds) || 1)),
+      showMoveHints: showMoveHints !== false,
+      requireTouchMove: requireTouchMove === true,
       playerIds: seeded,
       withdrawn: [],
       rounds: [],

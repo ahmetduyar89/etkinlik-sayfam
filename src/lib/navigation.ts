@@ -18,6 +18,8 @@ const INTERNAL_IDS = PORTAL_MODULES.filter((m) => m.kind === 'internal').map((m)
 /** Adres çubuğundaki yoldan aktif bölümü çıkarır. */
 export function sectionFromLocation(): Section {
     const path = window.location.pathname.replace(/^\/+|\/+$/g, '');
+    // Eski ayrı Satranç Yönetimi bağlantıları artık birleşik Sınıflar merkezine gider.
+    if (path === 'satranc-yonetim') return 'siniflar';
     if (INTERNAL_IDS.includes(path)) return path;
     // Eski bağlantılarla uyum: /?app=etkinlikler
     const app = new URLSearchParams(window.location.search).get('app');

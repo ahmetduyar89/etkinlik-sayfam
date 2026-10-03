@@ -67,7 +67,9 @@ export type DrawingTool =
     | 'lasso'
     | 'rect'
     | 'circle'
+    | 'ellipse'
     | 'triangle'
+    | 'right_triangle'
     | 'polygon'
     | 'cube'
     | 'rect_prism'
@@ -79,10 +81,14 @@ export type DrawingTool =
     | 'line'
     | 'arrow'
     | 'double_arrow'
-    | 'dashed';
+    | 'dashed'
+    | 'diamond'
+    | 'star'
+    | 'tape';
 
 /** Kalem ucu karakteri: yazma hissini belirler. */
-export type PenType = 'ballpoint' | 'fountain' | 'brush' | 'marker';
+export type PenType = 'ballpoint' | 'fountain' | 'brush' | 'calligraphy' | 'marker' | 'graphite';
+export type PressureSensitivity = 'soft' | 'normal' | 'firm';
 
 /** Silgi davranışı: piksel silgisi mi, çizgiyi komple silen silgi mi. */
 export type EraserMode = 'pixel' | 'stroke';
@@ -92,6 +98,12 @@ export interface Point {
     y: number;
     /** 0..1 arası uç baskısı; dolma/fırça kalemde kalınlığı belirler. */
     p?: number;
+    timestamp?: number;
+    pressure?: number;
+    velocity?: number;
+    tiltX?: number;
+    tiltY?: number;
+    twist?: number;
 }
 
 export interface BoundingBox {
@@ -117,10 +129,42 @@ export interface Stroke {
     stampIcon?: string;
     /** Serbest çizim kalemlerinde uç karakteri (varsayılan: ballpoint). */
     penType?: PenType;
+    pressureSensitivity?: PressureSensitivity;
+    inkVersion?: 2;
+    opacity?: number;
     /** `tool === 'math'` olduğunda çizilecek matematik nesnesi. */
     math?: MathObject;
     /** `tool === 'image'` olduğunda görselin data URL'i. */
     src?: string;
+    /** Serbest çizginin deseni (kesikli/noktalı kalem). */
+    dash?: DashStyle;
+    /**
+     * Kutusunun merkezi etrafındaki dönüş açısı (radyan).
+     *
+     * Serbest çizim ve çokgende noktalar doğrudan döndürülür; iki noktayla
+     * tanımlanan şekiller, metin, damga, görsel ve matematik nesneleri
+     * eksenlere hizalı kaldığı için dönüşleri burada saklanır.
+     */
+    rotation?: number;
+    /** Yatayda ayna simetrisi (çevirme). */
+    flipX?: boolean;
+    /** Dikeyde ayna simetrisi (çevirme). */
+    flipY?: boolean;
+    /** Metin font ailesi (sans, serif, mono, cursive vb.) */
+    fontFamily?: string;
+    /** Metin hizalama */
+    textAlign?: 'left' | 'center' | 'right';
+    /** Kalın metin */
+    bold?: boolean;
+    /** İtalik metin */
+    italic?: boolean;
+    /** Çalışma bandı: kapalı mı (gizli) yoksa açılmış mı (görünür) */
+    tapeHidden?: boolean;
+    calligraphyAngle?: number;
+    shapeFillMode?: 'none' | 'solid' | 'transparent';
+    shapeFillOpacity?: number;
+    shapeBorderColor?: string;
+    shapeBorderStyle?: DashStyle;
 }
 
 /** Çalışma alanının yakınlaştırma ve kaydırma durumu. */
@@ -383,13 +427,73 @@ export interface DrawConfig {
     stampIcon: string;
     /** Serbest çizim kaleminin ucu. */
     penType?: PenType;
+    pressureSensitivity?: PressureSensitivity;
+    highlighterOpacity?: number;
     /** Serbest çizilen şekli tanıyıp düzgün şekle çevir. */
     snapShapes?: boolean;
     /** Şekil/çizgi çizerken 15° açı kilidi. */
     snapAngle?: boolean;
     /** Silgi davranışı. */
     eraserMode?: EraserMode;
+    /** Serbest çizginin deseni. */
+    dash?: DashStyle;
+    /** Kaybolan mürekkep: çizilen iz birkaç saniyede solar, sayfaya işlenmez. */
+    ephemeral?: boolean;
+    /** Kalem kullanılırken parmak/avuç dokunuşlarını yok say. */
+    palmRejection?: boolean;
+    /** Izgaraya ve diğer nesnelere yapışma. */
+    snapToGrid?: boolean;
+    /** Ekranda duran ölçü aracı (cetvel / gönye / açıölçer). */
+    ruler?: RulerKind | null;
+    /** Metin aracı varsayılan font ailesi. */
+    fontFamily?: string;
+    /** Metin aracı varsayılan hizalama. */
+    textAlign?: 'left' | 'center' | 'right';
+    /** Metin aracı varsayılan kalınlık. */
+    bold?: boolean;
+    /** Metin aracı varsayılan italik. */
+    italic?: boolean;
+    /** Kalem çizgi akıcılığı / titreme engelleme düzeyi. */
+    streamlineLevel?: 'natural' | 'smooth' | 'calligraphy';
+    /** Kaligrafi kalemi uç açısı (derece, varsayılan 45). */
+    calligraphyAngle?: number;
+    /** Fosforlu kalemde düz çizgiye otomatik hizalama. */
+    highlighterAutoStraight?: boolean;
+    /** Silme bittiğinde otomatik önceki kaleme geri dön. */
+    autoSwitchBackEraser?: boolean;
+    /** Şekil dolgu modu (yok, opak, yarı saydam). */
+    shapeFillMode?: 'none' | 'solid' | 'transparent';
+    /** Şekil dolgu opaklığı (0..1). */
+    shapeFillOpacity?: number;
+    /** Şekil kenarlık rengi. */
+    shapeBorderColor?: string;
+    /** Şekil kenarlık deseni. */
+    shapeBorderStyle?: DashStyle;
+    /** Kement filtresi: el yazısı seçilsin mi. */
+    lassoFilterHandwriting?: boolean;
+    /** Kement filtresi: şekiller seçilsin mi. */
+    lassoFilterShapes?: boolean;
+    /** Kement filtresi: metin kutuları seçilsin mi. */
+    lassoFilterText?: boolean;
+    /** Kement filtresi: fotoğraflar seçilsin mi. */
+    lassoFilterImages?: boolean;
+    /** Kement seçim kipi (serbest veya dikdörtgen). */
+    lassoMode?: 'freeform' | 'rect';
+    /** Karalayarak silme jesti. */
+    smartScribbleErase?: boolean;
+    /** Daire içine alıp bekleme ile kemente geçiş. */
+    circleToLasso?: boolean;
+    /** Silgi boyutu ön ayarı. */
+    eraserSize?: 'small' | 'medium' | 'large' | 'custom';
+    /** Çalışma bandı gizli/açık modu. */
+    tapeHidden?: boolean;
 }
+
+/** Serbest çizgi deseni. */
+export type DashStyle = 'solid' | 'dashed' | 'dotted';
+
+/** Ölçü aracı türü. */
+export type RulerKind = 'ruler' | 'setsquare' | 'protractor';
 
 export interface TextBoxData {
     id: string;
@@ -405,7 +509,14 @@ export interface TextBoxData {
  * listeleridir (seçim sırasıyla aynı hizada).
  */
 export type DragState =
-    | { type: 'move'; startX: number; startY: number; orig: Point[][] }
+    | {
+          type: 'move';
+          startX: number;
+          startY: number;
+          orig: Point[][];
+          /** Taşımaya başlarken seçimin kutusu — yapışma bunun kenarlarını kullanır. */
+          origBB?: BoundingBox;
+      }
     | {
           type: 'resize';
           handle: string;
@@ -430,6 +541,8 @@ export interface DrawingCanvasHandle {
     zoomBy: (factor: number) => void;
     /** Yakınlaştırmayı %100'e döndürür ve kaydırmayı sıfırlar. */
     resetView: () => void;
+    /** Görünümü sayfanın tamamı görünecek şekilde ayarlar. */
+    fitPage: () => void;
     getView: () => Viewport;
     deleteSelected: () => void;
     setSelectedColor: (color: string) => void;
@@ -448,6 +561,13 @@ export interface DrawingCanvasHandle {
     getPageCount: () => number;
     /** Tüm sayfaların çizim verisini (kayıt için) döndürür. */
     getPages: () => Stroke[][];
+    /**
+     * Şu anda bir hareket sürüyor mu (kalem kağıtta, nesne sürükleniyor,
+     * parmak ekranda)? Otomatik kayıt bu sırada beklemeli: sayfanın tamamını
+     * JSON'a çevirmek ana iş parçacığını kilitler ve çizgi kalemin gerisinde
+     * kalır.
+     */
+    isBusy: () => boolean;
     /** Kayıtlı sayfa verisini canvas'a yükler. */
     loadPages: (pages: Stroke[][]) => void;
     /** Başka bir cihazdan gelen değişiklikleri uygular (ortak çizim). */
@@ -456,7 +576,24 @@ export interface DrawingCanvasHandle {
      * Sayfayı PNG olarak indirir. `paper` verilirse kağıt deseni de çizilir —
      * desen ekranda CSS arka planı olduğundan aksi hâlde çıktıda görünmez.
      */
-    screenshot: (wbMode: boolean, color: string, paper?: PaperStyle) => void;
+    screenshot: (
+        wbMode: boolean,
+        color: string,
+        paper?: PaperStyle,
+        /** Sayfanın altına çizilecek arka plan (bağlı PDF sayfası). */
+        background?: HTMLCanvasElement | null
+    ) => void;
+    /**
+     * Belirtilen sayfayı yüksek çözünürlüklü bir canvas'a işler ve döndürür.
+     * Dışa aktarım ve PDF oluşturmada kullanılır.
+     */
+    renderPageToCanvas: (
+        pageIdx: number,
+        wbMode: boolean,
+        color: string,
+        paper?: PaperStyle,
+        background?: HTMLCanvasElement | null
+    ) => HTMLCanvasElement | null;
 }
 
 // ── Ortak çizim (canlı operasyon akışı) ─────────────────────────────────
@@ -499,6 +636,15 @@ export interface ToastMessage {
 // ── Defter / Klasör (Not Defteri modülü) ────────────────────────────────
 export type NotebookKind = 'notebook' | 'whiteboard';
 
+/**
+ * Sayfa boyutu.
+ *
+ * `free` eski davranıştır: sayfanın sınırı yoktur, çizim her yere yayılır.
+ * Diğerleri gerçek kağıt ölçüleridir; dışa aktarma ve şablon bölmeleri bu
+ * dikdörtgene göre hizalanır.
+ */
+export type PageSize = 'free' | 'a4p' | 'a4l' | 'a3p' | 'a3l' | 'b5p' | 'b5l' | 'wide169';
+
 export type PaperStyle =
     | 'grid'
     | 'lined'
@@ -511,7 +657,10 @@ export type PaperStyle =
     | 'music'
     | 'handwriting'
     | 'wide_lined'
-    | 'todo';
+    | 'todo'
+    | 'number_line'
+    | 'exam'
+    | 'lab_report';
 
 export interface DriveFolder {
     id: string;
@@ -529,6 +678,8 @@ export interface Notebook {
     kind: NotebookKind;
     parent_id: string | null;
     paper: PaperStyle;
+    /** Sayfa boyutu (A4, A3…). Verilmezse sınırsız çalışma alanı. */
+    page_size?: PageSize;
     bg_color?: string;
     page_count?: number;
     subject?: string;
@@ -540,6 +691,21 @@ export interface Notebook {
     pdf_name?: string;
     /** PDF'in toplam sayfa sayısı */
     pdf_total_pages?: number;
+    /**
+     * PDF sayfasının dünya ölçüsü (birim). Defter oluşturulurken PDF'in kendi
+     * punto ölçüsünden hesaplanır ve bir daha değişmez: sayfa her cihazda aynı
+     * boyutta durur, üstüne alınan notlar kaymaz. Eski defterlerde yoktur;
+     * onlar eski yerleşimle açılır.
+     */
+    pdf_box?: { w: number; h: number };
+    /** Bulut PDF dosyasının indirme bağlantısı (Firebase Storage veya harici URL - Her cihazda erişim) */
+    pdf_url?: string;
+    /** Firebase Storage yolu */
+    pdf_storage_path?: string;
+    /** PDF sayfa döndürme açıları (1 tabanlı sayfa numarası -> derece: 0, 90, 180, 270) */
+    pdf_rotations?: Record<number, number>;
+    /** PDF yer imleri (1 tabanlı sayfa numaraları dizisi) */
+    pdf_bookmarks?: number[];
     /**
      * Sayfa içeriğinin sürüm numarası. Her kayıtta artar; editör ve
      * görüntüleyici bu küçük üst veri dokümanını dinleyerek içeriğin başka
@@ -580,3 +746,6 @@ export interface NotebookContent {
     chunk?: string;
     updated_at?: string;
 }
+
+export * from './classroom';
+
