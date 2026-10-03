@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Damla'nın Su Döngüsü Macerası | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .pushable:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+    @keyframes pulseRing { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+    .dest-ring { animation: pulseRing 1s ease-in-out infinite; cursor: pointer; }
+    @keyframes rise { from { transform: translateY(0); opacity: 0.8; } to { transform: translateY(-26px); opacity: 0; } }
+    .vapor { animation: rise 2.2s linear infinite; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-sm font-black flex items-center gap-1"><span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span></a>
+      <div>
+        <div class="flex items-center gap-2"><span class="text-2xl sm:text-3xl">💧</span><h1 class="display text-lg sm:text-2xl font-black tracking-wide">Damla'nın Su Döngüsü Macerası</h1></div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Damla'yı buharlaştır, bulut yap, kar olarak yağdır! Doğru süreçleri seçip hedefe ulaştır. ☀️☁️❄️</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab">🗺️ 1. Maceralar</button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white">🔬 2. Serbest Yolculuk</button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">MACERA 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">İlk Yolculuk</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 p-2.5 bg-sky-50 rounded-xl border-2 border-ink">
+          <div class="flex items-center gap-2">
+            <span id="taskIcon" class="text-2xl">🎯</span>
+            <p id="taskText" class="text-xs sm:text-sm font-black">Damla denizde. Onu göle ulaştır!</p>
+          </div>
+          <div class="text-right shrink-0">
+            <p class="text-[10px] font-black text-gray-500">HAMLE</p>
+            <p id="movesText" class="display text-2xl font-black leading-none">0</p>
+          </div>
+        </div>
+
+        <div class="relative w-full rounded-2xl border-3 border-ink overflow-hidden">
+          <svg id="scene" viewBox="0 0 560 340" class="w-full h-auto block">
+            <defs>
+              <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7dd3fc" /><stop offset="100%" stop-color="#e0f2fe" /></linearGradient>
+              <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38bdf8" /><stop offset="100%" stop-color="#0369a1" /></linearGradient>
+            </defs>
+            <rect width="560" height="340" fill="url(#sky)" />
+            <!-- Soğuk hava bölgesi -->
+            <rect width="560" height="92" fill="#ffffff" opacity="0.25" />
+            <text x="552" y="13" font-size="9" font-weight="900" fill="#0369a1" text-anchor="end">❄️ YÜKSEKLERDE HAVA SOĞUK</text>
+            <!-- Güneş -->
+            <g transform="translate(300,36)">
+              <circle r="22" fill="#facc15" stroke="#0f172a" stroke-width="2.5" />
+              <g stroke="#f59e0b" stroke-width="3" stroke-linecap="round"><path d="M0 -30 v-6 M30 0 h6 M-30 0 h-6 M21 21 l4 4 M-21 21 l-4 4" /></g>
+            </g>
+            <!-- Dağ -->
+            <polygon points="0,290 95,95 210,290" fill="#78716c" stroke="#0f172a" stroke-width="3" />
+            <polygon points="70,146 95,95 120,146 106,138 95,150 84,138" fill="#f8fafc" stroke="#0f172a" stroke-width="2" />
+            <!-- Kara ve yeraltı -->
+            <path d="M0 290 L380 290 L380 340 L0 340 Z" fill="#a16207" />
+            <path d="M0 262 Q120 250 210 268 Q300 280 380 268 L380 292 L0 292 Z" fill="#65a30d" stroke="#0f172a" stroke-width="2.5" />
+            <ellipse cx="170" cy="318" rx="70" ry="13" fill="#38bdf8" stroke="#0f172a" stroke-width="2" opacity="0.85" />
+            <text x="170" y="322" font-size="9" font-weight="900" fill="#0c4a6e" text-anchor="middle">YERALTI SUYU</text>
+            <!-- Nehir -->
+            <path d="M112 150 Q130 190 118 215 Q108 240 160 252 Q210 262 238 270" fill="none" stroke="#0f172a" stroke-width="11" stroke-linecap="round" />
+            <path d="M112 150 Q130 190 118 215 Q108 240 160 252 Q210 262 238 270" fill="none" stroke="#38bdf8" stroke-width="7" stroke-linecap="round" />
+            <!-- Göl -->
+            <ellipse cx="258" cy="276" rx="44" ry="13" fill="#0ea5e9" stroke="#0f172a" stroke-width="2.5" />
+            <path d="M300 276 Q340 280 380 286" fill="none" stroke="#0f172a" stroke-width="9" /><path d="M300 276 Q340 280 380 286" fill="none" stroke="#38bdf8" stroke-width="5" />
+            <!-- Deniz -->
+            <path d="M372 270 Q470 262 560 268 L560 340 L372 340 Z" fill="url(#sea)" stroke="#0f172a" stroke-width="2.5" />
+            <g class="vapor" style="transform-box: fill-box"><path d="M420 256 q5 -6 0 -12 q-5 -6 0 -12 M455 256 q5 -6 0 -12 q-5 -6 0 -12 M490 256 q5 -6 0 -12 q-5 -6 0 -12" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" /></g>
+            <!-- Ağaç -->
+            <g transform="translate(335,262)">
+              <rect x="-5" y="-40" width="10" height="42" fill="#92400e" stroke="#0f172a" stroke-width="2" />
+              <circle cx="0" cy="-54" r="22" fill="#16a34a" stroke="#0f172a" stroke-width="2.5" />
+              <path d="M-4 2 q-8 14 -18 22 M4 2 q10 12 16 24" stroke="#92400e" stroke-width="2.5" fill="none" />
+            </g>
+            <!-- Bulutlar -->
+            <g id="cloudsLayer"></g>
+            <!-- Hedef halkaları ve yer etiketleri -->
+            <g id="nodesLayer"></g>
+            <!-- Damla -->
+            <g id="damla"></g>
+          </svg>
+          <div id="toast" class="px-3 py-2 border-t-3 border-ink bg-sky-50 text-xs sm:text-sm font-bold hidden"></div>
+        </div>
+
+        <div>
+          <p class="text-xs font-black text-gray-700 mb-2">🧭 Damla şimdi: <span id="whereText" class="text-sky-700">Denizde (sıvı)</span>. Hangi süreçle nereye gitsin?</p>
+          <div id="actions" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-xs font-black">🔄 Baştan Başla</button>
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black">💡 İpucu</button>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-sky-50 to-cyan-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">Dünyadaki su sürekli yer ve hâl değiştirir ama <b>kaybolmaz</b>. Bugün içtiğin su, milyonlarca yıl önce bir dinozorun içtiği su olabilir!</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">Döngü Kâşifi Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">📓</span><h3 class="display text-base font-black">Damla'nın Günlüğü</h3></div>
+          <span id="procCount" class="text-xs font-bold text-gray-500">0/7 süreç</span>
+        </div>
+        <div id="procChips" class="flex flex-wrap gap-1.5 mb-2"></div>
+        <ol id="journal" class="text-[11px] font-bold space-y-1 max-h-44 overflow-y-auto"></ol>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Fen Bilgisi Rehberi</h3></div>
+        <div class="space-y-2 text-xs">
+          <div class="p-2 bg-orange-50 rounded-lg border border-orange-300"><p class="font-extrabold text-orange-900">☀️ Buharlaşma (ısı alır)</p><p class="text-[11px] text-orange-800 font-semibold mt-0.5">Güneş denizleri, gölleri ve nehirleri ısıtır. Sıvı su, gaz hâlindeki su buharına dönüşür.</p></div>
+          <div class="p-2 bg-sky-50 rounded-lg border border-sky-300"><p class="font-extrabold text-sky-900">☁️ Yoğuşma (ısı verir)</p><p class="text-[11px] text-sky-800 font-semibold mt-0.5">Yükselen su buharı soğuk havada minik su damlacıklarına dönüşür. Milyonlarca damlacık bir araya gelince bulut olur.</p></div>
+          <div class="p-2 bg-indigo-50 rounded-lg border border-indigo-300"><p class="font-extrabold text-indigo-900">🌧️ Yağış</p><p class="text-[11px] text-indigo-800 font-semibold mt-0.5">Damlacıklar birleşip ağırlaşınca yağmur, kar ya da dolu olarak yere düşer.</p></div>
+          <div class="p-2 bg-emerald-50 rounded-lg border border-emerald-300"><p class="font-extrabold text-emerald-900">🏞️ Toplanma</p><p class="text-[11px] text-emerald-800 font-semibold mt-0.5">Yağan su nehirlerle akar, toprağa sızar, göllerde ve denizlerde toplanır. Sonra döngü yeniden başlar!</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Macera Tamam!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-sky-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-sky-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      up() { tone('sine', 300, 1200, 0.5, 0.12); },
+      down() { tone('sine', 1100, 300, 0.45, 0.12); },
+      drop() { for (let i = 0; i < 3; i++) tone('sine', 1200, 500, 0.07, 0.1, i * 0.1); },
+      wind() { tone('triangle', 200, 350, 0.5, 0.08); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. HARİTA ---
+    const NODES = {
+      deniz: { n: 'Deniz', x: 470, y: 300, form: 'sivi', where: 'Denizde (sıvı)' },
+      gol: { n: 'Göl', x: 258, y: 276, form: 'sivi', where: 'Gölde (sıvı)' },
+      nehir: { n: 'Nehir', x: 128, y: 205, form: 'sivi', where: 'Nehirde (sıvı)' },
+      dag: { n: 'Dağ Zirvesi', x: 95, y: 118, form: 'kati', where: 'Dağ zirvesinde kar (katı)' },
+      toprak: { n: 'Yeraltı Suyu', x: 110, y: 318, form: 'sivi', where: 'Yeraltında (sıvı)' },
+      agac: { n: 'Ağaç', x: 335, y: 214, form: 'sivi', where: 'Ağacın içinde (sıvı)' },
+      buhar: { n: 'Su Buharı', x: 430, y: 180, form: 'gaz', where: 'Havada su buharı (gaz)' },
+      bulutDeniz: { n: 'Deniz Bulutu', x: 450, y: 52, form: 'bulut', where: 'Denizin üstünde bulutta (damlacık)' },
+      bulutKara: { n: 'Dağ Bulutu', x: 175, y: 48, form: 'bulut', where: 'Dağın üstünde bulutta (damlacık)' }
+    };
+
+    const PROCS = {
+      buharlasma: { n: 'Buharlaşma', e: '☀️', c: '#fed7aa' },
+      yogusma: { n: 'Yoğuşma', e: '☁️', c: '#bae6fd' },
+      yagis: { n: 'Yağış', e: '🌧️', c: '#c7d2fe' },
+      erime: { n: 'Erime', e: '💧', c: '#a5f3fc' },
+      akis: { n: 'Akış', e: '🏞️', c: '#bbf7d0' },
+      sizma: { n: 'Sızma', e: '⬇️', c: '#fde68a' },
+      terleme: { n: 'Terleme', e: '🌳', c: '#d9f99d' }
+    };
+
+    const EDGES = [
+      { from: 'deniz', to: 'buhar', p: 'buharlasma', label: 'Güneş ısıtsın, buharlaş', info: 'Güneş denizi ısıttı. Damla <b>ısı alarak</b> sıvıdan gaza, yani su buharına dönüştü!' },
+      { from: 'gol', to: 'buhar', p: 'buharlasma', label: 'Güneş ısıtsın, buharlaş', info: 'Göl suyu ısınınca Damla <b>buharlaştı</b> ve görünmez su buharı olarak havaya karıştı.' },
+      { from: 'nehir', to: 'buhar', p: 'buharlasma', label: 'Güneş ısıtsın, buharlaş', info: 'Nehirdeki su da Güneş\'le ısınıp <b>buharlaşabilir</b>.' },
+      { from: 'agac', to: 'buhar', p: 'terleme', label: 'Yapraktan buhar olarak çık', info: 'Bitkiler yapraklarındaki minik gözeneklerden su buharı verir. Buna <b>terleme</b> denir.' },
+      { from: 'buhar', to: 'bulutDeniz', p: 'yogusma', label: 'Yüksel, soğu, bulut ol', info: 'Sıcak hava yükseldi. Yükseklerde hava soğuk olduğu için su buharı <b>ısı vererek</b> minik damlacıklara dönüştü: <b>yoğuşma</b>! Bulut oluştu.' },
+      { from: 'bulutDeniz', to: 'bulutKara', p: null, label: 'Rüzgârla karaya git', info: 'Rüzgâr bulutu denizden karaya, dağların üstüne taşıdı. 💨' },
+      { from: 'bulutKara', to: 'bulutDeniz', p: null, label: 'Rüzgârla denize git', info: 'Rüzgâr bulutu yeniden denizin üstüne taşıdı. 💨' },
+      { from: 'bulutDeniz', to: 'deniz', p: 'yagis', label: 'Yağmur olarak denize düş', info: 'Damlacıklar birleşip ağırlaştı ve <b>yağmur</b> olarak denize düştü.' },
+      { from: 'bulutKara', to: 'gol', p: 'yagis', label: 'Yağmur olarak göle düş', info: 'Damla <b>yağmur</b> olarak göle düştü.' },
+      { from: 'bulutKara', to: 'dag', p: 'yagis', label: 'Kar olarak zirveye düş', info: 'Dağın zirvesi çok soğuktu. Damla donarak <b>kar tanesi</b> hâlinde yağdı! ❄️' },
+      { from: 'bulutKara', to: 'toprak', p: 'sizma', label: 'Toprağa yağ ve içine sız', info: 'Damla yağmur olarak toprağa düştü ve topraktaki boşluklardan <b>sızarak</b> yeraltı suyuna karıştı.' },
+      { from: 'dag', to: 'nehir', p: 'erime', label: 'Baharda eri, nehre karış', info: 'Bahar geldi, Güneş karı ısıttı. Kar <b>ısı alarak eridi</b> ve nehre karıştı.' },
+      { from: 'nehir', to: 'gol', p: 'akis', label: 'Yokuş aşağı akıp göle dök', info: 'Su her zaman <b>yüksekten alçağa</b> doğru akar. Nehir Damla\'yı göle taşıdı.' },
+      { from: 'gol', to: 'deniz', p: 'akis', label: 'Akarsuyla denize ulaş', info: 'Gölden çıkan akarsu Damla\'yı <b>denize</b> taşıdı. Nehirler sonunda denizlere ulaşır.' },
+      { from: 'toprak', to: 'nehir', p: 'akis', label: 'Kaynaktan çıkıp nehre ak', info: 'Yeraltı suyu bir <b>kaynaktan</b> yeryüzüne çıktı ve nehre karıştı. İçtiğimiz kaynak suları da böyle oluşur!' },
+      { from: 'toprak', to: 'agac', p: null, label: 'Köklerle ağaca emil', info: 'Ağacın <b>kökleri</b> topraktaki suyu emdi. Su gövdeden yapraklara kadar taşındı.' }
+    ];
+
+    const LEVELS = [
+      { title: 'İlk Yolculuk', start: 'deniz', goal: 'gol', par: 4, task: 'Damla denizde. Onu göle ulaştır!', hint: 'Önce buharlaş, sonra bulut ol. Rüzgâr seni karaya taşısın ve göle yağ.', fact: 'Göllere ve nehirlere gelen tatlı suyun büyük kısmı, denizlerden buharlaşan suyun yağış olarak geri düşmesiyle oluşur.' },
+      { title: 'Zirveye Kar', start: 'gol', goal: 'dag', par: 4, task: 'Damla gölde. Dağın zirvesine kar olarak ulaştır!', hint: 'Kar olmak için soğuk dağın üstündeki buluttan yağmalısın.', fact: 'Kar, bulut içindeki su buharının çok soğuk havada <b>buz kristallerine</b> dönüşmesiyle oluşur. Her kar tanesinin altı kollu bir şekli vardır.' },
+      { title: 'Denize Dönüş', start: 'dag', goal: 'deniz', par: 3, task: 'Damla zirvede kar. Denize kadar yolculuk etsin!', hint: 'Kar önce erimeli. Sonra su yokuş aşağı akar.', fact: 'Dağlardaki karlar ilkbaharda eriyince nehirlerin suyu artar. Bu erime suyu barajları ve tarlaları besler.' },
+      { title: 'Gizli Yeraltı Yolu', start: 'deniz', goal: 'nehir', par: 5, must: ['toprak'], task: 'Denizden nehre git ama yolda yeraltı suyuna mutlaka uğra!', hint: 'Dağ bulutundan toprağa yağ ve sız. Sonra bir kaynaktan nehre çık.', fact: 'Yeraltı suları kuyulardan ve kaynaklardan çıkarılarak içme suyu olarak kullanılır. Temiz tutulmaları çok önemlidir.' },
+      { title: 'Ağacın Nefesi', start: 'toprak', goal: 'bulutKara', par: 4, must: ['agac'], task: 'Yeraltındaki Damla bir ağaçtan geçerek dağ bulutuna ulaşsın!', hint: 'Kökler seni emsin, yapraklardan buhar olarak çık. Sonra bulut ol ve rüzgârla dağa git.', fact: 'Büyük bir ağaç bir yaz gününde yapraklarından yüzlerce litre suyu buhar olarak havaya verebilir. Ormanlar yağışa bu yüzden katkı sağlar.' },
+      { title: 'Büyük Döngü', start: 'deniz', goal: 'deniz', par: 7, needProcs: ['buharlasma', 'yogusma', 'yagis', 'erime', 'akis'], task: 'Denizden başla, buharlaşma, yoğuşma, yağış, erime ve akışın hepsini kullanıp denize geri dön!', hint: 'Deniz ➔ buhar ➔ bulut ➔ dağ bulutu ➔ kar ➔ nehir ➔ göl ➔ deniz.', fact: 'Tebrikler! Suyun Güneş enerjisiyle sürekli hâl ve yer değiştirmesine <b>su döngüsü</b> denir. Bu döngü sayesinde yeryüzünde tatlı su yenilenir.' }
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: İlk Buharlaşma', text: 'İlk macerayı tamamla.' },
+      { id: 'm2', title: '2. Görev: Süreç Koleksiyoncusu', text: '7 farklı süreci de kullan.', progress: 'procs' },
+      { id: 'm3', title: '3. Görev: Dünya Gezgini', text: 'Haritadaki 9 yerin hepsine uğra.', progress: 'places' },
+      { id: 'm4', title: '4. Görev: Döngü Ustası', text: '6 macerayı da tamamla.' }
+    ];
+
+    // --- 3. DURUM ---
+    const $ = id => document.getElementById(id);
+    let mode = 'levels';
+    let levelIndex = 0;
+    let pos = 'deniz';
+    let moves = 0;
+    let visited = new Set();
+    let usedProcs = new Set();
+    let busy = false;
+    let finished = false;
+    let score = 0;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    const allProcs = new Set();
+    const allPlaces = new Set();
+    let modalTimer = null;
+
+    // --- 4. ÇİZİM ---
+    function damlaSvg(form) {
+      const face = '<circle cx="-4" cy="2" r="2" fill="#0f172a" /><circle cx="4" cy="2" r="2" fill="#0f172a" /><path d="M-4 7 q4 4 8 0" stroke="#0f172a" stroke-width="1.8" fill="none" />';
+      if (form === 'gaz') return `<g opacity="0.95"><circle cx="-8" cy="2" r="9" fill="#f1f5f9" stroke="#0f172a" stroke-width="2" stroke-dasharray="3 2" /><circle cx="6" cy="-2" r="11" fill="#f1f5f9" stroke="#0f172a" stroke-width="2" stroke-dasharray="3 2" />${face}</g>`;
+      if (form === 'kati') return `<g><g stroke="#0f172a" stroke-width="5" stroke-linecap="round">${[0, 60, 120].map(a => `<line x1="-16" y1="0" x2="16" y2="0" transform="rotate(${a})" />`).join('')}</g><g stroke="#e0f2fe" stroke-width="3" stroke-linecap="round">${[0, 60, 120].map(a => `<line x1="-15" y1="0" x2="15" y2="0" transform="rotate(${a})" />`).join('')}</g><circle r="8" fill="#e0f2fe" stroke="#0f172a" stroke-width="2" />${face}</g>`;
+      if (form === 'bulut') return `<g><circle cx="-10" cy="4" r="10" fill="#fff" stroke="#0f172a" stroke-width="2" /><circle cx="8" cy="0" r="13" fill="#fff" stroke="#0f172a" stroke-width="2" /><circle cx="-1" cy="-6" r="10" fill="#fff" stroke="#0f172a" stroke-width="2" /><rect x="-18" y="2" width="34" height="10" fill="#fff" />${face}</g>`;
+      return `<g><path d="M0 -20 Q14 -2 12 8 A12 12 0 0 1 -12 8 Q-14 -2 0 -20 Z" fill="#38bdf8" stroke="#0f172a" stroke-width="2.5" /><ellipse cx="-4" cy="-4" rx="2.5" ry="4" fill="#ffffff" opacity="0.8" />${face}</g>`;
+    }
+
+    function renderClouds() {
+      const cloud = (x, y, s) => `<g transform="translate(${x},${y}) scale(${s})"><circle cx="-26" cy="6" r="18" fill="#fff" stroke="#0f172a" stroke-width="2.5" /><circle cx="0" cy="-6" r="24" fill="#fff" stroke="#0f172a" stroke-width="2.5" /><circle cx="28" cy="6" r="18" fill="#fff" stroke="#0f172a" stroke-width="2.5" /><rect x="-40" y="4" width="80" height="20" rx="10" fill="#fff" /></g>`;
+      $('cloudsLayer').innerHTML = cloud(450, 55, 0.9) + cloud(175, 50, 0.9);
+    }
+
+    function renderNodes() {
+      const opts = mode === 'levels' && finished ? [] : EDGES.filter(e => e.from === pos);
+      let h = '';
+      Object.entries(NODES).forEach(([k, n]) => {
+        const isDest = opts.some(e => e.to === k);
+        const isGoal = mode === 'levels' && LEVELS[levelIndex].goal === k;
+        const isMust = mode === 'levels' && (LEVELS[levelIndex].must || []).includes(k) && !visited.has(k);
+        if (isDest) h += `<circle class="dest-ring" data-to="${k}" cx="${n.x}" cy="${n.y}" r="24" fill="#facc15" fill-opacity="0.25" stroke="#facc15" stroke-width="4" stroke-dasharray="6 4" />`;
+        if (isGoal) h += `<text x="${n.x + 20}" y="${n.y - 16}" font-size="18">🏁</text>`;
+        if (isMust) h += `<text x="${n.x - 34}" y="${n.y - 14}" font-size="16">📍</text>`;
+        const lw = n.n.length * 5.6 + 12;
+        h += `<g pointer-events="none"><rect x="${n.x - lw / 2}" y="${n.y + 20}" width="${lw}" height="15" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" opacity="${isDest || isGoal ? 1 : 0.75}" /><text x="${n.x}" y="${n.y + 31}" font-size="9" font-weight="900" text-anchor="middle">${n.n}</text></g>`;
+      });
+      $('nodesLayer').innerHTML = h;
+      $('nodesLayer').querySelectorAll('.dest-ring').forEach(el => el.addEventListener('click', () => {
+        const e = EDGES.find(x => x.from === pos && x.to === el.dataset.to);
+        if (e) doMove(e);
+      }));
+    }
+
+    function renderDamla(animate, edge) {
+      const n = NODES[pos];
+      const g = $('damla');
+      g.innerHTML = damlaSvg(n.form);
+      if (animate && typeof gsap !== 'undefined') {
+        const from = NODES[edge.from];
+        const st = { x: from.x, y: from.y };
+        gsap.fromTo(st, { x: from.x, y: from.y }, {
+          x: n.x, y: n.y, duration: 0.9, ease: 'power1.inOut',
+          onUpdate: () => g.setAttribute('transform', `translate(${st.x},${st.y})`),
+          onComplete: () => { busy = false; afterMove(); }
+        });
+        gsap.fromTo(g.firstElementChild, { scale: 0.4, transformOrigin: 'center' }, { scale: 1, duration: 0.5, delay: 0.4, ease: 'back.out(2)' });
+      } else {
+        g.setAttribute('transform', `translate(${n.x},${n.y})`);
+        busy = false;
+        if (animate) afterMove();
+      }
+    }
+
+    function renderActions() {
+      const opts = EDGES.filter(e => e.from === pos);
+      $('actions').innerHTML = opts.map((e, i) => {
+        const pr = e.p ? PROCS[e.p] : { n: e.label.includes('Rüzgâr') ? 'Rüzgâr' : 'Kökler', e: e.label.includes('Rüzgâr') ? '💨' : '🌱', c: '#f1f5f9' };
+        return `<button data-i="${EDGES.indexOf(e)}" ${finished || busy ? 'disabled' : ''} class="act pushable p-2 text-left flex items-center gap-2" style="background:${pr.c}">
+          <span class="text-2xl">${pr.e}</span>
+          <span><span class="block text-[10px] font-black uppercase tracking-wider text-gray-600">${pr.n}</span><span class="block text-xs font-black">${e.label} ➔ ${NODES[e.to].n}</span></span></button>`;
+      }).join('');
+      $('actions').querySelectorAll('.act').forEach(b => b.addEventListener('click', () => doMove(EDGES[+b.dataset.i])));
+      $('whereText').textContent = NODES[pos].where;
+      $('movesText').textContent = moves;
+    }
+
+    function renderJournalChips() {
+      const src = mode === 'levels' ? usedProcs : allProcs;
+      $('procChips').innerHTML = Object.entries(PROCS).map(([k, p]) =>
+        `<span class="px-2 py-0.5 rounded-lg border-2 border-ink text-[10px] font-black ${src.has(k) ? '' : 'opacity-30'}" style="background:${p.c}">${p.e} ${p.n}</span>`).join('');
+      $('procCount').textContent = `${src.size}/7 süreç`;
+    }
+
+    // --- 5. HAREKET ---
+    function doMove(edge) {
+      if (busy || (mode === 'levels' && finished) || edge.from !== pos) return;
+      initAudio();
+      busy = true;
+      pos = edge.to;
+      moves++;
+      visited.add(pos); allPlaces.add(pos);
+      if (edge.p) { usedProcs.add(edge.p); allProcs.add(edge.p); }
+      if (edge.p === 'buharlasma' || edge.p === 'terleme' || edge.p === 'yogusma') Sound.up();
+      else if (edge.p === 'yagis' || edge.p === 'sizma') Sound.drop();
+      else if (!edge.p) Sound.wind();
+      else Sound.down();
+      const li = document.createElement('li');
+      li.innerHTML = `${moves}. ${edge.p ? PROCS[edge.p].e + ' <b>' + PROCS[edge.p].n + '</b>' : '💨 <b>' + (edge.label.includes('Rüzgâr') ? 'Rüzgâr' : 'Kökler') + '</b>'} ➔ ${NODES[edge.to].n}`;
+      $('journal').appendChild(li);
+      li.scrollIntoView({ block: 'nearest' });
+      toast(edge.info);
+      $('scienceNote').innerHTML = edge.info;
+      renderActions();
+      renderNodes();
+      renderJournalChips();
+      renderMissions();
+      renderDamla(true, edge);
+    }
+
+    function afterMove() {
+      renderActions();
+      if (allProcs.size >= 7) completeMission('m2');
+      if (allPlaces.size >= 9) completeMission('m3');
+      if (mode !== 'levels') return;
+      const L = LEVELS[levelIndex];
+      if (pos !== L.goal || moves === 0) return;
+      const missing = (L.must || []).filter(k => !visited.has(k));
+      const missingP = (L.needProcs || []).filter(k => !usedProcs.has(k));
+      if (missing.length === 0 && missingP.length === 0) winLevel();
+      else toast(`🏁 Hedefe vardın ama eksik var: ${missing.map(k => NODES[k].n).concat(missingP.map(k => PROCS[k].n)).join(', ')}. Yolculuğa devam et!`);
+    }
+
+    let toastT = null;
+    function toast(html) {
+      const t = $('toast'); t.innerHTML = html; t.classList.remove('hidden');
+      clearTimeout(toastT); toastT = setTimeout(() => t.classList.add('hidden'), 4500);
+    }
+
+    // --- 6. AKIŞ ---
+    function winLevel() {
+      finished = true;
+      const L = LEVELS[levelIndex];
+      const s = moves <= L.par ? 3 : moves <= L.par + 2 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20;
+      if (levelIndex === 0) completeMission('m1');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      updateScore(); renderLevelDots(); renderActions(); renderNodes();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 }, colors: ['#38bdf8', '#0ea5e9', '#ffffff', '#facc15'] });
+      showModal({ emoji: '💧', title: 'Macera Tamam!', stars: '⭐'.repeat(s) + '☆'.repeat(3 - s), info: `${moves} hamlede ulaştın. (En kısa yol: ${L.par} hamle)`, fact: L.fact, next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Serbest Yolculuk 🔬' });
+    }
+
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info; $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next); if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 900);
+    }
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        let extra = '';
+        if (!done && m.progress === 'procs') extra = ` <b class="text-sky-700">(${allProcs.size}/7)</b>`;
+        if (!done && m.progress === 'places') extra = ` <b class="text-sky-700">(${allPlaces.size}/9)</b>`;
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5"><span class="text-lg">${done ? '✅' : '⬜'}</span><div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}${extra}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Maceralar:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function resetJourney(start) {
+      pos = start; moves = 0; busy = false;
+      visited = new Set([start]); usedProcs = new Set();
+      allPlaces.add(start);
+      $('journal').innerHTML = `<li>🚩 Başlangıç: ${NODES[start].n}</li>`;
+      $('toast').classList.add('hidden');
+      renderDamla(false); renderActions(); renderNodes(); renderJournalChips(); renderMissions();
+    }
+
+    function loadLevel(i) {
+      closeModal();
+      mode = 'levels'; levelIndex = i; finished = false;
+      const L = LEVELS[i];
+      $('levelBadge').textContent = `MACERA ${i + 1}`;
+      $('levelTitle').textContent = L.title;
+      $('taskIcon').textContent = '🎯';
+      $('taskText').textContent = L.task;
+      renderLevelDots();
+      resetJourney(L.start);
+    }
+
+    function switchMode(m) {
+      const isS = m === 'sandbox';
+      $('tabLevels').classList.toggle('active-tab', !isS); $('tabLevels').classList.toggle('bg-white', isS);
+      $('tabSandbox').classList.toggle('active-tab', isS); $('tabSandbox').classList.toggle('bg-white', !isS);
+      $('levelDots').classList.toggle('hidden', isS);
+      if (isS) {
+        closeModal();
+        mode = 'sandbox'; finished = false;
+        $('levelBadge').textContent = 'SERBEST';
+        $('levelTitle').textContent = 'Serbest Yolculuk';
+        $('taskIcon').textContent = '🌍';
+        $('taskText').textContent = 'Damla\'yı dilediğin gibi gezdir. Bütün süreçleri ve yerleri keşfet!';
+        resetJourney('deniz');
+      } else loadLevel(levelIndex);
+    }
+
+    $('btnReset').addEventListener('click', () => { Sound.click(); if (mode === 'levels') loadLevel(levelIndex); else resetJourney('deniz'); });
+    $('btnHint').addEventListener('click', () => {
+      Sound.click();
+      $('scienceNote').innerHTML = mode === 'levels' ? `<b>İpucu:</b> ${LEVELS[levelIndex].hint}` : '<b>Keşif fikri:</b> Damla\'yı hiç denize uğratmadan tekrar buluta ulaştırabilir misin? (İpucu: göller, nehirler ve ağaçlar da suyu havaya gönderir.)';
+    });
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('sandbox'); });
+    $('btnModalRetry').addEventListener('click', () => loadLevel(levelIndex));
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('sandbox'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; Sound.click(); });
+
+    renderClouds(); updateScore(); loadLevel(0);
+  </script>
+</body>
+</html>

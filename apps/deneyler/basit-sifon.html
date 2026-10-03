@@ -1,0 +1,1960 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Basit Sifon Yapalım: Suyun Kendiliğinden Akışı - Küçük Mucitler</title>
+
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- GSAP Animation Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            paper: '#fffdfa',
+            ink: '#182b4d',
+            sun: '#facc15',
+            waterBlue: '#0284c7',
+            waterDark: '#0369a1',
+            tubePlastic: '#e0f2fe'
+          },
+          fontFamily: {
+            display: ['"Baloo 2"', 'cursive'],
+            body: ['Nunito', 'sans-serif']
+          },
+          borderWidth: {
+            '3': '3px'
+          },
+          boxShadow: {
+            card: '0 8px 0 #182b4d',
+            'card-sm': '0 4px 0 #182b4d',
+            'card-lg': '0 12px 0 #182b4d',
+            'card-pressed': '0 2px 0 #182b4d'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #f0fdf4;
+      color: #182b4d;
+      background-image:
+        radial-gradient(#bbf7d0 1.5px, transparent 1.5px),
+        radial-gradient(#dcfce7 1.5px, transparent 1.5px);
+      background-size: 28px 28px;
+      background-position: 0 0, 14px 14px;
+    }
+
+    .display {
+      font-family: 'Baloo 2', cursive;
+      font-weight: 800;
+    }
+
+    .chunky {
+      border: 3px solid #182b4d;
+      border-radius: 20px;
+      box-shadow: 0 6px 0 #182b4d;
+    }
+
+    .pushable {
+      border: 3px solid #182b4d;
+      border-radius: 14px;
+      box-shadow: 0 4px 0 #182b4d;
+      transition: all 0.12s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .pushable:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 #182b4d;
+    }
+
+    .pushable:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #182b4d;
+    }
+
+    /* Hortum içi su akışı çizgili animasyon */
+    @keyframes waterFlowForward {
+      0% { stroke-dashoffset: 48; }
+      100% { stroke-dashoffset: 0; }
+    }
+    @keyframes waterFlowReverse {
+      0% { stroke-dashoffset: 0; }
+      100% { stroke-dashoffset: 48; }
+    }
+    .flow-forward {
+      stroke-dasharray: 10 6;
+      animation: waterFlowForward 0.8s linear infinite;
+    }
+    .flow-reverse {
+      stroke-dasharray: 10 6;
+      animation: waterFlowReverse 0.8s linear infinite;
+    }
+
+    /* Su dalgalanma efekti */
+    @keyframes waterWave {
+      0%, 100% { transform: scaleY(1); }
+      50% { transform: scaleY(1.08); }
+    }
+    .wave-active {
+      animation: waterWave 1.2s ease-in-out infinite;
+      transform-origin: bottom center;
+    }
+
+    /* Yüzen akış rozetleri zıplama efekti */
+    @keyframes floatPulse {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-4px); }
+    }
+    .float-badge {
+      animation: floatPulse 1.5s ease-in-out infinite;
+    }
+
+    /* Girdap dönme efekti */
+    @keyframes spinVortex {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .vortex-spin {
+      animation: spinVortex 2s linear infinite;
+      transform-origin: center;
+    }
+
+    /* Özel kaydırma çubuğu (Slider) stilleri */
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: #e2e8f0;
+      border: 2px solid #182b4d;
+      border-radius: 9999px;
+      height: 12px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #facc15;
+      border: 2.5px solid #182b4d;
+      box-shadow: 0 2px 0 #182b4d;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-3 sm:p-5 md:p-6 select-none">
+
+  <!-- ÜST GEZİNME VE BAŞLIK ÇUBUĞU -->
+  <header class="max-w-6xl w-full mx-auto mb-4">
+    <div class="bg-white px-4 py-3 chunky flex flex-wrap items-center justify-between gap-3 shadow-card">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-ink text-sm font-black flex items-center gap-1.5" title="Ana Sayfaya Dön">
+          <span>🏠</span>
+          <span class="hidden sm:inline">Deneyler</span>
+        </a>
+        <div class="h-6 w-0.5 bg-gray-200"></div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 bg-emerald-100 text-emerald-900 border-2 border-ink rounded-full text-[11px] font-black uppercase tracking-wider">
+              Deney 22 • Sıvı Basıncı & Akışkanlar
+            </span>
+            <span class="hidden md:inline text-xs font-bold text-gray-500">
+              MEB 4. & 8. Sınıf Fen Bilimleri
+            </span>
+          </div>
+          <h1 class="display text-xl sm:text-2xl md:text-3xl text-ink leading-tight">
+            🌀 Basit Sifon Yapalım: Kendiliğinden Akan Su
+          </h1>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <!-- Akış Hızı Çarpanı Butonu -->
+        <button id="btnToggleSpeed" class="pushable px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 font-black text-xs flex items-center gap-1" title="Akış Hızını Değiştir">
+          <span id="speedIcon">⚡</span>
+          <span id="speedText">Hız: 1x</span>
+        </button>
+
+        <!-- Sıvı Rengi Butonu -->
+        <div class="relative">
+          <button id="btnColorMenu" class="pushable px-3 py-1.5 bg-sky-100 hover:bg-sky-200 text-ink font-bold text-xs flex items-center gap-1.5" title="Sıvı Rengini Değiştir">
+            <span id="currentColorDot" class="w-3.5 h-3.5 rounded-full bg-sky-500 border border-ink"></span>
+            <span class="hidden sm:inline">Sıvı Rengi</span>
+          </button>
+        </div>
+
+        <!-- Ses Aç/Kapat -->
+        <button id="btnToggleSound" class="pushable px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-ink font-bold text-xs flex items-center gap-1">
+          <span id="soundIcon">🔊</span>
+          <span class="hidden sm:inline">Ses Açık</span>
+        </button>
+
+        <!-- Sıfırla -->
+        <button id="btnResetExperiment" class="pushable px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-900 font-bold text-xs flex items-center gap-1">
+          <span>🔄</span>
+          <span>Sıfırla</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ANA İÇERİK: 2 KOLONLU DÜZEN -->
+  <main class="max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
+
+    <!-- SOL KOLON: İNTERAKTİF SİMÜLASYON SAHNESİ VE KONTROLLER (7 Kolon) -->
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      
+      <!-- SİMÜLASYON KARTI -->
+      <section class="bg-white p-4 chunky flex-1 flex flex-col justify-between relative shadow-card">
+        
+        <div>
+          <!-- Durum ve Rehberlik İpucu Bandı -->
+          <div id="tipBanner" class="mb-3 px-3 py-2 bg-emerald-50 border-2 border-ink rounded-xl text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-2">
+            <span id="tipIcon" class="text-xl shrink-0">💡</span>
+            <span id="tipText">Hortumu suyla doldurup sifonu başlat! Yüksek kaptan alçak kaba suyun kendiliğinden nasıl aktığını gözlemle.</span>
+          </div>
+
+          <!-- SVG DENEY SAHNESİ: Kap A (Sol), Kap B (Sağ), Şeffaf Hortum, Standlar -->
+          <div class="relative w-full aspect-[540/360] bg-gradient-to-b from-sky-100/60 via-amber-50/40 to-emerald-100/40 rounded-2xl border-3 border-ink overflow-hidden flex items-center justify-center shadow-inner">
+            
+            <!-- Arka Plan Masa / Tezgah Çizgisi -->
+            <div class="absolute bottom-0 left-0 right-0 h-14 bg-gradient-to-t from-amber-200 to-amber-100 border-t-2 border-ink/40"></div>
+            <!-- Masa Ahşap Çizgileri -->
+            <div class="absolute bottom-6 left-0 right-0 h-0.5 bg-amber-300/60"></div>
+
+            <svg id="siphonSvg" viewBox="0 0 540 360" class="w-full h-full overflow-visible select-none">
+              
+              <defs>
+                <!-- Dinamik Sıvı Degradesi (Mavi varsayılan) -->
+                <linearGradient id="liquidGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop id="liquidStop1" offset="0%" stop-color="#38bdf8"/>
+                  <stop id="liquidStop2" offset="100%" stop-color="#0284c7"/>
+                </linearGradient>
+
+                <!-- Şeffaf Hortum Plastik Degradesi -->
+                <linearGradient id="tubeGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+                  <stop offset="30%" stop-color="#e0f2fe" stop-opacity="0.3"/>
+                  <stop offset="70%" stop-color="#bae6fd" stop-opacity="0.2"/>
+                  <stop offset="100%" stop-color="#ffffff" stop-opacity="0.85"/>
+                </linearGradient>
+
+                <!-- Cam Beher Parlaması -->
+                <linearGradient id="glassGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.7"/>
+                  <stop offset="25%" stop-color="#bae6fd" stop-opacity="0.15"/>
+                  <stop offset="75%" stop-color="#bae6fd" stop-opacity="0.05"/>
+                  <stop offset="100%" stop-color="#ffffff" stop-opacity="0.5"/>
+                </linearGradient>
+
+                <!-- Klip Maskeleri: Beher Sıvıları -->
+                <clipPath id="clipCupA">
+                  <rect x="-42" y="-120" width="84" height="120" rx="4" />
+                </clipPath>
+                <clipPath id="clipCupB">
+                  <rect x="-42" y="-120" width="84" height="120" rx="4" />
+                </clipPath>
+
+                <!-- Hortum Hava Kabarcığı Filtresi -->
+                <filter id="glowAir" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="3" result="glow"/>
+                  <feComposite in="SourceGraphic" in2="glow" operator="over"/>
+                </filter>
+              </defs>
+
+              <!-- MASA ÜSTÜ ZEMİN ÇİZGİSİ -->
+              <line x1="10" y1="306" x2="530" y2="306" stroke="#182b4d" stroke-width="3" stroke-linecap="round" />
+
+              <!-- STAND A VE STAND B MASA GÖLGELERİ -->
+              <ellipse id="shadowA" cx="130" cy="308" rx="55" ry="7" fill="#64748b" opacity="0.3" />
+              <ellipse id="shadowB" cx="410" cy="308" rx="55" ry="7" fill="#64748b" opacity="0.3" />
+
+              <!-- SEVİYE FARKI DİNAMİK KESİKLİ ÇİZGİLER VE OKLAR (Δh Göstergesi) -->
+              <g id="deltaHGroup" opacity="1">
+                <!-- Seviye A Yatay Rehber Çizgi -->
+                <line id="guideLineA" x1="130" y1="180" x2="270" y2="180" stroke="#0284c7" stroke-width="1.8" stroke-dasharray="4 3" opacity="0.75" />
+                <!-- Seviye B Yatay Rehber Çizgi -->
+                <line id="guideLineB" x1="270" y1="230" x2="410" y2="230" stroke="#0284c7" stroke-width="1.8" stroke-dasharray="4 3" opacity="0.75" />
+                <!-- İki Seviye Arası Dikey Boyut Çizgisi -->
+                <line id="deltaLine" x1="270" y1="180" x2="270" y2="230" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" />
+                <!-- Üst/Alt Çentikler -->
+                <line id="deltaCapTop" x1="264" y1="180" x2="276" y2="180" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" />
+                <line id="deltaCapBottom" x1="264" y1="230" x2="276" y2="230" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" />
+                <!-- Delta H Etiketi Rozeti -->
+                <g id="deltaHBadge" transform="translate(270, 205)">
+                  <rect x="-38" y="-11" width="76" height="22" rx="6" fill="#ffffff" stroke="#182b4d" stroke-width="2" />
+                  <text id="deltaHText" x="0" y="4" text-anchor="middle" font-size="10" font-weight="900" fill="#dc2626" font-family="'Baloo 2'">Δh = 8 cm</text>
+                </g>
+              </g>
+
+              <!-- 1. SOL: KAP A GRUBU (Ayarlanabilir Stand + Beher A + Sıvı) -->
+              <g id="groupCupA" transform="translate(130, 306)">
+                <!-- Stand / Yükseklik Bloğu A -->
+                <g id="standA">
+                  <rect id="standRectA" x="-48" y="-90" width="96" height="90" rx="6" fill="#fde047" stroke="#182b4d" stroke-width="2.5" />
+                  <!-- Stand Çapraz Çizgileri -->
+                  <line id="standCrossA1" x1="-40" y1="-85" x2="40" y2="-5" stroke="#ca8a04" stroke-width="2" stroke-dasharray="4 3" />
+                  <line id="standCrossA2" x1="40" y1="-85" x2="-40" y2="-5" stroke="#ca8a04" stroke-width="2" stroke-dasharray="4 3" />
+                  <!-- Stand Yükseklik Yazısı -->
+                  <rect id="standBadgeA" x="-32" y="-52" width="64" height="18" rx="4" fill="#ffffff" stroke="#182b4d" stroke-width="1.5" />
+                  <text id="standTextA" x="0" y="-40" text-anchor="middle" font-size="9" font-weight="900" fill="#182b4d" font-family="'Baloo 2'">h_A = 9 cm</text>
+                </g>
+
+                <!-- Beher A Gövdesi (Standın üzerinde oturur) -->
+                <g id="beakerA" transform="translate(0, -90)">
+                  <!-- Kap A Canlı Akış Rozeti (Boşalıyor / Doluyor) -->
+                  <g id="badgeFlowA" transform="translate(0, -145)" opacity="0" class="float-badge">
+                    <rect id="badgeFlowBgA" x="-48" y="-11" width="96" height="22" rx="6" fill="#ef4444" stroke="#182b4d" stroke-width="2"/>
+                    <text id="badgeFlowTextA" x="0" y="4" text-anchor="middle" font-size="9.5" font-weight="900" fill="#ffffff" font-family="'Baloo 2'">⬇️ Boşalıyor</text>
+                  </g>
+
+                  <!-- Arka Cam -->
+                  <path d="M -42 -120 L -42 0 C -42 4 -38 6 -32 6 L 32 6 C 38 6 42 4 42 0 L 42 -120 Z" fill="#e0f2fe" stroke="#0284c7" stroke-width="2.5" opacity="0.5" />
+                  
+                  <!-- Sıvı Kütlesi (Klip Maskeli) -->
+                  <g clip-path="url(#clipCupA)">
+                    <rect id="waterRectA" x="-42" y="-80" width="84" height="85" fill="url(#liquidGrad)" />
+                    <!-- Sıvı Menisküs / Yüzey Elipsi -->
+                    <ellipse id="waterSurfaceA" cx="0" cy="-80" rx="42" ry="6" fill="#7dd3fc" />
+                    <!-- Canlı Yüzey Dalgalanması -->
+                    <ellipse id="waterRippleA" cx="0" cy="-80" rx="42" ry="6" fill="none" stroke="#ffffff" stroke-width="2" opacity="0" />
+                  </g>
+
+                  <!-- Kap A İçi Canlı Efektler: Emme Girdabı veya Fışkırma Jeti -->
+                  <!-- 1. Emme Girdabı (Su A'dan emilirken) -->
+                  <g id="vortexA" opacity="0" transform="translate(5, -20)">
+                    <circle cx="0" cy="0" r="12" fill="none" stroke="#ffffff" stroke-width="2" stroke-dasharray="5 3" class="vortex-spin"/>
+                    <circle cx="0" cy="0" r="6" fill="none" stroke="#7dd3fc" stroke-width="1.8"/>
+                    <text x="0" y="1" text-anchor="middle" font-size="7" font-weight="900" fill="#ffffff">🌀</text>
+                  </g>
+                  <!-- 2. Fışkıran Su & Yükselen Baloncuklar (Su A'ya dolarken) -->
+                  <g id="jetGroupA" opacity="0" transform="translate(5, -20)">
+                    <path d="M 0 0 Q -10 -15 -18 -30" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+                    <circle id="jetBubbleA1" cx="-4" cy="-12" r="3" fill="#ffffff" opacity="0.9"/>
+                    <circle id="jetBubbleA2" cx="-9" cy="-24" r="3.8" fill="#ffffff" opacity="0.9"/>
+                    <circle id="jetBubbleA3" cx="-14" cy="-38" r="3.2" fill="#ffffff" opacity="0.9"/>
+                    <circle id="jetBubbleA4" cx="-6" cy="-52" r="4.5" fill="#ffffff" opacity="0.9"/>
+                  </g>
+
+                  <!-- Beher Dereceleri (Ölçek Çizgileri) -->
+                  <line x1="-42" y1="-25" x2="-28" y2="-25" stroke="#0369a1" stroke-width="1.8" />
+                  <text x="-24" y="-22" font-size="8" font-weight="800" fill="#0369a1">100</text>
+                  <line x1="-42" y1="-55" x2="-28" y2="-55" stroke="#0369a1" stroke-width="1.8" />
+                  <text x="-24" y="-52" font-size="8" font-weight="800" fill="#0369a1">200</text>
+                  <line x1="-42" y1="-85" x2="-28" y2="-85" stroke="#0369a1" stroke-width="1.8" />
+                  <text x="-24" y="-82" font-size="8" font-weight="800" fill="#0369a1">300</text>
+
+                  <!-- Ön Cam Parlama & Dış Çerçeve -->
+                  <path d="M -42 -120 L -42 0 C -42 4 -38 6 -32 6 L 32 6 C 38 6 42 4 42 0 L 42 -120 Z" fill="url(#glassGrad)" stroke="#182b4d" stroke-width="3" />
+                  <!-- Beher Ağzı Elipsi -->
+                  <ellipse cx="0" cy="-120" rx="42" ry="6" fill="none" stroke="#182b4d" stroke-width="2.5" />
+
+                  <!-- Kap A Etiketi & Canlı Hacim -->
+                  <g transform="translate(0, 22)">
+                    <rect x="-42" y="-8" width="84" height="20" rx="5" fill="#ffffff" stroke="#182b4d" stroke-width="2" />
+                    <text id="cupLabelA" x="0" y="6" text-anchor="middle" font-size="10" font-weight="900" fill="#182b4d" font-family="'Baloo 2'">Kap A: 250 mL</text>
+                  </g>
+                </g>
+              </g>
+
+              <!-- 2. SAĞ: KAP B GRUBU (Ayarlanabilir Stand + Beher B + Sıvı) -->
+              <g id="groupCupB" transform="translate(410, 306)">
+                <!-- Stand / Yükseklik Bloğu B -->
+                <g id="standB">
+                  <rect id="standRectB" x="-48" y="-30" width="96" height="30" rx="6" fill="#fde047" stroke="#182b4d" stroke-width="2.5" />
+                  <!-- Stand Çapraz Çizgileri -->
+                  <line id="standCrossB1" x1="-40" y1="-26" x2="40" y2="-4" stroke="#ca8a04" stroke-width="2" stroke-dasharray="4 3" />
+                  <!-- Stand Yükseklik Yazısı -->
+                  <rect id="standBadgeB" x="-32" y="-22" width="64" height="16" rx="4" fill="#ffffff" stroke="#182b4d" stroke-width="1.5" />
+                  <text id="standTextB" x="0" y="-10" text-anchor="middle" font-size="9" font-weight="900" fill="#182b4d" font-family="'Baloo 2'">h_B = 3 cm</text>
+                </g>
+
+                <!-- Beher B Gövdesi (Standın üzerinde oturur) -->
+                <g id="beakerB" transform="translate(0, -30)">
+                  <!-- Kap B Canlı Akış Rozeti (Boşalıyor / Doluyor) -->
+                  <g id="badgeFlowB" transform="translate(0, -145)" opacity="0" class="float-badge">
+                    <rect id="badgeFlowBgB" x="-48" y="-11" width="96" height="22" rx="6" fill="#10b981" stroke="#182b4d" stroke-width="2"/>
+                    <text id="badgeFlowTextB" x="0" y="4" text-anchor="middle" font-size="9.5" font-weight="900" fill="#ffffff" font-family="'Baloo 2'">⬆️ Su Doluyor</text>
+                  </g>
+
+                  <!-- Arka Cam -->
+                  <path d="M -42 -120 L -42 0 C -42 4 -38 6 -32 6 L 32 6 C 38 6 42 4 42 0 L 42 -120 Z" fill="#e0f2fe" stroke="#0284c7" stroke-width="2.5" opacity="0.5" />
+                  
+                  <!-- Sıvı Kütlesi (Klip Maskeli) -->
+                  <g clip-path="url(#clipCupB)">
+                    <rect id="waterRectB" x="-42" y="-20" width="84" height="25" fill="url(#liquidGrad)" />
+                    <!-- Sıvı Menisküs / Yüzey Elipsi -->
+                    <ellipse id="waterSurfaceB" cx="0" cy="-20" rx="42" ry="6" fill="#7dd3fc" />
+                    <!-- Canlı Yüzey Dalgalanması -->
+                    <ellipse id="waterRippleB" cx="0" cy="-20" rx="42" ry="6" fill="none" stroke="#ffffff" stroke-width="2" opacity="0" />
+                  </g>
+
+                  <!-- Kap B İçi Canlı Efektler: Emme Girdabı veya Fışkırma Jeti -->
+                  <!-- 1. Emme Girdabı (Su B'den emilirken) -->
+                  <g id="vortexB" opacity="0" transform="translate(-5, -20)">
+                    <circle cx="0" cy="0" r="12" fill="none" stroke="#ffffff" stroke-width="2" stroke-dasharray="5 3" class="vortex-spin"/>
+                    <circle cx="0" cy="0" r="6" fill="none" stroke="#7dd3fc" stroke-width="1.8"/>
+                    <text x="0" y="1" text-anchor="middle" font-size="7" font-weight="900" fill="#ffffff">🌀</text>
+                  </g>
+                  <!-- 2. Fışkıran Su & Yükselen Baloncuklar (Su B'ye dolarken) -->
+                  <g id="jetGroupB" opacity="0" transform="translate(-5, -20)">
+                    <path d="M 0 0 Q 10 -15 18 -30" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+                    <circle id="jetBubbleB1" cx="4" cy="-12" r="3" fill="#ffffff" opacity="0.9"/>
+                    <circle id="jetBubbleB2" cx="9" cy="-24" r="3.8" fill="#ffffff" opacity="0.9"/>
+                    <circle id="jetBubbleB3" cx="14" cy="-38" r="3.2" fill="#ffffff" opacity="0.9"/>
+                    <circle id="jetBubbleB4" cx="6" cy="-52" r="4.5" fill="#ffffff" opacity="0.9"/>
+                  </g>
+
+                  <!-- Beher Dereceleri (Ölçek Çizgileri) -->
+                  <line x1="-42" y1="-25" x2="-28" y2="-25" stroke="#0369a1" stroke-width="1.8" />
+                  <text x="-24" y="-22" font-size="8" font-weight="800" fill="#0369a1">100</text>
+                  <line x1="-42" y1="-55" x2="-28" y2="-55" stroke="#0369a1" stroke-width="1.8" />
+                  <text x="-24" y="-52" font-size="8" font-weight="800" fill="#0369a1">200</text>
+                  <line x1="-42" y1="-85" x2="-28" y2="-85" stroke="#0369a1" stroke-width="1.8" />
+                  <text x="-24" y="-82" font-size="8" font-weight="800" fill="#0369a1">300</text>
+
+                  <!-- Ön Cam Parlama & Dış Çerçeve -->
+                  <path d="M -42 -120 L -42 0 C -42 4 -38 6 -32 6 L 32 6 C 38 6 42 4 42 0 L 42 -120 Z" fill="url(#glassGrad)" stroke="#182b4d" stroke-width="3" />
+                  <!-- Beher Ağzı Elipsi -->
+                  <ellipse cx="0" cy="-120" rx="42" ry="6" fill="none" stroke="#182b4d" stroke-width="2.5" />
+
+                  <!-- Kap B Etiketi & Canlı Hacim -->
+                  <g transform="translate(0, 22)">
+                    <rect x="-42" y="-8" width="84" height="20" rx="5" fill="#ffffff" stroke="#182b4d" stroke-width="2" />
+                    <text id="cupLabelB" x="0" y="6" text-anchor="middle" font-size="10" font-weight="900" fill="#182b4d" font-family="'Baloo 2'">Kap B: 50 mL</text>
+                  </g>
+                </g>
+              </g>
+
+              <!-- 3. ŞEFFAF HORTUM (U-TÜP KÖPRÜSÜ) -->
+              <!-- Kap A içinden çıkar, yukarı kıvrılır, köprü kurar ve Kap B içine dalar -->
+              <g id="hoseAssembly">
+                <!-- Hortum Gölgesi -->
+                <path id="hoseShadowPath" d="M 135 250 Q 135 70 270 70 Q 405 70 405 270" 
+                      fill="none" stroke="#64748b" stroke-width="16" opacity="0.15" stroke-linecap="round" />
+
+                <!-- Şeffaf Hortum Dış Kılıfı (Geniş Boru) -->
+                <path id="hoseOuterPath" d="M 135 250 Q 135 70 270 70 Q 405 70 405 270" 
+                      fill="none" stroke="#bae6fd" stroke-width="15" stroke-linecap="round" opacity="0.85" />
+                <path id="hoseBorderPath" d="M 135 250 Q 135 70 270 70 Q 405 70 405 270" 
+                      fill="none" stroke="#182b4d" stroke-width="17" stroke-linecap="round" opacity="0.35" stroke-dasharray="none" />
+
+                <!-- Hortum İçi Sıvı Sütunu (Sifon Kurulduğunda Görünür) -->
+                <path id="hoseLiquidPath" d="M 135 250 Q 135 70 270 70 Q 405 70 405 270" 
+                      fill="none" stroke="url(#liquidGrad)" stroke-width="10" stroke-linecap="round" opacity="0" />
+
+                <!-- Dinamik Akış Parçacıkları Çekirdeği -->
+                <path id="hoseStreamFlow" d="M 135 250 Q 135 70 270 70 Q 405 70 405 270" 
+                      fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0" />
+
+                <!-- CANLI VE PARLAK SU DAMLACIKLARI / İNCİLERİ GRUBU (60 FPS Akış) -->
+                <g id="dropletsGroup" opacity="0">
+                  <!-- 16 Adet Damlacık SVG içinde oluşturulur / JavaScript ile yürütülür -->
+                </g>
+
+                <!-- Hortum Üzerinde Yön Chevron Okları -->
+                <g id="hoseChevronsGroup" opacity="0">
+                  <!-- JS tarafından dinamik oluşturulur ve yönlendirilir -->
+                </g>
+
+                <!-- Hortum Uç Çemberleri (Giriş/Çıkış Ağızları) -->
+                <circle id="hoseTipA" cx="135" cy="250" r="7" fill="#0284c7" stroke="#182b4d" stroke-width="2.5" />
+                <circle id="hoseTipB" cx="405" cy="270" r="7" fill="#0284c7" stroke="#182b4d" stroke-width="2.5" />
+
+                <!-- Hortum Tepe Noktası Göstergesi & Hava Kabarcığı Efekti -->
+                <g id="apexGroup" transform="translate(270, 70)">
+                  <!-- Tepe Noktası Rozeti -->
+                  <circle cx="0" cy="0" r="6" fill="#ffffff" stroke="#182b4d" stroke-width="2" />
+                  <text id="apexLabel" x="0" y="-12" text-anchor="middle" font-size="9" font-weight="900" fill="#0369a1" font-family="'Baloo 2'">Sifon Tepesi (Negatif Basınç)</text>
+                  
+                  <!-- Hava Girişi Baloncuğu (Hava kaçağında görünür) -->
+                  <g id="airBubbleGroup" opacity="0" filter="url(#glowAir)">
+                    <circle cx="0" cy="0" r="14" fill="#ffffff" stroke="#ef4444" stroke-width="2.5" />
+                    <text x="0" y="4" text-anchor="middle" font-size="10" font-weight="900" fill="#dc2626">💨</text>
+                    <text x="0" y="24" text-anchor="middle" font-size="9" font-weight="900" fill="#dc2626" font-family="'Baloo 2'">HAVA GİRDİ!</text>
+                  </g>
+                </g>
+
+                <!-- Akış Yönü Oku (Hortum Ortasında Canlı Yanıp Söner) -->
+                <g id="flowDirectionArrow" opacity="0" transform="translate(270, 96)">
+                  <rect x="-44" y="-11" width="88" height="22" rx="6" fill="#16a34a" stroke="#182b4d" stroke-width="2" />
+                  <text id="flowArrowText" x="0" y="4.5" text-anchor="middle" font-size="10.5" font-weight="900" fill="#ffffff" font-family="'Baloo 2'">A ➔ B Akıyor 💦</text>
+                </g>
+              </g>
+
+              <!-- BAŞARI / KUTLAMA ROZETİ (Üst Merkez) -->
+              <g id="successBadge" opacity="0" style="opacity: 0; pointer-events: none;" transform="translate(270, 30)">
+                <rect x="-140" y="-15" width="280" height="30" rx="8" fill="#16a34a" stroke="#182b4d" stroke-width="2.5" />
+                <text id="successBadgeText" x="0" y="5" text-anchor="middle" font-size="12" font-weight="900" fill="#ffffff" font-family="'Baloo 2'">🎉 SU KENDİLİĞİNDEN AKIYOR!</text>
+              </g>
+
+            </svg>
+          </div>
+
+          <!-- CANLI FİZİK SENSÖRLERİ PANELİ (Δh, Debi, Akış Yönü, Sifon Durumu) -->
+          <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 bg-emerald-50/80 p-2.5 rounded-xl border-2 border-ink text-center">
+            
+            <!-- 1. Yükseklik Farkı Δh -->
+            <div class="bg-white p-2 rounded-lg border border-ink shadow-sm">
+              <span class="text-[10px] font-black text-gray-500 uppercase block">Seviye Farkı (Δh)</span>
+              <span id="sensorDeltaH" class="display text-base sm:text-lg font-black text-rose-600">8.0 cm</span>
+            </div>
+
+            <!-- 2. Akış Hızı & Debi -->
+            <div class="bg-white p-2 rounded-lg border border-ink shadow-sm">
+              <span class="text-[10px] font-black text-gray-500 uppercase block">Akış Hızı (Debi)</span>
+              <span id="sensorFlowRate" class="display text-base sm:text-lg font-black text-sky-600">0 mL/sn</span>
+            </div>
+
+            <!-- 3. Akış Yönü -->
+            <div class="bg-white p-2 rounded-lg border border-ink shadow-sm">
+              <span class="text-[10px] font-black text-gray-500 uppercase block">Akış Yönü</span>
+              <span id="sensorDirection" class="display text-xs sm:text-sm font-black text-amber-600 block mt-0.5">Beklemede ⏸️</span>
+            </div>
+
+            <!-- 4. Sifon Durumu -->
+            <div class="bg-white p-2 rounded-lg border border-ink shadow-sm">
+              <span class="text-[10px] font-black text-gray-500 uppercase block">Sifon Hortumu</span>
+              <span id="sensorStatus" class="display text-xs sm:text-sm font-black text-gray-600 block mt-0.5">Doldurulmadı ⭕</span>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- YÜKSEKLİK SÜRGÜLERİ VE KONTROL PANELİ -->
+        <div class="mt-3 pt-3 border-t-2 border-dashed border-gray-300 space-y-3">
+          
+          <!-- Kap Yükseklik Sürgüleri (Kap A ve Kap B) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-amber-50/80 p-3 rounded-xl border-2 border-ink">
+            <!-- Kap A Yükseklik Kontrolü -->
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-xs font-black text-ink flex items-center gap-1">
+                  <span>🔵</span> Kap A Yüksekliği (Sol):
+                </span>
+                <span id="labelSliderA" class="text-xs font-black text-sky-700 bg-white px-2 py-0.5 rounded border border-ink">9 cm</span>
+              </div>
+              <input id="sliderHeightA" type="range" min="0" max="14" value="9" class="w-full cursor-pointer" />
+            </div>
+
+            <!-- Kap B Yükseklik Kontrolü -->
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-xs font-black text-ink flex items-center gap-1">
+                  <span>🟠</span> Kap B Yüksekliği (Sağ):
+                </span>
+                <span id="labelSliderB" class="text-xs font-black text-amber-700 bg-white px-2 py-0.5 rounded border border-ink">3 cm</span>
+              </div>
+              <input id="sliderHeightB" type="range" min="0" max="14" value="3" class="w-full cursor-pointer" />
+            </div>
+          </div>
+
+          <!-- Aksiyon Butonları -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            
+            <!-- 1. Sifonu Başlat / Hortumu Doldur -->
+            <button id="btnPrimeSiphon" class="pushable py-2.5 px-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-card">
+              <span id="primeBtnIcon" class="text-base">🚀</span>
+              <span id="primeBtnText">Sifonu Başlat!</span>
+            </button>
+
+            <!-- 2. Seviyeleri Eşitle (Dengeyi Gör) -->
+            <button id="btnBalanceHeights" class="pushable py-2.5 px-2 bg-amber-400 hover:bg-amber-500 text-ink font-black text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-card">
+              <span class="text-base">⚖️</span>
+              <span>Seviyeleri Eşitle</span>
+            </button>
+
+            <!-- 3. Yönü Tersine Çevir (B'yi Yükselt) -->
+            <button id="btnReverseFlow" class="pushable py-2.5 px-2 bg-sky-500 hover:bg-sky-600 text-white font-black text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-card">
+              <span class="text-base">🔃</span>
+              <span>B'yi Yükselt (Ters Akıt)</span>
+            </button>
+
+            <!-- 4. Hortuma Hava Girdi (Sifonu Boz) -->
+            <button id="btnAirLeak" class="pushable py-2.5 px-2 bg-rose-500 hover:bg-rose-600 text-white font-black text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-card">
+              <span class="text-base">💨</span>
+              <span>Hortumu Del (Boz)</span>
+            </button>
+
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+
+
+    <!-- SAĞ KOLON: GÖREVLER, BİLİMSEL İLKELER VE TEST (5 Kolon) -->
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      
+      <!-- REHBER VE SEKMELER -->
+      <div class="grid grid-cols-3 gap-1 bg-emerald-100 p-1.5 rounded-2xl border-3 border-ink text-xs font-black">
+        <button id="tabMissions" class="side-tab-btn py-1.5 rounded-xl bg-white border-2 border-ink shadow-sm text-ink">
+          🎯 Görevler
+        </button>
+        <button id="tabScience" class="side-tab-btn py-1.5 rounded-xl text-gray-700 hover:bg-white/60">
+          🔬 Bilimsel Sırrı
+        </button>
+        <button id="tabQuiz" class="side-tab-btn py-1.5 rounded-xl text-gray-700 hover:bg-white/60">
+          ⭐ Bilgi Testi
+        </button>
+      </div>
+
+      <!-- SEÇENEK 1: GÖREVLER VE ADIM ADIM REHBER -->
+      <div id="sideViewMissions" class="space-y-3 flex-1 flex flex-col">
+        
+        <!-- Görev Listesi Kartı -->
+        <div class="bg-white p-3.5 chunky">
+          <div class="flex items-center justify-between border-b-2 border-gray-100 pb-2 mb-2">
+            <h3 class="display text-sm sm:text-base font-black text-ink flex items-center gap-1.5">
+              <span>🎯</span> <span>Sifon Mühendisi Görevleri</span>
+            </h3>
+            <span id="missionProgressText" class="px-2 py-0.5 bg-emerald-100 border border-ink rounded-full text-[10px] font-black text-emerald-900">
+              0 / 4 Görev
+            </span>
+          </div>
+
+          <ul class="space-y-2 text-xs font-bold text-gray-700">
+            <li id="m1" class="flex items-start gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50 transition-colors">
+              <span class="m-check text-base">⭕</span>
+              <div>
+                <span class="text-ink font-black block">1. Görev: Sifonu Başlat ve Suyu Akıt</span>
+                <span class="text-[11px] text-gray-600 font-medium">"Sifonu Başlat!" butonuna basarak hortumu suyla doldur. Yüksek olan Kap A'dan alçak Kap B'ye kendiliğinden akışı başlat!</span>
+              </div>
+            </li>
+            <li id="m2" class="flex items-start gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50 transition-colors">
+              <span class="m-check text-base">⭕</span>
+              <div>
+                <span class="text-ink font-black block">2. Görev: Akış Yönünü Tersine Çevir</span>
+                <span class="text-[11px] text-gray-600 font-medium">"B'yi Yükselt" butonuna bas veya sürgüyle Kap B'yi Kap A'nın üstüne çıkar. Suyun anında geriye doğru aktığını gör!</span>
+              </div>
+            </li>
+            <li id="m3" class="flex items-start gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50 transition-colors">
+              <span class="m-check text-base">⭕</span>
+              <div>
+                <span class="text-ink font-black block">3. Görev: Denge Noktasını Keşfet</span>
+                <span class="text-[11px] text-gray-600 font-medium">"Seviyeleri Eşitle" butonuna basarak kapları aynı hizaya getir. İki kaptaki su yüzeyleri eşitlenince akışın kendiliğinden durduğunu gözlemle!</span>
+              </div>
+            </li>
+            <li id="m4" class="flex items-start gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50 transition-colors">
+              <span class="m-check text-base">⭕</span>
+              <div>
+                <span class="text-ink font-black block">4. Görev: Sifonun Neden Bozulduğunu Gör</span>
+                <span class="text-[11px] text-gray-600 font-medium">"Hortumu Del (Boz)" butonuna basarak tepe noktasına hava girmesini sağla. Sıvı sütunu kopunca sifonun nasıl anında durduğunu keşfet!</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Hızlı Deney Adımları Özeti -->
+        <div class="bg-amber-50/70 p-3 rounded-2xl border-2 border-ink text-xs font-bold text-ink space-y-1.5">
+          <div class="flex items-center gap-1.5 text-amber-900 font-black">
+            <span>💡</span> <span>Evde Gerçek Sifon Nasıl Yapılır?</span>
+          </div>
+          <p class="text-[11px] text-gray-700 leading-relaxed">
+            1. İki kaba su koyun, birini masaya diğerini sandalyeye (daha aşağıya) yerleştirin.<br>
+            2. Şeffaf bir plastik hortumu tamamen suyla doldurun ve iki ucunu parmaklarınızla kapatın.<br>
+            3. Bir ucunu üstteki kaba, diğer ucunu alttaki kaba batırıp parmaklarınızı aynı anda çekin.<br>
+            4. Pompa veya motor olmadan suyun yokuş yukarı çıkıp aşağı döküldüğünü hayretle izleyin!
+          </p>
+        </div>
+
+      </div>
+
+      <!-- SEÇENEK 2: BİLİMSEL SIRRI (NASIL ÇALIŞIR?) -->
+      <div id="sideViewScience" class="hidden space-y-3 flex-1 flex flex-col">
+        
+        <div class="bg-white p-3.5 chunky space-y-3 text-xs leading-relaxed">
+          <h3 class="display text-sm sm:text-base font-black text-ink flex items-center gap-1.5 border-b-2 border-gray-100 pb-1.5">
+            <span>🔬</span> <span>Sifonun Büyüleyici Fiziği</span>
+          </h3>
+
+          <div class="p-2.5 rounded-xl bg-sky-50 border border-sky-200">
+            <h4 class="font-black text-sky-900 mb-1 flex items-center gap-1">
+              <span>1.</span> Yerçekimi ve Yükseklik Farkı (Δh)
+            </h4>
+            <p class="text-gray-700 text-[11px]">
+              Alttaki kaptaki su kolu, üstteki kaptaki su kolundan daha uzundur. Yerçekimi bu daha uzun ve ağır su sütununu aşağı doğru çeker. Bu çekiş, arkasından gelen suyu da sürükleyen sürekli bir emme (vakum) gücü yaratır.
+            </p>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-amber-50 border border-amber-200">
+            <h4 class="font-black text-amber-900 mb-1 flex items-center gap-1">
+              <span>2.</span> Moleküler Su Zinciri (Kohezyon)
+            </h4>
+            <p class="text-gray-700 text-[11px]">
+              Su molekülleri birbirine sıkıca tutunur (kohezyon kuvveti). Düşen su molekülleri tıpkı bir tren katarı gibi hortumun tepe noktasındaki diğer su moleküllerini de peşinden çeker. Hortuma hava girdiğinde ise bu "sıvı zinciri" anında kopar!
+            </p>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+            <h4 class="font-black text-emerald-900 mb-1 flex items-center gap-1">
+              <span>3.</span> Açık Hava Basıncı ($P_0$)
+            </h4>
+            <p class="text-gray-700 text-[11px]">
+              Kapların yüzeyine etki eden açık hava basıncı ($P_0$), suyu hortumun ağzına doğru iter. Hortumun tepe noktasında oluşan düşük basınç, atmosfer basıncının suyu yukarı itmesine olanak tanır.
+            </p>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-purple-50 border border-purple-200">
+            <h4 class="font-black text-purple-900 mb-1 flex items-center gap-1">
+              <span>🌍</span> Günlük Hayatta Nerelerde Kullanılır?
+            </h4>
+            <p class="text-gray-700 text-[11px]">
+              • <strong>Akvaryum Temizliği:</strong> Akvaryumu kımıldatmadan dipteki kirli suyu boşaltmak için sifon hortumu kullanılır.<br>
+              • <strong>Tuvalet Kokusunu Önleme:</strong> Klozetlerin altındaki S şeklindeki kıvrımlı sifon borusu pis kokuların eve girmesini engeller.<br>
+              • <strong>Baraj ve Kanalizasyon Sistemleri:</strong> Elektrik kesilse bile sel sularını otomatik tahliye eden dev sifon savakları bulunur.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- SEÇENEK 3: MİNİ BİLGİ TESTİ (QUIZ) -->
+      <div id="sideViewQuiz" class="hidden space-y-3 flex-1 flex flex-col">
+        
+        <div class="bg-white p-3.5 chunky flex-1 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between border-b-2 border-gray-100 pb-2 mb-3">
+              <h3 class="display text-sm sm:text-base font-black text-ink flex items-center gap-1.5">
+                <span>⭐</span> <span>Sifon Uzmanı Mini Test</span>
+              </h3>
+              <span id="quizScoreText" class="px-2 py-0.5 bg-amber-100 border border-ink rounded-full text-[10px] font-black text-amber-900">
+                Soru 1 / 4
+              </span>
+            </div>
+
+            <div id="quizContainer">
+              <!-- Soru Metni -->
+              <p id="quizQuestion" class="text-xs sm:text-sm font-black text-ink mb-3 leading-snug">
+                Sifon düzeneğinde suyun bir kaptan diğer kaba kendiliğinden akması için en temel şart nedir?
+              </p>
+
+              <!-- Şıklar Listesi -->
+              <div id="quizOptions" class="space-y-2">
+                <!-- Dinamik olarak JS tarafından doldurulur -->
+              </div>
+
+              <!-- Geri Bildirim Kutusu -->
+              <div id="quizFeedback" class="hidden mt-3 p-2.5 rounded-xl border-2 text-xs font-bold">
+              </div>
+            </div>
+          </div>
+
+          <!-- Test Navigasyon Butonu -->
+          <div class="mt-4 pt-2 border-t border-gray-100 flex justify-between items-center">
+            <button id="btnRestartQuiz" class="pushable px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-ink text-xs font-bold">
+              Testi Baştan Başlat
+            </button>
+            <button id="btnNextQuestion" class="pushable px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black hidden">
+              Sonraki Soru ➔
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- TEBRİKLER MODAL PENCERESİ -->
+  <div id="celebrationModal" class="fixed inset-0 bg-ink/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white p-6 chunky max-w-sm w-full text-center space-y-4 animate-bounce-short">
+      <div class="text-5xl">🏆</div>
+      <h2 class="display text-2xl text-ink">Harikasın Küçük Bilim İnsanı!</h2>
+      <p class="text-xs text-gray-700 font-bold leading-relaxed">
+        Tüm sifon görevlerini başarıyla tamamladın! Suyun yükseklik farkıyla kendiliğinden akmasını, seviye eşitliğinde durmasını ve açık hava basıncının gücünü keşfettin!
+      </p>
+      <div class="p-3 bg-amber-50 rounded-xl border-2 border-ink text-xs font-black text-amber-900">
+        🎉 4 / 4 Görev Başarıyla Tamamlandı!
+      </div>
+      <button id="btnCloseModal" class="pushable w-full py-2.5 bg-sun hover:bg-amber-400 text-ink display text-base">
+        Deneye Devam Et 🚀
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. SES EFEKTLERİ MOTORU (Web Audio API)
+    // ==========================================
+    class SoundFX {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+        this.streamNode = null;
+        this.streamGain = null;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playTone(freq, type = 'sine', duration = 0.15, vol = 0.15) {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+
+          gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {
+          console.warn('Ses çalınamadı', e);
+        }
+      }
+
+      playClick() {
+        this.playTone(600, 'triangle', 0.08, 0.1);
+      }
+
+      playSuccess() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+          setTimeout(() => {
+            this.playTone(freq, 'sine', 0.2, 0.15);
+          }, idx * 100);
+        });
+      }
+
+      playDing() {
+        this.playTone(880, 'sine', 0.4, 0.2);
+      }
+
+      playAirLeak() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        // Beyaz gürültü ile fısss sesi simülasyonu
+        try {
+          const bufferSize = this.ctx.sampleRate * 0.4;
+          const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+
+          const noise = this.ctx.createBufferSource();
+          noise.buffer = buffer;
+
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.value = 1800;
+
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.4);
+
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          noise.start();
+        } catch (e) {
+          this.playTone(150, 'sawtooth', 0.3, 0.2);
+        }
+      }
+
+      playBubbles() {
+        if (this.muted) return;
+        for (let i = 0; i < 4; i++) {
+          setTimeout(() => {
+            const freq = 400 + Math.random() * 400;
+            this.playTone(freq, 'sine', 0.09, 0.12);
+          }, i * 60);
+        }
+      }
+
+      startWaterSound() {
+        if (this.muted || this.streamNode) return;
+        this.init();
+        if (!this.ctx) return;
+
+        try {
+          // Yumuşak su şırıltısı
+          const bufferSize = this.ctx.sampleRate * 2;
+          const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * 0.5;
+          }
+
+          this.streamNode = this.ctx.createBufferSource();
+          this.streamNode.buffer = buffer;
+          this.streamNode.loop = true;
+
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.value = 650;
+
+          this.streamGain = this.ctx.createGain();
+          this.streamGain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+
+          this.streamNode.connect(filter);
+          filter.connect(this.streamGain);
+          this.streamGain.connect(this.ctx.destination);
+
+          this.streamNode.start();
+        } catch (e) {
+          // Sessiz geç
+        }
+      }
+
+      stopWaterSound() {
+        if (this.streamGain && this.ctx) {
+          try {
+            this.streamGain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.2);
+            setTimeout(() => {
+              if (this.streamNode) {
+                this.streamNode.stop();
+                this.streamNode.disconnect();
+                this.streamNode = null;
+              }
+            }, 250);
+          } catch (e) {
+            this.streamNode = null;
+          }
+        }
+      }
+    }
+
+    const sfx = new SoundFX();
+
+    // ==========================================
+    // 2. DENEY DURUMU VE FİZİK SİMÜLASYONU
+    // ==========================================
+    const State = {
+      heightA: 9,      // Stand A yüksekliği (0-14 cm)
+      heightB: 3,      // Stand B yüksekliği (0-14 cm)
+      waterA: 250,     // Kap A su hacmi (mL) - maks 300
+      waterB: 50,      // Kap B su hacmi (mL) - maks 300
+      isPrimed: false, // Hortum su dolu mu?
+      hasAirLeak: false, // Hava kaçağı oldu mu?
+      flowRate: 0,     // Anlık debi (mL/s)
+      direction: 'NONE', // 'A_TO_B', 'B_TO_A', 'BALANCED', 'NONE'
+      speedMultiplier: 1, // 1x, 2x, 4x akış hızı çarpanı
+      liquidColor: 'blue', // 'blue', 'red', 'green'
+      missionsCompleted: { m1: false, m2: false, m3: false, m4: false }
+    };
+
+    const Colors = {
+      blue: {
+        dot: '#0284c7',
+        stop1: '#38bdf8',
+        stop2: '#0284c7',
+        name: 'Mavi Su'
+      },
+      red: {
+        dot: '#ef4444',
+        stop1: '#f87171',
+        stop2: '#dc2626',
+        name: 'Kırmızı Şerbet'
+      },
+      green: {
+        dot: '#10b981',
+        stop1: '#34d399',
+        stop2: '#059669',
+        name: 'Yeşil İksir'
+      }
+    };
+
+    // DOM Elementleri
+    const groupCupA = document.getElementById('groupCupA');
+    const groupCupB = document.getElementById('groupCupB');
+    const standRectA = document.getElementById('standRectA');
+    const standRectB = document.getElementById('standRectB');
+    const standBadgeA = document.getElementById('standBadgeA');
+    const standBadgeB = document.getElementById('standBadgeB');
+    const standTextA = document.getElementById('standTextA');
+    const standTextB = document.getElementById('standTextB');
+    const standCrossA1 = document.getElementById('standCrossA1');
+    const standCrossA2 = document.getElementById('standCrossA2');
+    const standCrossB1 = document.getElementById('standCrossB1');
+
+    const waterRectA = document.getElementById('waterRectA');
+    const waterRectB = document.getElementById('waterRectB');
+    const waterSurfaceA = document.getElementById('waterSurfaceA');
+    const waterSurfaceB = document.getElementById('waterSurfaceB');
+    const waterRippleA = document.getElementById('waterRippleA');
+    const waterRippleB = document.getElementById('waterRippleB');
+    const cupLabelA = document.getElementById('cupLabelA');
+    const cupLabelB = document.getElementById('cupLabelB');
+
+    const badgeFlowA = document.getElementById('badgeFlowA');
+    const badgeFlowBgA = document.getElementById('badgeFlowBgA');
+    const badgeFlowTextA = document.getElementById('badgeFlowTextA');
+    const badgeFlowB = document.getElementById('badgeFlowB');
+    const badgeFlowBgB = document.getElementById('badgeFlowBgB');
+    const badgeFlowTextB = document.getElementById('badgeFlowTextB');
+
+    const vortexA = document.getElementById('vortexA');
+    const jetGroupA = document.getElementById('jetGroupA');
+    const vortexB = document.getElementById('vortexB');
+    const jetGroupB = document.getElementById('jetGroupB');
+
+    const hoseOuterPath = document.getElementById('hoseOuterPath');
+    const hoseBorderPath = document.getElementById('hoseBorderPath');
+    const hoseLiquidPath = document.getElementById('hoseLiquidPath');
+    const hoseStreamFlow = document.getElementById('hoseStreamFlow');
+    const dropletsGroup = document.getElementById('dropletsGroup');
+    const hoseChevronsGroup = document.getElementById('hoseChevronsGroup');
+    const hoseTipA = document.getElementById('hoseTipA');
+    const hoseTipB = document.getElementById('hoseTipB');
+    const hoseShadowPath = document.getElementById('hoseShadowPath');
+
+    const deltaLine = document.getElementById('deltaLine');
+    const deltaCapTop = document.getElementById('deltaCapTop');
+    const deltaCapBottom = document.getElementById('deltaCapBottom');
+    const deltaHBadge = document.getElementById('deltaHBadge');
+    const deltaHText = document.getElementById('deltaHText');
+    const guideLineA = document.getElementById('guideLineA');
+    const guideLineB = document.getElementById('guideLineB');
+
+    const sensorDeltaH = document.getElementById('sensorDeltaH');
+    const sensorFlowRate = document.getElementById('sensorFlowRate');
+    const sensorDirection = document.getElementById('sensorDirection');
+    const sensorStatus = document.getElementById('sensorStatus');
+
+    const flowDirectionArrow = document.getElementById('flowDirectionArrow');
+    const flowArrowText = document.getElementById('flowArrowText');
+    const airBubbleGroup = document.getElementById('airBubbleGroup');
+    const successBadge = document.getElementById('successBadge');
+
+    const sliderA = document.getElementById('sliderHeightA');
+    const sliderB = document.getElementById('sliderHeightB');
+    const labelSliderA = document.getElementById('labelSliderA');
+    const labelSliderB = document.getElementById('labelSliderB');
+
+    const btnPrime = document.getElementById('btnPrimeSiphon');
+    const primeBtnIcon = document.getElementById('primeBtnIcon');
+    const primeBtnText = document.getElementById('primeBtnText');
+    const btnToggleSpeed = document.getElementById('btnToggleSpeed');
+    const speedIcon = document.getElementById('speedIcon');
+    const speedText = document.getElementById('speedText');
+    const tipText = document.getElementById('tipText');
+    const tipBanner = document.getElementById('tipBanner');
+
+    // 1 cm = 8.5 SVG pikseli
+    const CM_TO_PX = 8.5;
+    // 300 mL = 100 SVG pikseli derinlik
+    const ML_TO_PX = 100 / 300;
+    const GROUND_Y = 306;
+
+    // ==========================================
+    // 3. CANLI DAMLACIK PARÇACIK SİSTEMİ (60 FPS)
+    // ==========================================
+    const NUM_DROPLETS = 20;
+    const dropletsData = [];
+
+    function initDropletSystem() {
+      dropletsGroup.innerHTML = '';
+      hoseChevronsGroup.innerHTML = '';
+
+      for (let i = 0; i < NUM_DROPLETS; i++) {
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+        // Ana parlak su incisi/damlası
+        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        c.setAttribute('r', (3.5 + (i % 3) * 0.7).toFixed(1));
+        c.setAttribute('fill', '#ffffff');
+        c.setAttribute('opacity', '0.9');
+        c.setAttribute('stroke', '#38bdf8');
+        c.setAttribute('stroke-width', '1.2');
+
+        // Damla üzerindeki ışık parlaması
+        const glint = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        glint.setAttribute('r', '1.4');
+        glint.setAttribute('fill', '#ffffff');
+
+        g.appendChild(c);
+        g.appendChild(glint);
+        dropletsGroup.appendChild(g);
+
+        dropletsData.push({
+          group: g,
+          circle: c,
+          glint: glint,
+          offsetRatio: i / NUM_DROPLETS
+        });
+      }
+
+      // 5 adet yön chevron oku
+      for (let j = 0; j < 5; j++) {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M -6 -5 L 2 0 L -6 5');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', '#ffffff');
+        path.setAttribute('stroke-width', '2.5');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+        path.setAttribute('opacity', '0.9');
+        hoseChevronsGroup.appendChild(path);
+      }
+    }
+
+    // Baloncukların Yükselme Durumu
+    const bubbleStatesA = [
+      { id: 'jetBubbleA1', phase: 0.1, cx: -4, baseY: -12 },
+      { id: 'jetBubbleA2', phase: 0.35, cx: -9, baseY: -24 },
+      { id: 'jetBubbleA3', phase: 0.6, cx: -14, baseY: -38 },
+      { id: 'jetBubbleA4', phase: 0.85, cx: -6, baseY: -52 }
+    ];
+    const bubbleStatesB = [
+      { id: 'jetBubbleB1', phase: 0.1, cx: 4, baseY: -12 },
+      { id: 'jetBubbleB2', phase: 0.35, cx: 9, baseY: -24 },
+      { id: 'jetBubbleB3', phase: 0.6, cx: 14, baseY: -38 },
+      { id: 'jetBubbleB4', phase: 0.85, cx: 6, baseY: -52 }
+    ];
+
+    let lastTime = performance.now();
+
+    function animateFlow(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      if (State.isPrimed && !State.hasAirLeak && State.flowRate > 0) {
+        dropletsGroup.setAttribute('opacity', '1');
+        hoseChevronsGroup.setAttribute('opacity', '1');
+
+        try {
+          const totalLen = hoseLiquidPath.getTotalLength();
+          if (totalLen > 10) {
+            // Hız piksel/saniye cinsinden
+            const pxSpeed = (State.flowRate / 10) * 160 * State.speedMultiplier;
+            const deltaRatio = (pxSpeed * dt) / totalLen;
+
+            dropletsData.forEach((d) => {
+              if (State.direction === 'A_TO_B') {
+                d.offsetRatio = (d.offsetRatio + deltaRatio) % 1;
+              } else if (State.direction === 'B_TO_A') {
+                d.offsetRatio = (d.offsetRatio - deltaRatio + 1) % 1;
+              }
+
+              const curDist = d.offsetRatio * totalLen;
+              const pt = hoseLiquidPath.getPointAtLength(curDist);
+
+              d.circle.setAttribute('cx', pt.x);
+              d.circle.setAttribute('cy', pt.y);
+              d.glint.setAttribute('cx', pt.x - 1.2);
+              d.glint.setAttribute('cy', pt.y - 1.2);
+            });
+
+            // Yön Chevrons Okları
+            const chevronElements = hoseChevronsGroup.children;
+            const step = totalLen / (chevronElements.length + 1);
+
+            for (let k = 0; k < chevronElements.length; k++) {
+              const ch = chevronElements[k];
+              const dist = (k + 1) * step;
+              const pt = hoseLiquidPath.getPointAtLength(dist);
+              const ptNext = hoseLiquidPath.getPointAtLength(Math.min(dist + 2, totalLen));
+              
+              let angle = Math.atan2(ptNext.y - pt.y, ptNext.x - pt.x) * (180 / Math.PI);
+              if (State.direction === 'B_TO_A') {
+                angle += 180;
+              }
+
+              ch.setAttribute('transform', `translate(${pt.x}, ${pt.y}) rotate(${angle})`);
+            }
+          }
+        } catch (e) {}
+
+        // Baloncukların Yükselme Hareketi
+        const bubbleSpeed = 1.2 * State.speedMultiplier;
+        if (State.direction === 'A_TO_B') {
+          bubbleStatesB.forEach((b) => {
+            b.phase = (b.phase + dt * bubbleSpeed) % 1;
+            const currentY = -10 - (b.phase * 55);
+            const currentX = b.cx + Math.sin(now * 0.008 + b.phase * 6) * 3.5;
+            const elem = document.getElementById(b.id);
+            if (elem) {
+              elem.setAttribute('cx', currentX);
+              elem.setAttribute('cy', currentY);
+              elem.setAttribute('opacity', (1 - b.phase * 0.4).toFixed(2));
+            }
+          });
+        } else if (State.direction === 'B_TO_A') {
+          bubbleStatesA.forEach((b) => {
+            b.phase = (b.phase + dt * bubbleSpeed) % 1;
+            const currentY = -10 - (b.phase * 55);
+            const currentX = b.cx + Math.sin(now * 0.008 + b.phase * 6) * 3.5;
+            const elem = document.getElementById(b.id);
+            if (elem) {
+              elem.setAttribute('cx', currentX);
+              elem.setAttribute('cy', currentY);
+              elem.setAttribute('opacity', (1 - b.phase * 0.4).toFixed(2));
+            }
+          });
+        }
+
+        // Yüzey Dalgalanması
+        const rippleScale = 1 + 0.05 * Math.sin(now * 0.01);
+        if (State.direction === 'A_TO_B') {
+          waterRippleB.setAttribute('transform', `scale(${rippleScale}, 1)`);
+        } else if (State.direction === 'B_TO_A') {
+          waterRippleA.setAttribute('transform', `scale(${rippleScale}, 1)`);
+        }
+
+      } else {
+        dropletsGroup.setAttribute('opacity', '0');
+        hoseChevronsGroup.setAttribute('opacity', '0');
+      }
+
+      requestAnimationFrame(animateFlow);
+    }
+
+    // ==========================================
+    // 4. SAHNE GÜNCELLEME VE FİZİK MATEMATİĞİ
+    // ==========================================
+    function updateScene() {
+      // 1. Stand Yükseklikleri ve SVG Pozisyonları
+      const pxHeightA = State.heightA * CM_TO_PX;
+      const pxHeightB = State.heightB * CM_TO_PX;
+
+      // Stand A boyutu
+      standRectA.setAttribute('height', Math.max(pxHeightA, 6));
+      standRectA.setAttribute('y', -pxHeightA);
+      standBadgeA.setAttribute('y', -pxHeightA / 2 - 8);
+      standTextA.setAttribute('y', -pxHeightA / 2 + 4);
+      standTextA.textContent = `h_A = ${State.heightA} cm`;
+      standCrossA1.setAttribute('y1', -pxHeightA + 4);
+      standCrossA2.setAttribute('y1', -pxHeightA + 4);
+
+      // Beher A tabanının Y pozisyonu
+      const beakerAY = -pxHeightA;
+      document.getElementById('beakerA').setAttribute('transform', `translate(0, ${beakerAY})`);
+
+      // Stand B boyutu
+      standRectB.setAttribute('height', Math.max(pxHeightB, 6));
+      standRectB.setAttribute('y', -pxHeightB);
+      standBadgeB.setAttribute('y', -pxHeightB / 2 - 8);
+      standTextB.setAttribute('y', -pxHeightB / 2 + 3);
+      standTextB.textContent = `h_B = ${State.heightB} cm`;
+      standCrossB1.setAttribute('y1', -pxHeightB + 4);
+
+      // Beher B tabanının Y pozisyonu
+      const beakerBY = -pxHeightB;
+      document.getElementById('beakerB').setAttribute('transform', `translate(0, ${beakerBY})`);
+
+      // 2. Su Seviyeleri (Beher iç koordinatlarında)
+      const waterHeightA = State.waterA * ML_TO_PX;
+      const waterHeightB = State.waterB * ML_TO_PX;
+
+      waterRectA.setAttribute('height', waterHeightA);
+      waterRectA.setAttribute('y', -waterHeightA);
+      waterSurfaceA.setAttribute('cy', -waterHeightA);
+      waterRippleA.setAttribute('cy', -waterHeightA);
+      cupLabelA.textContent = `Kap A: ${Math.round(State.waterA)} mL`;
+
+      waterRectB.setAttribute('height', waterHeightB);
+      waterRectB.setAttribute('y', -waterHeightB);
+      waterSurfaceB.setAttribute('cy', -waterHeightB);
+      waterRippleB.setAttribute('cy', -waterHeightB);
+      cupLabelB.textContent = `Kap B: ${Math.round(State.waterB)} mL`;
+
+      // 3. Mutlak Dünya Koordinatlarında Su Yüzeyleri (SVG Yükseklikleri)
+      // Y_dünya = GROUND_Y - standHeight - waterHeight
+      const absWaterSurfaceA_Y = GROUND_Y - pxHeightA - waterHeightA;
+      const absWaterSurfaceB_Y = GROUND_Y - pxHeightB - waterHeightB;
+
+      // Seviye Farkı Δh (cm cinsinden)
+      const deltaH_cm = parseFloat(((absWaterSurfaceB_Y - absWaterSurfaceA_Y) / CM_TO_PX).toFixed(1));
+
+      // 4. Hortum Uç Noktaları ve Dinamik Kavis Eğrisi
+      const tipA_X = 135;
+      const tipA_Y = GROUND_Y - pxHeightA - 20;
+      const tipB_X = 405;
+      const tipB_Y = GROUND_Y - pxHeightB - 20;
+
+      const topBeakerY = Math.min(GROUND_Y - pxHeightA - 120, GROUND_Y - pxHeightB - 120);
+      const apexY = Math.min(topBeakerY - 35, 75);
+
+      const hosePathData = `M ${tipA_X} ${tipA_Y} C ${tipA_X} ${apexY}, ${tipB_X} ${apexY}, ${tipB_X} ${tipB_Y}`;
+
+      hoseOuterPath.setAttribute('d', hosePathData);
+      hoseBorderPath.setAttribute('d', hosePathData);
+      hoseLiquidPath.setAttribute('d', hosePathData);
+      hoseStreamFlow.setAttribute('d', hosePathData);
+      hoseShadowPath.setAttribute('d', hosePathData);
+
+      hoseTipA.setAttribute('cx', tipA_X);
+      hoseTipA.setAttribute('cy', tipA_Y);
+      hoseTipB.setAttribute('cx', tipB_X);
+      hoseTipB.setAttribute('cy', tipB_Y);
+
+      // Tepe noktası grubu
+      document.getElementById('apexGroup').setAttribute('transform', `translate(270, ${apexY})`);
+      flowDirectionArrow.setAttribute('transform', `translate(270, ${apexY + 28})`);
+
+      // 5. Seviye Farkı Göstergeleri (Δh Boyut Çizgisi)
+      guideLineA.setAttribute('y1', absWaterSurfaceA_Y);
+      guideLineA.setAttribute('y2', absWaterSurfaceA_Y);
+      guideLineB.setAttribute('y1', absWaterSurfaceB_Y);
+      guideLineB.setAttribute('y2', absWaterSurfaceB_Y);
+
+      const minY = Math.min(absWaterSurfaceA_Y, absWaterSurfaceB_Y);
+      const maxY = Math.max(absWaterSurfaceA_Y, absWaterSurfaceB_Y);
+
+      deltaLine.setAttribute('y1', minY);
+      deltaLine.setAttribute('y2', maxY);
+      deltaCapTop.setAttribute('y1', minY);
+      deltaCapTop.setAttribute('y2', minY);
+      deltaCapBottom.setAttribute('y1', maxY);
+      deltaCapBottom.setAttribute('y2', maxY);
+
+      deltaHBadge.setAttribute('transform', `translate(270, ${(minY + maxY) / 2})`);
+      deltaHText.textContent = `Δh = ${Math.abs(deltaH_cm)} cm`;
+
+      sensorDeltaH.textContent = `${Math.abs(deltaH_cm)} cm`;
+
+      // 6. Akış Mantığı ve Durum Değerlendirmesi
+      evaluatePhysics(deltaH_cm, tipA_Y, tipB_Y, absWaterSurfaceA_Y, absWaterSurfaceB_Y);
+    }
+
+    function evaluatePhysics(deltaH_cm, tipA_Y, tipB_Y, surfA_Y, surfB_Y) {
+      const tipAInWater = tipA_Y > surfA_Y;
+      const tipBInWater = tipB_Y > surfB_Y;
+
+      if (!tipAInWater || !tipBInWater) {
+        if (State.isPrimed && !State.hasAirLeak) {
+          triggerAirLeak("Hortumun ucu su seviyesinin üstüne çıktı ve hava girdi!");
+        }
+      }
+
+      if (!State.isPrimed || State.hasAirLeak) {
+        State.flowRate = 0;
+        State.direction = 'NONE';
+        hoseLiquidPath.setAttribute('opacity', '0');
+        hoseStreamFlow.setAttribute('opacity', '0');
+        flowDirectionArrow.setAttribute('opacity', '0');
+        
+        badgeFlowA.setAttribute('opacity', '0');
+        badgeFlowB.setAttribute('opacity', '0');
+        vortexA.setAttribute('opacity', '0');
+        jetGroupA.setAttribute('opacity', '0');
+        vortexB.setAttribute('opacity', '0');
+        jetGroupB.setAttribute('opacity', '0');
+        waterRippleA.setAttribute('opacity', '0');
+        waterRippleB.setAttribute('opacity', '0');
+
+        sfx.stopWaterSound();
+
+        if (State.hasAirLeak) {
+          sensorStatus.textContent = 'Hava Kaçağı! ⚠️';
+          sensorStatus.className = 'display text-xs sm:text-sm font-black text-rose-600 block mt-0.5';
+          sensorDirection.textContent = 'Akış Kesildi 🛑';
+          sensorDirection.className = 'display text-xs sm:text-sm font-black text-rose-600 block mt-0.5';
+        } else {
+          sensorStatus.textContent = 'Doldurulmadı ⭕';
+          sensorStatus.className = 'display text-xs sm:text-sm font-black text-gray-600 block mt-0.5';
+          sensorDirection.textContent = 'Beklemede ⏸️';
+          sensorDirection.className = 'display text-xs sm:text-sm font-black text-amber-600 block mt-0.5';
+        }
+        sensorFlowRate.textContent = '0 mL/sn';
+        return;
+      }
+
+      // Sifon AKTİF ve HAVA YOK:
+      hoseLiquidPath.setAttribute('opacity', '0.95');
+
+      if (deltaH_cm > 0.3) {
+        // A -> B
+        State.direction = 'A_TO_B';
+        State.flowRate = Math.min(Math.round(Math.sqrt(deltaH_cm) * 5) + 3, 30);
+        
+        sensorDirection.textContent = 'A ➔ B Akıyor 💦';
+        sensorDirection.className = 'display text-xs sm:text-sm font-black text-sky-600 block mt-0.5';
+        sensorStatus.textContent = 'Sifon Aktif ✅';
+        sensorStatus.className = 'display text-xs sm:text-sm font-black text-emerald-600 block mt-0.5';
+
+        hoseStreamFlow.setAttribute('opacity', '0.9');
+        hoseStreamFlow.className.baseVal = 'flow-forward';
+        
+        flowDirectionArrow.setAttribute('opacity', '1');
+        flowArrowText.textContent = `A ➔ B (${State.flowRate * State.speedMultiplier} mL/s) 💦`;
+
+        // Canlı Rozetler ve Efektler
+        badgeFlowA.setAttribute('opacity', '1');
+        badgeFlowBgA.setAttribute('fill', '#ef4444');
+        badgeFlowTextA.textContent = `⬇️ Boşalıyor (-${State.flowRate * State.speedMultiplier} mL/s)`;
+
+        badgeFlowB.setAttribute('opacity', '1');
+        badgeFlowBgB.setAttribute('fill', '#10b981');
+        badgeFlowTextB.textContent = `⬆️ Su Doluyor (+${State.flowRate * State.speedMultiplier} mL/s)`;
+
+        vortexA.setAttribute('opacity', '1');
+        jetGroupA.setAttribute('opacity', '0');
+        vortexB.setAttribute('opacity', '0');
+        jetGroupB.setAttribute('opacity', '1');
+        waterRippleA.setAttribute('opacity', '0');
+        waterRippleB.setAttribute('opacity', '0.8');
+
+        sfx.startWaterSound();
+        completeMission('m1');
+
+      } else if (deltaH_cm < -0.3) {
+        // B -> A (Ters Akış)
+        State.direction = 'B_TO_A';
+        State.flowRate = Math.min(Math.round(Math.sqrt(Math.abs(deltaH_cm)) * 5) + 3, 30);
+
+        sensorDirection.textContent = 'B ➔ A Akıyor 💦';
+        sensorDirection.className = 'display text-xs sm:text-sm font-black text-purple-600 block mt-0.5';
+        sensorStatus.textContent = 'Sifon Aktif ✅';
+        sensorStatus.className = 'display text-xs sm:text-sm font-black text-emerald-600 block mt-0.5';
+
+        hoseStreamFlow.setAttribute('opacity', '0.9');
+        hoseStreamFlow.className.baseVal = 'flow-reverse';
+
+        flowDirectionArrow.setAttribute('opacity', '1');
+        flowArrowText.textContent = `B ➔ A (${State.flowRate * State.speedMultiplier} mL/s) 💦`;
+
+        // Canlı Rozetler ve Efektler
+        badgeFlowA.setAttribute('opacity', '1');
+        badgeFlowBgA.setAttribute('fill', '#10b981');
+        badgeFlowTextA.textContent = `⬆️ Su Doluyor (+${State.flowRate * State.speedMultiplier} mL/s)`;
+
+        badgeFlowB.setAttribute('opacity', '1');
+        badgeFlowBgB.setAttribute('fill', '#ef4444');
+        badgeFlowTextB.textContent = `⬇️ Boşalıyor (-${State.flowRate * State.speedMultiplier} mL/s)`;
+
+        vortexA.setAttribute('opacity', '0');
+        jetGroupA.setAttribute('opacity', '1');
+        vortexB.setAttribute('opacity', '1');
+        jetGroupB.setAttribute('opacity', '0');
+        waterRippleA.setAttribute('opacity', '0.8');
+        waterRippleB.setAttribute('opacity', '0');
+
+        sfx.startWaterSound();
+        completeMission('m2');
+
+      } else {
+        // Denge Durumu (h_A == h_B)
+        State.direction = 'BALANCED';
+        State.flowRate = 0;
+
+        sensorDirection.textContent = 'Denge: Durdu ⚖️';
+        sensorDirection.className = 'display text-xs sm:text-sm font-black text-emerald-600 block mt-0.5';
+        sensorStatus.textContent = 'Seviyeler Eşit 🎯';
+        sensorStatus.className = 'display text-xs sm:text-sm font-black text-emerald-600 block mt-0.5';
+
+        hoseStreamFlow.setAttribute('opacity', '0');
+        flowDirectionArrow.setAttribute('opacity', '0');
+
+        badgeFlowA.setAttribute('opacity', '0');
+        badgeFlowB.setAttribute('opacity', '0');
+        vortexA.setAttribute('opacity', '0');
+        jetGroupA.setAttribute('opacity', '0');
+        vortexB.setAttribute('opacity', '0');
+        jetGroupB.setAttribute('opacity', '0');
+        waterRippleA.setAttribute('opacity', '0');
+        waterRippleB.setAttribute('opacity', '0');
+
+        sfx.stopWaterSound();
+        completeMission('m3');
+      }
+
+      sensorFlowRate.textContent = `${State.flowRate * State.speedMultiplier} mL/sn`;
+    }
+
+    // Sürekli Su Transferi Döngüsü (Her 80ms'de bir akışkan transferi)
+    setInterval(() => {
+      if (!State.isPrimed || State.hasAirLeak || State.flowRate === 0) return;
+
+      const transferAmount = (State.flowRate * 0.12 * State.speedMultiplier);
+
+      if (State.direction === 'A_TO_B') {
+        if (State.waterA > 20 && State.waterB < 290) {
+          State.waterA -= transferAmount;
+          State.waterB += transferAmount;
+          updateScene();
+        } else {
+          State.flowRate = 0;
+          updateScene();
+        }
+      } else if (State.direction === 'B_TO_A') {
+        if (State.waterB > 20 && State.waterA < 290) {
+          State.waterB -= transferAmount;
+          State.waterA += transferAmount;
+          updateScene();
+        } else {
+          State.flowRate = 0;
+          updateScene();
+        }
+      }
+    }, 80);
+
+    // ==========================================
+    // 4. KULLANICI AKSİYONLARI VE ETKİLEŞİM
+    // ==========================================
+    function primeSiphon() {
+      sfx.playBubbles();
+      State.hasAirLeak = false;
+      airBubbleGroup.setAttribute('opacity', '0');
+
+      // Animasyonla hortum dolumu
+      primeBtnIcon.textContent = '⏳';
+      primeBtnText.textContent = 'Dolduruluyor...';
+
+      gsap.to(hoseLiquidPath, {
+        opacity: 0.9,
+        duration: 0.6,
+        ease: 'power1.out',
+        onComplete: () => {
+          State.isPrimed = true;
+          primeBtnIcon.textContent = '✅';
+          primeBtnText.textContent = 'Sifon Çalışıyor';
+          btnPrime.classList.remove('bg-emerald-500', 'hover:bg-emerald-600');
+          btnPrime.classList.add('bg-teal-600', 'hover:bg-teal-700');
+
+          tipBanner.className = 'mb-3 px-3 py-2 bg-emerald-100 border-2 border-ink rounded-xl text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-2';
+          tipText.textContent = "Harika! Hortum suyla doldu ve sifon kuruldu. Kapların yüksekliklerini değiştirerek akışı yönetebilirsin!";
+
+          showSuccessBadge("🎉 SİFON KURULDU & SU AKIYOR!");
+          updateScene();
+        }
+      });
+    }
+
+    function triggerAirLeak(customMsg) {
+      sfx.playAirLeak();
+      sfx.stopWaterSound();
+
+      State.hasAirLeak = true;
+      State.isPrimed = false;
+      State.flowRate = 0;
+
+      // Hava kabarcığı animasyonu
+      airBubbleGroup.setAttribute('opacity', '1');
+      gsap.fromTo(airBubbleGroup, { scale: 0.3 }, { scale: 1, duration: 0.4, ease: 'back.out(2)' });
+
+      // Hortum içindeki sıvının boşalması
+      gsap.to(hoseLiquidPath, { opacity: 0, duration: 0.5 });
+      gsap.to(hoseStreamFlow, { opacity: 0, duration: 0.2 });
+      flowDirectionArrow.setAttribute('opacity', '0');
+
+      primeBtnIcon.textContent = '🚀';
+      primeBtnText.textContent = 'Sifonu Başlat!';
+      btnPrime.classList.remove('bg-teal-600', 'hover:bg-teal-700');
+      btnPrime.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
+
+      tipBanner.className = 'mb-3 px-3 py-2 bg-rose-100 border-2 border-ink rounded-xl text-xs sm:text-sm font-bold text-rose-950 flex items-center gap-2';
+      tipText.textContent = customMsg || "Hortuma hava girdi! Sıvı sütunu koptuğu için açık hava basıncı artık suyu çekemez ve akış durur!";
+
+      // 4. Görev kontrolü
+      completeMission('m4');
+      updateScene();
+    }
+
+    function showSuccessBadge(text) {
+      const badge = document.getElementById('successBadge');
+      const badgeText = document.getElementById('successBadgeText');
+      badgeText.textContent = text;
+      
+      gsap.killTweensOf(badge);
+      gsap.fromTo(badge, 
+        { opacity: 0, y: 15, scale: 0.8 },
+        { opacity: 1, y: 30, scale: 1, duration: 0.4, ease: 'back.out(2)', onComplete: () => {
+          gsap.to(badge, { opacity: 0, delay: 2.5, duration: 0.5 });
+        }}
+      );
+    }
+
+    function resetExperiment() {
+      sfx.playClick();
+      State.heightA = 9;
+      State.heightB = 3;
+      State.waterA = 250;
+      State.waterB = 50;
+      State.isPrimed = false;
+      State.hasAirLeak = false;
+      State.flowRate = 0;
+      State.direction = 'NONE';
+
+      sliderA.value = 9;
+      sliderB.value = 3;
+      labelSliderA.textContent = '9 cm';
+      labelSliderB.textContent = '3 cm';
+
+      airBubbleGroup.setAttribute('opacity', '0');
+      hoseLiquidPath.setAttribute('opacity', '0');
+      hoseStreamFlow.setAttribute('opacity', '0');
+      flowDirectionArrow.setAttribute('opacity', '0');
+
+      primeBtnIcon.textContent = '🚀';
+      primeBtnText.textContent = 'Sifonu Başlat!';
+      btnPrime.classList.remove('bg-teal-600', 'hover:bg-teal-700');
+      btnPrime.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
+
+      tipBanner.className = 'mb-3 px-3 py-2 bg-emerald-50 border-2 border-ink rounded-xl text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-2';
+      tipText.textContent = "Hortumu suyla doldurup sifonu başlat! Yüksek kaptan alçak kaba suyun kendiliğinden nasıl aktığını gözlemle.";
+
+      updateScene();
+    }
+
+    // ==========================================
+    // 5. GÖREV TAKİP VE KUTLAMA SİSTEMİ
+    // ==========================================
+    function completeMission(id) {
+      if (State.missionsCompleted[id]) return;
+      State.missionsCompleted[id] = true;
+
+      const mElem = document.getElementById(id);
+      if (mElem) {
+        mElem.className = 'flex items-start gap-2 p-2 rounded-xl border-2 border-emerald-500 bg-emerald-50 transition-colors shadow-sm';
+        const icon = mElem.querySelector('.m-check');
+        if (icon) icon.textContent = '✅';
+      }
+
+      sfx.playDing();
+
+      // Toplam tamamlanan görev sayısı
+      const totalDone = Object.values(State.missionsCompleted).filter(Boolean).length;
+      document.getElementById('missionProgressText').textContent = `${totalDone} / 4 Görev`;
+
+      if (totalDone === 4) {
+        setTimeout(() => {
+          triggerFinalCelebration();
+        }, 800);
+      }
+    }
+
+    function triggerFinalCelebration() {
+      sfx.playSuccess();
+      try {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      } catch (e) {}
+
+      document.getElementById('celebrationModal').classList.remove('hidden');
+    }
+
+    // ==========================================
+    // 6. MİNİ BİLGİ TESTİ (QUIZ) MOTORU
+    // ==========================================
+    const QuizData = [
+      {
+        q: "Sifon düzeneğinde suyun bir kaptan diğer kaba KENDİLİĞİNDEN akması için ne gereklidir?",
+        options: [
+          "İki kap arasında yükseklik (seviye) farkı olmalıdır.",
+          "Hortumun içine bol miktarda hava üflenmelidir.",
+          "Kapların ağzının kapakla sıkıca kapatılması gerekir.",
+          "Suyun çok sıcak olması gerekir."
+        ],
+        correct: 0,
+        explanation: "Harika! Sifon, iki kap arasındaki yükseklik farkından (Δh) kaynaklanan yerçekimi ve hidrostatik basınç farkıyla çalışır."
+      },
+      {
+        q: "Hortumun tepe noktası delinirse veya bir ucu sudan çıkıp hava çekerse ne olur?",
+        options: [
+          "Su daha hızlı akmaya başlar.",
+          "Sıvı sütunu kopar, hava girer ve akış anında durur!",
+          "Su ters yönde fışkırır.",
+          "Hortumun rengi değişir."
+        ],
+        correct: 1,
+        explanation: "Doğru! Sifonun çalışması için hortumun tamamen sıvıyla dolu olması gerekir. Hava girerse su moleküllerinin oluşturduğu çekim zinciri kopar."
+      },
+      {
+        q: "İki kaptaki su yüzeyleri tam olarak aynı hizaya (aynı seviyeye) geldiğinde ne gözlemlenir?",
+        options: [
+          "Su kaplardan dışarı taşar.",
+          "Akış hızı iki katına çıkar.",
+          "Basınçlar eşitlenir ve su akışı kendiliğinden durur (denge).",
+          "Hortum patlar."
+        ],
+        correct: 2,
+        explanation: "Mükemmel! Seviyeler eşitlendiğinde Δh = 0 olur, basınç farkı sıfırlandığı için akış kendiliğinden durur."
+      },
+      {
+        q: "Akış yönünü Kap A'dan Kap B'ye akarken tersine (Kap B'den Kap A'ya) çevirmek için ne yapılmalıdır?",
+        options: [
+          "Kap B'yi Kap A'dan daha yüksek bir konuma kaldırmak.",
+          "Kap A'daki suyu ısıtmak.",
+          "Hortumu ikiye katlamak.",
+          "Kap B'ye buz atmak."
+        ],
+        correct: 0,
+        explanation: "Tebrikler! Sifon her zaman yüksek sıvı seviyesinden alçak sıvı seviyesine doğru akar; Kap B'yi yükseltirsen akış anında yön değiştirir!"
+      }
+    ];
+
+    let currentQIdx = 0;
+
+    function renderQuiz() {
+      const q = QuizData[currentQIdx];
+      document.getElementById('quizScoreText').textContent = `Soru ${currentQIdx + 1} / ${QuizData.length}`;
+      document.getElementById('quizQuestion').textContent = q.q;
+
+      const optsContainer = document.getElementById('quizOptions');
+      optsContainer.innerHTML = '';
+
+      const feedback = document.getElementById('quizFeedback');
+      feedback.className = 'hidden';
+      document.getElementById('btnNextQuestion').classList.add('hidden');
+
+      q.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'w-full text-left p-2.5 rounded-xl border-2 border-ink bg-gray-50 hover:bg-amber-50 text-xs font-bold text-ink transition-colors';
+        btn.innerHTML = `<span class="inline-block w-5 h-5 rounded-full bg-white border border-ink text-center leading-4 text-[11px] mr-2 font-black">${String.fromCharCode(65 + idx)}</span> ${opt}`;
+        btn.onclick = () => handleAnswer(idx, q);
+        optsContainer.appendChild(btn);
+      });
+    }
+
+    function handleAnswer(selectedIdx, q) {
+      const opts = document.getElementById('quizOptions').children;
+      for (let i = 0; i < opts.length; i++) {
+        opts[i].disabled = true;
+        opts[i].classList.remove('hover:bg-amber-50');
+      }
+
+      const feedback = document.getElementById('quizFeedback');
+      feedback.classList.remove('hidden');
+
+      if (selectedIdx === q.correct) {
+        opts[selectedIdx].classList.remove('bg-gray-50');
+        opts[selectedIdx].classList.add('bg-emerald-100', 'border-emerald-600', 'text-emerald-900');
+        feedback.className = 'mt-3 p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-50 text-emerald-950 text-xs font-bold';
+        feedback.innerHTML = `<span>🎉 Doğru Cevap!</span> ${q.explanation}`;
+        sfx.playDing();
+      } else {
+        opts[selectedIdx].classList.remove('bg-gray-50');
+        opts[selectedIdx].classList.add('bg-rose-100', 'border-rose-600', 'text-rose-900');
+        opts[q.correct].classList.remove('bg-gray-50');
+        opts[q.correct].classList.add('bg-emerald-100', 'border-emerald-600', 'text-emerald-900');
+        feedback.className = 'mt-3 p-2.5 rounded-xl border-2 border-rose-500 bg-rose-50 text-rose-950 text-xs font-bold';
+        feedback.innerHTML = `<span>❌ Tekrar Düşünelim:</span> ${q.explanation}`;
+        sfx.playClick();
+      }
+
+      const nextBtn = document.getElementById('btnNextQuestion');
+      if (currentQIdx < QuizData.length - 1) {
+        nextBtn.textContent = 'Sonraki Soru ➔';
+        nextBtn.classList.remove('hidden');
+      } else {
+        nextBtn.textContent = 'Testi Tamamla 🎉';
+        nextBtn.classList.remove('hidden');
+      }
+    }
+
+    // ==========================================
+    // 7. ETKİNLİK DİNLEYİCİLERİ VE BAŞLATMA
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', () => {
+      // Sürgü Dinleyicileri
+      sliderA.addEventListener('input', (e) => {
+        State.heightA = parseInt(e.target.value, 10);
+        labelSliderA.textContent = `${State.heightA} cm`;
+        updateScene();
+      });
+
+      sliderB.addEventListener('input', (e) => {
+        State.heightB = parseInt(e.target.value, 10);
+        labelSliderB.textContent = `${State.heightB} cm`;
+        updateScene();
+      });
+
+      // Butonlar
+      btnPrime.addEventListener('click', () => {
+        sfx.playClick();
+        primeSiphon();
+      });
+
+      document.getElementById('btnBalanceHeights').addEventListener('click', () => {
+        sfx.playClick();
+        // İki kabı aynı yüksekliğe getir (örneğin 6 cm)
+        State.heightA = 6;
+        State.heightB = 6;
+        sliderA.value = 6;
+        sliderB.value = 6;
+        labelSliderA.textContent = '6 cm';
+        labelSliderB.textContent = '6 cm';
+        showSuccessBadge("⚖️ KAPLAR AYNI SEVİYEDE!");
+        updateScene();
+      });
+
+      document.getElementById('btnReverseFlow').addEventListener('click', () => {
+        sfx.playClick();
+        // Kap B'yi Kap A'dan yükseğe çıkar
+        State.heightA = 2;
+        State.heightB = 11;
+        sliderA.value = 2;
+        sliderB.value = 11;
+        labelSliderA.textContent = '2 cm';
+        labelSliderB.textContent = '11 cm';
+
+        if (!State.isPrimed) {
+          primeSiphon();
+        } else {
+          showSuccessBadge("🔃 AKIŞ YÖNÜ TERSİNE DÖNDÜ (B ➔ A)!");
+          updateScene();
+        }
+      });
+
+      document.getElementById('btnAirLeak').addEventListener('click', () => {
+        triggerAirLeak();
+      });
+
+      document.getElementById('btnResetExperiment').addEventListener('click', () => {
+        resetExperiment();
+      });
+
+      // Sıvı Rengi Menüsü
+      const colorKeys = ['blue', 'red', 'green'];
+      let colorIdx = 0;
+      document.getElementById('btnColorMenu').addEventListener('click', () => {
+        sfx.playClick();
+        colorIdx = (colorIdx + 1) % colorKeys.length;
+        const col = Colors[colorKeys[colorIdx]];
+        document.getElementById('currentColorDot').style.backgroundColor = col.dot;
+        document.getElementById('liquidStop1').setAttribute('stop-color', col.stop1);
+        document.getElementById('liquidStop2').setAttribute('stop-color', col.stop2);
+      });
+
+      // Ses Aç/Kapat
+      document.getElementById('btnToggleSound').addEventListener('click', () => {
+        sfx.muted = !sfx.muted;
+        const icon = document.getElementById('soundIcon');
+        const text = document.getElementById('btnToggleSound').querySelector('span:nth-child(2)');
+        if (sfx.muted) {
+          icon.textContent = '🔇';
+          if (text) text.textContent = 'Ses Kapalı';
+          sfx.stopWaterSound();
+        } else {
+          icon.textContent = '🔊';
+          if (text) text.textContent = 'Ses Açık';
+          sfx.playTone(500, 'sine', 0.1);
+        }
+      });
+
+      // Sağ Sekmeler (Missions / Science / Quiz)
+      const tabM = document.getElementById('tabMissions');
+      const tabS = document.getElementById('tabScience');
+      const tabQ = document.getElementById('tabQuiz');
+      const viewM = document.getElementById('sideViewMissions');
+      const viewS = document.getElementById('sideViewScience');
+      const viewQ = document.getElementById('sideViewQuiz');
+
+      function switchTab(activeTab, activeView) {
+        [tabM, tabS, tabQ].forEach(t => {
+          t.className = 'side-tab-btn py-1.5 rounded-xl text-gray-700 hover:bg-white/60';
+        });
+        activeTab.className = 'side-tab-btn py-1.5 rounded-xl bg-white border-2 border-ink shadow-sm text-ink';
+
+        [viewM, viewS, viewQ].forEach(v => v.classList.add('hidden'));
+        activeView.classList.remove('hidden');
+        sfx.playClick();
+      }
+
+      tabM.addEventListener('click', () => switchTab(tabM, viewM));
+      tabS.addEventListener('click', () => switchTab(tabS, viewS));
+      tabQ.addEventListener('click', () => {
+        switchTab(tabQ, viewQ);
+        renderQuiz();
+      });
+
+      // Quiz Navigasyon
+      document.getElementById('btnNextQuestion').addEventListener('click', () => {
+        sfx.playClick();
+        if (currentQIdx < QuizData.length - 1) {
+          currentQIdx++;
+          renderQuiz();
+        } else {
+          sfx.playSuccess();
+          try {
+            confetti({ particleCount: 60, spread: 60 });
+          } catch (e) {}
+          currentQIdx = 0;
+          renderQuiz();
+        }
+      });
+
+      document.getElementById('btnRestartQuiz').addEventListener('click', () => {
+        sfx.playClick();
+        currentQIdx = 0;
+        renderQuiz();
+      });
+
+      // Akış Hızı Çarpanı Butonu
+      btnToggleSpeed.addEventListener('click', () => {
+        sfx.playClick();
+        if (State.speedMultiplier === 1) {
+          State.speedMultiplier = 2;
+          speedText.textContent = 'Hız: 2x ⚡';
+          btnToggleSpeed.className = 'pushable px-3 py-1.5 bg-amber-300 hover:bg-amber-400 text-ink font-black text-xs flex items-center gap-1';
+        } else if (State.speedMultiplier === 2) {
+          State.speedMultiplier = 4;
+          speedText.textContent = 'Hız: 4x 🚀';
+          btnToggleSpeed.className = 'pushable px-3 py-1.5 bg-rose-400 hover:bg-rose-500 text-white font-black text-xs flex items-center gap-1';
+        } else {
+          State.speedMultiplier = 1;
+          speedText.textContent = 'Hız: 1x';
+          btnToggleSpeed.className = 'pushable px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 font-black text-xs flex items-center gap-1';
+        }
+        showSuccessBadge(`⚡ AKIŞ HIZI: ${State.speedMultiplier}x`);
+      });
+
+      // Modal Kapat
+      document.getElementById('btnCloseModal').addEventListener('click', () => {
+        sfx.playClick();
+        document.getElementById('celebrationModal').classList.add('hidden');
+      });
+
+      // Damlacık parçacık sistemini kur ve animasyon döngüsünü başlat
+      initDropletSystem();
+      requestAnimationFrame(animateFlow);
+
+      // İlk çizim
+      updateScene();
+    });
+  </script>
+</body>
+</html>

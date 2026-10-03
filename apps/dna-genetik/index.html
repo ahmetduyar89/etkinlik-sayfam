@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101a2c">
+  <title>DNA ve Genetik Kod · Genetik Laboratuvarı</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#bolum=0"><span class="brand-mark" aria-hidden="true">⌬</span><span>GENETİK <strong>LABORATUVARI</strong><small>8. SINIF · FEN BİLİMLERİ</small></span></a>
+    <div class="top-actions"><button id="teacher" aria-pressed="false">Öğretmen notları</button><button id="download">HTML indir</button><button id="fullscreen" aria-label="Tam ekran">⛶</button></div>
+  </header>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="course-label">DİJİTAL DERS / 02</div><h1>DNA ve<br>Genetik Kod</h1>
+      <p class="course-description">Yaşamın bilgisini keşfet.<br>Modelle, dene, sonuç çıkar.</p>
+      <div class="progress-line"><span id="progress-label">0 / 13 bölüm</span><span id="progress-percent">%0</span></div><progress id="progress" max="13" value="0"></progress>
+      <nav id="chapters" aria-label="Ders bölümleri"></nav>
+      <div class="sidebar-note">İlerlemen bu tarayıcıda saklanır.<br><button id="reset-progress">İlerlemeyi sıfırla</button></div>
+      <details class="sources"><summary>Kaynaklar ve model sınırları</summary><p>MEB F.8.2 kazanım sırasına göre hazırlanmıştır. Yeni programın “Yaşamın Gizemi” ünitesiyle karıştırılmamalıdır.</p><a href="https://aydin.meb.gov.tr/meb_iys_dosyalar/2025_09/24112243_fenbilimleri1.donemkonusorudagilimtablolari.pdf" target="_blank" rel="noopener">MEB kazanım tablosu</a><p>Molekül renkleri temsilidir; hücre ve DNA aynı ölçekte çizilmez. Kalıtım modelleri tek gen ve tam baskınlık varsayar. Popülasyon sonuçları basitleştirilmiş bir modeldir.</p></details>
+    </aside>
+    <main id="main">
+      <div class="breadcrumb">FEN BİLİMLERİ <span>/</span> DNA VE GENETİK KOD <span>/</span> <span id="chapter-number"></span></div>
+      <div class="heading"><div><span id="eyebrow" class="eyebrow"></span><h2 id="title"></h2><p id="intro"></p></div><span id="duration" class="duration"></span></div>
+      <div id="teacher-note" class="teacher-note" hidden></div>
+      <section class="lab" aria-label="Etkileşimli laboratuvar">
+        <div class="lab-bar"><span><i></i> <span id="lab-title"></span></span><span class="model-label">ETKİLEŞİMLİ MODEL</span></div>
+        <div class="lab-body"><div id="stage" class="stage"></div><div id="controls" class="controls"></div></div>
+        <div id="observation" class="observation" aria-live="polite"></div>
+      </section>
+      <section class="reading"><div class="section-heading"><span class="eyebrow">ANLA & İLİŞKİ KUR</span><h3>Bu sahne bize ne anlatıyor?</h3></div><div id="explanation" class="explanation"></div></section>
+      <aside id="misconception" class="misconception"></aside>
+      <section class="check"><div class="section-heading"><span class="eyebrow">KENDİNİ YOKLA</span><h3 id="question-title">Gözleminden bir sonuç çıkar</h3></div><div id="questions"></div></section>
+      <footer class="lesson-footer"><button id="prev">← Önceki bölüm</button><span id="completion-status"></span><button id="next" class="primary">Sonraki bölüm →</button></footer>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="lessons.js"></script>
+  <script src="molecular-3d.bundle.js"></script>
+  <script src="lab.js"></script>
+</body>
+</html>

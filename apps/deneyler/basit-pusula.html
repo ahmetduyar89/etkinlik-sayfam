@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sihirli Su Pusulası: İğne Kuzeyi Gösteriyor! | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito (Kusursuz Türkçe font desteği) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'sans-serif'],
+            display: ['Baloo 2', 'cursive'],
+          },
+          colors: {
+            bgMain: '#f0fdf4',
+            ink: '#0f172a',
+            primary: '#059669',
+            compassRed: '#dc2626',
+            compassBlue: '#2563eb',
+            sun: '#facc15',
+          },
+          borderWidth: {
+            '3': '3px',
+            '3.5': '3.5px',
+          },
+          boxShadow: {
+            'hard': '4px 4px 0px #0f172a',
+            'hard-lg': '6px 6px 0px #0f172a',
+            'hard-sm': '2px 2px 0px #0f172a',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #f0fdf4;
+      color: #0f172a;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display {
+      font-family: 'Baloo 2', cursive;
+    }
+    .chunky {
+      border: 3.5px solid #0f172a;
+      border-radius: 1.25rem;
+      box-shadow: 4px 4px 0px #0f172a;
+    }
+    .pushable {
+      border: 3px solid #0f172a;
+      border-radius: 0.85rem;
+      box-shadow: 3px 3px 0px #0f172a;
+      transition: all 0.12s ease;
+      cursor: pointer;
+    }
+    .pushable:hover {
+      transform: translate(-1.5px, -1.5px);
+      box-shadow: 4.5px 4.5px 0px #0f172a;
+    }
+    .pushable:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #0f172a;
+    }
+    .active-tab {
+      background-color: #059669 !important;
+      color: #ffffff !important;
+      border-color: #0f172a !important;
+    }
+    /* Manyetik Parıltı Efekti */
+    @keyframes magneticGlow {
+      0%, 100% { filter: drop-shadow(0 0 4px rgba(220, 38, 38, 0.4)); }
+      50% { filter: drop-shadow(0 0 14px rgba(220, 38, 38, 0.9)); }
+    }
+    .magnetic-needle {
+      animation: magneticGlow 2s ease-in-out infinite;
+    }
+    /* Su Dalgalanma Efekti */
+    @keyframes rippleAnim {
+      0% { r: 10px; opacity: 0.8; }
+      100% { r: 90px; opacity: 0; }
+    }
+    .water-ripple {
+      animation: rippleAnim 2.4s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+    }
+    .drag-handle {
+      cursor: grab;
+      touch-action: none;
+    }
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <!-- Üst Başlık & Navigasyon Çubuğu -->
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="pushable p-2 bg-emerald-100 hover:bg-emerald-200 text-ink text-sm font-black flex items-center gap-1">
+        <span>⬅️</span> <span class="hidden sm:inline">Portala Dön</span>
+      </a>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">🧭</span>
+          <h1 class="display text-lg sm:text-2xl font-black text-ink tracking-wide">
+            Sihirli Su Pusulası: İğne Kuzeyi Gösteriyor!
+          </h1>
+        </div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">
+          Mıknatıslanan dikiş iğnesinin Dünya'nın manyetik alanıyla Kuzey'e dönüşünü keşfet! 🌍
+        </p>
+      </div>
+    </div>
+
+    <!-- Mod Değiştirme Butonları & Ses -->
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabBuild" class="pushable px-3.5 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1">
+          <span>🛠️</span> <span>1. Pusulayı Yap</span>
+        </button>
+        <button id="tabLab" class="pushable px-3.5 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1">
+          <span>🧲</span> <span>2. Manyetik Lab</span>
+        </button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1" title="Sesi Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Ana Çalışma Alanı -->
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+    
+    <!-- SOL PANEL: SİMÜLASYON SAHNESİ (7 SÜTUN) -->
+    <section class="lg:col-span-7 flex flex-col gap-3">
+
+      <!-- Sahne Kutusu -->
+      <div class="chunky bg-white overflow-hidden relative shadow-lg flex flex-col">
+        
+        <!-- Sahne Üst Durum Çubuğu -->
+        <div class="px-4 py-2.5 bg-gradient-to-r from-emerald-100 via-teal-50 to-emerald-50 border-b-3 border-ink flex items-center justify-between text-xs font-black">
+          <div class="flex items-center gap-2">
+            <span id="sceneBadgeIcon" class="text-lg">🛠️</span>
+            <span id="sceneBadgeText" class="text-ink uppercase tracking-wider font-black">Atölye: Adım 1 - İğneyi Mıknatısla</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="compassHeadingPill" class="bg-white px-3 py-1 rounded-full border-2 border-ink text-ink font-black text-xs flex items-center gap-1.5 shadow-sm">
+              <span>İğne Yönü:</span>
+              <strong id="headingDegText" class="text-compassRed font-black">Manyetize Edilmemiş</strong>
+            </span>
+          </div>
+        </div>
+
+        <!-- SVG Sahne Çizimi (650x440) -->
+        <div id="simStage" class="relative w-full h-[440px] bg-gradient-to-b from-sky-50 via-teal-50 to-emerald-100 flex items-center justify-center overflow-hidden select-none">
+          
+          <svg id="stageSvg" viewBox="0 0 650 440" class="w-full h-full">
+            <defs>
+              <!-- Su Radyal Gradyanı -->
+              <radialGradient id="waterGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#bae6fd" />
+                <stop offset="65%" stop-color="#38bdf8" />
+                <stop offset="100%" stop-color="#0284c7" />
+              </radialGradient>
+
+              <!-- Mantar Tıpa Gradyanı -->
+              <radialGradient id="corkGrad" cx="40%" cy="40%" r="60%">
+                <stop offset="0%" stop-color="#ffedd5" />
+                <stop offset="50%" stop-color="#fdba74" />
+                <stop offset="100%" stop-color="#c2410c" />
+              </radialGradient>
+
+              <!-- Mıknatıs N (Kırmızı) Gradyanı -->
+              <linearGradient id="magNorthGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#ef4444" />
+                <stop offset="100%" stop-color="#b91c1c" />
+              </linearGradient>
+
+              <!-- Mıknatıs S (Mavi) Gradyanı -->
+              <linearGradient id="magSouthGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#3b82f6" />
+                <stop offset="100%" stop-color="#1d4ed8" />
+              </linearGradient>
+
+              <!-- Yumuşak Gölge Filtresi -->
+              <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="2" dy="5" stdDeviation="4" flood-opacity="0.25" />
+              </filter>
+            </defs>
+
+            <!-- ============================================== -->
+            <!-- 1. DÜNYA MANYETİK ALAN ÇİZGİLERİ (Mod B & Adım 4) -->
+            <!-- ============================================== -->
+            <g id="magneticFieldLines" opacity="0" class="transition-opacity duration-500 pointer-events-none">
+              <g stroke="#0284c7" stroke-width="2" fill="none" stroke-dasharray="8 5" opacity="0.65">
+                <path d="M 325,30 C 100,70 100,370 325,410" />
+                <path d="M 325,30 C 170,90 170,350 325,410" />
+                <path d="M 325,30 C 550,70 550,370 325,410" />
+                <path d="M 325,30 C 480,90 480,350 325,410" />
+                <line x1="325" y1="10" x2="325" y2="430" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="5 5" />
+              </g>
+              <rect x="190" y="8" width="270" height="24" rx="6" fill="#ffffff" stroke="#dc2626" stroke-width="2" />
+              <text x="325" y="24" text-anchor="middle" font-size="11" font-weight="900" fill="#dc2626">🌐 DÜNYA MANYETİK ALANI (GÜNEYDEN KUZEYE)</text>
+            </g>
+
+            <!-- ============================================== -->
+            <!-- 2. ATÖLYE MASASI SAHNESİ (Adım 1 & 2) -->
+            <!-- ============================================== -->
+            <g id="stageWorkbench" opacity="1" class="transition-opacity duration-300">
+              <!-- Masa Örtüsü / Çalışma Matı -->
+              <rect x="40" y="35" width="570" height="370" rx="20" fill="#f8fafc" stroke="#cbd5e1" stroke-width="3" filter="url(#softShadow)" />
+              <rect x="50" y="45" width="550" height="350" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="8 6" stroke-width="2" />
+              <text x="70" y="75" font-size="14" font-weight="900" fill="#64748b">🛠️ DENEY ATÖLYE MASASI</text>
+
+              <!-- ADIM 1: BÜYÜK ÇUBUK MIKNATIS (Merkez: X=325, Y=275) -->
+              <g id="benchMagnetGroup" transform="translate(325, 275)" filter="url(#softShadow)">
+                <!-- Mıknatıs Taban Gölgesi -->
+                <rect x="-140" y="-30" width="280" height="60" rx="10" fill="#0f172a" opacity="0.1" />
+                
+                <!-- N Kutbu (Kırmızı, Sol) -->
+                <rect x="-135" y="-28" width="135" height="56" rx="8" fill="url(#magNorthGrad)" stroke="#0f172a" stroke-width="3" />
+                <text x="-67" y="9" text-anchor="middle" font-size="26" font-weight="900" fill="#ffffff">N (Kuzey)</text>
+                
+                <!-- S Kutbu (Mavi, Sağ) -->
+                <rect x="0" y="-28" width="135" height="56" rx="8" fill="url(#magSouthGrad)" stroke="#0f172a" stroke-width="3" />
+                <text x="67" y="9" text-anchor="middle" font-size="26" font-weight="900" fill="#ffffff">S (Güney)</text>
+                
+                <!-- Çubuk Mıknatıs Başlık Etiketi -->
+                <rect x="-75" y="38" width="150" height="24" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+                <text x="0" y="54" text-anchor="middle" font-size="11" font-weight="900" fill="#0f172a">Güçlü Doğal Mıknatıs</text>
+
+                <!-- Sürtme Yön Kılavuzu & Oku -->
+                <g id="strokeDirectionArrow">
+                  <path d="M -90,-50 L 70,-50" stroke="#dc2626" stroke-width="4" stroke-linecap="round" stroke-dasharray="8 6" />
+                  <polygon points="85,-50 68,-57 68,-43" fill="#dc2626" stroke="#0f172a" stroke-width="1.5" />
+                  <rect x="-110" y="-76" width="220" height="20" rx="5" fill="#ffffff" stroke="#dc2626" stroke-width="1.5" />
+                  <text x="0" y="-62" text-anchor="middle" font-size="11" font-weight="900" fill="#dc2626">Tek Yönde Sürtüş Hareketi ➡️</text>
+                </g>
+              </g>
+
+              <!-- ADIM 1: SÜRTÜLEN ÇELİK DİKİŞ İĞNESİ (Solid Safari Uyumlu Çizim) -->
+              <g id="benchNeedleGroup" transform="translate(325, 175)" class="cursor-pointer" filter="url(#softShadow)">
+                <!-- İğne Gövdesi (Solid Kalın Çelik Çubuk) -->
+                <rect x="-115" y="-4.5" width="225" height="9" rx="4.5" fill="#94a3b8" stroke="#0f172a" stroke-width="2" />
+                <!-- Metal Parlama Şeridi -->
+                <rect x="-105" y="-2" width="210" height="2.5" rx="1" fill="#f8fafc" opacity="0.85" />
+
+                <!-- İğne Deliği Ucu (Sol / Güney) -->
+                <circle cx="-115" cy="0" r="9" fill="#94a3b8" stroke="#0f172a" stroke-width="2" />
+                <ellipse cx="-115" cy="0" rx="3.5" ry="5.5" fill="#f1f5f9" stroke="#0f172a" stroke-width="1.5" />
+
+                <!-- İğne Sivri Ucu (Sağ / Kuzey - Mıknatıslanınca Kırmızı Olur) -->
+                <polygon id="benchNeedleTip" points="110,-6.5 110,6.5 142,0" fill="#94a3b8" stroke="#0f172a" stroke-width="2" />
+                
+                <!-- İğne Üzerindeki Kutup Rozetleri (Mıknatıslanınca Görünür) -->
+                <g id="benchNeedleLabels" opacity="0">
+                  <circle cx="120" cy="-24" r="14" fill="#dc2626" stroke="#0f172a" stroke-width="2" />
+                  <text x="120" y="-19" text-anchor="middle" font-size="12" font-weight="900" fill="#ffffff">N</text>
+                  
+                  <circle cx="-115" cy="-24" r="14" fill="#1e40af" stroke="#0f172a" stroke-width="2" />
+                  <text x="-115" y="-19" text-anchor="middle" font-size="12" font-weight="900" fill="#ffffff">S</text>
+                </g>
+
+                <!-- Sürtünme Kıvılcımı Efektleri -->
+                <g id="benchSparks" opacity="0">
+                  <polygon points="0,-16 -5,-5 -16,0 -5,5 0,16 5,5 16,0 5,-5" fill="#facc15" />
+                  <polygon points="-35,-12 -39,-4 -47,0 -39,4 -35,12 -31,4 -23,0 -31,-4" fill="#f59e0b" />
+                  <polygon points="35,-12 31,-4 23,0 31,4 35,12 39,4 47,0 39,-4" fill="#ef4444" />
+                </g>
+
+                <!-- Durum Açıklama Etiketi -->
+                <rect x="-115" y="-34" width="230" height="20" rx="5" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+                <text id="benchNeedleStatusText" x="0" y="-20" text-anchor="middle" font-size="11" font-weight="900" fill="#0f172a">
+                  🪡 Çelik Dikiş İğnesi (Manyetize Edilmemiş)
+                </text>
+              </g>
+
+              <!-- ADIM 2: MANTAR TIPA DİLİMİ (X=325, Y=250) -->
+              <g id="benchCorkGroup" transform="translate(325, 250)" opacity="0" filter="url(#softShadow)">
+                <ellipse cx="0" cy="0" rx="65" ry="38" fill="url(#corkGrad)" stroke="#0f172a" stroke-width="3.5" />
+                <!-- Mantar Dokusu -->
+                <ellipse cx="-20" cy="-10" rx="5" ry="3" fill="#78350f" opacity="0.6" />
+                <ellipse cx="25" cy="-8" rx="4" ry="2.5" fill="#78350f" opacity="0.6" />
+                <ellipse cx="-10" cy="12" rx="4" ry="2" fill="#78350f" opacity="0.6" />
+                <ellipse cx="18" cy="15" rx="5" ry="3" fill="#78350f" opacity="0.6" />
+                <rect x="-65" y="44" width="130" height="22" rx="5" fill="#ffffff" stroke="#78350f" stroke-width="1.5" />
+                <text x="0" y="59" text-anchor="middle" font-size="11" font-weight="900" fill="#78350f">🪵 Hafif Mantar Dilimi</text>
+              </g>
+
+            </g>
+
+            <!-- ============================================== -->
+            <!-- 3. SU KASESİ & PUSULA SAHNESİ (Adım 3, 4 & Mod B) -->
+            <!-- ============================================== -->
+            <g id="stageBowlArea" opacity="0" transform="translate(325, 220)" class="transition-opacity duration-300">
+              
+              <!-- Kase Taban Gölgesi -->
+              <ellipse cx="0" cy="10" rx="160" ry="160" fill="#0f172a" opacity="0.12" />
+
+              <!-- Sabit Yön Kadranı / Pusula Çemberi (K, D, G, B) -->
+              <g id="compassRoseBase">
+                <!-- Dış Pusula Kasası -->
+                <circle cx="0" cy="0" r="160" fill="#ffffff" stroke="#0f172a" stroke-width="4" />
+                <circle cx="0" cy="0" r="148" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2" />
+
+                <!-- Derece Çentikleri -->
+                <g stroke="#94a3b8" stroke-width="1.5">
+                  <!-- Ana eksenler -->
+                  <line x1="0" y1="-148" x2="0" y2="-134" stroke="#0f172a" stroke-width="2.5" />
+                  <line x1="0" y1="148" x2="0" y2="134" stroke="#0f172a" stroke-width="2.5" />
+                  <line x1="-148" y1="0" x2="-134" y2="0" stroke="#0f172a" stroke-width="2.5" />
+                  <line x1="148" y1="0" x2="134" y2="0" stroke="#0f172a" stroke-width="2.5" />
+                  <!-- Ara açılar -->
+                  <line x1="-104" y1="-104" x2="-94" y2="-94" />
+                  <line x1="104" y1="-104" x2="94" y2="-94" />
+                  <line x1="-104" y1="104" x2="-94" y2="94" />
+                  <line x1="104" y1="104" x2="94" y2="94" />
+                </g>
+
+                <!-- 4 Ana Yön Rozeti -->
+                <!-- KUZEY (K / 0°) -->
+                <rect x="-26" y="-144" width="52" height="25" rx="6" fill="#dc2626" stroke="#0f172a" stroke-width="2" />
+                <text x="0" y="-128" text-anchor="middle" font-size="13" font-weight="900" fill="#ffffff">K (0°)</text>
+
+                <!-- GÜNEY (G / 180°) -->
+                <rect x="-26" y="119" width="52" height="25" rx="6" fill="#1e40af" stroke="#0f172a" stroke-width="2" />
+                <text x="0" y="135" text-anchor="middle" font-size="13" font-weight="900" fill="#ffffff">G (180°)</text>
+
+                <!-- DOĞU (D / 90°) -->
+                <rect x="115" y="-12.5" width="48" height="25" rx="6" fill="#0f172a" />
+                <text x="139" y="4" text-anchor="middle" font-size="12" font-weight="900" fill="#ffffff">D (90°)</text>
+
+                <!-- BATI (B / 270°) -->
+                <rect x="-163" y="-12.5" width="48" height="25" rx="6" fill="#0f172a" />
+                <text x="-139" y="4" text-anchor="middle" font-size="12" font-weight="900" fill="#ffffff">B (270°)</text>
+              </g>
+
+              <!-- DÖNEBİLEN SU KASESİ (Kase çevrilince burası döner, iğne dönmez!) -->
+              <g id="rotatingBowlGroup">
+                <!-- Su Havuzu (Yarıçap: 114) -->
+                <circle cx="0" cy="0" r="114" fill="url(#waterGrad)" stroke="#0284c7" stroke-width="3" />
+                
+                <!-- Su Dalgalanma Animasyonu -->
+                <circle id="waterRipple" cx="0" cy="0" r="25" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.6" class="water-ripple" />
+
+                <!-- Cam Kase Dış Kenar & Parlama Çizgisi -->
+                <circle cx="0" cy="0" r="118" fill="none" stroke="#0f172a" stroke-width="3.5" />
+                <path d="M -80,-80 A 114,114 0 0,1 80,-80" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.6" />
+
+                <!-- Kase Tutamakları / Kulakçıklar -->
+                <rect x="-128" y="-10" width="10" height="20" rx="3" fill="#64748b" stroke="#0f172a" stroke-width="2" />
+                <rect x="118" y="-10" width="10" height="20" rx="3" fill="#64748b" stroke="#0f172a" stroke-width="2" />
+              </g>
+
+              <!-- SERBEST DÖNEN YÜZER MANTAR + İĞNE (Merkez: 0,0) -->
+              <g id="floatingNeedleRig" transform="rotate(0)" filter="url(#softShadow)" class="cursor-pointer">
+                
+                <!-- Yüzen Mantar Tıpa Diski -->
+                <g id="corkPieceGroup">
+                  <circle cx="0" cy="0" r="38" fill="url(#corkGrad)" stroke="#0f172a" stroke-width="3.5" />
+                  <circle cx="-14" cy="-10" r="3" fill="#78350f" opacity="0.5" />
+                  <circle cx="16" cy="-8" r="2.5" fill="#78350f" opacity="0.5" />
+                  <circle cx="-6" cy="14" r="3" fill="#78350f" opacity="0.5" />
+                  <circle cx="12" cy="16" r="2.5" fill="#78350f" opacity="0.5" />
+                  <ellipse cx="-16" cy="18" rx="5" ry="2.5" fill="#ffffff" opacity="0.7" />
+                </g>
+
+                <!-- DİKİŞ İĞNESİ (Solid Çizim - Safari Uyumlu) -->
+                <g id="waterNeedleGroup" class="magnetic-needle">
+                  <!-- Güney Yarısı (Gümüş / Gövde & Delik) -->
+                  <rect x="-3.5" y="0" width="7" height="68" rx="2" fill="#94a3b8" stroke="#0f172a" stroke-width="2" />
+                  <circle cx="0" cy="72" r="7.5" fill="#94a3b8" stroke="#0f172a" stroke-width="2" />
+                  <ellipse cx="0" cy="72" rx="2.5" ry="4.5" fill="#f1f5f9" stroke="#0f172a" stroke-width="1.5" />
+                  
+                  <!-- Kuzey Yarısı (Canlı Kırmızı Manyetik İbre & Sivri Uç) -->
+                  <rect x="-3.5" y="-68" width="7" height="68" rx="2" fill="#dc2626" stroke="#0f172a" stroke-width="2" />
+                  <polygon points="-5,-68 5,-68 0,-92" fill="#dc2626" stroke="#0f172a" stroke-width="2" />
+                  <circle cx="0" cy="-92" r="2.5" fill="#ffffff" />
+
+                  <!-- K ve G Harf Rozetleri -->
+                  <circle cx="0" cy="-38" r="11" fill="#b91c1c" stroke="#0f172a" stroke-width="1.5" />
+                  <text x="0" y="-34" text-anchor="middle" font-size="12" font-weight="900" fill="#ffffff">K</text>
+                  
+                  <circle cx="0" cy="42" r="11" fill="#1e40af" stroke="#0f172a" stroke-width="1.5" />
+                  <text x="0" y="46" text-anchor="middle" font-size="12" font-weight="900" fill="#ffffff">G</text>
+
+                  <!-- Merkez Pirinç Sabitleme Pimi -->
+                  <circle cx="0" cy="0" r="6" fill="#facc15" stroke="#0f172a" stroke-width="2.5" />
+                </g>
+
+                <!-- Kilitlenme Halka Işıltısı -->
+                <circle id="lockChimeRing" cx="0" cy="-92" r="18" fill="none" stroke="#facc15" stroke-width="3.5" opacity="0" />
+
+              </g>
+
+            </g>
+
+            <!-- ============================================== -->
+            <!-- 4. SÜRÜKLENEBİLİR HARİCİ MIKNATIS (MOD B İÇİN) -->
+            <!-- ============================================== -->
+            <g id="externalMagnetRig" transform="translate(540, 220)" opacity="0" filter="url(#softShadow)" class="drag-handle">
+              <!-- Mıknatıs Gövdesi -->
+              <rect x="-24" y="-50" width="48" height="50" rx="6" fill="url(#magNorthGrad)" stroke="#0f172a" stroke-width="2.5" />
+              <text x="0" y="-20" text-anchor="middle" font-size="16" font-weight="900" fill="#ffffff">N</text>
+              <rect x="-24" y="0" width="48" height="50" rx="6" fill="url(#magSouthGrad)" stroke="#0f172a" stroke-width="2.5" />
+              <text x="0" y="32" text-anchor="middle" font-size="16" font-weight="900" fill="#ffffff">S</text>
+              
+              <!-- Tutamak Rozeti -->
+              <rect x="-38" y="-68" width="76" height="18" rx="5" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+              <text x="0" y="-55" text-anchor="middle" font-size="9" font-weight="900" fill="#dc2626">🧲 SÜRÜKLE BENİ</text>
+            </g>
+
+          </svg>
+
+        </div>
+
+        <!-- Alt Kontrol Şeridi -->
+        <div class="p-3.5 bg-emerald-50 border-t-3 border-ink flex flex-wrap items-center justify-between gap-3">
+          
+          <!-- Atölye Adım Butonları Grubu -->
+          <div id="buildControls" class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+            <button id="btnPrevStep" class="pushable px-3.5 py-2 bg-white text-ink text-xs font-black opacity-50 pointer-events-none">
+              ⬅️ Önceki Adım
+            </button>
+            <button id="btnNextStep" class="pushable px-5 py-2.5 bg-sun hover:bg-amber-300 text-ink text-xs font-black flex items-center gap-1.5 shadow-hard">
+              <span id="btnNextStepText">⚡ İğneyi Mıknatısla</span> <span>➡️</span>
+            </button>
+            <span id="stepBadgeText" class="text-xs font-black text-emerald-950 ml-1">
+              Adım 1 / 4
+            </span>
+          </div>
+
+          <!-- Manyetik Laboratuvar Butonları Grubu (Mod B'de Görünür) -->
+          <div id="labControls" class="hidden flex-wrap items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end">
+            <button id="btnFlickNeedle" class="pushable px-3.5 py-2 bg-amber-200 hover:bg-amber-300 text-ink text-xs font-black flex items-center gap-1">
+              <span>🌀</span> <span>İğneyi Çevir / Dürt</span>
+            </button>
+            <button id="btnRotateBowl" class="pushable px-3.5 py-2 bg-sky-100 hover:bg-sky-200 text-ink text-xs font-black flex items-center gap-1">
+              <span>🥣</span> <span>Kaseyi Döndür</span>
+            </button>
+            <button id="btnToggleField" class="pushable px-3.5 py-2 bg-white hover:bg-teal-50 text-emerald-800 text-xs font-black flex items-center gap-1">
+              <span>🌐</span> <span>Manyetik Alan</span>
+            </button>
+            <button id="btnResetCompass" class="pushable px-3 py-2 bg-white hover:bg-red-50 text-red-600 text-xs font-black flex items-center gap-1">
+              <span>🔄 Sıfırla</span>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Bilimsel Rehber & Anlık Bilgi Kutusu -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-start gap-3">
+          <span id="bubbleEmoji" class="text-3xl">🧲</span>
+          <div>
+            <h4 id="bubbleTitle" class="display text-base font-black text-ink">Adım 1: Dikiş İğnesini Mıknatıslama</h4>
+            <p id="bubbleDesc" class="text-xs text-gray-700 font-bold leading-relaxed mt-0.5">
+              Çelik dikiş iğnesini mıknatısın kırmızı (N) kutbuna hep AYNI YÖNDE 10 kez sürtüyoruz. Böylece iğnenin içindeki atomik mıknatıslar hizalanır ve iğne minik bir pusula ibresine dönüşür!
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bilimsel Kural Kartı (Pusula Nasıl Çalışır?) -->
+      <div class="chunky bg-white p-4">
+        <h3 class="display text-base font-black text-ink flex items-center gap-2 mb-2">
+          <span>🔬</span> Pusula Nasıl Çalışır? Bilimsel Sırlar
+        </h3>
+        <ul class="text-xs text-gray-800 space-y-2 font-bold">
+          <li class="flex items-start gap-1.5">
+            <span class="text-sm">🌍</span>
+            <span><strong>Dünya Devasa Bir Mıknatıstır:</strong> Dünya'nın merkezindeki erimiş demir ve nikel çekirdek devasa bir manyetik alan üretir. Pusula iğnesi bu görünmez çizgilere hizalanır.</span>
+          </li>
+          <li class="flex items-start gap-1.5">
+            <span class="text-sm">💧</span>
+            <span><strong>Neden Su ve Mantar Tıpa?</strong> İğneyi masaya koysak sürtünme nedeniyle dönemez. Hafif mantar disk suyun üstünde yüzerek sürtünmeyi yok denecek kadar azaltır ve iğne rahatça dönebilir.</span>
+          </li>
+          <li class="flex items-start gap-1.5">
+            <span class="text-sm">🧭</span>
+            <span><strong>Zıt Kutuplar Birbirini Çeker:</strong> İğnenin mıknatıslanan sivri ucu, Dünya'nın Manyetik Kuzey Kutbu'na yönelir ve her zaman <strong>KUZEYİ (0° / K)</strong> gösterir!</span>
+          </li>
+        </ul>
+      </div>
+
+    </section>
+
+    <!-- SAĞ PANEL: ATÖLYE & LABORATUVAR ETKİLEŞİM PANELİ (5 SÜTUN) -->
+    <aside class="lg:col-span-5 flex flex-col gap-3">
+
+      <!-- PUSULA İNŞA İLERLEME ADIMLARI (MOD A İÇİN) -->
+      <div id="panelBuildSteps" class="chunky bg-white p-4 flex flex-col gap-3">
+        <div class="flex items-center justify-between border-b-2 border-gray-200 pb-2">
+          <span class="text-xs font-black uppercase text-emerald-800 tracking-wider">Montaj Aşamaları</span>
+          <span id="activeStepBadge" class="bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-md font-black text-xs">Adım 1</span>
+        </div>
+
+        <!-- 4 Adım Listesi -->
+        <div class="space-y-2 text-xs">
+          <!-- 1. Adım Kartı -->
+          <div id="stepCard-1" class="p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-50 flex items-center justify-between font-black">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🧲</span>
+              <div>
+                <span class="block text-ink">1. İğneyi Mıknatısla</span>
+                <span class="text-[10px] text-gray-600 font-bold">Mıknatısa tek yönde 10 kez sürt</span>
+              </div>
+            </div>
+            <span id="stepIcon-1" class="text-sm text-emerald-600">⏳</span>
+          </div>
+
+          <!-- 2. Adım Kartı -->
+          <div id="stepCard-2" class="p-2.5 rounded-xl border-2 border-gray-200 bg-gray-50 flex items-center justify-between font-bold text-gray-500">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🪵</span>
+              <div>
+                <span class="block">2. Mantar Tıpaya Tak</span>
+                <span class="text-[10px] font-semibold">Hafif mantar diskine yerleştir</span>
+              </div>
+            </div>
+            <span id="stepIcon-2" class="text-sm">⚪</span>
+          </div>
+
+          <!-- 3. Adım Kartı -->
+          <div id="stepCard-3" class="p-2.5 rounded-xl border-2 border-gray-200 bg-gray-50 flex items-center justify-between font-bold text-gray-500">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🥣</span>
+              <div>
+                <span class="block">3. Su Dolu Kaba Bırak</span>
+                <span class="text-[10px] font-semibold">Sürtünmesiz serbest yüzme ortamı</span>
+              </div>
+            </div>
+            <span id="stepIcon-3" class="text-sm">⚪</span>
+          </div>
+
+          <!-- 4. Adım Kartı -->
+          <div id="stepCard-4" class="p-2.5 rounded-xl border-2 border-gray-200 bg-gray-50 flex items-center justify-between font-bold text-gray-500">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🧭</span>
+              <div>
+                <span class="block">4. Kuzeye Kilitleniş!</span>
+                <span class="text-[10px] font-semibold">İğne Dünya'nın manyetik alanına döner</span>
+              </div>
+            </div>
+            <span id="stepIcon-4" class="text-sm">⚪</span>
+          </div>
+        </div>
+
+        <!-- Adım 1 İnteraktif Alanı (Sürtme Kontrolü) -->
+        <div id="strokeActionArea" class="mt-2 p-3 bg-amber-50 rounded-xl border-2 border-amber-300 flex flex-col gap-2">
+          <div class="flex items-center justify-between text-xs font-black">
+            <span class="text-amber-950">Mıknatıslama İlerlemesi:</span>
+            <span id="strokeCountText" class="text-compassRed font-black text-sm">0 / 10 Sürtme</span>
+          </div>
+          <!-- İlerleme Çubuğu -->
+          <div class="w-full bg-amber-200 rounded-full h-3.5 border border-amber-400 overflow-hidden">
+            <div id="strokeProgressBar" class="bg-gradient-to-r from-amber-500 to-red-500 h-full w-0 transition-all duration-200"></div>
+          </div>
+          <button id="btnStrokeNeedle" class="pushable p-2.5 bg-sun hover:bg-amber-300 text-ink text-xs font-black flex items-center justify-center gap-2 shadow-hard-sm">
+            <span>⚡</span> <span>İğneyi Mıknatısa Sürt! (+1)</span>
+          </button>
+          <span class="text-[10px] text-amber-900 font-bold text-center">
+            💡 İpucu: Butona basarak iğnenin mıknatıs boyunca gerçekçi sürtünüşünü izle!
+          </span>
+        </div>
+
+        <!-- Adım 2 İnteraktif Butonu -->
+        <div id="insertActionArea" class="hidden mt-2 p-3 bg-emerald-50 rounded-xl border-2 border-emerald-300 flex flex-col gap-2">
+          <button id="btnInsertNeedle" class="pushable p-2.5 bg-emerald-400 hover:bg-emerald-500 text-ink text-xs font-black flex items-center justify-center gap-2 shadow-hard-sm">
+            <span>🪵</span> <span>İğneyi Mantar Tıpaya Sapla!</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- MANYETİK DENEY LABORATUVARI (MOD B İÇİN) -->
+      <div id="panelLabExperiments" class="chunky bg-white p-4 flex-col gap-3 hidden">
+        <div class="flex items-center justify-between border-b-2 border-gray-200 pb-2">
+          <span class="text-xs font-black uppercase text-emerald-800 tracking-wider">Mıknatıs Test Kontrolleri</span>
+          <span class="bg-blue-100 text-blue-950 px-2 py-0.5 rounded font-black text-[11px]">Etkileşimli</span>
+        </div>
+
+        <p class="text-xs text-gray-700 font-bold">
+          Harici mıknatısı kaseye yaklaştırınca pusula iğnesi onu takip eder. Mıknatısı sahne üzerinde <strong>fareyle serbestçe sürükleyebilir</strong> ya da aşağıdaki hazır butonları kullanabilirsin!
+        </p>
+
+        <!-- Hızlı Konumlandırma Butonları -->
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <button class="mag-pos-btn pushable p-2 bg-white hover:bg-sky-50 text-left font-black" data-angle="90">
+            ➡️ Doğuya Getir<br><span class="text-[10px] text-gray-500 font-bold">İğne 90°'ye Döner</span>
+          </button>
+          <button class="mag-pos-btn pushable p-2 bg-white hover:bg-sky-50 text-left font-black" data-angle="270">
+            ⬅️ Batıya Getir<br><span class="text-[10px] text-gray-500 font-bold">İğne 270°'ye Döner</span>
+          </button>
+          <button class="mag-pos-btn pushable p-2 bg-white hover:bg-sky-50 text-left font-black" data-angle="180">
+            ⬇️ Güneye Getir<br><span class="text-[10px] text-gray-500 font-bold">İğne 180°'ye Döner</span>
+          </button>
+          <button class="mag-pos-btn pushable p-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 text-left font-black" data-angle="none">
+            🚫 Mıknatısı Uzaklaştır<br><span class="text-[10px] text-emerald-700 font-bold">Kuzey'e (0°) Geri Dönsün</span>
+          </button>
+        </div>
+
+        <!-- Pusula Canlı Bilgi Kartı -->
+        <div class="bg-gray-50 p-3 rounded-xl border-2 border-ink text-xs space-y-1.5 font-bold mt-1">
+          <div class="flex justify-between">
+            <span class="text-gray-600">İğnenin Gösterdiği Yön:</span>
+            <strong id="liveHeadingDeg" class="text-compassRed font-black">0° (Kuzey)</strong>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">Etkin Manyetik Kaynak:</span>
+            <strong id="liveFieldSource" class="text-emerald-700 font-black">Dünya Manyetik Alanı (Doğal)</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Küçük Bilim İnsanı Sorusu (Mini Test) -->
+      <div class="chunky bg-gradient-to-br from-emerald-50 to-teal-50 p-4">
+        <h3 class="display text-sm font-black text-emerald-950 flex items-center gap-1.5 mb-1">
+          <span>🎯</span> Günün Denizci & Kâşif Sorusu
+        </h3>
+        <p class="text-xs text-gray-700 font-bold mb-2">
+          Pusula iğnesi neden her zaman Kuzey-Güney doğrultusunda durur?
+        </p>
+        <div class="flex flex-col gap-1.5">
+          <button id="quizOpt1" class="pushable bg-white hover:bg-emerald-50 text-ink text-left p-2.5 text-xs font-bold">
+            🌍 Dünya'nın dev bir mıknatıs gibi manyetik alanı olduğu için
+          </button>
+          <button id="quizOpt2" class="pushable bg-white hover:bg-red-50 text-ink text-left p-2.5 text-xs font-bold">
+            🌬️ Rüzgâr iğneyi hep kuzey yönüne doğru üflediği için
+          </button>
+        </div>
+        <div id="quizFeedback" class="mt-2 text-xs font-black hidden"></div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Alt Bilgi -->
+  <footer class="max-w-6xl mx-auto w-full text-center text-xs font-bold text-gray-500 py-2 mt-2">
+    🧪 Küçük Mucitler Bilim Portalı · Basit Pusula Yapımı ve Manyetizma Simülasyonu
+  </footer>
+
+  <!-- SİMÜLASYON MOTORU VE MANYETİZMA KODLARI -->
+  <script>
+    // --- 1. WEB AUDIO API SES MOTORU ---
+    let audioCtx = null;
+    let isSoundOn = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // Metalik Sürtünme Sesi (İğneyi mıknatıslama)
+    function playScrapeSound() {
+      if (!isSoundOn) return;
+      initAudio();
+      try {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(1200 + Math.random() * 300, now);
+        osc.frequency.linearRampToValueAtTime(600, now + 0.18);
+
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.18);
+      } catch (e) {}
+    }
+
+    // Mantara Saplama / Tok Ses
+    function playPokeSound() {
+      if (!isSoundOn) return;
+      initAudio();
+      try {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.1);
+
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.1);
+      } catch (e) {}
+    }
+
+    // Suya Bırakma / Damlama Sesi
+    function playWaterPlopSound() {
+      if (!isSoundOn) return;
+      initAudio();
+      try {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(450, now);
+        osc.frequency.exponentialRampToValueAtTime(950, now + 0.1);
+
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.14);
+      } catch (e) {}
+    }
+
+    // Kuzeye Kilitlenme Çanı (Chime)
+    function playLockChime() {
+      if (!isSoundOn) return;
+      initAudio();
+      try {
+        [659.25, 880.00, 1318.51].forEach((freq, i) => {
+          setTimeout(() => {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.45);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.45);
+          }, i * 110);
+        });
+      } catch (e) {}
+    }
+
+    // Kase Döndürme / Dalga Sesi
+    function playWhooshSound() {
+      if (!isSoundOn) return;
+      initAudio();
+      try {
+        const now = audioCtx.currentTime;
+        const bufferSize = audioCtx.sampleRate * 0.35;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * 0.1;
+        }
+
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(550, now);
+
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        noise.start(now);
+      } catch (e) {}
+    }
+
+    // Başarı Fanfarı
+    function playWinFanfare() {
+      if (!isSoundOn) return;
+      initAudio();
+      try {
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+          setTimeout(() => {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.35);
+          }, i * 90);
+        });
+      } catch (e) {}
+    }
+
+    // --- 2. SİMÜLASYON DURUMU (STATE) ---
+    let currentMode = 'build'; // 'build' veya 'lab'
+    let buildStep = 1; // 1 ile 4 arası
+    let strokeCount = 0; // 0 ile 10 arası sürtme
+    let isMagnetized = false;
+    let isNeedleInserted = false;
+    let currentHeading = 0; // Pusula iğnesi dönüş açısı (derece)
+    let bowlRotation = 0; // Kase rotasyonu
+    let isFieldVisible = false;
+
+    // DOM Elemanları
+    const tabBuild = document.getElementById('tabBuild');
+    const tabLab = document.getElementById('tabLab');
+    const sceneBadgeIcon = document.getElementById('sceneBadgeIcon');
+    const sceneBadgeText = document.getElementById('sceneBadgeText');
+    const headingDegText = document.getElementById('headingDegText');
+
+    const buildControls = document.getElementById('buildControls');
+    const labControls = document.getElementById('labControls');
+    const panelBuildSteps = document.getElementById('panelBuildSteps');
+    const panelLabExperiments = document.getElementById('panelLabExperiments');
+
+    const btnPrevStep = document.getElementById('btnPrevStep');
+    const btnNextStep = document.getElementById('btnNextStep');
+    const btnNextStepText = document.getElementById('btnNextStepText');
+    const stepBadgeText = document.getElementById('stepBadgeText');
+    const activeStepBadge = document.getElementById('activeStepBadge');
+
+    // SVG Sahne Grupları
+    const stageWorkbench = document.getElementById('stageWorkbench');
+    const stageBowlArea = document.getElementById('stageBowlArea');
+    const benchMagnetGroup = document.getElementById('benchMagnetGroup');
+    const benchNeedleGroup = document.getElementById('benchNeedleGroup');
+    const benchNeedleTip = document.getElementById('benchNeedleTip');
+    const benchNeedleLabels = document.getElementById('benchNeedleLabels');
+    const benchNeedleStatusText = document.getElementById('benchNeedleStatusText');
+    const benchSparks = document.getElementById('benchSparks');
+    const benchCorkGroup = document.getElementById('benchCorkGroup');
+
+    const rotatingBowlGroup = document.getElementById('rotatingBowlGroup');
+    const floatingNeedleRig = document.getElementById('floatingNeedleRig');
+    const lockChimeRing = document.getElementById('lockChimeRing');
+    const magneticFieldLines = document.getElementById('magneticFieldLines');
+    const externalMagnetRig = document.getElementById('externalMagnetRig');
+
+    // Sağ Panel Elemanları
+    const strokeActionArea = document.getElementById('strokeActionArea');
+    const strokeCountText = document.getElementById('strokeCountText');
+    const strokeProgressBar = document.getElementById('strokeProgressBar');
+    const btnStrokeNeedle = document.getElementById('btnStrokeNeedle');
+    const insertActionArea = document.getElementById('insertActionArea');
+    const btnInsertNeedle = document.getElementById('btnInsertNeedle');
+
+    const liveHeadingDeg = document.getElementById('liveHeadingDeg');
+    const liveFieldSource = document.getElementById('liveFieldSource');
+
+    const bubbleEmoji = document.getElementById('bubbleEmoji');
+    const bubbleTitle = document.getElementById('bubbleTitle');
+    const bubbleDesc = document.getElementById('bubbleDesc');
+
+    const btnFlickNeedle = document.getElementById('btnFlickNeedle');
+    const btnRotateBowl = document.getElementById('btnRotateBowl');
+    const btnToggleField = document.getElementById('btnToggleField');
+    const btnResetCompass = document.getElementById('btnResetCompass');
+
+    // --- 3. AÇI VE HİZALAMA YARDIMCISI (Shortest Path & Damped Oscillation) ---
+    function getShortestAngleDelta(fromAngle, toAngle) {
+      let diff = (toAngle - fromAngle) % 360;
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
+      return diff;
+    }
+
+    function updateHeadingDisplay(deg) {
+      currentHeading = Math.round(((deg % 360) + 360) % 360);
+      
+      let dirName = 'Kuzey';
+      if (currentHeading >= 338 || currentHeading < 23) dirName = 'Kuzey (K)';
+      else if (currentHeading >= 23 && currentHeading < 68) dirName = 'Kuzeydoğu (KD)';
+      else if (currentHeading >= 68 && currentHeading < 113) dirName = 'Doğu (D)';
+      else if (currentHeading >= 113 && currentHeading < 158) dirName = 'Güneydoğu (GD)';
+      else if (currentHeading >= 158 && currentHeading < 203) dirName = 'Güney (G)';
+      else if (currentHeading >= 203 && currentHeading < 248) dirName = 'Güneybatı (GB)';
+      else if (currentHeading >= 248 && currentHeading < 293) dirName = 'Batı (B)';
+      else if (currentHeading >= 293 && currentHeading < 338) dirName = 'Kuzeybatı (KB)';
+
+      headingDegText.textContent = `${dirName} (${currentHeading}°)`;
+      liveHeadingDeg.textContent = `${currentHeading}° (${dirName})`;
+    }
+
+    // Salınımlı manyetik hizalanma
+    function alignNeedleTo(targetDeg, duration = 1.6, onComplete = null) {
+      if (!floatingNeedleRig) return;
+
+      const currentRot = gsap.getProperty(floatingNeedleRig, "rotation") || 0;
+      const delta = getShortestAngleDelta(currentRot, targetDeg);
+      const finalAngle = currentRot + delta;
+
+      const tl = gsap.timeline({
+        onUpdate: () => {
+          const r = gsap.getProperty(floatingNeedleRig, "rotation");
+          updateHeadingDisplay(r);
+        },
+        onComplete: () => {
+          gsap.set(floatingNeedleRig, { rotation: targetDeg });
+          updateHeadingDisplay(targetDeg);
+          if (onComplete) onComplete();
+        }
+      });
+
+      const swing1 = finalAngle + (delta > 0 ? -delta * 0.22 : -delta * 0.22);
+      const swing2 = finalAngle + (delta > 0 ? delta * 0.08 : delta * 0.08);
+
+      tl.to(floatingNeedleRig, {
+        rotation: swing1,
+        duration: duration * 0.55,
+        ease: "power2.out"
+      })
+      .to(floatingNeedleRig, {
+        rotation: swing2,
+        duration: duration * 0.25,
+        ease: "sine.inOut"
+      })
+      .to(floatingNeedleRig, {
+        rotation: finalAngle,
+        duration: duration * 0.2,
+        ease: "elastic.out(1, 0.4)"
+      });
+    }
+
+    // --- 4. ATÖLYE MODU ADIM ADIM MOTORU ---
+    const buildSteps = [
+      {
+        step: 1,
+        badgeText: 'Atölye: Adım 1 - İğneyi Mıknatısla',
+        title: 'Adım 1: Dikiş İğnesini Mıknatıslama',
+        emoji: '🧲',
+        desc: 'Çelik dikiş iğnesini mıknatısın kırmızı (N) kutbuna hep AYNI YÖNDE 10 kez sürtüyoruz. Böylece iğnenin atomik kutupları tek yöne dizilir ve iğne minik bir pusulaya dönüşür!',
+        btnText: isMagnetized ? '🪵 2. Adıma Geç (Mantar Tıpa)' : '⚡ İğneyi Mıknatısla (10 Sürtüş)',
+        setup: () => {
+          stageWorkbench.setAttribute('opacity', '1');
+          stageBowlArea.setAttribute('opacity', '0');
+          magneticFieldLines.setAttribute('opacity', '0');
+          externalMagnetRig.setAttribute('opacity', '0');
+
+          benchMagnetGroup.setAttribute('opacity', '1');
+          benchCorkGroup.setAttribute('opacity', '0');
+
+          strokeActionArea.classList.remove('hidden');
+          insertActionArea.classList.add('hidden');
+
+          gsap.set(benchNeedleGroup, { x: 325, y: 175, rotation: 0, scale: 1 });
+          headingDegText.textContent = isMagnetized ? 'Manyetize Edildi' : 'Manyetize Edilmemiş';
+        }
+      },
+      {
+        step: 2,
+        badgeText: 'Atölye: Adım 2 - Mantar Tıpaya Tak',
+        title: 'Adım 2: Mantar Tıpaya Yerleştirme',
+        emoji: '🪵',
+        desc: 'Mıknatıslanan çelik iğne ağırdır ve suya atılırsa dibe batar! Onu su yüzeyinde tutmak ve sürtünmesiz dönmesini sağlamak için hafif bir mantar dilimine takıyoruz.',
+        btnText: isNeedleInserted ? '🥣 3. Adıma Geç (Suya Bırak)' : '🪵 Mantara Sapla',
+        setup: () => {
+          stageWorkbench.setAttribute('opacity', '1');
+          stageBowlArea.setAttribute('opacity', '0');
+          magneticFieldLines.setAttribute('opacity', '0');
+
+          // Mıknatısı gizle, sadece mantar diski ve iğne kalsın
+          benchMagnetGroup.setAttribute('opacity', '0');
+          benchCorkGroup.setAttribute('opacity', '1');
+
+          strokeActionArea.classList.add('hidden');
+          insertActionArea.classList.remove('hidden');
+
+          if (!isNeedleInserted) {
+            gsap.set(benchNeedleGroup, { x: 325, y: 150, rotation: 0, scale: 1 });
+          } else {
+            gsap.set(benchNeedleGroup, { x: 325, y: 250, rotation: 0, scale: 0.95 });
+          }
+          headingDegText.textContent = 'Mantar Montajı';
+        }
+      },
+      {
+        step: 3,
+        badgeText: 'Atölye: Adım 3 - Su Kasesine Bırak',
+        title: 'Adım 3: Su Dolu Kaseye Bırakma',
+        emoji: '🥣',
+        desc: 'Mantar ve iğneyi su dolu geniş cam kaseye nazikçe bırakıyoruz. Suyun pürüzsüz yüzeyi katı zeminlerdeki sürtünmeyi sıfıra indirir!',
+        btnText: '🧭 4. Adıma Geç (Kuzeyi Gör)',
+        setup: () => {
+          stageWorkbench.setAttribute('opacity', '0');
+          stageBowlArea.setAttribute('opacity', '1');
+          magneticFieldLines.setAttribute('opacity', '0');
+
+          strokeActionArea.classList.add('hidden');
+          insertActionArea.classList.add('hidden');
+
+          playWaterPlopSound();
+
+          // Kaseye iniş animasyonu (hafif rastgele açıyla suya düşüş)
+          gsap.fromTo(floatingNeedleRig, 
+            { y: -70, scale: 0.8, rotation: 110, opacity: 0.3 }, 
+            { y: 0, scale: 1, rotation: 70, opacity: 1, duration: 1.0, ease: "bounce.out" }
+          );
+
+          updateHeadingDisplay(70);
+        }
+      },
+      {
+        step: 4,
+        badgeText: 'Atölye: Adım 4 - Kuzeye Kilitleniş!',
+        title: 'Adım 4: İğne Kuzeye Kilitleniyor!',
+        emoji: '🧭',
+        desc: 'Tebrikler! Su üstünde sürtünmesizce salınan mıknatıslı iğne, Dünya\'nın dev manyetik alanını hissederek dosdoğru KUZEYE (0° / K) kilitlendi!',
+        btnText: '🎉 Manyetik Laboratuvara Geç!',
+        setup: () => {
+          stageWorkbench.setAttribute('opacity', '0');
+          stageBowlArea.setAttribute('opacity', '1');
+          magneticFieldLines.setAttribute('opacity', '0.45');
+
+          strokeActionArea.classList.add('hidden');
+          insertActionArea.classList.add('hidden');
+
+          // Kuzey'e sönümlü salınım ve kilitlenme
+          alignNeedleTo(0, 2.0, () => {
+            playLockChime();
+            gsap.fromTo(lockChimeRing, { opacity: 1, scale: 1 }, { opacity: 0, scale: 2.5, duration: 0.9 });
+            if (window.confetti) {
+              confetti({ particleCount: 80, spread: 75, origin: { y: 0.6 } });
+            }
+          });
+        }
+      }
+    ];
+
+    function applyBuildStep(num) {
+      buildStep = num;
+      stepBadgeText.textContent = `Adım ${buildStep} / 4`;
+      activeStepBadge.textContent = `Adım ${buildStep}`;
+
+      const cfg = buildSteps[buildStep - 1];
+      sceneBadgeText.textContent = cfg.badgeText;
+      bubbleEmoji.textContent = cfg.emoji;
+      bubbleTitle.textContent = cfg.title;
+      bubbleDesc.textContent = cfg.desc;
+      btnNextStepText.textContent = cfg.btnText;
+
+      cfg.setup();
+
+      // Sol Adım Kartları Durumunu Güncelle
+      for (let i = 1; i <= 4; i++) {
+        const card = document.getElementById(`stepCard-${i}`);
+        const icon = document.getElementById(`stepIcon-${i}`);
+        if (i < buildStep) {
+          card.className = 'p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-50 flex items-center justify-between font-black text-emerald-950';
+          icon.textContent = '✅';
+        } else if (i === buildStep) {
+          card.className = 'p-2.5 rounded-xl border-2 border-emerald-600 bg-emerald-100 flex items-center justify-between font-black text-emerald-950 shadow-sm';
+          icon.textContent = '⏳';
+        } else {
+          card.className = 'p-2.5 rounded-xl border-2 border-gray-200 bg-gray-50 flex items-center justify-between font-bold text-gray-400';
+          icon.textContent = '⚪';
+        }
+      }
+
+      btnPrevStep.classList.toggle('opacity-50', buildStep === 1);
+      btnPrevStep.classList.toggle('pointer-events-none', buildStep === 1);
+    }
+
+    btnNextStep.addEventListener('click', () => {
+      if (buildStep === 1 && strokeCount < 10) {
+        completeMagnetizing();
+        return;
+      }
+
+      if (buildStep === 2 && !isNeedleInserted) {
+        insertNeedleToCork();
+        return;
+      }
+
+      if (buildStep < 4) {
+        applyBuildStep(buildStep + 1);
+      } else {
+        switchMode('lab');
+      }
+    });
+
+    btnPrevStep.addEventListener('click', () => {
+      if (buildStep > 1) {
+        applyBuildStep(buildStep - 1);
+      }
+    });
+
+    // --- 5. İĞNEYİ MIKNATISLAMA (ADIM 1 İŞLEVİ & GERÇEKÇİ SÜRTME) ---
+    function doStroke() {
+      if (strokeCount >= 10) return;
+      strokeCount++;
+      strokeCountText.textContent = `${strokeCount} / 10 Sürtme`;
+      strokeProgressBar.style.width = `${strokeCount * 10}%`;
+
+      playScrapeSound();
+
+      // Mıknatısa temas edip tek yönde boylu boyunca sürtme animasyonu
+      const tl = gsap.timeline();
+      tl.to(benchNeedleGroup, { x: 260, y: 245, duration: 0.12, ease: "power1.in" })
+        .to(benchNeedleGroup, {
+          x: 390,
+          y: 245,
+          duration: 0.2,
+          ease: "none",
+          onStart: () => {
+            gsap.fromTo(benchSparks, { opacity: 1, scale: 1.3 }, { opacity: 0, scale: 0.8, duration: 0.3 });
+          }
+        })
+        .to(benchNeedleGroup, { x: 325, y: 175, duration: 0.14, ease: "power1.out" });
+
+      if (strokeCount >= 10) {
+        setTimeout(completeMagnetizing, 480);
+      }
+    }
+
+    function completeMagnetizing() {
+      strokeCount = 10;
+      isMagnetized = true;
+      strokeCountText.textContent = '✅ İğne Tam Manyetize Oldu!';
+      strokeCountText.className = 'text-emerald-700 font-black text-sm';
+      strokeProgressBar.style.width = '100%';
+
+      benchNeedleTip.setAttribute('fill', '#dc2626');
+      benchNeedleLabels.setAttribute('opacity', '1');
+      benchNeedleStatusText.textContent = '🧲 Mıknatıslanmış İğne (Kutup: N / S)';
+      benchNeedleStatusText.setAttribute('fill', '#dc2626');
+
+      btnStrokeNeedle.classList.add('opacity-50', 'pointer-events-none');
+      btnStrokeNeedle.innerHTML = '<span>⚡</span> <span>İğne Mıknatıslandı! Harika!</span>';
+
+      btnNextStepText.textContent = '🪵 2. Adıma Geç (Mantar Tıpa)';
+
+      playLockChime();
+      bubbleTitle.textContent = 'Harika! İğne Artık Minik Bir Mıknatıs!';
+      bubbleDesc.textContent = 'İğneyi mıknatısın N kutbuna tek yönde 10 kez sürttün. Çeliğin içindeki atomlar hizalandı! Şimdi "2. Adıma Geç" butonuna basarak mantara takalım.';
+    }
+
+    btnStrokeNeedle.addEventListener('click', doStroke);
+
+    // İğneyi Mantara Saplama (Adım 2)
+    function insertNeedleToCork() {
+      isNeedleInserted = true;
+      playPokeSound();
+      gsap.to(benchNeedleGroup, {
+        x: 325,
+        y: 250,
+        scale: 0.95,
+        duration: 0.45,
+        ease: "back.out(1.4)"
+      });
+      btnInsertNeedle.classList.add('opacity-50', 'pointer-events-none');
+      btnInsertNeedle.innerHTML = '<span>✅</span> <span>İğne Mantara Takıldı!</span>';
+      btnNextStepText.textContent = '🥣 3. Adıma Geç (Suya Bırak)';
+      bubbleTitle.textContent = 'Pusula Gövdesi Hazır!';
+      bubbleDesc.textContent = 'İğne mantara sağlamca geçti! Mantar sayesinde iğnemiz batmayacak. Şimdi "3. Adıma Geç" ile su kasesine bırakalım.';
+    }
+
+    btnInsertNeedle.addEventListener('click', insertNeedleToCork);
+
+    // --- 6. MOD DEĞİŞTİRME MOTORU (ATÖLYE vs MANYETİK LAB) ---
+    function switchMode(mode) {
+      currentMode = mode;
+      if (mode === 'build') {
+        tabBuild.className = 'pushable px-3.5 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1';
+        tabLab.className = 'pushable px-3.5 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1';
+        
+        sceneBadgeIcon.textContent = '🛠️';
+        sceneBadgeText.textContent = 'Atölye: Basit Pusula Montajı';
+
+        buildControls.classList.remove('hidden');
+        labControls.classList.add('hidden');
+        labControls.classList.remove('flex');
+
+        panelBuildSteps.classList.remove('hidden');
+        panelLabExperiments.classList.add('hidden');
+        panelLabExperiments.classList.remove('flex');
+
+        externalMagnetRig.setAttribute('opacity', '0');
+
+        applyBuildStep(buildStep);
+
+      } else {
+        tabLab.className = 'pushable px-3.5 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1';
+        tabBuild.className = 'pushable px-3.5 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1';
+
+        sceneBadgeIcon.textContent = '🧲';
+        sceneBadgeText.textContent = 'Manyetik Laboratuvar & Keşif';
+
+        buildControls.classList.add('hidden');
+        labControls.classList.remove('hidden');
+        labControls.classList.add('flex');
+
+        panelBuildSteps.classList.add('hidden');
+        panelLabExperiments.classList.remove('hidden');
+        panelLabExperiments.classList.add('flex');
+
+        stageWorkbench.setAttribute('opacity', '0');
+        stageBowlArea.setAttribute('opacity', '1');
+        externalMagnetRig.setAttribute('opacity', '1');
+
+        gsap.set(externalMagnetRig, { x: 540, y: 220 });
+
+        bubbleEmoji.textContent = '🧲';
+        bubbleTitle.textContent = 'Manyetik Laboratuvara Hoş Geldin!';
+        bubbleDesc.textContent = 'Sağdaki harici mıknatısı fareyle kaseye yaklaştırıp gezdirerek iğnenin onu nasıl takip ettiğini incele veya "Kaseyi Döndür" ile pusulanın yönünü koruyuşunu test et!';
+
+        alignNeedleTo(0, 1.2);
+        playWinFanfare();
+      }
+    }
+
+    tabBuild.addEventListener('click', () => switchMode('build'));
+    tabLab.addEventListener('click', () => switchMode('lab'));
+
+    // --- 7. MOD B: HARİCİ MIKNATIS ETKİLEŞİMİ & SÜRÜKLEME ---
+    let isDraggingMagnet = false;
+    let dragOffset = { x: 0, y: 0 };
+
+    function getSvgCoordinates(e) {
+      const svg = document.getElementById('stageSvg');
+      const pt = svg.createSVGPoint();
+      pt.x = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+      pt.y = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+      return pt.matrixTransform(svg.getScreenCTM().inverse());
+    }
+
+    externalMagnetRig.addEventListener('pointerdown', (e) => {
+      isDraggingMagnet = true;
+      externalMagnetRig.setPointerCapture(e.pointerId);
+      const pt = getSvgCoordinates(e);
+      const currentX = gsap.getProperty(externalMagnetRig, "x") || 540;
+      const currentY = gsap.getProperty(externalMagnetRig, "y") || 220;
+      dragOffset.x = pt.x - currentX;
+      dragOffset.y = pt.y - currentY;
+      initAudio();
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!isDraggingMagnet) return;
+      const pt = getSvgCoordinates(e);
+      let targetX = pt.x - dragOffset.x;
+      let targetY = pt.y - dragOffset.y;
+
+      targetX = Math.max(50, Math.min(600, targetX));
+      targetY = Math.max(50, Math.min(390, targetY));
+
+      gsap.set(externalMagnetRig, { x: targetX, y: targetY });
+
+      const dx = targetX - 325;
+      const dy = targetY - 220;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist < 260) {
+        let angleRad = Math.atan2(dy, dx);
+        let angleDeg = (angleRad * 180 / Math.PI) + 90;
+        angleDeg = ((angleDeg % 360) + 360) % 360;
+
+        alignNeedleTo(angleDeg, 0.4);
+        liveFieldSource.textContent = 'Harici Mıknatıs (Baskın!)';
+        liveFieldSource.className = 'text-compassRed font-black';
+      } else {
+        alignNeedleTo(0, 0.8);
+        liveFieldSource.textContent = 'Dünya Manyetik Alanı (Doğal)';
+        liveFieldSource.className = 'text-emerald-700 font-black';
+      }
+    });
+
+    window.addEventListener('pointerup', () => {
+      if (isDraggingMagnet) {
+        isDraggingMagnet = false;
+        const currentX = gsap.getProperty(externalMagnetRig, "x") || 540;
+        const currentY = gsap.getProperty(externalMagnetRig, "y") || 220;
+        const dist = Math.hypot(currentX - 325, currentY - 220);
+        if (dist >= 250) {
+          alignNeedleTo(0, 1.2);
+        }
+      }
+    });
+
+    // Hazır Konum Butonları (Doğu, Batı, Güney, Uzaklaştır)
+    document.querySelectorAll('.mag-pos-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const angleAttr = btn.dataset.angle;
+
+        if (angleAttr === 'none') {
+          gsap.to(externalMagnetRig, { x: 580, y: 220, duration: 0.6, ease: "power2.out" });
+          liveFieldSource.textContent = 'Dünya Manyetik Alanı (Doğal)';
+          liveFieldSource.className = 'text-emerald-700 font-black';
+
+          bubbleTitle.textContent = 'Mıknatıs Uzaklaştı: İğne Kuzeye Döndü!';
+          bubbleDesc.textContent = 'Harici kuvvetli mıknatıs çekildiğinde Dünya\'nın doğal alanı tekrar galip gelir ve iğne Kuzey\'e (0°) geri kilitlenir!';
+          
+          playLockChime();
+          alignNeedleTo(0, 1.4);
+
+        } else {
+          const targetDeg = parseInt(angleAttr);
+
+          let targetX = 510;
+          let targetY = 220;
+          if (targetDeg === 90) { targetX = 510; targetY = 220; }
+          else if (targetDeg === 270) { targetX = 140; targetY = 220; }
+          else if (targetDeg === 180) { targetX = 325; targetY = 380; }
+
+          gsap.to(externalMagnetRig, { x: targetX, y: targetY, duration: 0.6, ease: "back.out(1.2)" });
+
+          liveFieldSource.textContent = 'Harici Mıknatıs!';
+          liveFieldSource.className = 'text-compassRed font-black';
+
+          bubbleTitle.textContent = `İğne Mıknatısı Takip Ediyor (${targetDeg}°)!`;
+          bubbleDesc.textContent = 'Yakındaki bir mıknatıs pusulayı şaşırtır ve iğneyi kendine doğru çeker. Gemilerde pusulanın yanına demir/mıknatıs konulmaz!';
+
+          playScrapeSound();
+          alignNeedleTo(targetDeg, 1.2);
+        }
+      });
+    });
+
+    // --- 8. DİĞER ETKİLEŞİMLER (Dürt, Kase Döndür, Manyetik Alan) ---
+    // İğneyi Çevir / Dürt Butonu
+    btnFlickNeedle.addEventListener('click', () => {
+      playWaterPlopSound();
+      const randomFlick = (Math.random() > 0.5 ? 1 : -1) * (90 + Math.random() * 120);
+      const currentRot = gsap.getProperty(floatingNeedleRig, "rotation") || 0;
+      
+      bubbleTitle.textContent = 'İğneyi Dürtüp Döndürdün!';
+      bubbleDesc.textContent = 'İğne suyun üstünde hızla dönmeye başladı ama Dünya\'nın görünmez manyetik torku onu yavaşlatıp tekrar Kuzey\'e hizalayacak!';
+
+      gsap.to(floatingNeedleRig, {
+        rotation: currentRot + randomFlick,
+        duration: 0.6,
+        ease: "power2.out",
+        onUpdate: () => {
+          const r = gsap.getProperty(floatingNeedleRig, "rotation");
+          updateHeadingDisplay(r);
+        },
+        onComplete: () => {
+          alignNeedleTo(0, 1.8, () => {
+            playLockChime();
+          });
+        }
+      });
+    });
+
+    // Kaseyi Döndürme Testi
+    btnRotateBowl.addEventListener('click', () => {
+      playWhooshSound();
+      bowlRotation += 90;
+
+      gsap.to(rotatingBowlGroup, {
+        rotation: bowlRotation,
+        duration: 0.85,
+        ease: "power2.inOut"
+      });
+
+      bubbleTitle.textContent = 'Kase Döndü, Ama İğne Sabit Kaldı!';
+      bubbleDesc.textContent = 'Fark ettin mi? Kaseyi ne kadar çevirirsen çevir, su üstünde sürtünmesiz yüzen iğne kaseyle birlikte dönmez; daima Dünya\'nın Kuzey Kutbu\'na bakmaya devam eder!';
+    });
+
+    // Manyetik Alan Çizgileri Toggle
+    btnToggleField.addEventListener('click', () => {
+      isFieldVisible = !isFieldVisible;
+      if (isFieldVisible) {
+        magneticFieldLines.setAttribute('opacity', '1');
+        btnToggleField.classList.add('active-tab');
+        bubbleTitle.textContent = 'Dünya Manyetik Alanı Görünür Kılındı!';
+        bubbleDesc.textContent = 'İşte göremediğimiz dev manyetik çizgiler! Pusula iğnesi uzaya yayılan bu görünmez manyetik otoyolda seyahat eden bir araba gibi çizgiye paralel durur.';
+      } else {
+        magneticFieldLines.setAttribute('opacity', '0');
+        btnToggleField.classList.remove('active-tab');
+      }
+      playScrapeSound();
+    });
+
+    // Sıfırla
+    btnResetCompass.addEventListener('click', () => {
+      bowlRotation = 0;
+      gsap.set(rotatingBowlGroup, { rotation: 0 });
+      gsap.to(externalMagnetRig, { x: 540, y: 220, duration: 0.5 });
+      alignNeedleTo(0, 1.0);
+      playWaterPlopSound();
+      liveFieldSource.textContent = 'Dünya Manyetik Alanı (Doğal)';
+      liveFieldSource.className = 'text-emerald-700 font-black';
+    });
+
+    // --- 9. MİNİ TEST ---
+    const quizOpt1 = document.getElementById('quizOpt1');
+    const quizOpt2 = document.getElementById('quizOpt2');
+    const quizFeedback = document.getElementById('quizFeedback');
+
+    quizOpt1.addEventListener('click', () => {
+      quizFeedback.classList.remove('hidden', 'text-red-600');
+      quizFeedback.classList.add('text-emerald-700');
+      quizFeedback.innerHTML = '🎉 <strong>TEBRİKLER, KÂŞİF!</strong><br>Dünya\'nın erimiş demir ve nikel çekirdeği devasa bir mıknatıstır. Mıknatısladığın dikiş iğnesi bu alana kapılarak daima Kuzey-Güney doğrultusunda hizalanır!';
+      if (window.confetti) {
+        confetti({ particleCount: 85, spread: 70, origin: { y: 0.7 } });
+      }
+      playWinFanfare();
+    });
+
+    quizOpt2.addEventListener('click', () => {
+      quizFeedback.classList.remove('hidden', 'text-emerald-700');
+      quizFeedback.classList.add('text-red-600');
+      quizFeedback.innerHTML = '🤔 <strong>Tekrar Düşünelim!</strong><br>Cam bir fanusun içinde ya da hiç rüzgâr olmayan bir odada bile pusula hep kuzeyi gösterir. Çünkü pusulayı döndüren şey rüzgâr değil, Dünya\'nın manyetik alanıdır!';
+      playScrapeSound();
+    });
+
+    // --- 10. SES AÇ/KAPAT ---
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    soundToggle.addEventListener('click', () => {
+      isSoundOn = !isSoundOn;
+      soundIcon.textContent = isSoundOn ? '🔊' : '🔇';
+    });
+
+    // Başlangıç
+    window.addEventListener('DOMContentLoaded', () => {
+      applyBuildStep(1);
+    });
+  </script>
+</body>
+</html>

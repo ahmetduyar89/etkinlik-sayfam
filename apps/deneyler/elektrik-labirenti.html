@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elektrik Labirenti: Şehri Aydınlat! | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'sans-serif'],
+            display: ['Baloo 2', 'cursive'],
+          },
+          colors: {
+            bgMain: '#fffbeb',
+            ink: '#0f172a',
+            electricYellow: '#facc15',
+            powerBlue: '#0284c7',
+            wireOrange: '#f97316',
+            glowGreen: '#10b981',
+          },
+          borderWidth: {
+            '3': '3px',
+            '3.5': '3.5px',
+          },
+          boxShadow: {
+            'hard': '4px 4px 0px #0f172a',
+            'hard-lg': '6px 6px 0px #0f172a',
+            'hard-sm': '2px 2px 0px #0f172a',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display {
+      font-family: 'Baloo 2', cursive;
+    }
+    .chunky {
+      border: 3.5px solid #0f172a;
+      border-radius: 1.25rem;
+      box-shadow: 4px 4px 0px #0f172a;
+    }
+    .pushable {
+      border: 3px solid #0f172a;
+      border-radius: 0.85rem;
+      box-shadow: 3px 3px 0px #0f172a;
+      transition: all 0.12s ease;
+      cursor: pointer;
+    }
+    .pushable:hover {
+      transform: translate(-1.5px, -1.5px);
+      box-shadow: 4.5px 4.5px 0px #0f172a;
+    }
+    .pushable:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #0f172a;
+    }
+    .sticker {
+      filter: drop-shadow(0 4px 0 #0f172a);
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .sticker:hover {
+      transform: scale(1.06) rotate(2deg);
+    }
+    .active-tab {
+      background-color: #facc15 !important;
+      color: #0f172a !important;
+      border-color: #0f172a !important;
+    }
+
+    /* Elektron Parçacık Nabız Efekti */
+    @keyframes electronFlow {
+      from { stroke-dashoffset: 60; }
+      to { stroke-dashoffset: 0; }
+    }
+    .wire-flowing {
+      stroke-dasharray: 8 6;
+      animation: electronFlow 0.8s linear infinite;
+    }
+
+    /* Işık Parlama Filtresi */
+    .glow-filter {
+      filter: drop-shadow(0 0 10px #facc15) drop-shadow(0 0 20px #fef08a);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <!-- Üst Başlık & Navigasyon Çubuğu -->
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-ink text-sm font-black flex items-center gap-1">
+        <span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span>
+      </a>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">⚡</span>
+          <h1 class="display text-lg sm:text-2xl font-black text-ink tracking-wide">
+            Elektrik Labirenti: Şehri Aydınlat!
+          </h1>
+        </div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">
+          Devredeki boşluklara iletkenleri yerleştir, akımı tamamla ve karanlık şehri ışıl ışıl aydınlat! 💡🏙️
+        </p>
+      </div>
+    </div>
+
+    <!-- Mod Değiştirme Butonları & Ses -->
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabMissions" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1">
+          <span>🎯</span> <span>1. Seviyeler</span>
+        </button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1">
+          <span>🔬</span> <span>2. Test Masası</span>
+        </button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1" title="Sesi Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Ana Çalışma Alanı -->
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+    
+    <!-- SOL PANEL: ŞEHİR & İNTERAKTİF DEVRE SAHNESİ (7 SÜTUN) -->
+    <div class="lg:col-span-7 flex flex-col gap-3">
+
+      <!-- 1. MOD: SEVİYE GÖREVİ & DEVRE SAHNESİ -->
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3 relative">
+        
+        <!-- Üst Durum & Seviye Çubuğu -->
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black text-ink shadow-sm">
+              SEVİYE 1
+            </span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black text-ink">
+              Köy Evi & Sokak Lambası
+            </h2>
+          </div>
+          
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-bold text-gray-500">Seviyeler:</span>
+            <button onclick="loadLevel(1)" id="lvlDot1" class="w-7 h-7 rounded-lg border-2 border-ink bg-yellow-400 font-black text-xs">1</button>
+            <button onclick="loadLevel(2)" id="lvlDot2" class="w-7 h-7 rounded-lg border-2 border-ink bg-gray-200 font-black text-xs">2</button>
+            <button onclick="loadLevel(3)" id="lvlDot3" class="w-7 h-7 rounded-lg border-2 border-ink bg-gray-200 font-black text-xs">3</button>
+          </div>
+        </div>
+
+        <!-- ŞEHİR VE DEVRE SVG SİMÜLASYON SAHNESİ -->
+        <div id="stageContainer" class="relative w-full rounded-2xl border-3 border-ink overflow-hidden bg-slate-900 select-none shadow-inner" style="min-height: 350px;">
+          
+          <svg id="citySvg" viewBox="0 0 540 370" class="w-full h-full">
+            <defs>
+              <!-- Gece Gökyüzü Degradesi -->
+              <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#090d16" />
+                <stop offset="100%" stop-color="#1e293b" />
+              </linearGradient>
+
+              <!-- Kablo Parlama Degradesi (Canlı Akım) -->
+              <linearGradient id="wireGlow" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#facc15" />
+                <stop offset="50%" stop-color="#38bdf8" />
+                <stop offset="100%" stop-color="#facc15" />
+              </linearGradient>
+            </defs>
+
+            <!-- Arka Plan Gökyüzü -->
+            <rect x="0" y="0" width="540" height="230" fill="url(#skyGrad)" />
+
+            <!-- Yıldızlar ve Ay -->
+            <circle cx="480" cy="40" r="18" fill="#fef08a" opacity="0.9" />
+            <circle cx="474" cy="36" r="15" fill="#090d16" />
+            <g opacity="0.7">
+              <circle cx="50" cy="30" r="1.5" fill="#ffffff" />
+              <circle cx="120" cy="60" r="1.5" fill="#ffffff" />
+              <circle cx="210" cy="25" r="2" fill="#ffffff" />
+              <circle cx="340" cy="45" r="1.5" fill="#ffffff" />
+              <circle cx="410" cy="70" r="2" fill="#ffffff" />
+              <circle cx="280" cy="80" r="1" fill="#ffffff" />
+            </g>
+
+            <!-- ŞEHİR BİNALARI SİLUETİ (ÜST ALAN: 0 - 220px) -->
+            <g id="cityGroup">
+              
+              <!-- 1. Bina: Küçük Köy Evi (Sol) -->
+              <g id="houseBuilding" transform="translate(40, 95)">
+                <!-- Çatı -->
+                <polygon points="45,0 0,35 90,35" fill="#b91c1c" stroke="#0f172a" stroke-width="2.5" />
+                <!-- Duvar -->
+                <rect x="10" y="35" width="70" height="65" fill="#475569" stroke="#0f172a" stroke-width="2.5" />
+                <!-- Kapı -->
+                <rect x="35" y="65" width="20" height="35" fill="#1e293b" stroke="#0f172a" stroke-width="2" />
+                <!-- Pencereler (Karanlık / Işıklı) -->
+                <rect id="houseWin1" x="18" y="45" width="16" height="16" rx="2" fill="#1e293b" stroke="#0f172a" stroke-width="1.5" />
+                <rect id="houseWin2" x="56" y="45" width="16" height="16" rx="2" fill="#1e293b" stroke="#0f172a" stroke-width="1.5" />
+              </g>
+
+              <!-- Sokak Lambası 1 -->
+              <g id="streetLamp1" transform="translate(145, 110)">
+                <line x1="10" y1="85" x2="10" y2="15" stroke="#64748b" stroke-width="3.5" />
+                <path d="M 10 15 Q 10 5 22 5" fill="none" stroke="#64748b" stroke-width="3" />
+                <!-- Fener Gövdesi -->
+                <path d="M 18 5 L 26 5 L 29 18 L 15 18 Z" fill="#334155" stroke="#0f172a" stroke-width="1.5" />
+                <!-- Ampul -->
+                <circle id="lampBulb1" cx="22" cy="20" r="4.5" fill="#475569" stroke="#0f172a" stroke-width="1" />
+                <!-- Işık Konisi (Gizli) -->
+                <polygon id="lampCone1" points="22,23 -5,85 50,85" fill="#fef08a" opacity="0" />
+              </g>
+
+              <!-- 2. Bina: Şehir Hastanesi / Okul (Orta) -->
+              <g id="hospitalBuilding" transform="translate(200, 60)">
+                <!-- Ana Blok -->
+                <rect x="0" y="30" width="115" height="105" fill="#334155" stroke="#0f172a" stroke-width="2.5" />
+                <!-- Çatı Katı -->
+                <rect x="30" y="10" width="55" height="20" fill="#475569" stroke="#0f172a" stroke-width="2" />
+                <!-- Kırmızı Haç / Logo -->
+                <rect id="crossH" x="50" y="16" width="15" height="5" fill="#ef4444" />
+                <rect id="crossV" x="55" y="11" width="5" height="15" fill="#ef4444" />
+                <!-- Pencereler (Grid) -->
+                <g id="hospWindows">
+                  <rect id="hWin1" x="12" y="45" width="18" height="14" rx="2" fill="#1e293b" stroke="#0f172a" stroke-width="1.2" />
+                  <rect id="hWin2" x="48" y="45" width="18" height="14" rx="2" fill="#1e293b" stroke="#0f172a" stroke-width="1.2" />
+                  <rect id="hWin3" x="84" y="45" width="18" height="14" rx="2" fill="#1e293b" stroke="#0f172a" stroke-width="1.2" />
+                  <rect id="hWin4" x="12" y="70" width="18" height="14" rx="2" fill="#1e293b" stroke="#0f172a" stroke-width="1.2" />
+                  <rect id="hWin5" x="48" y="70" width="18" height="14" rx="2" fill="#1e293b" stroke="#0f172a" stroke-width="1.2" />
+                  <rect id="hWin6" x="84" y="70" width="18" height="14" rx="2" fill="#1e293b" stroke="#0f172a" stroke-width="1.2" />
+                  <rect id="hWin7" x="12" y="95" width="18" height="14" rx="2" fill="#1e293b" stroke="#0f172a" stroke-width="1.2" />
+                  <rect id="hWin8" x="84" y="95" width="18" height="14" rx="2" fill="#1e293b" stroke="#0f172a" stroke-width="1.2" />
+                </g>
+                <!-- Kapı -->
+                <rect x="44" y="100" width="26" height="35" rx="3" fill="#0f172a" />
+              </g>
+
+              <!-- 3. Bina: Lunapark Dönme Dolabı (Sağ) -->
+              <g id="ferrisGroup" transform="translate(420, 115)">
+                <!-- Ayak Desteği -->
+                <polygon points="0,75 -35,85 35,85" fill="#475569" stroke="#0f172a" stroke-width="2" />
+                <!-- Dönen Çember ve Kollar -->
+                <g id="wheelSpinner">
+                  <circle cx="0" cy="0" r="50" fill="none" stroke="#64748b" stroke-width="3" />
+                  <line x1="-50" y1="0" x2="50" y2="0" stroke="#64748b" stroke-width="2" />
+                  <line x1="0" y1="-50" x2="0" y2="50" stroke="#64748b" stroke-width="2" />
+                  <line x1="-35" y1="-35" x2="35" y2="35" stroke="#64748b" stroke-width="2" />
+                  <line x1="-35" y1="35" x2="35" y2="-35" stroke="#64748b" stroke-width="2" />
+                  <!-- Sepetler (Işıklar) -->
+                  <circle id="pod1" cx="0" cy="-50" r="6" fill="#334155" stroke="#0f172a" stroke-width="1.5" />
+                  <circle id="pod2" cx="50" cy="0" r="6" fill="#334155" stroke="#0f172a" stroke-width="1.5" />
+                  <circle id="pod3" cx="0" cy="50" r="6" fill="#334155" stroke="#0f172a" stroke-width="1.5" />
+                  <circle id="pod4" cx="-50" cy="0" r="6" fill="#334155" stroke="#0f172a" stroke-width="1.5" />
+                  <circle id="pod5" cx="35" cy="35" r="6" fill="#334155" stroke="#0f172a" stroke-width="1.5" />
+                  <circle id="pod6" cx="-35" cy="-35" r="6" fill="#334155" stroke="#0f172a" stroke-width="1.5" />
+                </g>
+                <circle cx="0" cy="0" r="7" fill="#facc15" stroke="#0f172a" stroke-width="2" />
+              </g>
+
+            </g>
+
+            <!-- ZEMİN VE YOL (200px - 220px) -->
+            <rect x="0" y="195" width="540" height="25" fill="#1e293b" stroke="#0f172a" stroke-width="2" />
+            <line x1="0" y1="207" x2="540" y2="207" stroke="#475569" stroke-width="2" stroke-dasharray="14 10" />
+
+            <!-- DEVRE TABLASI (ALT ALAN: 220px - 370px) -->
+            <rect x="8" y="225" width="524" height="138" rx="16" fill="#f8fafc" stroke="#0f172a" stroke-width="3" />
+            <!-- Devre Başlığı -->
+            <text x="30" y="245" font-size="11" font-weight="900" fill="#64748b" font-family="'Baloo 2'">⚡ ANA ŞEHİR DEVRE HATTI</text>
+
+            <!-- GÜÇ KAYNAĞI: PİL / TRAFO (SOLDA) -->
+            <g id="batteryGroup" transform="translate(30, 260)">
+              <rect x="0" y="10" width="70" height="42" rx="6" fill="#3b82f6" stroke="#0f172a" stroke-width="2.5" />
+              <rect x="70" y="22" width="8" height="18" rx="2" fill="#cbd5e1" stroke="#0f172a" stroke-width="2" />
+              <text x="14" y="36" font-size="16" font-weight="900" fill="#ffffff" font-family="'Baloo 2'">PİL</text>
+              <text x="50" y="37" font-size="14" font-weight="900" fill="#facc15">+</text>
+              <text x="6" y="37" font-size="16" font-weight="900" fill="#ffffff">-</text>
+            </g>
+
+            <!-- KONTROL ANAHTARI (ŞALTER) -->
+            <g id="switchGroup" transform="translate(135, 275)">
+              <circle cx="0" cy="15" r="5" fill="#cbd5e1" stroke="#0f172a" stroke-width="2" />
+              <circle cx="35" cy="15" r="5" fill="#cbd5e1" stroke="#0f172a" stroke-width="2" />
+              <!-- Bıçak Kolu (Açık: yukarı eğik) -->
+              <line id="switchBlade" x1="0" y1="15" x2="28" y2="-5" stroke="#ef4444" stroke-width="4.5" stroke-linecap="round" />
+              <text x="18" y="38" text-anchor="middle" font-size="9" font-weight="900" fill="#475569" font-family="'Baloo 2'">ANAHTAR</text>
+            </g>
+
+            <!-- KABLO HATLARI (SVG Path) -->
+            <g id="wireLayer">
+              <!-- Pil (-) 'den şehre giden alt hat -->
+              <path id="wireReturn" d="M 30 290 L 15 290 L 15 210 L 260 210" fill="none" stroke="#64748b" stroke-width="4" stroke-linecap="round" />
+              
+              <!-- Pil (+) 'den Anahtara -->
+              <path id="wire1" d="M 108 290 L 135 290" fill="none" stroke="#64748b" stroke-width="4" />
+
+              <!-- Anahtardan 1. Sokete -->
+              <path id="wire2" d="M 170 290 L 205 290" fill="none" stroke="#64748b" stroke-width="4" />
+
+              <!-- 1. Soket ile 2. Soket Arası (Seviye 2 ve 3 için) -->
+              <path id="wireMiddle" d="M 285 290 L 325 290" fill="none" stroke="#64748b" stroke-width="4" />
+
+              <!-- Son Soketten Şehir Trafosuna / Ampule -->
+              <path id="wireToCity" d="M 405 290 L 450 290 L 450 210 L 260 210" fill="none" stroke="#64748b" stroke-width="4" />
+            </g>
+
+            <!-- 1. SOKET / YUVA (205px - 285px) -->
+            <g id="socket1Group" transform="translate(205, 260)" class="cursor-pointer">
+              <!-- Arka Panel Yuva -->
+              <rect x="0" y="0" width="80" height="60" rx="10" fill="#f1f5f9" stroke="#0f172a" stroke-width="2.5" stroke-dasharray="4 3" />
+              <!-- Metal Mandallar -->
+              <rect x="-4" y="22" width="10" height="16" rx="2" fill="#f59e0b" stroke="#0f172a" stroke-width="1.8" />
+              <rect x="74" y="22" width="10" height="16" rx="2" fill="#f59e0b" stroke="#0f172a" stroke-width="1.8" />
+              <!-- Yuva İçi Etiket / Yerleşen Nesne Görseli -->
+              <g id="slot1Content">
+                <text x="40" y="35" text-anchor="middle" font-size="10" font-weight="900" fill="#94a3b8" font-family="'Baloo 2'">1. BOŞLUK</text>
+              </g>
+            </g>
+
+            <!-- 2. SOKET / YUVA (325px - 405px) -->
+            <g id="socket2Group" transform="translate(325, 260)" class="cursor-pointer">
+              <rect x="0" y="0" width="80" height="60" rx="10" fill="#f1f5f9" stroke="#0f172a" stroke-width="2.5" stroke-dasharray="4 3" />
+              <rect x="-4" y="22" width="10" height="16" rx="2" fill="#f59e0b" stroke="#0f172a" stroke-width="1.8" />
+              <rect x="74" y="22" width="10" height="16" rx="2" fill="#f59e0b" stroke="#0f172a" stroke-width="1.8" />
+              <g id="slot2Content">
+                <text x="40" y="35" text-anchor="middle" font-size="10" font-weight="900" fill="#94a3b8" font-family="'Baloo 2'">2. BOŞLUK</text>
+              </g>
+            </g>
+
+            <!-- TEST GÖSTERGE AMPULÜ (DEVRE KONTROLÜ) -->
+            <g id="testerBulb" transform="translate(470, 275)">
+              <circle cx="15" cy="15" r="16" fill="#f8fafc" stroke="#0f172a" stroke-width="2" />
+              <path id="testerFilament" d="M 9 20 Q 15 8 21 20" fill="none" stroke="#94a3b8" stroke-width="2" />
+              <text x="15" y="42" text-anchor="middle" font-size="9" font-weight="900" fill="#64748b" font-family="'Baloo 2'">KONTROL</text>
+            </g>
+
+          </svg>
+
+          <!-- Durum Rozeti (Sol Üst) -->
+          <div class="absolute top-3 left-3 bg-white/95 px-3 py-1 rounded-xl border-2 border-ink text-xs font-black shadow-sm flex items-center gap-1.5">
+            <span id="circuitStatusDot" class="w-3 h-3 rounded-full bg-red-500 border border-ink"></span>
+            <span id="circuitStatusText" class="text-ink">Devre Açık: Akım Yok ❌</span>
+          </div>
+
+          <!-- Canlı Şehir Enerjisi Rozeti (Sağ Üst) -->
+          <div class="absolute top-3 right-3 bg-white/95 px-3 py-1 rounded-xl border-2 border-ink text-xs font-black shadow-sm flex items-center gap-1.5">
+            <span>💡 Şehir Aydınlığı:</span>
+            <span id="cityLightPercent" class="text-amber-700 font-black">0%</span>
+          </div>
+
+        </div>
+
+        <!-- 2. MALZEME TEPSİSİ (İNTERAKTİF MALZEME SEÇİMİ) -->
+        <div class="mt-1">
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-black text-gray-700 flex items-center gap-1.5">
+              <span>🧰</span> <span>Devre Boşluğuna Koymak İçin Malzeme Seç:</span>
+            </label>
+            <span id="activeSlotTargetText" class="text-[11px] font-black text-powerBlue bg-sky-50 px-2 py-0.5 rounded-md border border-sky-300">
+              👉 1. Boşluk Seçili
+            </span>
+          </div>
+
+          <!-- Malzeme Butonları Tepsisi -->
+          <div id="materialGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <!-- Dinamik Olarak JavaScript ile doldurulur -->
+          </div>
+        </div>
+
+        <!-- KONTROL VE AKSIYON BUTONLARI -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <div class="flex items-center gap-2">
+            <!-- AKIMI TEST ET / ÇALIŞTIR -->
+            <button id="btnTogglePower" class="pushable px-6 py-2.5 bg-yellow-400 hover:bg-yellow-300 text-ink font-black text-sm flex items-center gap-2 shadow-hard">
+              <span>⚡</span> <span id="powerBtnText">Anahtarı Kapat & Test Et</span>
+            </button>
+
+            <!-- BOŞALT / TEMİZLE -->
+            <button id="btnClearSlots" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-ink text-xs font-black flex items-center gap-1">
+              <span>🔄</span> <span>Temizle</span>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <!-- İPUCU AL -->
+            <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black flex items-center gap-1 border-2 border-ink">
+              <span>💡</span> <span>İpucu</span>
+            </button>
+
+            <!-- SONRAKİ SEVİYE BUTONU (KAZANILINCA AÇILIR) -->
+            <button id="btnNextLevel" class="pushable px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black hidden items-center gap-1 shadow-sm">
+              <span>Tebrikler! Sonraki Seviye</span> <span>➔</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- BİLİM İNSANI NOTU -->
+        <div class="p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border-2 border-ink flex items-start gap-2.5 mt-1">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shadow-sm shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black text-ink">Biliyor musun? (İletken vs. Yalıtkan Farkı)</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">
+              Demir, bakır, altın ve tuzlu su gibi <b>iletken</b> maddelerin içinde serbest elektronlar vardır ve elektrik akımını bir uçtan diğer uca taşır. Plastik, tahta ve cam gibi <b>yalıtkan</b> maddeler ise elektronların geçmesine izin vermez!
+            </p>
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+
+    <!-- SAĞ PANEL: GÖREVLER, PUAN & EĞİTİM REHBERİ (5 SÜTUN) -->
+    <div class="lg:col-span-5 flex flex-col gap-3">
+
+      <!-- 1. KÜÇÜK MUCİT GÖREVLERİ -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🎯</span>
+            <h3 class="display text-base font-black text-ink">Elektrik Ustası Görevleri</h3>
+          </div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">
+            0 Puan
+          </span>
+        </div>
+
+        <ul class="space-y-2.5" id="missionList">
+          <!-- Görev 1 -->
+          <li id="mission1" class="p-2.5 rounded-xl border-2 border-ink bg-amber-50 flex items-start gap-2.5">
+            <span id="m1Check" class="text-lg">⬜</span>
+            <div class="flex-1 text-xs">
+              <p class="font-extrabold text-ink">1. Görev: Köy Evini Aydınlat</p>
+              <p class="text-gray-600 font-semibold text-[11px]">1. Seviyede iletken bir metal kullanarak devreyi tamamla.</p>
+            </div>
+          </li>
+
+          <!-- Görev 2 -->
+          <li id="mission2" class="p-2.5 rounded-xl border-2 border-ink bg-gray-50 flex items-start gap-2.5">
+            <span id="m2Check" class="text-lg">⬜</span>
+            <div class="flex-1 text-xs">
+              <p class="font-extrabold text-ink">2. Görev: Hastane & Lunaparkı Kurtar</p>
+              <p class="text-gray-600 font-semibold text-[11px]">2. Seviyedeki iki boşluğu da doğru iletkenlerle bağla.</p>
+            </div>
+          </li>
+
+          <!-- Görev 3 -->
+          <li id="mission3" class="p-2.5 rounded-xl border-2 border-ink bg-gray-50 flex items-start gap-2.5">
+            <span id="m3Check" class="text-lg">⬜</span>
+            <div class="flex-1 text-xs">
+              <p class="font-extrabold text-ink">3. Görev: Sıvı İletkenliği Ustası Ol</p>
+              <p class="text-gray-600 font-semibold text-[11px]">Tuzlu su çözeltisini kullanarak tüm şehri %100 aydınlığa kavuştur!</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- 2. CANLI ŞEBEKE VE MULTİMETRE GÖSTERGESİ -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">📊</span>
+            <h3 class="display text-base font-black text-ink">Şebeke Göstergeleri</h3>
+          </div>
+          <span class="text-xs font-bold text-gray-500" id="circuitVolts">0.0 Volt</span>
+        </div>
+
+        <!-- Akım İlerleme Çubuğu -->
+        <div class="mb-3">
+          <div class="flex justify-between text-xs font-bold mb-1">
+            <span>Şehir Elektrik Oranı</span>
+            <span id="statPowerLevel" class="font-black text-amber-600">0%</span>
+          </div>
+          <div class="w-full h-4 bg-gray-100 rounded-full border-2 border-ink overflow-hidden p-0.5">
+            <div id="statPowerBar" class="h-full bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full w-0 transition-all duration-500"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-center">
+          <div class="p-2 bg-emerald-50 rounded-xl border-2 border-ink">
+            <p class="text-[10px] font-bold text-gray-500">Kullanılan İletken</p>
+            <p id="statConductors" class="text-base font-black text-emerald-800">0 Adet</p>
+          </div>
+          <div class="p-2 bg-red-50 rounded-xl border-2 border-ink">
+            <p class="text-[10px] font-bold text-gray-500">Engellenen Yalıtkan</p>
+            <p id="statInsulators" class="text-base font-black text-red-800">0 Adet</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. MEB KAZANIM REHBERİ (İLETKEN & YALITKAN TABLOSU) -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <span class="text-xl">📚</span>
+          <h3 class="display text-base font-black text-ink">Fen Bilgisi Rehberi</h3>
+        </div>
+
+        <div class="space-y-2 text-xs font-bold">
+          <div class="p-2 bg-emerald-50 rounded-lg border border-emerald-300">
+            <p class="text-emerald-900 font-extrabold flex items-center gap-1">
+              <span>✅</span> İletken Maddeler (Akımı Geçirir):
+            </p>
+            <p class="text-[11px] text-emerald-800 font-semibold mt-0.5">
+              Demir, bakır, altın, gümüş, alüminyum folyo, kurşun kalem ucu (grafit), tuzlu su, limonlu su.
+            </p>
+          </div>
+
+          <div class="p-2 bg-red-50 rounded-lg border border-red-300">
+            <p class="text-red-900 font-extrabold flex items-center gap-1">
+              <span>❌</span> Yalıtkan Maddeler (Akımı Durdurur):
+            </p>
+            <p class="text-[11px] text-red-800 font-semibold mt-0.5">
+              Plastik, cam, tahta, porselen, kauçuk, saf su, kuru hava, pamuk.
+            </p>
+          </div>
+
+          <div class="p-2 bg-amber-50 rounded-lg border border-amber-300">
+            <p class="text-amber-900 font-extrabold flex items-center gap-1">
+              <span>🛡️</span> Güvenlik Sırrı:
+            </p>
+            <p class="text-[11px] text-amber-800 font-semibold mt-0.5">
+              Elektrik çarpmaması için kabloların dışı <b>plastik</b> ile kaplanır. Elektrik tamircileri de <b>kauçuk eldiven</b> takar!
+            </p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- JAVASCRIPT: SES SENTEZLEYİCİ, OYUN MOTORU & ŞEHİR AYDINLATMA SİSTEMİ -->
+  <script>
+    // --- 1. WEB AUDIO API SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new AudioCtx();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    const Sound = {
+      click() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(450, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.06);
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.06);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.06);
+        } catch (e) {}
+      },
+
+      socket() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.09);
+          gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.09);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.09);
+        } catch (e) {}
+      },
+
+      zap() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          // Elektrik arkı / çıtırtı (FM Sentez)
+          const carrier = audioCtx.createOscillator();
+          const modulator = audioCtx.createOscillator();
+          const modGain = audioCtx.createGain();
+          const masterGain = audioCtx.createGain();
+
+          carrier.type = 'sawtooth';
+          carrier.frequency.setValueAtTime(140, audioCtx.currentTime);
+
+          modulator.type = 'square';
+          modulator.frequency.setValueAtTime(45, audioCtx.currentTime);
+          modGain.gain.setValueAtTime(80, audioCtx.currentTime);
+
+          modulator.connect(modGain);
+          modGain.connect(carrier.frequency);
+
+          masterGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+          masterGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+
+          carrier.connect(masterGain);
+          masterGain.connect(audioCtx.destination);
+
+          modulator.start();
+          carrier.start();
+          modulator.stop(audioCtx.currentTime + 0.25);
+          carrier.stop(audioCtx.currentTime + 0.25);
+        } catch (e) {}
+      },
+
+      lightUp() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          // Neşeli aydınlanma arpeji (Do - Mi - Sol - Do)
+          const notes = [261.63, 329.63, 392.00, 523.25];
+          notes.forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.07);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime + idx * 0.07);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + idx * 0.07 + 0.2);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime + idx * 0.07);
+            osc.stop(audioCtx.currentTime + idx * 0.07 + 0.2);
+          });
+        } catch (e) {}
+      },
+
+      buzzer() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+          osc.frequency.setValueAtTime(130, audioCtx.currentTime + 0.12);
+          gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.3);
+        } catch (e) {}
+      },
+
+      fanfare() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const fanfareNotes = [392, 523.25, 659.25, 783.99];
+          fanfareNotes.forEach((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.1);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime + i * 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.1 + 0.35);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime + i * 0.1);
+            osc.stop(audioCtx.currentTime + i * 0.1 + 0.35);
+          });
+        } catch (e) {}
+      }
+    };
+
+    // Ses Aç/Kapat Butonu
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    soundToggle.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundIcon.textContent = soundEnabled ? '🔊' : '🔇';
+    });
+
+    // --- 2. MALZEME VERİTABANI (İLETKEN & YALITKANLAR) ---
+    const MATERIALS = [
+      { id: 'iron_nail', name: 'Demir Çivi', icon: '🔩', type: 'conductor', info: 'Metaldir, elektrik akımını çok iyi iletir.' },
+      { id: 'plastic_eraser', name: 'Plastik Silgi', icon: '🧼', type: 'insulator', info: 'Plastiktir, elektronları durdurur (Yalıtkan).' },
+      { id: 'copper_wire', name: 'Bakır Tel', icon: '〰️', type: 'conductor', info: 'Mükemmel iletkendir, evlerimizin kablosudur.' },
+      { id: 'wood_stick', name: 'Tahta Çubuk', icon: '🥢', type: 'insulator', info: 'Kuru tahta yalıtkandır, akım geçirmez.' },
+      { id: 'alum_foil', name: 'Alüminyum Folyo', icon: '📜', type: 'conductor', info: 'Metal yaprak, elektriği hızla iletir.' },
+      { id: 'salt_water', name: 'Tuzlu Su', icon: '🧪', type: 'conductor', info: 'İyonlar sayesinde sıvılarda elektriği iletir!' },
+      { id: 'pure_water', name: 'Saf Su', icon: '💧', type: 'insulator', info: 'İçinde iyon olmadığı için elektriği iletmez.' },
+      { id: 'gold_key', name: 'Altın Anahtar', icon: '🗝️', type: 'conductor', info: 'Değerli bir metaldir ve harika bir iletkendir.' },
+      { id: 'glass_marble', name: 'Cam Bilye', icon: '🔮', type: 'insulator', info: 'Cam çok güçlü bir yalıtkandır.' },
+      { id: 'porcelain_cup', name: 'Porselen Kupa', icon: '☕', type: 'insulator', info: 'Porselen elektrik direklerinde yalıtkan olarak kullanılır.' },
+      { id: 'graphite_pencil', name: 'Kurşun Kalem Ucu', icon: '✏️', type: 'conductor', info: 'Grafit bir ametal olmasına rağmen elektriği iletir!' },
+      { id: 'paper_clip', name: 'Metal Ataş', icon: '📎', type: 'conductor', info: 'Çelik metalden yapılmıştır, akımı iletir.' }
+    ];
+
+    // --- 3. SEVİYE YAPILANDIRMASI ---
+    const LEVELS = {
+      1: {
+        title: 'Köy Evi & Sokak Lambası',
+        badge: 'SEVİYE 1 (TEMEL)',
+        slotsNeeded: 1,
+        materials: ['iron_nail', 'plastic_eraser', 'copper_wire', 'wood_stick'],
+        hint: 'Metaller (demir çivi veya bakır tel) harika iletkenlerdir! Plastik silgi ise akımı durdurur.',
+        targetLight: 35
+      },
+      2: {
+        title: 'Kasaba Hastanesi & Lunapark (Seri Devre)',
+        badge: 'SEVİYE 2 (SERİ BAĞLANTI)',
+        slotsNeeded: 2,
+        materials: ['alum_foil', 'glass_marble', 'paper_clip', 'porcelain_cup'],
+        hint: 'Seri devrede akımın geçmesi için HER İKİ boşluğa da iletken koymalısın!',
+        targetLight: 75
+      },
+      3: {
+        title: 'Büyükşehir & Sıvı İletkenliği Labirenti',
+        badge: 'SEVİYE 3 (USTA KİMYAGER)',
+        slotsNeeded: 2,
+        materials: ['salt_water', 'pure_water', 'gold_key', 'wood_stick'],
+        hint: 'Tuzlu su elektriği iletir ama saf su yalıtkandır! Altın anahtarla birlikte şehri aydınlat.',
+        targetLight: 100
+      }
+    };
+
+    // --- 4. OYUN DURUMU (STATE) ---
+    let currentLevel = 1;
+    let activeSlot = 1; // 1 veya 2
+    let slot1Item = null;
+    let slot2Item = null;
+    let isPowerOn = false;
+    let score = 0;
+    let conductorsUsed = 0;
+    let insulatorsEncountered = 0;
+
+    let mission1Done = false;
+    let mission2Done = false;
+    let mission3Done = false;
+
+    // DOM Elemanları
+    const levelBadge = document.getElementById('levelBadge');
+    const levelTitle = document.getElementById('levelTitle');
+    const activeSlotTargetText = document.getElementById('activeSlotTargetText');
+    const materialGrid = document.getElementById('materialGrid');
+    const btnTogglePower = document.getElementById('btnTogglePower');
+    const powerBtnText = document.getElementById('powerBtnText');
+    const btnClearSlots = document.getElementById('btnClearSlots');
+    const btnHint = document.getElementById('btnHint');
+    const btnNextLevel = document.getElementById('btnNextLevel');
+    const circuitStatusDot = document.getElementById('circuitStatusDot');
+    const circuitStatusText = document.getElementById('circuitStatusText');
+    const cityLightPercent = document.getElementById('cityLightPercent');
+    const statPowerLevel = document.getElementById('statPowerLevel');
+    const statPowerBar = document.getElementById('statPowerBar');
+    const scoreBadge = document.getElementById('scoreBadge');
+    const circuitVolts = document.getElementById('circuitVolts');
+    const statConductors = document.getElementById('statConductors');
+    const statInsulators = document.getElementById('statInsulators');
+
+    // SVG Bileşenleri
+    const switchBlade = document.getElementById('switchBlade');
+    const socket2Group = document.getElementById('socket2Group');
+    const wireMiddle = document.getElementById('wireMiddle');
+    const slot1Content = document.getElementById('slot1Content');
+    const slot2Content = document.getElementById('slot2Content');
+    const testerBulb = document.getElementById('testerBulb');
+    const testerFilament = document.getElementById('testerFilament');
+    const houseWin1 = document.getElementById('houseWin1');
+    const houseWin2 = document.getElementById('houseWin2');
+    const lampBulb1 = document.getElementById('lampBulb1');
+    const lampCone1 = document.getElementById('lampCone1');
+    const wheelSpinner = document.getElementById('wheelSpinner');
+
+    // --- 5. SEVİYE YÜKLEME ---
+    function loadLevel(lvlNum) {
+      currentLevel = lvlNum;
+      isPowerOn = false;
+      slot1Item = null;
+      slot2Item = null;
+      activeSlot = 1;
+
+      // Seviye Göstergeleri
+      [1, 2, 3].forEach(n => {
+        const dot = document.getElementById(`lvlDot${n}`);
+        dot.className = n === currentLevel 
+          ? 'w-7 h-7 rounded-lg border-2 border-ink bg-yellow-400 font-black text-xs' 
+          : 'w-7 h-7 rounded-lg border-2 border-ink bg-gray-200 font-black text-xs';
+      });
+
+      const lvl = LEVELS[currentLevel];
+      levelBadge.textContent = lvl.badge;
+      levelTitle.textContent = lvl.title;
+      btnNextLevel.classList.add('hidden');
+      btnNextLevel.classList.remove('flex');
+
+      // 2. Soket Görünürlüğü (1. Seviyede tek soket, 2 ve 3'te iki soket)
+      if (lvl.slotsNeeded === 1) {
+        socket2Group.setAttribute('opacity', '0.2');
+        wireMiddle.setAttribute('opacity', '0.2');
+        slot2Content.innerHTML = `<text x="40" y="35" text-anchor="middle" font-size="9" font-weight="900" fill="#cbd5e1" font-family="'Baloo 2'">DEVRE DIŞI</text>`;
+      } else {
+        socket2Group.setAttribute('opacity', '1');
+        wireMiddle.setAttribute('opacity', '1');
+        slot2Content.innerHTML = `<text x="40" y="35" text-anchor="middle" font-size="10" font-weight="900" fill="#94a3b8" font-family="'Baloo 2'">2. BOŞLUK</text>`;
+      }
+
+      updateSlotUI();
+      renderMaterials(lvl.materials);
+      resetCityLights();
+      Sound.click();
+    }
+
+    // --- 6. MALZEME BUTONLARINI ÇİZDİRME ---
+    function renderMaterials(materialIds) {
+      materialGrid.innerHTML = '';
+      materialIds.forEach(id => {
+        const mat = MATERIALS.find(m => m.id === id);
+        if (!mat) return;
+
+        const btn = document.createElement('button');
+        btn.className = 'pushable p-2 sm:p-2.5 bg-white hover:bg-amber-50 text-left flex items-center gap-2 transition-all';
+        btn.innerHTML = `
+          <span class="text-2xl shrink-0 p-1 bg-gray-50 border border-ink rounded-lg">${mat.icon}</span>
+          <div class="min-w-0">
+            <p class="text-xs font-black text-ink truncate">${mat.name}</p>
+            <p class="text-[10px] text-gray-500 font-bold truncate">${mat.type === 'conductor' ? '⚡ İletken' : '🛡️ Yalıtkan'}</p>
+          </div>
+        `;
+
+        btn.addEventListener('click', () => {
+          placeMaterial(mat);
+        });
+
+        materialGrid.appendChild(btn);
+      });
+    }
+
+    // --- 7. MALZEME YERLEŞTİRME ---
+    function placeMaterial(mat) {
+      Sound.socket();
+      const lvl = LEVELS[currentLevel];
+
+      if (activeSlot === 1) {
+        slot1Item = mat;
+        if (lvl.slotsNeeded > 1) {
+          activeSlot = 2; // Otomatik ikinci boşluğa geç
+        }
+      } else if (activeSlot === 2) {
+        slot2Item = mat;
+        activeSlot = 1; // Başa dön
+      }
+
+      updateSlotUI();
+    }
+
+    function updateSlotUI() {
+      const lvl = LEVELS[currentLevel];
+      activeSlotTargetText.textContent = `👉 ${activeSlot}. Boşluk Seçili`;
+
+      // 1. Yuva Görseli
+      if (slot1Item) {
+        slot1Content.innerHTML = `
+          <rect x="5" y="10" width="70" height="40" rx="6" fill="#fef08a" stroke="#0f172a" stroke-width="1.8" />
+          <text x="40" y="28" text-anchor="middle" font-size="16">${slot1Item.icon}</text>
+          <text x="40" y="44" text-anchor="middle" font-size="8" font-weight="900" fill="#0f172a" font-family="'Baloo 2'">${slot1Item.name}</text>
+        `;
+      } else {
+        slot1Content.innerHTML = `<text x="40" y="35" text-anchor="middle" font-size="10" font-weight="900" fill="#94a3b8" font-family="'Baloo 2'">1. BOŞLUK</text>`;
+      }
+
+      // 2. Yuva Görseli
+      if (lvl.slotsNeeded > 1) {
+        if (slot2Item) {
+          slot2Content.innerHTML = `
+            <rect x="5" y="10" width="70" height="40" rx="6" fill="#fef08a" stroke="#0f172a" stroke-width="1.8" />
+            <text x="40" y="28" text-anchor="middle" font-size="16">${slot2Item.icon}</text>
+            <text x="40" y="44" text-anchor="middle" font-size="8" font-weight="900" fill="#0f172a" font-family="'Baloo 2'">${slot2Item.name}</text>
+          `;
+        } else {
+          slot2Content.innerHTML = `<text x="40" y="35" text-anchor="middle" font-size="10" font-weight="900" fill="#94a3b8" font-family="'Baloo 2'">2. BOŞLUK</text>`;
+        }
+      }
+    }
+
+    // Soketlere Doğrudan Tıklayarak Seçme
+    document.getElementById('socket1Group').addEventListener('click', () => {
+      activeSlot = 1;
+      updateSlotUI();
+      Sound.click();
+    });
+    document.getElementById('socket2Group').addEventListener('click', () => {
+      if (LEVELS[currentLevel].slotsNeeded > 1) {
+        activeSlot = 2;
+        updateSlotUI();
+        Sound.click();
+      }
+    });
+
+    // --- 8. DEVREYİ TEST ET VE AKIMI GEÇİR ---
+    btnTogglePower.addEventListener('click', () => {
+      initAudio();
+      const lvl = LEVELS[currentLevel];
+
+      // Boşluklar doldu mu?
+      if (!slot1Item || (lvl.slotsNeeded === 2 && !slot2Item)) {
+        alert("Lütfen devredeki tüm boşluklara malzeme yerleştir!");
+        Sound.buzzer();
+        return;
+      }
+
+      // Anahtarı Kapat (Animasyon)
+      if (window.gsap) {
+        gsap.to(switchBlade, { attr: { y2: 15 }, duration: 0.15, ease: "power2.in" });
+      } else {
+        switchBlade.setAttribute('y2', '15');
+      }
+
+      // Devre iletken mi?
+      let isConductive = false;
+      if (lvl.slotsNeeded === 1) {
+        isConductive = (slot1Item.type === 'conductor');
+      } else {
+        isConductive = (slot1Item.type === 'conductor' && slot2Item.type === 'conductor');
+      }
+
+      if (isConductive) {
+        // BAŞARILI: Elektrik Akımı Geçiyor!
+        conductorsUsed += (lvl.slotsNeeded);
+        statConductors.textContent = `${conductorsUsed} Adet`;
+        activateElectricity(lvl.targetLight);
+      } else {
+        // BAŞARISIZ: En az bir yalıtkan akımı kesti!
+        insulatorsEncountered++;
+        statInsulators.textContent = `${insulatorsEncountered} Adet`;
+        triggerInsulatorBlock();
+      }
+    });
+
+    function activateElectricity(targetLight) {
+      Sound.zap();
+      setTimeout(() => Sound.lightUp(), 200);
+
+      isPowerOn = true;
+      circuitStatusDot.className = 'w-3 h-3 rounded-full bg-emerald-500 border border-ink animate-ping';
+      circuitStatusText.textContent = 'Devre Kapalı: Akım Akıyor! ⚡';
+      circuitVolts.textContent = '12.0 Volt';
+
+      // Kablolara Akım Animasyonu Ekle
+      ['wire1', 'wire2', 'wireMiddle', 'wireToCity', 'wireReturn'].forEach(wId => {
+        const el = document.getElementById(wId);
+        if (el) {
+          el.setAttribute('stroke', 'url(#wireGlow)');
+          el.classList.add('wire-flowing');
+        }
+      });
+
+      // Kontrol Ampulü Yanar
+      testerBulb.querySelector('circle').setAttribute('fill', '#facc15');
+      testerBulb.querySelector('circle').classList.add('glow-filter');
+      testerFilament.setAttribute('stroke', '#ffffff');
+
+      // Şehir Binalarının Işıkları Yanar
+      lightUpCity(currentLevel);
+
+      // Puan ve Gösterge Güncellemesi
+      score += 150;
+      scoreBadge.textContent = `${score} Puan`;
+      cityLightPercent.textContent = `${targetLight}%`;
+      statPowerLevel.textContent = `${targetLight}%`;
+      statPowerBar.style.width = `${targetLight}%`;
+
+      // Görev Kontrolleri
+      checkMissions();
+
+      // Seviye Zaferi ve Sonraki Seviye Açılışı
+      setTimeout(() => {
+        if (window.confetti) {
+          confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+        }
+        Sound.fanfare();
+        if (currentLevel < 3) {
+          btnNextLevel.classList.remove('hidden');
+          btnNextLevel.classList.add('flex');
+        } else {
+          alert("🏆 TEBRİKLER KÜÇÜK MUCİT!\nTüm şehri ışıl ışıl aydınlattın ve Elektrik Labirenti Şampiyonu oldun!");
+        }
+      }, 700);
+    }
+
+    function triggerInsulatorBlock() {
+      Sound.buzzer();
+      isPowerOn = false;
+      circuitStatusDot.className = 'w-3 h-3 rounded-full bg-red-500 border border-ink';
+      circuitStatusText.textContent = 'Akım Kesildi: Yalıtkan Madde! ❌';
+      circuitVolts.textContent = '0.0 Volt';
+
+      // Hangi nesne yalıtkan?
+      let badItems = [];
+      if (slot1Item && slot1Item.type === 'insulator') badItems.push(slot1Item.name);
+      if (slot2Item && slot2Item.type === 'insulator') badItems.push(slot2Item.name);
+
+      alert(`⚠️ Dikkat! ${badItems.join(' ve ')} bir YALITKAN maddedir.\nElektronların geçişine izin vermez ve devreyi keser. İletken bir malzeme deneyin!`);
+
+      // Anahtarı Geri Aç
+      setTimeout(() => {
+        if (window.gsap) {
+          gsap.to(switchBlade, { attr: { y2: -5 }, duration: 0.2 });
+        } else {
+          switchBlade.setAttribute('y2', '-5');
+        }
+      }, 500);
+    }
+
+    function lightUpCity(lvl) {
+      if (lvl >= 1) {
+        // Köy evi ve sokak lambası yanar
+        houseWin1.setAttribute('fill', '#fde047');
+        houseWin2.setAttribute('fill', '#fde047');
+        houseWin1.classList.add('glow-filter');
+        houseWin2.classList.add('glow-filter');
+        lampBulb1.setAttribute('fill', '#fde047');
+        lampCone1.setAttribute('opacity', '0.45');
+      }
+      if (lvl >= 2) {
+        // Hastane pencereleri ve dönme dolap ışıkları
+        ['hWin1', 'hWin2', 'hWin3', 'hWin4', 'hWin5', 'hWin6', 'hWin7', 'hWin8'].forEach(wId => {
+          const el = document.getElementById(wId);
+          if (el) el.setAttribute('fill', '#fde047');
+        });
+        ['pod1', 'pod2', 'pod3', 'pod4', 'pod5', 'pod6'].forEach(pId => {
+          const el = document.getElementById(pId);
+          if (el) el.setAttribute('fill', '#f43f5e');
+        });
+        // Dönme dolap dönmeye başlar!
+        if (window.gsap) {
+          gsap.to(wheelSpinner, { rotation: 360, duration: 6, repeat: -1, ease: "none", transformOrigin: "0 0" });
+        }
+      }
+      if (lvl >= 3) {
+        // Şehir tamamen ışık festivaline dönüşür
+        document.querySelectorAll('#hospWindows rect').forEach(r => r.classList.add('glow-filter'));
+      }
+    }
+
+    function resetCityLights() {
+      // Şehir lambalarını söndür
+      houseWin1.setAttribute('fill', '#1e293b');
+      houseWin2.setAttribute('fill', '#1e293b');
+      houseWin1.classList.remove('glow-filter');
+      houseWin2.classList.remove('glow-filter');
+      lampBulb1.setAttribute('fill', '#475569');
+      lampCone1.setAttribute('opacity', '0');
+
+      ['hWin1', 'hWin2', 'hWin3', 'hWin4', 'hWin5', 'hWin6', 'hWin7', 'hWin8'].forEach(wId => {
+        const el = document.getElementById(wId);
+        if (el) {
+          el.setAttribute('fill', '#1e293b');
+          el.classList.remove('glow-filter');
+        }
+      });
+
+      ['pod1', 'pod2', 'pod3', 'pod4', 'pod5', 'pod6'].forEach(pId => {
+        const el = document.getElementById(pId);
+        if (el) el.setAttribute('fill', '#334155');
+      });
+
+      // Kablo akımını durdur
+      ['wire1', 'wire2', 'wireMiddle', 'wireToCity', 'wireReturn'].forEach(wId => {
+        const el = document.getElementById(wId);
+        if (el) {
+          el.setAttribute('stroke', '#64748b');
+          el.classList.remove('wire-flowing');
+        }
+      });
+
+      // Kontrol ampulü söner
+      testerBulb.querySelector('circle').setAttribute('fill', '#f8fafc');
+      testerBulb.querySelector('circle').classList.remove('glow-filter');
+      testerFilament.setAttribute('stroke', '#94a3b8');
+
+      // Anahtar açık
+      switchBlade.setAttribute('y2', '-5');
+      circuitStatusDot.className = 'w-3 h-3 rounded-full bg-red-500 border border-ink';
+      circuitStatusText.textContent = 'Devre Açık: Akım Yok ❌';
+      circuitVolts.textContent = '0.0 Volt';
+
+      cityLightPercent.textContent = '0%';
+      statPowerLevel.textContent = '0%';
+      statPowerBar.style.width = '0%';
+    }
+
+    // Temizle Butonu
+    btnClearSlots.addEventListener('click', () => {
+      slot1Item = null;
+      slot2Item = null;
+      activeSlot = 1;
+      updateSlotUI();
+      resetCityLights();
+      Sound.click();
+    });
+
+    // İpucu Butonu
+    btnHint.addEventListener('click', () => {
+      Sound.click();
+      alert(`💡 SEVİYE İPUCU:\n${LEVELS[currentLevel].hint}`);
+    });
+
+    // Sonraki Seviyeye Geç
+    btnNextLevel.addEventListener('click', () => {
+      if (currentLevel < 3) {
+        loadLevel(currentLevel + 1);
+      }
+    });
+
+    // --- 9. GÖREV KONTROLLERİ ---
+    function checkMissions() {
+      if (currentLevel === 1 && !mission1Done) {
+        mission1Done = true;
+        document.getElementById('m1Check').textContent = '✅';
+        document.getElementById('mission1').className = 'p-2.5 rounded-xl border-2 border-ink bg-emerald-100 flex items-start gap-2.5';
+      }
+      if (currentLevel === 2 && !mission2Done) {
+        mission2Done = true;
+        document.getElementById('m2Check').textContent = '✅';
+        document.getElementById('mission2').className = 'p-2.5 rounded-xl border-2 border-ink bg-emerald-100 flex items-start gap-2.5';
+      }
+      if (currentLevel === 3 && !mission3Done) {
+        mission3Done = true;
+        document.getElementById('m3Check').textContent = '✅';
+        document.getElementById('mission3').className = 'p-2.5 rounded-xl border-2 border-ink bg-emerald-100 flex items-start gap-2.5';
+      }
+    }
+
+    // --- 10. SERBEST TEST MASASI (SANDBOX MODU) ---
+    const tabMissions = document.getElementById('tabMissions');
+    const tabSandbox = document.getElementById('tabSandbox');
+
+    tabMissions.addEventListener('click', () => {
+      tabMissions.className = 'pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1';
+      tabSandbox.className = 'pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1';
+      loadLevel(1);
+    });
+
+    tabSandbox.addEventListener('click', () => {
+      tabSandbox.className = 'pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1';
+      tabMissions.className = 'pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1';
+      
+      // Sandbox'ta tüm malzemeleri listele
+      currentLevel = 2; // Çift yuva aç
+      levelBadge.textContent = 'SERBEST TEST MASASI';
+      levelTitle.textContent = 'İstediğin 2 Nesneyi Birleştir & Test Et!';
+      renderMaterials(MATERIALS.map(m => m.id));
+      resetCityLights();
+      Sound.click();
+    });
+
+    // Başlangıç Yüklemesi
+    window.addEventListener('DOMContentLoaded', () => {
+      loadLevel(1);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sihirli Mercek — Çocuklar İçin Işığın Kırılması Deneyi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <style>
+    :root {
+      --ink: #182b4d;
+      --paper: #fffdf7;
+      --panel: #f4efe2;
+      --line: #d8ceb8;
+      --sun: #ffc93c;
+      --grape: #7b5be6;
+      --sea: #2ba6c9;
+      --leaf: #3bb273;
+      --coral: #ff6b6b;
+      --sky: #38bdf8;
+    }
+
+    body {
+      font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #fffdf7;
+      color: #182b4d;
+      background-image: radial-gradient(#d8ceb8 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+    }
+
+    .display {
+      font-family: 'Baloo 2', 'Nunito', cursive, sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .chunky {
+      border: 3.5px solid var(--ink);
+      border-radius: 20px;
+      box-shadow: 0 6px 0 var(--ink);
+    }
+
+    .pushable {
+      border: 3px solid var(--ink);
+      border-radius: 14px;
+      box-shadow: 0 4px 0 var(--ink);
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .pushable:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 var(--ink);
+    }
+
+    .pushable:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 var(--ink);
+    }
+
+    /* Renk Yardımcı Sınıfları */
+    .bg-coral { background-color: #ff5252 !important; }
+    .bg-grape { background-color: #7b5be6 !important; }
+    .bg-sun { background-color: #ffc93c !important; }
+    .bg-panel { background-color: #f4efe2 !important; }
+    .bg-paper { background-color: #fffdf7 !important; }
+    .bg-sky { background-color: #0284c7 !important; }
+    .text-ink { color: #182b4d !important; }
+    .border-ink { border-color: #182b4d !important; }
+
+    /* Range slider custom */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+    }
+    input[type=range]:focus {
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 14px;
+      cursor: pointer;
+      background: #e4dcce;
+      border: 2px solid var(--ink);
+      border-radius: 9999px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      height: 28px;
+      width: 28px;
+      border-radius: 50%;
+      background: var(--sky);
+      border: 2.5px solid var(--ink);
+      cursor: pointer;
+      -webkit-appearance: none;
+      margin-top: -8px;
+      box-shadow: 0 2px 0 var(--ink);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-3 sm:p-6 select-none">
+
+  <!-- Üst Bar -->
+  <div class="max-w-6xl mx-auto w-full mb-4">
+    <header class="flex flex-wrap items-center justify-between gap-4 bg-white/90 backdrop-blur p-4 rounded-2xl chunky">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="pushable bg-sun px-3.5 py-2 flex items-center gap-1.5 text-ink font-bold text-sm" title="Ana Sayfaya Dön">
+          <span>🏠</span> <span>Tüm Deneyler</span>
+        </a>
+        <h1 class="display text-2xl sm:text-3xl flex items-center gap-2">
+          <span>🔮</span> Sihirli Mercek: Büyülü Bardak
+        </h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="px-3 py-1 bg-sky-100 text-sky-900 text-xs sm:text-sm font-bold rounded-full border-2 border-ink">
+          4-5. Sınıf Fen · Işığın Kırılması
+        </span>
+        <button id="soundToggle" class="pushable bg-panel px-3 py-1.5 text-xs font-bold flex items-center gap-1">
+          <span id="soundIcon">🔊</span> <span id="soundLabel">Ses Açık</span>
+        </button>
+      </div>
+    </header>
+  </div>
+
+  <!-- Ana Düzen: Optik Masası (Sol) + Kontrol Paneli (Sağ) -->
+  <main class="max-w-6xl mx-auto w-full flex-1 flex flex-col lg:flex-row items-stretch gap-6 mb-6">
+
+    <!-- Sol Sütun: Simülasyon Sahnesi -->
+    <section class="chunky relative flex-1 flex flex-col justify-between overflow-hidden bg-white min-h-[480px]">
+      
+      <!-- SVG Optik Masası -->
+      <div class="relative flex-1 flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+        
+        <svg id="opticsSvg" viewBox="0 0 680 560" class="w-full h-full max-h-[520px]"
+             role="img" aria-label="Işığın Kırılması Deneyi" font-family="'Baloo 2', 'Nunito', sans-serif"
+             stroke-linecap="round" stroke-linejoin="round">
+
+          <defs>
+            <!-- Bardağın iç kesit kırpma maskesi -->
+            <clipPath id="glassInterior">
+              <rect x="230" y="110" width="220" height="340" rx="20" />
+            </clipPath>
+
+            <!-- Sıvının alt kesit kırpma maskesi (Dinamik su seviyesi için) -->
+            <clipPath id="waterClip">
+              <rect id="waterClipRect" x="230" y="450" width="220" height="0" rx="10" />
+            </clipPath>
+
+            <!-- Kırılan görüntünün bardak içinde sınırlandırılması -->
+            <clipPath id="glassViewPort">
+              <rect x="236" y="114" width="208" height="332" rx="16" />
+            </clipPath>
+
+            <!-- Sıvı renk gradyanları -->
+            <linearGradient id="waterFluidGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#bae6fd" stop-opacity="0.65" />
+              <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.85" />
+            </linearGradient>
+
+            <linearGradient id="oilFluidGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#fef08a" stop-opacity="0.75" />
+              <stop offset="100%" stop-color="#eab308" stop-opacity="0.9" />
+            </linearGradient>
+          </defs>
+
+          <!-- Laboratuvar Deney Masası Zemin Çizimi -->
+          <rect x="20" y="20" width="640" height="520" rx="24" fill="#faf6ed" stroke="#182b4d" stroke-width="4.5" />
+          
+          <!-- Ahşap Masa Çizgisi -->
+          <line x1="40" y1="460" x2="640" y2="460" stroke="#d8ceb8" stroke-width="6" />
+
+          <!-- ================= 1. KATMAN: BARDAĞIN ARKASINDAKİ RESİM KARTI ================= -->
+          <!-- Bu kart bardağın tam arkasında (X: 340 merkezli) durur. -->
+          <g id="cardStand" transform="translate(340, 270)">
+            <!-- Kart Standı & Kağıdı -->
+            <rect id="paperCardBg" x="-140" y="-120" width="280" height="230" rx="16" fill="#ffffff" stroke="#182b4d" stroke-width="3.5" />
+            <rect x="-140" y="-120" width="280" height="24" rx="6" fill="#e2e8f0" stroke="#182b4d" stroke-width="2" />
+            <text x="0" y="-104" text-anchor="middle" font-size="12" font-weight="bold" fill="#64748b">DENEY KARTI (ASIL GÖRÜNTÜ)</text>
+            
+            <!-- Orijinal Nesne Grubu (Her zaman sağa bakar) -->
+            <g id="originalFigureGroup" transform="translate(0, 15)">
+              <!-- Dinamik JS ile kedi, ok veya balık çizilir -->
+            </g>
+          </g>
+
+          <!-- ================= 2. KATMAN: OPTİK IŞIK IŞINLARI (RAY TRACING) ================= -->
+          <g id="lightRaysGroup" opacity="0">
+            <!-- Sol Ok Başından Gelen Işın (Kırmızı) -->
+            <!-- Nesneden bardağa gelir (X: 200 -> 240, Y: 240), bardağın içinde kırılır, odak noktasında (X: 340, Y: 310) kesişir ve diğer tarafa geçer -->
+            <path id="rayTop" d="M160 250 L240 250 L340 310 L440 370 L540 370" fill="none" stroke="#ef4444" stroke-width="3" stroke-dasharray="6 4" />
+            <path id="rayBottom" d="M160 310 L240 310 L340 250 L440 190 L540 190" fill="none" stroke="#3b82f6" stroke-width="3" stroke-dasharray="6 4" />
+            
+            <!-- Odak Noktası Rozeti (F) -->
+            <circle id="focalPointDot" cx="340" cy="280" r="7" fill="#ffc93c" stroke="#182b4d" stroke-width="2.5" />
+            <text id="focalLabel" x="340" y="265" text-anchor="middle" font-size="12" font-weight="bold" fill="#182b4d">Odak Noktası (F)</text>
+          </g>
+
+          <!-- ================= 3. KATMAN: SU DOLU CAM BARDAK & KIRILAN GÖRÜNTÜ ================= -->
+          <!-- Bardak Gövdesi (X: 230 - 450, Y: 110 - 450) -->
+          <g id="glassContainer">
+            
+            <!-- Camın arka saydam gölgesi -->
+            <rect x="230" y="110" width="220" height="340" rx="22" fill="#ffffff" fill-opacity="0.3" />
+
+            <!-- BARDAK İÇİNDE GÖRÜNEN KIRILMIŞ (TERS) GÖRÜNTÜ (SU SEVİYESİNİN ALTINDA) -->
+            <g clip-path="url(#glassViewPort)">
+              <!-- Sıvı Dolum Alanı -->
+              <g clip-path="url(#waterClip)">
+                <!-- Sıvı Gövdesi (Mavi su veya sarı zeytinyağı) -->
+                <rect id="liquidBody" x="230" y="110" width="220" height="340" fill="url(#waterFluidGrad)" />
+                
+                <!-- Sıvının Dalgalı Yüzeyi (Menisküs çizgisi) -->
+                <ellipse id="waterSurfaceEllipse" cx="340" cy="450" rx="100" ry="10" fill="#bae6fd" stroke="#38bdf8" stroke-width="3" />
+                
+                <!-- İŞTE SİHİR: Su içindeki kırılmış nesne (Yatayda Ters Dönmüş ve Hafif Büyütülmüş) -->
+                <g id="refractedFigureSlot" transform="translate(340, 285) scale(-1.15, 1.15)">
+                  <!-- Dinamik olarak orijinal figürün aynadaki tersi çizilir -->
+                </g>
+              </g>
+            </g>
+
+            <!-- Cam Bardak Dış Konturu & Yansımaları -->
+            <rect x="230" y="110" width="220" height="340" rx="22" fill="none" stroke="#182b4d" stroke-width="6" />
+            
+            <!-- Cam Kalın Tabanı -->
+            <rect x="233" y="430" width="214" height="18" rx="8" fill="#e2e8f0" stroke="#182b4d" stroke-width="3" opacity="0.7" />
+
+            <!-- Cam Yansıma Işıltıları -->
+            <path d="M246 130 V420" stroke="#ffffff" stroke-width="8" stroke-linecap="round" opacity="0.65" />
+            <path d="M260 140 V380" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" opacity="0.45" />
+            <path d="M434 130 V420" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity="0.4" />
+
+            <!-- Bardak Ağzı Elipsi -->
+            <ellipse cx="340" cy="115" rx="105" ry="12" fill="none" stroke="#182b4d" stroke-width="5" />
+          </g>
+
+          <!-- ================= 4. KATMAN: SU DÖKEN SÜRAHİ (PITCHER) ================= -->
+          <g id="pitcherGroup" transform="translate(180, 50)" class="cursor-pointer" opacity="0.95" onclick="animatePouring()">
+            <!-- Sürahi Gövdesi -->
+            <path d="M-30 0 L-45 70 A15 15 0 0 0 -30 85 H20 A15 15 0 0 0 35 70 L20 0 Z" fill="#e0f2fe" stroke="#182b4d" stroke-width="4" />
+            <!-- Kulp -->
+            <path d="M-40 15 C-65 20 -65 60 -35 70" fill="none" stroke="#182b4d" stroke-width="6" stroke-linecap="round" />
+            <!-- Ağız Döşeme Çıkıntısı -->
+            <polygon points="20,0 45,5 20,20" fill="#38bdf8" stroke="#182b4d" stroke-width="3" />
+            <!-- İçindeki Su -->
+            <path d="M-35 30 L-40 70 A10 10 0 0 0 -30 80 H15 A10 10 0 0 0 25 70 L15 30 Z" fill="#38bdf8" opacity="0.7" />
+            <text x="-5" y="105" text-anchor="middle" font-size="11" font-weight="bold" fill="#182b4d">Tıkla & Dök!</text>
+          </g>
+
+          <!-- Dökülen Su Akıntısı Çizgisi (Animasyon sırasında görünür) -->
+          <path id="waterStream" d="M225 55 Q270 70 330 200" fill="none" stroke="#38bdf8" stroke-width="8" stroke-linecap="round" opacity="0" />
+
+        </svg>
+
+        <!-- Sol Alt: Konsept Açıklama Kartı -->
+        <div id="conceptCard" class="pointer-events-none absolute bottom-4 left-4 right-4 sm:right-auto sm:max-w-[21rem] opacity-0 transition-all duration-300">
+          <div class="chunky relative bg-amber-50 p-4 shadow-xl">
+            <span class="absolute -bottom-[14px] left-8 h-5 w-5 rotate-45 border-b-[3px] border-r-[3px] border-[#182b4d] bg-amber-50"></span>
+            <div class="flex items-center gap-2">
+              <span id="conceptEmoji" class="text-2xl leading-none">🔮</span>
+              <h3 id="conceptTitle" class="display text-xl font-bold">Nasıl Ters Döndü?</h3>
+            </div>
+            <p id="conceptBody" class="mt-1.5 text-[14px] leading-snug">
+              İçi su dolu yuvarlak bardak tıpkı bir büyüteç (mercek) gibi davranır. Işık ışınları odak noktasında çapraz geçiş yaptığı için görüntü tam tersine döner!
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Sahne Alt Bilgi Şeridi -->
+      <div class="border-t-[3.5px] border-dotted border-[#182b4d] bg-amber-50/50 px-5 py-3.5 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p id="liveActionText" class="display text-lg text-ink">
+            Bardağa su doldur ve arkasındaki figürün nasıl yön değiştirdiğini izle!
+          </p>
+          <p id="subActionText" class="text-xs font-bold text-gray-600">
+            Su seviyesi yükseldikçe kırılma başlar ve görüntü tersine döner.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btnQuickPour" class="pushable bg-sky text-white hover:bg-sky-500 px-3 py-1.5 text-xs font-bold flex items-center gap-1">
+            <span>💧</span> <span>Bardağı Doldur</span>
+          </button>
+          <button id="btnEmptyCup" class="pushable bg-white hover:bg-gray-100 px-3 py-1.5 text-xs font-bold flex items-center gap-1">
+            <span>↺</span> <span>Boşalt</span>
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Sağ Sütun: Kontrol Paneli ve Deney Seçenekleri -->
+    <aside class="chunky flex w-full lg:w-[23rem] flex-col gap-4 bg-amber-50/70 p-4 sm:p-5">
+      
+      <!-- Su Dökme Kaydırıcısı -->
+      <div class="flex flex-col gap-2 bg-white p-3.5 rounded-xl border-2 border-ink">
+        <div class="flex items-center justify-between">
+          <label for="waterLevelSlider" class="display text-base sm:text-lg">Su Seviyesi</label>
+          <span id="waterPercentLabel" class="display text-base px-2.5 py-0.5 rounded-lg border-2 border-ink bg-sky-100 text-sky-900">
+            %0 (Boş)
+          </span>
+        </div>
+        <input id="waterLevelSlider" type="range" min="0" max="100" value="0" step="1">
+        <div class="flex justify-between text-[10px] font-bold text-gray-500 px-1">
+          <span>Boş</span>
+          <span>Yarı Dolu</span>
+          <span>Tam Dolu</span>
+        </div>
+      </div>
+
+      <!-- Deney Figürü Seçimi -->
+      <div class="flex flex-col gap-2 bg-white p-3.5 rounded-xl border-2 border-ink">
+        <div class="flex items-center justify-between">
+          <h2 class="display text-base sm:text-lg">🎨 Karttaki Figür</h2>
+          <span class="text-[11px] px-2 py-0.5 bg-yellow-100 text-yellow-900 font-bold rounded-md border border-ink">
+            3 Figür
+          </span>
+        </div>
+        
+        <div class="grid grid-cols-3 gap-2">
+          <button class="fig-btn pushable p-2 bg-sun text-ink flex flex-col items-center justify-center gap-1 text-center" data-fig="cat">
+            <span class="text-2xl">🐱</span>
+            <span class="display text-xs">Kedi Mırmır</span>
+          </button>
+
+          <button class="fig-btn pushable p-2 bg-white hover:bg-gray-50 text-ink flex flex-col items-center justify-center gap-1 text-center" data-fig="arrow">
+            <span class="text-2xl">➡️</span>
+            <span class="display text-xs">Renkli Ok</span>
+          </button>
+
+          <button class="fig-btn pushable p-2 bg-white hover:bg-gray-50 text-ink flex flex-col items-center justify-center gap-1 text-center" data-fig="fish">
+            <span class="text-2xl">🐟</span>
+            <span class="display text-xs">Yüzen Balık</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sıvı Türü Seçimi -->
+      <div class="flex flex-col gap-2 bg-white p-3.5 rounded-xl border-2 border-ink">
+        <h2 class="display text-base">🧪 Bardaktaki Sıvı</h2>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="btnFluidWater" class="pushable p-2 bg-sky-200 text-sky-950 flex items-center gap-2 text-left">
+            <span class="text-xl">💧</span>
+            <div>
+              <span class="display block text-xs">Saf Su</span>
+              <span class="text-[9px] text-gray-600 block">n = 1,33</span>
+            </div>
+          </button>
+
+          <button id="btnFluidOil" class="pushable p-2 bg-white hover:bg-yellow-50 text-amber-950 flex items-center gap-2 text-left">
+            <span class="text-xl">🟡</span>
+            <div>
+              <span class="display block text-xs">Zeytinyağı</span>
+              <span class="text-[9px] text-gray-600 block">n = 1,47 (Güçlü)</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Optik Işınlar & Odak Anahtarı -->
+      <div class="flex items-center justify-between bg-white p-3 rounded-xl border-2 border-ink">
+        <div>
+          <span class="display block text-xs sm:text-sm">⚡ Işık Işınlarını Göster</span>
+          <span class="block text-[10px] text-gray-600">Işığın nasıl kırıldığını ve kesiştiğini gör</span>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input id="rayToggle" type="checkbox" class="sr-only peer">
+          <div class="w-10 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600 border-2 border-ink"></div>
+        </label>
+      </div>
+
+      <!-- Mesafe Kaydırıcısı (Odak Noktası Deneyi) -->
+      <div class="flex flex-col gap-1.5 bg-white p-3 rounded-xl border-2 border-ink">
+        <div class="flex justify-between items-center text-xs font-bold">
+          <span>Kart - Bardak Mesafesi:</span>
+          <span id="distLabel" class="text-purple-700 font-extrabold">Uzak (Odak Arkası)</span>
+        </div>
+        <input id="distSlider" type="range" min="1" max="2" value="2" step="1" class="w-full cursor-pointer accent-purple-600">
+        <div class="flex justify-between text-[10px] text-gray-500 font-bold">
+          <span>Çok Yakın (Büyür)</span>
+          <span>Uzak (Ters Döner)</span>
+        </div>
+      </div>
+
+      <!-- Tahmin Modu Anahtarı -->
+      <div class="flex items-center justify-between bg-white p-3 rounded-xl border-2 border-ink mt-auto">
+        <div>
+          <span class="display block text-xs sm:text-sm">🎯 Tahmin Oyunu Modu</span>
+          <span class="block text-[10px] text-gray-600">Dökmeden önce yönü bil!</span>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input id="quizToggle" type="checkbox" checked class="sr-only peer">
+          <div class="w-10 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 border-2 border-ink"></div>
+        </label>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Tahmin Modalı (Quiz) -->
+  <div id="quizModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-6 flex flex-col gap-4 shadow-2xl relative">
+      <div class="flex items-center gap-3">
+        <span id="quizFigEmoji" class="text-4xl">🐱</span>
+        <div>
+          <h3 id="quizTitle" class="display text-xl font-bold">Hangi Yöne Bakacak?</h3>
+          <p id="quizSubtitle" class="text-xs text-gray-600">Bardağa su doldurulduğunda suyun arkasındaki figür nereye döner?</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 my-2">
+        <button id="btnGuessRight" class="pushable bg-gray-50 hover:bg-yellow-100 border-2 border-ink py-4 px-3 flex flex-col items-center justify-center gap-1">
+          <span class="text-3xl">➡️</span>
+          <span class="display text-base text-ink">SAĞA Doğru</span>
+          <span class="text-[10px] text-gray-500">Değişmez</span>
+        </button>
+
+        <button id="btnGuessLeft" class="pushable bg-emerald-100 hover:bg-emerald-200 border-2 border-ink py-4 px-3 flex flex-col items-center justify-center gap-1">
+          <span class="text-3xl">⬅️</span>
+          <span class="display text-base text-emerald-900">SOLA Doğru!</span>
+          <span class="text-[10px] text-emerald-700 font-bold">Tersine Döner!</span>
+        </button>
+      </div>
+
+      <button id="btnSkipQuiz" class="text-xs font-bold text-gray-500 hover:text-ink text-center py-1">
+        Tahmin etmeden doğrudan suyu doldur ➔
+      </button>
+    </div>
+  </div>
+
+  <footer class="text-center text-xs text-gray-600 font-semibold py-2">
+    Küçük Mucitler Bilim Laboratuvarı · İlkokul Seviyesi İnteraktif Fen Simülasyonu
+  </footer>
+
+  <!-- GSAP & Optik Mantığı -->
+  <script>
+    // --- Web Audio API Sentetik Sesler ---
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function getAudioCtx() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      return audioCtx;
+    }
+
+    function playTone(freq, type, duration, vol = 0.1) {
+      if (!soundEnabled) return;
+      try {
+        const ctx = getAudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(vol, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function playWaterPour() {
+      for (let i = 0; i < 8; i++) {
+        setTimeout(() => playTone(300 + Math.random() * 250, 'sine', 0.08, 0.08), i * 60);
+      }
+    }
+
+    function playFlipMagicChime() {
+      playTone(659.25, 'triangle', 0.15, 0.15); // E5
+      setTimeout(() => playTone(880, 'sine', 0.25, 0.18), 100); // A5
+      setTimeout(() => playTone(1174.66, 'sine', 0.35, 0.2), 220); // D6
+    }
+
+    function playWinChime() {
+      playTone(523.25, 'sine', 0.15, 0.15);
+      setTimeout(() => playTone(659.25, 'sine', 0.15, 0.15), 100);
+      setTimeout(() => playTone(783.99, 'sine', 0.2, 0.18), 200);
+      setTimeout(() => playTone(1046.50, 'sine', 0.35, 0.2), 300);
+    }
+
+    // Ses Aç/Kapat
+    const soundToggle = document.getElementById('soundToggle');
+    soundToggle.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+      document.getElementById('soundLabel').textContent = soundEnabled ? 'Ses Açık' : 'Sessiz';
+    });
+
+    // --- Figür SVG Veritabanı ---
+    const FIGURES = {
+      cat: {
+        id: 'cat',
+        name: 'Kedi Mırmır',
+        emoji: '🐱',
+        // Sağa bakan kedi çizimi
+        svg: `
+          <g>
+            <!-- Gövde -->
+            <ellipse cx="0" cy="15" rx="42" ry="26" fill="#f97316" stroke="#182b4d" stroke-width="3.5" />
+            <!-- Kafa -->
+            <circle cx="32" cy="-6" r="22" fill="#fb923c" stroke="#182b4d" stroke-width="3.5" />
+            <!-- Kulaklar -->
+            <polygon points="22,-24 30,-40 38,-24" fill="#f97316" stroke="#182b4d" stroke-width="3" />
+            <polygon points="34,-24 44,-38 48,-20" fill="#f97316" stroke="#182b4d" stroke-width="3" />
+            <!-- Gözler -->
+            <circle cx="38" cy="-8" r="3.5" fill="#182b4d" />
+            <circle cx="46" cy="-8" r="3.5" fill="#182b4d" />
+            <circle cx="40" cy="-9" r="1.2" fill="#ffffff" />
+            <circle cx="48" cy="-9" r="1.2" fill="#ffffff" />
+            <!-- Burun & Bıyıklar -->
+            <polygon points="44,-2 41,2 47,2" fill="#ec4899" />
+            <line x1="47" y1="1" x2="62" y2="-2" stroke="#182b4d" stroke-width="2" />
+            <line x1="47" y1="4" x2="60" y2="7" stroke="#182b4d" stroke-width="2" />
+            <!-- Bacaklar -->
+            <rect x="-24" y="28" width="12" height="26" rx="6" fill="#f97316" stroke="#182b4d" stroke-width="3" />
+            <rect x="14" y="28" width="12" height="26" rx="6" fill="#f97316" stroke="#182b4d" stroke-width="3" />
+            <!-- Kuyruk -->
+            <path d="M-40 10 C-60 -10 -65 15 -50 25" fill="none" stroke="#f97316" stroke-width="7" stroke-linecap="round" />
+            <path d="M-40 10 C-60 -10 -65 15 -50 25" fill="none" stroke="#182b4d" stroke-width="2.5" stroke-linecap="round" />
+          </g>
+        `,
+        quote: 'Miyav! Suyun arkasında bir anda sola yürümeye başladım!'
+      },
+      arrow: {
+        id: 'arrow',
+        name: 'Renkli Ok',
+        emoji: '➡️',
+        svg: `
+          <g>
+            <rect x="-55" y="-14" width="70" height="28" rx="6" fill="#ef4444" stroke="#182b4d" stroke-width="3.5" />
+            <polygon points="15,-34 60,0 15,34" fill="#ef4444" stroke="#182b4d" stroke-width="3.5" stroke-linejoin="round" />
+            <!-- Ok İçi Çizgi Deseni -->
+            <line x1="-35" y1="-8" x2="-35" y2="8" stroke="#ffffff" stroke-width="4" stroke-linecap="round" />
+            <line x1="-15" y1="-8" x2="-15" y2="8" stroke="#ffffff" stroke-width="4" stroke-linecap="round" />
+            <line x1="5" y1="-8" x2="5" y2="8" stroke="#ffffff" stroke-width="4" stroke-linecap="round" />
+          </g>
+        `,
+        quote: 'Sağa bakan kırmızı ok, bardağın arkasında sola bakan oka dönüştü!'
+      },
+      fish: {
+        id: 'fish',
+        name: 'Yüzen Balık',
+        emoji: '🐟',
+        svg: `
+          <g>
+            <!-- Balık Gövdesi -->
+            <ellipse cx="0" cy="0" rx="46" ry="28" fill="#3b82f6" stroke="#182b4d" stroke-width="3.5" />
+            <!-- Kuyruk Yüzgeci -->
+            <polygon points="-40,0 -65,-22 -55,0 -65,22" fill="#2563eb" stroke="#182b4d" stroke-width="3" stroke-linejoin="round" />
+            <!-- Sırt Yüzgeci -->
+            <path d="M-15 -27 Q0 -42 20 -25 Z" fill="#60a5fa" stroke="#182b4d" stroke-width="2.5" />
+            <!-- Sevimli Göz -->
+            <circle cx="28" cy="-6" r="6.5" fill="#ffffff" stroke="#182b4d" stroke-width="2" />
+            <circle cx="30" cy="-6" r="3" fill="#182b4d" />
+            <circle cx="31" cy="-7" r="1.2" fill="#ffffff" />
+            <!-- Solungaç Çizgisi -->
+            <path d="M12 -14 Q6 0 12 14" fill="none" stroke="#1d4ed8" stroke-width="3" stroke-linecap="round" />
+            <!-- Ağız -->
+            <path d="M44 2 Q40 6 45 10" fill="none" stroke="#182b4d" stroke-width="2.5" />
+          </g>
+        `,
+        quote: 'Şıp şıp! Sağa yüzüyordum, mercek beni sola doğru yüzdürdü!'
+      }
+    };
+
+    // --- State ---
+    let currentFigure = FIGURES.cat;
+    let waterLevel = 0; // 0 - 100
+    let currentFluid = 'water'; // 'water' | 'oil'
+    let isFarDistance = true; // true: Odak arkası (ters döner), false: Odak önü (büyür)
+    let showRays = false;
+    let hasFlippedBefore = false;
+
+    // DOM Elemanları
+    const waterLevelSlider = document.getElementById('waterLevelSlider');
+    const waterPercentLabel = document.getElementById('waterPercentLabel');
+    const waterClipRect = document.getElementById('waterClipRect');
+    const waterSurfaceEllipse = document.getElementById('waterSurfaceEllipse');
+    const liquidBody = document.getElementById('liquidBody');
+    const originalFigureGroup = document.getElementById('originalFigureGroup');
+    const refractedFigureSlot = document.getElementById('refractedFigureSlot');
+    const lightRaysGroup = document.getElementById('lightRaysGroup');
+    const rayToggle = document.getElementById('rayToggle');
+    const distSlider = document.getElementById('distSlider');
+    const distLabel = document.getElementById('distLabel');
+    const paperCardBg = document.getElementById('paperCardBg');
+    const liveActionText = document.getElementById('liveActionText');
+    const subActionText = document.getElementById('subActionText');
+    const conceptCard = document.getElementById('conceptCard');
+    const conceptTitle = document.getElementById('conceptTitle');
+    const conceptBody = document.getElementById('conceptBody');
+    const quizToggle = document.getElementById('quizToggle');
+    const quizModal = document.getElementById('quizModal');
+    const waterStream = document.getElementById('waterStream');
+
+    // Başlangıçta figürü yükle
+    function loadFigure(fig) {
+      currentFigure = fig;
+      originalFigureGroup.innerHTML = fig.svg;
+      refractedFigureSlot.innerHTML = fig.svg;
+
+      document.querySelectorAll('.fig-btn').forEach(btn => {
+        const isSelected = btn.getAttribute('data-fig') === fig.id;
+        btn.className = `fig-btn pushable p-2 ${isSelected ? 'bg-sun' : 'bg-white hover:bg-gray-50'} text-ink flex flex-col items-center justify-center gap-1 text-center`;
+      });
+    }
+
+    // --- Su Seviyesi Güncellemesi ---
+    function setWaterLevel(val) {
+      waterLevel = val;
+      waterLevelSlider.value = val;
+      waterPercentLabel.textContent = `%${val} ${val === 0 ? '(Boş)' : val === 100 ? '(Tam Dolu)' : ''}`;
+
+      // SVG Bardak Y koordinatları: Taban=450, Tavan=110, Yükseklik=340
+      const totalHeight = 340;
+      const currentHeight = (val / 100) * totalHeight;
+      const currentTopY = 450 - currentHeight;
+
+      waterClipRect.setAttribute('y', currentTopY);
+      waterClipRect.setAttribute('height', currentHeight);
+      waterSurfaceEllipse.setAttribute('cy', currentTopY);
+
+      // Kırılma durumu: Su seviyesi %40'ı aştığında ve uzak mesafedeyken görüntü döner!
+      if (val >= 40 && isFarDistance) {
+        if (!hasFlippedBefore && val >= 50) {
+          playFlipMagicChime();
+          hasFlippedBefore = true;
+        }
+        refractedFigureSlot.setAttribute('transform', 'translate(340, 285) scale(-1.18, 1.18)');
+        liveActionText.textContent = `🔮 SİHİR GERÇEKLEŞTİ! ${currentFigure.name} SOLA DÖNDÜ!`;
+        subActionText.textContent = 'Silindirik su bardağı ışığı kırarak görüntüyü yatayda ters çevirdi.';
+        showConcept(
+          'Işığın Kırılması!',
+          `${currentFigure.name}, odak noktasının arkasında kaldığı için su bardağının içinden bakıldığında tam ters yöne bakar!`,
+          '🔮'
+        );
+      } else if (val >= 40 && !isFarDistance) {
+        // Yakın mesafe: Odak noktasının önünde olduğu için DÜZ KALIR ama BÜYÜR (Büyüteç etkisi)
+        refractedFigureSlot.setAttribute('transform', 'translate(340, 285) scale(1.35, 1.35)');
+        liveActionText.textContent = `🔍 BÜYÜTEÇ ETKİSİ: ${currentFigure.name} düz kaldı ama büyüdü!`;
+        subActionText.textContent = 'Kart bardağa çok yakınken odak noktasını geçmediği için ters dönmez.';
+      } else {
+        hasFlippedBefore = false;
+        liveActionText.textContent = 'Bardağa su doldur ve arkasındaki figürün nasıl yön değiştirdiğini izle!';
+        subActionText.textContent = 'Su seviyesi yükseldikçe kırılma başlar ve görüntü tersine döner.';
+      }
+    }
+
+    waterLevelSlider.addEventListener('input', (e) => {
+      setWaterLevel(parseInt(e.target.value, 10));
+    });
+
+    // Hızlı Doldur / Boşalt
+    document.getElementById('btnQuickPour').addEventListener('click', () => {
+      if (quizToggle.checked && waterLevel < 10) {
+        openQuizModal();
+      } else {
+        animatePouring();
+      }
+    });
+
+    document.getElementById('btnEmptyCup').addEventListener('click', () => {
+      gsap.to(waterLevelSlider, {
+        value: 0,
+        duration: 0.5,
+        onUpdate: () => setWaterLevel(Math.round(waterLevelSlider.value))
+      });
+    });
+
+    // Sürahi Dökme Animasyonu
+    function animatePouring() {
+      playWaterPour();
+      gsap.timeline()
+        .to('#pitcherGroup', { rotation: -35, transformOrigin: "20px 20px", duration: 0.3, ease: "power1.out" })
+        .to(waterStream, { opacity: 0.9, duration: 0.15 }, 0.2)
+        .to(waterLevelSlider, {
+          value: 100,
+          duration: 1.2,
+          ease: "power1.inOut",
+          onUpdate: () => setWaterLevel(Math.round(waterLevelSlider.value))
+        }, 0.3)
+        .to(waterStream, { opacity: 0, duration: 0.2 }, 1.4)
+        .to('#pitcherGroup', { rotation: 0, duration: 0.4, ease: "back.out(1.5)" }, 1.5);
+    }
+
+    window.animatePouring = animatePouring;
+
+    // --- Figür Butonları ---
+    document.querySelectorAll('.fig-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-fig');
+        loadFigure(FIGURES[id]);
+      });
+    });
+
+    // --- Sıvı Türü Seçimi ---
+    const btnFluidWater = document.getElementById('btnFluidWater');
+    const btnFluidOil = document.getElementById('btnFluidOil');
+
+    btnFluidWater.addEventListener('click', () => {
+      currentFluid = 'water';
+      liquidBody.setAttribute('fill', 'url(#waterFluidGrad)');
+      btnFluidWater.className = 'pushable p-2 bg-sky-200 text-sky-950 flex items-center gap-2 text-left';
+      btnFluidOil.className = 'pushable p-2 bg-white hover:bg-yellow-50 text-amber-950 flex items-center gap-2 text-left';
+      setWaterLevel(waterLevel);
+    });
+
+    btnFluidOil.addEventListener('click', () => {
+      currentFluid = 'oil';
+      liquidBody.setAttribute('fill', 'url(#oilFluidGrad)');
+      btnFluidOil.className = 'pushable p-2 bg-yellow-200 text-amber-950 flex items-center gap-2 text-left';
+      btnFluidWater.className = 'pushable p-2 bg-white hover:bg-sky-50 text-sky-950 flex items-center gap-2 text-left';
+      setWaterLevel(waterLevel);
+      showConcept(
+        'Zeytinyağında Daha Güçlü Kırılma!',
+        'Zeytinyağının yoğunluğu ve kırıcılık indisi sudan farklıdır. Işığı daha çok büker!',
+        '🟡'
+      );
+    });
+
+    // --- Optik Işınlar Anahtarı ---
+    rayToggle.addEventListener('change', (e) => {
+      showRays = e.target.checked;
+      gsap.to(lightRaysGroup, { opacity: showRays ? 1 : 0, duration: 0.3 });
+      if (showRays) {
+        showConcept(
+          'Işığın Çapraz Kesişimi (X)',
+          'Işınlar bardaktan çıkarken ortada X şeklinde kesişir. Sol ışın sağa, sağ ışın sola geçer; bu yüzden görüntü ters döner!',
+          '⚡'
+        );
+      }
+    });
+
+    // --- Mesafe Ayarı ---
+    distSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      if (val === 1) {
+        // Çok yakın
+        isFarDistance = false;
+        distLabel.textContent = 'Çok Yakın (Büyüteç)';
+        distLabel.className = 'text-amber-700 font-extrabold';
+        gsap.to('#cardStand', { scale: 1.15, y: 255, duration: 0.3, transformOrigin: "center center" });
+      } else {
+        // Uzak
+        isFarDistance = true;
+        distLabel.textContent = 'Uzak (Odak Arkası)';
+        distLabel.className = 'text-purple-700 font-extrabold';
+        gsap.to('#cardStand', { scale: 1.0, y: 270, duration: 0.3, transformOrigin: "center center" });
+      }
+      setWaterLevel(waterLevel);
+    });
+
+    // --- Tahmin Oyunu (Quiz) ---
+    function openQuizModal() {
+      document.getElementById('quizFigEmoji').textContent = currentFigure.emoji;
+      document.getElementById('quizTitle').textContent = `${currentFigure.name} Hangi Yöne Bakacak?`;
+      document.getElementById('quizSubtitle').textContent = `Bardağın arkasında sağa bakan ${currentFigure.name}, bardağa su dolunca sence ne tarafa döner?`;
+      quizModal.classList.remove('hidden');
+    }
+
+    document.getElementById('btnGuessRight').addEventListener('click', () => {
+      evaluateQuiz(false);
+    });
+
+    document.getElementById('btnGuessLeft').addEventListener('click', () => {
+      evaluateQuiz(true);
+    });
+
+    document.getElementById('btnSkipQuiz').addEventListener('click', () => {
+      quizModal.classList.add('hidden');
+      animatePouring();
+    });
+
+    function evaluateQuiz(guessedLeft) {
+      quizModal.classList.add('hidden');
+      
+      if (guessedLeft) {
+        if (window.confetti) {
+          confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+        }
+        playWinChime();
+        showConcept(
+          '🎉 Tebrikler! Harika Bir Tahmin!',
+          `İşte bilimin büyüsü! Bardağa su dolunca ${currentFigure.name} SOLA dönecek! Şimdi izleyelim.`,
+          '🏆'
+        );
+      } else {
+        showConcept(
+          '🤔 Bilim Dolu Bir Sürpriz Seni Bekliyor!',
+          `Çoğu insan yönün değişmeyeceğini düşünür ama ışık bizi çok şaşırtır! Şimdi izle ve gör.`,
+          '🔬'
+        );
+      }
+
+      animatePouring();
+    }
+
+    // --- Kavram Kartı Gösterimi ---
+    let conceptTimer = null;
+    function showConcept(title, body, emoji = '💡') {
+      if (conceptTimer) clearTimeout(conceptTimer);
+      conceptTitle.textContent = title;
+      conceptBody.textContent = body;
+      conceptEmoji.textContent = emoji;
+
+      if (window.gsap) {
+        gsap.to(conceptCard, { opacity: 1, y: 0, duration: 0.4, ease: "back.out(1.7)" });
+      } else {
+        conceptCard.style.opacity = '1';
+      }
+
+      conceptTimer = setTimeout(() => {
+        if (window.gsap) {
+          gsap.to(conceptCard, { opacity: 0, y: 12, duration: 0.5, ease: "power2.in" });
+        } else {
+          conceptCard.style.opacity = '0';
+        }
+      }, 5500);
+    }
+
+    // Başlangıç
+    window.addEventListener('DOMContentLoaded', () => {
+      loadFigure(FIGURES.cat);
+      setWaterLevel(0);
+    });
+  </script>
+</body>
+</html>

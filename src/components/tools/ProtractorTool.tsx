@@ -20,19 +20,24 @@ export function ProtractorTool({ onClose }: ProtractorToolProps) {
     });
 
     return (
-        <motion.div
-            drag
-            dragControls={dragControls}
-            dragListener={false}
-            dragMomentum={false}
-            dragElastic={0}
-            className="fixed z-[11500] pointer-events-auto select-none"
-            style={{ top: 250, left: 200, touchAction: 'none' }}
-        >
-            <div
-                onPointerDown={(e) => dragControls.start(e)}
-                className="cursor-grab active:cursor-grabbing relative"
+        <div className="fixed inset-0 z-[11500] pointer-events-none flex items-center justify-center p-4 overflow-hidden">
+            <motion.div
+                drag
+                dragControls={dragControls}
+                dragListener={false}
+                dragMomentum={false}
+                dragElastic={0}
+                className="pointer-events-auto select-none"
+                style={{ touchAction: 'none' }}
             >
+                <div
+                    onPointerDown={(e) => {
+                        if ((e.target as HTMLElement).closest('button')) return;
+                        e.preventDefault();
+                        dragControls.start(e);
+                    }}
+                    className="cursor-grab active:cursor-grabbing relative"
+                >
                 <svg
                     width={r * 2 + 20}
                     height={r + 30}
@@ -122,5 +127,6 @@ export function ProtractorTool({ onClose }: ProtractorToolProps) {
                 </button>
             </div>
         </motion.div>
+        </div>
     );
 }
