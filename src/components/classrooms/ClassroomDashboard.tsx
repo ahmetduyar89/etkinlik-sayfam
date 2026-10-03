@@ -1,3 +1,4 @@
+import { QrLoginHelpButton } from '../common/QrLogin';
 // src/components/classrooms/ClassroomDashboard.tsx — Sınıf Odaklı Çalışma Alanı
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -211,6 +212,7 @@ export function ClassroomDashboard({
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {!isAdminPreview && <QrLoginHelpButton />}
                         {isAdminPreview ? (
                             <button
                                 type="button"

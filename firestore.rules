@@ -122,6 +122,10 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // QR secrets and approvals are accessible only to the server.
+    match /qrLoginRequests/{requestId} { allow read, write: if false; }
+    match /qrLoginRateLimits/{rateId} { allow read, write: if false; }
+
     match /{document=**} { allow read, write: if false; }
   }
 }

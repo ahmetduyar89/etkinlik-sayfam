@@ -23,7 +23,7 @@ export type AuthSession =
 /** Kayıtlı oturum bilgisini döner */
 export function getSession(): AuthSession | null {
     try {
-        const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+        const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY) || window.localStorage.getItem(SESSION_STORAGE_KEY);
         if (raw) {
             const parsed = JSON.parse(raw);
             if (parsed && (parsed.role === 'admin' || parsed.role === 'class')) {
@@ -64,10 +64,12 @@ export function isClassSession(): boolean {
 }
 
 /** Oturumu kaydet */
-export function saveSession(session: AuthSession): void {
+export function saveSession(session: AuthSession, persistence?: 'tab' | 'local'): void {
     try {
-        window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-        if (session.role === 'admin') {
+        const tab = persistence === 'tab' || (persistence !== 'local' && Boolean(window.sessionStorage.getItem(SESSION_STORAGE_KEY)));
+        (tab ? window.localStorage : window.sessionStorage).removeItem(SESSION_STORAGE_KEY);
+        (tab ? window.sessionStorage : window.localStorage).setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+        if (session.role === 'admin' && !tab) {
             window.localStorage.setItem(AUTH_STORAGE_KEY, APP_PASSWORD);
         } else {
             window.localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -82,11 +84,17 @@ export function saveAuth(): void {
     saveSession({ role: 'admin', username: APP_ADMIN_USER });
 }
 
+/** Kayıtlı uygulama oturumunu temizler. Firebase çıkışı ayrıca yapılır. */
+export function clearSession(): void {
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
 /** Çıkış yap: tüm oturumu temizle ve giriş ekranına dön */
 export function lockApp(): void {
     try {
-        window.localStorage.removeItem(SESSION_STORAGE_KEY);
-        window.localStorage.removeItem(AUTH_STORAGE_KEY);
+        clearSession();
     } catch {
         // Yoksay
     }

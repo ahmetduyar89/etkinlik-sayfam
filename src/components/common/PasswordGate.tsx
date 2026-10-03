@@ -5,7 +5,7 @@
 // atanmış etkinlikleri, deneyleri ve satrancı içeren sınıf panosu açılır.
 // ─────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
-import { onAuthStateChanged, signInWithEmailAndPassword } from 'firebase/auth';
+import { browserLocalPersistence, onAuthStateChanged, setPersistence, signInWithEmailAndPassword } from 'firebase/auth';
 import { Lock, Eye, EyeOff, School, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import {
@@ -20,7 +20,9 @@ import {
     saveSession,
 } from '../../utils/auth';
 import { auth } from '../../lib/firebase';
-import { bootstrapTeacherRole, signInClass } from '../../lib/firebase';
+import { bootstrapTeacherRole, fetchDocById, signInClass } from '../../lib/firebase';
+import { readQrScan } from '../../lib/qrLogin';
+import { QrLoginApproval, QrLoginDisplay } from './QrLogin';
 
 interface PasswordGateProps {
     children: React.ReactNode;
@@ -31,7 +33,13 @@ type LoginTab = 'admin' | 'class';
 export function PasswordGate({ children }: PasswordGateProps) {
     const secureAdminEnabled = Boolean(FIREBASE_ADMIN_EMAIL);
     const [isUnlocked, setIsUnlocked] = useState(() => secureAdminEnabled ? false : isAuthenticated());
-    const [authReady, setAuthReady] = useState(() => !secureAdminEnabled);
+    const [authReady, setAuthReady] = useState(false);
+    const [qrScan, setQrScan] = useState(readQrScan);
+    useEffect(() => {
+        const sync = () => setQrScan(readQrScan());
+        window.addEventListener('hashchange', sync);
+        return () => window.removeEventListener('hashchange', sync);
+    }, []);
     const [tab, setTab] = useState<LoginTab>('admin');
 
     // Admin form fields
@@ -49,51 +57,48 @@ export function PasswordGate({ children }: PasswordGateProps) {
     useEffect(() => {
         const onStorage = (e: StorageEvent) => {
             if (e.key === AUTH_STORAGE_KEY || e.key === SESSION_STORAGE_KEY) {
-                setIsUnlocked(isAuthenticated());
+                window.location.reload();
             }
         };
         window.addEventListener('storage', onStorage);
         return () => window.removeEventListener('storage', onStorage);
     }, []);
 
-    // Firebase yönetici girişi etkinse yalnızca doğrulanmış Firebase oturumu
-    // admin panelini açabilir. Yerel oturum kaydı tek başına yeterli değildir.
+    // Firebase is the authority for both teacher and class identities.
     useEffect(() => {
-        if (!secureAdminEnabled) return;
-        return onAuthStateChanged(auth, async (user) => {
+        let revision = 0;
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            const current = ++revision;
+            const finish = (unlocked: boolean) => {
+                if (revision === current) { setIsUnlocked(unlocked); setAuthReady(true); }
+            };
             if (!user) {
-                setIsUnlocked(false);
-                setAuthReady(true);
+                finish(!secureAdminEnabled && getSession()?.role === 'admin');
                 return;
             }
-            const token = await user.getIdTokenResult().catch(() => null);
-            const role = token?.claims.role;
-            if (role === 'teacher') {
-                saveSession({ role: 'admin', username: user.email || 'admin' });
-                setIsUnlocked(true);
-            } else if (user.email === FIREBASE_ADMIN_EMAIL) {
-                // Eski veya yeni açılmış öğretmen oturumunda özel rol henüz token'a
-                // yansımamış olabilir. Paneli açmadan önce rolü kurup token'ı yenile;
-                // aksi halde Firestore dinleyicileri eski yetkiyle başlayıp kalıcı
-                // "insufficient permissions" hatası gösterebilir.
-                try {
-                    await bootstrapTeacherRole();
+            try {
+                const token = await user.getIdTokenResult();
+                const role = token.claims.role;
+                if (role === 'teacher' || (secureAdminEnabled && user.email === FIREBASE_ADMIN_EMAIL)) {
+                    if (role !== 'teacher') await bootstrapTeacherRole();
+                    if (revision !== current) return;
                     saveSession({ role: 'admin', username: user.email || 'admin' });
-                    setIsUnlocked(true);
-                } catch (error) {
-                    console.error('Öğretmen rolü hazırlanamadı:', error);
-                    setIsUnlocked(false);
+                    finish(true);
+                } else if (role === 'class' && typeof token.claims.classId === 'string') {
+                    const classRoom = await fetchDocById<{ name: string; username: string }>('classes', token.claims.classId);
+                    if (revision !== current) return;
+                    if (!classRoom) { finish(false); return; }
+                    saveSession({ role: 'class', classId: token.claims.classId,
+                        className: classRoom.name, username: classRoom.username });
+                    finish(true);
+                } else {
+                    finish(false);
                 }
-            } else if (role === 'class' && typeof token?.claims.classId === 'string') {
-                // Sınıf adı giriş anında yerel oturuma yazılır. Token yalnızca
-                // rol ve classId bilgisini doğrular; asla admin oturumu üretmez.
-                const session = getSession();
-                setIsUnlocked(session?.role === 'class' && session.classId === token.claims.classId);
-            } else {
-                setIsUnlocked(false);
+            } catch {
+                finish(false);
             }
-            setAuthReady(true);
         });
+        return () => { revision += 1; unsubscribe(); };
     }, [secureAdminEnabled]);
 
     const handleAdminSubmit = useCallback(
@@ -109,9 +114,10 @@ export function PasswordGate({ children }: PasswordGateProps) {
                 }
                 setIsLoading(true);
                 try {
+                    await setPersistence(auth, browserLocalPersistence);
                     const credential = await signInWithEmailAndPassword(auth, FIREBASE_ADMIN_EMAIL, trimmed);
                     await bootstrapTeacherRole();
-                    saveSession({ role: 'admin', username: credential.user.email || 'admin' });
+                    saveSession({ role: 'admin', username: credential.user.email || 'admin' }, 'local');
                     setIsUnlocked(true);
                 } catch {
                     setError('Yönetici şifresi hatalı veya oturum açılamadı.');
@@ -146,13 +152,14 @@ export function PasswordGate({ children }: PasswordGateProps) {
 
             setIsLoading(true);
             try {
+                await setPersistence(auth, browserLocalPersistence);
                 const matched = await signInClass(u, p);
                 saveSession({
                     role: 'class',
                     classId: matched.classId,
                     className: matched.className,
                     username: matched.username,
-                });
+                }, 'local');
                 setIsUnlocked(true);
             } catch (err: unknown) {
                 console.error('Giriş doğrulama hatası:', err);
@@ -172,6 +179,7 @@ export function PasswordGate({ children }: PasswordGateProps) {
         );
     }
 
+    if (isUnlocked && qrScan) return <QrLoginApproval scan={qrScan} />;
     if (isUnlocked || isStudentLink() || isChessLink()) return <>{children}</>;
 
     return (
@@ -192,6 +200,8 @@ export function PasswordGate({ children }: PasswordGateProps) {
                 <p className="text-[13px] text-slate-500 mb-6 text-center">
                     Eğitim & Etkinlik Atölyesi
                 </p>
+
+                {qrScan && <p className="mb-4 rounded-xl bg-indigo-50 p-3 text-sm text-indigo-700">Tahtadaki girişi onaylamak için önce telefonunda kullanmak istediğin hesaba giriş yap.</p>}
 
                 {/* Sekme Değiştirici */}
                 <div className="w-full grid grid-cols-2 p-1 bg-slate-100/80 rounded-xl mb-5 text-[13px] font-semibold text-slate-600">
@@ -355,6 +365,8 @@ export function PasswordGate({ children }: PasswordGateProps) {
                         </button>
                     </form>
                 )}
+
+                {!qrScan && <QrLoginDisplay />}
 
                 <div className="mt-6 pt-5 border-t border-slate-100 w-full text-center">
                     <p className="text-[11.5px] text-slate-400">

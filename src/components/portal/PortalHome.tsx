@@ -1,3 +1,4 @@
+import { QrLoginHelpButton } from '../common/QrLogin';
 // src/components/portal/PortalHome.tsx — ATÖLYE ANA SAYFASI
 // ─────────────────────────────────────────────────────────────────────
 // Aydınlık, eğitsel bir kapak: kareli defter dokusu üzerinde yumuşak renk
@@ -51,6 +52,7 @@ export function PortalHome({ onOpenInternal }: PortalHomeProps) {
                         </span>
                         <div className="flex-1" />
 
+                        <QrLoginHelpButton />
                         <InstallAppButton />
                         <button
                             type="button"

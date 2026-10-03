@@ -1,7 +1,7 @@
 const { randomBytes, scryptSync, timingSafeEqual } = require('node:crypto');
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
-const { FieldValue, getFirestore } = require('firebase-admin/firestore');
+const { FieldValue, Timestamp, getFirestore } = require('firebase-admin/firestore');
 const { defineString } = require('firebase-functions/params');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { onDocumentUpdated } = require('firebase-functions/v2/firestore');
@@ -265,4 +265,27 @@ exports.archiveLiveChessGame = onDocumentUpdated({
     });
   }
   await batch.commit();
+});
+
+// QR approval never exposes credentials through Firestore or QR URLs.
+const { createQrHandlers } = require('./qr-login');
+const qrHandlers = createQrHandlers({ db, auth: getAuth(), HttpsError, Timestamp,
+  teacherEmail: () => teacherEmail.value() });
+for (const [name, handler] of Object.entries(qrHandlers)) {
+  exports[name] = onCall(callableOptions, handler);
+}
+
+// Remove expired requests and anonymous rate-limit records daily.
+const { onSchedule } = require('firebase-functions/v2/scheduler');
+exports.cleanupQrLogins = onSchedule({ schedule: 'every 24 hours', region: 'europe-west1' }, async () => {
+  for (const name of ['qrLoginRequests', 'qrLoginRateLimits']) {
+    for (let page = 0; page < 20; page += 1) {
+      const expired = await db.collection(name).where('expiresAt', '<=', Timestamp.now()).limit(500).get();
+      if (expired.empty) break;
+      const batch = db.batch();
+      expired.docs.forEach((item) => batch.delete(item.ref));
+      await batch.commit();
+      if (expired.size < 500) break;
+    }
+  }
 });
