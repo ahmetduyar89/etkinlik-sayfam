@@ -16,10 +16,10 @@
 //       Defterlerim → 'notebooks'). Kabuk gerisini halleder.
 // ─────────────────────────────────────────────────────────────────────
 import type { LucideIcon } from 'lucide-react';
-import { BookOpen, Bot, Coins, Crown, Dna, FlaskConical, Globe, LayoutGrid, Music, NotebookPen, Orbit, Puzzle, School, Shapes, Swords } from 'lucide-react';
+import { BookOpen, Bot, Coins, Crown, Dna, FlaskConical, FolderOpen, Globe, LayoutGrid, Music, NotebookPen, Orbit, Puzzle, School, Shapes, Swords } from 'lucide-react';
 import type { MainView } from '../types';
 
-export type ModuleKind = 'internal' | 'static';
+export type ModuleKind = 'internal' | 'static' | 'folder';
 export type ModuleStatus = 'ready' | 'soon';
 
 export interface PortalModule {
@@ -73,7 +73,7 @@ export const PORTAL_MODULES: PortalModule[] = [
     },
     {
         id: 'etkinlikler',
-        title: 'Etkinlikler',
+        title: 'Etkinliklerim',
         description:
             'İçerik merkezi: sınıf ve üniteye göre etkinlikler, testler, simülasyonlar ve QR ile öğrenci paylaşımı.',
         meta: 'Ünite rafı · Ders modu',
@@ -297,6 +297,57 @@ export const PORTAL_MODULES: PortalModule[] = [
         href: '/finans-pazar/',
         status: 'ready',
     },
+];
+
+/** Ana sayfa klasörleri; uygulamaların mevcut adresleri ve sınıf atamaları korunur. */
+export interface PortalFolder extends PortalModule {
+    kind: 'folder';
+    moduleIds: string[];
+}
+
+export const PORTAL_FOLDERS: PortalFolder[] = [
+    {
+        id: 'satranc-merkezi',
+        title: 'Satranç',
+        description: 'Taşları öğrenin, bulmacaları çözün ve arkadaşlarınızla canlı maç yapın. Tüm satranç çalışmalarınız burada.',
+        meta: 'Satranç eğitimi · Canlı maç',
+        icon: Crown,
+        accent: {
+            icon: 'from-amber-400 to-orange-500',
+            strip: 'from-amber-300 via-orange-300 to-yellow-200',
+            glow: 'rgba(245, 158, 11, 0.28)',
+        },
+        kind: 'folder',
+        href: '/satranc-merkezi',
+        status: 'ready',
+        moduleIds: ['satranc', 'canli-satranc'],
+    },
+    {
+        id: 'kesif-alani',
+        title: 'Keşif Alanı',
+        description: 'Deneyler, bilim, akıl oyunları, kodlama, sanat ve daha fazlası. Merak ettiğiniz bir çalışmayı seçip keşfetmeye başlayın.',
+        icon: FolderOpen,
+        accent: {
+            icon: 'from-emerald-400 to-teal-500',
+            strip: 'from-emerald-300 via-teal-300 to-cyan-200',
+            glow: 'rgba(16, 185, 129, 0.28)',
+        },
+        kind: 'folder',
+        href: '/kesif-alani',
+        status: 'ready',
+        moduleIds: PORTAL_MODULES.filter((mod) => mod.kind === 'static' && !['satranc', 'canli-satranc'].includes(mod.id)).map((mod) => mod.id),
+    },
+];
+
+export function findFolder(id: string): PortalFolder | undefined {
+    return PORTAL_FOLDERS.find((folder) => folder.id === id);
+}
+
+/** Ana sayfadaki dört giriş; sınıf yönetimi üst menüden açılır. */
+export const PORTAL_HOME_ENTRIES: PortalModule[] = [
+    PORTAL_FOLDERS[0],
+    ...['defterlerim', 'etkinlikler'].flatMap((id) => PORTAL_MODULES.filter((mod) => mod.id === id)),
+    PORTAL_FOLDERS[1],
 ];
 
 /** Kayıtlı bir bölümü kimliğinden bul. */

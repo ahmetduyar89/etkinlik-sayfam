@@ -15,7 +15,7 @@ import { ChessArena } from './components/chess/ChessArena';
 import { PortalHome } from './components/portal/PortalHome';
 import { ClassroomDashboard } from './components/classrooms/ClassroomDashboard';
 import { ClassAdminDashboard } from './components/classrooms/ClassAdminDashboard';
-import { findModule, findModuleByView } from './constants/portal';
+import { findFolder, findModule, findModuleByView } from './constants/portal';
 import { goToSection, sectionFromLocation, type Section } from './lib/navigation';
 import { isChessLink, isStudentLink, getSession } from './utils/auth';
 import type { MainView, ClassRoom } from './types';
@@ -79,9 +79,12 @@ export default function AppShell() {
         );
     }
 
-    if (section === 'portal') {
+    const folder = findFolder(section);
+    if (section === 'portal' || folder) {
         return (
             <PortalHome
+                key={section}
+                folder={folder}
                 onOpenInternal={goToSection}
             />
         );
