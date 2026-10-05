@@ -12,15 +12,21 @@ service cloud.firestore {
       return role() == 'student' && request.auth.token.studentId == studentId;
     }
     function isOwnLiveSeat(seat) {
-      return role() == 'student' && seat != null &&
+      return role() in ['student', 'chessGuest'] && seat != null &&
         seat.studentId == request.auth.token.studentId &&
         seat.classId == request.auth.token.classId;
     }
     function isLiveParticipant(data) {
       return isOwnLiveSeat(data.white) || isOwnLiveSeat(data.black);
     }
+    function isLiveJoin(before, after) {
+      return before.status == 'bekliyor' &&
+        after.diff(before).affectedKeys().hasOnly(['white', 'black', 'updated_at']) &&
+        ((before.white == null && isOwnLiveSeat(after.white) && after.black == before.black) ||
+         (before.black == null && isOwnLiveSeat(after.black) && after.white == before.white));
+    }
     function belongsToOwnClass(data) {
-      return signedIn() && data.classId == request.auth.token.classId;
+      return role() in ['teacher', 'class', 'student'] && data.classId == request.auth.token.classId;
     }
 
     match /teachers/{teacherId} {
@@ -54,7 +60,7 @@ service cloud.firestore {
       allow write: if isTeacher();
     }
     match /folders/{document=**} {
-      allow read: if signedIn();
+      allow read: if role() in ['teacher', 'class', 'student'];
       allow write: if isTeacher();
     }
     match /notebooks/{document=**} {
@@ -69,7 +75,7 @@ service cloud.firestore {
       allow read, write: if isTeacher() || role() == 'class';
     }
     match /submissions/{submissionId} {
-      allow create: if signedIn();
+      allow create: if role() in ['teacher', 'class', 'student'];
       allow read, update, delete: if isTeacher();
     }
 
@@ -102,15 +108,16 @@ service cloud.firestore {
 
     // Canlı satranç yalnız doğrulanmış oturumlara açıktır.
     match /chess_rooms/{roomId} {
-      allow read: if signedIn() && role() in ['teacher', 'class', 'student'];
+      allow read: if signedIn() && role() in ['teacher', 'class', 'student', 'chessGuest'];
       allow create: if isTeacher() || isLiveParticipant(request.resource.data);
       allow update: if isTeacher() ||
-        isLiveParticipant(resource.data) || isLiveParticipant(request.resource.data);
+        isLiveParticipant(resource.data) || isLiveJoin(resource.data, request.resource.data);
       allow delete: if isTeacher() || isLiveParticipant(resource.data);
     }
     match /liveChessPresence/{studentId} {
-      allow read: if signedIn() && role() in ['teacher', 'student'];
-      allow create, update, delete: if isTeacher() || isStudent(studentId);
+      allow read: if signedIn() && role() in ['teacher', 'student', 'chessGuest'];
+      allow create, update, delete: if isTeacher() || isStudent(studentId) ||
+        (role() == 'chessGuest' && request.auth.token.studentId == studentId);
     }
     match /liveChessQueue/{studentId} {
       allow read: if isTeacher() || isStudent(studentId);

@@ -9,6 +9,7 @@
     "build:check": "tsc && node scripts/export-dna-lesson.mjs && vite build && node scripts/copy-apps.mjs",
     "export:dna": "node scripts/export-dna-lesson.mjs",
     "type-check": "tsc --noEmit",
+    "test:live-chess": "node --test scripts/test-live-chess.mjs",
     "functions:check": "npm --prefix functions run check",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"

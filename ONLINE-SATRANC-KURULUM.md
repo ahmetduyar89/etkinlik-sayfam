@@ -18,6 +18,7 @@ belgesindeki yayın sırasını izleyin.
 | `saveClass` | Sınıfı, öğrenci numaralarını ve özetlenmiş parolayı kaydeder |
 | `deleteClass` | Sınıfın özel giriş ve öğrenci dizin kayıtlarını temizler |
 | `loginClass` | Sınıf parolasını sunucuda doğrular ve sınıf tokenı üretir |
+| `loginChessGuest` | Ad soyadla yalnız canlı satranç erişimi olan misafir tokenı üretir |
 | `loginStudent` | Öğrenci numarasını sunucuda doğrular ve öğrenci tokenı üretir |
 | `archiveLiveChessGame` | Biten canlı oyunu öğrenci ve sınıf raporlarına kaydeder |
 
@@ -48,6 +49,10 @@ firebase deploy --only firestore:rules
 - Sınıf hesabı yalnız kendi sınıf çalışma alanını açıyor.
 - Satranç dersi doğru sınıf listesiyle açılıyor.
 - Sınıf maçları ve turnuvaları Satranç Yönetimi ekranına geliyor.
-- Canlı satranç öğrenci numarası istiyor.
-- Biten canlı oyun ilgili sınıfın maç sayısına ekleniyor.
+- `?view=satranc` bağlantısı ad soyadla giriş açıyor; öğrenci numarası istemiyor.
+- Solda oyun istekleri ve yeni oyun formu, sağda başlayan canlı oyunlar görünüyor.
+- İki oyuncu katıldıktan sonra biri “Oyunu başlat” dediğinde oyun ve saat başlıyor.
+- Süre, ek süre, renk, görünürlük ve beraberlik teklifi seçimi oyuna uygulanıyor.
+- Misafir oturumları sınıf kayıtlarına ve öğrenci listelerine erişemiyor.
+- Kayıtlı öğrencilerin biten oyunları ilgili sınıf raporuna ekleniyor; misafirler için sınıf raporu oluşturulmuyor.
 - Firestore istemciden `classCredentials` ve `studentLookup` okumayı reddediyor.

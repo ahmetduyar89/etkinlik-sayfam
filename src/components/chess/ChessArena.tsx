@@ -4,8 +4,8 @@
 //         …/?view=satranc&oda=1234   → doğrudan o masa
 //
 // Bu sayfa ŞİFRE İSTEMEZ (bkz. utils/auth.ts). Çocuğa gönderilen bağlantı
-// tek dokunuşla açılsın diye giriş yerine tek soru vardır: "Adın ne?".
-// Ad tarayıcıda saklanır; ikinci girişte doğrudan salona düşülür.
+// tek dokunuşla açılsın diye giriş yerine tek soru vardır: "Adın soyadın ne?".
+// Oturum tarayıcıda saklanır; ikinci girişte doğrudan salona düşülür.
 //
 // Üç ekran vardır: ad sorma · salon · masa (çevrimiçi ya da bilgisayara karşı).
 // ─────────────────────────────────────────────────────────────────────
@@ -16,10 +16,12 @@ import { ChessTable } from './ChessTable';
 import { ChessBotTable } from './ChessBotTable';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { auth, db, signInStudent } from '../../lib/firebase';
+import { auth, db, signInChessGuest } from '../../lib/firebase';
 import {
     clearStudentSession,
     playerId,
+    normalizeName,
+    isValidName,
     readStudentSession,
     saveStudentSession,
     type ChessStudentSession,
@@ -61,7 +63,7 @@ export function ChessArena() {
             return;
         }
         const token = user ? await user.getIdTokenResult().catch(() => null) : null;
-        const valid = token?.claims.role === 'student' &&
+        const valid = (token?.claims.role === 'student' || token?.claims.role === 'chessGuest') &&
             token.claims.studentId === student.studentId &&
             token.claims.classId === student.classId;
         if (!valid) {
@@ -72,7 +74,7 @@ export function ChessArena() {
     }), [student]);
 
     // Öğretmen paneli ve salon çevrimiçi öğrencileri görebilsin diye kısa bir
-    // yaşam sinyali bırakılır. Öğrenci numarası hiçbir zaman bu belgeye yazılmaz.
+    // yaşam sinyali bırakılır. Ad soyad hiçbir zaman bu belgeye yazılmaz.
     useEffect(() => {
         if (!student) return;
         const ref = doc(db, 'liveChessPresence', student.studentId);
@@ -99,12 +101,12 @@ export function ChessArena() {
     }, []);
 
     if (!identityReady) {
-        return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" aria-label="Öğrenci oturumu kontrol ediliyor" /></div>;
+        return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" aria-label="Oyuncu oturumu kontrol ediliyor" /></div>;
     }
 
     if (!student) {
         return (
-            <StudentNumberGate
+            <PlayerNameGate
                 onAuthenticated={(session) => {
                     saveStudentSession(session);
                     setStudent(session);
@@ -152,27 +154,27 @@ export function ChessArena() {
 }
 
 /** Tek soruluk giriş: ad soyad. */
-function StudentNumberGate({
+function PlayerNameGate({
     onAuthenticated,
     roomCode,
 }: {
     onAuthenticated: (session: ChessStudentSession) => void;
     roomCode: string | null;
 }) {
-    const [schoolNumber, setSchoolNumber] = useState('');
+    const [fullName, setFullName] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const ready = /^\d+$/.test(schoolNumber);
+    const ready = isValidName(fullName);
 
     const submit = async () => {
         if (!ready || loading) return;
         setLoading(true);
         setError(null);
         try {
-            const result = await signInStudent(schoolNumber);
-            onAuthenticated({ ...result, schoolNumber });
+            const result = await signInChessGuest(normalizeName(fullName));
+            onAuthenticated(result);
         } catch {
-            setError('Öğrenci numarası bulunamadı. Öğretmeninizden listenizi kontrol etmesini isteyin.');
+            setError('Giriş yapılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.');
         } finally {
             setLoading(false);
         }
@@ -196,24 +198,24 @@ function StudentNumberGate({
                 </h1>
                 <p className="mt-1 text-[13px] text-on-surface-variant">
                     {roomCode
-                        ? `${roomCode} numaralı masaya katılıyorsun. Öğrenci numaranla kimliğini doğrula.`
-                        : 'Öğrenci numaranla giriş yap; çevrimiçi arkadaşlarınla güvenli biçimde oyna.'}
+                        ? `${roomCode} numaralı masaya katılıyorsun. Adını ve soyadını yazarak giriş yap.`
+                        : 'Adını ve soyadını yaz; oyun oluştur ya da arkadaşlarının oyununa katıl.'}
                 </p>
 
-                <label htmlFor="chess-number" className="sr-only">
-                    Öğrenci numarası
+                <label htmlFor="chess-name" className="sr-only">
+                    Ad soyad
                 </label>
                 <input
-                    id="chess-number"
-                    value={schoolNumber}
+                    id="chess-name"
+                    value={fullName}
                     onChange={(e) => {
-                        setSchoolNumber(e.target.value.replace(/\D/g, '').slice(0, 20));
+                        setFullName(e.target.value.slice(0, 80));
                         setError(null);
                     }}
                     autoFocus
-                    autoComplete="off"
-                    inputMode="numeric"
-                    placeholder="Öğrenci numarası"
+                    autoComplete="name"
+                    maxLength={80}
+                    placeholder="Ad soyad"
                     className="mt-5 w-full rounded-2xl border-[1.5px] border-transparent bg-surface-container-high px-4 py-3 text-center text-[15px] font-semibold text-on-surface outline-none transition focus:border-primary focus:bg-surface"
                 />
 
@@ -223,12 +225,12 @@ function StudentNumberGate({
                     className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-[14px] font-semibold text-on-primary shadow-[0_4px_12px_rgba(99,102,241,0.28)] transition hover:brightness-105 disabled:opacity-45 disabled:shadow-none"
                 >
                     <LogIn className="h-4 w-4" aria-hidden="true" />
-                    {loading ? 'Kontrol ediliyor…' : 'Oyuna gir'}
+                    {loading ? 'Kontrol ediliyor…' : 'Giriş yap'}
                 </button>
 
                 {error && <p className="mt-3 text-[12px] font-semibold text-red-600" role="alert">{error}</p>}
                 <p className="mt-4 text-[11px] leading-snug text-on-surface-variant">
-                    Adın ve sınıfın okul sistemindeki kayıtla eşleştirilir; öğrenci listesi dışarıya açılmaz.
+                    Ad soyadın oyunlarda diğer oyunculara görünür.
                 </p>
             </form>
         </div>

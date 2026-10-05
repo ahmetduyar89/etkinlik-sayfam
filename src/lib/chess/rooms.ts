@@ -45,7 +45,7 @@ export interface Seat {
     name: string;
     /** Doğrulanmış öğrencinin sınıfı; sonuç doğru sınıf raporuna bağlanır. */
     classId: string;
-    /** Oyuncu "Hazırım" dedi mi? İki taraf da hazır olunca oyun başlar. */
+    /** Oyun başladığında işaretlenir; eski oda kayıtlarıyla uyumludur. */
     ready: boolean;
     /** Son yaşam sinyali (ms). Sekmesi kapananlar listeden böyle düşer. */
     seen: number;
@@ -75,6 +75,7 @@ export interface ChessRoom {
     code: string;
     kind: RoomKind;
     status: RoomStatus;
+    allow_draw: boolean;
     white: Seat | null;
     black: Seat | null;
     /** Oynanmış hamleler (UCI). Oyunun kaynak doğruluğu budur. */
@@ -167,6 +168,7 @@ function emptyRoom(code: string, kind: RoomKind, clock: RoomClock | null): Omit<
         code,
         kind,
         status: 'bekliyor',
+        allow_draw: true,
         white: null,
         black: null,
         moves: [],
@@ -181,8 +183,9 @@ function emptyRoom(code: string, kind: RoomKind, clock: RoomClock | null): Omit<
     };
 }
 
-function newClock(timeControl: TimeControlId): RoomClock | null {
-    const tc = findTimeControl(timeControl);
+function newClock(timeControl: TimeControlId, minutes?: number, increment?: number): RoomClock | null {
+    const preset = findTimeControl(timeControl);
+    const tc = minutes === undefined ? preset : { initial_ms: minutes * 60_000, increment_ms: (increment ?? 0) * 1_000 };
     if (tc.initial_ms === 0) return null;
     return {
         initial_ms: tc.initial_ms,
@@ -206,6 +209,7 @@ function toRoom(id: string, data: Record<string, unknown>): ChessRoom {
         code: raw.code ?? id,
         kind: raw.kind ?? 'acik',
         status: raw.status ?? 'bekliyor',
+        allow_draw: raw.allow_draw ?? true,
         white: raw.white ?? null,
         black: raw.black ?? null,
         moves: Array.isArray(raw.moves) ? raw.moves : [],
@@ -260,9 +264,15 @@ export async function createRoom(options: {
     classId: string;
     kind: RoomKind;
     timeControl: TimeControlId;
+    minutes?: number;
+    increment?: number;
+    allowDraw?: boolean;
     /** Kuran oyuncunun rengi; 'rastgele' ise para atılır. */
     color: PieceColor | 'rastgele';
 }): Promise<ChessRoom> {
+    if (options.minutes !== undefined && (!Number.isInteger(options.minutes) || options.minutes < 0 || options.minutes > 180 || !Number.isInteger(options.increment ?? 0) || (options.increment ?? 0) < 0 || (options.increment ?? 0) > 60)) {
+        throw new RoomError('Süre 0–180 dakika, ek süre 0–60 saniye olmalıdır.');
+    }
     const color: PieceColor =
         options.color === 'rastgele' ? (Math.random() < 0.5 ? 'w' : 'b') : options.color;
 
@@ -277,8 +287,8 @@ export async function createRoom(options: {
                 if (isFresh(existing)) return null;
             }
             const seat: Seat = { id: options.id, studentId: options.studentId, name: options.name, classId: options.classId, ready: false, seen: Date.now() };
-            const base = emptyRoom(code, options.kind, newClock(options.timeControl));
-            const payload = { ...base, [color === 'w' ? 'white' : 'black']: seat };
+            const base = emptyRoom(code, options.kind, newClock(options.timeControl, options.minutes, options.increment));
+            const payload = { ...base, allow_draw: options.allowDraw ?? true, [color === 'w' ? 'white' : 'black']: seat };
             tx.set(ref, payload);
             return { id: code, ...payload } as ChessRoom;
         });
@@ -299,6 +309,7 @@ export async function joinRoom(code: string, id: string, studentId: string, name
             const seat: Seat = { ...seatOf(current, mine)!, name, seen: Date.now() };
             return mine === 'w' ? { white: seat } : { black: seat };
         }
+        if (current.status !== 'bekliyor') return null;
         const seat: Seat = { id, studentId, name, classId, ready: false, seen: Date.now() };
         if (!current.white) return { white: seat };
         if (!current.black) return { black: seat };
@@ -362,33 +373,24 @@ export function watchOpenRooms(
  * Masadaki eylemler
  * ------------------------------------------------------------------ */
 
-/** "Hazırım" düğmesi. İki taraf da hazır olduğunda oyun başlar. */
-export async function setReady(code: string, id: string, ready: boolean): Promise<void> {
-    await editRoom(code, (room) => {
-        const color = seatColor(room, id);
-        if (!color || room.status === 'oynaniyor') return null;
-        const seat: Seat = { ...seatOf(room, color)!, ready, seen: Date.now() };
-        const patch: Partial<ChessRoom> = color === 'w' ? { white: seat } : { black: seat };
-        const other = color === 'w' ? room.black : room.white;
-        if (ready && other?.ready) {
-            patch.status = 'oynaniyor';
-            patch.result = null;
-            patch.moves = [];
-            patch.fen = DEFAULT_FEN;
-            patch.last_move = null;
-            patch.draw_offer = null;
-            patch.rematch = { w: false, b: false };
-            if (room.clock) {
-                patch.clock = {
-                    ...room.clock,
-                    w_ms: room.clock.initial_ms,
-                    b_ms: room.clock.initial_ms,
-                    since: Date.now(),
-                };
-            }
-        }
-        return patch;
+/** İki koltuk doluyken bir oyuncu başlatır; saat bu işlemle çalışır. */
+export async function startGame(code: string, id: string): Promise<void> {
+    const started = await editRoom(code, (room) => {
+        if (!seatColor(room, id) || room.status !== 'bekliyor' || !room.white || !room.black) return null;
+        return {
+            status: 'oynaniyor',
+            moves: [],
+            fen: DEFAULT_FEN,
+            last_move: null,
+            result: null,
+            draw_offer: null,
+            rematch: { w: false, b: false },
+            white: { ...room.white, ready: true },
+            black: { ...room.black, ready: true },
+            clock: room.clock ? { ...room.clock, w_ms: room.clock.initial_ms, b_ms: room.clock.initial_ms, since: Date.now() } : null,
+        };
     });
+    if (!started) throw new RoomError('Oyunu başlatmak için iki oyuncunun da masaya katılması gerekir.');
 }
 
 /**
@@ -481,7 +483,7 @@ export async function flagTimeout(code: string, loser: PieceColor): Promise<void
 export async function offerDraw(code: string, id: string, offering: boolean): Promise<void> {
     await editRoom(code, (room) => {
         const color = seatColor(room, id);
-        if (!color || room.status !== 'oynaniyor') return null;
+        if (!color || room.status !== 'oynaniyor' || !room.allow_draw) return null;
         if (!offering) return room.draw_offer === color ? { draw_offer: null } : null;
         return { draw_offer: color };
     });
@@ -492,7 +494,7 @@ export async function answerDraw(code: string, id: string, accept: boolean): Pro
     await editRoom(code, (room) => {
         const color = seatColor(room, id);
         if (!color || room.status !== 'oynaniyor') return null;
-        if (!room.draw_offer || room.draw_offer === color) return null;
+        if (!room.allow_draw || !room.draw_offer || room.draw_offer === color) return null;
         if (!accept) return { draw_offer: null };
         return {
             status: 'bitti',

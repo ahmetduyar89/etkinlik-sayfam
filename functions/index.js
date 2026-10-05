@@ -217,6 +217,18 @@ exports.loginStudent = onCall(callableOptions, async (request) => {
   };
 });
 
+// Paylaşılan satranç bağlantısı için yalnız satranç erişimi olan misafir oturumu.
+exports.loginChessGuest = onCall(callableOptions, async (request) => {
+  const studentName = cleanText(request.data?.name, 80);
+  if (!/^[\p{L}][\p{L}\p{M}'’.-]*(?: [\p{L}][\p{L}\p{M}'’.-]*)+$/u.test(studentName)) {
+    throw new HttpsError('invalid-argument', 'Adınızı ve soyadınızı yazın.');
+  }
+  const studentId = `chess_${randomBytes(16).toString('hex')}`;
+  const classId = 'live-guests';
+  const token = await getAuth().createCustomToken(studentId, { role: 'chessGuest', studentId, classId });
+  return { token, studentId, studentName, classId };
+});
+
 // Canlı oyun ilk kez bittiğinde değişmez bir sonuç kaydı üretir. İki oyuncu
 // farklı sınıftaysa sonuç her iki sınıfın öğretmen raporuna da bağlanır.
 exports.archiveLiveChessGame = onDocumentUpdated({
@@ -249,7 +261,7 @@ exports.archiveLiveChessGame = onDocumentUpdated({
 
   const batch = db.batch();
   batch.set(db.collection('liveChessGames').doc(roomId), game);
-  const classIds = [...new Set([after.white.classId, after.black.classId].filter(Boolean))];
+  const classIds = [...new Set([after.white.classId, after.black.classId].filter((id) => id && id !== 'live-guests'))];
   for (const classId of classIds) {
     batch.set(db.collection('chess_matches').doc(`${roomId}--${classId}`), {
       id: roomId,

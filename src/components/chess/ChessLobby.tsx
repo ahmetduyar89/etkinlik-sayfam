@@ -2,7 +2,7 @@
 // ─────────────────────────────────────────────────────────────────────
 // Adını yazan oyuncu buraya düşer. Üç yol vardır:
 //   1) Açık masalardan birine dokunup oturmak
-//   2) Yeni masa kurup kodu/bağlantıyı arkadaşına göndermek
+//   2) Yeni oyun oluşturup kodu/bağlantıyı arkadaşına göndermek
 //   3) Rakip yoksa bilgisayara karşı oynamak
 //
 // Masa listesi canlıdır: biri masa kurduğunda liste kendiliğinden büyür,
@@ -17,7 +17,6 @@ import type { PieceColor } from '../../lib/chess/engine/Chess';
 import {
     TIME_CONTROLS,
     createRoom,
-    hasFreeSeat,
     pruneStaleRooms,
     readRoom,
     watchOpenRooms,
@@ -51,6 +50,9 @@ export function ChessLobby({
     const [joinCode, setJoinCode] = useState('');
     const [busy, setBusy] = useState(false);
     const [timeControl, setTimeControl] = useState<TimeControlId>('artisli10');
+    const [minutes, setMinutes] = useState(10);
+    const [increment, setIncrement] = useState(5);
+    const [allowDraw, setAllowDraw] = useState(true);
     const [kind, setKind] = useState<RoomKind>('acik');
     const [color, setColor] = useState<PieceColor | 'rastgele'>('rastgele');
     const toast = useToast();
@@ -95,6 +97,9 @@ export function ChessLobby({
                 classId,
                 kind,
                 timeControl,
+                minutes,
+                increment,
+                allowDraw,
                 color,
             });
             onOpenRoom(room.code);
@@ -103,7 +108,7 @@ export function ChessLobby({
         } finally {
             setBusy(false);
         }
-    }, [playerId, studentId, playerName, classId, kind, timeControl, color, onOpenRoom, toast]);
+    }, [playerId, studentId, playerName, classId, kind, timeControl, minutes, increment, allowDraw, color, onOpenRoom, toast]);
 
     const handleJoinByCode = useCallback(async () => {
         const code = joinCode.replace(/\D/g, '').slice(0, 4);
@@ -119,16 +124,18 @@ export function ChessLobby({
                 return;
             }
             onOpenRoom(code);
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Oyuna ulaşılamadı.');
         } finally {
             setBusy(false);
         }
     }, [joinCode, onOpenRoom, toast]);
 
-    const waiting = (rooms ?? []).filter((r) => hasFreeSeat(r));
-    const running = (rooms ?? []).filter((r) => !hasFreeSeat(r));
+    const waiting = (rooms ?? []).filter((r) => r.status === 'bekliyor');
+    const running = (rooms ?? []).filter((r) => r.status === 'oynaniyor');
 
     return (
-        <div className="mx-auto w-full max-w-5xl px-4 py-6">
+        <div className="mx-auto w-full max-w-6xl px-4 py-6">
             <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-on-surface">
@@ -144,16 +151,16 @@ export function ChessLobby({
                     onClick={onChangeName}
                     className="rounded-xl border border-outline-variant bg-surface px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:text-on-surface"
                 >
-                    Öğrenci değiştir
+                    Oyuncu değiştir
                 </button>
             </header>
 
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="grid gap-5 lg:grid-cols-2">
                 {/* ── Açık masalar ── */}
                 <section>
                     <div className="mb-2.5 flex items-center gap-2">
                         <Users className="h-4 w-4 text-primary" aria-hidden="true" />
-                        <h2 className="text-sm font-bold text-on-surface">Oyuna hazır masalar</h2>
+                        <h2 className="text-sm font-bold text-on-surface">Oyun istekleri</h2>
                         {rooms !== null && (
                             <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] font-bold text-on-surface-variant">
                                 {waiting.length}
@@ -171,7 +178,7 @@ export function ChessLobby({
                             <p className="text-sm font-semibold text-on-surface">
                                 {offline
                                     ? 'Masalara şu an ulaşılamıyor.'
-                                    : 'Şu an bekleyen masa yok.'}
+                                    : 'Henüz oyun isteği yok.'}
                             </p>
                             <p className="mt-1 text-xs text-on-surface-variant">
                                 {offline
@@ -180,34 +187,17 @@ export function ChessLobby({
                             </p>
                         </div>
                     ) : (
-                        <ul className="grid gap-2 sm:grid-cols-2">
+                        <ul className="grid gap-2">
                             {waiting.map((room) => (
                                 <RoomCard key={room.id} room={room} onOpen={onOpenRoom} />
                             ))}
                         </ul>
                     )}
 
-                    {running.length > 0 && (
-                        <>
-                            <h2 className="mb-2.5 mt-6 text-sm font-bold text-on-surface">
-                                Süren maçlar
-                                <span className="ml-2 text-xs font-medium text-on-surface-variant">
-                                    izleyebilirsin
-                                </span>
-                            </h2>
-                            <ul className="grid gap-2 sm:grid-cols-2">
-                                {running.map((room) => (
-                                    <RoomCard key={room.id} room={room} onOpen={onOpenRoom} watching />
-                                ))}
-                            </ul>
-                        </>
-                    )}
-                </section>
-
                 {/* ── Masa kur / koda katıl / bilgisayar ── */}
-                <aside className="flex flex-col gap-3">
+                <div className="mt-5 flex flex-col gap-3">
                     <div className="rounded-2xl border border-outline-variant bg-surface p-4">
-                        <h2 className="text-sm font-bold text-on-surface">Yeni masa kur</h2>
+                        <h2 className="text-sm font-bold text-on-surface">Yeni oyun oluştur</h2>
 
                         <p className="mb-1.5 mt-3 text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">
                             Süre
@@ -217,10 +207,10 @@ export function ChessLobby({
                                 <button
                                     key={tc.id}
                                     type="button"
-                                    onClick={() => setTimeControl(tc.id)}
+                                    onClick={() => { setTimeControl(tc.id); setMinutes(tc.initial_ms / 60_000); setIncrement(tc.increment_ms / 1_000); }}
                                     className={cn(
                                         'rounded-xl px-2 py-2 text-[11px] font-bold transition',
-                                        timeControl === tc.id
+                                        minutes * 60_000 === tc.initial_ms && (minutes === 0 || increment * 1_000 === tc.increment_ms)
                                             ? 'bg-primary text-on-primary'
                                             : 'bg-surface-container-high text-on-surface-variant hover:text-on-surface'
                                     )}
@@ -229,6 +219,19 @@ export function ChessLobby({
                                 </button>
                             ))}
                         </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-3">
+                            <label className="text-xs text-on-surface-variant">Süre (dakika, 0 = süresiz)
+                                <input type="number" min={0} max={180} step={1} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className="mt-1 w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-on-surface" />
+                            </label>
+                            <label className="text-xs text-on-surface-variant">Hamle başına ek saniye
+                                <input type="number" min={0} max={60} step={1} value={increment} disabled={minutes === 0} onChange={(e) => setIncrement(Number(e.target.value))} className="mt-1 w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-on-surface disabled:opacity-50" />
+                            </label>
+                        </div>
+                        <p className="mt-3 text-xs leading-relaxed text-on-surface-variant">Standart satranç kuralları uygulanır: şah, mat, pat, rok, geçerken alma ve piyon terfisi.</p>
+                        <label className="mt-3 flex items-center gap-2 text-xs text-on-surface-variant">
+                            <input type="checkbox" checked={allowDraw} onChange={(e) => setAllowDraw(e.target.checked)} className="h-4 w-4 rounded border-outline text-primary" /> Beraberlik teklifine izin ver
+                        </label>
 
                         <p className="mb-1.5 mt-3 text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">
                             Rengin
@@ -270,11 +273,11 @@ export function ChessLobby({
                         <button
                             type="button"
                             onClick={handleCreate}
-                            disabled={busy}
+                            disabled={busy || offline || !Number.isInteger(minutes) || minutes < 0 || minutes > 180 || !Number.isInteger(increment) || increment < 0 || increment > 60}
                             className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-on-primary transition hover:brightness-105 disabled:opacity-60"
                         >
                             <Plus className="h-4 w-4" aria-hidden="true" />
-                            Masayı kur
+                            Oyun isteği oluştur
                         </button>
                     </div>
 
@@ -297,6 +300,7 @@ export function ChessLobby({
                             <button
                                 type="button"
                                 onClick={handleJoinByCode}
+                                aria-label="Kodla oyuna katıl"
                                 disabled={busy}
                                 className="flex items-center justify-center rounded-xl bg-secondary px-4 text-sm font-bold text-on-secondary transition hover:brightness-105 disabled:opacity-60"
                             >
@@ -313,6 +317,21 @@ export function ChessLobby({
                         <Bot className="h-4 w-4" aria-hidden="true" />
                         Bilgisayara karşı oyna
                     </button>
+                </div>
+                </section>
+
+                <aside>
+                    <h2 className="mb-2.5 text-sm font-bold text-on-surface">Canlı oyunlar <span className="ml-2 text-xs text-on-surface-variant">{running.length}</span></h2>
+                    {rooms === null ? (
+                        <p className="rounded-2xl border border-outline-variant bg-surface p-8 text-sm text-on-surface-variant">Canlı oyunlar yükleniyor…</p>
+                    ) : running.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-outline bg-surface p-8 text-center">
+                            <p className="text-sm font-semibold text-on-surface">{offline ? 'Canlı oyunlara şu an ulaşılamıyor.' : 'Şu an devam eden oyun yok.'}</p>
+                            <p className="mt-1 text-xs text-on-surface-variant">Başlayan oyunlar burada görünür. Bir oyunu seçerek canlı izleyebilirsin.</p>
+                        </div>
+                    ) : (
+                        <ul className="grid gap-2">{running.map((room) => <RoomCard key={room.id} room={room} onOpen={onOpenRoom} watching />)}</ul>
+                    )}
                 </aside>
             </div>
         </div>
@@ -330,6 +349,7 @@ function RoomCard({
     watching?: boolean;
 }) {
     const host = room.white ?? room.black;
+    const full = Boolean(room.white && room.black);
     const freeColor: PieceColor = room.white ? 'b' : 'w';
     const minutes = room.clock ? Math.round(room.clock.initial_ms / 60_000) : 0;
 
@@ -356,11 +376,12 @@ function RoomCard({
                     <span className="mt-0.5 block text-[11px] text-on-surface-variant">
                         {watching
                             ? `${room.moves.length} hamle oynandı`
-                            : `${freeColor === 'w' ? 'Beyaz' : 'Siyah'} koltuğu boş · ${
-                                  minutes > 0 ? `${minutes} dk` : 'süresiz'
+                            : `${full ? 'İki oyuncu katıldı' : `${freeColor === 'w' ? 'Beyaz' : 'Siyah'} koltuğu boş`} · ${
+                                  minutes > 0 ? `${minutes} dk + ${(room.clock?.increment_ms ?? 0) / 1000} sn` : 'süresiz'
                               }`}
                     </span>
                 </span>
+                <span className="shrink-0 text-xs font-bold text-primary">{watching ? 'Canlı izle' : full ? 'Masayı aç' : 'Oyuna katıl'}</span>
                 <span className="shrink-0 rounded-lg bg-surface-container-high px-2 py-1 font-mono text-[11px] font-bold tracking-widest text-on-surface-variant">
                     {room.code}
                 </span>

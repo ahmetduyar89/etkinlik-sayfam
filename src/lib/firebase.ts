@@ -70,6 +70,15 @@ export async function signInStudent(schoolNumber: string): Promise<Omit<StudentL
     return session;
 }
 
+/** Ad soyadla, yalnız canlı satranç için bir oturum açar. */
+export async function signInChessGuest(name: string): Promise<Omit<StudentLoginResult, 'token'>> {
+    const call = httpsCallable<{ name: string }, StudentLoginResult>(functions, 'loginChessGuest');
+    const { data } = await call({ name });
+    await signInWithCustomToken(auth, data.token);
+    const { token: _token, ...session } = data;
+    return session;
+}
+
 /** Öğretmen hesabına güvenlik rolünü tanımlar; tekrar çağrılması güvenlidir. */
 export async function bootstrapTeacherRole(): Promise<void> {
     const call = httpsCallable<Record<string, never>, { ok: boolean }>(functions, 'bootstrapTeacher');
