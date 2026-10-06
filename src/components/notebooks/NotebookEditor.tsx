@@ -1491,7 +1491,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const renderDocumentHeader = () => (
         <header ref={documentHeaderRef} className="notebook-document-header" aria-label="Defter ve sayfa işlemleri">
             <div className="nb-document-identity">
-                <button type="button" className="nb-icon" onClick={handleClose} title="Defterlerime dön" aria-label="Defterlerime dön"><ArrowLeft size={18}/></button>
+                <button type="button" className="nb-icon nb-back" onClick={handleClose} title="Defterlerime dön" aria-label="Defterlerime dön"><ArrowLeft size={18}/><span>Geri</span></button>
                 <input value={title} onChange={e => setTitle(e.target.value)} onBlur={handleTitleCommit}
                     onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                     aria-label="Defter adı" className="nb-title"/>
@@ -1543,10 +1543,10 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     );
 
     return (
-        <div className="notebook-editor fixed inset-0 z-[9000] h-[100dvh] flex flex-col bg-surface-container-low">
+        <div className="notebook-editor app-safe-screen fixed inset-0 z-[9000] h-[100dvh] flex flex-col bg-surface-container-low">
             {/* Tam Tuval / Üst Menü Gizli İken Yüzen Mini Menü Kapsülü */}
             {hideHeader && !presenting && (
-                <div className="absolute top-2 left-3 z-[6500] flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md text-white border border-white/20 px-2.5 py-1 rounded-xl shadow-xl text-xs select-none">
+                <div className="nb-hidden-header-controls absolute top-2 left-3 z-[6500] flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md text-white border border-white/20 px-2.5 py-1 rounded-xl shadow-xl text-xs select-none">
                     <button
                         type="button"
                         onClick={handleClose}

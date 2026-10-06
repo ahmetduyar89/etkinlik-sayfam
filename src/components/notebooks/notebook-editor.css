@@ -6,3 +6,7 @@
 @media(max-width:700px){.nb-paper-control{display:none}.nb-mobile-paper{display:block;margin-top:10px}.nb-title{width:120px}.notebook-document-header{gap:4px;padding:5px 7px}.nb-save-state{display:none}.nb-page-navigation{gap:0}.nb-page-navigation .nb-icon{width:27px}.nb-document-actions{flex:0}}
 @media(max-width:450px){.nb-title{width:85px;font-size:12px}.nb-document-identity>.nb-icon{width:25px}.nb-document-actions{gap:0}.nb-document-actions>.nb-icon{display:none}.nb-save-warning{font-size:0}.nb-document-identity{gap:0}.nb-separator{display:none}.nb-page-count{min-width:35px}}
 .nb-file-actions>div>button svg,.nb-file-actions>div>button span{color:#52647b}
+.nb-back{width:auto!important;min-width:36px;padding:0 8px;display:flex;gap:5px;color:#334155}
+.nb-back span{font-size:12px;font-weight:600}
+@media(pointer:coarse){.notebook-document-header{min-height:54px}.nb-icon{min-height:42px;min-width:36px}.nb-back{min-width:66px}.nb-page-navigation .nb-icon{min-width:30px}}
+@media(max-width:450px){.nb-back span{display:none}}

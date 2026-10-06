@@ -51,7 +51,7 @@ export function PortalHome({ onOpenInternal, folder }: PortalHomeProps) {
             <Zemin />
 
             <div className="relative">
-                <header className="border-b border-white/70 bg-white/70 backdrop-blur-xl">
+                <header className="app-safe-header border-b border-slate-200 bg-white">
                     <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-2 sm:gap-3 px-3 py-3 sm:py-4 sm:px-8">
                         <span className="font-headline-lg text-[19px] font-extrabold tracking-[-0.02em] text-slate-900">
                             Ahmet <span className="text-primary">DUYAR</span>
@@ -82,9 +82,9 @@ export function PortalHome({ onOpenInternal, folder }: PortalHomeProps) {
                             onClick={lockApp}
                             title="Çıkış yap"
                             aria-label="Çıkış yap"
-                            className="flex min-h-11 shrink-0 w-10 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-900/5 hover:text-slate-700"
+                            className="flex min-h-11 shrink-0 px-3 items-center justify-center gap-2 rounded-xl text-slate-700 transition-colors hover:bg-slate-900/5 hover:text-slate-700"
                         >
-                            <Lock className="h-[18px] w-[18px]" />
+                            <Lock className="h-[18px] w-[18px]" /><span className="hidden sm:inline text-sm font-semibold">Çıkış</span>
                         </button>
                     </div>
                 </header>

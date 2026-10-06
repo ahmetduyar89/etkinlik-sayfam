@@ -31,7 +31,7 @@ export const Navbar = forwardRef<HTMLInputElement, NavbarProps>(function Navbar(
 ) {
     const isContent = view === 'content';
     return (
-        <header className="bg-white font-sans top-0 sticky z-[100] border-b border-outline-variant shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+        <header className="app-safe-header bg-white font-sans top-0 sticky z-[100] border-b border-outline-variant shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
             <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 sm:gap-3 xl:gap-[18px] w-full px-3 sm:px-6 py-3 max-w-[1440px] mx-auto">
                 {/* Ağaç çekmecesi (dar ekran) */}
                 <button

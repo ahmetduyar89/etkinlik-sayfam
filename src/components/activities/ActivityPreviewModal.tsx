@@ -318,7 +318,7 @@ export function ActivityPreviewModal({
                 role="dialog"
                 aria-modal="true"
                 aria-label={activity.title}
-                className="relative w-full h-full bg-white overflow-hidden flex flex-col"
+                className="app-safe-screen relative w-full h-full bg-slate-900 overflow-hidden flex flex-col"
             >
                 <header className="min-h-14 flex-wrap py-2 px-3 sm:px-4 bg-slate-900 border-b border-white/5 flex justify-between items-center shrink-0 z-[11000] gap-2">
                     <div className="flex items-center gap-2 min-w-0">

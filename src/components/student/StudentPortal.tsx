@@ -291,7 +291,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
 
     return (
         <div
-            className="fixed inset-0 bg-[#0f172a] z-[3000] flex flex-col h-[100dvh] overflow-hidden"
+            className="app-safe-screen fixed inset-0 bg-[#0f172a] z-[3000] flex flex-col h-[100dvh] overflow-hidden"
             onPointerDown={(e) => e.stopPropagation()}
         >
             <header
