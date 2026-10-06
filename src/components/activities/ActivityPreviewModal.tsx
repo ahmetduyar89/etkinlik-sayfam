@@ -596,8 +596,9 @@ export function ActivityPreviewModal({
                         </div>
                     )}
 
+                    {/* Extra drawing pages belong to the whiteboard, not the lesson overlay. */}
                     <AnimatePresence>
-                        {isPreviewDrawingMode && (
+                        {isPreviewDrawingMode && showWhiteboard && (
                             <PageNav
                                 current={pageInfo.current}
                                 total={pageInfo.total}
