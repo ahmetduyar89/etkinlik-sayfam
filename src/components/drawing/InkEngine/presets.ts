@@ -22,6 +22,8 @@ export function decodePresets(raw: string | null): InkPreset[] {
             return [{ name: entry.name.trim().slice(0, 32) || 'Kalem', settings: {
                 tool: s.tool, color: s.color, width: s.width,
                 penType: ['ballpoint', 'fountain', 'brush', 'calligraphy', 'marker', 'graphite'].includes(s.penType) ? s.penType : 'ballpoint',
+                tipSharpness: typeof s.tipSharpness === 'number' && Number.isFinite(s.tipSharpness) ? Math.max(0, Math.min(1, s.tipSharpness)) : .5,
+                pressureResponse: typeof s.pressureResponse === 'number' && Number.isFinite(s.pressureResponse) ? Math.max(0, Math.min(1, s.pressureResponse)) : .65,
                 pressureSensitivity: ['soft', 'normal', 'firm'].includes(s.pressureSensitivity) ? s.pressureSensitivity : 'normal',
                 streamlineLevel: ['natural', 'smooth', 'calligraphy'].includes(s.streamlineLevel) ? s.streamlineLevel : 'smooth',
                 highlighterOpacity: typeof s.highlighterOpacity === 'number' && Number.isFinite(s.highlighterOpacity) ? Math.max(0.2, Math.min(0.4, s.highlighterOpacity)) : 0.3,

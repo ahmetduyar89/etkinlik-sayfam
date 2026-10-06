@@ -2,14 +2,15 @@
 
 `DrawingToolbar.tsx` keeps the application's public component contract and delegates to `GoodnotesPenToolbar`. The original object library and all six dynamic laboratory launchers remain connected. The existing canvas owns document pages, collaboration, history, selection, pixel erasing, DPR transforms and rendering scheduling.
 
-New browser pen strokes carry `inkVersion: 3`, captured nib/pressure settings and `inkComplete`. Older strokes retain their original renderer. Ballpoint width is constant; fountain uses pressure, velocity and elliptical nib orientation; brush uses a nonlinear pressure response and applies its taper only on completion. Actual/coalesced input is stored; predicted input is only a disposable preview. Centreline interpolation produces a filled ribbon. Completed paths use the existing weak cache.
+New browser pen strokes carry `inkVersion: 4`, captured nib/pressure settings and `inkComplete`. Older strokes retain their original renderer. Ballpoint width is constant; fountain uses pressure, velocity and elliptical nib orientation; brush uses a nonlinear pressure response and applies its taper only on completion. Actual/coalesced input is stored; predicted input is only a disposable preview. Centreline interpolation produces a filled ribbon. Completed paths use the existing weak cache.
 
 Millimetres use 96 / 25.4 logical page pixels. They describe document coordinates, rather than a promise of physical millimetres on every monitor. Colour/width slots and per-pen tuning persist in local storage. The preview uses the same ribbon geometry as the canvas.
 
-Shapes snap after 500 ms within a four-screen-pixel stationary tolerance. Short strokes and poor fits remain handwriting. Triangles and orthogonal rectangles preserve their orientation as polygon objects. Scribbles require fast repeated direction reversals and remove only intersecting ink, in one undoable collaboration operation.
+Shapes snap after 450 ms within a ten-screen-pixel stationary tolerance. A pointer-owned state machine supports scale/rotation on drag, rotated ellipse fitting and arrows. See `../engine/README.md` for contracts, algorithms and integration. Short strokes and poor fits remain handwriting. Triangles and orthogonal rectangles preserve their orientation as polygon objects. Scribbles require fast repeated direction reversals and remove only intersecting ink, in one undoable collaboration operation.
 
 Validation:
 
+- `node scripts/test-draw-hold.mjs`
 - `node scripts/test-goodnotes.mjs`
 - `npm run type-check`
 - `npm run build`

@@ -671,7 +671,8 @@ const drawShape = (
     fillMode?: 'none' | 'solid' | 'transparent',
     fillOpacity?: number,
     borderStyle?: string,
-    borderColor?: string
+    borderColor?: string,
+    headAngle = Math.PI / 7
 ) => {
     if (borderColor) {
         tCtx.strokeStyle = borderColor;
@@ -753,18 +754,18 @@ const drawShape = (
         tCtx.fillStyle = tCtx.strokeStyle;
         tCtx.beginPath();
         tCtx.moveTo(x2, y2);
-        tCtx.lineTo(x2 - h * Math.cos(a - Math.PI / 7), y2 - h * Math.sin(a - Math.PI / 7));
+        tCtx.lineTo(x2 - h * Math.cos(a - headAngle), y2 - h * Math.sin(a - headAngle));
         tCtx.lineTo(x2 - (h * 0.72) * Math.cos(a), y2 - (h * 0.72) * Math.sin(a));
-        tCtx.lineTo(x2 - h * Math.cos(a + Math.PI / 7), y2 - h * Math.sin(a + Math.PI / 7));
+        tCtx.lineTo(x2 - h * Math.cos(a + headAngle), y2 - h * Math.sin(a + headAngle));
         tCtx.closePath();
         tCtx.fill();
 
         if (tool === 'double_arrow') {
             tCtx.beginPath();
             tCtx.moveTo(x1, y1);
-            tCtx.lineTo(x1 + h * Math.cos(a - Math.PI / 7), y1 + h * Math.sin(a - Math.PI / 7));
+            tCtx.lineTo(x1 + h * Math.cos(a - headAngle), y1 + h * Math.sin(a - headAngle));
             tCtx.lineTo(x1 + (h * 0.72) * Math.cos(a), y1 + (h * 0.72) * Math.sin(a));
-            tCtx.lineTo(x1 + h * Math.cos(a + Math.PI / 7), y1 + h * Math.sin(a + Math.PI / 7));
+            tCtx.lineTo(x1 + h * Math.cos(a + headAngle), y1 + h * Math.sin(a + headAngle));
             tCtx.closePath();
             tCtx.fill();
         }
@@ -1110,7 +1111,7 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, 
     tCtx.lineCap = 'round';
     tCtx.lineJoin = 'round';
     if (s.tool === 'eraser') tCtx.globalCompositeOperation = 'destination-out';
-    if (s.tool === 'highlighter') {
+    if (s.tool === 'highlighter' || s.shapeInk === 'highlighter') {
         // Akıllı fosforlu: Açık renk kağıtta 'multiply' ile alttaki siyah yazıyı
         // soluklaştırmaz / grileştirmez. Koyu kağıtta 'screen' ile parlama sağlar.
         tCtx.globalCompositeOperation = isDarkBg ? 'screen' : 'multiply';
@@ -1243,7 +1244,8 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, 
             s.shapeFillMode,
             s.shapeFillOpacity,
             s.shapeBorderStyle,
-            s.shapeBorderColor
+            s.shapeBorderColor,
+            s.arrowHeadAngle
         );
     }
     tCtx.restore();

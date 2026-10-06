@@ -133,8 +133,12 @@ export interface Stroke {
     /** Normalized Goodnotes brush settings, captured on each stroke. */
     tipSharpness?: number;
     pressureResponse?: number;
-    inkVersion?: 2 | 3;
+    inkVersion?: 2 | 3 | 4;
     inkComplete?: boolean;
+    /** Preserve highlighter compositing after Draw & Hold morphing. */
+    shapeInk?: 'highlighter';
+    /** Arrow wing angle in radians. */
+    arrowHeadAngle?: number;
     opacity?: number;
     /** `tool === 'math'` olduğunda çizilecek matematik nesnesi. */
     math?: MathObject;

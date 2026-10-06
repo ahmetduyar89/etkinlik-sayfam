@@ -458,10 +458,13 @@ export function getInkPath(stroke: Stroke, baseWidth: number): Path2D | null {
         cached.width === baseWidth && cached.pen === stroke.penType && cached.version === stroke.inkVersion &&
         cached.sensitivity === stroke.pressureSensitivity && cached.sharpness === stroke.tipSharpness &&
         cached.response === stroke.pressureResponse && cached.complete === stroke.inkComplete && cached.tail === tail) return cached.path;
-    const modern = stroke.inkVersion === 3 && isGoodnotesPen(stroke.penType);
+    const modern = (stroke.inkVersion === 3 || stroke.inkVersion === 4) && isGoodnotesPen(stroke.penType);
     const outline = modern ? ribbonOutline(stroke.points, {pen: isGoodnotesPen(stroke.penType) ? stroke.penType : 'ballpoint',
         width: baseWidth, sharpness: stroke.tipSharpness ?? .5, sensitivity: stroke.pressureResponse ?? .65,
-        complete: stroke.inkComplete ?? false}) : getStrokeOutlinePoints(stroke.points, baseWidth, stroke.penType, stroke);
+        complete: stroke.inkComplete ?? false, settings: stroke.inkVersion === 4 ? {
+            type: 'pen', color: stroke.color, baseWidth, minWidth: baseWidth * .12, maxWidth: baseWidth * 2.8,
+            pressureSensitivity: stroke.pressureResponse ?? .65, smoothingFactor: .35,
+        } : undefined}) : getStrokeOutlinePoints(stroke.points, baseWidth, stroke.penType, stroke);
     if (!outline.length) return null;
     const path = modern ? outlinePath(outline) : new Path2D();
     if (!modern) {

@@ -46,5 +46,8 @@ try {
     assert.equal(actualSamples({...sample,getCoalescedEvents:()=>[{...sample,timeStamp:10},sample]}).length,2);
     const input=new InkInput();assert.equal(input.sample(sample,{x:0,y:0},'ballpoint').pressure,.5);
     assert.ok(input.sample({...sample,timeStamp:30,pressure:.8},{x:0,y:0},'brush'));
+    assert.ok(input.sample({...sample,timeStamp:40,pressure:.8,twist:90},{x:0,y:0},'fountain'), 'stationary barrel rotation is retained');
+    assert.equal(input.sample({...sample,timeStamp:50},{x:NaN,y:0}),null);
+    assert.equal(actualSamples({...sample,getCoalescedEvents:()=>[{...sample,twist:90},sample]}).length,2, 'orientation changes survive coalesced deduplication');
     console.log('Goodnotes: fixed widths, caps, pressure, nib, taper, degenerate geometry, 5 shape cases, scribble rejection and coalesced input passed.');
 } finally { await rm(dir,{recursive:true,force:true}); }

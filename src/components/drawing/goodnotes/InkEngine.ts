@@ -3,7 +3,7 @@ const clamp = (x: number, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 const distance = (a: InkPoint, b: InkPoint) => Math.hypot(a.x - b.x, a.y - b.y);
 const cubic = (a: number, b: number, c: number, d: number, t: number) => .5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t);
 /** Catmull–Rom centreline, including pressure, time and stylus orientation. */
-export function interpolate(points: InkPoint[]): InkPoint[] {
+export function interpolate(points: InkPoint[], interpolateRotation = false): InkPoint[] {
     if (points.length < 3)
         return points;
     const result: InkPoint[] = [points[0]];
@@ -18,25 +18,32 @@ export function interpolate(points: InkPoint[]): InkPoint[] {
                 velocity: (b.velocity ?? 0) * (1 - t) + (c.velocity ?? 0) * t,
                 tiltX: (b.tiltX ?? 0) * (1 - t) + (c.tiltX ?? 0) * t,
                 tiltY: (b.tiltY ?? 0) * (1 - t) + (c.tiltY ?? 0) * t,
+                ...(interpolateRotation ? { twist: ((b.twist ?? 0) + (((c.twist ?? 0) - (b.twist ?? 0) + 540) % 360 - 180) * t + 360) % 360 } : {}),
                 timestamp: (b.timestamp ?? 0) * (1 - t) + (c.timestamp ?? 0) * t });
         }
     }
     return result;
 }
 /** Width is exactly constant for the ballpoint, independent of all sensor input. */
-export function brushWidth(point: InkPoint, tangent: InkPoint, config: BrushConfig): number {
+function unboundedBrushWidth(point: InkPoint, tangent: InkPoint, config: BrushConfig): number {
     if (config.pen === 'ballpoint')
         return config.width;
     const p = clamp(point.p ?? .5), response = clamp(config.sensitivity);
     if (config.pen === 'brush')
-        return config.width * (1 - response + response * (.12 + 2.55 * Math.pow(p, 1.8)));
+        return config.width * (1 - response + response * (.12 + 2.55 * Math.pow(p, 1.8))) *
+            (config.settings ? 1 - .18 * clamp((point.velocity ?? 0) / 1800) : 1);
     const speed = clamp((point.velocity ?? 0) / 1800);
     const tilt = Math.hypot(point.tiltX ?? 0, point.tiltY ?? 0);
-    const angle = point.twist ? point.twist * Math.PI / 180 : tilt > 5 ? Math.atan2(point.tiltY ?? 0, point.tiltX ?? 0) : Math.PI / 4;
+    const hasRotation = config.settings ? point.twist !== undefined : !!point.twist;
+    const angle = hasRotation ? (point.twist ?? 0) * Math.PI / 180 : tilt > 5 ? Math.atan2(point.tiltY ?? 0, point.tiltX ?? 0) : Math.PI / 4;
     const nx = -tangent.y, ny = tangent.x;
     const major = nx * Math.cos(angle) + ny * Math.sin(angle), minor = -nx * Math.sin(angle) + ny * Math.cos(angle);
     const nib = Math.hypot(major, minor * (.72 - .48 * clamp(config.sharpness)));
     return config.width * (1 + response * (p - .5) * 1.3) * (1 - .35 * speed) * nib;
+}
+export function brushWidth(point: InkPoint, tangent: InkPoint, config: BrushConfig): number {
+    const width = unboundedBrushWidth(point, tangent, config);
+    return config.settings ? clamp(width, config.settings.minWidth, config.settings.maxWidth) : width;
 }
 /** Filled left/right ribbon with round caps; live brush tails never retract. */
 export function ribbonOutline(raw: InkPoint[], config: BrushConfig): InkPoint[] {
@@ -50,7 +57,7 @@ export function ribbonOutline(raw: InkPoint[], config: BrushConfig): InkPoint[] 
     }
     if (!filtered.length)
         return [];
-    const points = interpolate(filtered);
+    const points = interpolate(filtered, !!config.settings);
     if (points.length === 1) {
         const p = points[0], r = brushWidth(p, { x: 1, y: 0 }, config) / 2;
         return Array.from({ length: 24 }, (_, i) => ({ x: p.x + Math.cos(i * Math.PI / 12) * r, y: p.y + Math.sin(i * Math.PI / 12) * r }));
@@ -59,11 +66,21 @@ export function ribbonOutline(raw: InkPoint[], config: BrushConfig): InkPoint[] 
     for (let i = 1; i < points.length; i++)
         lengths.push(lengths[i - 1] + distance(points[i - 1], points[i]));
     const total = lengths[lengths.length - 1], left: InkPoint[] = [], right: InkPoint[] = [], radii: number[] = [], angles: number[] = [];
+    let previousRadius: number | undefined;
     for (let i = 0; i < points.length; i++) {
         const prev = points[Math.max(0, i - 1)], next = points[Math.min(points.length - 1, i + 1)];
         const dx = next.x - prev.x, dy = next.y - prev.y, len = Math.hypot(dx, dy) || 1;
         const tangent = { x: dx / len, y: dy / len };
         let r = brushWidth(points[i], tangent, config) / 2;
+        if (config.settings) {
+            r = clamp(r, config.settings.minWidth / 2, config.settings.maxWidth / 2);
+            // Time-based lerp stays consistent across 60/120/240 Hz input rates.
+            const dt = Math.max(.1, (points[i].timestamp ?? i * 8) - (points[Math.max(0, i - 1)].timestamp ?? (i - 1) * 8));
+            const factor = clamp(config.settings.smoothingFactor);
+            const alpha = factor === 0 ? 1 : 1 - Math.exp(-dt / (2 + 22 * factor));
+            r = previousRadius === undefined ? r : previousRadius + alpha * (r - previousRadius);
+            previousRadius = r;
+        }
         if (config.pen === 'brush' && config.complete && total > config.width * 2) {
             const tail = Math.min(total * .3, config.width * 5);
             r *= .04 + .96 * Math.pow(clamp((total - lengths[i]) / tail), .8);

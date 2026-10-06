@@ -29,9 +29,12 @@ import { InkHistory } from './InkEngine/history';
 import { extendActiveBounds } from './InkEngine/activeBounds';
 import { nativeInkBridge } from './InkEngine/nativeBridge';
 import { simplifyStroke } from './InkEngine/simplification';
+import { sampleAge, type InkDiagnostic } from './InkEngine/deviceSession';
 import { InkDebugLab, emptyInkMetrics } from './InkEngine/InkDebugLab';
-import { adjustSnappedShape, snapAngle } from './shapeRecognizer';
-import { recognizeShape, isScribble, HOLD_DELAY_MS, HOLD_SLOP_PX } from './goodnotes/GestureRecognizer';
+import { snapAngle } from './shapeRecognizer';
+import { isScribble } from './goodnotes/GestureRecognizer';
+import { DrawHoldController } from './engine/DrawHold';
+import { shapeToStroke } from './engine/adapter';
 import { isGoodnotesPen } from './goodnotes/types';
 import { recognizeEquation } from './equationRecognizer';
 import {
@@ -117,6 +120,9 @@ interface DrawingCanvasProps {
     onViewChange?: (view: Viewport, size: { w: number; h: number }) => void;
     /** Üst araç çubuğu ayarlarını (font, boyut, renk) tuvalden güncellemek için. */
     onConfigChange?: (patch: Partial<DrawConfig>) => void;
+    /** Optional local laboratory instrumentation; absent during ordinary document use. */
+    onInkDiagnostic?: (event: InkDiagnostic) => void;
+    legacyInputFilter?: boolean;
 }
 
 /** Geri al yığınında tutulan en fazla adım sayısı. */
@@ -147,6 +153,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             pageBox,
             onViewChange,
             onConfigChange,
+            onInkDiagnostic,
+            legacyInputFilter,
         },
         ref
     ) {
@@ -155,22 +163,15 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const overlayCanvasRef = React.useRef<HTMLCanvasElement>(null);
         const [strokes, setStrokes] = React.useState<Stroke[]>([]);
         const currentStrokeRef = React.useRef<Stroke | null>(null);
-        const holdTimerRef = React.useRef<number | null>(null);
-        const holdAnchorRef = React.useRef<Point | null>(null);
-        const heldShapeRef = React.useRef<{
-            originalStroke: Stroke;
-            snappedShape: { tool: DrawingTool; points: Point[] };
-        } | null>(null);
-
+        const holdControllerRef = React.useRef(new DrawHoldController());
+        const recognitionPointsRef = React.useRef<Point[]>([]);
+        const heldShapeRef = React.useRef<boolean>(false);
         const cancelHoldTimer = React.useCallback(() => {
-            if (holdTimerRef.current !== null) {
-                window.clearTimeout(holdTimerRef.current);
-                holdTimerRef.current = null;
-            }
-            holdAnchorRef.current = null;
+            holdControllerRef.current.cancel();
+            recognitionPointsRef.current = [];
         }, []);
-
-        React.useEffect(() => cancelHoldTimer, [cancelHoldTimer, config.tool, config.snapShapes]);
+        React.useEffect(() => { cancelHoldTimer(); }, [cancelHoldTimer, config.tool, config.snapShapes]);
+        React.useEffect(() => cancelHoldTimer, [cancelHoldTimer]);
 
         const [selectedIdxs, setSelectedIdxs] = React.useState<number[]>([]);
         const [selBB, setSelBB] = React.useState<BoundingBox | null>(null);
@@ -1696,7 +1697,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const cancelCurrentStroke = () => {
             cancelInkFrame();
             cancelHoldTimer();
-            heldShapeRef.current = null;
+            heldShapeRef.current = false;
             polyPointsRef.current = [];
             setPolyCount(0);
             if (!isDrawingRef.current && !currentStrokeRef.current) return;
@@ -2897,7 +2898,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
 
             cancelHoldTimer();
-            heldShapeRef.current = null;
+            heldShapeRef.current = false;
             isDrawingRef.current = true;
             // Şekil araçlarında başlangıç noktası da ızgaraya oturur.
             const firstRulerHit = rulerRef.current
@@ -2913,8 +2914,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 : (SHAPE_TOOLS.includes(config.tool) || config.tool === 'tape')
                   ? snapPoint({ x, y })
                   : { x, y };
-            inkInputRef.current = new InkInput(config.streamlineLevel === 'natural' ? 0.5 : config.streamlineLevel === 'calligraphy' ? 1.35 : 1, inkDebugEnabled && legacyInkRef.current);
+            inkInputRef.current = new InkInput(config.streamlineLevel === 'natural' ? 0.5 : config.streamlineLevel === 'calligraphy' ? 1.35 : 1, legacyInputFilter ?? (inkDebugEnabled && legacyInkRef.current));
             inkPointerRef.current = e.pointerId;
+            if (config.tool === 'pencil' || config.tool === 'highlighter') onInkDiagnostic?.({stage: 'begin', id: String(e.pointerId), pointerType: e.pointerType, trusted: e.nativeEvent.isTrusted, legacy: legacyInputFilter ?? (inkDebugEnabled && legacyInkRef.current)});
             if (inkDebugEnabled) {
                 const samples = inkMetricsRef.current.samples;
                 inkMetricsRef.current = { ...emptyInkMetrics(), samples };
@@ -2929,7 +2931,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 width: config.tool === 'highlighter' ? config.width * 5 : config.width,
                 fillEnabled: config.fillEnabled,
                 penType: config.tool === 'pencil' ? config.penType ?? 'ballpoint' : undefined,
-                inkVersion: config.tool === 'pencil' && isGoodnotesPen(config.penType ?? 'ballpoint') ? 3 : 2,
+                inkVersion: config.tool === 'pencil' && isGoodnotesPen(config.penType ?? 'ballpoint') ? 4 : 2,
                 tipSharpness: config.tipSharpness ?? .5,
                 pressureResponse: config.pressureResponse ?? .65,
                 pressureSensitivity: config.pressureSensitivity ?? 'normal',
@@ -2943,7 +2945,22 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 tapeHidden: config.tool === 'tape' ? true : undefined,
                 points: config.tool === 'tape' ? [first, first] : [first],
             };
-            holdAnchorRef.current = { x: first.x, y: first.y };
+            if ((config.tool === 'pencil' || config.tool === 'highlighter') && (config.snapShapes ?? true) && !rulerEdgeRef.current) {
+                recognitionPointsRef.current = [{ x, y }];
+                holdControllerRef.current.begin(e.pointerId, { x, y }, recognitionPointsRef.current, viewRef.current.scale, shape => {
+                    const current = currentStrokeRef.current;
+                    if (!isDrawingRef.current || !current) return;
+                    const wasHighlighter = current.tool === 'highlighter' || current.shapeInk === 'highlighter';
+                    // Cancel a scheduled raw/predicted preview before publishing fitted geometry.
+                    cancelInkFrame();
+                    heldShapeRef.current = true;
+                    currentStrokeRef.current = { ...current, ...shapeToStroke(shape), penType: undefined,
+                        shapeInk: wasHighlighter ? 'highlighter' : undefined,
+                        shapeFillMode: wasHighlighter ? 'none' : current.shapeFillMode,
+                        fillEnabled: wasHighlighter ? false : current.fillEnabled };
+                    paintMain([currentStrokeRef.current]);
+                });
+            }
             activeStrokeBBRef.current = { x1: first.x, y1: first.y, x2: first.x, y2: first.y };
         };
 
@@ -3122,15 +3139,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (!currentStrokeRef.current) return;
             const stroke = currentStrokeRef.current;
 
-            // Draw-and-hold ile şekil kilitlendiyse ve kullanıcı parmağını kaldırmadan sürüklüyorsa:
-            if (heldShapeRef.current && stroke.tool !== 'pencil') {
-                const adjusted = adjustSnappedShape(heldShapeRef.current.snappedShape, { x, y }, config.snapAngle);
-                currentStrokeRef.current = {
-                    ...stroke,
-                    tool: adjusted.tool,
-                    points: adjusted.points,
-                };
-                paintMain([currentStrokeRef.current]);
+            // Ownership is checked before shape adjustment as well as freehand sampling.
+            if (inkPointerRef.current !== null && inkPointerRef.current !== e.pointerId) return;
+            if (heldShapeRef.current) {
+                holdControllerRef.current.move(e.pointerId, { x, y }, stroke.points, viewRef.current.scale, config.snapAngle);
                 return;
             }
 
@@ -3197,10 +3209,11 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             // aktif çizimin önceki ve yeni sınırlarını kapsayan temiz bölge tazelenir.
             const oldBB = activeStrokeBBRef.current || getBB(stroke);
             let addedPoints = 0;
-            const inkStartedAt = inkDebugEnabled ? performance.now() : 0;
+            const inkStartedAt = inkDebugEnabled || onInkDiagnostic ? performance.now() : 0;
 
             for (const sample of coalescedSamples(e)) {
                 let raw = toWorld(sample.clientX, sample.clientY);
+                const recognitionPoint = raw;
 
                 // Cetvel/gönye kenarına oturt: hareket boyunca aynı kenarda
                 // kalınır, böylece çizgi cetvel boyunca düz gider.
@@ -3243,7 +3256,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
                 const point = inkInputRef.current.sample(sample, raw, stroke.penType, !!rulerEdgeRef.current);
                 if (!point) continue;
+                if (holdControllerRef.current.state !== 'idle') {
+                    const lastRaw = recognitionPointsRef.current.at(-1);
+                    if (!lastRaw || Math.hypot(recognitionPoint.x - lastRaw.x, recognitionPoint.y - lastRaw.y) > .1 / viewRef.current.scale) recognitionPointsRef.current.push(recognitionPoint);
+                }
                 stroke.points.push(point);
+                onInkDiagnostic?.({stage:'sample', timestamp:sample.timeStamp, pressure:sample.pressure, raw:recognitionPoint, filtered:point, scale:viewRef.current.scale});
                 if (inkDebugEnabled) {
                     const metrics = inkMetricsRef.current;
                     metrics.samples++;
@@ -3270,16 +3288,20 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 const pending = pendingInkRegionRef.current;
                 const region = dirty ? unionBB(pending ? [pending, dirty] : [dirty]) : pending;
                 pendingInkRegionRef.current = region;
+                const queuedAt = onInkDiagnostic ? performance.now() : 0;
                 inkFrameRef.current.schedule(() => {
                     pendingInkRegionRef.current = null;
-                    const renderStarted = inkDebugEnabled ? performance.now() : 0;
+                    const renderStarted = inkDebugEnabled || onInkDiagnostic ? performance.now() : 0;
                     // Copy the full point list only for the presentation that actually reaches a frame.
                     const preview = predictedPoints.length ? { ...stroke, points: [...stroke.points, ...predictedPoints] } : stroke;
                     repaintStrokeRegion(preview, region, preview);
-                    if (inkDebugEnabled) inkMetricsRef.current.renderMs = performance.now() - renderStarted;
+                    const completedAt = inkDebugEnabled || onInkDiagnostic ? performance.now() : 0;
+                    if (inkDebugEnabled) inkMetricsRef.current.renderMs = completedAt - renderStarted;
+                    onInkDiagnostic?.({stage:'frame', renderMs:completedAt-renderStarted, queueMs:renderStarted-queuedAt, sampleAgeMs:sampleAge(completedAt, stroke.points.at(-1)?.timestamp ?? e.timeStamp)});
                 });
             }
 
+            onInkDiagnostic?.({stage:'process', durationMs:performance.now()-inkStartedAt});
             if (inkDebugEnabled) {
                 const point = stroke.points[stroke.points.length - 1];
                 Object.assign(inkMetricsRef.current, {
@@ -3290,68 +3312,29 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 });
             }
 
-            // Kalem modunda "Çiz ve Bekle": yalnızca akıllı kalem açıkken.
-            // Mikro titremelerde zamanlayıcı sıfırlanmaz, kullanıcı kalemi sabit tutunca şekil kusursuzca oturur.
-            if (stroke.tool === 'pencil' && (config.snapShapes ?? true)) {
-                const curPt = stroke.points[stroke.points.length - 1];
-                const anchor = holdAnchorRef.current;
-                const distFromAnchor = anchor && curPt ? Math.hypot(curPt.x - anchor.x, curPt.y - anchor.y) : Infinity;
-
-                const triggerHold = () => {
-                    if (!isDrawingRef.current || !currentStrokeRef.current) return;
-                    const cur = currentStrokeRef.current;
-                    if (cur.points.length >= 4) {
-                        const recognized = recognizeShape(cur.points);
-                        if (recognized) {
-                            heldShapeRef.current = {
-                                originalStroke: { ...cur },
-                                snappedShape: recognized,
-                            };
-                            currentStrokeRef.current = {
-                                ...cur,
-                                tool: recognized.tool,
-                                points: recognized.points,
-                                penType: undefined,
-                                fillEnabled: config.fillEnabled,
-                            };
-                            paintMain([currentStrokeRef.current]);
-
-                            // Görsel dokunsal geri bildirim: uca yeşil bir halka
-                            const oCtx = overlayCtxRef.current;
-                            if (oCtx) {
-                                const v = viewRef.current;
-                                const sp = toScreenPoint({ x, y }, v);
-                                oCtx.save();
-                                oCtx.strokeStyle = '#10b981';
-                                oCtx.lineWidth = 2.5;
-                                oCtx.beginPath();
-                                oCtx.arc(sp.x, sp.y, 14, 0, Math.PI * 2);
-                                oCtx.stroke();
-                                oCtx.restore();
-                                window.setTimeout(clearOverlay, 240);
-                            }
-                        }
-                    }
-                };
-
-                if (distFromAnchor * viewRef.current.scale > HOLD_SLOP_PX) {
-                    cancelHoldTimer();
-                    if (curPt) holdAnchorRef.current = { x: curPt.x, y: curPt.y };
-                    holdTimerRef.current = window.setTimeout(triggerHold, HOLD_DELAY_MS);
-                } else if (!holdTimerRef.current) {
-                    holdTimerRef.current = window.setTimeout(triggerHold, HOLD_DELAY_MS);
+            if ((stroke.tool === 'pencil' || stroke.tool === 'highlighter') && (config.snapShapes ?? true)) {
+                // Raw screen motion controls dwell; filtered ink cannot conceal ongoing movement.
+                for (const sample of actualSamples(e.nativeEvent)) {
+                    const rawPoint = toWorld(sample.clientX, sample.clientY);
+                    if (!Number.isFinite(rawPoint.x) || !Number.isFinite(rawPoint.y)) continue;
+                    if (rulerEdgeRef.current) { cancelHoldTimer(); break; }
+                    holdControllerRef.current.move(e.pointerId, rawPoint, recognitionPointsRef.current, viewRef.current.scale);
                 }
             }
         };
 
         const stopDrawing = (e?: React.PointerEvent) => {
             if (e) touchPointersRef.current.delete(e.pointerId);
-            cancelInkFrame();
             if (e && inkPointerRef.current !== null && e.pointerId !== inkPointerRef.current && isDrawingRef.current) {
                 pointersRef.current.delete(e.pointerId);
                 return;
             }
+            cancelInkFrame();
             const active = currentStrokeRef.current;
+            if (e?.type === 'pointerup' && active && heldShapeRef.current) {
+                holdControllerRef.current.move(e.pointerId, toWorld(e.clientX, e.clientY), active.points, viewRef.current.scale, config.snapAngle);
+            }
+            cancelHoldTimer();
             if (e?.type === 'pointerup' && active && !heldShapeRef.current &&
                 (active.tool === 'pencil' || active.tool === 'highlighter') && !rulerEdgeRef.current) {
                 const last = active.points[active.points.length - 1];
@@ -3516,7 +3499,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
                 if (e?.type === 'pointercancel') {
                     currentStrokeRef.current = null;
-                    heldShapeRef.current = null;
+                    heldShapeRef.current = false;
                     isDrawingRef.current = false;
                     gestureDirtyRef.current = false;
                     redraw();
@@ -3545,8 +3528,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 }
                 stroke = {...stroke, inkComplete: true};
                 if (heldShapeRef.current) {
-                    heldShapeRef.current = null;
-                } else if ((stroke.tool === 'pencil' || stroke.tool === 'highlighter') && stroke.inkVersion !== 3 && stroke.points.length > 5) {
+                    heldShapeRef.current = false;
+                } else if ((stroke.tool === 'pencil' || stroke.tool === 'highlighter') && stroke.inkVersion !== 3 && stroke.inkVersion !== 4 && stroke.points.length > 5) {
                     stroke = {
                         ...stroke,
                         points: simplifyStroke(stroke.points, 0.4),
@@ -3559,7 +3542,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     currentStrokeRef.current = null;
                     isDrawingRef.current = false;
                     gestureDirtyRef.current = false;
-                    heldShapeRef.current = null;
+                    heldShapeRef.current = false;
                     redraw();
                     window.setTimeout(flushPendingOps, 0);
                     return;
@@ -3574,7 +3557,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             isDrawingRef.current = false;
             gestureDirtyRef.current = false;
             currentStrokeRef.current = null;
-            heldShapeRef.current = null;
+            heldShapeRef.current = false;
             // Çizim biterken bekleyen uzak işlemler uygulanır.
             window.setTimeout(flushPendingOps, 0);
             // Çizim sürerken ertelenen yeniden boyutlandırma şimdi uygulanır.

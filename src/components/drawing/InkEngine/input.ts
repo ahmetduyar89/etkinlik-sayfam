@@ -14,7 +14,8 @@ export function actualSamples(event: PointerEvent): PointerEvent[] {
         .sort((a, b) => a.timeStamp - b.timeStamp);
     return samples.filter((p, i) => !i || p.timeStamp !== samples[i - 1].timeStamp ||
         p.clientX !== samples[i - 1].clientX || p.clientY !== samples[i - 1].clientY ||
-        p.pressure !== samples[i - 1].pressure);
+        p.pressure !== samples[i - 1].pressure || p.tiltX !== samples[i - 1].tiltX ||
+        p.tiltY !== samples[i - 1].tiltY || p.twist !== samples[i - 1].twist);
 }
 
 export function predictedSamples(event: PointerEvent): PointerEvent[] {
@@ -40,8 +41,9 @@ export class InkInput {
     fork(): InkInput { return Object.assign(new InkInput(), this); }
 
     sample(event: PointerEvent, position: Point, pen?: PenType, constrained = false): Point | null {
+        if (![position.x, position.y, event.timeStamp].every(Number.isFinite)) return null;
         // Pozisyon değişmediyse mükerrer örneği atla
-        if (this.raw && this.filtered && position.x === this.raw.x && position.y === this.raw.y && event.pressure === this.filtered.pressure && event.tiltX === this.filtered.tiltX && event.tiltY === this.filtered.tiltY) return null;
+        if (this.raw && this.filtered && position.x === this.raw.x && position.y === this.raw.y && event.pressure === this.filtered.pressure && event.tiltX === this.filtered.tiltX && event.tiltY === this.filtered.tiltY && event.twist === this.filtered.twist) return null;
         if (this.raw && event.timeStamp < this.time) return null;
         const timeDiff = this.raw ? (event.timeStamp - this.time) / 1000 : 0;
         const dt = this.raw ? Math.min(0.1, Math.max(0.002, timeDiff > 0 ? timeDiff : 1 / 120)) : 1 / 120;
