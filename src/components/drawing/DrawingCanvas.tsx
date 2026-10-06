@@ -30,7 +30,9 @@ import { extendActiveBounds } from './InkEngine/activeBounds';
 import { nativeInkBridge } from './InkEngine/nativeBridge';
 import { simplifyStroke } from './InkEngine/simplification';
 import { InkDebugLab, emptyInkMetrics } from './InkEngine/InkDebugLab';
-import { adjustSnappedShape, recognizeShape, snapAngle } from './shapeRecognizer';
+import { adjustSnappedShape, snapAngle } from './shapeRecognizer';
+import { recognizeShape, isScribble, HOLD_DELAY_MS, HOLD_SLOP_PX } from './goodnotes/GestureRecognizer';
+import { isGoodnotesPen } from './goodnotes/types';
 import { recognizeEquation } from './equationRecognizer';
 import {
     RULER_SNAP_PX,
@@ -167,6 +169,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
             holdAnchorRef.current = null;
         }, []);
+
+        React.useEffect(() => cancelHoldTimer, [cancelHoldTimer, config.tool, config.snapShapes]);
 
         const [selectedIdxs, setSelectedIdxs] = React.useState<number[]>([]);
         const [selBB, setSelBB] = React.useState<BoundingBox | null>(null);
@@ -2906,7 +2910,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 width: config.tool === 'highlighter' ? config.width * 5 : config.width,
                 fillEnabled: config.fillEnabled,
                 penType: config.tool === 'pencil' ? config.penType ?? 'ballpoint' : undefined,
-                inkVersion: 2,
+                inkVersion: config.tool === 'pencil' && isGoodnotesPen(config.penType ?? 'ballpoint') ? 3 : 2,
+                tipSharpness: config.tipSharpness ?? .5,
+                pressureResponse: config.pressureResponse ?? .65,
                 pressureSensitivity: config.pressureSensitivity ?? 'normal',
                 opacity: config.tool === 'highlighter' ? config.highlighterOpacity ?? 0.3 : undefined,
                 dash: config.dash && config.dash !== 'solid' ? config.dash : undefined,
@@ -3264,7 +3270,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
             // Kalem modunda "Çiz ve Bekle": yalnızca akıllı kalem açıkken.
             // Mikro titremelerde zamanlayıcı sıfırlanmaz, kullanıcı kalemi sabit tutunca şekil kusursuzca oturur.
-            if (stroke.tool === 'pencil' && config.snapShapes) {
+            if (stroke.tool === 'pencil' && (config.snapShapes ?? true)) {
                 const curPt = stroke.points[stroke.points.length - 1];
                 const anchor = holdAnchorRef.current;
                 const distFromAnchor = anchor && curPt ? Math.hypot(curPt.x - anchor.x, curPt.y - anchor.y) : Infinity;
@@ -3306,12 +3312,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     }
                 };
 
-                if (distFromAnchor > 12) {
-                    if (curPt) holdAnchorRef.current = { x: curPt.x, y: curPt.y };
+                if (distFromAnchor * viewRef.current.scale > HOLD_SLOP_PX) {
                     cancelHoldTimer();
-                    holdTimerRef.current = window.setTimeout(triggerHold, 320);
+                    if (curPt) holdAnchorRef.current = { x: curPt.x, y: curPt.y };
+                    holdTimerRef.current = window.setTimeout(triggerHold, HOLD_DELAY_MS);
                 } else if (!holdTimerRef.current) {
-                    holdTimerRef.current = window.setTimeout(triggerHold, 320);
+                    holdTimerRef.current = window.setTimeout(triggerHold, HOLD_DELAY_MS);
                 }
             }
         };
@@ -3485,21 +3491,39 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     }
                 }
 
+                if (e?.type === 'pointercancel') {
+                    currentStrokeRef.current = null;
+                    heldShapeRef.current = null;
+                    isDrawingRef.current = false;
+                    gestureDirtyRef.current = false;
+                    redraw();
+                    window.setTimeout(flushPendingOps, 0);
+                    return;
+                }
+                if (stroke.tool === 'pencil' && (config.smartScribbleErase ?? true) && !heldShapeRef.current && isScribble(stroke.points)) {
+                    // Hit actual stroke segments rather than a broad bounding box.
+                    const candidates = spatialIndexRef.current.query(strokesRef.current, getBB(stroke));
+                    const removed = strokesRef.current.filter(target =>
+                        candidates.has(target) && isSelectable(target) && (target.tool === 'pencil' || target.tool === 'highlighter') &&
+                        stroke.points.some((p, i) => i > 0 && strokeNearSegment(target, stroke.points[i-1], p, 2)));
+                    if (removed.length) {
+                        pushHistory();
+                        const deleted = new Set(removed);
+                        strokesRef.current = strokesRef.current.filter(target => !deleted.has(target));
+                        commitStrokes();
+                        emit({type: 'remove', page: currentPageRef.current, ids: removed.flatMap(target => target.id ? [target.id] : [])});
+                        currentStrokeRef.current = null;
+                        isDrawingRef.current = false;
+                        gestureDirtyRef.current = false;
+                        redraw();
+                        window.setTimeout(flushPendingOps, 0);
+                        return;
+                    }
+                }
+                stroke = {...stroke, inkComplete: true};
                 if (heldShapeRef.current) {
                     heldShapeRef.current = null;
-                } else if (config.snapShapes && stroke.tool === 'pencil') {
-                    // Şekil düzeltme: serbest çizilen kapalı/düz şekilleri tanı.
-                    const recognized = recognizeShape(stroke.points);
-                    if (recognized) {
-                        stroke = {
-                            ...stroke,
-                            tool: recognized.tool,
-                            points: recognized.points,
-                            penType: undefined,
-                            fillEnabled: config.fillEnabled,
-                        };
-                    }
-                } else if ((stroke.tool === 'pencil' || stroke.tool === 'highlighter') && stroke.points.length > 5) {
+                } else if ((stroke.tool === 'pencil' || stroke.tool === 'highlighter') && stroke.inkVersion !== 3 && stroke.points.length > 5) {
                     stroke = {
                         ...stroke,
                         points: simplifyStroke(stroke.points, 0.4),

@@ -14,6 +14,7 @@
 // bu dosyayı değiştirmeye gerek yoktur.
 import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { responsiveAppHtml } from './responsive-apps.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -126,6 +127,18 @@ async function geriBaglantisiEkle(indexFile, appName) {
     console.log(`[copy-apps] ${appName}: "Atölye'ye dön" bağlantısı eklendi`);
 }
 
+// Nested experiment pages need the same viewport and mobile controls as entry pages.
+async function responsivePages(directory, appName) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+        const file = path.join(directory, entry.name);
+        if (entry.isDirectory()) await responsivePages(file, appName);
+        else if (entry.name.endsWith('.html')) {
+            const html = await readFile(file, 'utf8');
+            await writeFile(file, responsiveAppHtml(html, appName));
+        }
+    }
+}
+
 for (const folder of folders) {
     const from = path.join(appsDir, folder.name);
     const to = path.join(distDir, folder.name);
@@ -137,6 +150,8 @@ for (const folder of folders) {
         recursive: true,
         filter: (src) => !SKIP.has(path.basename(src)),
     });
+
+    await responsivePages(to, folder.name);
 
     const hasIndex = existsSync(path.join(from, 'index.html'));
     const warn = hasIndex ? '' : '  ⚠ index.html yok — /' + folder.name + '/ açılmayacak';

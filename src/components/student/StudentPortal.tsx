@@ -206,7 +206,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
 
     if (isFinished) {
         return (
-            <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8 text-center space-y-6">
+            <div className="min-h-[100svh] bg-white flex flex-col items-center justify-center p-8 text-center space-y-6">
                 <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center shadow-xl shadow-emerald-100">
                     <Zap className="w-10 h-10" aria-hidden="true" />
                 </div>
@@ -227,7 +227,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
 
     if (!isStarted) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+            <div className="min-h-[100svh] bg-slate-50 flex items-center justify-center p-4">
                 <motion.form
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -291,7 +291,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
 
     return (
         <div
-            className="fixed inset-0 bg-[#0f172a] z-[3000] flex flex-col h-screen overflow-hidden"
+            className="fixed inset-0 bg-[#0f172a] z-[3000] flex flex-col h-[100dvh] overflow-hidden"
             onPointerDown={(e) => e.stopPropagation()}
         >
             <header

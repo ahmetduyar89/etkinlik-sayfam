@@ -41,7 +41,7 @@ export class InkInput {
 
     sample(event: PointerEvent, position: Point, pen?: PenType, constrained = false): Point | null {
         // Pozisyon değişmediyse mükerrer örneği atla
-        if (this.raw && position.x === this.raw.x && position.y === this.raw.y) return null;
+        if (this.raw && this.filtered && position.x === this.raw.x && position.y === this.raw.y && event.pressure === this.filtered.pressure && event.tiltX === this.filtered.tiltX && event.tiltY === this.filtered.tiltY) return null;
         if (this.raw && event.timeStamp < this.time) return null;
         const timeDiff = this.raw ? (event.timeStamp - this.time) / 1000 : 0;
         const dt = this.raw ? Math.min(0.1, Math.max(0.002, timeDiff > 0 ? timeDiff : 1 / 120)) : 1 / 120;

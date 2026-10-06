@@ -1,11 +1,11 @@
 import type { DrawConfig } from '../../../types';
 export const PRESET_STORAGE_KEY = 'ink.pen-presets.v1';
 export const MAX_PEN_PRESETS = 12;
-export type PenSettings = Pick<DrawConfig, 'tool' | 'color' | 'width' | 'penType' | 'pressureSensitivity' | 'streamlineLevel' | 'highlighterOpacity' | 'dash'>;
+export type PenSettings = Pick<DrawConfig, 'tool' | 'color' | 'width' | 'penType' | 'pressureSensitivity' | 'tipSharpness' | 'pressureResponse' | 'streamlineLevel' | 'highlighterOpacity' | 'dash'>;
 export interface InkPreset { name: string; settings: PenSettings }
 export function capturePenSettings(config: DrawConfig): PenSettings {
     return { tool: config.tool === 'highlighter' ? 'highlighter' : 'pencil', color: config.color, width: config.width,
-        penType: config.penType ?? 'ballpoint', pressureSensitivity: config.pressureSensitivity ?? 'normal',
+        penType: config.penType ?? 'ballpoint', tipSharpness: config.tipSharpness ?? .5, pressureResponse: config.pressureResponse ?? .65, pressureSensitivity: config.pressureSensitivity ?? 'normal',
         streamlineLevel: config.streamlineLevel ?? 'smooth', highlighterOpacity: config.highlighterOpacity ?? 0.3,
         dash: config.dash ?? 'solid' };
 }

@@ -301,11 +301,11 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
             }}
             title={view === 'list' ? 'Sınıflarım ve Çalışma Alanları' : editingClass ? 'Sınıfı Düzenle' : 'Yeni Sınıf Ekle'}
         >
-            <div className="flex flex-col flex-1 overflow-y-auto max-h-[75vh] pr-1">
+            <div className="flex flex-col flex-1 overflow-y-auto max-h-[75dvh] pr-1">
                 {/* LİSTE GÖRÜNÜMÜ */}
                 {view === 'list' && (
                     <div className="flex flex-col gap-5">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                             <div>
                                 <p className="text-[13.5px] text-slate-500">
                                     Sisteme tanımladığınız sınıflar. Her sınıf kendi kullanıcı adı ve şifresiyle giriş yaptığında sadece o sınıfa tanımladığınız çalışmalar açılır.
@@ -577,7 +577,7 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
 
                         {/* Öğrenci Kadrosu */}
                         <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-5 flex flex-col gap-3">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                 <h4 className="text-[14px] font-extrabold text-slate-800 flex items-center gap-2">
                                     <Users className="w-4 h-4 text-indigo-600" />
                                     Öğrenci Kadrosu ({parsedStudents.length} Öğrenci)
@@ -644,7 +644,7 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
 
                         {/* Sınıfa Özel Fen Deneyleri */}
                         <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-5 flex flex-col gap-3">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                 <h4 className="text-[14px] font-extrabold text-slate-800 flex items-center gap-2">
                                     <FlaskConical className="w-4 h-4 text-emerald-600" />
                                     Sınıfa Tanımlanan Deneyler ({assignedExperiments.length} Seçili)

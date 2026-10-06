@@ -193,12 +193,12 @@ export function ChessTable({ code, playerId, studentId, playerName, classId, onE
               : 'Kaybettin';
 
     return (
-        <div className="mx-auto w-full max-w-5xl px-4 py-5">
-            <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mx-auto w-full max-w-5xl px-3 py-3 sm:px-6 sm:py-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-4">
                 <button
                     type="button"
                     onClick={handleExit}
-                    className="flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:text-on-surface"
+                    className="flex min-h-11 items-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:text-on-surface"
                 >
                     <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                     Salon
@@ -216,8 +216,8 @@ export function ChessTable({ code, playerId, studentId, playerName, classId, onE
                 </div>
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-                <div className="flex flex-col gap-2.5">
+            <div className="chess-game-layout grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+                <div className="chess-board-column mx-auto flex w-full min-w-0 max-w-[36rem] flex-col gap-2 lg:mx-0">
                     <PlayerBar
                         name={topSeat?.name ?? 'Rakip bekleniyor'}
                         color={opponentColor}
@@ -248,7 +248,7 @@ export function ChessTable({ code, playerId, studentId, playerName, classId, onE
                     />
                 </div>
 
-                <aside className="flex flex-col gap-3">
+                <aside className="flex min-w-0 flex-col gap-3">
                     <div className="rounded-2xl border border-outline-variant bg-surface p-4 text-xs text-on-surface-variant">
                         <h2 className="mb-1 font-bold text-on-surface">Oyun kuralları</h2>
                         <p>Standart satranç · {room.clock ? `${room.clock.initial_ms / 60_000} dakika + ${room.clock.increment_ms / 1_000} saniye/hamle` : 'Süresiz'}</p>
@@ -290,7 +290,7 @@ export function ChessTable({ code, playerId, studentId, playerName, classId, onE
                     )}
 
                     {room.status === 'bitti' && room.result && (
-                        <div className="flex flex-col gap-3">
+                        <div className="flex min-w-0 flex-col gap-3">
                             <ResultBanner
                                 result={resultTitle}
                                 reason={room.result.reason}
@@ -341,7 +341,7 @@ export function ChessTable({ code, playerId, studentId, playerName, classId, onE
                                 type="button"
                                 onClick={() => void offerDraw(code, playerId, !iOfferedDraw)}
                                 className={cn(
-                                    'flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-bold transition',
+                                    'flex flex-1 items-center justify-center gap-1.5 rounded-xl border min-h-11 px-3 py-2.5 text-sm font-bold transition',
                                     iOfferedDraw
                                         ? 'border-secondary/40 bg-secondary-container text-on-secondary-container'
                                         : 'border-outline-variant bg-surface text-on-surface-variant hover:text-on-surface'
@@ -357,7 +357,7 @@ export function ChessTable({ code, playerId, studentId, playerName, classId, onE
                             <button
                                 type="button"
                                 onClick={() => void resign(code, playerId)}
-                                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-error/30 bg-error-container px-3 py-2.5 text-xs font-bold text-on-error-container transition hover:brightness-105"
+                                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-error/30 bg-error-container min-h-11 px-3 py-2.5 text-sm font-bold text-on-error-container transition hover:brightness-105"
                             >
                                 <Flag className="h-3.5 w-3.5" aria-hidden="true" />
                                 Pes et

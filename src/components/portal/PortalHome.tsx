@@ -47,12 +47,12 @@ export function PortalHome({ onOpenInternal, folder }: PortalHomeProps) {
     }, [folder]);
 
     return (
-        <div className="relative min-h-screen overflow-hidden bg-[#f6f7fb] font-sans">
+        <div className="relative min-h-[100svh] overflow-hidden bg-[#f6f7fb] font-sans">
             <Zemin />
 
             <div className="relative">
                 <header className="border-b border-white/70 bg-white/70 backdrop-blur-xl">
-                    <div className="mx-auto flex max-w-[1240px] items-center gap-3 px-5 py-4 sm:px-8">
+                    <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-2 sm:gap-3 px-3 py-3 sm:py-4 sm:px-8">
                         <span className="font-headline-lg text-[19px] font-extrabold tracking-[-0.02em] text-slate-900">
                             Ahmet <span className="text-primary">DUYAR</span>
                         </span>
@@ -70,7 +70,7 @@ export function PortalHome({ onOpenInternal, folder }: PortalHomeProps) {
                             onClick={() => onOpenInternal('siniflar')}
                             aria-label="Sınıflar yönetimini aç"
                             title="Sınıflar"
-                            className="flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-indigo-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-indigo-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                         >
                             <School className="h-[18px] w-[18px]" aria-hidden="true" />
                             <span className="hidden sm:inline">Sınıflar</span>
@@ -82,14 +82,14 @@ export function PortalHome({ onOpenInternal, folder }: PortalHomeProps) {
                             onClick={lockApp}
                             title="Çıkış yap"
                             aria-label="Çıkış yap"
-                            className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-900/5 hover:text-slate-700"
+                            className="flex min-h-11 shrink-0 w-10 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-900/5 hover:text-slate-700"
                         >
                             <Lock className="h-[18px] w-[18px]" />
                         </button>
                     </div>
                 </header>
 
-                <main className="mx-auto max-w-[1240px] px-5 pb-16 pt-12 sm:px-8 sm:pt-16">
+                <main className="mx-auto max-w-[1240px] px-4 pb-[max(4rem,env(safe-area-inset-bottom))] pt-7 sm:px-8 sm:pt-16">
                     {folder && (
                         <button
                             type="button"

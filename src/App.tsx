@@ -914,7 +914,7 @@ export default function App({ onExitToPortal, view: viewProp, onViewChange }: Ap
                                             <span className="flex-1 h-px bg-outline-variant" />
                                             <span className="text-[12.5px] font-semibold text-on-surface-variant flex-shrink-0 hidden sm:inline">{shelf.grades}</span>
                                         </div>
-                                        <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(232px,1fr))]">
+                                        <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,232px),1fr))]">
                                             {shelf.items.map((act) => (
                                                 <ActivityCard
                                                     key={act.id}
@@ -935,7 +935,7 @@ export default function App({ onExitToPortal, view: viewProp, onViewChange }: Ap
                                 ))}
 
                                 {totalPages > 1 && (
-                                    <div className="flex items-center justify-center gap-2 pt-6">
+                                    <div className="flex flex-wrap items-center justify-center gap-2 pt-6">
                                         <button
                                             onClick={() => { setPage(safePage - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                                             disabled={safePage === 1}

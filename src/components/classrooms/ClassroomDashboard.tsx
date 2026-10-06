@@ -153,7 +153,7 @@ export function ClassroomDashboard({
 
     if (!activeClass) {
         return (
-            <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center p-6 text-center font-sans">
+            <div className="min-h-[100svh] bg-[#f8fafc] flex flex-col items-center justify-center p-6 text-center font-sans">
                 <School className="w-12 h-12 text-slate-400 mb-3" />
                 <h2 className="text-[20px] font-bold text-slate-800 mb-1">Sınıf Bilgisi Yükleniyor…</h2>
                 <p className="text-[14px] text-slate-500 mb-6">
@@ -171,10 +171,10 @@ export function ClassroomDashboard({
     }
 
     return (
-        <div className="min-h-screen bg-[#f6f8fc] font-sans pb-20">
+        <div className="min-h-[100svh] bg-[#f6f8fc] font-sans pb-20">
             {/* Admin Önizleme Üst Şeridi */}
             {isAdminPreview && (
-                <div className="bg-amber-500 text-amber-950 px-4 py-2 text-[12.5px] font-bold flex items-center justify-between shadow-sm">
+                <div className="bg-amber-500 text-amber-950 px-4 py-2 text-[12.5px] font-bold flex flex-wrap items-center justify-between gap-2 shadow-sm">
                     <div className="flex items-center gap-2">
                         <Crown className="w-4 h-4" />
                         <span>Admin Önizleme Modu: "{activeClass.name}" sınıfının öğrenci görünümündesiniz.</span>

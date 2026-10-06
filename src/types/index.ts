@@ -130,7 +130,11 @@ export interface Stroke {
     /** Serbest çizim kalemlerinde uç karakteri (varsayılan: ballpoint). */
     penType?: PenType;
     pressureSensitivity?: PressureSensitivity;
-    inkVersion?: 2;
+    /** Normalized Goodnotes brush settings, captured on each stroke. */
+    tipSharpness?: number;
+    pressureResponse?: number;
+    inkVersion?: 2 | 3;
+    inkComplete?: boolean;
     opacity?: number;
     /** `tool === 'math'` olduğunda çizilecek matematik nesnesi. */
     math?: MathObject;
@@ -428,6 +432,9 @@ export interface DrawConfig {
     /** Serbest çizim kaleminin ucu. */
     penType?: PenType;
     pressureSensitivity?: PressureSensitivity;
+    /** Normalized Goodnotes brush settings, captured on each stroke. */
+    tipSharpness?: number;
+    pressureResponse?: number;
     highlighterOpacity?: number;
     /** Serbest çizilen şekli tanıyıp düzgün şekle çevir. */
     snapShapes?: boolean;

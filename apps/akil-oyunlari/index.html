@@ -3068,8 +3068,8 @@
       if (cvs) {
         cvs.addEventListener('click', (e) => {
           const rect = cvs.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
+          const x = (e.clientX - rect.left) * (cvs.width / rect.width);
+          const y = (e.clientY - rect.top) * (cvs.height / rect.height);
           const lvl = laserLevels[laserCurrentLevel];
           const cellSize = cvs.width / lvl.size;
           const c = Math.floor(x / cellSize);

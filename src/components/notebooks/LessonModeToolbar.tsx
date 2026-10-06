@@ -32,7 +32,7 @@ export function LessonModeToolbar({
 
     const btn = (active: boolean) =>
         cn(
-            'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12.5px] font-semibold transition-colors',
+            'inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12.5px] font-semibold transition-colors',
             active
                 ? 'bg-primary text-white'
                 : 'text-on-surface-variant hover:bg-surface-container-high'

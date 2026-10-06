@@ -173,7 +173,7 @@ export function PasswordGate({ children }: PasswordGateProps) {
 
     if (!authReady && !isStudentLink() && !isChessLink()) {
         return (
-            <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center text-slate-500">
+            <div className="min-h-[100svh] bg-[#f8fafc] flex items-center justify-center text-slate-500">
                 <Loader2 className="h-6 w-6 animate-spin" aria-label="Oturum kontrol ediliyor" />
             </div>
         );
@@ -183,7 +183,7 @@ export function PasswordGate({ children }: PasswordGateProps) {
     if (isUnlocked || isStudentLink() || isChessLink()) return <>{children}</>;
 
     return (
-        <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 sm:p-6 font-sans">
+        <div className="min-h-[100svh] bg-[#f8fafc] flex items-center justify-center p-4 sm:p-6 font-sans">
             <div className="w-full max-w-[400px] bg-white border border-slate-200/80 rounded-[28px] shadow-[0_12px_40px_rgba(15,23,42,0.08)] p-6 sm:p-8 flex flex-col items-center">
                 {/* Logo & Başlık */}
                 <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100/80 text-indigo-600 flex items-center justify-center mb-3.5 shadow-sm">

@@ -292,7 +292,7 @@ export function ActivityPreviewModal({
                 aria-label={activity.title}
                 className="relative w-full h-full bg-white overflow-hidden flex flex-col"
             >
-                <header className="h-14 px-4 bg-slate-900 border-b border-white/5 flex justify-between items-center shrink-0 z-[11000] gap-2">
+                <header className="min-h-14 flex-wrap py-2 px-3 sm:px-4 bg-slate-900 border-b border-white/5 flex justify-between items-center shrink-0 z-[11000] gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                         <div className="w-7 h-7 bg-indigo-500/20 rounded-lg flex items-center justify-center shrink-0">
                             <Blocks className="w-3.5 h-3.5 text-indigo-400" aria-hidden="true" />

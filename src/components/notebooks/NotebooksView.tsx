@@ -707,7 +707,7 @@ export function NotebooksView() {
                     {isNewMenuOpen && (
                         <div
                             role="menu"
-                            className="absolute right-0 top-full mt-2 z-40 w-[340px] bg-white border border-outline-variant rounded-[20px] shadow-[0_18px_44px_rgba(15,23,42,0.16)] p-3"
+                            className="responsive-popover absolute right-0 top-full mt-2 z-40 w-[340px] max-w-[calc(100vw-1.5rem)] bg-white border border-outline-variant rounded-[20px] shadow-[0_18px_44px_rgba(15,23,42,0.16)] p-3"
                         >
                             <div className="grid grid-cols-2 gap-2.5">
                                 <button

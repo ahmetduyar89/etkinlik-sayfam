@@ -101,7 +101,7 @@ export function ChessArena() {
     }, []);
 
     if (!identityReady) {
-        return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" aria-label="Oyuncu oturumu kontrol ediliyor" /></div>;
+        return <div className="flex min-h-[100svh] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" aria-label="Oyuncu oturumu kontrol ediliyor" /></div>;
     }
 
     if (!student) {
@@ -181,13 +181,13 @@ function PlayerNameGate({
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="flex min-h-[100svh] items-center justify-center px-4 py-6">
             <form
                 onSubmit={(e) => {
                     e.preventDefault();
                     void submit();
                 }}
-                className="w-full max-w-[380px] rounded-[22px] border border-outline-variant bg-surface p-7 text-center shadow-[0_8px_30px_rgba(15,23,42,0.08)]"
+                className="w-full max-w-[380px] rounded-[22px] border border-outline-variant bg-surface p-5 sm:p-7 text-center shadow-[0_8px_30px_rgba(15,23,42,0.08)]"
             >
                 <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
                     <Crown className="h-7 w-7" aria-hidden="true" />
@@ -216,7 +216,7 @@ function PlayerNameGate({
                     autoComplete="name"
                     maxLength={80}
                     placeholder="Ad soyad"
-                    className="mt-5 w-full rounded-2xl border-[1.5px] border-transparent bg-surface-container-high px-4 py-3 text-center text-[15px] font-semibold text-on-surface outline-none transition focus:border-primary focus:bg-surface"
+                    className="mt-5 w-full rounded-2xl border-[1.5px] border-transparent bg-surface-container-high px-4 py-3 text-center text-base font-semibold text-on-surface outline-none transition focus:border-primary focus:bg-surface"
                 />
 
                 <button

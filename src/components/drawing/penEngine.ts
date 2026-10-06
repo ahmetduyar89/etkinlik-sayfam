@@ -3,6 +3,8 @@
 
 import type { PenType, Point, Stroke } from '../../types';
 import { widthFactor, nibFactor } from './InkEngine/physics';
+import { ribbonOutline, outlinePath } from './goodnotes/InkEngine';
+import { isGoodnotesPen } from './goodnotes/types';
 import { renderGraphite } from './InkEngine/graphite';
 
 export interface PenProfile {
@@ -153,13 +155,13 @@ export function samplePressure(
 ): number {
     const profile = getPenProfile(pen);
     const hasStylusPressure =
-        pointerType === 'pen' && Number.isFinite(pressure) && pressure > 0 && pressure !== 0.5;
+        pointerType === 'pen' && Number.isFinite(pressure) && pressure >= 0;
 
     let raw: number;
     if (hasStylusPressure) {
         // Stylus basıncını yumuşak bir S-eğrisiyle daha hassas hale getir
         const p = clamp(pressure, 0.01, 1);
-        raw = p * p * (3 - 2 * p); // smoothstep
+        raw = p; // Preserve real tablet pressure, including the valid midpoint.
     } else {
         // Hız tabanlı baskı: hızlı hareket ederken incelir, yavaşlarken dolgunlaşır
         // Akıllı tahtalarda geniş hareket alanı olduğu için aşırı incelmeyi sınırla
@@ -249,7 +251,7 @@ interface StrokePoint {
 /**
  * Ham noktaları normalize edip mesafe, kümülatif uzunluk ve yön vektörleriyle işler.
  */
-function getStrokePoints(rawPoints: Point[], penProfile: PenProfile): StrokePoint[] {
+function getStrokePoints(rawPoints: Point[]): StrokePoint[] {
     const pts: Point[] = [];
     for (const p of rawPoints) {
         const last = pts[pts.length - 1];
@@ -310,7 +312,7 @@ export function getStrokeOutlinePoints(
     options?: Pick<Stroke, 'inkVersion' | 'pressureSensitivity'>
 ): Point[] {
     const profile = getPenProfile(penType);
-    const strokePoints = getStrokePoints(rawPoints, profile);
+    const strokePoints = getStrokePoints(rawPoints);
     const count = strokePoints.length;
 
     if (count === 0) return [];
@@ -439,6 +441,9 @@ interface CachedInkPath {
     pen: Stroke['penType'];
     version: Stroke['inkVersion'];
     sensitivity: Stroke['pressureSensitivity'];
+    sharpness?: number;
+    response?: number;
+    complete?: boolean;
     tail: Point | undefined;
     path: Path2D;
 }
@@ -451,18 +456,24 @@ export function getInkPath(stroke: Stroke, baseWidth: number): Path2D | null {
     const cached = inkPaths.get(stroke);
     if (cached && cached.points === stroke.points && cached.count === stroke.points.length &&
         cached.width === baseWidth && cached.pen === stroke.penType && cached.version === stroke.inkVersion &&
-        cached.sensitivity === stroke.pressureSensitivity && cached.tail === tail) return cached.path;
-    const outline = getStrokeOutlinePoints(stroke.points, baseWidth, stroke.penType, stroke);
+        cached.sensitivity === stroke.pressureSensitivity && cached.sharpness === stroke.tipSharpness &&
+        cached.response === stroke.pressureResponse && cached.complete === stroke.inkComplete && cached.tail === tail) return cached.path;
+    const modern = stroke.inkVersion === 3 && isGoodnotesPen(stroke.penType);
+    const outline = modern ? ribbonOutline(stroke.points, {pen: isGoodnotesPen(stroke.penType) ? stroke.penType : 'ballpoint',
+        width: baseWidth, sharpness: stroke.tipSharpness ?? .5, sensitivity: stroke.pressureResponse ?? .65,
+        complete: stroke.inkComplete ?? false}) : getStrokeOutlinePoints(stroke.points, baseWidth, stroke.penType, stroke);
     if (!outline.length) return null;
-    const path = new Path2D();
+    const path = modern ? outlinePath(outline) : new Path2D();
+    if (!modern) {
     path.moveTo(outline[0].x, outline[0].y);
     for (let i = 0; i < outline.length; i++) {
         const current = outline[i], next = outline[(i + 1) % outline.length];
         path.quadraticCurveTo(current.x, current.y, (current.x + next.x) / 2, (current.y + next.y) / 2);
     }
     path.closePath();
+    }
     inkPaths.set(stroke, { points: stroke.points, count: stroke.points.length, width: baseWidth,
-        pen: stroke.penType, version: stroke.inkVersion, sensitivity: stroke.pressureSensitivity, tail, path });
+        pen: stroke.penType, version: stroke.inkVersion, sensitivity: stroke.pressureSensitivity, sharpness: stroke.tipSharpness, response: stroke.pressureResponse, complete: stroke.inkComplete, tail, path });
     return path;
 }
 

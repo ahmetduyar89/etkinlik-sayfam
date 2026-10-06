@@ -39,9 +39,9 @@ export function ClassAdminDashboard({ onBack, onPreviewClass }: ClassAdminDashbo
     };
 
     return (
-        <div className="min-h-screen bg-[#f6f7fb] text-slate-900">
+        <div className="min-h-[100svh] bg-[#f6f7fb] text-slate-900">
             <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
-                <div className="mx-auto flex max-w-[1320px] items-center gap-3 px-5 py-4 sm:px-8">
+                <div className="mx-auto flex max-w-[1320px] flex-wrap items-center gap-2 sm:gap-3 px-3 py-3 sm:py-4 sm:px-8">
                     <button type="button" onClick={onBack} className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">
                         <ArrowLeft className="h-4 w-4" /> Atölye
                     </button>
@@ -49,13 +49,13 @@ export function ClassAdminDashboard({ onBack, onPreviewClass }: ClassAdminDashbo
                     <School className="h-5 w-5 text-indigo-600" />
                     <strong className="text-[17px]">Sınıflar</strong>
                     <span className="hidden text-sm text-slate-400 sm:inline">Öğrenciler, girişler ve satranç yönetimi</span>
-                    <button type="button" onClick={openManager} className="ml-auto rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
+                    <button type="button" onClick={openManager} className="ml-auto rounded-xl bg-indigo-600 min-h-11 px-3 sm:px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
                         Sınıfları yönet
                     </button>
                 </div>
             </header>
 
-            <main className="mx-auto grid max-w-[1320px] gap-6 px-5 py-8 sm:px-8 lg:grid-cols-[22rem_minmax(0,1fr)]">
+            <main className="mx-auto grid max-w-[1320px] gap-4 sm:gap-6 px-3 py-5 sm:py-8 sm:px-8 lg:grid-cols-[22rem_minmax(0,1fr)]">
                 <aside>
                     <h1 className="text-3xl font-extrabold tracking-tight">Sınıf merkezi</h1>
                     <p className="mt-2 text-sm leading-relaxed text-slate-500">Bir sınıf seçin; giriş bilgilerini, öğrenci listesini, satranç ilerlemesini, maçları ve turnuvaları aynı yerde yönetin.</p>
@@ -91,7 +91,7 @@ export function ClassAdminDashboard({ onBack, onPreviewClass }: ClassAdminDashbo
                     </div>
                 </aside>
 
-                <section>
+                <section className="min-w-0">
                     {selected ? (
                         <ClassWorkspace item={selected} cloud={cloud} onEdit={() => editClass(selected)} onPreview={() => onPreviewClass(selected)} />
                     ) : (
@@ -220,7 +220,7 @@ function ClassWorkspace({ item, cloud, onEdit, onPreview }: {
                     <h3 className="font-extrabold text-slate-900">Öğrenciler ve satranç durumu</h3>
                     <p className="mt-1 text-xs text-slate-500">Öğrenci numarası, canlı giriş hazırlığı, seviye, ders ve maç sonuçları birlikte gösterilir.</p>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="min-w-0 overflow-x-auto overscroll-x-contain" tabIndex={0} aria-label="Öğrenci tablosu, yatay kaydırılabilir">
                     <table className="w-full min-w-[820px] text-left text-sm">
                         <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                             <tr>

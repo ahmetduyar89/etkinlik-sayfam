@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import AppShell from './AppShell';
 import './index.css';
+import './responsive.css';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ToastProvider } from './components/common/ToastProvider';
 import { ConfirmDialogProvider } from './components/common/ConfirmDialog';

@@ -187,7 +187,7 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
 
     if (error) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+            <div className="min-h-[100svh] flex flex-col items-center justify-center gap-3 bg-background px-6 text-center">
                 <p className="text-[15px] font-bold text-on-surface">Defter açılamadı</p>
                 <p className="text-[13.5px] text-on-surface-variant max-w-[420px]">{error}</p>
             </div>
@@ -196,7 +196,7 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
 
     if (!notebook || pages === null) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+            <div className="min-h-[100svh] flex flex-col items-center justify-center gap-4 bg-background">
                 <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                 <p className="text-on-surface-variant font-bold uppercase tracking-widest text-xs">
                     Defter açılıyor…
@@ -215,7 +215,7 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
     const canGoNext = pageInfo.current < pageInfo.total - 1;
 
     return (
-        <div ref={stageRef} className="h-screen flex flex-col bg-background">
+        <div ref={stageRef} className="h-[100dvh] flex flex-col bg-background">
             <header className="flex items-center gap-3 px-4 h-14 bg-white border-b border-outline-variant flex-shrink-0">
                 <h1 className="flex-1 min-w-0 truncate text-[15px] font-extrabold text-on-surface">
                     {notebook.title}

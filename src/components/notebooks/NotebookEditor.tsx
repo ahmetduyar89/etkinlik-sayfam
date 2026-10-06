@@ -197,11 +197,11 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const [bgColor, setBgColor] = React.useState(notebook.bg_color || '#ffffff');
 
     const [config, setConfig] = React.useState<DrawConfig>(() => {
-        let savedPenType: any = 'marker';
-        let savedWidth = 4;
+        let savedPenType: DrawConfig['penType'] = 'ballpoint';
+        let savedWidth = 0.5 * 96 / 25.4;
         try {
             const pt = localStorage.getItem('notebook_pen_type');
-            if (pt) savedPenType = pt;
+            if (pt === 'ballpoint' || pt === 'fountain' || pt === 'brush') savedPenType = pt;
             const pw = localStorage.getItem('notebook_pen_width');
             if (pw) savedWidth = parseFloat(pw) || 4;
         } catch {}
@@ -216,7 +216,10 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             streamlineLevel: 'smooth',
             snapShapes: true,
             snapAngle: false,
-            eraserMode: 'pixel',
+            eraserMode: 'stroke',
+            smartScribbleErase: true,
+            tipSharpness: .5,
+            pressureResponse: .65,
         };
     });
 
@@ -1173,7 +1176,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     <div
                         role="menu"
                         aria-label="PDF Menüsü"
-                        className="absolute right-0 sm:left-0 sm:right-auto top-[calc(100%+8px)] z-[9200] w-[280px] bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
+                        className="responsive-popover absolute right-0 sm:left-0 sm:right-auto top-[calc(100%+8px)] z-[9200] w-[280px] bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
                     >
                         {notebook.pdf_id ? (
                             <>
@@ -1284,7 +1287,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     <div
                         role="menu"
                         aria-label="Dışa Aktarma Menüsü"
-                        className="absolute right-0 top-[calc(100%+8px)] z-[9200] w-[270px] bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
+                        className="responsive-popover absolute right-0 top-[calc(100%+8px)] z-[9200] w-[270px] bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
                     >
                         <p className="px-2.5 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
                             PDF Dışa Aktarma
@@ -1406,7 +1409,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     <div
                         role="menu"
                         aria-label="Sayfa şablonu"
-                        className="absolute left-1/2 -translate-x-1/2 top-[calc(100%+8px)] z-[9200] w-[268px] max-h-[70vh] overflow-y-auto bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
+                        className="responsive-popover absolute left-1/2 -translate-x-1/2 top-[calc(100%+8px)] z-[9200] w-[268px] max-h-[70vh] overflow-y-auto bg-white text-on-surface rounded-2xl shadow-2xl border border-outline-variant p-2 animate-in fade-in zoom-in-95 duration-150"
                     >
                         <div className="mb-2">
                             <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
@@ -1499,7 +1502,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     );
 
     const renderCompactHeader = () => (
-        <header className="flex items-center justify-between px-2 sm:px-3 py-1 bg-primary text-white shadow-sm flex-shrink-0 relative z-[6000] text-xs h-[38px]">
+        <header className="notebook-header flex flex-wrap items-center justify-between gap-1 px-2 sm:px-3 py-1 bg-primary text-white shadow-sm flex-shrink-0 relative z-[6000] text-xs min-h-[38px]">
             {/* Sol: Geri + Başlık + Sayfalar + Sayfa Gezintisi */}
             <div className="flex items-center gap-1 sm:gap-2 min-w-0">
                 <button
@@ -1671,7 +1674,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     );
 
     return (
-        <div className="fixed inset-0 z-[9000] flex flex-col bg-surface-container-low">
+        <div className="notebook-editor fixed inset-0 z-[9000] h-[100dvh] flex flex-col bg-surface-container-low">
             {/* Tam Tuval / Üst Menü Gizli İken Yüzen Mini Menü Kapsülü */}
             {hideHeader && !presenting && (
                 <div className="absolute top-2 left-3 z-[6500] flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md text-white border border-white/20 px-2.5 py-1 rounded-xl shadow-xl text-xs select-none">
@@ -1736,7 +1739,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 <>
                     {/* Üst şerit - Belge ve Dışa Aktarma Başlığı */}
                     <header
-                        className="flex items-center justify-between px-3 sm:px-4 py-2 bg-primary text-white shadow-[0_2px_10px_rgba(15,23,42,0.18)] flex-shrink-0 relative z-[6000]"
+                        className="notebook-header flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 px-3 sm:px-4 py-2 bg-primary text-white shadow-[0_2px_10px_rgba(15,23,42,0.18)] flex-shrink-0 relative z-[6000]"
                     >
                 {/* Sol: Geri düğmesi, Başlık, Defter türü */}
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -1888,7 +1891,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             {/* İkincil Şerit - Sayfa Gezintisi, Kağıt Şablonu & Ders Sunum Araçları */}
             <div
                 className={cn(
-                    'flex items-center justify-between px-3 sm:px-4 py-1.5 bg-white dark:bg-surface-container border-b border-outline-variant flex-shrink-0 relative z-[5500] text-[12.5px]',
+                    'notebook-page-tools flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-1.5 bg-white dark:bg-surface-container border-b border-outline-variant flex-shrink-0 relative z-[5500] text-[12.5px]',
                     presenting && 'hidden'
                 )}
             >

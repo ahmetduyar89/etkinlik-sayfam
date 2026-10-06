@@ -2,6 +2,7 @@ import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
+import { responsiveAppHtml } from './scripts/responsive-apps.mjs'
 
 // `apps/` altındaki statik projeleri (satranç, deneyler…) geliştirme sunucusunda
 // da yayınla. Yayın sırasında aynı işi scripts/copy-apps.mjs yapar.
@@ -95,7 +96,7 @@ a[${GERI_MARKER}]:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2p
         if (!fs.existsSync(file)) return next()
 
         if (file.endsWith('.html')) {
-          let html = fs.readFileSync(file, 'utf-8')
+          let html = responsiveAppHtml(fs.readFileSync(file, 'utf-8'), name)
           if (!html.includes('data-atolye-geri')) {
             const kapanis = html.lastIndexOf('</body>')
             html = kapanis === -1 ? html + GERI_BAGLANTISI : html.slice(0, kapanis) + GERI_BAGLANTISI + html.slice(kapanis)
