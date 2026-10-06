@@ -714,14 +714,22 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
         }, [cancelInkFrame]);
 
+        const [reducedElementMotion, setReducedElementMotion] = React.useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        React.useEffect(() => {
+            const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+            const update = () => setReducedElementMotion(media.matches);
+            media.addEventListener('change', update);
+            return () => media.removeEventListener('change', update);
+        }, []);
+
         /** Sayfadaki animasyonlu (canlı) simülasyonların indeksleri. */
         const animatedIndexes = React.useCallback(() => {
             const out: number[] = [];
             strokesRef.current.forEach((st, i) => {
-                if (isAnimated(st)) out.push(i);
+                if (isAnimated(st) && !(reducedElementMotion && st.tool === 'image')) out.push(i);
             });
             return out;
-        }, []);
+        }, [reducedElementMotion]);
 
         const redraw = React.useCallback(() => {
             // Canlı simülasyonlar tampona girmez: her karede üstte yeniden
@@ -735,6 +743,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             paintBuffer(new Set(animated));
             paintMain(animated.map((i) => strokesRef.current[i]));
         }, [animatedIndexes, paintBuffer, paintMain]);
+
+        React.useEffect(() => { redraw(); }, [reducedElementMotion, redraw]);
 
         const previousToolRef = React.useRef<DrawingTool>('pencil');
         React.useEffect(() => {
@@ -803,8 +813,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
         /** Sayfada canlı (animasyonlu) simülasyon var mı. */
         const hasAnimated = React.useMemo(
-            () => strokes.some(isAnimated),
-            [strokes]
+            () => strokes.some(st => isAnimated(st) && !(reducedElementMotion && st.tool === 'image')),
+            [strokes, reducedElementMotion]
         );
 
         /**
@@ -816,12 +826,16 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (!hasAnimated) return;
             let cancelled = false;
             if (simStartRef.current === 0) simStartRef.current = performance.now();
+            let lastGifPaint = -Infinity;
             const tick = () => {
                 if (cancelled) return;
                 simTimeRef.current = (performance.now() - simStartRef.current) / 1000;
                 const animated = animatedIndexes();
                 // Sürükleme sırasında tampon seçime göre ayarlı; karışmasın.
-                if (animated.length > 0 && !dragCachedRef.current) {
+                const now = performance.now();
+                const hasSimulation = animated.some(i => strokesRef.current[i].tool === 'math');
+                if (!document.hidden && animated.length > 0 && !dragCachedRef.current && (hasSimulation || now - lastGifPaint >= 80)) {
+                    lastGifPaint = now;
                     const live = animated.map((i) => strokesRef.current[i]);
                     // Devam eden çizim de her karede yeniden basılmalı; aksi
                     // halde animasyon ana katmanı temizlerken kalem izi kaybolur.

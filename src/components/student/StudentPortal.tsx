@@ -396,6 +396,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
                 <AnimatePresence>
                     {isDrawingMode && (
                         <DrawingToolbar
+                            onInsertElement={(src,w,h) => canvasRef.current?.insertImage(src,w,h)}
                             onCommand={handleToolbarCommand}
                             config={drawConfig}
                             setConfig={setDrawConfig}

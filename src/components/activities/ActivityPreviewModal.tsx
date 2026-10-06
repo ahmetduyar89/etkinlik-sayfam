@@ -486,6 +486,7 @@ export function ActivityPreviewModal({
                 <AnimatePresence>
                     {isPreviewDrawingMode && (
                         <DrawingToolbar
+                            onInsertElement={(src,w,h) => canvasRef.current?.insertImage(src,w,h)}
                             fixed
                             onInsertMath={(math) => canvasRef.current?.insertMath(math)}
                             onCommand={(type) => {

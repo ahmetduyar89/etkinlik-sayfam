@@ -1,3 +1,4 @@
+import { animatedElement, elementFrame } from './elements/animation';
 // src/components/drawing/strokeRenderer.ts
 // Çizim verisinin canvas'a aktarılması ve geometri yardımcıları.
 //
@@ -1089,9 +1090,14 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, 
         const y = Math.min(a.y, b.y);
         const w = Math.abs(b.x - a.x);
         const h = Math.abs(b.y - a.y);
-        const img = getImage(s.src);
+        const animation = animatedElement(s.src);
+        const img = getImage(animation?.sprite ?? s.src);
         if (img) {
-            tCtx.drawImage(img, x, y, w, h);
+            if (animation) {
+                const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                const frame = elementFrame(reduceMotion ? 0 : time, animation.frames, animation.frameMs);
+                tCtx.drawImage(img, frame*animation.width, 0, animation.width, animation.height, x, y, w, h);
+            } else tCtx.drawImage(img, x, y, w, h);
         } else {
             // Yüklenene kadar yer tutucu çerçeve.
             tCtx.save();

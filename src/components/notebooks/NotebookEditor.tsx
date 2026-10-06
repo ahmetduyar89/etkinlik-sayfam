@@ -1614,6 +1614,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             {/* GoodNotes Tarzı Sabit Çizim Araç Çubuğu */}
             {!presenting && (
                 <DrawingToolbar
+                            onInsertElement={(src,w,h) => canvasRef.current?.insertImage(src,w,h)}
                     fixed
                     compact
                     onCommand={(type) => {

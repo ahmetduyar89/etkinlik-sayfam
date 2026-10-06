@@ -21,6 +21,8 @@ export interface DrawingToolbarProps {
     onInsertMath?: (math: MathObject) => void;
     canUndo?: boolean;
     canRedo?: boolean;
+    /** Insert an original built-in PNG or animated element without lossy image import. */
+    onInsertElement?: (src: string, width: number, height: number) => void;
     onInsertImages?: (files: FileList | File[]) => void;
     isInsertingImage?: boolean;
     zoom?: number;
