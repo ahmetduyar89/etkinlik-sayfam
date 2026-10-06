@@ -141,8 +141,8 @@ export const PORTAL_MODULES: PortalModule[] = [
         id: 'deneyler',
         title: 'Küçük Mucitler Laboratuvarı',
         description:
-            'Çocuklar için interaktif fen deneyleri: pusuladan termometreye, gölge oyunundan ışıldayan devreye 14 etkileşimli düzenek.',
-        meta: '14 deney · İnteraktif',
+            'Çocuklar için interaktif fen deneyleri: pusuladan termometreye, gölge oyunundan ışıldayan devreye 23 etkileşimli düzenek.',
+        meta: '23 deney · İnteraktif',
         icon: FlaskConical,
         accent: {
             icon: 'from-emerald-400 to-teal-500',

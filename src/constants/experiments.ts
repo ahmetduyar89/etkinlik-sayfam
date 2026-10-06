@@ -10,6 +10,14 @@ export interface ExperimentItem {
 
 export const EXPERIMENTS_CATALOG: ExperimentItem[] = [
     {
+        id: 'karabiber-tuz',
+        file: 'karabiber-tuz.html',
+        title: 'Karabiber-Tuz Deneyi',
+        category: 'Elektrik',
+        icon: '🎈',
+        summary: 'Yüne sürtülen balonla statik elektriği keşfet ve karabiberi tuzdan ayır.',
+    },
+    {
         id: 'basit-pusula',
         file: 'basit-pusula.html',
         title: 'Basit Pusula Yapımı',

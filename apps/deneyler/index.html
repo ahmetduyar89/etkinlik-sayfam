@@ -284,7 +284,7 @@
           <h2 class="display text-xl sm:text-2xl text-ink flex items-center gap-2">
             <span>🧪</span> İnteraktif Deney İstasyonları
           </h2>
-          <p class="text-xs font-bold text-gray-500">22 Harika Fen Deneyi Hazır!</p>
+          <p class="text-xs font-bold text-gray-500">23 Harika Fen Deneyi Hazır!</p>
         </div>
       </div>
 
@@ -293,8 +293,46 @@
       </button>
     </div>
 
-    <!-- 22 Büyük İnteraktif Kart Izgarası -->
+    <!-- 23 Büyük İnteraktif Kart Izgarası -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+
+      <!-- Karabiber-Tuz Deneyi: statik elektrik -->
+      <article class="chunky bg-white overflow-hidden flex flex-col justify-between hover:shadow-[0_12px_0_#182b4d] transition-all duration-200">
+        <div class="relative bg-gradient-to-br from-pink-100 via-purple-50 to-amber-100 p-6 flex items-center justify-center border-b-3 border-ink min-h-[200px]">
+          <span class="absolute top-3 left-3 px-2.5 py-0.5 bg-white border-2 border-ink rounded-full text-[11px] font-black text-purple-700">YENİ DENEY</span>
+          <span class="absolute top-3 right-3 px-2 py-0.5 bg-sun border-2 border-ink rounded-lg text-[11px] font-bold">1–4. Sınıf</span>
+          <svg width="180" height="145" viewBox="0 0 180 145" class="sticker" aria-hidden="true">
+            <ellipse cx="90" cy="127" rx="74" ry="12" fill="#f8fafc" stroke="#182b4d" stroke-width="3"/>
+            <ellipse cx="90" cy="48" rx="36" ry="42" fill="#f472b6" stroke="#182b4d" stroke-width="3"/>
+            <ellipse cx="76" cy="30" rx="8" ry="15" fill="white" opacity=".6" transform="rotate(25 76 30)"/>
+            <path d="M90 90L84 97H96Z" fill="#ec4899" stroke="#182b4d" stroke-width="2"/>
+            <text x="105" y="42" font-size="24" fill="#182b4d">−</text>
+            <circle cx="68" cy="97" r="3" fill="#443326"/><circle cx="110" cy="86" r="3" fill="#443326"/><circle cx="79" cy="114" r="3" fill="#443326"/>
+            <path d="M68 116V106M110 110V95" stroke="#7c3aed" stroke-width="2" stroke-dasharray="3 2"/>
+            <circle cx="57" cy="126" r="3" fill="#443326"/><circle cx="100" cy="126" r="3" fill="#443326"/>
+            <path d="M70 122h5v5h-5zM121 121h5v5h-5zM88 129h5v5h-5z" fill="white" stroke="#94a3b8"/>
+          </svg>
+        </div>
+        <div class="p-5 flex-1 flex flex-col justify-between gap-4">
+          <div>
+            <h3 class="display text-xl text-ink mb-2">🎈 Karabiber-Tuz Deneyi</h3>
+            <p class="text-xs text-gray-700 leading-relaxed font-semibold mb-3">Balonu yüne sürt, tuz ve karabiber karışımına yaklaştır. Karabiberlerin balona sıçramasını izle! Görünmeyen statik elektriğin sırrını keşfet.</p>
+            <div class="bg-purple-50 p-2.5 rounded-xl border-2 border-ink/40 mb-3">
+              <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Neler Öğreneceksin?</span>
+              <ul class="text-[11px] font-bold text-ink space-y-1">
+                <li>⚡ Sürtünmeyle elektrik yükünün birikmesini keşfeder.</li>
+                <li>🎈 Balonun taneleri dokunmadan çekmesini gözlemler.</li>
+                <li>🔍 Mesafeyi değiştirir, gözlemlerini karşılaştırır.</li>
+              </ul>
+            </div>
+            <div class="flex flex-wrap gap-1.5"><span class="px-2 py-0.5 bg-pink-100 text-pink-800 text-[10px] font-bold rounded-lg border border-ink">Statik Elektrik</span><span class="px-2 py-0.5 bg-purple-100 text-purple-800 text-[10px] font-bold rounded-lg border border-ink">Karışımları Ayırma</span></div>
+          </div>
+          <div class="flex items-center gap-2 pt-3 border-t-2 border-dashed border-gray-300">
+            <a href="karabiber-tuz.html" class="pushable flex-1 text-center display bg-purple-500 hover:bg-purple-600 text-white py-2.5 text-sm font-extrabold">🧪 Deneye Başla</a>
+            <button onclick="openModalSimulation('karabiber-tuz.html', 'Karabiber-Tuz Deneyi')" class="pushable bg-white hover:bg-gray-100 px-3 py-2.5 text-ink font-bold text-xs" title="Sayfadan ayrılmadan aç">🖥️ Hızlı</button>
+          </div>
+        </div>
+      </article>
 
       <!-- KART 1: Sihirli Termometre -->
       <article class="chunky bg-white overflow-hidden flex flex-col justify-between hover:shadow-[0_12px_0_#182b4d] transition-all duration-200">

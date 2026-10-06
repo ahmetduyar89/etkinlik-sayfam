@@ -277,6 +277,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const onViewChangeRef = React.useRef(onViewChange);
         /** Aktif işaretçiler — çift parmak yakınlaştırmayı tanımak için. */
         const pointersRef = React.useRef(new Map<number, Point>());
+        /** Finger gestures remain available while Pencil hover suppresses finger ink. */
+        const touchPointersRef = React.useRef(new Map<number, Point>());
         /**
          * Çift parmak jestinin başlangıç durumu: parmak arası mesafe, o anki
          * ölçek ve parmakların ORTA NOKTASININ altında kalan dünya noktası.
@@ -2099,6 +2101,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const angle = twist !== 0 ? (twist * Math.PI) / 180 : hasTilt ? Math.atan2(tiltY, tiltX) : Math.PI / 4;
 
             if (penType === 'fountain' || penType === 'brush') {
+                // Only the nib outline uses local, rotated coordinates. Restore
+                // screen coordinates before drawing its central aiming dot.
+                oCtx.save();
                 oCtx.translate(c.x, c.y);
                 oCtx.rotate(angle);
                 oCtx.beginPath();
@@ -2108,6 +2113,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 oCtx.lineWidth = 1.2;
                 oCtx.fill();
                 oCtx.stroke();
+                oCtx.restore();
             } else {
                 oCtx.beginPath();
                 oCtx.arc(c.x, c.y, radius, 0, Math.PI * 2);
@@ -2325,12 +2331,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
         /** Çok parmak dokunuşunu izlemeye başlar/genişletir. */
         const trackTapStart = (e: React.PointerEvent) => {
-            const count = pointersRef.current.size;
+            const count = touchPointersRef.current.size;
             if (count < 2) {
                 tapRef.current = null;
                 return;
             }
-            const origin = new Map(pointersRef.current);
+            const origin = new Map(touchPointersRef.current);
             tapRef.current = {
                 maxPointers: Math.max(count, tapRef.current?.maxPointers ?? 0),
                 start: tapRef.current?.start ?? performance.now(),
@@ -2342,7 +2348,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         /** Parmaklar kalkınca dokunuşu değerlendirir: 2 = geri al, 3 = ileri al. */
         const resolveTap = () => {
             const tap = tapRef.current;
-            if (!tap || pointersRef.current.size > 0) return;
+            if (!tap || touchPointersRef.current.size > 0) return;
             tapRef.current = null;
             if (performance.now() - tap.start > 400 || tap.moved > 16) return;
             if (tap.maxPointers === 2) doUndo();
@@ -2466,7 +2472,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
          * parmaklar eski ölçüye göre hesaplanır ve sayfa bir anda sıçrardı.
          */
         const anchorPinch = () => {
-            const pointers = [...pointersRef.current.values()];
+            const pointers = [...touchPointersRef.current.values()];
             if (pointers.length < 2) {
                 pinchRef.current = null;
                 return;
@@ -2488,7 +2494,28 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         };
 
         const startDrawing = async (e: React.PointerEvent) => {
-            if (!enabled || isPalmTouch(e)) return;
+            if (!enabled) return;
+            // Reject broad palm contacts, but track real fingers before the
+            // Pencil cooldown: hover can refresh that cooldown indefinitely.
+            if (e.pointerType === 'touch') {
+                if (config.palmRejection !== false &&
+                    ((e.width ?? 0) > PALM_CONTACT_PX || (e.height ?? 0) > PALM_CONTACT_PX)) return;
+                // Keep fingers off the page while an actual Pencil stroke is active.
+                if (isDrawingRef.current && inkPointerRef.current !== null &&
+                    !touchPointersRef.current.has(inkPointerRef.current)) return;
+                touchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                trackTapStart(e);
+                try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* optional capture */ }
+                if (viewportEnabled && touchPointersRef.current.size >= 2) {
+                    cancelCurrentStroke();
+                    inkPointerRef.current = null;
+                    panRef.current = null;
+                    clearOverlay();
+                    anchorPinch();
+                    return;
+                }
+            }
+            if (isPalmTouch(e)) return;
             clearOverlay();
             // İşaretçiyi yakala: el tuvalin kenarından ya da üstteki araç
             // çubuğunun üzerinden geçtiğinde çizgi ortadan kesilmesin.
@@ -2498,15 +2525,6 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 /* bazı tarayıcılar reddedebilir; yakalamasız da çalışır */
             }
             pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-            trackTapStart(e);
-
-            // Çift parmak: yakınlaştırma/kaydırma kipine geç.
-            if (viewportEnabled && pointersRef.current.size === 2) {
-                cancelCurrentStroke();
-                clearOverlay();
-                anchorPinch();
-                return;
-            }
             if (pointersRef.current.size > 1) return;
 
             // Avuç içi reddi: kalem elde dururken parmak çizmez.
@@ -2934,6 +2952,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (pointersRef.current.has(e.pointerId)) {
                 pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
             }
+            if (touchPointersRef.current.has(e.pointerId)) {
+                touchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            }
 
             // Çok parmak dokunuşu mu, yoksa gerçek bir hareket mi?
             const tap = tapRef.current;
@@ -2953,8 +2974,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             // hesaplansaydı (eski hâli) parmaklar birlikte kaydırıldığında
             // aralarındaki mesafe değişmediği için sayfa yerinde kalırdı.
             const pinch = pinchRef.current;
-            if (pinch && pointersRef.current.size >= 2) {
-                const [a, b] = [...pointersRef.current.values()];
+            if (pinch && touchPointersRef.current.size >= 2) {
+                const [a, b] = [...touchPointersRef.current.values()];
                 const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
                 const scale = Math.min(
                     MAX_SCALE,
@@ -3324,6 +3345,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         };
 
         const stopDrawing = (e?: React.PointerEvent) => {
+            if (e) touchPointersRef.current.delete(e.pointerId);
             cancelInkFrame();
             if (e && inkPointerRef.current !== null && e.pointerId !== inkPointerRef.current && isDrawingRef.current) {
                 pointersRef.current.delete(e.pointerId);
