@@ -455,9 +455,48 @@ export function ActivityPreviewModal({
                     </div>
                 </header>
 
+                <AnimatePresence>
+                    {isPreviewDrawingMode && (
+                        <DrawingToolbar
+                            fixed
+                            onInsertMath={(math) => canvasRef.current?.insertMath(math)}
+                            onCommand={(type) => {
+                                if (type === 'UNDO_DRAWING') canvasRef.current?.undo();
+                                if (type === 'REDO_DRAWING') canvasRef.current?.redo();
+                                if (type === 'CLEAR_DRAWING') canvasRef.current?.clear();
+                                if (type === 'TOGGLE_WHITEBOARD')
+                                    setShowWhiteboard((v) => !v);
+                            }}
+                            config={previewDrawConfig}
+                            setConfig={setPreviewDrawConfig}
+                            showWhiteboard={showWhiteboard}
+                            setShowWhiteboard={setShowWhiteboard}
+                            bgColor={bgColor}
+                            onBgColorChange={setBgColor}
+                            onScreenshot={handleScreenshot}
+                            isTextBoxMode={isTextBoxMode}
+                            onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
+                            canUndo={drawHistory.canUndo}
+                            canRedo={drawHistory.canRedo}
+                            onSelectTool={(toolId) => {
+                                if (toolId === 'compass') setShowCompass(true);
+                                else if (toolId === 'numberLine' || toolId === 'number_line') setShowNumberLine(true);
+                                else if (toolId === 'calculator') setShowCalculator(true);
+                                else if (toolId === 'periodicTable' || toolId === 'periodic_table') setShowPeriodicTable(true);
+                                else if (toolId === 'geogebra' || toolId === 'tool_geogebra') setShowGeogebra(true);
+                                else if (toolId === 'simpleMachines' || toolId === 'simple_machines' || toolId === 'tool_simple_machines') setShowSimpleMachines(true);
+                                else if (toolId === 'dnaGenetics' || toolId === 'dna_genetics' || toolId === 'tool_dna_genetics') setShowDnaGenetics(true);
+                                else if (toolId === 'moleculeBuilder' || toolId === 'molecule_builder' || toolId === 'tool_molecule_builder') setShowMoleculeBuilder(true);
+                                else if (toolId === 'linearGraph' || toolId === 'linear_graph' || toolId === 'tool_linear_graph') setShowLinearGraph(true);
+                                else if (toolId === 'mathFormula' || toolId === 'math_formula' || toolId === 'tool_math_formula') setShowMathFormula(true);
+                            }}
+                        />
+                    )}
+                </AnimatePresence>
+
                 <main
                     ref={mainRef}
-                    className="flex-1 relative overflow-y-auto overflow-x-hidden custom-scroll"
+                    className="flex-1 min-h-0 relative isolate overflow-y-auto overflow-x-hidden custom-scroll"
                     style={{
                         backgroundColor: showWhiteboard ? bgColor || '#ffffff' : '#ffffff',
                     }}
@@ -556,43 +595,6 @@ export function ActivityPreviewModal({
                             />
                         </div>
                     )}
-
-                    <AnimatePresence>
-                        {isPreviewDrawingMode && (
-                            <DrawingToolbar
-                                onCommand={(type) => {
-                                    if (type === 'UNDO_DRAWING') canvasRef.current?.undo();
-                                    if (type === 'REDO_DRAWING') canvasRef.current?.redo();
-                                    if (type === 'CLEAR_DRAWING') canvasRef.current?.clear();
-                                    if (type === 'TOGGLE_WHITEBOARD')
-                                        setShowWhiteboard((v) => !v);
-                                }}
-                                config={previewDrawConfig}
-                                setConfig={setPreviewDrawConfig}
-                                showWhiteboard={showWhiteboard}
-                                setShowWhiteboard={setShowWhiteboard}
-                                bgColor={bgColor}
-                                onBgColorChange={setBgColor}
-                                onScreenshot={handleScreenshot}
-                                isTextBoxMode={isTextBoxMode}
-                                onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
-                                canUndo={drawHistory.canUndo}
-                                canRedo={drawHistory.canRedo}
-                                onSelectTool={(toolId) => {
-                                    if (toolId === 'compass') setShowCompass(true);
-                                    else if (toolId === 'numberLine' || toolId === 'number_line') setShowNumberLine(true);
-                                    else if (toolId === 'calculator') setShowCalculator(true);
-                                    else if (toolId === 'periodicTable' || toolId === 'periodic_table') setShowPeriodicTable(true);
-                                    else if (toolId === 'geogebra' || toolId === 'tool_geogebra') setShowGeogebra(true);
-                                    else if (toolId === 'simpleMachines' || toolId === 'simple_machines' || toolId === 'tool_simple_machines') setShowSimpleMachines(true);
-                                    else if (toolId === 'dnaGenetics' || toolId === 'dna_genetics' || toolId === 'tool_dna_genetics') setShowDnaGenetics(true);
-                                    else if (toolId === 'moleculeBuilder' || toolId === 'molecule_builder' || toolId === 'tool_molecule_builder') setShowMoleculeBuilder(true);
-                                    else if (toolId === 'linearGraph' || toolId === 'linear_graph' || toolId === 'tool_linear_graph') setShowLinearGraph(true);
-                                    else if (toolId === 'mathFormula' || toolId === 'math_formula' || toolId === 'tool_math_formula') setShowMathFormula(true);
-                                }}
-                            />
-                        )}
-                    </AnimatePresence>
 
                     <AnimatePresence>
                         {isPreviewDrawingMode && (
