@@ -1200,6 +1200,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     zoomAt(factor, w / 2, h / 2);
                 },
                 resetView: () => applyViewChange({ ...IDENTITY_VIEW }),
+                setContentOffset: (offset: Point) => applyViewChange({ ...viewRef.current, tx: -offset.x, ty: -offset.y }),
                 fitPage: () => {
                     const page = pageRectRef.current;
                     const { w, h } = getCanvasSize();

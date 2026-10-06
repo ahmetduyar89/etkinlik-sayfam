@@ -551,6 +551,8 @@ export interface DrawingCanvasHandle {
     /** Görünümü sayfanın tamamı görünecek şekilde ayarlar. */
     fitPage: () => void;
     getView: () => Viewport;
+    /** Align an annotation overlay with the embedded document scroll. */
+    setContentOffset: (offset: Point) => void;
     deleteSelected: () => void;
     setSelectedColor: (color: string) => void;
     duplicateSelected: () => void;

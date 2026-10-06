@@ -48,7 +48,7 @@ function Range({ label, value, min = 0, max = 100, step = 1, unit = '%', onChang
     return <label className="gn-range"><span>{label}<b>{Number(value.toFixed(2))}{unit}</b></span><input type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(+e.target.value)}/></label>;
 }
 export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
-    const { config, setConfig, fixed = false, onOpenLibrary } = props;
+    const { config, setConfig, fixed = false, compact = false, onOpenLibrary } = props;
     const [panel, setPanel] = useState<Panel>(null), [slot, setSlot] = useState(0), [prefs, setPrefs] = useState(readPreferences);
     const [hex, setHex] = useState(config.color);
     const root = useRef<HTMLDivElement>(null), file = useRef<HTMLInputElement>(null), memory = useRef(new InkToolMemory());
@@ -114,7 +114,7 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
         patch({ color: value });
     };
     const button = (title: string, Icon: typeof PenTool, action: () => void, active = false, disabled = false) => <button type="button" key={title} className={`gn-icon ${active ? 'is-active' : ''}`} title={title} aria-label={title} aria-pressed={active ? true : undefined} onClick={action} disabled={disabled}><Icon size={21}/></button>;
-    return <div ref={root} className={`gn-toolbar ${fixed ? 'gn-fixed' : 'gn-floating'}`} onPointerDown={e => e.stopPropagation()}>
+    return <div ref={root} className={`gn-toolbar ${fixed ? 'gn-fixed' : 'gn-floating'} ${compact ? 'gn-compact' : ''}`} onPointerDown={e => e.stopPropagation()}>
         <div className="gn-bar" role="toolbar" aria-label="Kalem araç çubuğu">
             <div className="gn-group">
                 {button('Geri al', Undo, () => props.onCommand('UNDO_DRAWING'), false, props.canUndo === false)}
@@ -138,14 +138,15 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
                 {prefs.widths.map((w, i) => <button type="button" key={i} className={`gn-width ${Math.abs(config.width - w * MM_TO_PX) < .05 ? 'is-selected' : ''}`} aria-label={`${w} mm · düzenlemek için çift dokun`} title={`${w} mm`} onClick={() => patch({ width: w * MM_TO_PX })} onDoubleClick={() => { setSlot(i); setPanel('width'); }}><span style={{ height: Math.min(15, Math.max(2, w * 8)), width: Math.min(15, Math.max(2, w * 8)) }}/><small>{w.toFixed(1)}</small></button>)}
             </div><span className="gn-divider"/>
             <div className="gn-group gn-utilities">
-                <button type="button" className={`gn-named ${props.isLibraryOpen || panel === 'library' ? 'is-active' : ''}`} onClick={() => onOpenLibrary ? onOpenLibrary() : toggle('library')}><BookOpen size={19}/><span>Kütüphane</span></button>
-                {props.onSelectTool && <button type="button" className={`gn-named ${panel === 'lab' ? 'is-active' : ''}`} onClick={() => toggle('lab')}><FlaskConical size={19}/><span>Dinamik Laboratuvar</span></button>}
+                <button type="button" aria-label="Kütüphane" title="Kütüphane" className={`gn-named ${props.isLibraryOpen || panel === 'library' ? 'is-active' : ''}`} onClick={() => onOpenLibrary ? onOpenLibrary() : toggle('library')}><BookOpen size={19}/><span>Kütüphane</span></button>
+                {props.onSelectTool && <button type="button" aria-label="Dinamik Laboratuvar" title="Dinamik Laboratuvar" className={`gn-named ${panel === 'lab' ? 'is-active' : ''}`} onClick={() => toggle('lab')}><FlaskConical size={19}/><span>Dinamik Laboratuvar</span></button>}
                 {button('Sayfa ve yazma ayarları', Grid2X2, () => toggle('page'), panel === 'page')}
             </div>
+            {compact && props.onZoomOut && <div className="gn-zoom">{button('Uzaklaştır', Minus, () => props.onZoomOut?.())}<button type="button" onClick={props.onZoomReset}>%{Math.round((props.zoom ?? 1) * 100)}</button>{button('Yakınlaştır', Plus, () => props.onZoomIn?.())}{props.onZoomFit && button('Sayfaya sığdır', Scan, props.onZoomFit)}</div>}
         </div>
-        <div className="gn-status"><span className="gn-status-dot"/>{config.tool === 'pencil' ? names[pen] : config.tool === 'eraser' ? 'Silgi' : config.tool === 'lasso' ? 'Kement seçimi' : 'Çizim araçları'}<span>·</span>{(config.width / MM_TO_PX).toFixed(2)} mm<span>·</span><span>{(config.snapShapes ?? true) ? 'Çiz ve bekle açık' : 'Çiz ve bekle kapalı'}</span>
-            {props.onZoomOut && <div className="gn-zoom">{button('Uzaklaştır', Minus, () => props.onZoomOut?.())}<button type="button" onClick={props.onZoomReset}>%{Math.round((props.zoom ?? 1) * 100)}</button>{button('Yakınlaştır', Plus, () => props.onZoomIn?.())}{props.onZoomFit && button('Sayfaya sığdır', Scan, props.onZoomFit)}</div>}
-        </div>
+        {!compact && <div className="gn-status"><span className="gn-status-dot"/>{config.tool === 'pencil' ? names[pen] : config.tool === 'eraser' ? 'Silgi' : config.tool === 'lasso' ? 'Kement seçimi' : 'Çizim araçları'}<span>·</span>{(config.width / MM_TO_PX).toFixed(2)} mm<span>·</span><span>{(config.snapShapes ?? true) ? 'Çiz ve bekle açık' : 'Çiz ve bekle kapalı'}</span>
+            {!compact && props.onZoomOut && <div className="gn-zoom">{button('Uzaklaştır', Minus, () => props.onZoomOut?.())}<button type="button" onClick={props.onZoomReset}>%{Math.round((props.zoom ?? 1) * 100)}</button>{button('Yakınlaştır', Plus, () => props.onZoomIn?.())}{props.onZoomFit && button('Sayfaya sığdır', Scan, props.onZoomFit)}</div>}
+        </div>}
         {panel && panel !== 'library' && panel !== 'lab' && <div className="gn-popover" role="dialog" aria-label="Araç ayarları"><div className="gn-popover-heading"><b>{({ pen: 'Kalem', lasso: 'Kement', eraser: 'Silgi', color: 'Renk paleti', width: 'Çizgi kalınlığı', page: 'Sayfa ve yazma', shapes: 'Şekiller' })[panel]}</b><button type="button" onClick={() => setPanel(null)} aria-label="Ayarları kapat"><X size={17}/></button></div>
             {panel === 'pen' && <>
                 <div className="gn-pen-tabs">{(['fountain', 'ballpoint', 'brush'] as const).map(p => <button type="button" className={pen === p ? 'is-active' : ''} key={p} onClick={() => patch({ tool: 'pencil', penType: p, tipSharpness: prefs.pens[p]?.tipSharpness ?? .5, pressureResponse: prefs.pens[p]?.pressureResponse ?? .65 })}><PenTool size={22}/>{names[p]}</button>)}</div>

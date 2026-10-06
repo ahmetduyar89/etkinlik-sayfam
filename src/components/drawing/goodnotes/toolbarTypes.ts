@@ -5,6 +5,8 @@ export interface DrawingToolbarProps {
     config: DrawConfig;
     setConfig: (c: DrawConfig) => void;
     fixed?: boolean;
+    /** Single writing row for the notebook workspace. */
+    compact?: boolean;
     showWhiteboard?: boolean;
     setShowWhiteboard?: (val: boolean) => void;
     bgColor?: string;

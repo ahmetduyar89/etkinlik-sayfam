@@ -15,6 +15,7 @@ import { FullscreenToggle } from '../common/FullscreenToggle';
 import { getFormattedHtml } from '../../utils/format-html';
 import { HTML2CANVAS_CDN } from '../../constants/drawing';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
+import { bindContentScroll } from '../drawing/contentScroll';
 import { DrawingToolbar } from '../drawing/DrawingToolbar';
 import { TextBoxLayer } from '../tools/TextBoxLayer';
 import { RulerTool } from '../tools/RulerTool';
@@ -131,6 +132,33 @@ export function ActivityPreviewModal({
     const [formattedHtml, setFormattedHtml] = React.useState<string>('');
     const [isLoadingContent, setIsLoadingContent] = React.useState(true);
     const isRawHtml = activity.content_mode === 'raw_html';
+    const contentScrollRef = React.useRef<ReturnType<typeof bindContentScroll>>(null);
+    const connectContentScroll = React.useCallback(() => {
+        contentScrollRef.current?.dispose();
+        const iframe = iframeRef.current;
+        contentScrollRef.current = iframe && !showWhiteboard
+            ? bindContentScroll(iframe, offset => canvasRef.current?.setContentOffset(offset))
+            : null;
+        if (showWhiteboard) canvasRef.current?.setContentOffset({ x: 0, y: 0 });
+    }, [showWhiteboard]);
+
+    React.useEffect(() => {
+        connectContentScroll();
+        return () => contentScrollRef.current?.dispose();
+    }, [connectContentScroll, formattedHtml, isLoadingContent]);
+
+    React.useEffect(() => {
+        const stage = stageRef.current;
+        if (!stage || !isPreviewDrawingMode || showWhiteboard) return;
+        const wheel = (event: WheelEvent) => {
+            if (event.ctrlKey || event.metaKey || !contentScrollRef.current) return;
+            event.preventDefault();
+            contentScrollRef.current.wheel(event);
+        };
+        stage.addEventListener('wheel', wheel, { passive: false });
+        return () => stage.removeEventListener('wheel', wheel);
+    }, [isPreviewDrawingMode, showWhiteboard, isLoadingContent]);
+
 
     React.useEffect(() => {
         const loadContent = async () => {
@@ -528,6 +556,7 @@ export function ActivityPreviewModal({
                                 <iframe
                                     key={activity.id}
                                     ref={iframeRef}
+                                    onLoad={connectContentScroll}
                                     srcDoc={formattedHtml}
                                     title={activity.title}
                                     sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads allow-pointer-lock"

@@ -1,21 +1,19 @@
 // src/components/notebooks/NotebookEditor.tsx
 // Tam ekran defter / beyaz tahta editörü.
-// Üstte kendi şeridi (başlık, kağıt deseni, zemin rengi, sayfa gezintisi),
-// altta mevcut sürüklenebilir çizim araç çubuğu bulunur. İçerik Firestore'a
+// Üstte kompakt belge başlığı ve tek satırlı yazma araçları bulunur. İçerik Firestore'a
 // otomatik kaydedilir (yazma sonrası ~1.2 sn beklenir).
 import React from 'react';
+import './notebook-editor.css';
 import {
     Activity,
     AlertTriangle,
     ArrowLeft,
     Bookmark,
-    Camera,
     Check,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
     ChevronUp,
-    Cloud,
     FileDown,
     FileText,
     FileUp,
@@ -24,20 +22,17 @@ import {
     Layers,
     ListTree,
     Loader2,
-    Maximize2,
-    Minimize2,
     Plus,
+    MoreHorizontal,
     Tv,
     Printer,
     QrCode,
-    Redo2,
     RotateCw,
     Save,
     Scissors,
     Search,
     Share2,
     Trash2,
-    Undo2,
     Unlink,
     Users,
 } from 'lucide-react';
@@ -135,7 +130,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
 
     // Defter tam ekran açılır; kurulu uygulamada saat/pil şeridi üst şeridin
     // rengini alsın, araya beyaz bir bant girmesin.
-    useSurfaceTint('#6366f1');
+    useSurfaceTint('#ffffff');
     /** Bağlı PDF sayfasının işlenmiş tuvali — PNG çıktısında arka plan olur. */
     const pdfCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
     const handlePdfCanvas = React.useCallback((c: HTMLCanvasElement | null) => {
@@ -230,27 +225,19 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         } catch {}
     }, [config.penType, config.width]);
 
-    const [compactHeader, setCompactHeader] = React.useState<boolean>(() => {
-        try {
-            const saved = localStorage.getItem('notebook_compact_header');
-            if (saved !== null) return saved === 'true';
-            // Akıllı tahta veya geniş dokunmatik ekranlarda varsayılan kompakt mod
-            return window.innerWidth >= 1024 && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-        } catch {
-            return false;
-        }
-    });
-    const [hideHeader, setHideHeader] = React.useState<boolean>(false);
-
-    const toggleCompactHeader = () => {
-        setCompactHeader((prev) => {
-            const next = !prev;
-            try {
-                localStorage.setItem('notebook_compact_header', String(next));
-            } catch {}
-            return next;
-        });
-    };
+    const [hideHeader, setHideHeader] = React.useState(false);
+    const [editorMenu, setEditorMenu] = React.useState<'document' | 'lesson' | null>(null);
+    const documentHeaderRef = React.useRef<HTMLElement>(null);
+    React.useEffect(() => {
+        if (!editorMenu) return;
+        const outside = (event: PointerEvent) => {
+            if (!documentHeaderRef.current?.contains(event.target as Node)) setEditorMenu(null);
+        };
+        const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setEditorMenu(null); };
+        document.addEventListener('pointerdown', outside);
+        document.addEventListener('keydown', escape);
+        return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
+    }, [editorMenu]);
 
     const [isTextBoxMode, setIsTextBoxMode] = React.useState(false);
 
@@ -1501,174 +1488,56 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         </div>
     );
 
-    const renderCompactHeader = () => (
-        <header className="notebook-header flex flex-wrap items-center justify-between gap-1 px-2 sm:px-3 py-1 bg-primary text-white shadow-sm flex-shrink-0 relative z-[6000] text-xs min-h-[38px]">
-            {/* Sol: Geri + Başlık + Sayfalar + Sayfa Gezintisi */}
-            <div className="flex items-center gap-1 sm:gap-2 min-w-0">
-                <button
-                    type="button"
-                    onClick={handleClose}
-                    title="Defterlerime dön"
-                    aria-label="Defterlerime dön"
-                    className="p-1 rounded-lg hover:bg-white/15 transition-colors shrink-0"
-                >
-                    <ArrowLeft className="w-4 h-4" />
-                </button>
-
-                <input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    onBlur={handleTitleCommit}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                    }}
-                    aria-label="Defter adı"
-                    className="bg-white/10 hover:bg-white/15 focus:bg-white/20 rounded-lg px-2 py-0.5 text-[12px] font-semibold outline-none border border-transparent focus:border-white/40 transition-colors w-[100px] sm:w-[150px] truncate"
-                />
-
-                <div className="w-px h-3.5 bg-white/20 mx-0.5 shrink-0" />
-
-                {/* Sayfalar Çekmecesi */}
-                <button
-                    type="button"
-                    onClick={() => setShowPages((v) => !v)}
-                    title="Sayfa Küçük Resimleri"
-                    className={cn(
-                        'p-1 rounded-lg transition-colors shrink-0',
-                        showPages ? 'bg-white/25 text-white' : 'hover:bg-white/15 text-white/80'
-                    )}
-                >
-                    <Layers className="w-3.5 h-3.5" />
-                </button>
-
-                {/* Sayfa Gezintisi & Ekleme */}
-                <div className="flex items-center gap-0.5 shrink-0 bg-white/10 rounded-lg px-0.5 py-0.5">
-                    <button
-                        type="button"
-                        onClick={() => canvasRef.current?.prevPage()}
-                        disabled={pageInfo.current === 0}
-                        title="Önceki Sayfa"
-                        className="p-0.5 rounded hover:bg-white/15 disabled:opacity-30 transition-colors"
-                    >
-                        <ChevronLeft className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleJumpToPage}
-                        title="Sayfaya Git"
-                        className="px-1 text-[11px] font-bold tabular-nums hover:underline"
-                    >
-                        {pageInfo.current + 1}/{pageInfo.total}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => canvasRef.current?.nextPage()}
-                        disabled={pageInfo.current >= pageInfo.total - 1}
-                        title="Sonraki Sayfa"
-                        className="p-0.5 rounded hover:bg-white/15 disabled:opacity-30 transition-colors"
-                    >
-                        <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleAddPage}
-                        title="Yeni Sayfa Ekle"
-                        className="p-0.5 rounded hover:bg-white/15 text-emerald-300 transition-colors"
-                    >
-                        <Plus className="w-3.5 h-3.5" />
-                    </button>
-                </div>
+    const renderDocumentHeader = () => (
+        <header ref={documentHeaderRef} className="notebook-document-header" aria-label="Defter ve sayfa işlemleri">
+            <div className="nb-document-identity">
+                <button type="button" className="nb-icon" onClick={handleClose} title="Defterlerime dön" aria-label="Defterlerime dön"><ArrowLeft size={18}/></button>
+                <input value={title} onChange={e => setTitle(e.target.value)} onBlur={handleTitleCommit}
+                    onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                    aria-label="Defter adı" className="nb-title"/>
+                {collab && <span className="nb-collab" title="Birlikte çizim"><Users size={14}/></span>}
+                {saveBlock ? <button type="button" className="nb-save-warning" onClick={() => saveBlock === 'conflict' && void resolveConflict()}
+                    title={saveBlock === 'conflict' ? 'Kayıt çakışmasını çöz' : saveBlock === 'full' ? 'Defter dolu; otomatik kayıt durdu' : 'Otomatik kayıt durduruldu'}>
+                    <AlertTriangle size={14}/>{saveBlock === 'conflict' ? 'Çakışma' : 'Kayıt durdu'}</button>
+                    : <span className="nb-save-state" title={saveState === 'saving' ? 'Kaydediliyor' : 'Buluta otomatik kaydedilir'}>
+                        {saveState === 'saving' ? <Loader2 size={12} className="animate-spin"/> : <span/>}<small>{saveState === 'saving' ? 'Kaydediliyor' : 'Kayıtlı'}</small>
+                    </span>}
             </div>
-
-            {/* Orta: Kağıt Şablonu & Hızlı Zemin Renkleri */}
-            <div className="hidden md:flex items-center gap-2">
-                {renderPaperDropdown(true)}
-                <div className="flex items-center gap-1">
-                    {BG_COLORS.slice(0, 4).map((b) => (
-                        <button
-                            key={b.color}
-                            onClick={() => changeBg(b.color)}
-                            title={b.label}
-                            className={cn(
-                                'w-3.5 h-3.5 rounded-full border transition-transform hover:scale-110',
-                                bgColor === b.color ? 'border-white ring-1 ring-white/60 scale-110' : 'border-white/30'
-                            )}
-                            style={{ backgroundColor: b.color }}
-                        />
-                    ))}
-                </div>
+            <div className="nb-page-navigation" role="group" aria-label="Defter sayfaları">
+                <button type="button" className={`nb-icon ${showPages ? 'is-active' : ''}`} onClick={() => setShowPages(v => !v)} title="Sayfalar" aria-label="Sayfalar" aria-pressed={showPages}><Layers size={17}/></button>
+                <span className="nb-separator"/>
+                <button type="button" className="nb-icon" onClick={() => canvasRef.current?.prevPage()} disabled={pageInfo.current === 0} aria-label="Önceki sayfa"><ChevronLeft size={16}/></button>
+                <button type="button" className="nb-page-count" onClick={handleJumpToPage} title="Sayfaya git">{pageInfo.current + 1}<span> / {pageInfo.total}</span></button>
+                <button type="button" className="nb-icon" onClick={() => canvasRef.current?.nextPage()} disabled={pageInfo.current >= pageInfo.total - 1} aria-label="Sonraki sayfa"><ChevronRight size={16}/></button>
+                <button type="button" className="nb-icon" onClick={handleAddPage} title="Yeni sayfa" aria-label="Yeni sayfa"><Plus size={17}/></button>
             </div>
-
-            {/* Sağ: Ders Sunum Araçları, PDF, Dışa Aktar, Geri/İleri, Kaydet, Mod Butonları */}
-            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-                <LessonModeToolbar
-                    overlay={overlay}
-                    onOverlayChange={setOverlay}
-                    presenting={presenting}
-                    onPresentingChange={setPresenting}
-                    fullscreenTarget={stageRef}
-                />
-
-                <div className="w-px h-3.5 bg-white/20 mx-0.5 shrink-0" />
-
-                {renderPdfDropdown(true)}
-                {renderExportDropdown(true)}
-
-                {/* Geri / İleri */}
-                <div className="flex items-center">
-                    <button
-                        onClick={handleUndo}
-                        disabled={!history.canUndo}
-                        title="Geri Al"
-                        className="p-1 rounded-lg hover:bg-white/15 disabled:opacity-30 transition-colors"
-                    >
-                        <Undo2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                        onClick={handleRedo}
-                        disabled={!history.canRedo}
-                        title="İleri Al"
-                        className="p-1 rounded-lg hover:bg-white/15 disabled:opacity-30 transition-colors"
-                    >
-                        <Redo2 className="w-3.5 h-3.5" />
-                    </button>
+            <div className="nb-document-actions">
+                <div className="nb-paper-control">{renderPaperDropdown(false)}</div>
+                <div className="nb-menu-anchor">
+                    <button type="button" className={`nb-icon ${editorMenu === 'lesson' ? 'is-active' : ''}`} onClick={() => setEditorMenu(editorMenu === 'lesson' ? null : 'lesson')} title="Ders ve sunum araçları" aria-label="Ders ve sunum araçları" aria-expanded={editorMenu === 'lesson'}><Tv size={18}/></button>
+                    {editorMenu === 'lesson' && <div className="nb-menu-panel nb-lesson-panel"><b>Ders ve sunum</b><LessonModeToolbar overlay={overlay} onOverlayChange={setOverlay} presenting={presenting} onPresentingChange={setPresenting} fullscreenTarget={stageRef}/></div>}
                 </div>
-
-                {/* Kaydet */}
-                <button
-                    onClick={() => void save()}
-                    title="Kaydet"
-                    className="p-1 sm:px-2 sm:py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white font-semibold text-[11px] flex items-center gap-1 transition-colors"
-                >
-                    {saveState === 'saving' ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                        <Save className="w-3.5 h-3.5" />
-                    )}
-                    <span className="hidden lg:inline">Kaydet</span>
-                </button>
-
-                <div className="w-px h-3.5 bg-white/20 mx-0.5 shrink-0" />
-
-                {/* Standart 2 Satırlı Menüye Geç */}
-                <button
-                    type="button"
-                    onClick={toggleCompactHeader}
-                    title="Standart Menüye Geç (2 Satır)"
-                    className="p-1 rounded-lg hover:bg-white/15 text-white/80 hover:text-white transition-colors"
-                >
-                    <Maximize2 className="w-3.5 h-3.5" />
-                </button>
-
-                {/* Tam Tuval - Üst Menüyü Gizle */}
-                <button
-                    type="button"
-                    onClick={() => setHideHeader(true)}
-                    title="Üst Menüyü Tamamen Gizle (Tam Tuval Alanı)"
-                    className="p-1 rounded-lg hover:bg-white/15 text-white/80 hover:text-white transition-colors"
-                >
-                    <ChevronUp className="w-3.5 h-3.5" />
-                </button>
+                <button type="button" className="nb-icon nb-save-button" onClick={() => void save()} title="Kaydet" aria-label="Kaydet"><Save size={17}/></button>
+                <div className="nb-menu-anchor">
+                    <button type="button" className={`nb-icon ${editorMenu === 'document' ? 'is-active' : ''}`} onClick={() => setEditorMenu(editorMenu === 'document' ? null : 'document')} title="Diğer defter işlemleri" aria-label="Diğer defter işlemleri" aria-expanded={editorMenu === 'document'}><MoreHorizontal size={21}/></button>
+                    {editorMenu === 'document' && <div className="nb-menu-panel">
+                        <b>Belge işlemleri</b>
+                        <div className="nb-file-actions">{renderPdfDropdown(true)}{renderExportDropdown(true)}</div>
+                        <div className="nb-mobile-paper">{renderPaperDropdown(false)}</div>
+                        <p>Kağıt rengi</p><div className="nb-paper-colors">{BG_COLORS.map(b => <button type="button" key={b.color} style={{background:b.color}} aria-label={`Zemin rengi: ${b.label}`} title={b.label} className={bgColor === b.color ? 'is-selected' : ''} onClick={() => changeBg(b.color)}/>)}</div>
+                        <hr/>
+                        <button type="button" className="nb-menu-item" onClick={() => handleToggleBookmark(pageInfo.current + 1)}><Bookmark size={16}/> {notebook.pdf_bookmarks?.includes(pageInfo.current + 1) ? 'Yer imini kaldır' : 'Sayfayı yer imlerine ekle'}</button>
+                        <button type="button" className="nb-menu-item" onClick={handleRotateCurrentPage}><RotateCw size={16}/> Sayfayı döndür</button>
+                        {notebook.pdf_id && <>
+                            <button type="button" className="nb-menu-item" onClick={() => {setShowSearchModal(true);setEditorMenu(null);}}><Search size={16}/> PDF içinde ara</button>
+                            <button type="button" className="nb-menu-item" onClick={() => {setShowOutlineModal(true);setEditorMenu(null);}}><ListTree size={16}/> PDF bölümleri</button>
+                            <button type="button" className="nb-menu-item" onClick={() => setShowPdfDebug(v => !v)}><Activity size={16}/> PDF tanı paneli</button>
+                        </>}
+                        {pageInfo.total > 1 && <button type="button" className="nb-menu-item nb-danger" onClick={() => void handleDeletePage()}><Trash2 size={16}/> Bu sayfayı sil</button>}
+                        <hr/>
+                        <button type="button" className="nb-menu-item" onClick={() => {setHideHeader(true);setEditorMenu(null);}}><ChevronUp size={16}/> Başlığı gizle</button>
+                    </div>}
+                </div>
             </div>
         </header>
     );
@@ -1731,347 +1600,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 </div>
             )}
 
-            {/* AKILLI TAHTA / KOMPAKT MOD (Tek Slim Satır) */}
-            {!hideHeader && !presenting && compactHeader && renderCompactHeader()}
-
-            {/* STANDART MOD (2 Satırlı Geniş Menü) */}
-            {!hideHeader && !presenting && !compactHeader && (
-                <>
-                    {/* Üst şerit - Belge ve Dışa Aktarma Başlığı */}
-                    <header
-                        className="notebook-header flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 px-3 sm:px-4 py-2 bg-primary text-white shadow-[0_2px_10px_rgba(15,23,42,0.18)] flex-shrink-0 relative z-[6000]"
-                    >
-                {/* Sol: Geri düğmesi, Başlık, Defter türü */}
-                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                    <button
-                        onClick={handleClose}
-                        title="Defterlerime dön"
-                        aria-label="Defterlerime dön"
-                        className="p-1.5 sm:p-2 rounded-xl hover:bg-white/15 transition-colors shrink-0"
-                    >
-                        <ArrowLeft className="w-[18px] h-[18px]" />
-                    </button>
-
-                    <input
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        onBlur={handleTitleCommit}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                        }}
-                        aria-label="Defter adı"
-                        className="bg-white/10 hover:bg-white/15 focus:bg-white/20 rounded-xl px-2.5 sm:px-3 py-1.5 text-[13.5px] sm:text-[14px] font-semibold outline-none border border-transparent focus:border-white/40 transition-colors w-[130px] sm:w-[220px] md:w-[260px] truncate"
-                    />
-
-                    <span className="hidden lg:inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/15 shrink-0">
-                        {notebook.kind === 'whiteboard' ? 'Beyaz Tahta' : 'Not Defteri'}
-                    </span>
-                </div>
-
-                {/* Sağ: PDF Menüsü, Dışa Aktarma & Paylaşma, Geri/İleri, Otomatik Kayıt, Kaydet */}
-                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                    {/* Ortak çizim bildirimi */}
-                    {collab && (
-                        <span
-                            className="hidden xl:flex items-center gap-1.5 text-[11.5px] font-semibold text-white bg-emerald-600/90 rounded-lg px-2 py-1"
-                            title="Bu deftere başka bir cihazdan da çiziliyor; değişiklikler anında paylaşılıyor."
-                        >
-                            <Users className="w-3.5 h-3.5" /> Birlikte
-                        </span>
-                    )}
-
-                    {/* PDF Menüsü */}
-                    {renderPdfDropdown(false)}
-
-                    {/* Dışa Aktar */}
-                    {renderExportDropdown(false)}
-
-                    <div className="w-px h-4 bg-white/20 mx-0.5" />
-
-                    {/* Kayıt durumu */}
-                    {saveBlock === 'conflict' ? (
-                        <button
-                            onClick={() => void resolveConflict()}
-                            title="Defter başka bir cihazda da değişti; hangi sürümün kalacağını seçin."
-                            className="flex items-center gap-1.5 text-[11.5px] font-semibold text-white bg-red-600 rounded-lg px-2 py-1 hover:bg-red-500 transition-colors"
-                        >
-                            <AlertTriangle className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Çakışma</span>
-                        </button>
-                    ) : saveBlock ? (
-                        <span
-                            className="flex items-center gap-1.5 text-[11.5px] font-semibold text-white bg-red-600 rounded-lg px-2 py-1"
-                            title={
-                                saveBlock === 'full'
-                                    ? 'Defter azami boyuta ulaştı; otomatik kayıt durdu.'
-                                    : 'İçerik yüklenemedi; veriyi korumak için otomatik kayıt durdu.'
-                            }
-                        >
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">{saveBlock === 'full' ? 'Dolu' : 'Durduruldu'}</span>
-                        </span>
-                    ) : (
-                        <span
-                            className="hidden md:flex items-center gap-1 text-[11.5px] font-medium text-white/80 px-1"
-                            title={saveState === 'saving' ? 'Kaydediliyor…' : saveState === 'saved' ? 'Değişiklikler kaydedildi' : 'Buluta otomatik kaydedilir'}
-                        >
-                            {saveState === 'saving' ? (
-                                <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                                    <span className="hidden lg:inline">Kaydediliyor…</span>
-                                </>
-                            ) : saveState === 'saved' ? (
-                                <>
-                                    <Check className="w-3.5 h-3.5 text-emerald-300" />
-                                    <span className="hidden lg:inline">Kaydedildi</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Cloud className="w-3.5 h-3.5 text-white/70" />
-                                    <span className="hidden lg:inline">Kayıtlı</span>
-                                </>
-                            )}
-                        </span>
-                    )}
-
-                    {/* Geri / İleri */}
-                    <div className="flex items-center">
-                        <button
-                            onClick={handleUndo}
-                            disabled={!history.canUndo}
-                            title="Geri al (Ctrl+Z)"
-                            aria-label="Geri al"
-                            className="p-1.5 rounded-lg hover:bg-white/15 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-                        >
-                            <Undo2 className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={handleRedo}
-                            disabled={!history.canRedo}
-                            title="İleri al (Ctrl+Shift+Z)"
-                            aria-label="İleri al"
-                            className="p-1.5 rounded-lg hover:bg-white/15 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-                        >
-                            <Redo2 className="w-4 h-4" />
-                        </button>
-                    </div>
-
-                    {/* Kaydet butonu */}
-                    <button
-                        onClick={() => void save()}
-                        className="inline-flex items-center gap-1.5 bg-white text-primary px-3 py-1.5 rounded-xl text-[12.5px] font-bold hover:bg-white/95 active:scale-95 transition shadow-sm"
-                    >
-                        <Save className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Kaydet</span>
-                    </button>
-
-                    <div className="w-px h-4 bg-white/20 mx-0.5" />
-
-                    {/* Akıllı Tahta / Kompakt Mod Geçiş Butonu */}
-                    <button
-                        type="button"
-                        onClick={toggleCompactHeader}
-                        title="Akıllı Tahta / Kompakt Mod (Menüyü Tek Satıra İndir)"
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[12px] font-semibold transition-colors shrink-0"
-                    >
-                        <Tv className="w-3.5 h-3.5 text-sky-300" />
-                        <span className="hidden md:inline">Kompakt</span>
-                    </button>
-
-                    {/* Üst Menüyü Gizle */}
-                    <button
-                        type="button"
-                        onClick={() => setHideHeader(true)}
-                        title="Üst Menüyü Gizle (Tam Tuval Alanı)"
-                        className="p-1.5 rounded-xl hover:bg-white/15 text-white/80 hover:text-white transition-colors shrink-0"
-                    >
-                        <ChevronUp className="w-4 h-4" />
-                    </button>
-                </div>
-            </header>
-
-            {/* İkincil Şerit - Sayfa Gezintisi, Kağıt Şablonu & Ders Sunum Araçları */}
-            <div
-                className={cn(
-                    'notebook-page-tools flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-1.5 bg-white dark:bg-surface-container border-b border-outline-variant flex-shrink-0 relative z-[5500] text-[12.5px]',
-                    presenting && 'hidden'
-                )}
-            >
-                {/* Sol: Sayfalar paneli butonu, Sayfa gezintisi, Sayfa Ekle / Sil */}
-                <div className="flex items-center gap-1 sm:gap-1.5">
-                    <button
-                        onClick={() => setShowPages((v) => !v)}
-                        aria-pressed={showPages}
-                        title="Sayfa küçük resimleri"
-                        className={cn(
-                            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors',
-                            showPages
-                                ? 'bg-primary/10 text-primary'
-                                : 'text-on-surface-variant hover:bg-surface-container-high'
-                        )}
-                    >
-                        <Layers className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Sayfalar</span>
-                    </button>
-
-                    <div className="w-px h-4 bg-outline-variant mx-0.5" />
-
-                    <button
-                        onClick={() => canvasRef.current?.prevPage()}
-                        disabled={pageInfo.current === 0}
-                        aria-label="Önceki sayfa"
-                        className="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 transition-colors"
-                    >
-                        <ChevronLeft className="w-4 h-4" />
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={handleJumpToPage}
-                        title="Sayfaya git (tıklayın)"
-                        className="text-[12px] font-bold text-on-surface tabular-nums px-2 py-0.5 rounded-md hover:bg-surface-container-high transition-colors cursor-pointer border border-transparent hover:border-outline-variant"
-                    >
-                        {pageInfo.current + 1} / {pageInfo.total}
-                    </button>
-
-                    <button
-                        onClick={() => canvasRef.current?.nextPage()}
-                        disabled={pageInfo.current >= pageInfo.total - 1}
-                        aria-label="Sonraki sayfa"
-                        className="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 transition-colors"
-                    >
-                        <ChevronRight className="w-4 h-4" />
-                    </button>
-
-                    {/* Yer İmi (Bookmark) Ekle / Kaldır */}
-                    <button
-                        type="button"
-                        onClick={() => handleToggleBookmark(pageInfo.current + 1)}
-                        title={
-                            notebook.pdf_bookmarks?.includes(pageInfo.current + 1)
-                                ? 'Bu sayfa yer imlerinde (kaldırmak için tıklayın)'
-                                : 'Bu sayfayı yer imlerine ekle'
-                        }
-                        className={cn(
-                            'p-1.5 rounded-lg transition-colors',
-                            notebook.pdf_bookmarks?.includes(pageInfo.current + 1)
-                                ? 'text-amber-500 bg-amber-500/10 hover:bg-amber-500/20'
-                                : 'text-on-surface-variant hover:text-amber-500 hover:bg-surface-container-high'
-                        )}
-                    >
-                        <Bookmark
-                            className={cn(
-                                'w-3.5 h-3.5',
-                                notebook.pdf_bookmarks?.includes(pageInfo.current + 1) && 'fill-amber-400'
-                            )}
-                        />
-                    </button>
-
-                    {/* Sayfayı 90° Döndür */}
-                    <button
-                        type="button"
-                        onClick={handleRotateCurrentPage}
-                        title="Bu sayfayı 90° saat yönünde döndür"
-                        className="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors"
-                    >
-                        <RotateCw className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* PDF Arama & Bölümler & Tanı Paneli */}
-                    {notebook.pdf_id && (
-                        <>
-                            <div className="w-px h-4 bg-outline-variant mx-0.5" />
-                            <button
-                                type="button"
-                                onClick={() => setShowSearchModal(true)}
-                                title="PDF İçinde Ara (Metin Arama)"
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30 transition-colors"
-                            >
-                                <Search className="w-3.5 h-3.5" />
-                                <span className="hidden md:inline">Ara</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setShowOutlineModal(true)}
-                                title="İçindekiler / Bölümler"
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-colors"
-                            >
-                                <ListTree className="w-3.5 h-3.5" />
-                                <span className="hidden md:inline">Bölümler</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setShowPdfDebug((v) => !v)}
-                                title="PDF Tanı & Performans Paneli (FPS, Zoom, Koordinat)"
-                                className={cn(
-                                    'p-1.5 rounded-lg transition-colors',
-                                    showPdfDebug
-                                        ? 'text-emerald-500 bg-emerald-500/10'
-                                        : 'text-on-surface-variant hover:text-emerald-500 hover:bg-surface-container-high'
-                                )}
-                            >
-                                <Activity className="w-3.5 h-3.5" />
-                            </button>
-                        </>
-                    )}
-
-                    <div className="w-px h-4 bg-outline-variant mx-0.5" />
-
-                    <button
-                        onClick={handleAddPage}
-                        title="Yeni sayfa ekle"
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
-                    >
-                        <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Sayfa</span>
-                    </button>
-
-                    {pageInfo.total > 1 && (
-                        <button
-                            onClick={() => void handleDeletePage()}
-                            title="Bu sayfayı sil"
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                        >
-                            <Trash2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Sil</span>
-                        </button>
-                    )}
-                </div>
-
-                {/* Orta: Kağıt Şablonu & Zemin Rengi */}
-                <div className="flex items-center gap-2">
-                    {/* Kağıt şablonu dropdown */}
-                    {renderPaperDropdown(false)}
-
-                    {/* Zemin renkleri */}
-                    <div className="hidden sm:flex items-center gap-1 ml-0.5">
-                        {BG_COLORS.map((b) => (
-                            <button
-                                key={b.color}
-                                onClick={() => changeBg(b.color)}
-                                title={b.label}
-                                aria-label={`Zemin rengi: ${b.label}`}
-                                className={cn(
-                                    'w-4 h-4 sm:w-5 sm:h-5 rounded-full border transition-transform hover:scale-110 shadow-xs',
-                                    bgColor === b.color ? 'border-primary ring-2 ring-primary/30 scale-110' : 'border-outline-variant/60'
-                                )}
-                                style={{ backgroundColor: b.color }}
-                            />
-                        ))}
-                    </div>
-                </div>
-
-                {/* Sağ: Ders & Sunum Modu Araçları (Spot, Perde, Sunum, Tam Ekran) */}
-                <div className="flex items-center gap-1">
-                    <LessonModeToolbar
-                        overlay={overlay}
-                        onOverlayChange={setOverlay}
-                        presenting={presenting}
-                        onPresentingChange={setPresenting}
-                        fullscreenTarget={stageRef}
-                    />
-                </div>
-            </div>
-        </>
-    )}
+            {!hideHeader && !presenting && renderDocumentHeader()}
 
     {/* Gizli PDF Dosya Seçici */}
     <input
@@ -2086,6 +1615,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             {!presenting && (
                 <DrawingToolbar
                     fixed
+                    compact
                     onCommand={(type) => {
                         if (type === 'UNDO_DRAWING') handleUndo();
                         if (type === 'REDO_DRAWING') handleRedo();
