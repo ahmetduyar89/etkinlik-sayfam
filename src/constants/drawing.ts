@@ -300,6 +300,7 @@ export const getTextBoxTextColor = (bg: string): string =>
     TEXTBOX_TEXT_COLORS[bg] || TEXTBOX_TEXT_COLORS.default;
 
 export const ERASER_MODES: ReadonlyArray<{ id: EraserMode; label: string; hint: string }> = [
+    { id: 'precision', label: 'Detaylı', hint: 'Daha küçük temas alanıyla mürekkebi hassasça keser' },
     { id: 'pixel', label: 'Piksel', hint: 'Kalem ve fosforlu izini dokunduğu yerden keser' },
     {
         id: 'stroke',

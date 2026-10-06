@@ -1,3 +1,5 @@
+import { actualSizePageView } from './InkEngine/pageViewport';
+import { eraserContactRadius } from './InkEngine/physics';
 import React from 'react';
 import { cn } from '../../utils/cn';
 import {
@@ -1202,7 +1204,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     const { w, h } = getCanvasSize();
                     zoomAt(factor, w / 2, h / 2);
                 },
-                resetView: () => applyViewChange({ ...IDENTITY_VIEW }),
+                resetView: () => applyViewChange(actualSizePageView(pageRectRef.current, getCanvasSize())),
                 setContentOffset: (offset: Point) => applyViewChange({ ...viewRef.current, tx: -offset.x, ty: -offset.y }),
                 fitPage: () => {
                     const page = pageRectRef.current;
@@ -1835,12 +1837,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         };
 
         /** Silgi ucunun yarıçapı (dünya birimi). İmleç de bu daireyi çizer. */
-        const eraserRadius = () => {
-            if (config.eraserSize === 'small') return 12;
-            if (config.eraserSize === 'medium') return 24;
-            if (config.eraserSize === 'large') return 48;
-            return Math.max(6, config.width * 5);
-        };
+        const eraserRadius = () => eraserContactRadius(config);
 
         /**
          * İşaretçi olayının taşıdığı ARA örnekler.
@@ -2496,11 +2493,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
         const startDrawing = async (e: React.PointerEvent) => {
             if (!enabled) return;
-            // Reject broad palm contacts, but track real fingers before the
-            // Pencil cooldown: hover can refresh that cooldown indefinitely.
+            // Track contacts for viewport gestures before palm classification.
+            // Safari can report broad contact areas for intentional fingers.
+            // Palm rejection still blocks ink; an active Pencil owns the page.
             if (e.pointerType === 'touch') {
-                if (config.palmRejection !== false &&
-                    ((e.width ?? 0) > PALM_CONTACT_PX || (e.height ?? 0) > PALM_CONTACT_PX)) return;
                 // Keep fingers off the page while an actual Pencil stroke is active.
                 if (isDrawingRef.current && inkPointerRef.current !== null &&
                     !touchPointersRef.current.has(inkPointerRef.current)) return;
@@ -3325,6 +3321,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
         const stopDrawing = (e?: React.PointerEvent) => {
             if (e) touchPointersRef.current.delete(e.pointerId);
+            // Cancellation is not a deliberate two/three-finger undo tap.
+            if (e?.type === 'pointercancel') tapRef.current = null;
             if (e && inkPointerRef.current !== null && e.pointerId !== inkPointerRef.current && isDrawingRef.current) {
                 pointersRef.current.delete(e.pointerId);
                 return;

@@ -1,4 +1,4 @@
-import type { PenType, Point, PressureSensitivity } from '../../../types';
+import type { DrawConfig, PenType, Point, PressureSensitivity } from '../../../types';
 
 export const PRESSURE_GAMMA: Record<PressureSensitivity, number> = { soft: 0.65, normal: 1, firm: 1.65 };
 export const TOOL_PHYSICS: Record<PenType, { min: number; max: number; velocity: number; tilt: number }> = {
@@ -37,4 +37,10 @@ export function nibFactor(point: Point, tangent: { x: number; y: number }, pen?:
     const minor = -normalX * Math.sin(angle) + normalY * Math.cos(angle);
     const eccentricity = pen === 'calligraphy' ? 0.35 : pen === 'brush' ? 0.75 : 0.65;
     return Math.hypot(major, minor * eccentricity);
+}
+
+/** Shared by erasing and its cursor; precision uses half the normal contact radius. */
+export function eraserContactRadius(config: Pick<DrawConfig, 'eraserMode' | 'eraserSize' | 'width'>): number {
+    const radius = config.eraserSize === 'small' ? 12 : config.eraserSize === 'medium' ? 24 : config.eraserSize === 'large' ? 48 : Math.max(6, config.width * 5);
+    return config.eraserMode === 'precision' ? radius * 0.5 : radius;
 }

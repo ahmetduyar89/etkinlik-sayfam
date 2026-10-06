@@ -91,7 +91,7 @@ export type PenType = 'ballpoint' | 'fountain' | 'brush' | 'calligraphy' | 'mark
 export type PressureSensitivity = 'soft' | 'normal' | 'firm';
 
 /** Silgi davranışı: piksel silgisi mi, çizgiyi komple silen silgi mi. */
-export type EraserMode = 'pixel' | 'stroke';
+export type EraserMode = 'pixel' | 'precision' | 'stroke';
 
 export interface Point {
     x: number;

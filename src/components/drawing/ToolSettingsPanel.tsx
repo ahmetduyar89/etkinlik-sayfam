@@ -363,7 +363,8 @@ export function ToolSettingsPanel({
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1.5">
                             Silgi Türü
                         </span>
-                        <div className="grid grid-cols-2 gap-1 bg-white/[0.04] p-1 rounded-xl border border-white/10">
+                        <div className="grid grid-cols-3 gap-1 bg-white/[0.04] p-1 rounded-xl border border-white/10">
+                            <button type="button" onClick={() => setConfig({...config, eraserMode:'precision'})} className={cn('py-1.5 rounded-lg text-xs font-semibold text-center', eraserMode === 'precision' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5')}>Detaylı Silgi</button>
                             <button
                                 type="button"
                                 onClick={() => setConfig({ ...config, eraserMode: 'pixel' })}
@@ -390,7 +391,7 @@ export function ToolSettingsPanel({
                             </button>
                         </div>
                         <span className="block text-[10px] text-slate-400 mt-1 px-1">
-                            {eraserMode === 'pixel'
+                            {eraserMode === 'precision' ? 'Küçük temas alanıyla hassas siler' : eraserMode === 'pixel'
                                 ? 'Dokunulan yeri siler'
                                 : 'Dokunulan çizginin tamamını siler'}
                         </span>

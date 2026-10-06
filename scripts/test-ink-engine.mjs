@@ -6,7 +6,19 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 const dir = await mkdtemp(join(tmpdir(), 'ink-test-'));
 try {
-    await build({ entryPoints: ['src/components/drawing/InkEngine/input.ts', 'src/components/notebooks/pageCodec.ts', 'src/components/drawing/InkEngine/physics.ts', 'src/components/drawing/penEngine.ts', 'src/components/drawing/InkEngine/graphite.ts', 'src/components/drawing/InkEngine/frameQueue.ts', 'src/components/drawing/InkEngine/spatialIndex.ts', 'src/components/drawing/InkEngine/history.ts', 'src/components/drawing/InkEngine/activeBounds.ts', 'src/components/drawing/InkEngine/presets.ts', 'src/components/drawing/InkEngine/toolMemory.ts', 'src/components/drawing/InkEngine/simplification.ts', 'src/components/drawing/InkEngine/nativeBridge.ts'], outdir: dir, bundle: true, platform: 'node', format: 'esm', outExtension: { '.js': '.mjs' } });
+    await build({ entryPoints: ['src/components/drawing/InkEngine/input.ts', 'src/components/drawing/InkEngine/pageViewport.ts', 'src/components/notebooks/pageCodec.ts', 'src/components/drawing/InkEngine/physics.ts', 'src/components/drawing/penEngine.ts', 'src/components/drawing/InkEngine/graphite.ts', 'src/components/drawing/InkEngine/frameQueue.ts', 'src/components/drawing/InkEngine/spatialIndex.ts', 'src/components/drawing/InkEngine/history.ts', 'src/components/drawing/InkEngine/activeBounds.ts', 'src/components/drawing/InkEngine/presets.ts', 'src/components/drawing/InkEngine/toolMemory.ts', 'src/components/drawing/InkEngine/simplification.ts', 'src/components/drawing/InkEngine/nativeBridge.ts'], outdir: dir, bundle: true, platform: 'node', format: 'esm', outExtension: { '.js': '.mjs' } });
+    const { actualSizePageView } = await import(pathToFileURL(join(dir, 'drawing/InkEngine/pageViewport.mjs')));
+    for (const [page, canvas] of [
+        [{x:0,y:0,w:794,h:1123},{w:1373,h:700}],
+        [{x:0,y:0,w:1123,h:794},{w:600,h:900}],
+        [{x:40,y:80,w:500,h:700},{w:1000,h:800}],
+    ]) {
+        const view = actualSizePageView(page,canvas);
+        assert.equal(view.scale,1,'100% reset must not fit the page');
+        assert.equal((page.x+page.w/2)*view.scale+view.tx,canvas.w/2,'horizontal page center');
+        assert.equal((page.y+page.h/2)*view.scale+view.ty,canvas.h/2,'vertical page center');
+    }
+    assert.deepEqual(actualSizePageView(null,{w:1000,h:800}),{scale:1,tx:0,ty:0},'unbounded canvas reset');
     const { InkInput, actualSamples, predictedSamples } = await import(pathToFileURL(join(dir, 'drawing/InkEngine/input.mjs')));
     const { encodePages, decodePages } = await import(pathToFileURL(join(dir, 'notebooks/pageCodec.mjs')));
     const event = (timeStamp, x = 0, pressure = 0.5) => ({ pointerId: 1, pointerType: 'pen', timeStamp, clientX: x, clientY: 0, pressure, tiltX: 25, tiltY: 10, twist: 40 });
@@ -26,8 +38,13 @@ try {
     const pages = [{ strokes: [{ tool: 'pencil', color: '#000', points: [first, point] }], boxes: [] }];
     assert.deepEqual(decodePages(encodePages(pages)), pages, 'rich points survive save/load');
     assert.deepEqual(decodePages('[{"strokes":[{"tool":"pencil","points":[[1,2,0.5],{"x":3,"y":4}]}]}]')[0].strokes[0].points, [{ x: 1, y: 2, p: 0.5 }, { x: 3, y: 4 }]);
-    const { widthFactor, nibFactor, TOOL_PHYSICS } = await import(pathToFileURL(join(dir, 'drawing/InkEngine/physics.mjs')));
+    const { widthFactor, nibFactor, TOOL_PHYSICS, eraserContactRadius } = await import(pathToFileURL(join(dir, 'drawing/InkEngine/physics.mjs')));
     const { getStrokeOutlinePoints, getInkPath } = await import(pathToFileURL(join(dir, 'drawing/penEngine.mjs')));
+    for (const [eraserSize, radius] of [['small',12],['medium',24],['large',48],['custom',10]]) {
+        assert.equal(eraserContactRadius({eraserSize,width:2,eraserMode:'pixel'}),radius);
+        assert.equal(eraserContactRadius({eraserSize,width:2,eraserMode:'precision'}),radius/2);
+        assert.equal(eraserContactRadius({eraserSize,width:2,eraserMode:'stroke'}),radius);
+    }
     for (const pen of Object.keys(TOOL_PHYSICS)) {
         const low = widthFactor({ p: 0.1 }, pen);
         const high = widthFactor({ p: 0.9 }, pen);
