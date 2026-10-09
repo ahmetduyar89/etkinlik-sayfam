@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Besin Zinciri Kulesi | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .pushable:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-sm font-black flex items-center gap-1"><span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span></a>
+      <div>
+        <div class="flex items-center gap-2"><span class="text-2xl sm:text-3xl">🐸</span><h1 class="display text-lg sm:text-2xl font-black tracking-wide">Besin Zinciri Kulesi</h1></div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Kim kimi yer? Canlıları doğru sırayla üst üste diz, kuleyi yıkma! 🌿➔🐇➔🦊</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab">🏗️ 1. Kule Kur</button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white">⚖️ 2. Ekosistem Dengesi</button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">KULE 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">Çayır</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <p id="taskText" class="p-2.5 bg-lime-50 rounded-xl border-2 border-ink text-xs sm:text-sm font-black">🎯 3 katlı bir besin zinciri kulesi kur!</p>
+
+        <!-- KULE MODU -->
+        <div id="towerMode" class="grid grid-cols-1 sm:grid-cols-5 gap-3">
+          <div id="towerBox" class="sm:col-span-2 relative rounded-2xl border-3 border-ink bg-gradient-to-b from-sky-200 to-lime-100 p-3 flex flex-col-reverse items-center gap-1.5 min-h-[330px]">
+            <div class="w-full rounded-xl border-3 border-ink bg-yellow-300 py-1.5 text-center text-xs font-black">☀️ GÜNEŞ ENERJİSİ</div>
+            <div id="tower" class="w-full flex flex-col-reverse items-center gap-1.5"></div>
+          </div>
+          <div class="sm:col-span-3 flex flex-col gap-2">
+            <p class="text-xs font-black">🧺 Canlı Havuzu: <span class="font-bold text-gray-500">Sıradaki kata koymak için dokun.</span></p>
+            <div id="pool" class="grid grid-cols-3 gap-2"></div>
+            <div class="flex gap-2 mt-1">
+              <button id="btnUndo" class="pushable px-3 py-2 bg-white text-xs font-black">↩️ Son Katı Kaldır</button>
+              <button id="btnReset" class="pushable px-3 py-2 bg-gray-100 text-xs font-black">🔄 Baştan</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- EKOSİSTEM MODU -->
+        <div id="ecoMode" class="hidden flex-col gap-3">
+          <div class="rounded-2xl border-3 border-ink overflow-hidden bg-gradient-to-b from-sky-100 to-lime-200 p-3">
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="bg-white/90 rounded-xl border-2 border-ink p-2"><p class="text-3xl">🌿</p><p class="text-[11px] font-black">Ot</p><p id="popG" class="display text-xl font-black text-green-700">250</p></div>
+              <div class="bg-white/90 rounded-xl border-2 border-ink p-2"><p class="text-3xl">🐇</p><p class="text-[11px] font-black">Tavşan</p><p id="popR" class="display text-xl font-black text-amber-700">60</p></div>
+              <div class="bg-white/90 rounded-xl border-2 border-ink p-2"><p class="text-3xl">🦊</p><p class="text-[11px] font-black">Tilki</p><p id="popF" class="display text-xl font-black text-orange-700">30</p></div>
+            </div>
+            <canvas id="chart" class="w-full h-auto block mt-3 rounded-xl border-2 border-ink bg-white"></canvas>
+            <div class="flex flex-wrap gap-3 mt-1.5 text-[10px] font-black"><span class="text-green-700">━ Ot (÷5)</span><span class="text-amber-600">━ Tavşan</span><span class="text-orange-700">━ Tilki</span></div>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button data-ev="huntF" class="ev pushable py-2 bg-white text-[11px] font-black">🦊➖ Tilkileri Azalt</button>
+            <button data-ev="addR" class="ev pushable py-2 bg-white text-[11px] font-black">🐇➕ Tavşan Ekle</button>
+            <button data-ev="drought" class="ev pushable py-2 bg-white text-[11px] font-black">🏜️ Kuraklık</button>
+            <button data-ev="reset" class="ev pushable py-2 bg-gray-100 text-[11px] font-black">🔄 Dengeye Döndür</button>
+          </div>
+        </div>
+
+        <div class="flex justify-end pt-2 border-t-2 border-dashed border-gray-200">
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black">💡 İpucu</button>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-lime-50 to-green-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">Her besin zinciri bir <b>üreticiyle</b> başlar. Bitkiler Güneş ışığını kullanarak kendi besinini üretir. Hayvanlar ise besinini başka canlılardan alır, bu yüzden <b>tüketici</b>dir.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">Ekolog Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Fen Bilgisi Rehberi</h3></div>
+        <div class="space-y-2 text-xs">
+          <div class="p-2 bg-green-50 rounded-lg border border-green-300"><p class="font-extrabold text-green-900">🌿 Üreticiler</p><p class="text-[11px] text-green-800 font-semibold mt-0.5">Kendi besinini üreten bitkiler ve su yosunları (algler).</p></div>
+          <div class="p-2 bg-amber-50 rounded-lg border border-amber-300"><p class="font-extrabold text-amber-900">🐇 Otçullar</p><p class="text-[11px] text-amber-800 font-semibold mt-0.5">Sadece bitkilerle beslenen tüketiciler: tavşan, çekirge, inek...</p></div>
+          <div class="p-2 bg-orange-50 rounded-lg border border-orange-300"><p class="font-extrabold text-orange-900">🦊 Etçiller</p><p class="text-[11px] text-orange-800 font-semibold mt-0.5">Başka hayvanlarla beslenen tüketiciler: tilki, kartal, yılan...</p></div>
+          <div class="p-2 bg-stone-50 rounded-lg border border-stone-300"><p class="font-extrabold text-stone-900">🍄 Ayrıştırıcılar</p><p class="text-[11px] text-stone-700 font-semibold mt-0.5">Mantarlar ve bakteriler ölü canlıları parçalayarak toprağa karıştırır. Doğanın temizlikçileridir!</p></div>
+          <div class="p-2 bg-yellow-50 rounded-lg border border-yellow-300"><p class="font-extrabold text-yellow-900">⚡ Enerji Akışı</p><p class="text-[11px] text-yellow-800 font-semibold mt-0.5">Enerji Güneş'ten üreticilere, oradan tüketicilere geçer. Her basamakta enerjinin bir kısmı harcanır, bu yüzden zincirin tepesine az enerji ulaşır.</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Kule Sağlam!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-lime-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-lime-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      stack(n) { tone('triangle', 300 + n * 90, 500 + n * 90, 0.12, 0.22); },
+      crash() { tone('sawtooth', 300, 60, 0.45, 0.2); tone('square', 120, 50, 0.3, 0.1, 0.1); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. CANLILAR ---
+    const ORG = {
+      ot: { e: '🌿', n: 'Ot', t: 'uretici' },
+      bugday: { e: '🌾', n: 'Buğday', t: 'uretici' },
+      alg: { e: '🟢', n: 'Su Yosunu', t: 'uretici' },
+      mese: { e: '🌳', n: 'Meşe Ağacı', t: 'uretici' },
+      tavsan: { e: '🐇', n: 'Tavşan', t: 'otcul', eats: ['ot', 'bugday'] },
+      cekirge: { e: '🦗', n: 'Çekirge', t: 'otcul', eats: ['ot', 'bugday'] },
+      fare: { e: '🐁', n: 'Tarla Faresi', t: 'otcul', eats: ['bugday'] },
+      sincap: { e: '🐿️', n: 'Sincap', t: 'otcul', eats: ['mese'] },
+      salyangoz: { e: '🐌', n: 'Salyangoz', t: 'otcul', eats: ['ot'] },
+      karides: { e: '🦐', n: 'Karides', t: 'otcul', eats: ['alg'] },
+      kurbaga: { e: '🐸', n: 'Kurbağa', t: 'etcil', eats: ['cekirge'] },
+      hamsi: { e: '🐟', n: 'Hamsi', t: 'etcil', eats: ['karides'] },
+      yilan: { e: '🐍', n: 'Yılan', t: 'etcil', eats: ['fare', 'kurbaga'] },
+      kirpi: { e: '🦔', n: 'Kirpi', t: 'etcil', eats: ['salyangoz', 'cekirge'] },
+      tilki: { e: '🦊', n: 'Tilki', t: 'etcil', eats: ['tavsan', 'fare', 'sincap'] },
+      baykus: { e: '🦉', n: 'Baykuş', t: 'etcil', eats: ['fare'] },
+      kartal: { e: '🦅', n: 'Kartal', t: 'etcil', eats: ['yilan', 'tavsan', 'sincap'] },
+      yunus: { e: '🐬', n: 'Yunus', t: 'etcil', eats: ['hamsi'] },
+      mantar: { e: '🍄', n: 'Mantar', t: 'ayristirici' },
+      tas: { e: '🪨', n: 'Taş', t: 'cansiz' }
+    };
+    const TYPE = { uretici: 'Üretici', otcul: 'Otçul', etcil: 'Etçil', ayristirici: 'Ayrıştırıcı', cansiz: 'Cansız' };
+    const TYPE_C = { uretici: '#bbf7d0', otcul: '#fde68a', etcil: '#fed7aa', ayristirici: '#e7e5e4', cansiz: '#e2e8f0' };
+
+    const LEVELS = [
+      { title: 'Çayır', len: 3, pool: ['ot', 'tavsan', 'tilki', 'tas', 'mantar', 'kartal'], hint: 'Önce üretici gelir: yeşil bir bitki. Sonra onu yiyen otçul, en üstte de otçulu yiyen etçil.', fact: '<b>Ot ➔ Tavşan ➔ Tilki</b>. Tavşan otla, tilki de tavşanla beslenir. Enerji Güneş\'ten ota, otla beslenen tavşana, oradan da tilkiye geçer.' },
+      { title: 'Karadeniz', len: 4, pool: ['alg', 'karides', 'hamsi', 'yunus', 'ot', 'tavsan'], hint: 'Denizde üretici, suda yaşayan minik su yosunlarıdır. Karides yosunla, hamsi karidesle beslenir...', fact: 'Denizlerdeki besin zincirleri gözle zor görülen minik <b>su yosunlarıyla</b> başlar. Bu yosunlar Dünya\'daki oksijenin büyük kısmını üretir!' },
+      { title: 'Buğday Tarlası', len: 4, pool: ['bugday', 'fare', 'yilan', 'kartal', 'tilki', 'cekirge', 'mantar'], hint: 'Buğday ➔ fare. Fareyi tilki de yer ama tilkiyi kule için yiyecek kimse yok! Fareyi yiyen başka bir canlı seç.', fact: 'Bir canlı birden fazla canlıyla beslenebilir. Fare hem yılana hem tilkiye hem de baykuşa besin olur. Birbirine bağlı zincirler <b>besin ağını</b> oluşturur.' },
+      { title: 'Büyük Çayır', len: 5, pool: ['ot', 'cekirge', 'kurbaga', 'yilan', 'kartal', 'tavsan', 'kirpi', 'salyangoz', 'mantar'], hint: 'Ot ➔ çekirge ➔ ... Çekirgeyi yiyen ve kendisi de yılana besin olan bir canlı var: suyun kenarında yaşar!', fact: 'Zincirin tepesindeki kartal gibi canlılara <b>son tüketici</b> denir. Tepedeki canlıların sayısı genellikle azdır, çünkü onlara az enerji ulaşır.' },
+      { title: 'Usta Ekolog', len: 4, free: true, pool: ['mese', 'bugday', 'ot', 'sincap', 'fare', 'cekirge', 'salyangoz', 'kurbaga', 'kirpi', 'yilan', 'baykus', 'kartal', 'tilki', 'mantar', 'tas'], hint: 'Birden çok doğru cevap var! Çekirge hem otla hem buğdayla beslenir. Kurbağa çekirgeyi, yılan da kurbağayı ya da fareyi yer.', fact: 'Harika! Doğada her canlı birbirine bağlıdır. Bir halka yok olursa bütün zincir etkilenir.' }
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: İlk Kule', text: 'Çayır kulesini kur.' },
+      { id: 'm2', title: '2. Görev: Beşli Kule', text: '5 katlı kuleyi hiç yıkmadan kur.' },
+      { id: 'm3', title: '3. Görev: Denge Bozulursa', text: 'Ekosistemde tilkileri azalt ve tavşanların arttığını gözle.' },
+      { id: 'm4', title: '4. Görev: Usta Ekolog', text: '5 kulenin hepsini tamamla.' }
+    ];
+
+    // --- 3. DURUM ---
+    const $ = id => document.getElementById(id);
+    let mode = 'levels';
+    let levelIndex = 0;
+    let chain = [];
+    let crashes = 0;
+    let finished = false;
+    let score = 0;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    let modalTimer = null;
+
+    // --- 4. KULE ---
+    function renderTower() {
+      const L = LEVELS[levelIndex];
+      const tower = $('tower');
+      let h = '';
+      for (let i = 0; i < L.len; i++) {
+        const id = chain[i];
+        if (id) {
+          const o = ORG[id];
+          h += `<div class="floor w-full rounded-xl border-3 border-ink px-2 py-1 flex items-center justify-between" style="background:${TYPE_C[o.t]}; width:${100 - i * 8}%">
+            <span class="text-2xl">${o.e}</span><span class="text-xs font-black">${o.n}</span><span class="text-[9px] font-black">${i === 0 ? 'Üretici' : i === L.len - 1 ? 'Son tüketici' : `${i}. tüketici`}</span></div>`;
+        } else {
+          h += `<div class="w-full rounded-xl border-3 border-dashed border-ink/40 bg-white/40 py-2 text-center text-[11px] font-black text-gray-500" style="width:${100 - i * 8}%">${i + 1}. kat ${i === chain.length ? '👈 sıradaki' : ''}</div>`;
+        }
+      }
+      tower.innerHTML = h;
+    }
+
+    function renderPool() {
+      const L = LEVELS[levelIndex];
+      $('pool').innerHTML = L.pool.map(id => {
+        const o = ORG[id];
+        const used = chain.includes(id);
+        return `<button data-id="${id}" ${used || finished ? 'disabled' : ''} class="org pushable bg-white hover:bg-lime-50 py-2 flex flex-col items-center"><span class="text-3xl">${o.e}</span><span class="text-[10px] font-black">${o.n}</span></button>`;
+      }).join('');
+      $('pool').querySelectorAll('.org').forEach(b => b.addEventListener('click', () => place(b.dataset.id)));
+    }
+
+    function place(id) {
+      if (finished) return;
+      initAudio();
+      const L = LEVELS[levelIndex];
+      const o = ORG[id];
+      const pos = chain.length;
+      let err = null;
+      if (o.t === 'cansiz') err = `${o.e} <b>${o.n}</b> bir canlı değil! Besin zincirinde sadece canlılar bulunur.`;
+      else if (o.t === 'ayristirici') err = `${o.e} <b>Mantar</b> bir ayrıştırıcıdır. Ölü canlıları parçalar, bu kuledeki gibi bir zincir basamağı olmaz.`;
+      else if (pos === 0 && o.t !== 'uretici') err = `Zincir <b>üreticiyle</b> başlamalı! ${o.e} ${o.n} kendi besinini üretemez.`;
+      else if (pos > 0 && !(o.eats || []).includes(chain[pos - 1])) {
+        const prev = ORG[chain[pos - 1]];
+        err = o.t === 'uretici' ? `${o.e} ${o.n} bir üreticidir, ${prev.n.toLowerCase()} yemez!` : `${o.e} ${o.n}, ${prev.e} ${prev.n.toLowerCase()} ile beslenmez. ${o.n} şunlarla beslenir: ${(o.eats || []).map(x => ORG[x].n.toLowerCase()).join(', ')}.`;
+      }
+      if (err) { crash(err); return; }
+      chain.push(id);
+      Sound.stack(pos);
+      $('scienceNote').innerHTML = pos === 0 ? `✅ ${o.e} <b>${o.n}</b> bir üreticidir. Güneş ışığıyla kendi besinini üretir.` : `✅ ${o.e} <b>${o.n}</b>, ${ORG[chain[pos - 1]].n.toLowerCase()} ile beslenir. (${TYPE[o.t]})`;
+      renderTower(); renderPool();
+      const floors = $('tower').querySelectorAll('.floor');
+      if (typeof gsap !== 'undefined' && floors[pos]) gsap.from(floors[pos], { y: -60, opacity: 0, duration: 0.35, ease: 'bounce.out' });
+      if (chain.length === L.len) winLevel();
+    }
+
+    function crash(msg) {
+      crashes++;
+      Sound.crash();
+      $('scienceNote').innerHTML = '❌ ' + msg;
+      if (typeof gsap !== 'undefined') gsap.fromTo('#towerBox', { rotate: -3 }, { rotate: 0, duration: 0.6, ease: 'elastic.out(4,0.2)' });
+    }
+
+    function winLevel() {
+      finished = true;
+      const L = LEVELS[levelIndex];
+      const s = crashes === 0 ? 3 : crashes <= 2 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20;
+      if (levelIndex === 0) completeMission('m1');
+      if (L.len === 5 && crashes === 0) completeMission('m2');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      updateScore(); renderLevelDots(); renderPool();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 }, colors: ['#22c55e', '#facc15', '#f97316'] });
+      showModal({ emoji: '🏗️', title: 'Kule Sağlam!', stars: '⭐'.repeat(s) + '☆'.repeat(3 - s), info: chain.map(id => ORG[id].e).join(' ➔ '), fact: L.fact, next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Ekosistem ⚖️' });
+    }
+
+    // --- 5. EKOSİSTEM DENGESİ ---
+    const chartC = $('chart');
+    const cctx = chartC.getContext('2d');
+    const CW = 520, CH = 170;
+    (() => { const dpr = window.devicePixelRatio || 1; chartC.width = CW * dpr; chartC.height = CH * dpr; cctx.setTransform(dpr, 0, 0, dpr, 0, 0); })();
+    let eco = { G: 250, R: 60, F: 30 };
+    let ecoHist = [];
+    let foxCut = null;
+
+    function ecoStep(dt) {
+      const { G, R, F } = eco;
+      const dG = 0.8 * G * (1 - G / 1000) - 0.01 * G * R;
+      const dR = 0.004 * G * R - 0.4 * R - 0.02 * R * F;
+      const dF = 0.005 * R * F - 0.3 * F;
+      eco.G = Math.max(1, G + dG * dt);
+      eco.R = Math.max(0, R + dR * dt);
+      eco.F = Math.max(0, F + dF * dt);
+      if (eco.F < 0.5) eco.F = 0;
+      if (eco.R < 0.5) eco.R = 0;
+    }
+
+    function drawChart() {
+      cctx.clearRect(0, 0, CW, CH);
+      cctx.fillStyle = '#ffffff'; cctx.fillRect(0, 0, CW, CH);
+      const maxV = 160;
+      const y = v => CH - 8 - Math.min(v, maxV) / maxV * (CH - 16);
+      cctx.strokeStyle = '#e2e8f0'; cctx.lineWidth = 1;
+      [40, 80, 120].forEach(v => { cctx.beginPath(); cctx.moveTo(0, y(v)); cctx.lineTo(CW, y(v)); cctx.stroke(); });
+      const series = [['G', '#15803d', 0.2], ['R', '#d97706', 1], ['F', '#c2410c', 1]];
+      const step = CW / 300;
+      series.forEach(([k, c, sc]) => {
+        cctx.strokeStyle = c; cctx.lineWidth = 3; cctx.beginPath();
+        ecoHist.forEach((p, i) => { const px = i * step, py = y(p[k] * sc); i ? cctx.lineTo(px, py) : cctx.moveTo(px, py); });
+        cctx.stroke();
+      });
+    }
+
+    let last = performance.now();
+    let simAcc = 0;
+    function loop(now) {
+      const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+      last = now;
+      if (mode === 'eco') {
+        simAcc += dt;
+        while (simAcc > 0.05) {
+          for (let i = 0; i < 2; i++) ecoStep(0.025);
+          ecoHist.push({ ...eco });
+          if (ecoHist.length > 300) ecoHist.shift();
+          simAcc -= 0.05;
+        }
+        $('popG').textContent = Math.round(eco.G);
+        $('popR').textContent = Math.round(eco.R);
+        $('popF').textContent = Math.round(eco.F);
+        if (foxCut && eco.R > foxCut + 8) completeMission('m3');
+        drawChart();
+      }
+      requestAnimationFrame(loop);
+    }
+
+    document.querySelectorAll('.ev').forEach(b => b.addEventListener('click', () => {
+      initAudio(); Sound.click();
+      const ev = b.dataset.ev;
+      if (ev === 'huntF') { eco.F = Math.max(0, eco.F * 0.3); foxCut = eco.R; $('scienceNote').innerHTML = '🦊 Tilkiler azaldı. Tavşanları avlayan az canlı kaldı. <b>Tavşanlar ve otlar</b> nasıl değişiyor? Grafiği izle!'; }
+      if (ev === 'addR') { eco.R += 40; $('scienceNote').innerHTML = '🐇 Çok sayıda tavşan geldi. Otlar hızla azalır mı? Tilkiler ne olur?'; }
+      if (ev === 'drought') { eco.G *= 0.35; $('scienceNote').innerHTML = '🏜️ Kuraklık otları kuruttu. Üretici azalınca bütün zincir etkilenir!'; }
+      if (ev === 'reset') { eco = { G: 250, R: 60, F: 30 }; foxCut = null; $('scienceNote').innerHTML = '⚖️ Ekosistem dengede. Bir olay seç ve neler olacağını tahmin et!'; }
+    }));
+
+    // --- 6. AKIŞ ---
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info; $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next); if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 800);
+    }
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5"><span class="text-lg">${done ? '✅' : '⬜'}</span><div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Kuleler:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function loadLevel(i) {
+      closeModal();
+      mode = 'levels'; levelIndex = i; chain = []; crashes = 0; finished = false;
+      const L = LEVELS[i];
+      $('levelBadge').textContent = `KULE ${i + 1}`;
+      $('levelTitle').textContent = L.title;
+      $('taskText').textContent = `🎯 ${L.len} katlı bir besin zinciri kulesi kur!${L.free ? ' (Birden fazla doğru cevap var.)' : ''}`;
+      renderLevelDots(); renderTower(); renderPool();
+    }
+
+    function switchMode(m) {
+      const isE = m === 'eco';
+      $('tabLevels').classList.toggle('active-tab', !isE); $('tabLevels').classList.toggle('bg-white', isE);
+      $('tabSandbox').classList.toggle('active-tab', isE); $('tabSandbox').classList.toggle('bg-white', !isE);
+      $('levelDots').classList.toggle('hidden', isE);
+      $('towerMode').classList.toggle('hidden', isE);
+      $('ecoMode').classList.toggle('hidden', !isE); $('ecoMode').classList.toggle('flex', isE);
+      if (isE) {
+        closeModal();
+        mode = 'eco';
+        $('levelBadge').textContent = 'EKOSİSTEM';
+        $('levelTitle').textContent = 'Ot ➔ Tavşan ➔ Tilki';
+        $('taskText').textContent = '🎯 Bir olay seç ve besin zincirindeki canlı sayılarının nasıl değiştiğini grafikte izle!';
+      } else loadLevel(levelIndex);
+    }
+
+    $('btnUndo').addEventListener('click', () => { if (finished || !chain.length) return; chain.pop(); Sound.click(); renderTower(); renderPool(); });
+    $('btnReset').addEventListener('click', () => { Sound.click(); loadLevel(levelIndex); });
+    $('btnHint').addEventListener('click', () => {
+      Sound.click();
+      $('scienceNote').innerHTML = mode === 'levels' ? `<b>İpucu:</b> ${LEVELS[levelIndex].hint}` : '<b>Tahmin et:</b> Tilkiler azalırsa tavşanlar çoğalır. Peki çok fazla tavşan olursa otlara ne olur? Sonra tavşanlar ne yiyecek?';
+    });
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('eco'); });
+    $('btnModalRetry').addEventListener('click', () => loadLevel(levelIndex));
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('eco'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; Sound.click(); });
+
+    renderMissions(); updateScore(); loadLevel(0);
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

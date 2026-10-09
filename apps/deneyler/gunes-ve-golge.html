@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gölgem Değişiyor mu? — Gün İçinde Gölge Boyu Deneyi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <style>
+    :root {
+      --ink: #182b4d;
+      --paper: #fffdf7;
+      --panel: #f4efe2;
+      --line: #d8ceb8;
+      --sun: #ffc93c;
+      --grape: #7b5be6;
+      --sea: #2ba6c9;
+      --leaf: #3bb273;
+      --coral: #ff6b6b;
+      --sky: #0284c7;
+    }
+
+    body {
+      font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #fffdf7;
+      color: #182b4d;
+      background-image: radial-gradient(#d8ceb8 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+    }
+
+    .display {
+      font-family: 'Baloo 2', 'Nunito', cursive, sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .chunky {
+      border: 3.5px solid var(--ink);
+      border-radius: 20px;
+      box-shadow: 0 6px 0 var(--ink);
+    }
+
+    .pushable {
+      border: 3px solid var(--ink);
+      border-radius: 14px;
+      box-shadow: 0 4px 0 var(--ink);
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .pushable:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 var(--ink);
+    }
+
+    .pushable:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 var(--ink);
+    }
+
+    /* Renk Yardımcı Sınıfları */
+    .bg-coral { background-color: #ff5252 !important; }
+    .bg-grape { background-color: #7b5be6 !important; }
+    .bg-sun { background-color: #ffc93c !important; }
+    .bg-panel { background-color: #f4efe2 !important; }
+    .bg-paper { background-color: #fffdf7 !important; }
+    .bg-sky { background-color: #0284c7 !important; }
+    .bg-mint { background-color: #3bb273 !important; }
+    .text-ink { color: #182b4d !important; }
+    .border-ink { border-color: #182b4d !important; }
+
+    /* Range slider custom */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+    }
+    input[type=range]:focus {
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 14px;
+      cursor: pointer;
+      background: #e4dcce;
+      border: 2px solid var(--ink);
+      border-radius: 9999px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      height: 28px;
+      width: 28px;
+      border-radius: 50%;
+      background: var(--sun);
+      border: 2.5px solid var(--ink);
+      cursor: pointer;
+      -webkit-appearance: none;
+      margin-top: -8px;
+      box-shadow: 0 2px 0 var(--ink);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-3 sm:p-6 select-none">
+
+  <!-- Üst Bar -->
+  <div class="max-w-6xl mx-auto w-full mb-4">
+    <header class="flex flex-wrap items-center justify-between gap-4 bg-white/90 backdrop-blur p-4 rounded-2xl chunky">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="pushable bg-sun px-3.5 py-2 flex items-center gap-1.5 text-ink font-bold text-sm" title="Ana Sayfaya Dön">
+          <span>🏠</span> <span>Tüm Deneyler</span>
+        </a>
+        <h1 class="display text-2xl sm:text-3xl flex items-center gap-2">
+          <span>☀️</span> Gölgem Değişiyor mu?
+        </h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="px-3 py-1 bg-amber-100 text-amber-900 text-xs sm:text-sm font-bold rounded-full border-2 border-ink">
+          3-4. Sınıf Fen · Gün İçinde Gölge Boyu
+        </span>
+        <button id="soundToggle" class="pushable bg-panel px-3 py-1.5 text-xs font-bold flex items-center gap-1">
+          <span id="soundIcon">🔊</span> <span id="soundLabel">Ses Açık</span>
+        </button>
+      </div>
+    </header>
+  </div>
+
+  <!-- Ana Düzen: Gökyüzü Sahnesi (Sol) + Kontrol Paneli (Sağ) -->
+  <main class="max-w-6xl mx-auto w-full flex-1 flex flex-col lg:flex-row items-stretch gap-6 mb-6">
+
+    <!-- Sol Sütun: Simülasyon Sahnesi -->
+    <section class="chunky relative flex-1 flex flex-col justify-between overflow-hidden bg-white min-h-[520px]">
+      
+      <!-- Üst Bilgi Barı: Saat ve Güneş Açısı -->
+      <div class="bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 p-4 border-b-3 border-ink flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div id="timeStatusIcon" class="w-11 h-11 rounded-2xl bg-amber-200 border-2 border-ink flex items-center justify-center text-2xl shadow-sm">
+            ☀️
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-black uppercase text-gray-500">Zaman ve Güneş Konumu</span>
+              <span id="sunAngleTag" class="px-2 py-0.5 rounded-md text-[10px] font-black bg-sun border border-ink text-ink">Güneş Açısı: 45°</span>
+            </div>
+            <div id="statusTitle" class="text-base sm:text-lg font-black text-ink display">
+              Saat: <span id="clockDisplay" class="text-coral">09:00 (Sabah)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Canlı Gölge Ölçüm Göstergeleri -->
+        <div class="flex items-center gap-2">
+          <div class="bg-white px-3 py-1.5 rounded-xl border-2 border-ink text-center shadow-sm">
+            <span class="text-[10px] font-bold text-gray-400 block uppercase">Gölge Yönü</span>
+            <span id="shadowDirectionBadge" class="text-xs font-black text-ink">Batı ⬅️</span>
+          </div>
+          <div class="bg-white px-3 py-1.5 rounded-xl border-2 border-ink text-center shadow-sm">
+            <span class="text-[10px] font-bold text-gray-400 block uppercase">Gölge Boyu</span>
+            <span id="shadowLengthBadge" class="text-xs font-black text-purple-700">140 cm (UZUN)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SVG Canlı Gökyüzü ve Bahçe Sahnesi -->
+      <div class="relative flex-1 flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+        
+        <svg id="skySvg" viewBox="0 0 700 440" class="w-full h-full max-h-[460px]"
+             role="img" aria-label="Gölge Boyunun Gün İçinde Değişimi" font-family="'Baloo 2', 'Nunito', sans-serif"
+             stroke-linecap="round" stroke-linejoin="round">
+
+          <defs>
+            <!-- Dinamik Gökyüzü Gradyanı -->
+            <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop id="skyStopTop" offset="0%" stop-color="#38bdf8"/>
+              <stop id="skyStopBottom" offset="100%" stop-color="#bae6fd"/>
+            </linearGradient>
+
+            <!-- Güneş Parıltısı -->
+            <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fff" stop-opacity="1"/>
+              <stop offset="40%" stop-color="#fef08a" stop-opacity="0.9"/>
+              <stop offset="70%" stop-color="#f59e0b" stop-opacity="0.5"/>
+              <stop offset="100%" stop-color="#ea580c" stop-opacity="0"/>
+            </radialGradient>
+
+            <!-- Gölge Yere Düşme Filtresi -->
+            <filter id="shadowBlur" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="1.5" />
+            </filter>
+          </defs>
+
+          <!-- Gökyüzü Arka Planı -->
+          <rect id="skyBg" x="0" y="0" width="700" height="340" fill="url(#skyGrad)" />
+
+          <!-- Güneş'in Gökyüzündeki Yolu (Ark Kesikli Çizgi) -->
+          <path d="M70 330 A290 240 0 0 1 630 330" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-dasharray="8 6" opacity="0.4" />
+          
+          <!-- Yön İşaretleri (Doğu ve Batı) -->
+          <g transform="translate(60, 315)">
+            <rect x="-35" y="-12" width="70" height="24" rx="6" fill="#ffffff" stroke="#182b4d" stroke-width="2" opacity="0.9" />
+            <text x="0" y="4" text-anchor="middle" font-size="11" font-weight="900" fill="#0369a1">🌅 DOĞU</text>
+          </g>
+          <g transform="translate(640, 315)">
+            <rect x="-35" y="-12" width="70" height="24" rx="6" fill="#ffffff" stroke="#182b4d" stroke-width="2" opacity="0.9" />
+            <text x="0" y="4" text-anchor="middle" font-size="11" font-weight="900" fill="#c2410c">🌇 BATI</text>
+          </g>
+
+          <!-- Tepe Noktası (Öğle Güneşi İşareti) -->
+          <text x="350" y="45" text-anchor="middle" font-size="11" font-weight="900" fill="#ffffff" opacity="0.8">
+            ☀️ ÖĞLE (12:00 - TAM TEPE)
+          </text>
+
+          <!-- Bahçe / Zemin (Toprak ve Çim) -->
+          <rect x="0" y="330" width="700" height="110" fill="#4ade80" stroke="#182b4d" stroke-width="3.5" />
+          <!-- Zemin Ölçüm Cetveli / Çizgisi -->
+          <line x1="50" y1="360" x2="650" y2="360" stroke="#166534" stroke-width="3" stroke-dasharray="10 8" />
+          <text x="350" y="425" text-anchor="middle" font-size="11" font-weight="900" fill="#14532d">
+            📏 Bahçe Zemin Cetveli (Gölge Uzunluğu Takip Çizgisi)
+          </text>
+
+          <!-- ================= TEBEŞİR İZLERİ GRUBU (Kullanıcı İşaretleri) ================= -->
+          <g id="chalkMarksGroup"></g>
+
+          <!-- ================= GÜNEŞ IŞINI (Güneşten Karakter Başına Doğru) ================= -->
+          <line id="sunRayBeam" x1="100" y1="200" x2="350" y2="245" stroke="#fef08a" stroke-width="3" stroke-dasharray="6 4" opacity="0.8" />
+
+          <!-- ================= GÖLGE (ZEMİNE DÜŞEN DİNAMİK GÖLGE) ================= -->
+          <!-- Merkez: x=350, y=345 (Karakterin ayak tabanı) -->
+          <g id="groundShadowGroup" transform="translate(350, 345)">
+            <!-- Dinamik Şekil: Elips / Yassı Silüet (Uzayıp kısalır ve yön değiştirir) -->
+            <ellipse id="charShadow" cx="0" cy="0" rx="40" ry="12" fill="#1e293b" opacity="0.65" filter="url(#shadowBlur)" />
+          </g>
+
+          <!-- ================= GÜNEŞ (SEVİMLİ HAREKETLİ GÜNEŞ MASKOTU) ================= -->
+          <g id="sunGroup" transform="translate(100, 200)" class="cursor-pointer">
+            <!-- Işıma Çemberi -->
+            <circle cx="0" cy="0" r="45" fill="url(#sunGlow)" />
+            <!-- Güneş Çekirdeği -->
+            <circle cx="0" cy="0" r="26" fill="#ffc93c" stroke="#182b4d" stroke-width="3" />
+            <!-- Sevimli Güneş Yüzü -->
+            <circle cx="-8" cy="-5" r="3.5" fill="#182b4d" />
+            <circle cx="8" cy="-5" r="3.5" fill="#182b4d" />
+            <circle cx="-14" cy="2" r="4" fill="#f87171" opacity="0.7" />
+            <circle cx="14" cy="2" r="4" fill="#f87171" opacity="0.7" />
+            <!-- Gülümseme -->
+            <path d="M-9 5 Q0 13 9 5" fill="none" stroke="#182b4d" stroke-width="2.5" />
+            <!-- Güneş Işınları (Taç) -->
+            <g stroke="#f59e0b" stroke-width="3" stroke-linecap="round">
+              <line x1="0" y1="-32" x2="0" y2="-40" />
+              <line x1="0" y1="32" x2="0" y2="40" />
+              <line x1="-32" y1="0" x2="-40" y2="0" />
+              <line x1="32" y1="0" x2="40" y2="0" />
+              <line x1="-22" y1="-22" x2="-28" y2="-28" />
+              <line x1="22" y1="22" x2="28" y2="28" />
+              <line x1="-22" y1="22" x2="-28" y2="28" />
+              <line x1="22" y1="-22" x2="28" y2="-28" />
+            </g>
+          </g>
+
+          <!-- ================= ORTA FİGÜR: KÜÇÜK KÂŞİF CAN VEYA GÜNEŞ SAATİ ================= -->
+          <!-- 1. Karakter Görünümü -->
+          <g id="characterRig" transform="translate(350, 245)">
+            <!-- Kafa ve Şapka -->
+            <circle cx="0" cy="-20" r="16" fill="#fed7aa" stroke="#182b4d" stroke-width="2.5" />
+            <!-- Kâşif Şapkası -->
+            <path d="M-22 -26 Q0 -42 22 -26 Z" fill="#f59e0b" stroke="#182b4d" stroke-width="2.5" />
+            <ellipse cx="0" cy="-24" rx="26" ry="6" fill="#f59e0b" stroke="#182b4d" stroke-width="2" />
+            <!-- Gözler ve Gülümseme -->
+            <circle cx="-5" cy="-18" r="2.5" fill="#182b4d" />
+            <circle cx="5" cy="-18" r="2.5" fill="#182b4d" />
+            <path d="M-4 -10 Q0 -6 4 -10" fill="none" stroke="#182b4d" stroke-width="2" />
+            <!-- Gövde / Tişört -->
+            <rect x="-14" y="-4" width="28" height="38" rx="8" fill="#ef4444" stroke="#182b4d" stroke-width="2.5" />
+            <!-- Dürbün / Büyüteç İpi -->
+            <path d="M-10 0 L0 18 L10 0" fill="none" stroke="#ffc93c" stroke-width="2" />
+            <!-- Şort -->
+            <rect x="-13" y="34" width="26" height="25" rx="4" fill="#3b82f6" stroke="#182b4d" stroke-width="2.5" />
+            <!-- Bacaklar & Ayakkabılar -->
+            <line x1="-7" y1="59" x2="-7" y2="92" stroke="#fed7aa" stroke-width="6" />
+            <line x1="7" y1="59" x2="7" y2="92" stroke="#fed7aa" stroke-width="6" />
+            <ellipse cx="-10" cy="95" rx="8" ry="5" fill="#182b4d" />
+            <ellipse cx="10" cy="95" rx="8" ry="5" fill="#182b4d" />
+            <!-- Kollar -->
+            <line x1="-14" y1="4" x2="-25" y2="35" stroke="#fed7aa" stroke-width="5" stroke-linecap="round" />
+            <line x1="14" y1="4" x2="25" y2="35" stroke="#fed7aa" stroke-width="5" stroke-linecap="round" />
+          </g>
+
+          <!-- 2. Antik Güneş Saati Görünümü (İnteraktif Kadran & Dönen Gölge) -->
+          <g id="sundialRig" transform="translate(350, 315)" opacity="0" class="pointer-events-none">
+            <!-- Taş Kaide / Ayak -->
+            <rect x="-35" y="25" width="70" height="28" rx="6" fill="#64748b" stroke="#182b4d" stroke-width="2.5" />
+            <!-- Dairesel Taş Zemin / Kadran Plakası -->
+            <ellipse cx="0" cy="22" rx="105" ry="36" fill="#e2e8f0" stroke="#182b4d" stroke-width="3.5" />
+            <ellipse cx="0" cy="18" rx="98" ry="31" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" />
+
+            <!-- Kadran Saat Çizgileri (Merkezden kenarlara uzanan saat kılavuzları) -->
+            <g stroke="#cbd5e1" stroke-width="1.5">
+              <line x1="0" y1="12" x2="78" y2="18" />
+              <line x1="0" y1="12" x2="62" y2="30" />
+              <line x1="0" y1="12" x2="44" y2="38" />
+              <line x1="0" y1="12" x2="24" y2="44" />
+              <line x1="0" y1="12" x2="0" y2="47" />
+              <line x1="0" y1="12" x2="-24" y2="44" />
+              <line x1="0" y1="12" x2="-44" y2="38" />
+              <line x1="0" y1="12" x2="-62" y2="30" />
+              <line x1="0" y1="12" x2="-78" y2="18" />
+            </g>
+
+            <!-- Saat Rakamları (Gölgenin düştüğü saatler: Sabah sağda, Öğle ortada, Akşam solda) -->
+            <text x="82" y="21" text-anchor="middle" font-size="10" font-weight="900" fill="#0369a1">07</text>
+            <text x="65" y="34" text-anchor="middle" font-size="10" font-weight="900" fill="#0369a1">08</text>
+            <text x="46" y="42" text-anchor="middle" font-size="10" font-weight="900" fill="#0369a1">09</text>
+            <text x="25" y="47" text-anchor="middle" font-size="10" font-weight="900" fill="#0369a1">10</text>
+            <text x="0" y="48" text-anchor="middle" font-size="12" font-weight="900" fill="#b45309">12</text>
+            <text x="-25" y="47" text-anchor="middle" font-size="10" font-weight="900" fill="#c2410c">14</text>
+            <text x="-46" y="42" text-anchor="middle" font-size="10" font-weight="900" fill="#c2410c">15</text>
+            <text x="-65" y="34" text-anchor="middle" font-size="10" font-weight="900" fill="#c2410c">16</text>
+            <text x="-82" y="21" text-anchor="middle" font-size="10" font-weight="900" fill="#c2410c">17</text>
+
+            <!-- DİNAMİK GÜNEŞ SAATİ GÖLGESİ (Gnomon'un Kadrana Düşen Keskin Gölgesi) -->
+            <polygon id="sundialShadow" points="-3,12 3,12 0,46" fill="#0f172a" opacity="0.85" filter="url(#shadowBlur)" />
+
+            <!-- Dikey Mil / Çubuk (Gnomon - Bronz Piramit İğne) -->
+            <polygon points="-5,14 5,14 0,-55" fill="#d97706" stroke="#182b4d" stroke-width="2.5" />
+            <polygon points="0,14 5,14 0,-55" fill="#b45309" />
+            <circle cx="0" cy="-55" r="4.5" fill="#ffc93c" stroke="#182b4d" stroke-width="1.5" />
+
+            <!-- Kadran Okuma Kutusu -->
+            <g transform="translate(0, 68)">
+              <rect x="-65" y="-12" width="130" height="24" rx="6" fill="#182b4d" stroke="#ffc93c" stroke-width="1.5" />
+              <text id="sundialTimeReadout" x="0" y="4" text-anchor="middle" font-size="11" font-weight="900" fill="#fef08a">
+                Güneş Saati: 09:00
+              </text>
+            </g>
+          </g>
+
+        </svg>
+
+        <!-- Anlık Bilimsel Kavram Kartı (Pop-up) -->
+        <div id="conceptCard" class="absolute bottom-4 left-4 right-4 sm:left-6 sm:right-auto sm:max-w-md bg-white p-4 rounded-2xl chunky shadow-xl border-3 border-ink opacity-0 pointer-events-none transition-all duration-300 transform translate-y-3">
+          <div class="flex items-start gap-3">
+            <span id="conceptEmoji" class="text-3xl">💡</span>
+            <div>
+              <h4 id="conceptTitle" class="display text-base sm:text-lg text-ink">Biliyor musun?</h4>
+              <p id="conceptBody" class="text-xs text-gray-700 font-semibold leading-relaxed mt-0.5"></p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Alt Hızlı Eylem Çubuğu -->
+      <div class="p-3 bg-amber-50 border-t-3 border-ink flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <button id="btnMarkChalk" class="pushable bg-sun hover:bg-amber-300 text-ink px-4 py-2 text-xs font-black flex items-center gap-1.5 shadow-sm">
+            <span>✏️</span> <span>Gölgeyi Tebeşirle İşaretle</span>
+          </button>
+          <button id="btnPlayDay" class="pushable bg-sky text-white hover:bg-sky-600 px-4 py-2 text-xs font-black flex items-center gap-1.5 shadow-sm">
+            <span>⏩</span> <span>1 Günü Canlandır</span>
+          </button>
+        </div>
+        <button id="btnClearChalk" class="pushable bg-white hover:bg-gray-100 text-gray-600 px-3 py-2 text-xs font-bold flex items-center gap-1">
+          <span>🧹</span> <span>İzleri Temizle</span>
+        </button>
+      </div>
+
+    </section>
+
+    <!-- Sağ Sütun: Deney Kontrol & Bilim Paneli -->
+    <aside class="w-full lg:w-80 flex flex-col gap-4">
+
+      <!-- 24 Saatlik Zaman Kaydırıcısı -->
+      <div class="chunky bg-white p-4">
+        <span class="text-xs font-black uppercase text-gray-500 tracking-wider block mb-1">Zamanı Ayarla</span>
+        <div class="flex justify-between items-center text-xs font-black mb-2">
+          <span class="text-gray-600">Saat:</span>
+          <span id="sliderHourVal" class="text-coral text-base font-extrabold">09:00</span>
+        </div>
+        <input id="hourSlider" type="range" min="6.5" max="17.5" step="0.25" value="9" class="w-full">
+        
+        <div class="flex justify-between text-[10px] font-bold text-gray-400 mt-1 mb-3">
+          <span>06:30 (Doğuş)</span>
+          <span>12:00 (Öğle)</span>
+          <span>17:30 (Batış)</span>
+        </div>
+
+        <!-- Hızlı Saat Butonları -->
+        <div class="grid grid-cols-3 gap-1">
+          <button class="time-btn pushable p-2 bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-black text-center" data-hour="8.5">
+            🌅 Sabah<br><span class="text-[10px] font-bold">08:30</span>
+          </button>
+          <button class="time-btn pushable p-2 bg-yellow-200 hover:bg-yellow-300 text-yellow-950 text-xs font-black text-center" data-hour="12.0">
+            ☀️ Öğle<br><span class="text-[10px] font-bold">12:00</span>
+          </button>
+          <button class="time-btn pushable p-2 bg-orange-100 hover:bg-orange-200 text-orange-950 text-xs font-black text-center" data-hour="16.5">
+            🌇 Akşam<br><span class="text-[10px] font-bold">16:30</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sahne Modu (Kâşif Çocuk vs Güneş Saati) -->
+      <div class="chunky bg-white p-4">
+        <span class="text-xs font-black uppercase text-gray-500 tracking-wider block mb-2">Deney Nesnesi</span>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="modeCharacter" class="pushable p-2.5 bg-sun text-ink font-extrabold text-xs flex flex-col items-center justify-center gap-1 text-center">
+            <span class="text-lg">🧒</span>
+            <span>Kâşif Can</span>
+          </button>
+          <button id="modeSundial" class="pushable p-2.5 bg-white hover:bg-amber-50 text-ink font-bold text-xs flex flex-col items-center justify-center gap-1 text-center">
+            <span class="text-lg">🧭</span>
+            <span>Güneş Saati</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Bilimsel Kural: Neden Değişir? -->
+      <div class="chunky bg-panel p-4">
+        <h3 class="display text-base text-ink flex items-center gap-2 mb-2">
+          <span>🔬</span> Gün Boyunca Gölge Değişimi
+        </h3>
+        <ul class="text-xs text-gray-800 space-y-2 font-semibold">
+          <li class="flex items-start gap-1.5">
+            <span class="text-sm">🌅</span>
+            <span><strong>Sabah:</strong> Güneş doğuda alçaktadır. Işınlar eğik gelir, gölgemiz <strong>BATIYA</strong> uzanır ve <strong>ÇOK UZUNDUR</strong>!</span>
+          </li>
+          <li class="flex items-start gap-1.5">
+            <span class="text-sm">☀️</span>
+            <span><strong>Öğle:</strong> Güneş tam tepededir (dik açı). Gölgemiz <strong>EN KISA</strong> boyuna iner, ayak dibinde kalır.</span>
+          </li>
+          <li class="flex items-start gap-1.5">
+            <span class="text-sm">🌇</span>
+            <span><strong>Akşam:</strong> Güneş batıda alçaldığında gölgemiz <strong>DOĞUYA</strong> uzanır ve tekrar <strong>UZAR</strong>!</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Tahmin Oyunu (Mini Bilgi Yarışması) -->
+      <div class="chunky bg-gradient-to-br from-purple-50 to-pink-50 p-4">
+        <h3 class="display text-base text-purple-900 flex items-center gap-2 mb-1">
+          <span>🎯</span> Küçük Bilim İnsanı Sorusu
+        </h3>
+        <p class="text-xs text-gray-700 font-semibold mb-3">
+          Günün hangi vaktinde gölgemiz en kısa boyuna ulaşır?
+        </p>
+        <div class="flex flex-col gap-2">
+          <button id="btnQuizNoon" class="pushable bg-white hover:bg-emerald-50 text-ink text-left p-2.5 text-xs font-extrabold flex items-center gap-2">
+            <span>☀️</span> <span>Öğle Vakti (Güneş tam tepedeyken)</span>
+          </button>
+          <button id="btnQuizMorning" class="pushable bg-white hover:bg-red-50 text-ink text-left p-2.5 text-xs font-extrabold flex items-center gap-2">
+            <span>🌅</span> <span>Sabah Vakti (Güneş yeni doğarken)</span>
+          </button>
+        </div>
+        <div id="quizFeedback" class="mt-2 text-xs font-black hidden"></div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="max-w-6xl mx-auto w-full text-center text-xs font-bold text-gray-500 py-2">
+    🧪 Küçük Mucitler Bilim Portalı · Gün İçinde Gölge Boyunun Değişimi Simülasyonu
+  </footer>
+
+  <!-- SİMÜLASYON MOTORU VE GÜNEŞ FİZİĞİ -->
+  <script>
+    // --- 1. WEB AUDIO API DOĞA VE SES MOTORU ---
+    let audioCtx = null;
+    let isSoundOn = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // Tebeşirle Çizme Sesi (Scratch efekti)
+    function playChalkSound() {
+      if (!isSoundOn) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'highpass';
+      osc.frequency.setValueAtTime(2200, now);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.12);
+    }
+
+    // Kuş Cıvıltısı (Sabah efekti)
+    function playBirdSound() {
+      if (!isSoundOn) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+      [1800, 2400, 2100].forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + i * 0.06);
+        gain.gain.setValueAtTime(0.08, now + i * 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.08);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + i * 0.06);
+        osc.stop(now + i * 0.06 + 0.09);
+      });
+    }
+
+    // Doğru Cevap Kutlama Akoru
+    function playWinChime() {
+      if (!isSoundOn) return;
+      initAudio();
+      [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+        setTimeout(() => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.35);
+        }, i * 90);
+      });
+    }
+
+    // --- 2. SİMÜLASYON DURUMU (STATE) ---
+    let currentHour = 9.0; // 6.5 (06:30) - 17.5 (17:30)
+    let currentMode = 'character'; // 'character' veya 'sundial'
+    let chalkMarks = [];
+
+    // DOM Elemanları
+    const hourSlider = document.getElementById('hourSlider');
+    const sliderHourVal = document.getElementById('sliderHourVal');
+    const clockDisplay = document.getElementById('clockDisplay');
+    const sunAngleTag = document.getElementById('sunAngleTag');
+    const shadowDirectionBadge = document.getElementById('shadowDirectionBadge');
+    const shadowLengthBadge = document.getElementById('shadowLengthBadge');
+    const timeStatusIcon = document.getElementById('timeStatusIcon');
+    const statusTitle = document.getElementById('statusTitle');
+
+    const skyStopTop = document.getElementById('skyStopTop');
+    const skyStopBottom = document.getElementById('skyStopBottom');
+    const sunGroup = document.getElementById('sunGroup');
+    const sunRayBeam = document.getElementById('sunRayBeam');
+    const charShadow = document.getElementById('charShadow');
+    const chalkMarksGroup = document.getElementById('chalkMarksGroup');
+
+    const characterRig = document.getElementById('characterRig');
+    const sundialRig = document.getElementById('sundialRig');
+    const sundialShadow = document.getElementById('sundialShadow');
+    const sundialTimeReadout = document.getElementById('sundialTimeReadout');
+    const modeCharacter = document.getElementById('modeCharacter');
+    const modeSundial = document.getElementById('modeSundial');
+
+    const btnMarkChalk = document.getElementById('btnMarkChalk');
+    const btnPlayDay = document.getElementById('btnPlayDay');
+    const btnClearChalk = document.getElementById('btnClearChalk');
+
+    // --- 3. GÜNEŞİN HAREKETİ VE GÖLGE HESAPLAMA MOTORU ---
+    function updateSunAndShadow(hour) {
+      currentHour = hour;
+
+      // Saat formatı metni (Ör: 09:30)
+      const hInt = Math.floor(hour);
+      const mInt = Math.round((hour - hInt) * 60);
+      const mStr = mInt < 10 ? '0' + mInt : mInt;
+      const hStr = hInt < 10 ? '0' + hInt : hInt;
+      const timeStr = `${hStr}:${mStr}`;
+      sliderHourVal.textContent = timeStr;
+
+      // 1. Güneşin Gökyüzündeki Yay Pozisyonu
+      // 06:00 -> Açısı: 0 radyan (solda ufukta, Doğu)
+      // 12:00 -> Açısı: Math.PI / 2 radyan (tam tepe)
+      // 18:00 -> Açısı: Math.PI radyan (sağda ufukta, Batı)
+      const progress = (hour - 6.0) / 12.0; // 0.0 ile 1.0 arası
+      const sunAngleRad = progress * Math.PI; // 0 ile PI arası
+
+      // Yarıçaplar (Elips yay: cx=350, cy=330, rx=280, ry=230)
+      const sunX = 350 - (Math.cos(sunAngleRad) * 280);
+      const sunY = 330 - (Math.sin(sunAngleRad) * 230);
+
+      sunGroup.setAttribute('transform', `translate(${sunX}, ${sunY})`);
+
+      // Güneşin yerden yüksekliği (açı derece olarak: 0° - 90° - 0°)
+      const elevationDeg = Math.round(Math.sin(sunAngleRad) * 85);
+      sunAngleTag.textContent = `Güneş Açısı: ${elevationDeg}°`;
+
+      // 2. Gökyüzü Renk Geçişleri
+      let topColor = '#38bdf8';
+      let bottomColor = '#bae6fd';
+      let timeLabel = '';
+
+      if (hour < 8.5) {
+        // Sabah (Tan yeri - turuncu & pembe & sarı)
+        topColor = '#0284c7';
+        bottomColor = '#fed7aa';
+        timeLabel = ' (Sabah)';
+        timeStatusIcon.textContent = '🌅';
+      } else if (hour <= 14.5) {
+        // Öğle (Parlak masmavi)
+        topColor = '#0ea5e9';
+        bottomColor = '#e0f2fe';
+        timeLabel = ' (Öğle)';
+        timeStatusIcon.textContent = '☀️';
+      } else {
+        // Akşamüstü / Gün Batımı (Kızıl & altın sarısı)
+        topColor = '#4338ca';
+        bottomColor = '#fb923c';
+        timeLabel = ' (Akşamüstü)';
+        timeStatusIcon.textContent = '🌇';
+      }
+      skyStopTop.setAttribute('stop-color', topColor);
+      skyStopBottom.setAttribute('stop-color', bottomColor);
+      clockDisplay.textContent = `${timeStr}${timeLabel}`;
+
+      // 3. Mod Kontrolü: Güneş Saati veya Kâşif Can
+      if (currentMode === 'sundial') {
+        // Kâşif Can gölgesini gizle
+        charShadow.setAttribute('opacity', '0');
+
+        // Güneş Saati (Gnomon ve Kadran) Gölge Matematiği:
+        // Kadran saatleri: 07:00 (sağ x=78, y=18), 12:00 (orta x=0, y=47), 17:00 (sol x=-78, y=18)
+        // Saat 12'de gölge tam öne (0, 47) düşer. Sabah güneşi solda (Doğu) -> gölge sağa (x>0).
+        // Akşam güneşi sağda (Batı) -> gölge sola (x<0).
+        const u = Math.max(-1.05, Math.min(1.05, (hour - 12.0) / 5.0));
+        const dialTipX = -u * 78;
+        const dialTipY = 47 - (29 * u * u);
+
+        if (sundialShadow) {
+          sundialShadow.setAttribute('points', `-4,12 4,12 ${dialTipX.toFixed(1)},${dialTipY.toFixed(1)}`);
+        }
+        if (sundialTimeReadout) {
+          sundialTimeReadout.textContent = `Güneş Saati: ${timeStr}`;
+        }
+
+        // Işın çizgisi: Güneşten gnomon tepesinden geçip kadran ucuna
+        const worldDialTipX = 350 + dialTipX;
+        const worldDialTipY = 315 + dialTipY;
+
+        sunRayBeam.setAttribute('x1', sunX);
+        sunRayBeam.setAttribute('y1', sunY);
+        sunRayBeam.setAttribute('x2', worldDialTipX);
+        sunRayBeam.setAttribute('y2', worldDialTipY);
+
+        // Rozet ve Durum Metinleri
+        const dialAngle = Math.round(-u * 65);
+        if (Math.abs(u) < 0.1) {
+          shadowDirectionBadge.textContent = '12:00 (Tam Kuzey) 🎯';
+          shadowLengthBadge.textContent = 'Kadran: 0° (Öğle)';
+          shadowLengthBadge.className = 'text-xs font-black text-amber-600';
+          statusTitle.innerHTML = `🧭 Güneş Saati: Tam öğle vakti! Gnomon gölgesi <span class="text-amber-600 font-extrabold">12:00 Çizgisinde</span>!`;
+        } else if (u < 0) {
+          shadowDirectionBadge.textContent = `Batı Yönü (${dialAngle}°) ➡️`;
+          shadowLengthBadge.textContent = `Kadran: ${timeStr}`;
+          shadowLengthBadge.className = 'text-xs font-black text-blue-600';
+          statusTitle.innerHTML = `🧭 Güneş Saati: Güneş doğudan vuruyor, gölge <span class="text-blue-600 font-extrabold">${timeStr} Kadranına</span> düşüyor!`;
+        } else {
+          shadowDirectionBadge.textContent = `Doğu Yönü (${dialAngle}°) ⬅️`;
+          shadowLengthBadge.textContent = `Kadran: ${timeStr}`;
+          shadowLengthBadge.className = 'text-xs font-black text-orange-600';
+          statusTitle.innerHTML = `🧭 Güneş Saati: Güneş batıdan vuruyor, gölge <span class="text-orange-600 font-extrabold">${timeStr} Kadranına</span> düşüyor!`;
+        }
+
+      } else {
+        // Kâşif Can Modu: Karakter Gölgesi
+        charShadow.setAttribute('opacity', '0.65');
+
+        // Işın güneşten (sunX, sunY) başlar, karakterin başından (350, 245) geçip zemine (345) ulaşır.
+        const deltaY = Math.max(30, 245 - sunY);
+        const rawTipX = 350 + ((350 - sunX) * 95 / deltaY);
+        const clampedTipX = Math.max(120, Math.min(580, rawTipX));
+
+        sunRayBeam.setAttribute('x1', sunX);
+        sunRayBeam.setAttribute('y1', sunY);
+        sunRayBeam.setAttribute('x2', clampedTipX);
+        sunRayBeam.setAttribute('y2', 345);
+
+        // Gölge Geometrisi:
+        // KURAL: Gölge DAİMA Güneş'in ZIT tarafına düşer!
+        // Güneş DOĞUDA (Solda, sunX < 350) iken -> Gölge BATIYA (Sağa, deltaX > 0) uzanır.
+        // Güneş BATIDA (Sağda, sunX > 350) iken -> Gölge DOĞUYA (Sola, deltaX < 0) uzanır.
+        const shadowSpanX = clampedTipX - 350;
+        const shadowLengthPx = Math.abs(shadowSpanX);
+        const shadowHalf = Math.max(16, shadowLengthPx / 2);
+        const shadowCenterOffset = shadowSpanX / 2;
+        const shadowRy = Math.max(7, 13 - Math.min(6, shadowLengthPx * 0.03));
+
+        charShadow.setAttribute('cx', shadowCenterOffset);
+        charShadow.setAttribute('rx', shadowHalf);
+        charShadow.setAttribute('ry', shadowRy);
+
+        const shadowLengthCm = Math.round(25 + (shadowLengthPx * 0.85));
+
+        if (Math.abs(sunX - 350) < 35) {
+          shadowDirectionBadge.textContent = 'Ayak Dibi 🎯';
+          shadowLengthBadge.textContent = `${shadowLengthCm} cm (EN KISA)`;
+          shadowLengthBadge.className = 'text-xs font-black text-emerald-600';
+          statusTitle.innerHTML = 'Öğle Vakti! Güneş tam tepede, gölge <span class="text-emerald-700 font-extrabold">AYAK DİBİNDE (EN KISA)</span>!';
+        } else if (sunX < 350) {
+          shadowDirectionBadge.textContent = 'Batı ➡️';
+          shadowLengthBadge.textContent = `${shadowLengthCm} cm (UZUN)`;
+          shadowLengthBadge.className = 'text-xs font-black text-purple-700';
+          statusTitle.innerHTML = 'Sabah Vakti! Güneş Doğuda, gölge zıt taraf olan <span class="text-purple-700 font-extrabold">BATIYA (SAĞA)</span> uzanıyor!';
+        } else {
+          shadowDirectionBadge.textContent = 'Doğu ⬅️';
+          shadowLengthBadge.textContent = `${shadowLengthCm} cm (UZUN)`;
+          shadowLengthBadge.className = 'text-xs font-black text-purple-700';
+          statusTitle.innerHTML = 'Akşamüstü! Güneş Batıda, gölge zıt taraf olan <span class="text-purple-700 font-extrabold">DOĞUYA (SOLA)</span> uzanıyor!';
+        }
+      }
+    }
+
+    // Slider Hareketi
+    hourSlider.addEventListener('input', (e) => {
+      updateSunAndShadow(parseFloat(e.target.value));
+    });
+
+    // Hızlı Saat Butonları
+    document.querySelectorAll('.time-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetH = parseFloat(btn.dataset.hour);
+        hourSlider.value = targetH;
+        updateSunAndShadow(targetH);
+
+        if (targetH < 10) {
+          playBirdSound();
+          showConcept('Sabah: Uzun Gölge!', 'Güneş yeni doğdu ve ufka yakın. Işınlar eğik geldiği için gölgen batıya doğru upuzun uzanır!', '🌅');
+        } else if (targetH === 12.0) {
+          showConcept('Öğle: En Kısa Gölge!', 'Güneş gökyüzünün en yüksek noktasında! Işınlar dik açıyla geldiği için gölgen ayaklarının dibinde küçücük kalır.', '☀️');
+        } else {
+          showConcept('Akşamüstü: Yeniden Uzayan Gölge!', 'Güneş batıya doğru alçalırken ışınlar tekrar eğikleşir ve gölgen bu kez doğu yönüne doğru uzar!', '🌇');
+        }
+      });
+    });
+
+    // --- 4. TEBEŞİRLE GÖLGE ÇİZME VE İŞARETLEME ARACI ---
+    btnMarkChalk.addEventListener('click', () => {
+      playChalkSound();
+
+      const hInt = Math.floor(currentHour);
+      const mInt = Math.round((currentHour - hInt) * 60);
+      const timeStr = `${hInt < 10 ? '0'+hInt : hInt}:${mInt < 10 ? '0'+mInt : mInt}`;
+
+      // Renk seçimi (Sabah sarı, öğle beyaz, akşam turuncu)
+      let chalkColor = '#fef08a';
+      if (currentHour >= 11 && currentHour <= 13) chalkColor = '#ffffff';
+      else if (currentHour > 13) chalkColor = '#fed7aa';
+
+      const markId = `chalk-${Date.now()}`;
+      const markGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      markGroup.setAttribute('id', markId);
+
+      if (currentMode === 'sundial') {
+        const u = Math.max(-1.05, Math.min(1.05, (currentHour - 12.0) / 5.0));
+        const dialTipX = -u * 78;
+        const dialTipY = 47 - (29 * u * u);
+        const worldX = 350 + dialTipX;
+        const worldY = 315 + dialTipY;
+
+        markGroup.innerHTML = `
+          <line x1="350" y1="327" x2="${worldX}" y2="${worldY}" stroke="${chalkColor}" stroke-width="2.5" stroke-dasharray="4 3" />
+          <circle cx="${worldX}" cy="${worldY}" r="4" fill="${chalkColor}" stroke="#182b4d" stroke-width="1.5" />
+          <rect x="${worldX - 25}" y="${worldY + 6}" width="50" height="16" rx="4" fill="#182b4d" stroke="${chalkColor}" stroke-width="1" />
+          <text x="${worldX}" y="${worldY + 18}" text-anchor="middle" font-size="9" font-weight="900" fill="${chalkColor}">🧭 ${timeStr}</text>
+        `;
+
+        chalkMarksGroup.appendChild(markGroup);
+        chalkMarks.push(markGroup);
+
+        showConcept(
+          'Güneş Saati Kadrana İşaretlendi!',
+          `Saat ${timeStr} anındaki gnomon gölgesi kadrana tebeşirle kaydedildi! Saati değiştirerek kadran çizgileriyle eşleşmeyi gör!`,
+          '🧭'
+        );
+      } else {
+        const cx = parseFloat(charShadow.getAttribute('cx')) + 350;
+        const rx = parseFloat(charShadow.getAttribute('rx'));
+        const ry = parseFloat(charShadow.getAttribute('ry'));
+
+        markGroup.innerHTML = `
+          <!-- Tebeşir Çizgisi -->
+          <ellipse cx="${cx}" cy="345" rx="${rx}" ry="${ry}" fill="none" stroke="${chalkColor}" stroke-width="2.5" stroke-dasharray="6 4" opacity="0.9" />
+          <!-- Tebeşir Yazısı / Saat Damgası -->
+          <rect x="${cx - 30}" y="358" width="60" height="18" rx="4" fill="#182b4d" stroke="${chalkColor}" stroke-width="1.5" />
+          <text x="${cx}" y="371" text-anchor="middle" font-size="10" font-weight="900" fill="${chalkColor}">✏️ ${timeStr}</text>
+        `;
+
+        chalkMarksGroup.appendChild(markGroup);
+        chalkMarks.push(markGroup);
+
+        showConcept(
+          'Gölgeni Tebeşirle İşaretledin!',
+          `Saat ${timeStr} gölgesi zemine kaydedildi! Şimdi zaman kaydırıcısıyla saati değiştirip diğer saatlerdeki gölgelerle yan yana kıyasla!`,
+          '✏️'
+        );
+      }
+
+      if (window.gsap) {
+        gsap.from(markGroup, { scale: 1.15, transformOrigin: 'center center', duration: 0.3, ease: 'back.out(2)' });
+      }
+    });
+
+    // Tebeşir İzlerini Temizle
+    btnClearChalk.addEventListener('click', () => {
+      chalkMarksGroup.innerHTML = '';
+      chalkMarks = [];
+      showConcept('İzler Temizlendi!', 'Yeniden dilediğin saatlerde tebeşirle çizim yapabilirsin.', '🧹');
+    });
+
+    // --- 5. 1 GÜNÜ CANLANDIR (HIZLANDIRILMIŞ GÜN TURU) ---
+    let isPlayingDay = false;
+    btnPlayDay.addEventListener('click', () => {
+      if (isPlayingDay) return;
+      isPlayingDay = true;
+      btnPlayDay.classList.add('opacity-50', 'pointer-events-none');
+
+      hourSlider.value = 6.5;
+      updateSunAndShadow(6.5);
+      playBirdSound();
+
+      const timelineObj = { h: 6.5 };
+      if (window.gsap) {
+        gsap.to(timelineObj, {
+          h: 17.5,
+          duration: 5.5,
+          ease: 'power1.inOut',
+          onUpdate: () => {
+            hourSlider.value = timelineObj.h;
+            updateSunAndShadow(timelineObj.h);
+          },
+          onComplete: () => {
+            isPlayingDay = false;
+            btnPlayDay.classList.remove('opacity-50', 'pointer-events-none');
+            showConcept(
+              'Günün Sonu: Güneş Battı!',
+              'Gördün mü? Sabah upuzun başlayan gölge, öğleyin ayaklarının dibine kadar kısaldı; akşam ise diğer yöne doğru tekrar uzadı!',
+              '🌙'
+            );
+          }
+        });
+      }
+    });
+
+    // --- 6. SAHNE MODU DEĞİŞTİRME (KÂŞİF vs GÜNEŞ SAATİ) ---
+    modeCharacter.addEventListener('click', () => {
+      currentMode = 'character';
+      modeCharacter.className = 'pushable p-2.5 bg-sun text-ink font-extrabold text-xs flex flex-col items-center justify-center gap-1 text-center';
+      modeSundial.className = 'pushable p-2.5 bg-white hover:bg-amber-50 text-ink font-bold text-xs flex flex-col items-center justify-center gap-1 text-center';
+
+      if (window.gsap) {
+        gsap.to(characterRig, { opacity: 1, duration: 0.3 });
+        gsap.to(sundialRig, { opacity: 0, duration: 0.3 });
+      } else {
+        characterRig.style.opacity = '1';
+        sundialRig.style.opacity = '0';
+      }
+      updateSunAndShadow(currentHour);
+      showConcept('Kâşif Can Bahçede!', 'Can ayakta dururken gölgesinin gün içindeki boyunu ve yönünü gözlemliyorsun.', '🧒');
+    });
+
+    modeSundial.addEventListener('click', () => {
+      currentMode = 'sundial';
+      modeSundial.className = 'pushable p-2.5 bg-sun text-ink font-extrabold text-xs flex flex-col items-center justify-center gap-1 text-center';
+      modeCharacter.className = 'pushable p-2.5 bg-white hover:bg-amber-50 text-ink font-bold text-xs flex flex-col items-center justify-center gap-1 text-center';
+
+      if (window.gsap) {
+        gsap.to(sundialRig, { opacity: 1, duration: 0.3 });
+        gsap.to(characterRig, { opacity: 0, duration: 0.3 });
+      } else {
+        sundialRig.style.opacity = '1';
+        characterRig.style.opacity = '0';
+      }
+      updateSunAndShadow(currentHour);
+      showConcept('Antik Güneş Saati Aktif!', 'Eski çağlarda insanlar saati öğrenmek için güneş saatinin dik çubuğunun (gnomon) kadran üzerindeki gölgesini takip ederdi.', '🧭');
+    });
+
+    // --- 7. MİNİ TEST & KAVRAM KARTLARI ---
+    const btnQuizNoon = document.getElementById('btnQuizNoon');
+    const btnQuizMorning = document.getElementById('btnQuizMorning');
+    const quizFeedback = document.getElementById('quizFeedback');
+
+    btnQuizNoon.addEventListener('click', () => {
+      quizFeedback.classList.remove('hidden', 'text-red-600');
+      quizFeedback.classList.add('text-emerald-700');
+      quizFeedback.innerHTML = '🎉 <strong>TEBRİKLER, DOĞRU CEVAP!</strong><br>Öğle vakti Güneş tam tepededir (dik açı). Işınlar dik geldiği için gölgemiz EN KISA boyuna ulaşır!';
+      if (window.confetti) {
+        confetti({ particleCount: 80, spread: 70, origin: { y: 0.7 } });
+      }
+      playWinChime();
+    });
+
+    btnQuizMorning.addEventListener('click', () => {
+      quizFeedback.classList.remove('hidden', 'text-emerald-700');
+      quizFeedback.classList.add('text-red-600');
+      quizFeedback.innerHTML = '🤔 <strong>Tekrar Düşünelim!</strong><br>Sabah vakti Güneş ufka yakındır ve ışınlar eğik geldiği için gölgemiz KISA değil, ÇOK UZUN olur!';
+    });
+
+    // Kavram Kartı Popup
+    const conceptCard = document.getElementById('conceptCard');
+    const conceptTitle = document.getElementById('conceptTitle');
+    const conceptBody = document.getElementById('conceptBody');
+    const conceptEmoji = document.getElementById('conceptEmoji');
+    let conceptTimer = null;
+
+    function showConcept(title, body, emoji = '💡') {
+      if (conceptTimer) clearTimeout(conceptTimer);
+      conceptTitle.textContent = title;
+      conceptBody.textContent = body;
+      conceptEmoji.textContent = emoji;
+
+      if (window.gsap) {
+        gsap.to(conceptCard, { opacity: 1, y: 0, duration: 0.35, ease: "back.out(1.5)" });
+      } else {
+        conceptCard.style.opacity = '1';
+      }
+
+      conceptTimer = setTimeout(() => {
+        if (window.gsap) {
+          gsap.to(conceptCard, { opacity: 0, y: 10, duration: 0.4, ease: "power2.in" });
+        } else {
+          conceptCard.style.opacity = '0';
+        }
+      }, 5500);
+    }
+
+    // Ses Aç/Kapat Butonu
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    const soundLabel = document.getElementById('soundLabel');
+    soundToggle.addEventListener('click', () => {
+      isSoundOn = !isSoundOn;
+      soundIcon.textContent = isSoundOn ? '🔊' : '🔇';
+      soundLabel.textContent = isSoundOn ? 'Ses Açık' : 'Sessiz';
+    });
+
+    // Başlangıç
+    window.addEventListener('DOMContentLoaded', () => {
+      updateSunAndShadow(9.0);
+      setTimeout(() => {
+        showConcept(
+          'Gölge Takip Laboratuvarına Hoş Geldin!',
+          'Zaman kaydırıcısıyla saatleri değiştirerek Güneş\'in hareketini izle ve "Gölgeyi Tebeşirle İşaretle" butonuyla boy farklarını kaydet!',
+          '☀️'
+        );
+      }, 800);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sürtünme Kuvveti: Yüzeyler Yarışıyor! | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito (Kusursuz Türkçe font desteği) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'sans-serif'],
+            display: ['Baloo 2', 'cursive'],
+          },
+          colors: {
+            bgMain: '#fffbeb',
+            ink: '#0f172a',
+            primary: '#ea580c',
+            sun: '#facc15',
+          },
+          borderWidth: {
+            '3': '3px',
+            '3.5': '3.5px',
+          },
+          boxShadow: {
+            'hard': '4px 4px 0px #0f172a',
+            'hard-lg': '6px 6px 0px #0f172a',
+            'hard-sm': '2px 2px 0px #0f172a',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display {
+      font-family: 'Baloo 2', cursive;
+    }
+    .chunky {
+      border: 3.5px solid #0f172a;
+      border-radius: 1.25rem;
+      box-shadow: 4px 4px 0px #0f172a;
+    }
+    .pushable {
+      border: 3px solid #0f172a;
+      border-radius: 0.85rem;
+      box-shadow: 3px 3px 0px #0f172a;
+      transition: all 0.12s ease;
+      cursor: pointer;
+    }
+    .pushable:hover {
+      transform: translate(-1.5px, -1.5px);
+      box-shadow: 4.5px 4.5px 0px #0f172a;
+    }
+    .pushable:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #0f172a;
+    }
+    .active-tab {
+      background-color: #ea580c !important;
+      color: #ffffff !important;
+      border-color: #0f172a !important;
+    }
+    .active-surface-a {
+      border-color: #ef4444 !important;
+      background-color: #fee2e2 !important;
+      box-shadow: 3px 3px 0px #991b1b !important;
+    }
+    .active-surface-b {
+      border-color: #2563eb !important;
+      background-color: #dbeafe !important;
+      box-shadow: 3px 3px 0px #1e40af !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <!-- Üst Başlık & Navigasyon Çubuğu -->
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-ink text-sm font-black flex items-center gap-1">
+        <span>⬅️</span> <span class="hidden sm:inline">Portala Dön</span>
+      </a>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">🏎️</span>
+          <h1 class="display text-lg sm:text-2xl font-black text-ink tracking-wide">
+            Sürtünme Kuvveti: Yüzeyler Yarışıyor!
+          </h1>
+        </div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">
+          Pürüzlü ve kaygan yüzeylerin harekete direncini keşfet! 🏁
+        </p>
+      </div>
+    </div>
+
+    <!-- Mod Değiştirme Butonları & Ses -->
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabRace" class="pushable px-3.5 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1">
+          <span>🏁</span> <span>1. Pist Yarışı</span>
+        </button>
+        <button id="tabLab" class="pushable px-3.5 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1">
+          <span>🔬</span> <span>2. Dinamometre & Büyüteç</span>
+        </button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1" title="Sesi Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Ana Çalışma Alanı -->
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+    
+    <!-- SOL PANEL: SİMÜLASYON SAHNESİ (7 SÜTUN) -->
+    <section class="lg:col-span-7 flex flex-col gap-3">
+
+      <!-- Sahne Kutusu -->
+      <div class="chunky bg-white overflow-hidden relative shadow-lg flex flex-col">
+        
+        <!-- Sahne Üst Durum Çubuğu -->
+        <div class="px-4 py-2.5 bg-gradient-to-r from-amber-100 via-orange-50 to-amber-50 border-b-3 border-ink flex items-center justify-between text-xs font-black">
+          <div class="flex items-center gap-2">
+            <span id="sceneBadgeIcon" class="text-lg">🏎️</span>
+            <span id="sceneBadgeText" class="text-ink uppercase tracking-wider font-black">Çift Şeritli Yüzey Karşılaştırma Pisti</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="bg-white px-3 py-1 rounded-full border-2 border-ink text-ink font-black text-xs">
+              Rampa Eğimi: <strong id="rampSlopeText" class="text-primary font-black">Orta (30°)</strong>
+            </span>
+          </div>
+        </div>
+
+        <!-- SVG Sahne Çizimi (Yükseklik 440px) -->
+        <div id="simStage" class="relative w-full h-[440px] bg-gradient-to-b from-sky-50 via-amber-50 to-orange-50 flex items-center justify-center overflow-hidden">
+          
+          <svg id="raceSvg" viewBox="0 0 650 440" class="w-full h-full">
+            <defs>
+              <!-- Buz Deseni -->
+              <linearGradient id="iceGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#bae6fd" />
+                <stop offset="50%" stop-color="#e0f2fe" />
+                <stop offset="100%" stop-color="#7dd3fc" />
+              </linearGradient>
+
+              <!-- Ahşap Parke Deseni -->
+              <linearGradient id="woodGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#fed7aa" />
+                <stop offset="50%" stop-color="#ffedd5" />
+                <stop offset="100%" stop-color="#fdba74" />
+              </linearGradient>
+
+              <!-- Halı Deseni -->
+              <linearGradient id="carpetGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#fda4af" />
+                <stop offset="50%" stop-color="#f43f5e" />
+                <stop offset="100%" stop-color="#e11d48" />
+              </linearGradient>
+
+              <!-- Zımpara Kâğıdı Deseni -->
+              <linearGradient id="sandpaperGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#78716c" />
+                <stop offset="50%" stop-color="#a8a29e" />
+                <stop offset="100%" stop-color="#44403c" />
+              </linearGradient>
+
+              <!-- Gölgelendirme Filtresi -->
+              <filter id="carShadow">
+                <feDropShadow dx="2" dy="4" stdDeviation="2" flood-opacity="0.3" />
+              </filter>
+            </defs>
+
+            <!-- 1. MOD A: ÇİFT ŞERİTLİ YARIŞ PİSTİ ELEMANLARI -->
+            <g id="raceTrackGroup">
+              
+              <!-- ===== 1. ŞERİT (ŞERİT A - ÜSTTE / KIRMIZI ARABA) ===== -->
+              <!-- Şerit A Başlık Etiketi -->
+              <g transform="translate(15, 24)">
+                <rect x="0" y="0" width="340" height="24" rx="6" fill="#fee2e2" stroke="#ef4444" stroke-width="2" />
+                <text x="10" y="16" font-size="11" font-weight="900" fill="#991b1b">🔴 ŞERİT A:</text>
+                <text id="labelSurfaceA" x="80" y="16" font-size="11" font-weight="900" fill="#0f172a">🧊 Buz Pisti (Çok Az Sürtünme)</text>
+              </g>
+
+              <!-- Rampa A (Kırmızı Araba Rampası: x:15 to 110, y:55 to 135) -->
+              <g id="rampRigA">
+                <polygon id="rampPolyA" points="15,55 110,135 15,135" fill="#d97706" stroke="#0f172a" stroke-width="3" />
+                <line x1="15" y1="55" x2="110" y2="135" stroke="#f59e0b" stroke-width="6" stroke-linecap="round" />
+                <!-- Start Çizgisi -->
+                <line x1="32" y1="62" x2="32" y2="82" stroke="#ef4444" stroke-width="3" />
+                <text x="36" y="74" font-size="9" font-weight="900" fill="#991b1b">START</text>
+              </g>
+
+              <!-- Şerit A Yatay Pist (x:110 to 630, y:100, height:65) -->
+              <g id="trackLaneA" transform="translate(110, 85)">
+                <!-- Pist Zemini -->
+                <rect id="trackSurfaceA" x="0" y="0" width="520" height="50" rx="4" fill="url(#iceGrad)" stroke="#0f172a" stroke-width="3" />
+                <!-- Pist Dokusu / Kesikli Çizgi -->
+                <line x1="0" y1="25" x2="520" y2="25" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="8 6" opacity="0.7" />
+
+                <!-- Mezura Şeridi & Rozetleri (Alt Kenar y:50) -->
+                <rect x="0" y="50" width="520" height="20" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+                <!-- Mezura Çizgileri ve Net Rakamlar -->
+                <g stroke="#0f172a" stroke-width="1.5">
+                  <line x1="0" y1="50" x2="0" y2="70" />
+                  <line x1="100" y1="50" x2="100" y2="70" />
+                  <line x1="200" y1="50" x2="200" y2="70" />
+                  <line x1="300" y1="50" x2="300" y2="70" />
+                  <line x1="400" y1="50" x2="400" y2="70" />
+                  <line x1="500" y1="50" x2="500" y2="70" />
+                </g>
+                <text x="5" y="64" font-size="10" font-weight="900" fill="#0f172a">0</text>
+                <text x="92" y="64" font-size="10" font-weight="900" fill="#0f172a">50 cm</text>
+                <text x="188" y="64" font-size="10" font-weight="900" fill="#0f172a">100 cm</text>
+                <text x="288" y="64" font-size="10" font-weight="900" fill="#0f172a">150 cm</text>
+                <text x="388" y="64" font-size="10" font-weight="900" fill="#0f172a">200 cm</text>
+                <text x="475" y="64" font-size="10" font-weight="900" fill="#dc2626">250 cm 🏁</text>
+
+                <!-- Şerit A Durma Noktası Bayrağı & Rozeti -->
+                <g id="stopFlagA" transform="translate(450, 0)" opacity="0">
+                  <line x1="0" y1="-25" x2="0" y2="50" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="4 3" />
+                  <rect x="-42" y="-36" width="84" height="24" rx="6" fill="#dc2626" stroke="#0f172a" stroke-width="2" />
+                  <text id="stopTextA" x="0" y="-20" text-anchor="middle" font-size="11" font-weight="900" fill="#ffffff">📍 240 cm</text>
+                </g>
+
+                <!-- KIRMIZI YARIŞ ARABASI A (x: 0'dan 480'e kayar) -->
+                <g id="carA" transform="translate(0, 10)" filter="url(#carShadow)">
+                  <rect x="0" y="0" width="50" height="24" rx="7" fill="#ef4444" stroke="#0f172a" stroke-width="2.5" />
+                  <path d="M14,0 L20,-11 L36,-11 L41,0 Z" fill="#bae6fd" stroke="#0f172a" stroke-width="2" />
+                  <circle cx="27" cy="12" r="7" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+                  <text x="27" y="16" text-anchor="middle" font-size="10" font-weight="900" fill="#0f172a">A</text>
+                  <circle cx="12" cy="24" r="6.5" fill="#1e293b" stroke="#0f172a" stroke-width="2" />
+                  <circle cx="38" cy="24" r="6.5" fill="#1e293b" stroke="#0f172a" stroke-width="2" />
+                  <circle cx="12" cy="24" r="2.5" fill="#ffffff" />
+                  <circle cx="38" cy="24" r="2.5" fill="#ffffff" />
+                  <!-- Far -->
+                  <circle cx="48" cy="12" r="3" fill="#fef08a" stroke="#0f172a" stroke-width="1" />
+                </g>
+              </g>
+
+              <!-- ===== 2. ŞERİT (ŞERİT B - ALTTA / MAVİ ARABA) ===== -->
+              <!-- Şerit B Başlık Etiketi -->
+              <g transform="translate(15, 185)">
+                <rect x="0" y="0" width="340" height="24" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2" />
+                <text x="10" y="16" font-size="11" font-weight="900" fill="#1e40af">🔵 ŞERİT B:</text>
+                <text id="labelSurfaceB" x="80" y="16" font-size="11" font-weight="900" fill="#0f172a">🧶 Yün Halı (Çok Sürtünme)</text>
+              </g>
+
+              <!-- Rampa B (Mavi Araba Rampası: x:15 to 110, y:215 to 295) -->
+              <g id="rampRigB">
+                <polygon id="rampPolyB" points="15,215 110,295 15,295" fill="#d97706" stroke="#0f172a" stroke-width="3" />
+                <line x1="15" y1="215" x2="110" y2="295" stroke="#f59e0b" stroke-width="6" stroke-linecap="round" />
+                <!-- Start Çizgisi -->
+                <line x1="32" y1="222" x2="32" y2="242" stroke="#2563eb" stroke-width="3" />
+                <text x="36" y="234" font-size="9" font-weight="900" fill="#1e40af">START</text>
+              </g>
+
+              <!-- Şerit B Yatay Pist (x:110 to 630, y:245, height:65) -->
+              <g id="trackLaneB" transform="translate(110, 245)">
+                <!-- Pist Zemini -->
+                <rect id="trackSurfaceB" x="0" y="0" width="520" height="50" rx="4" fill="url(#carpetGrad)" stroke="#0f172a" stroke-width="3" />
+                <!-- Pist Dokusu / Kesikli Çizgi -->
+                <line x1="0" y1="25" x2="520" y2="25" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="8 6" opacity="0.7" />
+
+                <!-- Mezura Şeridi & Rozetleri (Alt Kenar y:50) -->
+                <rect x="0" y="50" width="520" height="20" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+                <!-- Mezura Çizgileri ve Net Rakamlar -->
+                <g stroke="#0f172a" stroke-width="1.5">
+                  <line x1="0" y1="50" x2="0" y2="70" />
+                  <line x1="100" y1="50" x2="100" y2="70" />
+                  <line x1="200" y1="50" x2="200" y2="70" />
+                  <line x1="300" y1="50" x2="300" y2="70" />
+                  <line x1="400" y1="50" x2="400" y2="70" />
+                  <line x1="500" y1="50" x2="500" y2="70" />
+                </g>
+                <text x="5" y="64" font-size="10" font-weight="900" fill="#0f172a">0</text>
+                <text x="92" y="64" font-size="10" font-weight="900" fill="#0f172a">50 cm</text>
+                <text x="188" y="64" font-size="10" font-weight="900" fill="#0f172a">100 cm</text>
+                <text x="288" y="64" font-size="10" font-weight="900" fill="#0f172a">150 cm</text>
+                <text x="388" y="64" font-size="10" font-weight="900" fill="#0f172a">200 cm</text>
+                <text x="475" y="64" font-size="10" font-weight="900" fill="#dc2626">250 cm 🏁</text>
+
+                <!-- Şerit B Durma Noktası Bayrağı & Rozeti -->
+                <g id="stopFlagB" transform="translate(160, 0)" opacity="0">
+                  <line x1="0" y1="-25" x2="0" y2="50" stroke="#2563eb" stroke-width="2.5" stroke-dasharray="4 3" />
+                  <rect x="-42" y="-36" width="84" height="24" rx="6" fill="#2563eb" stroke="#0f172a" stroke-width="2" />
+                  <text id="stopTextB" x="0" y="-20" text-anchor="middle" font-size="11" font-weight="900" fill="#ffffff">📍 80 cm</text>
+                </g>
+
+                <!-- MAVİ YARIŞ ARABASI B (x: 0'dan 480'e kayar) -->
+                <g id="carB" transform="translate(0, 10)" filter="url(#carShadow)">
+                  <rect x="0" y="0" width="50" height="24" rx="7" fill="#2563eb" stroke="#0f172a" stroke-width="2.5" />
+                  <path d="M14,0 L20,-11 L36,-11 L41,0 Z" fill="#bae6fd" stroke="#0f172a" stroke-width="2" />
+                  <circle cx="27" cy="12" r="7" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />
+                  <text x="27" y="16" text-anchor="middle" font-size="10" font-weight="900" fill="#0f172a">B</text>
+                  <circle cx="12" cy="24" r="6.5" fill="#1e293b" stroke="#0f172a" stroke-width="2" />
+                  <circle cx="38" cy="24" r="6.5" fill="#1e293b" stroke="#0f172a" stroke-width="2" />
+                  <circle cx="12" cy="24" r="2.5" fill="#ffffff" />
+                  <circle cx="38" cy="24" r="2.5" fill="#ffffff" />
+                  <!-- Far -->
+                  <circle cx="48" cy="12" r="3" fill="#fef08a" stroke="#0f172a" stroke-width="1" />
+                </g>
+              </g>
+
+              <!-- Kazanan Rozeti (Alt Bölümde Ferah Gösterim) -->
+              <g id="winnerBanner" transform="translate(325, 395)" opacity="0">
+                <rect x="-170" y="-24" width="340" height="48" rx="14" fill="#facc15" stroke="#0f172a" stroke-width="3.5" filter="url(#carShadow)" />
+                <text id="winnerText" x="0" y="6" text-anchor="middle" font-size="15" font-weight="900" fill="#0f172a">
+                  🏆 ŞERİT A KAZANDI! (240 cm)
+                </text>
+              </g>
+
+            </g>
+
+            <!-- 2. MOD B: DİNAMOMETRE & MİKROSKOPİK LABORATUVAR ELEMANLARI (GİZLİ BAŞLAR) -->
+            <g id="labGroup" opacity="0" class="pointer-events-none transition-opacity duration-300">
+              
+              <!-- Masa / Zemin -->
+              <rect x="30" y="250" width="590" height="130" id="labSurfaceRect" fill="url(#iceGrad)" stroke="#0f172a" stroke-width="3.5" rx="8" />
+              <rect x="40" y="260" width="320" height="28" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+              <text id="labSurfaceTag" x="50" y="279" font-size="12" font-weight="900" fill="#0f172a">Yüzey: 🧊 Buz Pisti (Çok Az Sürtünme)</text>
+
+              <!-- Test Bloğu / Kütlesi (X=110, Y=180) -->
+              <g id="labBlock" transform="translate(110, 180)">
+                <rect x="0" y="0" width="95" height="70" rx="8" fill="#d97706" stroke="#0f172a" stroke-width="3.5" />
+                <text x="47" y="38" text-anchor="middle" font-size="14" font-weight="900" fill="#ffffff">500 gr</text>
+                <text x="47" y="56" text-anchor="middle" font-size="11" font-weight="900" fill="#fed7aa">Ahşap Kütle</text>
+                <!-- Bağlantı Halkası -->
+                <circle cx="95" cy="35" r="7" fill="none" stroke="#0f172a" stroke-width="3.5" />
+              </g>
+
+              <!-- DİNAMOMETRE RİGİ (X: 215 to 440) -->
+              <g id="dynamometerRig" transform="translate(212, 215)">
+                <!-- Kanca & Çekme Teli -->
+                <line id="dynoWire" x1="0" y1="0" x2="35" y2="0" stroke="#0f172a" stroke-width="4" />
+                <circle cx="0" cy="0" r="5" fill="#0f172a" />
+
+                <!-- Dinamometre Saydam Dış Borusu -->
+                <rect x="35" y="-18" width="180" height="36" rx="10" fill="#ffffff" stroke="#0f172a" stroke-width="3.5" />
+                <!-- Skala Çizgileri (0 N - 10 N) -->
+                <g stroke="#0f172a" stroke-width="2">
+                  <line x1="50" y1="-10" x2="50" y2="10" />
+                  <line x1="80" y1="-10" x2="80" y2="10" />
+                  <line x1="110" y1="-10" x2="110" y2="10" />
+                  <line x1="140" y1="-10" x2="140" y2="10" />
+                  <line x1="170" y1="-10" x2="170" y2="10" />
+                  <line x1="200" y1="-10" x2="200" y2="10" />
+                </g>
+                <text x="50" y="28" text-anchor="middle" font-size="10" font-weight="900" fill="#0f172a">0N</text>
+                <text x="80" y="28" text-anchor="middle" font-size="10" font-weight="900" fill="#0f172a">2N</text>
+                <text x="110" y="28" text-anchor="middle" font-size="10" font-weight="900" fill="#0f172a">4N</text>
+                <text x="140" y="28" text-anchor="middle" font-size="10" font-weight="900" fill="#0f172a">6N</text>
+                <text x="170" y="28" text-anchor="middle" font-size="10" font-weight="900" fill="#0f172a">8N</text>
+                <text x="200" y="28" text-anchor="middle" font-size="10" font-weight="900" fill="#0f172a">10N</text>
+
+                <!-- İç Yay (Zigzag) & Kırmızı İbre -->
+                <path id="dynoSpring" d="M35,0 L47,-7 L59,7 L71,-7 L83,7 L95,-7 L107,0" fill="none" stroke="#ef4444" stroke-width="3" stroke-linecap="round" />
+                <polygon id="dynoPointer" points="64,-16 72,0 64,16 56,0" fill="#dc2626" stroke="#0f172a" stroke-width="1.5" />
+
+                <!-- Çekme Kolu / Halka -->
+                <rect x="215" y="-14" width="28" height="28" rx="6" fill="#0284c7" stroke="#0f172a" stroke-width="2.5" />
+                <!-- Çeken El Simgesi -->
+                <text x="248" y="10" font-size="28">🫱</text>
+              </g>
+
+              <!-- Dinamometre Canlı Kuvvet Rozeti (Üstte) -->
+              <g transform="translate(320, 140)">
+                <rect x="-90" y="-22" width="180" height="44" rx="10" fill="#1e293b" stroke="#facc15" stroke-width="2.5" />
+                <text id="dynoForceVal" x="0" y="6" text-anchor="middle" font-size="18" font-weight="900" fill="#facc15">1.2 Newton (N)</text>
+              </g>
+
+              <!-- MİKROSKOBİK BÜYÜTEÇ (SAĞ ÜST KÖŞE) -->
+              <g id="microscopeLoupe" transform="translate(520, 100)">
+                <circle cx="0" cy="0" r="65" fill="#ffffff" stroke="#0f172a" stroke-width="4" filter="url(#carShadow)" />
+                <circle cx="0" cy="0" r="58" fill="#f8fafc" stroke="#38bdf8" stroke-width="2.5" />
+                <text x="0" y="-30" text-anchor="middle" font-size="10" font-weight="900" fill="#0369a1">🔬 MİKROSKOPİK DOKU</text>
+                
+                <!-- Mikroskobik Tepecikler -->
+                <path id="microscopicTexture" d="M-45,5 Q-20,3 0,5 Q25,7 45,5" fill="none" stroke="#0284c7" stroke-width="5" stroke-linecap="round" />
+                <!-- Pürüzlülük Durumu Metni -->
+                <rect x="-50" y="16" width="100" height="22" rx="5" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1" />
+                <text id="microscopicLabel" x="0" y="31" text-anchor="middle" font-size="10" font-weight="900" fill="#0f172a">Pürüzsüz Kristaller</text>
+                <!-- Sap -->
+                <path d="M45,45 L75,75" stroke="#b45309" stroke-width="10" stroke-linecap="round" />
+              </g>
+
+            </g>
+
+          </svg>
+
+        </div>
+
+        <!-- Alt Kontrol Şeridi (Büyük ve Yüksek Kontrastlı Butonlar) -->
+        <div class="p-3.5 bg-amber-50 border-t-3 border-ink flex flex-wrap items-center justify-between gap-3">
+          
+          <!-- Rampa Eğimi Seçici -->
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-black text-ink">Rampa Açısı:</span>
+            <button class="slope-btn pushable px-3 py-1.5 bg-white hover:bg-orange-50 text-xs font-bold" data-slope="low">15° Alçak</button>
+            <button class="slope-btn pushable px-3 py-1.5 bg-orange-600 text-white text-xs font-black active-tab" data-slope="medium">30° Orta</button>
+            <button class="slope-btn pushable px-3 py-1.5 bg-white hover:bg-orange-50 text-xs font-bold" data-slope="high">45° Dik</button>
+          </div>
+
+          <!-- Aksiyon Butonları -->
+          <div class="flex items-center gap-2.5">
+            <button id="btnStartRace" class="pushable px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-black flex items-center gap-2 shadow-hard">
+              <span>🚀</span> <span>Yarışı Başlat!</span>
+            </button>
+            <button id="btnResetRace" class="pushable px-4 py-2.5 bg-white hover:bg-gray-100 text-ink text-xs font-black flex items-center gap-1">
+              <span>🔄</span> <span>Sıfırla</span>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Bilimsel Rehber & Sonuç Kutusu (Artık pistin üstünü kapatmıyor, ferah aşağıda!) -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-start gap-3">
+          <span id="bubbleEmoji" class="text-3xl">🏎️</span>
+          <div>
+            <h4 id="bubbleTitle" class="display text-base font-black text-ink">Yüzeyleri Seç ve Yarışı Başlat!</h4>
+            <p id="bubbleDesc" class="text-xs text-gray-700 font-bold leading-relaxed mt-0.5">
+              Her iki şerit için sağdaki panelden dilediğin yüzeyleri seç. "Yarışı Başlat" butonuna basarak sürtünme kuvvetinin arabaların kayma mesafesini nasıl etkilediğini gözlemle!
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bilimsel Kural Kartı (Neden Yavaşlar? Sürtünme Nedir?) -->
+      <div class="chunky bg-white p-4">
+        <h3 class="display text-base font-black text-ink flex items-center gap-2 mb-2">
+          <span>🔬</span> Sürtünme Kuvveti Nedir?
+        </h3>
+        <ul class="text-xs text-gray-800 space-y-2 font-bold">
+          <li class="flex items-start gap-1.5">
+            <span class="text-sm">🛑</span>
+            <span><strong>Hareketi Engelleyen Kuvvet:</strong> Birbiriyle temas eden iki yüzey arasında oluşan ve cismin hareketini yavaşlatan veya durduran kuvvettir.</span>
+          </li>
+          <li class="flex items-start gap-1.5">
+            <span class="text-sm">🧊</span>
+            <span><strong>Pürüzsüz Yüzeyler (Buz, Cam):</strong> Sürtünme kuvveti çok azdır. Cisimler kayarak çok uzak mesafelere ulaşır.</span>
+          </li>
+          <li class="flex items-start gap-1.5">
+            <span class="text-sm">📄</span>
+            <span><strong>Pürüzlü Yüzeyler (Halı, Zımpara):</strong> Mikroskobik çıkıntılar birbirine takılır, sürtünme çok büyüktür ve cisim hemen durur!</span>
+          </li>
+        </ul>
+      </div>
+
+    </section>
+
+    <!-- SAĞ PANEL: PİST VE LABORATUVAR KONTROLLERİ (5 SÜTUN) -->
+    <aside class="lg:col-span-5 flex flex-col gap-3">
+
+      <!-- PİST AYARLARI: ŞERİT A VE ŞERİT B YÜZEY SEÇİCİSİ -->
+      <div id="panelRaceSettings" class="chunky bg-white p-4 flex flex-col gap-3">
+        
+        <!-- Şerit A Yüzey Seçici -->
+        <div class="p-3 bg-red-50 rounded-xl border-2 border-red-300">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-black text-red-900 flex items-center gap-1">
+              <span>🔴</span> <span>Şerit A (Kırmızı Araba):</span>
+            </span>
+            <span id="badgeDistA" class="text-xs font-black text-white bg-red-600 px-2.5 py-0.5 rounded-full shadow-sm">-- cm</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <button class="surface-btn-a pushable p-2.5 bg-white text-left font-black active-surface-a" data-surface="ice">
+              🧊 Buz Pisti<br><span class="text-[10px] text-gray-500 font-bold">Çok Az Sürtünme</span>
+            </button>
+            <button class="surface-btn-a pushable p-2.5 bg-white text-left font-bold" data-surface="wood">
+              🪵 Ahşap Parke<br><span class="text-[10px] text-gray-500 font-bold">Az Sürtünme</span>
+            </button>
+            <button class="surface-btn-a pushable p-2.5 bg-white text-left font-bold" data-surface="carpet">
+              🧶 Yün Halı<br><span class="text-[10px] text-gray-500 font-bold">Çok Sürtünme</span>
+            </button>
+            <button class="surface-btn-a pushable p-2.5 bg-white text-left font-bold" data-surface="sandpaper">
+              📄 Zımpara Kâğıdı<br><span class="text-[10px] text-gray-500 font-bold">Aşırı Sürtünme</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Şerit B Yüzey Seçici -->
+        <div class="p-3 bg-blue-50 rounded-xl border-2 border-blue-300">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-black text-blue-900 flex items-center gap-1">
+              <span>🔵</span> <span>Şerit B (Mavi Araba):</span>
+            </span>
+            <span id="badgeDistB" class="text-xs font-black text-white bg-blue-600 px-2.5 py-0.5 rounded-full shadow-sm">-- cm</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <button class="surface-btn-b pushable p-2.5 bg-white text-left font-bold" data-surface="ice">
+              🧊 Buz Pisti<br><span class="text-[10px] text-gray-500 font-bold">Çok Az Sürtünme</span>
+            </button>
+            <button class="surface-btn-b pushable p-2.5 bg-white text-left font-bold" data-surface="wood">
+              🪵 Ahşap Parke<br><span class="text-[10px] text-gray-500 font-bold">Az Sürtünme</span>
+            </button>
+            <button class="surface-btn-b pushable p-2.5 bg-white text-left font-black active-surface-b" data-surface="carpet">
+              🧶 Yün Halı<br><span class="text-[10px] text-gray-500 font-bold">Çok Sürtünme</span>
+            </button>
+            <button class="surface-btn-b pushable p-2.5 bg-white text-left font-bold" data-surface="sandpaper">
+              📄 Zımpara Kâğıdı<br><span class="text-[10px] text-gray-500 font-bold">Aşırı Sürtünme</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Karşılaştırma Sonuç Tablosu -->
+        <div class="bg-gray-50 p-3.5 rounded-xl border-2 border-ink text-xs">
+          <span class="font-black text-gray-800 uppercase tracking-wider block mb-2 text-[11px]">🏁 Yarış Karşılaştırma Tablosu:</span>
+          <div class="flex justify-between items-center py-1.5 border-b border-gray-200">
+            <span class="font-bold text-gray-700">🔴 Şerit A Mesafesi:</span>
+            <strong id="resultDistA" class="text-red-700 font-black text-sm">-- cm</strong>
+          </div>
+          <div class="flex justify-between items-center py-1.5 border-b border-gray-200">
+            <span class="font-bold text-gray-700">🔵 Şerit B Mesafesi:</span>
+            <strong id="resultDistB" class="text-blue-700 font-black text-sm">-- cm</strong>
+          </div>
+          <div class="flex justify-between items-center pt-2 font-black">
+            <span class="text-gray-800">Fark ve Kazanan:</span>
+            <span id="resultDiff" class="text-emerald-700 font-black text-xs">Yarışı başlatın</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- LABORATUVAR KONTROLLERİ: DİNAMOMETRE YÜZEY SEÇİCİSİ -->
+      <div id="panelLabSettings" class="chunky bg-white p-4 flex-col gap-3 hidden">
+        <span class="text-xs font-black uppercase text-gray-500 tracking-wider block">Dinamometre Test Yüzeyini Seç:</span>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <button class="dyno-surface-btn pushable p-3 bg-white text-left font-black active-tab" data-surface="ice">
+            🧊 Buz Pisti<br><span class="text-[10px] text-gray-200 font-bold">1.2 N (Çok Kolay)</span>
+          </button>
+          <button class="dyno-surface-btn pushable p-3 bg-white text-left font-bold" data-surface="wood">
+            🪵 Ahşap Parke<br><span class="text-[10px] text-gray-500 font-bold">3.0 N (Kolay)</span>
+          </button>
+          <button class="dyno-surface-btn pushable p-3 bg-white text-left font-bold" data-surface="carpet">
+            🧶 Yün Halı<br><span class="text-[10px] text-gray-500 font-bold">6.2 N (Zor)</span>
+          </button>
+          <button class="dyno-surface-btn pushable p-3 bg-white text-left font-bold" data-surface="sandpaper">
+            📄 Zımpara Kâğıdı<br><span class="text-[10px] text-gray-500 font-bold">9.5 N (Çok Zor)</span>
+          </button>
+        </div>
+
+        <button id="btnPullDyno" class="pushable p-3 bg-sun hover:bg-amber-300 text-ink text-sm font-black flex items-center justify-center gap-2 shadow-hard mt-1">
+          <span>🫱</span> <span>Dinamometre ile Çek ve Ölç!</span>
+        </button>
+      </div>
+
+      <!-- Küçük Bilim İnsanı Sorusu (Mini Test) -->
+      <div class="chunky bg-gradient-to-br from-amber-50 to-orange-50 p-4">
+        <h3 class="display text-sm font-black text-amber-950 flex items-center gap-1.5 mb-1">
+          <span>🎯</span> Küçük Bilim İnsanı Sorusu
+        </h3>
+        <p class="text-xs text-gray-700 font-bold mb-2">
+          Kışın karlı ve buzlu yollarda araba tekerleklerine neden zincir takılır?
+        </p>
+        <div class="flex flex-col gap-1.5">
+          <button id="quizOpt1" class="pushable bg-white hover:bg-emerald-50 text-ink text-left p-2.5 text-xs font-bold">
+            ⛓️ Sürtünmeyi artırıp arabanın kaymasını önlemek için
+          </button>
+          <button id="quizOpt2" class="pushable bg-white hover:bg-red-50 text-ink text-left p-2.5 text-xs font-bold">
+            ❄️ Arabanın daha hızlı kayarak gitmesini sağlamak için
+          </button>
+        </div>
+        <div id="quizFeedback" class="mt-2 text-xs font-black hidden"></div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Alt Bilgi -->
+  <footer class="max-w-6xl mx-auto w-full text-center text-xs font-bold text-gray-500 py-2 mt-2">
+    🧪 Küçük Mucitler Bilim Portalı · Sürtünme Kuvveti ve Farklı Yüzeylerin Karşılaştırılması
+  </footer>
+
+  <!-- SİMÜLASYON MOTORU VE FİZİK KODLARI -->
+  <script>
+    // --- 1. WEB AUDIO API SES MOTORU ---
+    let audioCtx = null;
+    let isSoundOn = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // Buz Kayma Sesi (Pürüzsüz hafif ıslık / rüzgâr)
+    function playIceSound(duration = 2.0) {
+      if (!isSoundOn) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(300, now + duration);
+
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.linearRampToValueAtTime(0.001, now + duration);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + duration);
+    }
+
+    // Ahşap Yuvarlanma Sesi (Tok tekerlek sesi)
+    function playWoodSound(duration = 1.6) {
+      if (!isSoundOn) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(240, now);
+      osc.frequency.exponentialRampToValueAtTime(80, now + duration);
+
+      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.linearRampToValueAtTime(0.001, now + duration);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + duration);
+    }
+
+    // Halı Sürtünme Sesi (Boğuk kumaş hışırtısı)
+    function playCarpetSound(duration = 1.2) {
+      if (!isSoundOn) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+      const bufferSize = audioCtx.sampleRate * duration;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.12;
+      }
+
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(500, now);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.linearRampToValueAtTime(0.001, now + duration);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      noise.start(now);
+    }
+
+    // Zımpara Kâğıdı Kazıma Sesi (Pürüzlü hışırtı)
+    function playSandpaperSound(duration = 0.8) {
+      if (!isSoundOn) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+      const bufferSize = audioCtx.sampleRate * duration;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.25;
+      }
+
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1800, now);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      noise.start(now);
+    }
+
+    // Dinamometre Yay Gerilme Sesi
+    function playSpringSound() {
+      if (!isSoundOn) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(200, now);
+      osc.frequency.exponentialRampToValueAtTime(650, now + 0.35);
+
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.4);
+    }
+
+    // Damalı Bayrak / Bitiş Melodisi
+    function playFinishFanfare() {
+      if (!isSoundOn) return;
+      initAudio();
+      [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+        setTimeout(() => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.3);
+        }, i * 90);
+      });
+    }
+
+    // --- 2. SİMÜLASYON DURUMU (STATE) ---
+    let currentMode = 'race';
+    let currentSlope = 'medium';
+    let surfaceA = 'ice';
+    let surfaceB = 'carpet';
+    let isRacing = false;
+
+    const surfaces = {
+      ice: {
+        name: 'Buz Pisti',
+        emoji: '🧊',
+        friction: 'Çok Az',
+        distanceBase: 240,
+        dynoForce: 1.2,
+        gradId: 'url(#iceGrad)',
+        color: '#0369a1',
+        sound: playIceSound,
+        microDesc: 'Pürüzsüz Kristaller',
+        microPath: 'M-45,5 Q-20,3 0,5 Q25,7 45,5'
+      },
+      wood: {
+        name: 'Ahşap Parke',
+        emoji: '🪵',
+        friction: 'Az',
+        distanceBase: 165,
+        dynoForce: 3.0,
+        gradId: 'url(#woodGrad)',
+        color: '#b45309',
+        sound: playWoodSound,
+        microDesc: 'Hafif Ahşap Damarları',
+        microPath: 'M-45,5 Q-30,0 -15,5 Q0,10 15,5 Q30,0 45,5'
+      },
+      carpet: {
+        name: 'Yün Halı',
+        emoji: '🧶',
+        friction: 'Çok',
+        distanceBase: 80,
+        dynoForce: 6.2,
+        gradId: 'url(#carpetGrad)',
+        color: '#be185d',
+        sound: playCarpetSound,
+        microDesc: 'Pürüzlü Yün İplikleri',
+        microPath: 'M-45,5 Q-40,-5 -35,5 Q-30,-5 -25,5 Q-20,-5 -15,5 Q-10,-5 -5,5 Q0,-5 5,5 Q10,-5 15,5 Q20,-5 25,5 Q30,-5 35,5 Q40,-5 45,5'
+      },
+      sandpaper: {
+        name: 'Zımpara Kâğıdı',
+        emoji: '📄',
+        friction: 'Aşırı Yüksek',
+        distanceBase: 35,
+        dynoForce: 9.5,
+        gradId: 'url(#sandpaperGrad)',
+        color: '#44403c',
+        sound: playSandpaperSound,
+        microDesc: 'Sivri ve Keskin Taşçıklar',
+        microPath: 'M-45,5 L-38,-10 L-31,5 L-24,-12 L-17,5 L-10,-10 L-3,5 L4,-12 L11,5 L18,-10 L25,5 L32,-12 L39,5 L45,-10'
+      }
+    };
+
+    const slopeMultipliers = {
+      low: 0.7,
+      medium: 1.0,
+      high: 1.25
+    };
+
+    // DOM Elemanları
+    const tabRace = document.getElementById('tabRace');
+    const tabLab = document.getElementById('tabLab');
+    const sceneBadgeIcon = document.getElementById('sceneBadgeIcon');
+    const sceneBadgeText = document.getElementById('sceneBadgeText');
+    const rampSlopeText = document.getElementById('rampSlopeText');
+
+    const raceTrackGroup = document.getElementById('raceTrackGroup');
+    const labGroup = document.getElementById('labGroup');
+    const panelRaceSettings = document.getElementById('panelRaceSettings');
+    const panelLabSettings = document.getElementById('panelLabSettings');
+
+    const trackSurfaceA = document.getElementById('trackSurfaceA');
+    const trackSurfaceB = document.getElementById('trackSurfaceB');
+    const labelSurfaceA = document.getElementById('labelSurfaceA');
+    const labelSurfaceB = document.getElementById('labelSurfaceB');
+    const carA = document.getElementById('carA');
+    const carB = document.getElementById('carB');
+    const stopFlagA = document.getElementById('stopFlagA');
+    const stopFlagB = document.getElementById('stopFlagB');
+    const stopTextA = document.getElementById('stopTextA');
+    const stopTextB = document.getElementById('stopTextB');
+    const winnerBanner = document.getElementById('winnerBanner');
+    const winnerText = document.getElementById('winnerText');
+
+    const badgeDistA = document.getElementById('badgeDistA');
+    const badgeDistB = document.getElementById('badgeDistB');
+    const resultDistA = document.getElementById('resultDistA');
+    const resultDistB = document.getElementById('resultDistB');
+    const resultDiff = document.getElementById('resultDiff');
+
+    const bubbleEmoji = document.getElementById('bubbleEmoji');
+    const bubbleTitle = document.getElementById('bubbleTitle');
+    const bubbleDesc = document.getElementById('bubbleDesc');
+
+    const btnStartRace = document.getElementById('btnStartRace');
+    const btnResetRace = document.getElementById('btnResetRace');
+
+    // Dinamometre Lab Elemanları
+    const labSurfaceRect = document.getElementById('labSurfaceRect');
+    const labSurfaceTag = document.getElementById('labSurfaceTag');
+    const dynoForceVal = document.getElementById('dynoForceVal');
+    const dynoWire = document.getElementById('dynoWire');
+    const dynoSpring = document.getElementById('dynoSpring');
+    const dynoPointer = document.getElementById('dynoPointer');
+    const microscopicTexture = document.getElementById('microscopicTexture');
+    const microscopicLabel = document.getElementById('microscopicLabel');
+    const btnPullDyno = document.getElementById('btnPullDyno');
+    let labSurface = 'ice';
+
+    // --- 3. YÜZEY SEÇİMLERİNİ GÜNCELLEME ---
+    function updateSurfaceUI() {
+      const sA = surfaces[surfaceA];
+      const sB = surfaces[surfaceB];
+
+      trackSurfaceA.setAttribute('fill', sA.gradId);
+      labelSurfaceA.textContent = `${sA.name} (${sA.friction} Sürtünme)`;
+
+      trackSurfaceB.setAttribute('fill', sB.gradId);
+      labelSurfaceB.textContent = `${sB.name} (${sB.friction} Sürtünme)`;
+
+      bubbleTitle.textContent = `${sA.name} vs ${sB.name}`;
+      bubbleDesc.textContent = `Şerit A'da ${sA.name} (${sA.friction} sürtünme), Şerit B'de ise ${sB.name} (${sB.friction} sürtünme) seçili. Sence hangisi daha uzağa gidecek? "Yarışı Başlat" butonuna bas!`;
+    }
+
+    document.querySelectorAll('.surface-btn-a').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.surface-btn-a').forEach(b => {
+          b.classList.remove('active-surface-a', 'font-black');
+          b.classList.add('font-bold');
+        });
+        btn.classList.add('active-surface-a', 'font-black');
+        btn.classList.remove('font-bold');
+        surfaceA = btn.dataset.surface;
+        resetRace();
+        updateSurfaceUI();
+      });
+    });
+
+    document.querySelectorAll('.surface-btn-b').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.surface-btn-b').forEach(b => {
+          b.classList.remove('active-surface-b', 'font-black');
+          b.classList.add('font-bold');
+        });
+        btn.classList.add('active-surface-b', 'font-black');
+        btn.classList.remove('font-bold');
+        surfaceB = btn.dataset.surface;
+        resetRace();
+        updateSurfaceUI();
+      });
+    });
+
+    // Rampa Eğimi Seçici
+    document.querySelectorAll('.slope-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.slope-btn').forEach(b => {
+          b.classList.remove('active-tab', 'bg-orange-600', 'text-white', 'font-black');
+          b.classList.add('bg-white', 'text-ink', 'font-bold');
+        });
+        btn.classList.add('active-tab', 'bg-orange-600', 'text-white', 'font-black');
+        btn.classList.remove('bg-white', 'text-ink', 'font-bold');
+        currentSlope = btn.dataset.slope;
+
+        const rampPolyA = document.getElementById('rampPolyA');
+        const rampPolyB = document.getElementById('rampPolyB');
+
+        if (currentSlope === 'low') {
+          rampSlopeText.textContent = 'Alçak (15°)';
+          rampPolyA.setAttribute('points', '15,85 110,135 15,135');
+          rampPolyB.setAttribute('points', '15,245 110,295 15,295');
+        } else if (currentSlope === 'medium') {
+          rampSlopeText.textContent = 'Orta (30°)';
+          rampPolyA.setAttribute('points', '15,55 110,135 15,135');
+          rampPolyB.setAttribute('points', '15,215 110,295 15,295');
+        } else {
+          rampSlopeText.textContent = 'Dik (45°)';
+          rampPolyA.setAttribute('points', '15,25 110,135 15,135');
+          rampPolyB.setAttribute('points', '15,185 110,295 15,295');
+        }
+        resetRace();
+      });
+    });
+
+    // --- 4. YARIŞ MOTORU (GSAP ANİMASYONU & SÜRTÜNME HESABI) ---
+    function resetRace() {
+      isRacing = false;
+      btnStartRace.classList.remove('opacity-50', 'pointer-events-none', 'bg-amber-400');
+      btnStartRace.classList.add('bg-emerald-500', 'hover:bg-emerald-400');
+      btnStartRace.innerHTML = '<span>🚀</span> <span>Yarışı Başlat!</span>';
+
+      if (window.gsap) {
+        gsap.set(carA, { x: 0 });
+        gsap.set(carB, { x: 0 });
+      } else {
+        carA.setAttribute('transform', 'translate(0, 10)');
+        carB.setAttribute('transform', 'translate(0, 10)');
+      }
+
+      stopFlagA.setAttribute('opacity', '0');
+      stopFlagB.setAttribute('opacity', '0');
+      winnerBanner.setAttribute('opacity', '0');
+
+      badgeDistA.textContent = '-- cm';
+      badgeDistB.textContent = '-- cm';
+      resultDistA.textContent = '-- cm';
+      resultDistB.textContent = '-- cm';
+      resultDiff.textContent = 'Yarışı başlatın';
+    }
+
+    btnResetRace.addEventListener('click', resetRace);
+
+    btnStartRace.addEventListener('click', () => {
+      if (isRacing) return;
+      isRacing = true;
+      btnStartRace.classList.add('opacity-50', 'pointer-events-none');
+      btnStartRace.classList.remove('bg-emerald-500', 'hover:bg-emerald-400');
+      btnStartRace.classList.add('bg-amber-400');
+      btnStartRace.innerHTML = '<span>⏳</span> <span>Arabalar Yarışıyor...</span>';
+
+      // Sesleri Çal
+      surfaces[surfaceA].sound(2.2);
+      setTimeout(() => surfaces[surfaceB].sound(2.0), 100);
+
+      // Mesafeleri Hesapla (cm): Pist 500 px = 250 cm (1 cm = 2 px)
+      const slopeMul = slopeMultipliers[currentSlope];
+      const distCmA = Math.round(surfaces[surfaceA].distanceBase * slopeMul + (Math.random() * 6 - 3));
+      const distCmB = Math.round(surfaces[surfaceB].distanceBase * slopeMul + (Math.random() * 6 - 3));
+
+      // Clamped to 250 cm
+      const clampedA = Math.min(250, Math.max(20, distCmA));
+      const clampedB = Math.min(250, Math.max(20, distCmB));
+
+      const pxA = clampedA * 2.0;
+      const pxB = clampedB * 2.0;
+
+      const durA = 1.0 + (pxA / 220);
+      const durB = 1.0 + (pxB / 220);
+
+      finishedCars = 0;
+
+      // Arabaları Yarıştır
+      if (window.gsap) {
+        gsap.to(carA, {
+          x: pxA,
+          duration: durA,
+          ease: "power2.out",
+          onComplete: () => {
+            stopFlagA.setAttribute('transform', `translate(${pxA + 25}, 0)`);
+            stopTextA.textContent = `📍 ${clampedA} cm`;
+            stopFlagA.setAttribute('opacity', '1');
+            badgeDistA.textContent = `${clampedA} cm`;
+            resultDistA.textContent = `${clampedA} cm`;
+            checkRaceEnd(clampedA, clampedB);
+          }
+        });
+
+        gsap.to(carB, {
+          x: pxB,
+          duration: durB,
+          ease: "power2.out",
+          onComplete: () => {
+            stopFlagB.setAttribute('transform', `translate(${pxB + 25}, 0)`);
+            stopTextB.textContent = `📍 ${clampedB} cm`;
+            stopFlagB.setAttribute('opacity', '1');
+            badgeDistB.textContent = `${clampedB} cm`;
+            resultDistB.textContent = `${clampedB} cm`;
+            checkRaceEnd(clampedA, clampedB);
+          }
+        });
+      }
+    });
+
+    let finishedCars = 0;
+    function checkRaceEnd(dA, dB) {
+      finishedCars++;
+      if (finishedCars < 2) return;
+      finishedCars = 0;
+
+      // Butonu Yeniden Aktif Et
+      isRacing = false;
+      btnStartRace.classList.remove('opacity-50', 'pointer-events-none', 'bg-amber-400');
+      btnStartRace.classList.add('bg-sun', 'hover:bg-amber-300');
+      btnStartRace.innerHTML = '<span>🔄</span> <span>Yeniden Yarıştır!</span>';
+
+      // Sonuç değerlendirmesi
+      winnerBanner.setAttribute('opacity', '1');
+      if (dA > dB) {
+        winnerText.textContent = `🏆 ŞERİT A KAZANDI! (${dA} cm)`;
+        resultDiff.textContent = `🔴 Şerit A ${dA - dB} cm daha uzağa gitti!`;
+        resultDiff.className = 'text-red-700 font-black text-xs';
+        bubbleTitle.textContent = 'Şerit A Daha Az Sürtünmeli!';
+        bubbleDesc.textContent = `${surfaces[surfaceA].name} yüzeyinde sürtünme daha az olduğu için Kırmızı Araba tam ${dA} cm uzağa kaydı!`;
+      } else if (dB > dA) {
+        winnerText.textContent = `🏆 ŞERİT B KAZANDI! (${dB} cm)`;
+        resultDiff.textContent = `🔵 Şerit B ${dB - dA} cm daha uzağa gitti!`;
+        resultDiff.className = 'text-blue-700 font-black text-xs';
+        bubbleTitle.textContent = 'Şerit B Daha Az Sürtünmeli!';
+        bubbleDesc.textContent = `${surfaces[surfaceB].name} yüzeyinde sürtünme daha az olduğu için Mavi Araba tam ${dB} cm uzağa kaydı!`;
+      } else {
+        winnerText.textContent = `🤝 BERABERE! (${dA} cm)`;
+        resultDiff.textContent = `İki yüzey de eşit mesafede durdu!`;
+        resultDiff.className = 'text-purple-700 font-black text-xs';
+      }
+
+      if (window.confetti) {
+        confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+      }
+      playFinishFanfare();
+    }
+
+    // --- 5. MOD DEĞİŞTİRME MOTORU (YARIŞ vs DİNAMOMETRE LAB) ---
+    function switchMode(mode) {
+      currentMode = mode;
+      if (mode === 'race') {
+        tabRace.className = 'pushable px-3.5 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1';
+        tabLab.className = 'pushable px-3.5 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1';
+        
+        sceneBadgeIcon.textContent = '🏎️';
+        sceneBadgeText.textContent = 'Çift Şeritli Yüzey Karşılaştırma Pisti';
+
+        raceTrackGroup.setAttribute('opacity', '1');
+        raceTrackGroup.classList.remove('pointer-events-none');
+        labGroup.setAttribute('opacity', '0');
+        labGroup.classList.add('pointer-events-none');
+
+        panelRaceSettings.classList.remove('hidden');
+        panelLabSettings.classList.add('hidden');
+        panelLabSettings.classList.remove('flex');
+
+        updateSurfaceUI();
+
+      } else {
+        tabLab.className = 'pushable px-3.5 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1';
+        tabRace.className = 'pushable px-3.5 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1';
+
+        sceneBadgeIcon.textContent = '🔬';
+        sceneBadgeText.textContent = 'Dinamometre & Mikroskop Laboratuvarı';
+
+        raceTrackGroup.setAttribute('opacity', '0');
+        raceTrackGroup.classList.add('pointer-events-none');
+        labGroup.setAttribute('opacity', '1');
+        labGroup.classList.remove('pointer-events-none');
+
+        panelRaceSettings.classList.add('hidden');
+        panelLabSettings.classList.remove('hidden');
+        panelLabSettings.classList.add('flex');
+
+        updateLabUI();
+      }
+    }
+
+    tabRace.addEventListener('click', () => switchMode('race'));
+    tabLab.addEventListener('click', () => switchMode('lab'));
+
+    // --- 6. DİNAMOMETRE & MİKROSKOPİK LABORATUVAR MOTORU ---
+    function updateLabUI() {
+      const s = surfaces[labSurface];
+      labSurfaceRect.setAttribute('fill', s.gradId);
+      labSurfaceTag.textContent = `Yüzey: ${s.emoji} ${s.name} (${s.friction} Sürtünme)`;
+      microscopicLabel.textContent = s.microDesc;
+      microscopicTexture.setAttribute('d', s.microPath);
+
+      bubbleTitle.textContent = `Dinamometre ile ${s.name} Testi`;
+      bubbleDesc.textContent = `Mikroskop büyütecine bak: ${s.microDesc} görünüyor! "Dinamometre ile Çek ve Ölç!" butonuna basarak 500 gr bloğu hareket ettirmek için kaç Newton gerektiğini ölç!`;
+    }
+
+    document.querySelectorAll('.dyno-surface-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.dyno-surface-btn').forEach(b => {
+          b.classList.remove('active-tab', 'font-black');
+          b.classList.add('bg-white', 'text-ink', 'font-bold');
+        });
+        btn.classList.add('active-tab', 'font-black');
+        btn.classList.remove('bg-white', 'text-ink', 'font-bold');
+        labSurface = btn.dataset.surface;
+        updateLabUI();
+      });
+    });
+
+    // Dinamometre Çekme Animasyonu
+    let isPulling = false;
+    btnPullDyno.addEventListener('click', () => {
+      if (isPulling) return;
+      isPulling = true;
+      btnPullDyno.classList.add('opacity-50', 'pointer-events-none');
+
+      playSpringSound();
+      surfaces[labSurface].sound(1.5);
+
+      const targetForce = surfaces[labSurface].dynoForce;
+      // 0 N = X:50, 10 N = X:200 -> 1 N = 15 px
+      const pointerTargetX = 50 + (targetForce * 15);
+      const wireExtend = 15 + (targetForce * 4.0);
+
+      if (window.gsap) {
+        gsap.to(dynoPointer, { attr: { points: `${pointerTargetX},-16 ${pointerTargetX+8},0 ${pointerTargetX},16 ${pointerTargetX-8},0` }, duration: 0.6, ease: "back.out(1.7)" });
+        gsap.to(dynoWire, { attr: { x2: wireExtend }, duration: 0.6 });
+        gsap.to('#labBlock', { x: 135, duration: 0.8, ease: "power1.out" });
+
+        const counter = { val: 0 };
+        gsap.to(counter, {
+          val: targetForce,
+          duration: 0.6,
+          ease: "power1.out",
+          onUpdate: () => {
+            dynoForceVal.textContent = `${counter.val.toFixed(1)} Newton (N)`;
+          },
+          onComplete: () => {
+            bubbleTitle.textContent = `Ölçülen Sürtünme Kuvveti: ${targetForce} N`;
+            bubbleDesc.textContent = `${surfaces[labSurface].name} yüzeyinde bloğu çekmek için tam ${targetForce} Newton kuvvet gerekti! Pürüz arttıkça gereken kuvvet artar.`;
+
+            setTimeout(() => {
+              gsap.to(dynoPointer, { attr: { points: `64,-16 72,0 64,16 56,0` }, duration: 0.4 });
+              gsap.to(dynoWire, { attr: { x2: 35 }, duration: 0.4 });
+              gsap.to('#labBlock', { x: 110, duration: 0.4 });
+              isPulling = false;
+              btnPullDyno.classList.remove('opacity-50', 'pointer-events-none');
+            }, 2500);
+          }
+        });
+      }
+    });
+
+    // --- 7. MİNİ TEST ---
+    const quizOpt1 = document.getElementById('quizOpt1');
+    const quizOpt2 = document.getElementById('quizOpt2');
+    const quizFeedback = document.getElementById('quizFeedback');
+
+    quizOpt1.addEventListener('click', () => {
+      quizFeedback.classList.remove('hidden', 'text-red-600');
+      quizFeedback.classList.add('text-emerald-700');
+      quizFeedback.innerHTML = '🎉 <strong>TEBRİKLER, HARİKA CEVAP!</strong><br>Zincir, lastik ile buz arasındaki pürüzlülüğü yani SÜRTÜNME KUVVETİNİ artırır; böylece araba kaymaz ve güvenle yola tutunur!';
+      if (window.confetti) {
+        confetti({ particleCount: 70, spread: 60, origin: { y: 0.7 } });
+      }
+      playFinishFanfare();
+    });
+
+    quizOpt2.addEventListener('click', () => {
+      quizFeedback.classList.remove('hidden', 'text-emerald-700');
+      quizFeedback.classList.add('text-red-600');
+      quizFeedback.innerHTML = '🤔 <strong>Tekrar Düşünelim!</strong><br>Karlı yolda hızlı kaymak tehlikelidir! Zincir sürtünmeyi ARTIRARAK arabanın kaymasını engellemek için takılır.';
+    });
+
+    // --- 8. SES AÇ/KAPAT ---
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    soundToggle.addEventListener('click', () => {
+      isSoundOn = !isSoundOn;
+      soundIcon.textContent = isSoundOn ? '🔊' : '🔇';
+    });
+
+    // Başlangıç
+    window.addEventListener('DOMContentLoaded', () => {
+      updateSurfaceUI();
+    });
+  </script>
+</body>
+</html>

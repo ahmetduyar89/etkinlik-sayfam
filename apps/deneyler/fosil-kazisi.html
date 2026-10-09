@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fosil Kazısı Ekibi | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .pushable:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+    .tool-on { background: #facc15 !important; transform: translate(2px, 2px); box-shadow: 1px 1px 0 #0f172a !important; }
+    #dig { cursor: crosshair; touch-action: none; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-sm font-black flex items-center gap-1"><span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span></a>
+      <div>
+        <div class="flex items-center gap-2"><span class="text-2xl sm:text-3xl">🦕</span><h1 class="display text-lg sm:text-2xl font-black tracking-wide">Fosil Kazısı Ekibi</h1></div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Kazmayla hızlı, fırçayla dikkatli kaz! Fosili kırmadan ortaya çıkar ve müzeye gönder. ⛏️🖌️🏛️</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab">⛏️ 1. Kazı Alanı</button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white">🏛️ 2. Fosil Müzesi</button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">KAZI 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">Ammonit</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <!-- KAZI MODU -->
+        <div id="digMode" class="flex flex-col gap-3">
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="p-1.5 bg-amber-50 rounded-xl border-2 border-ink"><p class="text-[10px] font-black text-gray-500">ORTAYA ÇIKAN</p><p id="revealText" class="display text-lg font-black leading-none">0%</p></div>
+            <div class="p-1.5 bg-rose-50 rounded-xl border-2 border-ink"><p class="text-[10px] font-black text-gray-500">FOSİL SAĞLAMLIĞI</p><p id="healthText" class="display text-lg font-black leading-none text-rose-700">100%</p></div>
+            <div class="p-1.5 bg-sky-50 rounded-xl border-2 border-ink"><p class="text-[10px] font-black text-gray-500">ENERJİ</p><p id="energyText" class="display text-lg font-black leading-none text-sky-700">120</p></div>
+          </div>
+          <div class="relative rounded-2xl border-3 border-ink overflow-hidden bg-amber-900">
+            <canvas id="dig" class="w-full h-auto block"></canvas>
+            <div id="depthLabels" class="absolute right-1 top-0 bottom-0 flex flex-col justify-around pointer-events-none"></div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="toolPick" class="tool pushable px-4 py-2 bg-white text-sm font-black tool-on">⛏️ Kazma <span class="text-[10px] font-bold">(geniş, 1 enerji)</span></button>
+            <button id="toolBrush" class="tool pushable px-4 py-2 bg-white text-sm font-black">🖌️ Fırça <span class="text-[10px] font-bold">(küçük, 1 enerji)</span></button>
+            <button id="btnFinish" class="pushable px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black ml-auto">🏛️ Müzeye Gönder</button>
+          </div>
+        </div>
+
+        <!-- MÜZE MODU -->
+        <div id="museumMode" class="hidden flex-col gap-3">
+          <div id="museumGrid" class="grid grid-cols-3 gap-2"></div>
+          <div class="p-3 bg-stone-50 rounded-xl border-3 border-ink">
+            <p class="display text-base font-black mb-2">🎞️ Fosil Nasıl Oluşur?</p>
+            <div id="formation" class="grid grid-cols-2 sm:grid-cols-5 gap-2"></div>
+            <button id="btnFormation" class="pushable mt-2 px-4 py-2 bg-amber-300 text-xs font-black">▶️ Adımları Göster</button>
+          </div>
+          <div class="p-3 bg-amber-50 rounded-xl border-3 border-ink">
+            <p class="display text-base font-black mb-1">🧱 Katman Bulmacası</p>
+            <p class="text-xs font-bold text-gray-600 mb-2">Kayaç katmanlarına <b>en eskiden en yeniye</b> doğru dokun!</p>
+            <div id="layerPuzzle" class="flex flex-col gap-1.5"></div>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-xs font-black">🔄 Baştan</button>
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black">💡 İpucu</button>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-amber-50 to-stone-100 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5"><b>Fosiller</b>, milyonlarca yıl önce yaşamış canlıların kayaçlarda korunmuş kalıntıları ya da izleridir. Bize geçmişte yaşamış canlılar hakkında bilgi verirler!</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">Paleontolog Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Fen Bilgisi Rehberi</h3></div>
+        <div class="space-y-2 text-xs">
+          <div class="p-2 bg-amber-50 rounded-lg border border-amber-300"><p class="font-extrabold text-amber-900">🪨 Tortul Kayaçlar</p><p class="text-[11px] text-amber-800 font-semibold mt-0.5">Kum, çamur ve canlı kalıntılarının üst üste birikip sertleşmesiyle oluşur. Fosiller en çok bu kayaçlarda bulunur.</p></div>
+          <div class="p-2 bg-stone-50 rounded-lg border border-stone-300"><p class="font-extrabold">🧱 Katmanlar</p><p class="text-[11px] text-gray-700 font-semibold mt-0.5">Katmanlar üst üste biriktiği için genellikle <b>alttaki katman daha eski</b>, üstteki daha yenidir.</p></div>
+          <div class="p-2 bg-sky-50 rounded-lg border border-sky-300"><p class="font-extrabold text-sky-900">🔎 Paleontolog</p><p class="text-[11px] text-sky-800 font-semibold mt-0.5">Fosilleri inceleyen bilim insanıdır. Kazıda fırça, küçük çekiç ve keski gibi araçlarla çok dikkatli çalışır.</p></div>
+          <div class="p-2 bg-emerald-50 rounded-lg border border-emerald-300"><p class="font-extrabold text-emerald-900">🇹🇷 Türkiye'de Fosil</p><p class="text-[11px] text-emerald-800 font-semibold mt-0.5">Türkiye'nin birçok bölgesinde deniz canlısı ve memeli fosilleri bulunmuştur. Bulduğun bir fosili müzeye haber vermelisin!</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Müzeye Gönderildi!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-amber-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-amber-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      pick() { tone('square', 180, 90, 0.08, 0.12); },
+      brush() { tone('triangle', 1800, 1200, 0.05, 0.05); },
+      crack() { tone('sawtooth', 900, 150, 0.2, 0.18); },
+      correct() { tone('triangle', 660, 990, 0.12, 0.2); },
+      wrong() { tone('sawtooth', 220, 110, 0.3, 0.15); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. FOSİLLER ---
+    const COLS = 28, ROWS = 18, CS = 20;
+    const W = COLS * CS, H = ROWS * CS;
+    const LAYERS = [
+      { y0: 0, y1: 4, c: '#a16207', n: 'Toprak', age: 'Günümüz' },
+      { y0: 4, y1: 9, c: '#b45309', n: 'Kumtaşı', age: 'Yaklaşık 10 milyon yıl' },
+      { y0: 9, y1: 14, c: '#92400e', n: 'Kireçtaşı', age: 'Yaklaşık 70 milyon yıl' },
+      { y0: 14, y1: 18, c: '#78350f', n: 'Kiltaşı', age: 'Yaklaşık 400 milyon yıl' }
+    ];
+
+    // Her fosil offscreen canvas'a çizilir, maske buradan çıkarılır
+    const FOSSILS = [
+      {
+        id: 'ammonit', n: 'Ammonit', e: '🐚', cx: 280, cy: 230, energy: 130,
+        draw(c) {
+          c.strokeStyle = '#e7e5e4'; c.lineWidth = 16; c.lineCap = 'round'; c.beginPath();
+          for (let a = 0; a < Math.PI * 5; a += 0.1) { const r = 6 + a * 7; const x = this.cx + r * Math.cos(a), y = this.cy + r * Math.sin(a); a ? c.lineTo(x, y) : c.moveTo(x, y); }
+          c.stroke();
+          c.strokeStyle = '#a8a29e'; c.lineWidth = 3; c.beginPath();
+          for (let a = 0; a < Math.PI * 5; a += 0.1) { const r = 6 + a * 7; const x = this.cx + r * Math.cos(a), y = this.cy + r * Math.sin(a); a ? c.lineTo(x, y) : c.moveTo(x, y); }
+          c.stroke();
+        },
+        fact: '<b>Ammonitler</b> milyonlarca yıl önce denizlerde yaşamış, spiral kabuklu hayvanlardır. Karada bulunan ammonit fosilleri, o bölgenin bir zamanlar <b>deniz</b> olduğunu gösterir!'
+      },
+      {
+        id: 'balik', n: 'Balık Fosili', e: '🐟', cx: 270, cy: 170, energy: 140,
+        draw(c) {
+          c.fillStyle = '#e7e5e4';
+          c.beginPath(); c.ellipse(this.cx, this.cy, 110, 40, 0, 0, Math.PI * 2); c.fill();
+          c.beginPath(); c.moveTo(this.cx + 100, this.cy); c.lineTo(this.cx + 160, this.cy - 45); c.lineTo(this.cx + 160, this.cy + 45); c.fill();
+          c.strokeStyle = '#a8a29e'; c.lineWidth = 3;
+          c.beginPath(); c.moveTo(this.cx - 100, this.cy); c.lineTo(this.cx + 120, this.cy); c.stroke();
+          for (let i = -80; i <= 90; i += 18) { c.beginPath(); c.moveTo(this.cx + i, this.cy - 30); c.lineTo(this.cx + i + 8, this.cy); c.lineTo(this.cx + i, this.cy + 30); c.stroke(); }
+          c.fillStyle = '#78716c'; c.beginPath(); c.arc(this.cx - 80, this.cy - 8, 7, 0, Math.PI * 2); c.fill();
+        },
+        fact: 'Balık fosilleri genellikle göl ya da deniz dibindeki ince çamurda oluşur. Ölen balık hızla çamurla örtülünce kemikleri çürümeden korunabilir.'
+      },
+      {
+        id: 'yaprak', n: 'Yaprak Fosili', e: '🍃', cx: 280, cy: 120, energy: 110,
+        draw(c) {
+          c.fillStyle = '#e7e5e4';
+          c.beginPath(); c.ellipse(this.cx, this.cy, 120, 55, -0.2, 0, Math.PI * 2); c.fill();
+          c.strokeStyle = '#a8a29e'; c.lineWidth = 4;
+          c.beginPath(); c.moveTo(this.cx - 140, this.cy + 28); c.lineTo(this.cx + 115, this.cy - 24); c.stroke();
+          c.lineWidth = 2.5;
+          for (let i = -90; i <= 80; i += 24) { const y = this.cy - i * 0.2; c.beginPath(); c.moveTo(this.cx + i, y); c.lineTo(this.cx + i + 25, y - 40); c.moveTo(this.cx + i, y); c.lineTo(this.cx + i + 35, y + 30); c.stroke(); }
+        },
+        fact: 'Bitkiler de fosilleşir! Yaprak fosilleri genellikle bir <b>iz</b> şeklindedir: Yaprak çürür ama şekli taşın üzerinde kalır. Bu fosiller eski iklimler hakkında bilgi verir.'
+      },
+      {
+        id: 'trilobit', n: 'Trilobit', e: '🪲', cx: 280, cy: 300, energy: 150,
+        draw(c) {
+          c.fillStyle = '#e7e5e4';
+          c.beginPath(); c.ellipse(this.cx, this.cy, 70, 50, 0, 0, Math.PI * 2); c.fill();
+          c.beginPath(); c.arc(this.cx - 58, this.cy, 34, Math.PI * 0.5, Math.PI * 1.5); c.fill();
+          c.strokeStyle = '#a8a29e'; c.lineWidth = 3;
+          c.beginPath(); c.moveTo(this.cx - 60, this.cy - 16); c.lineTo(this.cx + 70, this.cy - 16); c.moveTo(this.cx - 60, this.cy + 16); c.lineTo(this.cx + 70, this.cy + 16); c.stroke();
+          for (let i = -40; i <= 60; i += 13) { c.beginPath(); c.moveTo(this.cx + i, this.cy - 48); c.lineTo(this.cx + i, this.cy + 48); c.stroke(); }
+        },
+        fact: '<b>Trilobitler</b> dinozorlardan çok daha önce, yaklaşık 500 milyon yıl önce denizlerde yaşamış eklem bacaklı hayvanlardır. En eski katmanlarda bulunurlar.'
+      },
+      {
+        id: 'dis', n: 'Dinozor Dişi', e: '🦖', cx: 280, cy: 215, energy: 100,
+        draw(c) {
+          c.fillStyle = '#f5f5f4';
+          c.beginPath(); c.moveTo(this.cx - 50, this.cy + 60); c.quadraticCurveTo(this.cx - 40, this.cy - 40, this.cx + 20, this.cy - 90); c.quadraticCurveTo(this.cx + 30, this.cy - 10, this.cx + 50, this.cy + 60); c.closePath(); c.fill();
+          c.strokeStyle = '#a8a29e'; c.lineWidth = 3;
+          for (let i = 0; i < 6; i++) { c.beginPath(); c.moveTo(this.cx + 30 + i * 2, this.cy - 60 + i * 20); c.lineTo(this.cx + 38 + i * 2, this.cy - 56 + i * 20); c.stroke(); }
+          c.fillStyle = '#d6d3d1'; c.fillRect(this.cx - 50, this.cy + 50, 100, 20);
+        },
+        fact: 'Dinozorların sert <b>dişleri</b> ve kemikleri kolayca fosilleşir. Dişin şekline bakarak dinozorun etçil mi otçul mu olduğunu anlayabiliriz. Keskin ve tırtıklı diş etçile aittir!'
+      }
+    ];
+
+    const LAYER_PUZZLE = [
+      { n: 'Toprak', c: '#a16207', e: '🌱', order: 3 },
+      { n: 'Kumtaşı (memeli dişi)', c: '#b45309', e: '🦷', order: 2 },
+      { n: 'Kireçtaşı (dinozor dişi)', c: '#92400e', e: '🦖', order: 1 },
+      { n: 'Kiltaşı (trilobit)', c: '#78350f', e: '🪲', order: 0 }
+    ];
+
+    const FORMATION = [
+      ['🐟', 'Canlı ölür ve göl dibine çöker.'],
+      ['🟫', 'Üzerini hızla çamur ve kum örter.'],
+      ['🧱', 'Yıllar boyunca yeni katmanlar birikir ve sertleşir.'],
+      ['🪨', 'Kemikler yavaş yavaş taşlaşır, fosil olur.'],
+      ['⛏️', 'Katmanlar aşınınca ya da kazı yapılınca fosil ortaya çıkar.']
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: İlk Buluntu', text: 'Ammoniti müzeye gönder.' },
+      { id: 'm2', title: '2. Görev: Usta Eller', text: 'Bir fosili hiç zarar vermeden (%100 sağlam) çıkar.' },
+      { id: 'm3', title: '3. Görev: Katman Uzmanı', text: 'Müzedeki katman bulmacasını çöz.' },
+      { id: 'm4', title: '4. Görev: Baş Paleontolog', text: '5 fosilin hepsini müzeye gönder.' }
+    ];
+
+    // --- 3. DURUM ---
+    const $ = id => document.getElementById(id);
+    let mode = 'levels';
+    let levelIndex = 0;
+    let dirt = [];       // 0: açık, 1: toprak
+    let fossilMask = [];
+    let fossilCells = 0;
+    let damage = 0;
+    let energy = 0;
+    let tool = 'pick';
+    let finished = false;
+    let score = 0;
+    let puzzleStep = 0;
+    const stars = Array(FOSSILS.length).fill(0);
+    const missionsDone = {};
+    let modalTimer = null;
+
+    const cv = $('dig');
+    const ctx = cv.getContext('2d');
+    (() => { const dpr = window.devicePixelRatio || 1; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); })();
+    const fossilCanvas = document.createElement('canvas');
+    fossilCanvas.width = W; fossilCanvas.height = H;
+    const fctx = fossilCanvas.getContext('2d');
+
+    function layerAt(row) { return LAYERS.find(l => row >= l.y0 && row < l.y1); }
+
+    function buildFossil(f) {
+      fctx.clearRect(0, 0, W, H);
+      f.draw(fctx);
+      const data = fctx.getImageData(0, 0, W, H).data;
+      fossilMask = []; fossilCells = 0;
+      for (let r = 0; r < ROWS; r++) {
+        fossilMask[r] = [];
+        for (let c = 0; c < COLS; c++) {
+          let hit = 0;
+          for (let dy = 4; dy < CS; dy += 6) for (let dx = 4; dx < CS; dx += 6) if (data[((r * CS + dy) * W + (c * CS + dx)) * 4 + 3] > 0) hit++;
+          fossilMask[r][c] = hit >= 3 ? 1 : 0;
+          fossilCells += fossilMask[r][c];
+        }
+      }
+    }
+
+    // --- 4. ÇİZİM ---
+    function seeded(i) { const x = Math.sin(i * 91.7) * 43758.5; return x - Math.floor(x); }
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      // Kaya arka plan (kazılmış alan)
+      for (let r = 0; r < ROWS; r++) {
+        const l = layerAt(r);
+        ctx.fillStyle = shade(l.c, -75);
+        ctx.fillRect(0, r * CS, W, CS);
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        for (let c = 0; c < COLS; c += 2) ctx.fillRect(c * CS + (r % 2) * CS, r * CS, CS, CS);
+      }
+      // Fosil
+      ctx.drawImage(fossilCanvas, 0, 0);
+      // Çatlaklar
+      cracks.forEach(k => { ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(k.x - 10, k.y - 6); ctx.lineTo(k.x - 2, k.y + 4); ctx.lineTo(k.x + 4, k.y - 4); ctx.lineTo(k.x + 11, k.y + 6); ctx.stroke(); });
+      // Toprak
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        if (!dirt[r][c]) continue;
+        const l = layerAt(r);
+        ctx.fillStyle = shade(l.c, Math.round((seeded(r * 31 + c) - 0.5) * 16));
+        ctx.fillRect(c * CS, r * CS, CS, CS);
+        if (seeded(r * 7 + c * 13) > 0.8) { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.arc(c * CS + 10, r * CS + 10, 3, 0, Math.PI * 2); ctx.fill(); }
+      }
+      // Katman çizgileri
+      ctx.strokeStyle = 'rgba(15,23,42,0.35)'; ctx.lineWidth = 2;
+      LAYERS.forEach(l => { ctx.beginPath(); ctx.moveTo(0, l.y0 * CS); ctx.lineTo(W, l.y0 * CS); ctx.stroke(); });
+    }
+    function shade(hex, amt) {
+      const n = parseInt(hex.slice(1), 16);
+      const r = Math.max(0, Math.min(255, (n >> 16) + amt)), g = Math.max(0, Math.min(255, ((n >> 8) & 255) + amt)), b = Math.max(0, Math.min(255, (n & 255) + amt));
+      return `rgb(${r},${g},${b})`;
+    }
+
+    function stats() {
+      let open = 0;
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (fossilMask[r][c] && !dirt[r][c]) open++;
+      const reveal = fossilCells ? open / fossilCells : 0;
+      const health = Math.max(0, 1 - damage / Math.max(8, fossilCells * 0.25));
+      return { reveal, health };
+    }
+
+    function updateHud() {
+      const s = stats();
+      $('revealText').textContent = `${Math.round(s.reveal * 100)}%`;
+      $('healthText').textContent = `${Math.round(s.health * 100)}%`;
+      $('energyText').textContent = energy;
+      $('depthLabels').innerHTML = LAYERS.map(l => `<span class="text-[9px] font-black text-white bg-ink/60 px-1 rounded">${l.age}</span>`).join('');
+    }
+
+    // --- 5. KAZI ---
+    let cracks = [];
+    let digging = false;
+    let lastCell = null;
+    function cellFromEvent(e) {
+      const rect = cv.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width * W;
+      const y = (e.clientY - rect.top) / rect.height * H;
+      return { c: Math.floor(x / CS), r: Math.floor(y / CS), x, y };
+    }
+
+    function digAt(cell) {
+      if (finished || energy <= 0) return;
+      const key = `${cell.r},${cell.c},${tool}`;
+      if (lastCell === key) return;
+      lastCell = key;
+      const radius = tool === 'pick' ? 1 : 0;
+      let removed = 0, hurt = 0;
+      for (let dr = -radius; dr <= radius; dr++) for (let dc = -radius; dc <= radius; dc++) {
+        const r = cell.r + dr, c = cell.c + dc;
+        if (r < 0 || c < 0 || r >= ROWS || c >= COLS) continue;
+        // Kazma; görünür hâldeki fosile ya da tam vurduğu noktadaki fosile zarar verir
+        if (tool === 'pick' && fossilMask[r][c] && (!dirt[r][c] || (dr === 0 && dc === 0))) hurt++;
+        if (dirt[r][c]) { dirt[r][c] = 0; removed++; }
+      }
+      if (!removed && !hurt) return;
+      energy--;
+      if (tool === 'pick' && hurt) {
+        damage += hurt;
+        cracks.push({ x: cell.c * CS + CS / 2, y: cell.r * CS + CS / 2 });
+        Sound.crack();
+        $('scienceNote').innerHTML = '💥 <b>Dikkat!</b> Kazma fosile çarptı ve çatlattı. Fosilin yakınında <b>fırça</b> kullan!';
+        if (typeof gsap !== 'undefined') gsap.fromTo(cv, { x: -5 }, { x: 0, duration: 0.3, ease: 'elastic.out(5,0.2)' });
+      } else if (tool === 'pick') Sound.pick(); else Sound.brush();
+      draw(); updateHud();
+      const s = stats();
+      if (s.health <= 0) failLevel('Fosil parçalandı! 💔', 'Kazmayı fosile çok yakın kullandın. Fosilin kenarlarını fırçayla temizle.');
+      else if (energy <= 0 && s.reveal < 0.85) failLevel('Enerjin bitti! 😓', 'Kazmayı fosilden uzak yerlerde, fırçayı fosilin hemen çevresinde kullan.');
+    }
+
+    cv.addEventListener('pointerdown', e => { initAudio(); digging = true; lastCell = null; cv.setPointerCapture(e.pointerId); digAt(cellFromEvent(e)); });
+    cv.addEventListener('pointermove', e => { if (digging) digAt(cellFromEvent(e)); });
+    cv.addEventListener('pointerup', () => { digging = false; });
+    cv.addEventListener('pointercancel', () => { digging = false; });
+
+    function setTool(t) {
+      tool = t; Sound.click();
+      $('toolPick').classList.toggle('tool-on', t === 'pick');
+      $('toolBrush').classList.toggle('tool-on', t === 'brush');
+    }
+    $('toolPick').addEventListener('click', () => setTool('pick'));
+    $('toolBrush').addEventListener('click', () => setTool('brush'));
+
+    $('btnFinish').addEventListener('click', () => {
+      if (finished) return;
+      const s = stats();
+      if (s.reveal < 0.85) { Sound.wrong(); $('scienceNote').innerHTML = `🏛️ Müze fosilin en az <b>%85</b>'inin ortaya çıkmasını istiyor. Şu an %${Math.round(s.reveal * 100)}.`; return; }
+      winLevel(s);
+    });
+
+    function winLevel(s) {
+      finished = true;
+      const f = FOSSILS[levelIndex];
+      const st = s.health >= 0.95 ? 3 : s.health >= 0.6 ? 2 : 1;
+      const gained = Math.max(0, st - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], st);
+      score += 100 + gained * 20 + energy;
+      if (levelIndex === 0) completeMission('m1');
+      if (damage === 0) completeMission('m2');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      // Kalan toprağı temizle
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) dirt[r][c] = 0;
+      draw(); updateScore(); renderLevelDots();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 }, colors: ['#a16207', '#e7e5e4', '#facc15'] });
+      const layer = layerAt(Math.floor(f.cy / CS));
+      showModal({ emoji: f.e, title: `${f.n} Müzede!`, stars: '⭐'.repeat(st) + '☆'.repeat(3 - st), info: `Sağlamlık %${Math.round(s.health * 100)} · ${layer.n} katmanında bulundu (${layer.age.toLowerCase()} önce)`, fact: f.fact, next: levelIndex < FOSSILS.length - 1 ? 'Sonraki ➔' : 'Müzeye Git 🏛️' });
+    }
+
+    function failLevel(title, info) {
+      finished = true;
+      Sound.wrong();
+      showModal({ emoji: '💔', title, stars: '☆☆☆', info, fact: 'Gerçek paleontologlar bir fosili çıkarmak için bazen haftalarca, milimetre milimetre çalışır. Sabır bu işin en önemli aracıdır!', next: null });
+    }
+
+    // --- 6. MÜZE ---
+    function renderMuseum() {
+      $('museumGrid').innerHTML = FOSSILS.map((f, i) => `<div class="p-2 rounded-xl border-3 border-ink text-center ${stars[i] ? 'bg-amber-50' : 'bg-gray-100'}">
+        <p class="text-4xl ${stars[i] ? '' : 'grayscale opacity-30'}">${f.e}</p><p class="text-[11px] font-black">${stars[i] ? f.n : '???'}</p><p class="text-xs">${'⭐'.repeat(stars[i])}</p></div>`).join('')
+        + `<div class="p-2 rounded-xl border-3 border-dashed border-ink/40 text-center flex items-center justify-center text-[11px] font-black text-gray-500">${stars.filter(Boolean).length}/5 fosil</div>`;
+      $('formation').innerHTML = FORMATION.map((s, i) => `<div class="form-step p-2 bg-white rounded-xl border-2 border-ink text-center"><p class="text-3xl">${s[0]}</p><p class="text-[10px] font-black leading-tight">${i + 1}. ${s[1]}</p></div>`).join('');
+      renderPuzzle();
+    }
+    function renderPuzzle() {
+      const shuffled = [...LAYER_PUZZLE].sort((a, b) => a.n.localeCompare(b.n));
+      $('layerPuzzle').innerHTML = shuffled.map(l => `<button data-o="${l.order}" ${l.order < puzzleStep ? 'disabled' : ''} class="lay pushable py-2 text-white text-xs font-black flex items-center justify-between px-3" style="background:${l.c}"><span>${l.e} ${l.n}</span><span>${l.order < puzzleStep ? `✅ ${l.order + 1}. en eski` : ''}</span></button>`).join('');
+      $('layerPuzzle').querySelectorAll('.lay').forEach(b => b.addEventListener('click', () => {
+        if (+b.dataset.o === puzzleStep) {
+          puzzleStep++; Sound.correct();
+          if (puzzleStep === 4) { completeMission('m3'); $('scienceNote').innerHTML = '✅ Harika! Katmanlar üst üste biriktiği için <b>en alttaki en eski</b>, en üstteki en yenidir.'; }
+          renderPuzzle();
+        } else { Sound.wrong(); $('scienceNote').innerHTML = '❌ İpucu: Katmanlar alttan üste doğru birikir. Önce en derindeki katman oluşmuştur.'; }
+      }));
+    }
+    $('btnFormation').addEventListener('click', () => {
+      Sound.click();
+      if (typeof gsap !== 'undefined') gsap.fromTo('.form-step', { opacity: 0, y: 20 }, { opacity: 1, y: 0, stagger: 0.5, duration: 0.4, ease: 'back.out(2)' });
+    });
+
+    // --- 7. AKIŞ ---
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info; $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next); if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 800);
+    }
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5"><span class="text-lg">${done ? '✅' : '⬜'}</span><div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Kazılar:</span>' + FOSSILS.map((f, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function loadLevel(i) {
+      closeModal();
+      mode = 'levels'; levelIndex = i; finished = false; damage = 0; cracks = [];
+      const f = FOSSILS[i];
+      energy = f.energy;
+      dirt = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
+      buildFossil(f);
+      $('levelBadge').textContent = `KAZI ${i + 1}`;
+      $('levelTitle').textContent = 'Gizemli Fosil';
+      $('scienceNote').innerHTML = '⛏️ Kazmayla geniş alanları hızlıca aç. Fosilin kenarını gördüğünde <b>fırçaya</b> geç!';
+      setTool('pick');
+      renderLevelDots(); draw(); updateHud();
+    }
+
+    function switchMode(m) {
+      const isM = m === 'museum';
+      $('tabLevels').classList.toggle('active-tab', !isM); $('tabLevels').classList.toggle('bg-white', isM);
+      $('tabSandbox').classList.toggle('active-tab', isM); $('tabSandbox').classList.toggle('bg-white', !isM);
+      $('levelDots').classList.toggle('hidden', isM);
+      $('digMode').classList.toggle('hidden', isM);
+      $('museumMode').classList.toggle('hidden', !isM); $('museumMode').classList.toggle('flex', isM);
+      if (isM) {
+        closeModal();
+        mode = 'museum';
+        $('levelBadge').textContent = 'MÜZE';
+        $('levelTitle').textContent = 'Fosil Müzesi';
+        renderMuseum();
+      } else loadLevel(levelIndex);
+    }
+
+    $('btnReset').addEventListener('click', () => { Sound.click(); if (mode === 'levels') loadLevel(levelIndex); else { puzzleStep = 0; renderPuzzle(); } });
+    $('btnHint').addEventListener('click', () => {
+      Sound.click();
+      $('scienceNote').innerHTML = mode === 'levels' ? '<b>İpucu:</b> Kazma 3x3 kare açar ama fosile değerse onu çatlatır. Açılan alanda beyaz-gri bir parça görünce etrafını tek tek fırçala. Enerjini boşa harcama!' : '<b>İpucu:</b> Katman bulmacasında önce en derindeki (en koyu) katmanı seç.';
+    });
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('museum'); });
+    $('btnModalRetry').addEventListener('click', () => loadLevel(levelIndex));
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < FOSSILS.length - 1) loadLevel(levelIndex + 1); else switchMode('museum'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; Sound.click(); });
+
+    renderMissions(); updateScore(); loadLevel(0);
+  </script>
+</body>
+</html>

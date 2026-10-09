@@ -1,0 +1,180 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function role() { return signedIn() ? request.auth.token.role : null; }
+    function isTeacher() { return role() == 'teacher'; }
+    function isClass(classId) {
+      return role() == 'class' && request.auth.token.classId == classId;
+    }
+    function isStudent(studentId) {
+      return role() == 'student' && request.auth.token.studentId == studentId;
+    }
+    function isOwnLiveSeat(seat) {
+      return role() in ['student', 'chessGuest'] && seat != null &&
+        seat.studentId == request.auth.token.studentId &&
+        seat.classId == request.auth.token.classId;
+    }
+    function isLiveParticipant(data) {
+      return isOwnLiveSeat(data.white) || isOwnLiveSeat(data.black);
+    }
+    function isLiveJoin(before, after) {
+      return before.status == 'bekliyor' &&
+        after.diff(before).affectedKeys().hasOnly(['white', 'black', 'updated_at']) &&
+        ((before.white == null && isOwnLiveSeat(after.white) && after.black == before.black) ||
+         (before.black == null && isOwnLiveSeat(after.black) && after.white == before.white));
+    }
+    function belongsToOwnClass(data) {
+      return role() in ['teacher', 'class', 'student'] && data.classId == request.auth.token.classId;
+    }
+
+    match /teachers/{teacherId} {
+      allow read: if isTeacher() && request.auth.uid == teacherId;
+      allow write: if false;
+    }
+
+    // Parola sınıf belgesinde bulunmaz. Sınıf yalnız kendi kaydını okuyabilir.
+    match /classes/{classId} {
+      allow read: if isTeacher() || isClass(classId) ||
+        (role() == 'student' && request.auth.token.classId == classId);
+      allow write: if false;
+
+      match /students/{studentId} {
+        allow read: if isTeacher() || isClass(classId) ||
+          (isStudent(studentId) && request.auth.token.classId == classId);
+        allow write: if false;
+      }
+    }
+
+    // Yalnız Admin SDK kullanan callable functions erişir.
+    match /classCredentials/{document=**} { allow read, write: if false; }
+    match /studentLookup/{document=**} { allow read, write: if false; }
+
+    // Paylaşım bağlantıları içerikleri okuyabilir; yalnız öğretmen değiştirebilir.
+    match /activities/{document=**} {
+      allow read: if true;
+      allow write: if isTeacher();
+    }
+    match /units/{document=**} {
+      allow read: if true;
+      allow write: if isTeacher();
+    }
+    match /folders/{document=**} {
+      allow read: if role() in ['teacher', 'class', 'student'];
+      allow write: if isTeacher();
+    }
+    match /notebooks/{document=**} {
+      allow read: if true;
+      allow write: if isTeacher() || role() == 'class';
+    }
+    match /notebook_content/{document=**} {
+      allow read: if true;
+      allow write: if isTeacher() || role() == 'class';
+    }
+    match /notebook_ops/{document=**} {
+      allow read, write: if isTeacher() || role() == 'class';
+    }
+    match /submissions/{submissionId} {
+      allow create: if (isTeacher() || role() == 'class' ||
+        (role() == 'student' && request.resource.data.student_id == request.auth.token.studentId &&
+         request.resource.data.class_id == request.auth.token.classId)) &&
+        request.resource.data.owner_uid == request.auth.uid && request.resource.data.answers is map &&
+        request.resource.data.submitted_at == null;
+      allow read: if isTeacher() || (signedIn() && resource.data.owner_uid == request.auth.uid);
+      allow update: if isTeacher() || (signedIn() && resource.data.owner_uid == request.auth.uid &&
+        resource.data.submitted_at == null &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answers', 'submitted_at']) &&
+        request.resource.data.answers is map);
+      allow delete: if isTeacher();
+    }
+
+    match /learning_assignments/{assignmentId} {
+      allow read: if isTeacher() || isClass(resource.data.classId) ||
+        (role() == 'student' && request.auth.token.classId == resource.data.classId);
+      allow write: if false;
+    }
+    match /learning_results/{resultId} {
+      allow read: if isTeacher() || isClass(resource.data.classId) ||
+        (isStudent(resource.data.studentId) && request.auth.token.classId == resource.data.classId);
+      allow write: if false;
+    }
+
+    match /chess_matches/{matchId} {
+      function ownMatch(data) {
+        return role() == 'student' && data.classId == request.auth.token.classId &&
+          (data.whiteId == request.auth.token.studentId || data.blackId == request.auth.token.studentId);
+      }
+      allow read: if isTeacher() || belongsToOwnClass(resource.data);
+      allow create: if isTeacher() || isClass(request.resource.data.classId) || ownMatch(request.resource.data);
+      allow update: if isTeacher() ||
+        (isClass(resource.data.classId) && isClass(request.resource.data.classId)) ||
+        (ownMatch(resource.data) && ownMatch(request.resource.data));
+      allow delete: if isTeacher() || isClass(resource.data.classId);
+    }
+    match /chess_tournaments/{tournamentId} {
+      allow read: if isTeacher() || belongsToOwnClass(resource.data);
+      allow create: if isTeacher() || isClass(request.resource.data.classId);
+      allow update: if isTeacher() ||
+        (isClass(resource.data.classId) && isClass(request.resource.data.classId));
+      allow delete: if isTeacher() || isClass(resource.data.classId);
+    }
+    match /chess_progress/{progressId} {
+      function ownProfile(data) {
+        return role() == 'student' && data.classId == request.auth.token.classId &&
+          data.profileId == 'student:' + request.auth.token.studentId;
+      }
+      allow read: if isTeacher() || isClass(resource.data.classId) || ownProfile(resource.data);
+      allow create: if isTeacher() || isClass(request.resource.data.classId) || ownProfile(request.resource.data);
+      allow update: if isTeacher() ||
+        (isClass(resource.data.classId) && isClass(request.resource.data.classId)) ||
+        (ownProfile(resource.data) && ownProfile(request.resource.data));
+      allow delete: if isTeacher() || isClass(resource.data.classId) || ownProfile(resource.data);
+    }
+    match /chess_bot_games/{gameId} {
+      allow read: if isTeacher() || isClass(resource.data.classId) ||
+        (isStudent(resource.data.studentId) && request.auth.token.classId == resource.data.classId);
+      allow write: if false;
+    }
+    match /chess_sync/{syncId} {
+      allow read: if isTeacher() || belongsToOwnClass(resource.data);
+      allow create, update: if isTeacher() || belongsToOwnClass(request.resource.data);
+      allow delete: if isTeacher() || belongsToOwnClass(resource.data);
+    }
+
+    // Canlı satranç yalnız doğrulanmış oturumlara açıktır.
+    match /chess_rooms/{roomId} {
+      allow read: if signedIn() && role() in ['teacher', 'class', 'student', 'chessGuest'];
+      allow create: if isTeacher() || isLiveParticipant(request.resource.data);
+      allow update: if isTeacher() ||
+        isLiveParticipant(resource.data) || isLiveJoin(resource.data, request.resource.data);
+      allow delete: if isTeacher() || isLiveParticipant(resource.data);
+    }
+    match /liveChessPresence/{presenceId} {
+      function ownPresence(data) {
+        return role() in ['student', 'chessGuest'] && data.studentId == request.auth.token.studentId &&
+          data.classId == request.auth.token.classId && presenceId == data.classId + '--' + data.studentId;
+      }
+      allow read: if (signedIn() && role() in ['teacher', 'student', 'chessGuest']) || isClass(resource.data.classId);
+      allow create: if isTeacher() || ownPresence(request.resource.data);
+      allow update: if isTeacher() || (ownPresence(resource.data) && ownPresence(request.resource.data));
+      allow delete: if isTeacher() || ownPresence(resource.data);
+    }
+    match /liveChessQueue/{studentId} {
+      allow read: if isTeacher() || isStudent(studentId);
+      allow create, update, delete: if isTeacher() || isStudent(studentId);
+    }
+    match /liveChessGames/{gameId} {
+      allow read: if isTeacher() || isClass(resource.data.whiteClassId) || isClass(resource.data.blackClassId) ||
+        (role() == 'student' && ((resource.data.whiteId == request.auth.token.studentId && resource.data.whiteClassId == request.auth.token.classId) ||
+          (resource.data.blackId == request.auth.token.studentId && resource.data.blackClassId == request.auth.token.classId)));
+      allow write: if false;
+    }
+
+    // QR secrets and approvals are accessible only to the server.
+    match /qrLoginRequests/{requestId} { allow read, write: if false; }
+    match /qrLoginRateLimits/{rateId} { allow read, write: if false; }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}

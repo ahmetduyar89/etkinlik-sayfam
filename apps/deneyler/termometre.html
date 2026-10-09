@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sihirli Termometre — Çocuklar İçin Termoskop Deneyi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <style>
+    :root {
+      --thermal: #3bb273;
+      --thermal-ink: #182b4d;
+      --ink: #182b4d;
+      --paper: #fffdf7;
+      --panel: #f4efe2;
+      --line: #d8ceb8;
+      --sun: #ffc93c;
+      --grape: #7b5be6;
+      --sea: #2ba6c9;
+      --leaf: #3bb273;
+      --frost: #bfe8f5;
+    }
+
+    body {
+      font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #fffdf7;
+      color: #182b4d;
+      background-image: radial-gradient(#d8ceb8 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+    }
+
+    .display {
+      font-family: 'Baloo 2', 'Nunito', cursive, sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .tabular {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .chunky {
+      border: 3.5px solid var(--ink);
+      border-radius: 20px;
+      box-shadow: 0 6px 0 var(--ink);
+    }
+
+    .pushable {
+      border: 3px solid var(--ink);
+      border-radius: 14px;
+      box-shadow: 0 4px 0 var(--ink);
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .pushable:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 var(--ink);
+    }
+
+    .pushable:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 var(--ink);
+    }
+
+    .bg-sun { background-color: #ffc93c !important; }
+    .bg-panel { background-color: #f4efe2 !important; }
+    .bg-paper { background-color: #fffdf7 !important; }
+    .text-ink { color: #182b4d !important; }
+    .border-ink { border-color: #182b4d !important; }
+
+    /* Range slider custom styling */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+    }
+    input[type=range]:focus {
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 16px;
+      cursor: pointer;
+      background: #e4dcce;
+      border: 2.5px solid var(--ink);
+      border-radius: 9999px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      height: 32px;
+      width: 32px;
+      border-radius: 50%;
+      background: var(--thermal);
+      border: 3px solid var(--ink);
+      cursor: pointer;
+      -webkit-appearance: none;
+      margin-top: -10px;
+      box-shadow: 0 3px 0 var(--ink);
+      transition: transform 0.1s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-3 sm:p-6 select-none">
+
+  <!-- Üst Bar -->
+  <div class="max-w-6xl mx-auto w-full mb-4">
+    <header class="flex flex-wrap items-center justify-between gap-4 bg-white/90 backdrop-blur p-4 rounded-2xl chunky">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="pushable bg-sun px-3.5 py-2 flex items-center gap-1.5 text-ink font-bold text-sm" title="Ana Sayfaya Dön">
+          <span>🏠</span> <span>Tüm Deneyler</span>
+        </a>
+        <h1 class="display text-2xl sm:text-3xl flex items-center gap-2">
+          <span>🌡️</span> Sihirli Termometre
+        </h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs sm:text-sm font-bold rounded-full border-2 border-ink">
+          3-4. Sınıf Fen Bilgisi
+        </span>
+        <button id="soundToggle" class="pushable bg-panel px-3 py-1.5 text-xs font-bold flex items-center gap-1">
+          <span id="soundIcon">🔊</span> <span id="soundLabel">Ses Açık</span>
+        </button>
+      </div>
+    </header>
+  </div>
+
+  <!-- Ana Düzen: Sahne (Sol) + Kontrol Paneli (Sağ) -->
+  <main class="max-w-6xl mx-auto w-full flex-1 flex flex-col lg:flex-row items-stretch gap-6 mb-6">
+
+    <!-- Sol Sütun: Simülasyon Sahnesi -->
+    <section class="chunky relative flex-1 flex flex-col justify-between overflow-hidden bg-white min-h-[460px]">
+      
+      <!-- Termoskop SVG Alanı -->
+      <div class="relative flex-1 flex items-center justify-center p-2 sm:p-6 overflow-hidden">
+        
+        <svg id="thermoscope" viewBox="0 0 620 680" class="w-full h-full max-h-[520px]"
+             role="img" aria-label="Termoskop Düzeneği" font-family="'Baloo 2', 'Nunito', sans-serif"
+             stroke-linecap="round" stroke-linejoin="round">
+
+          <defs>
+            <clipPath id="vessel-interior">
+              <path d="M132 430 V626 a14 14 0 0 0 14 14 H454 a14 14 0 0 0 14 -14 V430 Z" />
+            </clipPath>
+            <clipPath id="bottle-interior">
+              <path d="M256 326 V372 C256 392 212 396 212 424 V604 a16 16 0 0 0 16 16 H372 a16 16 0 0 0 16 -16 V424 C388 396 344 392 344 372 V326 Z" />
+            </clipPath>
+            <clipPath id="pipette-interior">
+              <rect x="293" y="50" width="14" height="296" rx="7" />
+            </clipPath>
+          </defs>
+
+          <!-- Dış kap ve içindeki su -->
+          <path d="M132 430 V626 a14 14 0 0 0 14 14 H454 a14 14 0 0 0 14 -14 V430 Z" fill="#ffffff" />
+          <g clip-path="url(#vessel-interior)">
+            <rect id="outer-water" x="132" y="477" width="336" height="167" fill="#3bb273" opacity="0.38" />
+            <line id="outer-water-surface" x1="132" y1="477" x2="468" y2="477" stroke="#3bb273" stroke-width="5" />
+            
+            <!-- Soğuma buz kristalleri -->
+            <g id="frost" opacity="0">
+              <circle cx="168" cy="520" r="6" fill="#bfe8f5" stroke="#182b4d" stroke-width="2.5" />
+              <circle cx="196" cy="592" r="5" fill="#bfe8f5" stroke="#182b4d" stroke-width="2.5" />
+              <circle cx="160" cy="604" r="7" fill="#bfe8f5" stroke="#182b4d" stroke-width="2.5" />
+              <circle cx="420" cy="512" r="7" fill="#bfe8f5" stroke="#182b4d" stroke-width="2.5" />
+              <circle cx="440" cy="578" r="5" fill="#bfe8f5" stroke="#182b4d" stroke-width="2.5" />
+              <circle cx="404" cy="610" r="6" fill="#bfe8f5" stroke="#182b4d" stroke-width="2.5" />
+            </g>
+          </g>
+          <path d="M124 430 V628 a20 20 0 0 0 20 20 H456 a20 20 0 0 0 20 -20 V430" fill="none" stroke="#182b4d" stroke-width="5" />
+
+          <!-- Şişe ve içindeki kırmızı su -->
+          <path d="M256 326 V372 C256 392 212 396 212 424 V604 a16 16 0 0 0 16 16 H372 a16 16 0 0 0 16 -16 V424 C388 396 344 392 344 372 V326 Z" fill="#ffffff" />
+          <g clip-path="url(#bottle-interior)">
+            <rect id="bottle-liquid" x="206" y="326" width="188" height="300" fill="#e23b2e" />
+            <path d="M212 424 C240 442 260 410 300 424 C340 438 360 408 388 424 V444 H212 Z" fill="#f2685c" />
+            
+            <!-- Yükselen kabarcıklar (Isınırken) -->
+            <g id="bubbles" opacity="0">
+              <circle id="bubble-0" cx="246" cy="600" r="7" fill="#ffd6d1" stroke="#ffffff" stroke-width="2.5" />
+              <circle id="bubble-1" cx="352" cy="600" r="5" fill="#ffd6d1" stroke="#ffffff" stroke-width="2.5" />
+              <circle id="bubble-2" cx="288" cy="600" r="6" fill="#ffd6d1" stroke="#ffffff" stroke-width="2.5" />
+              <circle id="bubble-3" cx="330" cy="600" r="8" fill="#ffd6d1" stroke="#ffffff" stroke-width="2.5" />
+              <circle id="bubble-4" cx="264" cy="600" r="5" fill="#ffd6d1" stroke="#ffffff" stroke-width="2.5" />
+            </g>
+          </g>
+
+          <!-- Şişenin Duygusal Yüzü -->
+          <g id="face">
+            <g id="blush" opacity="0">
+              <ellipse cx="240" cy="514" rx="15" ry="9" fill="#ff8fa3" />
+              <ellipse cx="360" cy="514" rx="15" ry="9" fill="#ff8fa3" />
+            </g>
+            <g id="eyes">
+              <circle cx="268" cy="486" r="20" fill="#ffffff" stroke="#182b4d" stroke-width="4" />
+              <circle cx="332" cy="486" r="20" fill="#ffffff" stroke="#182b4d" stroke-width="4" />
+              <circle id="pupil-left" cx="270" cy="490" r="9" fill="#182b4d" />
+              <circle id="pupil-right" cx="334" cy="490" r="9" fill="#182b4d" />
+            </g>
+            <!-- Ağız: stable gülümser, heating şaşırır, cooling titrer -->
+            <path id="mouth" d="M276 520 Q300 546 324 520" fill="none" stroke="#182b4d" stroke-width="5" />
+          </g>
+
+          <!-- Şişe Dış Çizgisi ve Işıltı -->
+          <path d="M256 326 V372 C256 392 212 396 212 424 V604 a16 16 0 0 0 16 16 H372 a16 16 0 0 0 16 -16 V424 C388 396 344 392 344 372 V326 Z" fill="none" stroke="#182b4d" stroke-width="5" />
+          <path d="M226 444 V498" stroke="#ffffff" stroke-opacity="0.7" stroke-width="8" />
+
+          <!-- Delikli Kapak -->
+          <rect x="246" y="300" width="108" height="30" rx="8" fill="#7b5be6" stroke="#182b4d" stroke-width="4" />
+          <g stroke="#a58bf0" stroke-width="3">
+            <line x1="262" y1="309" x2="262" y2="321" />
+            <line x1="274" y1="309" x2="274" y2="321" />
+            <line x1="326" y1="309" x2="326" y2="321" />
+            <line x1="338" y1="309" x2="338" y2="321" />
+          </g>
+
+          <!-- Oyun Hamuru Sızdırmazlık -->
+          <path d="M254 306 c1 -13 10 -19 21 -21 c6 -9 14 -11 25 -11 c11 0 19 2 25 11 c11 2 20 8 21 21 Z" fill="#ffc93c" stroke="#182b4d" stroke-width="4" />
+          <g stroke="#e0a91f" stroke-width="2.5" opacity="0.9">
+            <line x1="268" y1="296" x2="278" y2="291" />
+            <line x1="324" y1="296" x2="332" y2="292" />
+          </g>
+
+          <!-- Pipet ve Kılcal Sıvı Sütunu -->
+          <rect x="286" y="44" width="28" height="302" rx="9" fill="#ffffff" />
+          <g clip-path="url(#pipette-interior)">
+            <rect id="pipette-liquid" x="293" y="202" width="14" height="142" fill="#e23b2e" />
+          </g>
+          <rect x="286" y="44" width="28" height="302" rx="9" fill="none" stroke="#182b4d" stroke-width="4" />
+          <line x1="294" y1="58" x2="294" y2="330" stroke="#ffffff" stroke-opacity="0.65" stroke-width="4" />
+          <ellipse id="pipette-meniscus" cx="300" cy="202" rx="7" ry="2.5" fill="#f2685c" />
+
+          <!-- Sıcak ve Soğuk Sembolleri (Güneş & Kar Tanesi) -->
+          <g stroke="#182b4d" stroke-width="3">
+            <circle cx="232" cy="92" r="13" fill="#ffc93c" />
+            <line x1="232" y1="68" x2="232" y2="74" />
+            <line x1="232" y1="110" x2="232" y2="116" />
+            <line x1="208" y1="92" x2="214" y2="92" />
+            <line x1="250" y1="92" x2="256" y2="92" />
+          </g>
+          <g stroke="#2ba6c9" stroke-width="3">
+            <line x1="232" y1="246" x2="232" y2="278" />
+            <line x1="218" y1="254" x2="246" y2="270" />
+            <line x1="218" y1="270" x2="246" y2="254" />
+          </g>
+
+          <!-- Referans Çizgisi: Oda Sıcaklığı 25 °C -->
+          <line id="reference-level" x1="266" y1="202" x2="334" y2="202" stroke="#182b4d" stroke-width="3" stroke-dasharray="7 6" opacity="0.45" />
+          <text x="254" y="195" text-anchor="end" fill="#182b4d" font-size="14" opacity="0.7">oda sıcaklığı</text>
+
+          <!-- Anlık Sıvı Seviye Oku -->
+          <g id="level-marker" transform="translate(0, 202)">
+            <path d="M366 -9 L346 0 L366 9 Z" fill="var(--thermal)" stroke="#182b4d" stroke-width="3" />
+          </g>
+
+          <!-- Keçeli Kalem İşaretleri Katmanı -->
+          <g id="marker-layer"></g>
+
+          <!-- Etiket Açıklamaları -->
+          <g fill="#182b4d" font-size="15" font-weight="600">
+            <text x="140" y="140" text-anchor="end">Pipet</text>
+            <text x="140" y="296" text-anchor="end">Oyun hamuru</text>
+            <text x="488" y="318">Delikli kapak</text>
+            <text x="488" y="446">Kırmızı su</text>
+            <text x="488" y="562">Kaptaki su</text>
+          </g>
+          <g stroke="#182b4d" stroke-width="2.5" fill="none" opacity="0.6">
+            <path d="M148 135 H280" />
+            <path d="M148 291 H258" />
+            <path d="M482 313 H358" />
+            <path d="M482 441 H392" />
+            <path d="M482 557 H430" />
+          </g>
+        </svg>
+
+        <!-- Sol Alt: Konuşma Balonu (Kavram Kartı) -->
+        <div id="conceptCard" class="pointer-events-none absolute bottom-4 left-4 right-4 sm:right-auto sm:max-w-[20rem] opacity-0 transition-all duration-300">
+          <div class="chunky relative bg-amber-50 p-4 shadow-lg">
+            <span class="absolute -bottom-[14px] left-8 h-5 w-5 rotate-45 border-b-[3px] border-r-[3px] border-[#182b4d] bg-amber-50"></span>
+            <div class="flex items-center gap-2">
+              <span id="conceptEmoji" class="text-2xl leading-none">🔥</span>
+              <h3 id="conceptTitle" class="display text-xl font-bold">Genleşme!</h3>
+            </div>
+            <p id="conceptBody" class="mt-1.5 text-[14px] leading-snug">
+              Sıcaklığın artmasıyla maddenin yapısındaki tanecikler hızlanır ve daha geniş bir hacme yayılır.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Sahne Alt Bilgi Şeridi -->
+      <div class="border-t-[3.5px] border-dotted border-[#182b4d] bg-amber-50/50 px-5 py-3.5 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p id="liveActionText" class="display text-lg text-ink">
+            Şişe ile kap aynı sıcaklıkta, sütun duruyor.
+          </p>
+          <p class="tabular text-sm font-semibold text-gray-700">
+            Dış kap: <span id="labelAmbient" class="font-bold">25,0</span> °C · Şişe sıvısı: <span id="labelBottle" class="font-bold">25,0</span> °C
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs px-2.5 py-1 bg-white rounded-lg border-2 border-ink font-bold">
+            Durum: <span id="stateBadge" class="text-emerald-700">Dengede</span>
+          </span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Sağ Sütun: Kontrol Paneli -->
+    <aside class="chunky flex w-full lg:w-[23rem] flex-col gap-5 bg-amber-50/70 p-5">
+      
+      <!-- Sıcaklık Kaydırıcısı -->
+      <div class="flex flex-col gap-2 bg-white p-4 rounded-xl border-2 border-ink">
+        <div class="flex items-center justify-between">
+          <label for="tempSlider" class="display text-lg">Sıcaklık Ayarı</label>
+          <span id="sliderValueText" class="display text-xl px-2.5 py-0.5 rounded-lg border-2 border-ink bg-amber-100" style="color: var(--thermal-ink)">
+            25 °C
+          </span>
+        </div>
+        <input id="tempSlider" type="range" min="0" max="100" value="25" step="1">
+        <div class="flex justify-between text-xs font-bold text-gray-500 px-1">
+          <span>0 °C (Buzlu)</span>
+          <span>50 °C</span>
+          <span>100 °C (Kaynar)</span>
+        </div>
+      </div>
+
+      <!-- Hazır Ortamlar -->
+      <div class="flex flex-col gap-2.5">
+        <h2 class="display text-lg">Şişeyi nereye koyalım?</h2>
+        
+        <button id="btnPresetIce" class="pushable flex items-center gap-3 px-4 py-2.5 text-left bg-white">
+          <span class="text-3xl leading-none">🧊</span>
+          <div>
+            <span class="display block text-base">Buzlu Su (0 °C)</span>
+            <span class="block text-xs text-gray-600">Su büzülür, pipetten aşağı iner</span>
+          </div>
+        </button>
+
+        <button id="btnPresetRoom" class="pushable flex items-center gap-3 px-4 py-2.5 text-left bg-sun">
+          <span class="text-3xl leading-none">🏠</span>
+          <div>
+            <span class="display block text-base">Oda Sıcaklığı (25 °C)</span>
+            <span class="block text-xs text-gray-600">Denge hali, tam ortası</span>
+          </div>
+        </button>
+
+        <button id="btnPresetHot" class="pushable flex items-center gap-3 px-4 py-2.5 text-left bg-white">
+          <span class="text-3xl leading-none">🔥</span>
+          <div>
+            <span class="display block text-base">Sıcak Su (85 °C)</span>
+            <span class="block text-xs text-gray-600">Su genleşir, yukarı tırmanır</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Keçeli Kalem İşaretleri -->
+      <div class="flex flex-col gap-2.5 bg-white p-4 rounded-xl border-2 border-ink">
+        <h2 class="display text-lg">✏️ Çizgi Çek (Keçeli Kalem)</h2>
+        <p class="text-xs text-gray-700 leading-snug">
+          Pipetteki su nereye geldiyse oraya bir çizgi bırak. Sıcaklığı değiştirip farkı incele!
+        </p>
+        <button id="btnMark" class="pushable display bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 text-base flex items-center justify-center gap-2">
+          <span>🖍️</span> <span>Buraya Çizgi Çek</span>
+        </button>
+        <button id="btnClearMarkers" class="pushable bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-700">
+          Çizgileri Temizle (<span id="markerCount">0</span>)
+        </button>
+      </div>
+
+      <!-- Baştan Başla -->
+      <button id="btnReset" class="pushable bg-amber-100 hover:bg-amber-200 px-4 py-2.5 text-sm font-bold mt-auto flex items-center justify-center gap-2">
+        <span>↺</span> <span>Deneyi Baştan Başlat</span>
+      </button>
+
+    </aside>
+
+  </main>
+
+  <footer class="text-center text-xs text-gray-600 font-semibold py-2">
+    Küçük Mucitler Bilim Laboratuvarı · İlkokul Seviyesi İnteraktif Fen Simülasyonu
+  </footer>
+
+  <!-- Mantık ve GSAP Animasyon Motoru -->
+  <script>
+    // --- Web Audio API Sentetik Ses Üretici ---
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      return audioCtx;
+    }
+
+    function playTone(freq, type, duration, volume = 0.1) {
+      if (!soundEnabled) return;
+      try {
+        const ctx = getAudioContext();
+        if (ctx.state === 'suspended') ctx.resume();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(volume, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch (e) { /* sessiz devam */ }
+    }
+
+    function playPop() { playTone(540, 'sine', 0.12, 0.15); }
+    function playBubble() { playTone(820, 'triangle', 0.08, 0.1); }
+    function playChime() {
+      playTone(523.25, 'sine', 0.15, 0.1);
+      setTimeout(() => playTone(659.25, 'sine', 0.18, 0.1), 80);
+      setTimeout(() => playTone(783.99, 'sine', 0.25, 0.12), 160);
+    }
+
+    // --- Ses Açma/Kapama ---
+    const soundToggle = document.getElementById('soundToggle');
+    soundToggle.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+      document.getElementById('soundLabel').textContent = soundEnabled ? 'Ses Açık' : 'Sessiz';
+    });
+
+    // --- Termal Matematik ve Geometri ---
+    const PIPETTE_COLUMN = { top: 60, bottom: 344 };
+    const ICE_LEVEL = 0.26;
+    const ROOM_LEVEL = 0.5;
+    const TOP_LEVEL = 0.96;
+    const ROOM_TEMP = 25;
+
+    const COLD_SLOPE = (ROOM_LEVEL - ICE_LEVEL) / (ROOM_TEMP - 0);
+    const WARM_SLOPE = (TOP_LEVEL - ROOM_LEVEL) / (100 - ROOM_TEMP);
+
+    function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
+
+    function pipetteLevelFromTemp(temp) {
+      const t = clamp(temp, 0, 100);
+      return t <= ROOM_TEMP
+        ? ICE_LEVEL + t * COLD_SLOPE
+        : ROOM_LEVEL + (t - ROOM_TEMP) * WARM_SLOPE;
+    }
+
+    function tempFromPipetteLevel(level) {
+      const l = clamp(level, ICE_LEVEL, TOP_LEVEL);
+      return l <= ROOM_LEVEL
+        ? (l - ICE_LEVEL) / COLD_SLOPE
+        : ROOM_TEMP + (l - ROOM_LEVEL) / WARM_SLOPE;
+    }
+
+    function columnRect(col, level) {
+      const span = col.bottom - col.top;
+      const height = clamp(level, 0, 1) * span;
+      return { y: col.bottom - height, height };
+    }
+
+    // Renk skalası: Turkuaz -> Yeşil -> Sarı -> Kırmızı
+    const RAMP = [
+      { at: 0, r: 43, g: 166, b: 201 },
+      { at: 0.34, r: 59, g: 178, b: 115 },
+      { at: 0.67, r: 242, g: 178, b: 51 },
+      { at: 1, r: 226, g: 59, b: 46 }
+    ];
+
+    function thermalColor(temp) {
+      const t = clamp(temp / 100, 0, 1);
+      for (let i = 1; i < RAMP.length; i++) {
+        if (t <= RAMP[i].at) {
+          const p = RAMP[i - 1];
+          const c = RAMP[i];
+          const span = c.at - p.at;
+          const ratio = (t - p.at) / span;
+          const r = Math.round(p.r + (c.r - p.r) * ratio);
+          const g = Math.round(p.g + (c.g - p.g) * ratio);
+          const b = Math.round(p.b + (c.b - p.b) * ratio);
+          return `rgb(${r}, ${g}, ${b})`;
+        }
+      }
+      return 'rgb(226, 59, 46)';
+    }
+
+    function thermalInk(temp) {
+      const t = clamp(temp / 100, 0, 1);
+      return t > 0.5 ? '#932219' : '#145970';
+    }
+
+    // --- State ---
+    let ambientTemperature = 25;
+    let bottleTemperature = 25;
+    let markers = [];
+    let isSettling = false;
+    let trend = 'stable';
+
+    // DOM Elemanları
+    const pipetteLiquid = document.getElementById('pipette-liquid');
+    const pipetteMeniscus = document.getElementById('pipette-meniscus');
+    const levelMarker = document.getElementById('level-marker');
+    const outerWater = document.getElementById('outer-water');
+    const outerWaterSurface = document.getElementById('outer-water-surface');
+    const eyes = document.getElementById('eyes');
+    const mouth = document.getElementById('mouth');
+    const blush = document.getElementById('blush');
+    const bubbles = document.getElementById('bubbles');
+    const frost = document.getElementById('frost');
+    const markerLayer = document.getElementById('marker-layer');
+    const conceptCard = document.getElementById('conceptCard');
+    const conceptEmoji = document.getElementById('conceptEmoji');
+    const conceptTitle = document.getElementById('conceptTitle');
+    const conceptBody = document.getElementById('conceptBody');
+    const liveActionText = document.getElementById('liveActionText');
+    const labelAmbient = document.getElementById('labelAmbient');
+    const labelBottle = document.getElementById('labelBottle');
+    const stateBadge = document.getElementById('stateBadge');
+    const tempSlider = document.getElementById('tempSlider');
+    const sliderValueText = document.getElementById('sliderValueText');
+    const markerCountText = document.getElementById('markerCount');
+
+    const btnPresetIce = document.getElementById('btnPresetIce');
+    const btnPresetRoom = document.getElementById('btnPresetRoom');
+    const btnPresetHot = document.getElementById('btnPresetHot');
+    const btnMark = document.getElementById('btnMark');
+    const btnClearMarkers = document.getElementById('btnClearMarkers');
+    const btnReset = document.getElementById('btnReset');
+
+    const MOUTHS = {
+      heating: "M285 522 a15 13 0 1 0 30 0 a15 13 0 1 0 -30 0",
+      cooling: "M276 528 l12 -9 l12 9 l12 -9 l12 9",
+      stable: "M276 520 Q300 546 324 520"
+    };
+
+    let currentTween = null;
+    let bubbleTimeline = null;
+    let conceptTimeout = null;
+
+    function initAnimations() {
+      if (window.gsap) {
+        gsap.timeline({ repeat: -1, repeatDelay: 3.5, delay: 1 })
+          .to(eyes, { scaleY: 0.1, duration: 0.1, yoyo: true, repeat: 1, svgOrigin: "300 487" });
+
+        bubbleTimeline = gsap.timeline({ repeat: -1, paused: true });
+        for (let i = 0; i < 5; i++) {
+          bubbleTimeline.fromTo(`#bubble-${i}`, 
+            { attr: { cy: 600 }, opacity: 0 },
+            { 
+              attr: { cy: 372 }, 
+              opacity: 1, 
+              duration: 2.2, 
+              ease: "none", 
+              keyframes: { opacity: [0, 0.9, 0.9, 0] } 
+            }, 
+            i * 0.4
+          );
+        }
+      }
+    }
+
+    function applyLevel(level) {
+      const rect = columnRect(PIPETTE_COLUMN, level);
+      pipetteLiquid.setAttribute('y', rect.y.toFixed(2));
+      pipetteLiquid.setAttribute('height', rect.height.toFixed(2));
+      pipetteMeniscus.setAttribute('cy', rect.y.toFixed(2));
+      levelMarker.setAttribute('transform', `translate(0, ${rect.y.toFixed(2)})`);
+    }
+
+    function updateTheme(temp) {
+      const color = thermalColor(temp);
+      const ink = thermalInk(temp);
+      document.documentElement.style.setProperty('--thermal', color);
+      document.documentElement.style.setProperty('--thermal-ink', ink);
+      outerWater.setAttribute('fill', color);
+      outerWaterSurface.setAttribute('stroke', color);
+      sliderValueText.style.color = ink;
+    }
+
+    function setTrend(newTrend) {
+      trend = newTrend;
+      mouth.setAttribute('d', MOUTHS[trend]);
+      mouth.setAttribute('fill', trend === 'heating' ? '#182b4d' : 'none');
+
+      if (window.gsap) {
+        gsap.to(blush, { opacity: trend === 'heating' ? 0.85 : 0, duration: 0.3 });
+        gsap.to(bubbles, { opacity: trend === 'heating' ? 1 : 0, duration: 0.3 });
+        gsap.to(frost, { opacity: trend === 'cooling' ? 1 : 0, duration: 0.3 });
+
+        if (trend === 'heating') {
+          bubbleTimeline && bubbleTimeline.play();
+        } else {
+          bubbleTimeline && bubbleTimeline.pause();
+        }
+      }
+
+      if (trend === 'heating') {
+        conceptEmoji.textContent = '🔥';
+        conceptTitle.textContent = 'Genleşme!';
+        conceptBody.textContent = 'Sıcak su şişeyi ısıttı! Suyun tanecikleri hızlandı ve daha çok yer kaplayarak pipette yukarı fırladı.';
+        showConceptCard();
+        stateBadge.textContent = 'Genleşiyor ⬆️';
+        stateBadge.className = 'text-red-700';
+        liveActionText.textContent = 'Su ısındı, tanecikler hızlandı, sütun yukarı tırmanıyor!';
+      } else if (trend === 'cooling') {
+        conceptEmoji.textContent = '🧊';
+        conceptTitle.textContent = 'Büzülme!';
+        conceptBody.textContent = 'Buzlu su şişeyi soğuttu! Suyun tanecikleri yavaşladı ve daha az yer kaplayarak pipetten aşağı indi.';
+        showConceptCard();
+        stateBadge.textContent = 'Büzülüyor ⬇️';
+        stateBadge.className = 'text-blue-700';
+        liveActionText.textContent = 'Su soğudu, tanecikler yavaşladı, sütun aşağı iniyor!';
+      } else {
+        stateBadge.textContent = 'Dengede ✋';
+        stateBadge.className = 'text-emerald-700';
+        liveActionText.textContent = 'Şişe ile dış kap aynı sıcaklıkta, sıvı dengede.';
+        hideConceptCardWithDelay();
+      }
+    }
+
+    function showConceptCard() {
+      if (conceptTimeout) clearTimeout(conceptTimeout);
+      if (window.gsap) {
+        gsap.to(conceptCard, { opacity: 1, y: 0, duration: 0.4, ease: "back.out(1.7)" });
+      } else {
+        conceptCard.style.opacity = '1';
+      }
+    }
+
+    function hideConceptCardWithDelay() {
+      if (conceptTimeout) clearTimeout(conceptTimeout);
+      conceptTimeout = setTimeout(() => {
+        if (window.gsap) {
+          gsap.to(conceptCard, { opacity: 0, y: 10, duration: 0.5, ease: "power2.in" });
+        } else {
+          conceptCard.style.opacity = '0';
+        }
+      }, 2000);
+    }
+
+    function setTargetTemperature(targetTemp) {
+      ambientTemperature = targetTemp;
+      tempSlider.value = targetTemp;
+      sliderValueText.textContent = `${targetTemp} °C`;
+      labelAmbient.textContent = targetTemp.toFixed(1).replace('.', ',');
+
+      updatePresetButtons();
+
+      const diff = ambientTemperature - bottleTemperature;
+      if (Math.abs(diff) > 0.5) {
+        setTrend(diff > 0 ? 'heating' : 'cooling');
+      } else {
+        setTrend('stable');
+      }
+
+      const targetLevel = pipetteLevelFromTemp(ambientTemperature);
+      const currentLevel = pipetteLevelFromTemp(bottleTemperature);
+      const levelDelta = Math.abs(targetLevel - currentLevel);
+      const duration = clamp(0.5 + levelDelta * 2.5, 0.5, 2.2);
+
+      const animProxy = { level: currentLevel };
+
+      if (currentTween) currentTween.kill();
+
+      if (window.gsap) {
+        currentTween = gsap.to(animProxy, {
+          level: targetLevel,
+          duration: duration,
+          ease: "power2.out",
+          onUpdate: () => {
+            applyLevel(animProxy.level);
+            bottleTemperature = tempFromPipetteLevel(animProxy.level);
+            labelBottle.textContent = bottleTemperature.toFixed(1).replace('.', ',');
+            updateTheme(bottleTemperature);
+            if (Math.random() < 0.2 && trend === 'heating') playBubble();
+          },
+          onComplete: () => {
+            applyLevel(targetLevel);
+            bottleTemperature = ambientTemperature;
+            labelBottle.textContent = bottleTemperature.toFixed(1).replace('.', ',');
+            updateTheme(bottleTemperature);
+            setTrend('stable');
+            playChime();
+          }
+        });
+      } else {
+        applyLevel(targetLevel);
+        bottleTemperature = targetTemp;
+        labelBottle.textContent = bottleTemperature.toFixed(1).replace('.', ',');
+        updateTheme(bottleTemperature);
+        setTrend('stable');
+      }
+    }
+
+    function updatePresetButtons() {
+      btnPresetIce.className = `pushable flex items-center gap-3 px-4 py-2.5 text-left ${ambientTemperature === 0 ? 'bg-sun' : 'bg-white'}`;
+      btnPresetRoom.className = `pushable flex items-center gap-3 px-4 py-2.5 text-left ${ambientTemperature === 25 ? 'bg-sun' : 'bg-white'}`;
+      btnPresetHot.className = `pushable flex items-center gap-3 px-4 py-2.5 text-left ${ambientTemperature === 85 ? 'bg-sun' : 'bg-white'}`;
+    }
+
+    let markerIdCounter = 0;
+    function addMarker() {
+      const currentY = parseFloat(pipetteLiquid.getAttribute('y'));
+      if (isNaN(currentY)) return;
+
+      const tooClose = markers.some(m => Math.abs(m.y - currentY) < 7);
+      if (tooClose) {
+        alert("Buraya zaten çok yakın bir çizgi çektin! Sıcaklığı değiştirip yeni bir seviye dene.");
+        return;
+      }
+
+      markerIdCounter++;
+      const marker = {
+        id: `m-${markerIdCounter}`,
+        y: currentY,
+        temp: bottleTemperature,
+        tilt: (Math.random() - 0.5) * 2.5
+      };
+      markers.push(marker);
+      playPop();
+      renderMarkers();
+    }
+
+    function renderMarkers() {
+      markerLayer.innerHTML = '';
+      markers.forEach(m => {
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        g.setAttribute('transform', `rotate(${m.tilt} 258 ${m.y})`);
+
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute('x1', '258');
+        line.setAttribute('y1', m.y);
+        line.setAttribute('x2', '342');
+        line.setAttribute('y2', m.y);
+        line.setAttribute('stroke', '#182b4d');
+        line.setAttribute('stroke-width', '4');
+
+        const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        dot.setAttribute('cx', '258');
+        dot.setAttribute('cy', m.y);
+        dot.setAttribute('r', '6');
+        dot.setAttribute('fill', '#3bb273');
+        dot.setAttribute('stroke', '#182b4d');
+        dot.setAttribute('stroke-width', '3');
+
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute('x', '378');
+        text.setAttribute('y', m.y + 5);
+        text.setAttribute('fill', '#182b4d');
+        text.setAttribute('font-size', '15');
+        text.setAttribute('font-weight', 'bold');
+        text.textContent = `${m.temp.toFixed(1).replace('.', ',')} °C`;
+
+        g.appendChild(line);
+        g.appendChild(dot);
+        g.appendChild(text);
+        markerLayer.appendChild(g);
+
+        if (window.gsap) {
+          gsap.from(line, { attr: { x2: 258 }, duration: 0.35, ease: "power2.out" });
+          gsap.from(dot, { scale: 0, duration: 0.3, ease: "back.out(3)", transformOrigin: "center" });
+          gsap.from(text, { opacity: 0, x: -10, duration: 0.3, delay: 0.1 });
+        }
+      });
+
+      markerCountText.textContent = markers.length;
+    }
+
+    tempSlider.addEventListener('input', (e) => {
+      setTargetTemperature(parseInt(e.target.value, 10));
+    });
+
+    btnPresetIce.addEventListener('click', () => setTargetTemperature(0));
+    btnPresetRoom.addEventListener('click', () => setTargetTemperature(25));
+    btnPresetHot.addEventListener('click', () => setTargetTemperature(85));
+
+    btnMark.addEventListener('click', addMarker);
+    btnClearMarkers.addEventListener('click', () => {
+      markers = [];
+      renderMarkers();
+      playPop();
+    });
+
+    btnReset.addEventListener('click', () => {
+      markers = [];
+      renderMarkers();
+      setTargetTemperature(25);
+      playPop();
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initAnimations();
+      applyLevel(pipetteLevelFromTemp(25));
+      updateTheme(25);
+      updatePresetButtons();
+    });
+  </script>
+</body>
+</html>

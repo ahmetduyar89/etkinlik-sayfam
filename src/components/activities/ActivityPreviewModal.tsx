@@ -11,18 +11,31 @@ import {
     ZoomOut,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { FullscreenToggle } from '../common/FullscreenToggle';
 import { getFormattedHtml } from '../../utils/format-html';
 import { HTML2CANVAS_CDN } from '../../constants/drawing';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
+import { bindContentScroll } from '../drawing/contentScroll';
 import { DrawingToolbar } from '../drawing/DrawingToolbar';
 import { TextBoxLayer } from '../tools/TextBoxLayer';
 import { RulerTool } from '../tools/RulerTool';
 import { ProtractorTool } from '../tools/ProtractorTool';
+import { CompassTool } from '../tools/CompassTool';
+import { NumberLineTool } from '../tools/NumberLineTool';
+import { MiniCalculatorTool } from '../tools/MiniCalculatorTool';
+import { PeriodicTableTool } from '../tools/PeriodicTableTool';
+import { GeoGebraStudioTool } from '../tools/GeoGebraStudioTool';
+import { SimpleMachinesTool } from '../tools/SimpleMachinesTool';
+import { DnaGeneticsTool } from '../tools/DnaGeneticsTool';
+import { MoleculeBuilderTool } from '../tools/MoleculeBuilderTool';
+import { LinearGraphTool } from '../tools/LinearGraphTool';
+import { MathFormulaTool } from '../tools/MathFormulaTool';
 import { SpotlightOverlay } from '../tools/SpotlightOverlay';
 import { OverlayTimer } from '../tools/OverlayTimer';
 import { PageNav } from '../tools/PageNav';
 import { usePrompt } from '../common/PromptDialog';
 import { useToast } from '../common/ToastProvider';
+import { useSurfaceTint } from '../../utils/surfaceTint';
 import type {
     Activity,
     DrawConfig,
@@ -94,17 +107,58 @@ export function ActivityPreviewModal({
     const [pageInfo, setPageInfo] = React.useState({ current: 0, total: 1 });
     const [showRuler, setShowRuler] = React.useState(false);
     const [showProtractor, setShowProtractor] = React.useState(false);
-
+    const [showCompass, setShowCompass] = React.useState(false);
+    const [showNumberLine, setShowNumberLine] = React.useState(false);
+    const [showCalculator, setShowCalculator] = React.useState(false);
+    const [showPeriodicTable, setShowPeriodicTable] = React.useState(false);
+    const [showGeogebra, setShowGeogebra] = React.useState(false);
+    const [showSimpleMachines, setShowSimpleMachines] = React.useState(false);
+    const [showDnaGenetics, setShowDnaGenetics] = React.useState(false);
+    const [showMoleculeBuilder, setShowMoleculeBuilder] = React.useState(false);
+    const [showLinearGraph, setShowLinearGraph] = React.useState(false);
+    const [showMathFormula, setShowMathFormula] = React.useState(false);
     const mainRef = React.useRef<HTMLElement>(null);
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const stageRef = React.useRef<HTMLDivElement>(null);
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
+    const [drawHistory, setDrawHistory] = React.useState({ canUndo: false, canRedo: false });
     const prompt = usePrompt();
     const toast = useToast();
+
+    // Tam ekran koyu yüzey: kurulu uygulamada saat/pil şeridi de aynı renge
+    // boyansın, ekranın üstünde beyaz bir bant kalmasın.
+    useSurfaceTint('#0f172a');
 
     const [formattedHtml, setFormattedHtml] = React.useState<string>('');
     const [isLoadingContent, setIsLoadingContent] = React.useState(true);
     const isRawHtml = activity.content_mode === 'raw_html';
+    const contentScrollRef = React.useRef<ReturnType<typeof bindContentScroll>>(null);
+    const connectContentScroll = React.useCallback(() => {
+        contentScrollRef.current?.dispose();
+        const iframe = iframeRef.current;
+        contentScrollRef.current = iframe && !showWhiteboard
+            ? bindContentScroll(iframe, offset => canvasRef.current?.setContentOffset(offset))
+            : null;
+        if (showWhiteboard) canvasRef.current?.setContentOffset({ x: 0, y: 0 });
+    }, [showWhiteboard]);
+
+    React.useEffect(() => {
+        connectContentScroll();
+        return () => contentScrollRef.current?.dispose();
+    }, [connectContentScroll, formattedHtml, isLoadingContent]);
+
+    React.useEffect(() => {
+        const stage = stageRef.current;
+        if (!stage || !isPreviewDrawingMode || showWhiteboard) return;
+        const wheel = (event: WheelEvent) => {
+            if (event.ctrlKey || event.metaKey || !contentScrollRef.current) return;
+            event.preventDefault();
+            contentScrollRef.current.wheel(event);
+        };
+        stage.addEventListener('wheel', wheel, { passive: false });
+        return () => stage.removeEventListener('wheel', wheel);
+    }, [isPreviewDrawingMode, showWhiteboard, isLoadingContent]);
+
 
     React.useEffect(() => {
         const loadContent = async () => {
@@ -264,9 +318,9 @@ export function ActivityPreviewModal({
                 role="dialog"
                 aria-modal="true"
                 aria-label={activity.title}
-                className="relative w-full h-full bg-white overflow-hidden flex flex-col"
+                className="app-safe-screen relative w-full h-full bg-slate-900 overflow-hidden flex flex-col"
             >
-                <header className="h-14 px-4 bg-slate-900 border-b border-white/5 flex justify-between items-center shrink-0 z-[11000] gap-2">
+                <header className="min-h-14 flex-wrap py-2 px-3 sm:px-4 bg-slate-900 border-b border-white/5 flex justify-between items-center shrink-0 z-[11000] gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                         <div className="w-7 h-7 bg-indigo-500/20 rounded-lg flex items-center justify-center shrink-0">
                             <Blocks className="w-3.5 h-3.5 text-indigo-400" aria-hidden="true" />
@@ -416,6 +470,8 @@ export function ActivityPreviewModal({
                             </span>
                         </button>
 
+                        <FullscreenToggle variant="dark" />
+
                         <button
                             type="button"
                             onClick={onClose}
@@ -427,9 +483,49 @@ export function ActivityPreviewModal({
                     </div>
                 </header>
 
+                <AnimatePresence>
+                    {isPreviewDrawingMode && (
+                        <DrawingToolbar
+                            onInsertElement={(src,w,h) => canvasRef.current?.insertImage(src,w,h)}
+                            fixed
+                            onInsertMath={(math) => canvasRef.current?.insertMath(math)}
+                            onCommand={(type) => {
+                                if (type === 'UNDO_DRAWING') canvasRef.current?.undo();
+                                if (type === 'REDO_DRAWING') canvasRef.current?.redo();
+                                if (type === 'CLEAR_DRAWING') canvasRef.current?.clear();
+                                if (type === 'TOGGLE_WHITEBOARD')
+                                    setShowWhiteboard((v) => !v);
+                            }}
+                            config={previewDrawConfig}
+                            setConfig={setPreviewDrawConfig}
+                            showWhiteboard={showWhiteboard}
+                            setShowWhiteboard={setShowWhiteboard}
+                            bgColor={bgColor}
+                            onBgColorChange={setBgColor}
+                            onScreenshot={handleScreenshot}
+                            isTextBoxMode={isTextBoxMode}
+                            onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
+                            canUndo={drawHistory.canUndo}
+                            canRedo={drawHistory.canRedo}
+                            onSelectTool={(toolId) => {
+                                if (toolId === 'compass') setShowCompass(true);
+                                else if (toolId === 'numberLine' || toolId === 'number_line') setShowNumberLine(true);
+                                else if (toolId === 'calculator') setShowCalculator(true);
+                                else if (toolId === 'periodicTable' || toolId === 'periodic_table') setShowPeriodicTable(true);
+                                else if (toolId === 'geogebra' || toolId === 'tool_geogebra') setShowGeogebra(true);
+                                else if (toolId === 'simpleMachines' || toolId === 'simple_machines' || toolId === 'tool_simple_machines') setShowSimpleMachines(true);
+                                else if (toolId === 'dnaGenetics' || toolId === 'dna_genetics' || toolId === 'tool_dna_genetics') setShowDnaGenetics(true);
+                                else if (toolId === 'moleculeBuilder' || toolId === 'molecule_builder' || toolId === 'tool_molecule_builder') setShowMoleculeBuilder(true);
+                                else if (toolId === 'linearGraph' || toolId === 'linear_graph' || toolId === 'tool_linear_graph') setShowLinearGraph(true);
+                                else if (toolId === 'mathFormula' || toolId === 'math_formula' || toolId === 'tool_math_formula') setShowMathFormula(true);
+                            }}
+                        />
+                    )}
+                </AnimatePresence>
+
                 <main
                     ref={mainRef}
-                    className="flex-1 relative overflow-y-auto overflow-x-hidden custom-scroll"
+                    className="flex-1 min-h-0 relative isolate overflow-y-auto overflow-x-hidden custom-scroll"
                     style={{
                         backgroundColor: showWhiteboard ? bgColor || '#ffffff' : '#ffffff',
                     }}
@@ -461,6 +557,7 @@ export function ActivityPreviewModal({
                                 <iframe
                                     key={activity.id}
                                     ref={iframeRef}
+                                    onLoad={connectContentScroll}
                                     srcDoc={formattedHtml}
                                     title={activity.title}
                                     sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads allow-pointer-lock"
@@ -476,6 +573,7 @@ export function ActivityPreviewModal({
                                 />
                             )}
                             <DrawingCanvas
+                                onConfigChange={patch => setPreviewDrawConfig(prev => ({...prev, ...patch}))}
                                 ref={canvasRef}
                                 config={previewDrawConfig}
                                 enabled={isPreviewDrawingMode}
@@ -484,12 +582,8 @@ export function ActivityPreviewModal({
                                 onPageChange={(cur, tot) =>
                                     setPageInfo({ current: cur, total: tot })
                                 }
-                                onRequestText={() =>
-                                    prompt({
-                                        title: 'Metin ekle',
-                                        placeholder: 'Yazı girin',
-                                        confirmLabel: 'Ekle',
-                                    })
+                                onHistoryChange={(canUndo, canRedo) =>
+                                    setDrawHistory({ canUndo, canRedo })
                                 }
                             />
                             <TextBoxLayer
@@ -533,30 +627,9 @@ export function ActivityPreviewModal({
                         </div>
                     )}
 
+                    {/* Extra drawing pages belong to the whiteboard, not the lesson overlay. */}
                     <AnimatePresence>
-                        {isPreviewDrawingMode && (
-                            <DrawingToolbar
-                                onCommand={(type) => {
-                                    if (type === 'UNDO_DRAWING') canvasRef.current?.undo();
-                                    if (type === 'CLEAR_DRAWING') canvasRef.current?.clear();
-                                    if (type === 'TOGGLE_WHITEBOARD')
-                                        setShowWhiteboard((v) => !v);
-                                }}
-                                config={previewDrawConfig}
-                                setConfig={setPreviewDrawConfig}
-                                showWhiteboard={showWhiteboard}
-                                setShowWhiteboard={setShowWhiteboard}
-                                bgColor={bgColor}
-                                onBgColorChange={setBgColor}
-                                onScreenshot={handleScreenshot}
-                                isTextBoxMode={isTextBoxMode}
-                                onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
-                            />
-                        )}
-                    </AnimatePresence>
-
-                    <AnimatePresence>
-                        {isPreviewDrawingMode && (
+                        {isPreviewDrawingMode && showWhiteboard && (
                             <PageNav
                                 current={pageInfo.current}
                                 total={pageInfo.total}
@@ -594,6 +667,71 @@ export function ActivityPreviewModal({
 
             {showRuler && <RulerTool onClose={() => setShowRuler(false)} />}
             {showProtractor && <ProtractorTool onClose={() => setShowProtractor(false)} />}
+            {showCompass && (
+                <CompassTool
+                    onClose={() => setShowCompass(false)}
+                    onDrawCircle={(cx, cy, r) => {
+                        toast.success(`Yarıçapı ${r}px olan çember çizildi.`);
+                    }}
+                />
+            )}
+            {showNumberLine && <NumberLineTool onClose={() => setShowNumberLine(false)} />}
+            {showCalculator && <MiniCalculatorTool onClose={() => setShowCalculator(false)} />}
+            {showPeriodicTable && <PeriodicTableTool onClose={() => setShowPeriodicTable(false)} />}
+            {showGeogebra && (
+                <GeoGebraStudioTool
+                    onClose={() => setShowGeogebra(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('GeoGebra çizimi tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showSimpleMachines && (
+                <SimpleMachinesTool
+                    onClose={() => setShowSimpleMachines(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('Basit makineler düzeneği tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showDnaGenetics && (
+                <DnaGeneticsTool
+                    onClose={() => setShowDnaGenetics(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('DNA / Çaprazlama tablosu tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showMoleculeBuilder && (
+                <MoleculeBuilderTool
+                    onClose={() => setShowMoleculeBuilder(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('Molekül modeli tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showLinearGraph && (
+                <LinearGraphTool
+                    onClose={() => setShowLinearGraph(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('Doğrusal denklem grafiği tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
+            {showMathFormula && (
+                <MathFormulaTool
+                    onClose={() => setShowMathFormula(false)}
+                    onInsertImage={(dataUrl, w, h) => {
+                        canvasRef.current?.insertImage(dataUrl, w, h);
+                        toast.success('Matematik formülü tahta sayfasına yapıştırıldı.');
+                    }}
+                />
+            )}
         </div>
     );
 }

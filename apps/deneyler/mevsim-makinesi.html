@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mevsim Makinesi: Dünya'yı Döndür! | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+    input[type=range] { accent-color: #f59e0b; }
+    #earthGroup { cursor: grab; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-ink text-sm font-black flex items-center gap-1">
+        <span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span>
+      </a>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">🌍</span>
+          <h1 class="display text-lg sm:text-2xl font-black text-ink tracking-wide">Mevsim Makinesi</h1>
+        </div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Dünya'yı Güneş'in etrafında döndür, gölgeni ve mevsimleri değiştir! ☀️🍂❄️🌸</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1"><span>🎯</span> <span>1. Görevler</span></button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1"><span>🔬</span> <span>2. Test Masası</span></button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black" title="Sesi Aç/Kapat"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">GÖREV 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">Yaz Tatili Başlasın</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <div class="flex items-center gap-2 p-2.5 bg-sky-50 rounded-xl border-2 border-ink">
+          <span id="taskIcon" class="text-2xl">☀️</span>
+          <p id="taskText" class="text-xs sm:text-sm font-black text-ink">Dünya'yı döndür: Ankara'da öğle vakti gölgen en kısa olsun!</p>
+        </div>
+
+        <!-- SAHNE -->
+        <div class="relative w-full rounded-2xl border-3 border-ink overflow-hidden shadow-inner bg-slate-900">
+          <svg id="scene" viewBox="0 0 560 330" class="w-full h-auto block touch-none">
+            <defs>
+              <radialGradient id="sunGrad"><stop offset="0%" stop-color="#fef9c3" /><stop offset="60%" stop-color="#facc15" /><stop offset="100%" stop-color="#f97316" /></radialGradient>
+              <linearGradient id="skyDay" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38bdf8" /><stop offset="100%" stop-color="#e0f2fe" /></linearGradient>
+              <clipPath id="rightClip"><rect x="300" y="0" width="260" height="330" /></clipPath>
+            </defs>
+
+            <!-- SOL: UZAY VE YÖRÜNGE -->
+            <rect x="0" y="0" width="300" height="330" fill="#0f172a" />
+            <g opacity="0.7">
+              <circle cx="20" cy="30" r="1.2" fill="#fff" /><circle cx="270" cy="22" r="1.5" fill="#fff" /><circle cx="60" cy="300" r="1.2" fill="#fff" />
+              <circle cx="250" cy="300" r="1" fill="#fff" /><circle cx="140" cy="18" r="1" fill="#fff" /><circle cx="285" cy="170" r="1.2" fill="#fff" />
+            </g>
+            <text x="150" y="20" font-size="11" font-weight="900" fill="#fde68a" text-anchor="middle">UZAYDAN BAKIŞ</text>
+            <ellipse cx="150" cy="170" rx="118" ry="72" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="5 5" />
+            <g id="monthLabels"></g>
+            <circle cx="150" cy="170" r="26" fill="url(#sunGrad)" stroke="#0f172a" stroke-width="2.5" />
+            <text x="150" y="175" font-size="12" font-weight="900" fill="#7c2d12" text-anchor="middle">GÜNEŞ</text>
+            <g id="earthGroup">
+              <circle r="26" fill="transparent" />
+              <circle id="earthBody" r="15" fill="#1e3a8a" stroke="#0f172a" stroke-width="2" />
+              <path id="earthLit" fill="#38bdf8" />
+              <path id="earthLand" d="M-6 -8 q5 -3 8 1 q-2 5 -7 4 z M2 4 q6 -1 7 4 q-4 3 -8 0 z" fill="#22c55e" opacity="0.9" />
+              <g id="axisGroup">
+                <line x1="0" y1="-24" x2="0" y2="24" stroke="#f8fafc" stroke-width="2.5" />
+                <text x="0" y="-27" font-size="9" font-weight="900" fill="#f8fafc" text-anchor="middle">K</text>
+              </g>
+            </g>
+            <g transform="translate(8,300)">
+              <rect width="120" height="22" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1.5" />
+              <text id="distText" x="60" y="15" font-size="10" font-weight="800" fill="#e2e8f0" text-anchor="middle">Güneş'e: 147,1 mn km</text>
+            </g>
+
+            <!-- SAĞ: TÜRKİYE'DE ÖĞLE VAKTİ -->
+            <g clip-path="url(#rightClip)">
+              <rect id="skyRect" x="300" y="0" width="260" height="330" fill="url(#skyDay)" />
+              <path id="sunArc" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.7" />
+              <circle id="sceneSun" r="16" fill="url(#sunGrad)" stroke="#0f172a" stroke-width="2" />
+              <rect x="300" y="262" width="260" height="68" id="groundRect" fill="#86efac" />
+              <line x1="300" y1="262" x2="560" y2="262" stroke="#0f172a" stroke-width="2.5" />
+              <!-- Ağaç -->
+              <g transform="translate(515,262)">
+                <rect x="-5" y="-50" width="10" height="50" fill="#92400e" stroke="#0f172a" stroke-width="2" />
+                <circle id="treeTop" cx="0" cy="-66" r="26" fill="#16a34a" stroke="#0f172a" stroke-width="2.5" />
+                <g id="treeExtras"></g>
+              </g>
+              <!-- Gölge -->
+              <polygon id="shadow" fill="#0f172a" opacity="0.55" />
+              <!-- Çocuk (1,2 m) -->
+              <g id="kid" transform="translate(360,262)">
+                <circle cx="0" cy="-52" r="8" fill="#fcd34d" stroke="#0f172a" stroke-width="2" />
+                <rect id="kidShirt" x="-8" y="-43" width="16" height="22" rx="4" fill="#ef4444" stroke="#0f172a" stroke-width="2" />
+                <rect x="-7" y="-22" width="6" height="22" fill="#1e40af" stroke="#0f172a" stroke-width="1.5" />
+                <rect x="1" y="-22" width="6" height="22" fill="#1e40af" stroke="#0f172a" stroke-width="1.5" />
+                <g id="kidHat"></g>
+              </g>
+              <text id="altText" x="430" y="20" font-size="11" font-weight="900" fill="#0f172a" text-anchor="middle">ANKARA · ÖĞLE VAKTİ</text>
+              <g transform="translate(310,275)">
+                <rect width="96" height="22" rx="8" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+                <text id="shadowText" x="48" y="15" font-size="10.5" font-weight="900" fill="#0f172a" text-anchor="middle">Gölge: 0,35 m</text>
+              </g>
+              <g transform="translate(412,275)">
+                <rect width="140" height="22" rx="8" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+                <text id="seasonText" x="70" y="15" font-size="10.5" font-weight="900" fill="#0f172a" text-anchor="middle">☀️ Yaz</text>
+              </g>
+              <text id="polarText" x="430" y="150" font-size="13" font-weight="900" fill="#f8fafc" text-anchor="middle"></text>
+            </g>
+            <line x1="300" y1="0" x2="300" y2="330" stroke="#0f172a" stroke-width="3" />
+          </svg>
+        </div>
+
+        <!-- KONTROLLER -->
+        <div class="flex flex-col gap-2">
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-black w-16">📅 Tarih:</span>
+            <input id="daySlider" type="range" min="0" max="364" value="172" class="flex-1">
+            <span id="dateText" class="display text-base font-black w-28 text-right">21 Haziran</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="btnPlay" class="pushable px-4 py-2 bg-yellow-400 hover:bg-yellow-300 text-sm font-black flex items-center gap-1.5"><span id="playIcon">▶️</span> <span id="playText">Bir Yıl Oynat</span></button>
+            <div id="sandboxControls" class="hidden flex-wrap items-center gap-2">
+              <button id="btnTilt" class="pushable px-3 py-2 bg-white text-xs font-black">📐 Eksen: <span id="tiltText">23,5° eğik</span></button>
+              <select id="citySelect" class="pushable px-2 py-2 bg-white text-xs font-black">
+                <option value="ankara">📍 Ankara</option>
+                <option value="ekvator">📍 Ekvator</option>
+                <option value="norvec">📍 Kuzey Norveç</option>
+              </select>
+            </div>
+            <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black ml-auto">💡 İpucu</button>
+          </div>
+        </div>
+
+        <!-- QUIZ -->
+        <div id="quizBox" class="hidden p-3 bg-purple-50 rounded-xl border-2 border-ink">
+          <p id="quizQ" class="text-sm font-black mb-2"></p>
+          <div id="quizOpts" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">Dünya'nın dönme ekseni yaklaşık <b>23,5°</b> eğiktir ve hep aynı yöne bakar. Bu yüzden yıl boyunca Güneş ışınları Türkiye'ye farklı açılarla gelir ve mevsimler oluşur!</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">Mevsim Kâşifi Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📊</span><h3 class="display text-base font-black">Öğle Vakti Ölçümleri</h3></div>
+        <div class="grid grid-cols-2 gap-2 text-center">
+          <div class="p-2 bg-amber-50 rounded-xl border-2 border-ink"><p class="text-[10px] font-bold text-gray-500">Güneş'in Yüksekliği</p><p id="statAlt" class="text-lg font-black text-amber-800">73,5°</p></div>
+          <div class="p-2 bg-slate-50 rounded-xl border-2 border-ink"><p class="text-[10px] font-bold text-gray-500">Gölge Boyu (1,2 m çocuk)</p><p id="statShadow" class="text-lg font-black text-slate-800">0,35 m</p></div>
+          <div class="p-2 bg-sky-50 rounded-xl border-2 border-ink"><p class="text-[10px] font-bold text-gray-500">Gündüz Süresi</p><p id="statDay" class="text-lg font-black text-sky-800">14 sa 50 dk</p></div>
+          <div class="p-2 bg-orange-50 rounded-xl border-2 border-ink"><p class="text-[10px] font-bold text-gray-500">Yere Düşen Güneş Enerjisi</p>
+            <div class="h-3.5 mt-1.5 bg-white rounded-full border-2 border-ink overflow-hidden"><div id="energyBar" class="h-full bg-gradient-to-r from-yellow-300 to-orange-500" style="width:80%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Fen Bilgisi Rehberi</h3></div>
+        <div class="space-y-2 text-xs">
+          <div class="p-2 bg-yellow-50 rounded-lg border border-yellow-300"><p class="font-extrabold text-yellow-900">☀️ Yazın Neden Sıcak?</p><p class="text-[11px] text-yellow-800 font-semibold mt-0.5">Güneş öğlen gökyüzünde <b>yüksektedir</b>. Işınlar dike yakın gelir ve gündüzler uzundur. Gölgemiz de kısalır.</p></div>
+          <div class="p-2 bg-sky-50 rounded-lg border border-sky-300"><p class="font-extrabold text-sky-900">❄️ Kışın Neden Soğuk?</p><p class="text-[11px] text-sky-800 font-semibold mt-0.5">Güneş <b>alçaktadır</b>. Işınlar eğik gelip geniş bir alana yayılır ve gündüzler kısadır. Gölgemiz uzar.</p></div>
+          <div class="p-2 bg-rose-50 rounded-lg border border-rose-300"><p class="font-extrabold text-rose-900">🚫 Yanlış Bilgi Avı</p><p class="text-[11px] text-rose-800 font-semibold mt-0.5">"Yazın Dünya Güneş'e yaklaşır" yanlıştır! Dünya, Güneş'e en çok Ocak ayında yaklaşır. Mevsimleri eksen eğikliği oluşturur.</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- SONUÇ PENCERESİ -->
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Görev Tamam!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-sky-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-sky-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      tick() { tone('sine', 900, 1000, 0.03, 0.05); },
+      wrong() { tone('sawtooth', 220, 110, 0.3, 0.15); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. ASTRONOMİ HESAPLARI ---
+    const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    const MDAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const CITIES = {
+      ankara: { name: 'ANKARA', lat: 39.9 },
+      ekvator: { name: 'EKVATOR', lat: 0 },
+      norvec: { name: 'KUZEY NORVEÇ', lat: 69.6 }
+    };
+    const KID_H = 1.2;
+    const rad = d => d * Math.PI / 180;
+    const deg = r => r * 180 / Math.PI;
+
+    function dateOf(d) {
+      let m = 0, day = d;
+      while (day >= MDAYS[m]) { day -= MDAYS[m]; m++; }
+      return { m, day: day + 1 };
+    }
+    function dateText(d) { const x = dateOf(d); return `${x.day} ${MONTHS[x.m]}`; }
+
+    function declination(d, tilt) { return tilt * Math.sin(2 * Math.PI * (d - 80) / 365); }
+    function noonAltitude(lat, dec) { return 90 - Math.abs(lat - dec); }
+    function dayLength(lat, dec) {
+      const c = -Math.tan(rad(lat)) * Math.tan(rad(dec));
+      if (c <= -1) return 24;
+      if (c >= 1) return 0;
+      return 2 * deg(Math.acos(c)) / 15;
+    }
+    function shadowLen(alt) { return alt <= 0 ? Infinity : KID_H / Math.tan(rad(alt)); }
+    function sunDistance(d) { return 149.6 * (1 - 0.0167 * Math.cos(2 * Math.PI * (d - 3) / 365)); }
+    function seasonOf(d) {
+      if (d >= 79 && d < 171) return { n: 'İlkbahar', e: '🌸' };
+      if (d >= 171 && d < 265) return { n: 'Yaz', e: '☀️' };
+      if (d >= 265 && d < 354) return { n: 'Sonbahar', e: '🍂' };
+      return { n: 'Kış', e: '❄️' };
+    }
+    function fmt(x, n = 2) { return x.toFixed(n).replace('.', ','); }
+
+    // Gün <-> yörünge açısı (Aralık gündönümü sağda)
+    const dayToTheta = d => ((d - 355 + 365) % 365) / 365 * 360;
+    const thetaToDay = th => Math.round((355 + ((th % 360 + 360) % 360) / 360 * 365)) % 365;
+
+    // --- 3. GÖREVLER ---
+    const LEVELS = [
+      {
+        title: 'Yaz Tatili Başlasın', icon: '☀️',
+        task: 'Dünya\'yı döndür: Ankara\'da öğle vakti gölgen en kısa olsun!',
+        check: s => s.shadow <= s.minShadow * 1.03,
+        hint: 'Gölge, Güneş gökyüzünde en yüksekteyken en kısadır. Kuzey yarım küre Güneş\'e doğru eğildiğinde bu olur.',
+        fact: 'Türkiye\'de öğle gölgesi yılın en kısa hâlini <b>21 Haziran</b> civarında alır. Bu güne <b>yaz gündönümü</b> denir ve yılın en uzun gündüzü yaşanır.'
+      },
+      {
+        title: 'Kardan Adam Zamanı', icon: '⛄',
+        task: 'Şimdi tam tersi: Öğle gölgen yılın en uzun hâline gelsin!',
+        check: s => s.shadow >= s.maxShadow * 0.97,
+        hint: 'Kuzey yarım küre Güneş\'ten uzağa eğildiğinde Güneş öğlen bile alçakta kalır.',
+        fact: '<b>21 Aralık</b> civarı <b>kış gündönümüdür</b>. Yılın en uzun gecesi yaşanır. Güneş ışınları çok eğik geldiği için ısıtma gücü azalır.'
+      },
+      {
+        title: 'Gece = Gündüz', icon: '⚖️',
+        task: 'Gündüz ile gecenin eşit olduğu (12\'şer saat) bir güne git!',
+        check: s => Math.abs(s.dayLen - 12) < 0.15,
+        hint: 'Böyle iki gün var: biri ilkbaharın, diğeri sonbaharın başında. Mart ya da Eylül\'e bak!',
+        fact: '<b>21 Mart</b> ve <b>23 Eylül</b> civarında gece ve gündüz eşittir. Bu günlere <b>ekinoks</b> denir. Güneş ışınları o gün Ekvator\'a dik gelir.'
+      },
+      {
+        title: 'Uzun Yaz Akşamları', icon: '🌇',
+        task: 'Ankara\'da gündüz 14,5 saatten uzun olsun!',
+        check: s => s.dayLen > 14.5,
+        hint: 'Gündüzler yaza doğru uzar. Mayıs sonu ile Temmuz ortası arasını dene.',
+        fact: 'Yazın gündüzler uzun olduğu için yeryüzü Güneş\'ten daha uzun süre enerji alır. Hem yüksek Güneş hem uzun gündüz yazı sıcak yapar!'
+      },
+      {
+        title: 'Yanlış Bilgi Avcısı', icon: '🕵️',
+        task: 'Dünya\'nın Güneş\'e en yakın olduğu güne git! (Sol alttaki uzaklığı izle)',
+        check: s => s.dist <= 147.2,
+        quiz: {
+          q: 'Dünya şu an Güneş\'e en yakın konumda. Peki Türkiye\'de hangi mevsim yaşanıyor?',
+          opts: ['☀️ Yaz', '❄️ Kış', '🌸 İlkbahar', '🍂 Sonbahar'], answer: 1
+        },
+        hint: 'Uzaklık kutusunda en küçük değeri bul. İpucu: Yılın ilk günlerine bak!',
+        fact: 'Dünya Güneş\'e en çok <b>Ocak</b> başında yaklaşır ama Türkiye\'de o zaman kış yaşanır! Demek ki mevsimleri <b>uzaklık değil, eksen eğikliği</b> oluşturur.'
+      },
+      {
+        title: 'Eksen Dik Olsaydı?', icon: '📐',
+        task: 'Ekseni dikleştir. Sonra hem Haziran\'a hem Aralık\'a git ve gölgeleri karşılaştır.',
+        tiltLevel: true,
+        check: s => s.tilt === 0 && s.visitedJun && s.visitedDec,
+        hint: '"Eksen" düğmesine bas. Sonra takvimi Haziran\'a ve Aralık\'a getir. Gölge değişiyor mu?',
+        fact: 'Dünya\'nın ekseni eğik olmasaydı Güneş her gün aynı yükseklikte olurdu. Gölgeler, gündüz süresi ve sıcaklık yıl boyunca değişmezdi. Yani <b>mevsimler olmazdı</b>!'
+      }
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: Gündönümü Avcısı', text: 'Yazın en kısa ve kışın en uzun gölgeyi bul.' },
+      { id: 'm2', title: '2. Görev: Mit Kırıcı', text: 'Yanlış Bilgi Avcısı sorusunu doğru cevapla.' },
+      { id: 'm3', title: '3. Görev: Kutup Gecesi', text: 'Test Masasında Kuzey Norveç\'te Güneş\'in hiç doğmadığı bir gün bul.' },
+      { id: 'm4', title: '4. Görev: Mevsim Ustası', text: '6 görevin hepsini tamamla.' }
+    ];
+
+    // --- 4. DURUM ---
+    let mode = 'levels';
+    let levelIndex = 0;
+    let day = 172;
+    let tilt = 23.44;
+    let city = 'ankara';
+    let playing = false;
+    let holdT = 0;
+    let finished = false;
+    let quizOpen = false;
+    let score = 0;
+    let visitedJun = false, visitedDec = false;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    let attempts = 0;
+
+    // --- 5. ÇİZİM ---
+    const $ = id => document.getElementById(id);
+    const ORB = { cx: 150, cy: 170, rx: 118, ry: 72 };
+
+    function buildMonthLabels() {
+      const g = $('monthLabels');
+      let html = '';
+      MONTHS.forEach((name, m) => {
+        let d = 0; for (let i = 0; i < m; i++) d += MDAYS[i];
+        d += 14;
+        const th = rad(dayToTheta(d));
+        const x = ORB.cx + (ORB.rx + 22) * Math.cos(th);
+        const y = ORB.cy - (ORB.ry + 18) * Math.sin(th);
+        html += `<text x="${x}" y="${y + 3}" font-size="8.5" font-weight="800" fill="#94a3b8" text-anchor="middle">${name.slice(0, 3)}</text>`;
+      });
+      g.innerHTML = html;
+    }
+
+    function render() {
+      const c = CITIES[city];
+      const dec = declination(day, tilt);
+      const alt = noonAltitude(c.lat, dec);
+      const shadow = shadowLen(alt);
+      const dl = dayLength(c.lat, dec);
+      const dist = sunDistance(day);
+
+      // Yörünge
+      const th = rad(dayToTheta(day));
+      const ex = ORB.cx + ORB.rx * Math.cos(th);
+      const ey = ORB.cy - ORB.ry * Math.sin(th);
+      $('earthGroup').setAttribute('transform', `translate(${ex},${ey})`);
+      $('axisGroup').setAttribute('transform', `rotate(${tilt > 0 ? 23.5 : 0})`);
+      // Aydınlık yarım (Güneş'e bakan taraf)
+      const ang = Math.atan2(ORB.cy - ey, ORB.cx - ex);
+      const r = 15;
+      const p1x = Math.cos(ang + Math.PI / 2) * r, p1y = Math.sin(ang + Math.PI / 2) * r;
+      $('earthLit').setAttribute('d', `M${p1x},${p1y} A${r},${r} 0 0 0 ${-p1x},${-p1y} Z`);
+      $('distText').textContent = `Güneş'e: ${fmt(dist, 1)} mn km`;
+
+      // Sahne gökyüzü
+      const sunCx = 430, sunCy = 262, R = 120;
+      const a = Math.max(-5, alt);
+      const sx = sunCx - R * Math.cos(rad(a));
+      const sy = sunCy - R * Math.sin(rad(a));
+      $('sunArc').setAttribute('d', `M${sunCx - R},${sunCy} A${R},${R} 0 0 1 ${sunCx + R},${sunCy}`);
+      $('sceneSun').setAttribute('cx', sx);
+      $('sceneSun').setAttribute('cy', sy);
+      $('sceneSun').style.display = alt > 0 ? '' : 'none';
+      $('skyRect').setAttribute('fill', alt > 0 ? 'url(#skyDay)' : '#1e293b');
+      $('polarText').textContent = alt > 0 ? '' : '🌑 Bugün Güneş hiç doğmuyor!';
+      $('altText').textContent = `${c.name} · ÖĞLE VAKTİ`;
+      $('altText').setAttribute('fill', alt > 0 ? '#0f172a' : '#f8fafc');
+
+      // Gölge (Güneş güneyde/solda, gölge sağa)
+      const PX = 50; // 1 m = 50 px
+      const kidX = 360;
+      const sl = Math.min(shadow * PX, 220);
+      if (alt > 0) {
+        $('shadow').setAttribute('points', `${kidX - 8},258 ${kidX - 8},266 ${kidX + sl},268 ${kidX + sl},256`);
+        $('shadow').style.display = '';
+      } else {
+        $('shadow').style.display = 'none';
+      }
+
+      // Mevsim görünümü
+      const s = seasonOf(day);
+      const seasonLabel = tilt === 0 ? '⚖️ Mevsim farkı yok' : city === 'ekvator' ? '🌴 Hep sıcak' : `${s.e} ${s.n}`;
+      $('seasonText').textContent = seasonLabel;
+      let tree = '#16a34a', ground = '#86efac', extras = '', hat = '', shirt = '#ef4444';
+      const effSeason = (tilt === 0 || city === 'ekvator') ? 'Yaz' : s.n;
+      if (effSeason === 'Sonbahar') { tree = '#f97316'; ground = '#fcd34d'; extras = '<circle cx="-30" cy="-6" r="3" fill="#ea580c"/><circle cx="22" cy="-3" r="3" fill="#f59e0b"/>'; shirt = '#a16207'; }
+      if (effSeason === 'Kış') { tree = 'none'; ground = '#f8fafc'; extras = '<path d="M0 -50 L-18 -80 M0 -60 L16 -86 M0 -70 L-6 -92" stroke="#92400e" stroke-width="4" stroke-linecap="round"/>'; hat = '<path d="M-9 -56 Q0 -72 9 -56 Z" fill="#2563eb" stroke="#0f172a" stroke-width="1.5"/>'; shirt = '#1d4ed8'; }
+      if (effSeason === 'İlkbahar') { tree = '#4ade80'; extras = '<circle cx="-10" cy="-78" r="3.5" fill="#f9a8d4"/><circle cx="12" cy="-62" r="3.5" fill="#f9a8d4"/><circle cx="4" cy="-84" r="3.5" fill="#fbcfe8"/>'; shirt = '#22c55e'; }
+      $('treeTop').setAttribute('fill', tree);
+      $('treeTop').setAttribute('stroke', tree === 'none' ? 'none' : '#0f172a');
+      $('treeExtras').innerHTML = extras;
+      $('groundRect').setAttribute('fill', ground);
+      $('kidHat').innerHTML = hat;
+      $('kidShirt').setAttribute('fill', shirt);
+
+      // Göstergeler
+      $('dateText').textContent = dateText(day);
+      $('daySlider').value = day;
+      $('statAlt').textContent = alt > 0 ? `${fmt(alt, 1)}°` : 'Doğmuyor';
+      $('shadowText').textContent = alt > 0 ? `Gölge: ${fmt(shadow)} m` : 'Gölge yok';
+      $('statShadow').textContent = alt > 0 ? (shadow > 20 ? '20 m\'den uzun' : `${fmt(shadow)} m`) : '—';
+      const h = Math.floor(dl), mm = Math.round((dl - h) * 60);
+      $('statDay').textContent = `${h} sa ${mm} dk`;
+      const energy = alt > 0 ? Math.sin(rad(alt)) * dl / 16 : 0;
+      $('energyBar').style.width = `${Math.min(100, Math.round(energy * 100))}%`;
+
+      return { alt, shadow, dayLen: dl, dist };
+    }
+
+    function extremes() {
+      let min = Infinity, max = 0;
+      const c = CITIES[city];
+      for (let d = 0; d < 365; d++) {
+        const sh = shadowLen(noonAltitude(c.lat, declination(d, tilt)));
+        if (sh < min) min = sh;
+        if (sh > max && isFinite(sh)) max = sh;
+      }
+      return { min, max };
+    }
+    let ext = extremes();
+
+    // --- 6. DÖNGÜ ---
+    let last = performance.now();
+    let lastTickDay = day;
+    function loop(now) {
+      const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+      last = now;
+      if (playing) {
+        day = (day + dt * 45) % 365;
+        if (Math.floor(day / 30) !== Math.floor(lastTickDay / 30)) Sound.tick();
+        lastTickDay = day;
+      }
+      const dInt = Math.floor(day);
+      const saved = day;
+      day = dInt;
+      const st = render();
+      day = saved;
+
+      const m = dateOf(dInt).m;
+      if (m === 5) visitedJun = true;
+      if (m === 11) visitedDec = true;
+
+      if (mode === 'levels' && !finished && !quizOpen && !playing && !dragging) {
+        const L = LEVELS[levelIndex];
+        const s = { ...st, minShadow: ext.min, maxShadow: ext.max, tilt, visitedJun, visitedDec };
+        if (L.check(s)) {
+          holdT += dt;
+          if (holdT > 0.6) {
+            if (L.quiz) openQuiz(L.quiz); else winLevel();
+          }
+        } else holdT = 0;
+      }
+      if (mode === 'sandbox' && city === 'norvec' && st.alt <= 0 && tilt > 0) completeMission('m3');
+      requestAnimationFrame(loop);
+    }
+
+    // --- 7. SÜRÜKLEME ---
+    let dragging = false;
+    const svg = $('scene');
+    function svgPoint(e) {
+      const pt = svg.createSVGPoint();
+      pt.x = e.clientX; pt.y = e.clientY;
+      return pt.matrixTransform(svg.getScreenCTM().inverse());
+    }
+    $('earthGroup').addEventListener('pointerdown', e => {
+      if (finished || quizOpen) return;
+      dragging = true; playing = false; updatePlayBtn();
+      svg.setPointerCapture(e.pointerId);
+      initAudio();
+    });
+    svg.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      const p = svgPoint(e);
+      const th = deg(Math.atan2(-(p.y - ORB.cy) / ORB.ry, (p.x - ORB.cx) / ORB.rx));
+      const nd = thetaToDay(th);
+      if (Math.floor(nd / 15) !== Math.floor(day / 15)) Sound.tick();
+      day = nd;
+    });
+    const endDrag = () => { dragging = false; holdT = 0; };
+    svg.addEventListener('pointerup', endDrag);
+    svg.addEventListener('pointercancel', endDrag);
+
+    $('daySlider').addEventListener('input', e => { day = +e.target.value; playing = false; updatePlayBtn(); holdT = 0; });
+
+    function updatePlayBtn() {
+      $('playIcon').textContent = playing ? '⏸️' : '▶️';
+      $('playText').textContent = playing ? 'Durdur' : 'Bir Yıl Oynat';
+    }
+    $('btnPlay').addEventListener('click', () => { if (finished || quizOpen) return; playing = !playing; Sound.click(); updatePlayBtn(); });
+
+    $('btnTilt').addEventListener('click', () => {
+      tilt = tilt > 0 ? 0 : 23.44;
+      Sound.click();
+      $('tiltText').textContent = tilt > 0 ? '23,5° eğik' : 'Dik (0°)';
+      visitedJun = false; visitedDec = false;
+      ext = extremes();
+    });
+    $('citySelect').addEventListener('change', e => { city = e.target.value; Sound.click(); ext = extremes(); });
+
+    // --- 8. QUIZ ---
+    function openQuiz(q) {
+      quizOpen = true;
+      attempts = 0;
+      $('quizBox').classList.remove('hidden');
+      $('quizQ').textContent = q.q;
+      $('quizOpts').innerHTML = q.opts.map((o, i) => `<button data-i="${i}" class="q-opt pushable py-2 bg-white text-sm font-black">${o}</button>`).join('');
+      document.querySelectorAll('.q-opt').forEach(b => b.addEventListener('click', () => {
+        if (+b.dataset.i === q.answer) {
+          b.classList.add('bg-emerald-300');
+          quizOpen = false;
+          $('quizBox').classList.add('hidden');
+          completeMission('m2');
+          winLevel();
+        } else {
+          attempts++;
+          b.classList.add('bg-rose-200');
+          b.disabled = true;
+          Sound.wrong();
+          $('scienceNote').innerHTML = '<b>Tekrar düşün:</b> Takvime bak, bu tarih yılın hangi ayında?';
+        }
+      }));
+      if (typeof gsap !== 'undefined') gsap.from('#quizBox', { scale: 0.9, opacity: 0, duration: 0.3 });
+    }
+
+    // --- 9. SEVİYE AKIŞI ---
+    let hintsUsed = 0;
+    function loadLevel(i) {
+      closeModal();
+      mode = 'levels';
+      levelIndex = i;
+      const L = LEVELS[i];
+      finished = false; quizOpen = false; holdT = 0; hintsUsed = 0; attempts = 0;
+      playing = false; updatePlayBtn();
+      city = 'ankara'; tilt = 23.44;
+      $('tiltText').textContent = '23,5° eğik';
+      visitedJun = false; visitedDec = false;
+      ext = extremes();
+      // Hedefin uzağından başla
+      day = [355, 172, 20, 355, 172, 100][i];
+      $('quizBox').classList.add('hidden');
+      $('levelBadge').textContent = `GÖREV ${i + 1}`;
+      $('levelTitle').textContent = L.title;
+      $('taskIcon').textContent = L.icon;
+      $('taskText').textContent = L.task;
+      const sc = $('sandboxControls');
+      sc.classList.toggle('hidden', !L.tiltLevel); sc.classList.toggle('flex', !!L.tiltLevel);
+      $('citySelect').classList.toggle('hidden', !!L.tiltLevel);
+      renderLevelDots();
+    }
+
+    function winLevel() {
+      finished = true;
+      const L = LEVELS[levelIndex];
+      const s = Math.max(1, 3 - hintsUsed - attempts);
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20;
+      updateScore(); renderLevelDots();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+      if (stars[0] && stars[1]) completeMission('m1');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      showModal({
+        emoji: L.icon, title: 'Görev Tamam!', stars: '⭐'.repeat(s) + '☆'.repeat(3 - s),
+        info: `Tarih: ${dateText(Math.floor(day))}`, fact: L.fact,
+        next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Test Masası 🔬'
+      });
+    }
+
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info;
+      $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next);
+      if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 500);
+    }
+    let modalTimer = null;
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5">
+          <span class="text-lg">${done ? '✅' : '⬜'}</span>
+          <div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Görevler:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function switchMode(m) {
+      const isS = m === 'sandbox';
+      $('tabLevels').classList.toggle('active-tab', !isS); $('tabLevels').classList.toggle('bg-white', isS);
+      $('tabSandbox').classList.toggle('active-tab', isS); $('tabSandbox').classList.toggle('bg-white', !isS);
+      $('levelDots').classList.toggle('hidden', isS);
+      if (isS) {
+        mode = 'sandbox'; finished = false; quizOpen = false;
+        $('quizBox').classList.add('hidden');
+        const sc = $('sandboxControls'); sc.classList.remove('hidden'); sc.classList.add('flex');
+        $('citySelect').classList.remove('hidden');
+        $('levelBadge').textContent = 'TEST MASASI';
+        $('levelTitle').textContent = 'Serbest Keşif';
+        $('taskIcon').textContent = '🔬';
+        $('taskText').textContent = 'Ekseni değiştir, farklı şehirleri seç, bir yılı oynat. Gölgeler nasıl değişiyor?';
+      } else {
+        loadLevel(levelIndex);
+      }
+    }
+
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('sandbox'); });
+    $('btnHint').addEventListener('click', () => {
+      Sound.click();
+      if (mode === 'levels') { hintsUsed = 1; $('scienceNote').innerHTML = `<b>İpucu:</b> ${LEVELS[levelIndex].hint}`; }
+      else $('scienceNote').innerHTML = '<b>Deney fikri:</b> Ekvator\'u seç ve bir yıl oynat. Gölge boyu çok az değişir. Sonra Kuzey Norveç\'i seç: Kışın Güneş hiç doğmaz, yazın ise hiç batmaz!';
+    });
+    $('btnModalRetry').addEventListener('click', () => { closeModal(); loadLevel(levelIndex); });
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('sandbox'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; Sound.click(); });
+
+    // --- 10. BAŞLAT ---
+    buildMonthLabels();
+    renderMissions(); updateScore();
+    loadLevel(0);
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

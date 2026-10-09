@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Basınç Uzmanı Pipetler: Yüzey Alanı ve Basınç - Küçük Mucitler</title>
+
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- GSAP Animation Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            paper: '#fffdfa',
+            ink: '#182b4d',
+            sun: '#facc15',
+            sky: '#38bdf8',
+            potato: '#d97706',
+            potatoLight: '#fef3c7',
+            potatoSkin: '#b45309',
+            strawBlue: '#0284c7',
+            strawRed: '#e11d48',
+            gloveBlue: '#2563eb'
+          },
+          fontFamily: {
+            display: ['"Baloo 2"', 'cursive'],
+            body: ['Nunito', 'sans-serif']
+          },
+          borderWidth: {
+            '3': '3px'
+          },
+          boxShadow: {
+            card: '0 8px 0 #182b4d',
+            'card-sm': '0 4px 0 #182b4d',
+            'card-lg': '0 12px 0 #182b4d',
+            'card-pressed': '0 2px 0 #182b4d'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #182b4d;
+    }
+    .display {
+      font-family: 'Baloo 2', cursive;
+    }
+    .pushable {
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+      border: 3px solid #182b4d;
+      border-radius: 1rem;
+      box-shadow: 0 4px 0 #182b4d;
+    }
+    .pushable:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #182b4d;
+    }
+    .pushable-sm {
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+      border: 2px solid #182b4d;
+      border-radius: 0.75rem;
+      box-shadow: 0 3px 0 #182b4d;
+    }
+    .pushable-sm:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 #182b4d;
+    }
+    .chunky {
+      border: 3px solid #182b4d;
+      border-radius: 1.25rem;
+      box-shadow: 0 6px 0 #182b4d;
+    }
+    input[type=range] {
+      accent-color: #d97706;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col p-3 sm:p-5 antialiased selection:bg-amber-200">
+
+  <!-- ÜST NAVİGASYON VE LOGO BARI -->
+  <header class="max-w-6xl w-full mx-auto mb-4 flex items-center justify-between gap-3 bg-white px-4 py-3 chunky">
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="pushable-sm px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-ink font-black text-xs sm:text-sm flex items-center gap-1.5" title="Ana Sayfaya Dön">
+        <span>⬅</span> <span class="hidden sm:inline">Deneyler</span>
+      </a>
+      <div class="flex items-center gap-2">
+        <span class="text-2xl sm:text-3xl">🥔</span>
+        <div>
+          <span class="text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">19. Deney • 4, 5 & 8. Sınıf Fen</span>
+          <h1 class="display text-base sm:text-xl font-extrabold leading-none text-ink">Basınç Uzmanı Pipetler</h1>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sağ Üst: Ses & Sıfırlama -->
+    <div class="flex items-center gap-2">
+      <button id="soundToggle" class="pushable-sm px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-ink font-bold text-xs flex items-center gap-1">
+        <span id="soundIcon">🔊</span>
+        <span class="hidden sm:inline">Ses</span>
+      </button>
+      <button id="btnResetExperiment" class="pushable-sm px-2.5 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-900 font-bold text-xs flex items-center gap-1" title="Deneyi Sıfırla">
+        <span>🔄</span> <span class="hidden sm:inline">Yeni Patates</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ANA İÇERİK IZGARASI -->
+  <main class="max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
+    
+    <!-- SOL KOLON: FİZİK SİMÜLASYONU VE DENEY ALANI (7 Kolon) -->
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      
+      <!-- FİZİK LABORATUVARI KARTI -->
+      <section class="bg-white p-4 chunky flex flex-col justify-between flex-1 min-h-[500px]">
+        <div>
+          <!-- Başlık ve Durum Göstergesi -->
+          <div class="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-3 mb-3">
+            <div>
+              <span class="text-xs font-black uppercase text-amber-600 tracking-wider">Mekanik Laboratuvarı</span>
+              <h2 class="display text-lg sm:text-xl font-black text-ink">Pipetle Patates Delme Düzeneği</h2>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="lockBadge" class="px-2.5 py-1 bg-rose-100 text-rose-900 border-2 border-ink rounded-full text-xs font-black flex items-center gap-1">
+                <span>💨</span> <span id="lockBadgeText">Delik Açık (Hava Kaçar)</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Canlı İpucu Şeridi -->
+          <div id="tipBanner" class="bg-amber-50 p-2.5 rounded-xl border-2 border-amber-300 mb-3 flex items-center gap-2 text-xs font-bold text-amber-900">
+            <span id="tipIcon" class="text-xl">💡</span>
+            <span id="tipText">Pipetin üst deliğini başparmağınla kapatırsan içindeki hava sıkışarak pipeti çelik gibi sertleştirir!</span>
+          </div>
+
+          <!-- SVG DENEY SAHNESİ (Patates, Masa, Hareketli Pipet, Eldivenli El, Hava Kabarcıkları) -->
+          <div class="relative w-full aspect-[420/280] bg-gradient-to-b from-sky-50 via-amber-50/40 to-amber-100 rounded-2xl border-3 border-ink overflow-hidden flex items-center justify-center shadow-inner">
+            
+            <!-- Masa Tablası -->
+            <div class="absolute bottom-0 left-0 right-0 h-10 bg-amber-200 border-t-2 border-ink/40"></div>
+
+            <svg id="strawSvg" viewBox="0 0 420 280" class="w-full h-full overflow-visible select-none">
+              
+              <defs>
+                <!-- Patates Dokusu Degradesi -->
+                <radialGradient id="potatoGrad" cx="45%" cy="40%" r="60%">
+                  <stop offset="0%" stop-color="#fde68a"/>
+                  <stop offset="65%" stop-color="#d97706"/>
+                  <stop offset="100%" stop-color="#92400e"/>
+                </radialGradient>
+
+                <!-- Patates İç Kesit Rengi -->
+                <linearGradient id="potatoFlesh" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#fef3c7"/>
+                  <stop offset="100%" stop-color="#fde68a"/>
+                </linearGradient>
+
+                <!-- Pipet Kırmızı/Mavi Çizgili Degrade -->
+                <linearGradient id="strawGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#0284c7"/>
+                  <stop offset="25%" stop-color="#38bdf8"/>
+                  <stop offset="50%" stop-color="#ffffff"/>
+                  <stop offset="75%" stop-color="#38bdf8"/>
+                  <stop offset="100%" stop-color="#0369a1"/>
+                </linearGradient>
+
+                <!-- Sıkışan Hava Basıncı Parıltısı -->
+                <linearGradient id="airPressureGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.8"/>
+                  <stop offset="100%" stop-color="#2563eb" stop-opacity="0.2"/>
+                </linearGradient>
+              </defs>
+
+              <!-- MASA ÜSTÜ GÖLGELER -->
+              <ellipse cx="210" cy="245" rx="100" ry="14" fill="#94a3b8" opacity="0.4" />
+
+              <!-- PATATES (Merkezde duran taze patates) -->
+              <g id="potatoGroup" transform="translate(210, 215)">
+                <!-- Patates Ana Gövdesi (Doğal organik patates konturu) -->
+                <path id="potatoBody" d="M -90 5 C -95 -35, -50 -55, 0 -52 C 55 -55, 95 -35, 90 5 C 85 35, 45 42, 0 40 C -45 42, -85 35, -90 5 Z" 
+                      fill="url(#potatoGrad)" stroke="#182b4d" stroke-width="3.5" stroke-linejoin="round" />
+
+                <!-- Patates Kabuk Lekeleri ve Gözleri -->
+                <ellipse cx="-45" cy="-20" rx="4" ry="2" fill="#78350f" opacity="0.6" transform="rotate(-15 -45 -20)" />
+                <ellipse cx="40" cy="-25" rx="5" ry="2.5" fill="#78350f" opacity="0.6" transform="rotate(20 40 -25)" />
+                <ellipse cx="-20" cy="15" rx="4" ry="2" fill="#78350f" opacity="0.6" transform="rotate(5 -20 15)" />
+                <ellipse cx="50" cy="12" rx="3.5" ry="2" fill="#78350f" opacity="0.6" transform="rotate(-10 50 12)" />
+                <ellipse cx="5" cy="-10" rx="3" ry="1.5" fill="#78350f" opacity="0.5" />
+
+                <!-- Patates Üzerindeki Delinme / Hasar Yarası -->
+                <ellipse id="punctureHole" cx="0" cy="-52" rx="7" ry="3" fill="#78350f" stroke="#182b4d" stroke-width="2" opacity="0" />
+
+                <text x="0" y="24" text-anchor="middle" font-size="11" font-weight="900" fill="#ffffff" font-family="'Baloo 2'" opacity="0.9">🥔 Çiğ Patates</text>
+              </g>
+
+              <!-- HAREKETLİ PİPET VE ELDİVENLİ EL DÜZENEĞİ -->
+              <g id="strawAssembly" transform="translate(210, 50)">
+                
+                <!-- 1. PİPET GÖVDESİ (DÜZ VEYA SİVRİ AÇILI UÇLU) -->
+                <!-- Pipet İçi Sıkışan Hava Sütunu (Başparmak kapalıyken mavi parlar) -->
+                <rect id="strawAirColumn" x="-5" y="0" width="10" height="110" fill="url(#airPressureGrad)" opacity="0" />
+
+                <!-- Sağlam Düz Pipet -->
+                <g id="strawStraightGroup">
+                  <path id="strawPath" d="M -6 0 L -6 110 L 6 110 L 6 0 Z" 
+                        fill="url(#strawGrad)" stroke="#182b4d" stroke-width="2.5" stroke-linejoin="round" />
+                  <!-- Pipet Üzerindeki Çizgiler -->
+                  <line x1="-2" y1="0" x2="-2" y2="110" stroke="#ef4444" stroke-width="1.8" />
+                  <line x1="2" y1="0" x2="2" y2="110" stroke="#0284c7" stroke-width="1.5" />
+                </g>
+
+                <!-- Bükülmüş / Ezilmiş Pipet (Delik açıkken vuruşta görünür) -->
+                <g id="strawCrushedGroup" opacity="0">
+                  <path d="M -6 0 L -6 35 L -16 55 L 14 75 L -4 95 L -6 110 L 6 110 L 8 95 L 24 75 L -6 55 L 6 35 L 6 0 Z" 
+                        fill="#fda4af" stroke="#182b4d" stroke-width="2.5" stroke-linejoin="round" />
+                  <!-- Kırılma Çizgileri -->
+                  <line x1="-16" y1="55" x2="6" y2="55" stroke="#be123c" stroke-width="2" />
+                  <line x1="-4" y1="75" x2="14" y2="75" stroke="#be123c" stroke-width="2" />
+                  <!-- Büküldü Rozeti (Kendi arkaplanına sahip, çakışmayan etiket) -->
+                  <g transform="translate(34, 52)">
+                    <rect x="0" y="-12" width="90" height="24" rx="6" fill="#fef2f2" stroke="#dc2626" stroke-width="2" />
+                    <text x="45" y="4" text-anchor="middle" font-size="11" font-weight="900" fill="#dc2626" font-family="'Baloo 2'">💥 BÜKÜLDÜ!</text>
+                  </g>
+                </g>
+
+                <!-- 2. HAVA KAÇIŞ OKLARI / PATLAMA EFEKTİ (Delik Açıkken) -->
+                <g id="airEscapeBurst" opacity="0" transform="translate(0, -5)">
+                  <path d="M -15 -10 Q -5 -25 0 -30 Q 5 -25 15 -10" fill="none" stroke="#38bdf8" stroke-width="2" stroke-dasharray="3 2" />
+                  <text x="0" y="-35" text-anchor="middle" font-size="9" font-weight="900" fill="#0284c7" font-family="'Baloo 2'">💨 Hava Kaçtı!</text>
+                </g>
+
+                <!-- 3. GÜVENLİK ELDİVENLİ EL & BAŞPARMAK (Üst deliği kapatan veya açan el) -->
+                <g id="handGloveGroup" transform="translate(0, -8)">
+                  <!-- Eldivenli El Ayası -->
+                  <path d="M -18 -35 C -25 -25 -22 -10 -14 0 L 14 0 C 22 -10 25 -25 18 -35 Z" fill="#2563eb" stroke="#182b4d" stroke-width="2.5" />
+                  
+                  <!-- Başparmak (Üst deliğe basan parmak) -->
+                  <g id="thumbFinger" transform="translate(0, 0)">
+                    <ellipse cx="0" cy="2" rx="9" ry="6" fill="#3b82f6" stroke="#182b4d" stroke-width="2" />
+                    <!-- Başparmak Tırnağı / Dikişi -->
+                    <path d="M -5 0 Q 0 4 5 0" fill="none" stroke="#93c5fd" stroke-width="1.5" />
+                  </g>
+
+                  <!-- Parmak Durum Rozeti -->
+                  <g id="thumbStatusTag" transform="translate(38, -12)">
+                    <rect x="-8" y="-9" width="60" height="18" rx="6" fill="#ffffff" stroke="#182b4d" stroke-width="1.8" />
+                    <text id="thumbStatusText" x="22" y="3" text-anchor="middle" font-size="9" font-weight="900" fill="#dc2626" font-family="'Baloo 2'">AÇIK</text>
+                  </g>
+                </g>
+
+                <!-- Vuruş Yönü Oku -->
+                <g id="strikeArrow" opacity="0.7" transform="translate(32, 40)">
+                  <line x1="0" y1="0" x2="0" y2="35" stroke="#e11d48" stroke-width="3" stroke-linecap="round" />
+                  <polygon points="-5,35 0,44 5,35" fill="#e11d48" />
+                  <text x="14" y="24" font-size="10" font-weight="900" fill="#e11d48" font-family="'Baloo 2'">Kuvvet ⬇</text>
+                </g>
+
+              </g>
+
+              <!-- PATATES İÇİNE GİREN PİPET PARÇASI (Saplanınca görünür) -->
+              <g id="embeddedStraw" opacity="0" transform="translate(210, 163)">
+                <rect x="-6" y="0" width="12" height="35" fill="#0284c7" stroke="#182b4d" stroke-width="2" opacity="0.85" />
+                <line x1="-2" y1="0" x2="-2" y2="35" stroke="#ef4444" stroke-width="1.8" />
+              </g>
+
+              <!-- BAŞARI / DELME PATLAMA ROZETİ (Üst temiz bölgede, eldiven veya pipetle çakışmaz) -->
+              <g id="successBadge" opacity="0" style="opacity: 0; pointer-events: none;" transform="translate(210, 26)">
+                <rect x="-105" y="-15" width="210" height="30" rx="8" fill="#16a34a" stroke="#182b4d" stroke-width="2.5" />
+                <text x="0" y="5" text-anchor="middle" font-size="12" font-weight="900" fill="#ffffff" font-family="'Baloo 2'">🎯 PATATESİ DELİP GEÇTİ!</text>
+              </g>
+
+            </svg>
+          </div>
+
+          <!-- CANLI FİZİK SENSÖRLERİ PANELİ (P = F / A) -->
+          <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 bg-amber-50 p-2.5 rounded-xl border-2 border-ink text-center">
+            
+            <!-- 1. Kuvvet Sensörü -->
+            <div class="bg-white p-2 rounded-lg border border-ink shadow-sm">
+              <span class="text-[10px] font-black text-gray-500 uppercase block">Uygulanan Kuvvet (F)</span>
+              <span id="forceValueText" class="display text-base sm:text-lg font-black text-rose-600">30 N</span>
+            </div>
+
+            <!-- 2. Temas Yüzey Alanı -->
+            <div class="bg-white p-2 rounded-lg border border-ink shadow-sm">
+              <span class="text-[10px] font-black text-gray-500 uppercase block">Yüzey Alanı (A)</span>
+              <span id="areaValueText" class="display text-base sm:text-lg font-black text-sky-600">4 mm² (Sivri)</span>
+            </div>
+
+            <!-- 3. Hesaplanan Basınç (P = F / A) -->
+            <div class="bg-white p-2 rounded-lg border border-ink shadow-sm">
+              <span class="text-[10px] font-black text-gray-500 uppercase block">Basınç (P = F/A)</span>
+              <span id="pressureValueText" class="display text-base sm:text-lg font-black text-amber-600">750 N/cm²</span>
+            </div>
+
+            <!-- 4. Saplanma Derinliği -->
+            <div class="bg-white p-2 rounded-lg border border-ink shadow-sm">
+              <span class="text-[10px] font-black text-gray-500 uppercase block">Saplanma Derinliği</span>
+              <span id="depthValueText" class="display text-base sm:text-lg font-black text-emerald-600">0 mm</span>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- AKSİYON VE DENEY KONTROL PANELİ -->
+        <div class="mt-3 pt-3 border-t-2 border-dashed border-gray-300 space-y-3">
+          
+          <!-- Kontrol Seçenekleri: Uç Türü ve Hava Kilidi -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            
+            <!-- 1. Başparmak Hava Kilidi Butonu (En Önemli Değişken) -->
+            <button id="btnToggleHole" class="pushable py-2.5 px-3 bg-rose-100 hover:bg-rose-200 text-ink font-black text-xs sm:text-sm flex items-center justify-center gap-2">
+              <span id="holeBtnIcon">💨</span>
+              <span id="holeBtnText">Üst Deliği Kapat (Hava Kilidi)</span>
+            </button>
+
+            <!-- 2. Pipet Ucu Şekli (Yüzey Alanı Değişkeni) -->
+            <button id="btnToggleTip" class="pushable py-2.5 px-3 bg-amber-100 hover:bg-amber-200 text-ink font-black text-xs sm:text-sm flex items-center justify-center gap-2">
+              <span id="tipBtnIcon">✂️</span>
+              <span id="tipBtnText">Ucu Sivri Kes (Dar Yüzey)</span>
+            </button>
+
+          </div>
+
+          <!-- Kuvvet / Hız Ayar Kaydırıcısı -->
+          <div class="flex items-center justify-between gap-3 bg-yellow-50 px-3 py-2 rounded-xl border border-ink text-xs font-bold">
+            <label for="forceSlider" class="flex items-center gap-1.5 whitespace-nowrap text-ink">
+              <span>💪</span> <span>Vuruş Kuvveti:</span>
+            </label>
+            <span class="text-[10px] text-gray-500 font-bold">Yumuşak (10N)</span>
+            <input id="forceSlider" type="range" min="10" max="50" value="35" class="w-full h-2 bg-amber-200 rounded-lg cursor-pointer border border-ink" />
+            <span class="text-[10px] text-gray-500 font-bold">Sert (50N)</span>
+          </div>
+
+          <!-- BÜYÜK VUR & SAPLA BUTONU -->
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+            <button id="btnStrike" class="sm:col-span-9 pushable py-3 bg-amber-500 hover:bg-amber-600 text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-card">
+              <span class="text-xl animate-bounce">⚡</span>
+              <span>PATATESE SAPLA! (Vur)</span>
+              <span class="text-[11px] bg-amber-700 px-2 py-0.5 rounded-full text-white/90 hidden sm:inline">[Space]</span>
+            </button>
+            <button id="btnRemoveStraw" class="sm:col-span-3 pushable py-3 bg-gray-100 hover:bg-gray-200 text-ink font-bold text-xs flex items-center justify-center gap-1">
+              <span>🧹</span> <span>Pipeti Çıkar</span>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+
+
+    <!-- SAĞ KOLON: BİLİMSEL İLKELER, 4'LÜ MATRİS, GÖREVLER VE TEST (5 Kolon) -->
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      
+      <!-- REHBER VE SEKMELER -->
+      <div class="grid grid-cols-3 gap-1 bg-amber-100 p-1.5 rounded-2xl border-3 border-ink text-xs font-black">
+        <button id="tabTheory" class="side-tab-btn py-1.5 rounded-xl bg-white border-2 border-ink shadow-sm text-ink">
+          📖 Basınç & P=F/A
+        </button>
+        <button id="tabMatrix" class="side-tab-btn py-1.5 rounded-xl text-gray-700 hover:bg-white/60">
+          🔬 4 Durum
+        </button>
+        <button id="tabQuiz" class="side-tab-btn py-1.5 rounded-xl text-gray-700 hover:bg-white/60">
+          ⭐ Bilgi Testi
+        </button>
+      </div>
+
+      <!-- SEÇENEK 1: BİLİMSEL İLKELER VE GÖREVLER -->
+      <div id="sideViewTheory" class="space-y-3 flex-1 flex flex-col">
+        
+        <!-- Görev Listesi -->
+        <div class="bg-white p-3.5 chunky">
+          <div class="flex items-center justify-between border-b-2 border-gray-100 pb-2 mb-2">
+            <h3 class="display text-sm sm:text-base font-black text-ink flex items-center gap-1.5">
+              <span>🎯</span> <span>Basınç Uzmanı Görevleri</span>
+            </h3>
+            <span id="missionProgressText" class="px-2 py-0.5 bg-amber-100 border border-ink rounded-full text-[10px] font-black text-amber-900">
+              0 / 3 Görev
+            </span>
+          </div>
+
+          <ul class="space-y-2 text-xs font-bold text-gray-700">
+            <li id="m1" class="flex items-start gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50 transition-colors">
+              <span class="m-check text-base">⭕</span>
+              <div>
+                <span class="text-ink font-black block">1. Görev: Açık Delikle Bükülmeyi Gör</span>
+                <span class="text-[11px] text-gray-600 font-medium">Üst delik açıkken vur; havanın kaçıp pipetin nasıl ezildiğini gözlemle!</span>
+              </div>
+            </li>
+            <li id="m2" class="flex items-start gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50 transition-colors">
+              <span class="m-check text-base">⭕</span>
+              <div>
+                <span class="text-ink font-black block">2. Görev: Hava Kilidiyle Patatesi Del</span>
+                <span class="text-[11px] text-gray-600 font-medium">Başparmağınla üst deliği kapat, kuvveti artır ve patatese sapla!</span>
+              </div>
+            </li>
+            <li id="m3" class="flex items-start gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50 transition-colors">
+              <span class="m-check text-base">⭕</span>
+              <div>
+                <span class="text-ink font-black block">3. Görev: Sivri Uçla Maksimum Basınç</span>
+                <span class="text-[11px] text-gray-600 font-medium">Ucu sivri kes (küçük yüzey alanı) ve patatesi delip geçir!</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Katı Basıncı ve Hava Kilidi Prensibi Kartı -->
+        <div class="bg-white p-3.5 chunky flex-1 space-y-2.5">
+          <h3 class="display text-sm sm:text-base font-black text-ink flex items-center gap-1.5">
+            <span>📐</span> <span>Basıncın 2 Büyük Gizemi</span>
+          </h3>
+
+          <!-- Formül Kutusu -->
+          <div class="bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 p-2.5 rounded-xl border-2 border-ink text-center">
+            <span class="text-[11px] font-black text-amber-900 block uppercase tracking-wider">Katı Basıncı Formülü</span>
+            <div class="display text-xl font-black text-ink my-0.5">
+              Basınç (P) = <span class="text-rose-600">Kuvvet (F)</span> / <span class="text-sky-600">Yüzey Alanı (A)</span>
+            </div>
+            <p class="text-[11px] text-gray-700 font-bold">
+              Yüzey alanı küçüldükçe ($\downarrow$), aynı kuvvetle oluşan basınç devasa artar ($\uparrow$)!
+            </p>
+          </div>
+
+          <!-- İki Temel Açıklama -->
+          <div class="space-y-2 text-xs">
+            <div class="bg-blue-50 p-2.5 rounded-xl border-2 border-blue-200">
+              <span class="font-black text-blue-900 block mb-0.5">💨 1. Neden Başparmakla Kapatırız?</span>
+              <p class="text-[11px] text-blue-800 leading-tight">
+                Üst delik kapatıldığında pipet içindeki hava hapsolur. Çarpma anında sıkışan hava, incecik plastiği içeriden destekleyerek çelik bir sütun gibi dimdik tutar!
+              </p>
+            </div>
+
+            <div class="bg-rose-50 p-2.5 rounded-xl border-2 border-rose-200">
+              <span class="font-black text-rose-900 block mb-0.5">✂️ 2. Neden Sivri Uç Kolay Batar?</span>
+              <p class="text-[11px] text-rose-800 leading-tight">
+                Sivri uç temas alanını 6 kat küçültür! Tıpkı dikiş iğnesinin veya bıçağın ucu gibi, küçük yüzey patates kabuğunu tereyağı gibi yarar.
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- SEÇENEK 2: 4 DURUM KARŞILAŞTIRMA MATRİSİ -->
+      <div id="sideViewMatrix" class="hidden space-y-3 flex-1">
+        <div class="bg-white p-4 chunky">
+          <div class="flex items-center justify-between mb-3 border-b-2 border-gray-100 pb-2">
+            <h3 class="display text-base font-black text-ink flex items-center gap-1.5">
+              <span>🔬</span> <span>4 Farklı Durum Deneyi</span>
+            </h3>
+            <span class="px-2 py-0.5 bg-purple-100 border border-ink text-purple-900 rounded-full text-[10px] font-black">
+              Deney Matrisi
+            </span>
+          </div>
+
+          <div class="space-y-2 text-xs">
+            
+            <!-- Durum 1: Düz Uç + Delik Açık -->
+            <div class="p-2.5 rounded-xl border-2 border-rose-300 bg-rose-50">
+              <div class="flex items-center justify-between font-black text-rose-900 mb-1">
+                <span>1. Düz Uç + Delik AÇIK</span>
+                <span class="text-[10px] px-2 py-0.5 bg-rose-200 rounded border border-rose-400">❌ Başarısız</span>
+              </div>
+              <p class="text-[11px] text-rose-800 leading-tight">
+                Hava dışarı kaçar. Pipet yumuşak kalır ve patatese çarpınca ortadan bükülüp ezilir.
+              </p>
+            </div>
+
+            <!-- Durum 2: Düz Uç + Delik Kapalı -->
+            <div class="p-2.5 rounded-xl border-2 border-amber-300 bg-amber-50">
+              <div class="flex items-center justify-between font-black text-amber-900 mb-1">
+                <span>2. Düz Uç + Delik KAPALI</span>
+                <span class="text-[10px] px-2 py-0.5 bg-amber-200 rounded border border-amber-400">⚠️ Kısmi Başarı</span>
+              </div>
+              <p class="text-[11px] text-amber-800 leading-tight">
+                Hava sıkışır ve pipet bükülmez; ancak geniş düz yüzey nedeniyle patatese az miktarda saplanır.
+              </p>
+            </div>
+
+            <!-- Durum 3: Sivri Uç + Delik Açık -->
+            <div class="p-2.5 rounded-xl border-2 border-sky-300 bg-sky-50">
+              <div class="flex items-center justify-between font-black text-sky-900 mb-1">
+                <span>3. Sivri Uç + Delik AÇIK</span>
+                <span class="text-[10px] px-2 py-0.5 bg-sky-200 rounded border border-sky-400">⚠️ Riskli</span>
+              </div>
+              <p class="text-[11px] text-sky-800 leading-tight">
+                Sivri uç kabuğu deler fakat hava kaçtığı için pipetin üst kısımları yine bükülebilir.
+              </p>
+            </div>
+
+            <!-- Durum 4: Sivri Uç + Delik Kapalı -->
+            <div class="p-2.5 rounded-xl border-2 border-emerald-400 bg-emerald-50">
+              <div class="flex items-center justify-between font-black text-emerald-900 mb-1">
+                <span>4. Sivri Uç + Delik KAPALI</span>
+                <span class="text-[10px] px-2 py-0.5 bg-emerald-200 rounded border border-emerald-400">⭐ SÜPER BAŞARI</span>
+              </div>
+              <p class="text-[11px] text-emerald-800 leading-tight">
+                Maksimum basınç ($P \uparrow$) + sert pnömatik hava sütunu! Pipet patatesin içinden tereyağı gibi geçer!
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+
+      <!-- SEÇENEK 3: BİLGİ SINAVI (QUIZ) -->
+      <div id="sideViewQuiz" class="hidden space-y-3 flex-1">
+        <div class="bg-white p-4 chunky">
+          <div class="flex items-center justify-between mb-3 border-b-2 border-gray-100 pb-2">
+            <h3 class="display text-base font-black text-ink flex items-center gap-1.5">
+              <span>⭐</span> <span>Basınç Bilgi Testi</span>
+            </h3>
+            <span id="quizScoreBadge" class="px-2 py-0.5 bg-yellow-300 text-ink border border-ink rounded-full text-[10px] font-black">
+              Soru 1 / 5
+            </span>
+          </div>
+
+          <div id="quizBox" class="space-y-3">
+            <div class="bg-amber-50 p-3 rounded-xl border-2 border-amber-300">
+              <span id="quizQuestion" class="font-extrabold text-xs text-ink block leading-relaxed">
+                1. Pipetin üst deliğini başparmağımızla kapattığımızda pipetin patatese bükülmeden saplanmasını sağlayan fiziksel olay nedir?
+              </span>
+            </div>
+
+            <div id="quizOptions" class="space-y-2">
+              <!-- Seçenekler dinamik olarak yüklenir -->
+            </div>
+
+            <div id="quizFeedback" class="hidden p-2.5 rounded-xl border-2 text-xs font-bold leading-tight"></div>
+            
+            <button id="btnNextQuiz" class="hidden w-full pushable py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs items-center justify-center gap-1">
+              <span>Sıradaki Soru ➔</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ALT BİLGİ (FOOTER) -->
+  <footer class="max-w-6xl w-full mx-auto mt-4 py-2 px-4 bg-white/70 rounded-xl border border-ink/30 text-center text-xs text-gray-600 font-bold flex flex-wrap items-center justify-between gap-2">
+    <span>Küçük Mucitler Laboratuvarı • Basınç Uzmanı Pipetler Deneyi</span>
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="text-amber-800 hover:underline">Tüm Deneyler</a>
+      <span>•</span>
+      <a href="sogan-zarinda-hucre-kesfi.html" class="text-amber-800 hover:underline">Önceki: Soğan Zarı Hücresi</a>
+    </div>
+  </footer>
+
+
+  <!-- JAVASCRIPT: SESLER, FİZİK MOTORU, ANİMASYON VE TEST -->
+  <script>
+    // --- 1. WEB AUDIO API SES MOTORU ---
+    let audioCtx = null;
+    let isSoundEnabled = true;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    const Sound = {
+      // Hızlı iniş rüzgar sesi (whoosh)
+      whoosh() {
+        if (!isSoundEnabled) return;
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(320, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+      },
+
+      // Sert patatese saplanma tok darbe sesi (thump / thud)
+      thud() {
+        if (!isSoundEnabled) return;
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(160, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(45, ctx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.5, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
+      },
+
+      // Pipet bükülme / kırılma çıtırtısı (crunch)
+      crunch() {
+        if (!isSoundEnabled) return;
+        const ctx = getAudioContext();
+        [220, 180, 140].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          const t = ctx.currentTime + (idx * 0.04);
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.2, t);
+          gain.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.08);
+        });
+      },
+
+      // Hava kaçışı fısıltısı (hiss)
+      airHiss() {
+        if (!isSoundEnabled) return;
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(850, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.18);
+        gain.gain.setValueAtTime(0.18, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.18);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.18);
+      },
+
+      // Buton tıkırtısı
+      click() {
+        if (!isSoundEnabled) return;
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, ctx.currentTime);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.05);
+      },
+
+      // Başarı melodisi
+      success() {
+        if (!isSoundEnabled) return;
+        const ctx = getAudioContext();
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          const t = ctx.currentTime + (idx * 0.08);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.2, t);
+          gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.2);
+        });
+      }
+    };
+
+    // Ses Aç/Kapat Butonu
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    soundToggle.addEventListener('click', () => {
+      isSoundEnabled = !isSoundEnabled;
+      soundIcon.textContent = isSoundEnabled ? '🔊' : '🔇';
+      if (isSoundEnabled) Sound.click();
+    });
+
+
+    // --- 2. SİMÜLASYON FİZİK VE DURUM MOTORU ---
+    const State = {
+      isHoleSealed: false, // true = başparmakla kapalı, false = açık
+      isPointedTip: true,  // true = sivri açılı uç, false = düz uç
+      appliedForce: 35,    // 10 N ile 50 N arası
+      isStriking: false,
+      isEmbedded: false,
+      penetrationDepth: 0, // mm
+      calculatedPressure: 0,
+      missions: {
+        crush: false,
+        thumbPierce: false,
+        superStab: false
+      }
+    };
+
+    // Element Bağlantıları
+    const strawAssembly = document.getElementById('strawAssembly');
+    const strawPath = document.getElementById('strawPath');
+    const strawStraightGroup = document.getElementById('strawStraightGroup');
+    const strawCrushedGroup = document.getElementById('strawCrushedGroup');
+    const strawAirColumn = document.getElementById('strawAirColumn');
+    const airEscapeBurst = document.getElementById('airEscapeBurst');
+    const thumbStatusText = document.getElementById('thumbStatusText');
+    const embeddedStraw = document.getElementById('embeddedStraw');
+    const punctureHole = document.getElementById('punctureHole');
+    const successBadge = document.getElementById('successBadge');
+    const strikeArrow = document.getElementById('strikeArrow');
+
+    // Panel Butonları ve Metinler
+    const btnToggleHole = document.getElementById('btnToggleHole');
+    const holeBtnIcon = document.getElementById('holeBtnIcon');
+    const holeBtnText = document.getElementById('holeBtnText');
+    const btnToggleTip = document.getElementById('btnToggleTip');
+    const tipBtnIcon = document.getElementById('tipBtnIcon');
+    const tipBtnText = document.getElementById('tipBtnText');
+    const btnStrike = document.getElementById('btnStrike');
+    const btnRemoveStraw = document.getElementById('btnRemoveStraw');
+    const forceSlider = document.getElementById('forceSlider');
+    const lockBadge = document.getElementById('lockBadge');
+    const lockBadgeText = document.getElementById('lockBadgeText');
+    const tipBanner = document.getElementById('tipBanner');
+    const tipIcon = document.getElementById('tipIcon');
+    const tipText = document.getElementById('tipText');
+
+    // Göstergeler
+    const forceValueText = document.getElementById('forceValueText');
+    const areaValueText = document.getElementById('areaValueText');
+    const pressureValueText = document.getElementById('pressureValueText');
+    const depthValueText = document.getElementById('depthValueText');
+
+    // Fizik Hesaplama Fonksiyonu
+    function updatePhysicsCalculations() {
+      // Alan: Düz uç = 24 mm² (0.24 cm²), Sivri uç = 4 mm² (0.04 cm²)
+      const areaMm2 = State.isPointedTip ? 4 : 24;
+      const areaCm2 = areaMm2 / 100;
+      
+      // Basınç = F / A (N/cm²)
+      const pressure = Math.round(State.appliedForce / areaCm2);
+      State.calculatedPressure = pressure;
+
+      // Göstergeleri Güncelle
+      forceValueText.textContent = `${State.appliedForce} N`;
+      areaValueText.textContent = State.isPointedTip ? "4 mm² (Sivri)" : "24 mm² (Düz)";
+      pressureValueText.textContent = `${pressure} N/cm²`;
+      depthValueText.textContent = `${State.penetrationDepth} mm`;
+    }
+
+    // Pipet Uç Şeklini Ayarla (Düz veya Açılı Sivri)
+    function updateTipVisual() {
+      if (State.isPointedTip) {
+        // Sivri açılı uç (sol ucu uzun, sağ ucu kısa kesilmiş)
+        strawPath.setAttribute('d', "M -6 0 L -6 114 L 6 102 L 6 0 Z");
+        btnToggleTip.className = "pushable py-2.5 px-3 bg-emerald-100 hover:bg-emerald-200 text-ink font-black text-xs sm:text-sm flex items-center justify-center gap-2";
+        tipBtnIcon.textContent = "📐";
+        tipBtnText.textContent = "Ucu Düz Kes (Geniş Yüzey)";
+      } else {
+        // Düz uç
+        strawPath.setAttribute('d', "M -6 0 L -6 110 L 6 110 L 6 0 Z");
+        btnToggleTip.className = "pushable py-2.5 px-3 bg-amber-100 hover:bg-amber-200 text-ink font-black text-xs sm:text-sm flex items-center justify-center gap-2";
+        tipBtnIcon.textContent = "✂️";
+        tipBtnText.textContent = "Ucu Sivri Kes (Dar Yüzey)";
+      }
+      updatePhysicsCalculations();
+    }
+
+    // Başparmak Hava Kilidini Ayarla
+    function updateHoleVisual() {
+      if (State.isHoleSealed) {
+        // Delik Kapalı (Hava Kilitli)
+        thumbStatusText.textContent = "KAPALI";
+        thumbStatusText.setAttribute('fill', '#15803d');
+        strawAirColumn.setAttribute('opacity', '0.85');
+        btnToggleHole.className = "pushable py-2.5 px-3 bg-emerald-400 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2";
+        holeBtnIcon.textContent = "🔒";
+        holeBtnText.textContent = "Hava Kilidini Aç (Açık Uç)";
+        lockBadge.className = "px-2.5 py-1 bg-emerald-100 text-emerald-900 border-2 border-ink rounded-full text-xs font-black flex items-center gap-1";
+        lockBadgeText.textContent = "Delik Kapalı (Hava Kilitli ✨)";
+      } else {
+        // Delik Açık
+        thumbStatusText.textContent = "AÇIK";
+        thumbStatusText.setAttribute('fill', '#dc2626');
+        strawAirColumn.setAttribute('opacity', '0');
+        btnToggleHole.className = "pushable py-2.5 px-3 bg-rose-100 hover:bg-rose-200 text-ink font-black text-xs sm:text-sm flex items-center justify-center gap-2";
+        holeBtnIcon.textContent = "💨";
+        holeBtnText.textContent = "Üst Deliği Kapat (Hava Kilidi)";
+        lockBadge.className = "px-2.5 py-1 bg-rose-100 text-rose-900 border-2 border-ink rounded-full text-xs font-black flex items-center gap-1";
+        lockBadgeText.textContent = "Delik Açık (Hava Kaçar)";
+      }
+    }
+
+    btnToggleTip.addEventListener('click', () => {
+      Sound.click();
+      if (State.isEmbedded || strawCrushedGroup.getAttribute('opacity') === '1') {
+        resetStraw();
+      }
+      State.isPointedTip = !State.isPointedTip;
+      updateTipVisual();
+    });
+
+    btnToggleHole.addEventListener('click', () => {
+      Sound.click();
+      if (State.isEmbedded || strawCrushedGroup.getAttribute('opacity') === '1') {
+        resetStraw();
+      }
+      State.isHoleSealed = !State.isHoleSealed;
+      updateHoleVisual();
+    });
+
+    forceSlider.addEventListener('input', (e) => {
+      State.appliedForce = parseInt(e.target.value);
+      updatePhysicsCalculations();
+    });
+
+
+    // --- 3. PATATESE SAPLAMA / VURUŞ MOTORU ---
+    function triggerStrike() {
+      if (State.isStriking) return;
+
+      // Eğer pipet zaten saplanmış veya bükülmüşse, önce hızla başa alıp vursun
+      if (State.isEmbedded || strawCrushedGroup.getAttribute('opacity') === '1') {
+        gsap.set(strawAssembly, { y: 50 });
+        strawStraightGroup.setAttribute('opacity', '1');
+        strawCrushedGroup.setAttribute('opacity', '0');
+        airEscapeBurst.setAttribute('opacity', '0');
+        State.isEmbedded = false;
+        State.penetrationDepth = 0;
+      }
+
+      State.isStriking = true;
+
+      // Önceki durumları ve rozetleri temizle
+      strawStraightGroup.setAttribute('opacity', '1');
+      strawCrushedGroup.setAttribute('opacity', '0');
+      airEscapeBurst.setAttribute('opacity', '0');
+      gsap.killTweensOf(successBadge);
+      gsap.set(successBadge, { opacity: 0, scale: 0.8 });
+      // Vuruş anında kuvvet okunu gizle (metinlerin üstüne binmesin)
+      gsap.to(strikeArrow, { opacity: 0, duration: 0.1 });
+
+      Sound.whoosh();
+
+      // İniş Hızı ve Hedef Derinlik Hesabı
+      let willPenetrate = false;
+      let targetDepth = 0;
+      let isCrushed = false;
+
+      if (!State.isHoleSealed) {
+        // Delik AÇIK:
+        // Eğer delik açıksa, iç basınç oluşamaz! Pipet ezilir ve bükülür.
+        isCrushed = true;
+        willPenetrate = false;
+        targetDepth = 0;
+      } else {
+        // Delik KAPALI: Hava kilitli! Pipet sert bir kolon haline gelir.
+        if (State.isPointedTip) {
+          // Sivri uç + Kapalı delik: Maksimum derinlik (Kuvvete göre 25 - 45 mm)
+          willPenetrate = true;
+          targetDepth = Math.round(15 + (State.appliedForce * 0.6));
+        } else {
+          // Düz uç + Kapalı delik: Yüzey alanı geniş olduğu için patates kabuğu direnç gösterir (kısmi saplanma: 5 - 12 mm)
+          willPenetrate = true;
+          targetDepth = Math.round(5 + (State.appliedForce * 0.15));
+        }
+      }
+
+      // Vuruş Hareketi (Aşağı Hızlı Darbe)
+      gsap.to(strawAssembly, {
+        y: 110,
+        duration: 0.16,
+        ease: "power3.in",
+        onComplete: () => {
+          if (isCrushed) {
+            // BAŞARISIZ: PİPET EZİLDİ VE BÜKÜLDÜ
+            Sound.crunch();
+            Sound.airHiss();
+            strawStraightGroup.setAttribute('opacity', '0');
+            strawCrushedGroup.setAttribute('opacity', '1');
+            airEscapeBurst.setAttribute('opacity', '1');
+            gsap.set(successBadge, { opacity: 0 }); // Başarı rozeti kesinlikle gizli
+            
+            // Patates hafif sarsılır
+            gsap.fromTo("#potatoGroup", { y: 215 }, { y: 218, yoyo: true, repeat: 3, duration: 0.05 });
+
+            tipIcon.textContent = "💥";
+            tipText.textContent = "Hava kaçtığı için pipet basınç oluşturamadı ve büküldü! Başparmağınla üst deliği kapatmayı dene!";
+            State.penetrationDepth = 0;
+            updatePhysicsCalculations();
+
+            completeMission('crush');
+            State.isStriking = false;
+
+          } else {
+            // BAŞARILI: PATATESE SAPLANDI!
+            Sound.thud();
+            
+            // Patatese saplanma derinliği
+            const embedY = 110 + targetDepth;
+            gsap.to(strawAssembly, {
+              y: embedY,
+              duration: 0.08,
+              ease: "power1.out"
+            });
+
+            punctureHole.setAttribute('opacity', '0.9');
+            State.penetrationDepth = targetDepth;
+            updatePhysicsCalculations();
+
+            // Patates sarsılma tepkisi
+            gsap.fromTo("#potatoGroup", { y: 215 }, { y: 219, yoyo: true, repeat: 4, duration: 0.04 });
+
+            if (State.isPointedTip && targetDepth >= 30) {
+              // Süper Delme! Rozet üst açık alanda parlar
+              gsap.killTweensOf(successBadge);
+              gsap.fromTo(successBadge, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35, ease: "back.out(2)" });
+              Sound.success();
+              if (window.confetti) {
+                confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
+              }
+              tipIcon.textContent = "🎉";
+              tipText.textContent = `HARİKA! Sivri uç (dar alan) ve hava kilidi birleşti! ${State.calculatedPressure} N/cm² devasa basınçla ${targetDepth} mm derine saplandı!`;
+              completeMission('superStab');
+            } else {
+              gsap.set(successBadge, { opacity: 0 });
+              tipIcon.textContent = "🎯";
+              tipText.textContent = `Sert hava sütunu sayesinde bükülmeden ${targetDepth} mm saplandı! Ucu sivri keserek daha da derine girmesini sağlayabilirsin!`;
+              completeMission('thumbPierce');
+            }
+
+            State.isEmbedded = true;
+            State.isStriking = false;
+          }
+        }
+      });
+    }
+
+    btnStrike.addEventListener('click', triggerStrike);
+
+    // Pipeti Çıkar / Başa Al
+    function resetStraw() {
+      Sound.click();
+      gsap.killTweensOf(strawAssembly);
+      gsap.killTweensOf(successBadge);
+      gsap.set(successBadge, { opacity: 0, scale: 0.8 });
+      gsap.to(strikeArrow, { opacity: 0.7, duration: 0.2 });
+      gsap.to(strawAssembly, {
+        y: 50,
+        duration: 0.3,
+        ease: "power2.out",
+        onComplete: () => {
+          strawStraightGroup.setAttribute('opacity', '1');
+          strawCrushedGroup.setAttribute('opacity', '0');
+          airEscapeBurst.setAttribute('opacity', '0');
+          gsap.set(successBadge, { opacity: 0 });
+          State.penetrationDepth = 0;
+          State.isEmbedded = false;
+          State.isStriking = false;
+          updatePhysicsCalculations();
+        }
+      });
+    }
+
+    btnRemoveStraw.addEventListener('click', resetStraw);
+
+    // Klavye Space Tuşu Desteği
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        triggerStrike();
+      }
+    });
+
+    // Yeni Patates / Deneyi Sıfırla
+    document.getElementById('btnResetExperiment').addEventListener('click', () => {
+      Sound.click();
+      resetStraw();
+      punctureHole.setAttribute('opacity', '0');
+      tipIcon.textContent = "💡";
+      tipText.textContent = "Yeni patates masaya kondu! Farklı kuvvet ve uç kombinasyonlarını test et!";
+    });
+
+
+    // --- 4. GÖREV VE DEDEKTİF SİSTEMİ ---
+    function completeMission(key) {
+      if (State.missions[key]) return;
+      State.missions[key] = true;
+
+      const mEl = document.getElementById(key === 'crush' ? 'm1' : key === 'thumbPierce' ? 'm2' : 'm3');
+      if (mEl) {
+        mEl.className = "flex items-start gap-2 p-2 rounded-xl border border-emerald-300 bg-emerald-50 transition-colors";
+        mEl.querySelector('.m-check').textContent = "✅";
+      }
+
+      const count = Object.values(State.missions).filter(Boolean).length;
+      document.getElementById('missionProgressText').textContent = `${count} / 3 Görev`;
+
+      if (count === 3) {
+        Sound.success();
+        if (window.confetti) {
+          confetti({ particleCount: 80, spread: 80, origin: { y: 0.5 } });
+        }
+      }
+    }
+
+
+    // --- 5. SAĞ PANEL SEKMELERİ (TEORİ VS 4 DURUM VS TEST) ---
+    const tabTheory = document.getElementById('tabTheory');
+    const tabMatrix = document.getElementById('tabMatrix');
+    const tabQuiz = document.getElementById('tabQuiz');
+    const sideViewTheory = document.getElementById('sideViewTheory');
+    const sideViewMatrix = document.getElementById('sideViewMatrix');
+    const sideViewQuiz = document.getElementById('sideViewQuiz');
+
+    function switchSideTab(tab) {
+      Sound.click();
+      [tabTheory, tabMatrix, tabQuiz].forEach(b => b.className = "side-tab-btn py-1.5 rounded-xl text-gray-700 hover:bg-white/60");
+      [sideViewTheory, sideViewMatrix, sideViewQuiz].forEach(v => v.classList.add('hidden'));
+
+      if (tab === 'theory') {
+        tabTheory.className = "side-tab-btn py-1.5 rounded-xl bg-white border-2 border-ink shadow-sm text-ink";
+        sideViewTheory.classList.remove('hidden');
+      } else if (tab === 'matrix') {
+        tabMatrix.className = "side-tab-btn py-1.5 rounded-xl bg-white border-2 border-ink shadow-sm text-ink";
+        sideViewMatrix.classList.remove('hidden');
+      } else if (tab === 'quiz') {
+        tabQuiz.className = "side-tab-btn py-1.5 rounded-xl bg-white border-2 border-ink shadow-sm text-ink";
+        sideViewQuiz.classList.remove('hidden');
+      }
+    }
+
+    tabTheory.addEventListener('click', () => switchSideTab('theory'));
+    tabMatrix.addEventListener('click', () => switchSideTab('matrix'));
+    tabQuiz.addEventListener('click', () => switchSideTab('quiz'));
+
+
+    // --- 6. MEB UYUMLU BASINÇ BİLGİ SINAVI (QUIZ) ---
+    const QuizData = [
+      {
+        q: "1. Pipetin üst deliğini başparmağımızla kapattığımızda patatese bükülmeden saplanmasını sağlayan temel fiziksel olay nedir?",
+        opts: ["Plastiğin ısınarak sertleşmesi", "İçeride hapsolan havanın sıkışarak pipeti sert bir sütuna dönüştürmesi", "Patatesin manyetik çekim uygulaması", "Parmak izimizin pipete yapışması"],
+        correct: 1,
+        exp: "Delik kapatıldığında hava dışarı kaçamaz. Sıkışan iç hava basıncı, pipeti içeriden destekleyerek bükülmesini engeller."
+      },
+      {
+        q: "2. Katı basıncı formülüne göre ($P = F / A$), kuvvet sabit tutulurken temas yüzey alanı küçültülürse basınç nasıl değişir?",
+        opts: ["Basınç azalır", "Basınç değişmez", "Basınç katbekat artar", "Basınç sıfır olur"],
+        correct: 2,
+        exp: "Yüzey alanı ile basınç ters orantılıdır. Alan küçüldükçe aynı kuvvet çok daha büyük bir basınca dönüşür."
+      },
+      {
+        q: "3. Pipetin ucunu makasla eğik ve sivri kestiğimizde patatese neden çok daha derin ve kolay saplanır?",
+        opts: ["Pipet hafiflediği için", "Temas yüzey alanı küçüldüğü ve basınç arttığı için", "Pipetin rengi değiştiği için", "Hava sürtünmesi azaldığı için"],
+        correct: 1,
+        exp: "Sivri uç temas alanını küçültür; bu da patates kabuğuna binen basıncı devasa artırarak yarılmasını sağlar."
+      },
+      {
+        q: "4. Aşağıdaki günlük yaşam örneklerinden hangisi 'yüzey alanını küçülterek basıncı artırma' amacına örnek DEĞİLDİR?",
+        opts: ["Bıçağın ağzının bilerek inceltilmesi", "Çivinin ve iğnenin ucunun sivri yapılması", "Karda batmamak için geniş tabanlı kar ayakkabısı giyilmesi", "Krampon tabanında sivri dişlerin bulunması"],
+        correct: 2,
+        exp: "Kar ayakkabısı yüzey alanını GENİŞLETEREK basıncı AZALTIR; böylece karda batmadan yürünür."
+      },
+      {
+        q: "5. Pipetin üst deliği AÇIKKEN patatese sertçe vurursak ne olması beklenir?",
+        opts: ["Patates ikiye bölünür", "İçindeki hava hızla dışarı kaçar, pipet destek bulamayarak ortadan bükülür", "Pipet taşa dönüşür", "Patates havaya uçar"],
+        correct: 1,
+        exp: "Hava kaçtığı için iç basınç desteği kaybolur ve esnek plastik çarpma anında akordeon gibi bükülür."
+      }
+    ];
+
+    let currentQIdx = 0;
+    let quizScore = 0;
+
+    const quizScoreBadge = document.getElementById('quizScoreBadge');
+    const quizQuestion = document.getElementById('quizQuestion');
+    const quizOptions = document.getElementById('quizOptions');
+    const quizFeedback = document.getElementById('quizFeedback');
+    const btnNextQuiz = document.getElementById('btnNextQuiz');
+
+    function loadQuiz(idx) {
+      const q = QuizData[idx];
+      quizScoreBadge.textContent = `Soru ${idx + 1} / ${QuizData.length}`;
+      quizQuestion.textContent = q.q;
+      quizOptions.innerHTML = '';
+      quizFeedback.className = "hidden";
+      btnNextQuiz.classList.add('hidden');
+
+      q.opts.forEach((opt, oIdx) => {
+        const btn = document.createElement('button');
+        btn.className = "w-full text-left p-2.5 rounded-xl border-2 border-ink bg-white hover:bg-amber-50 font-bold text-xs flex items-center gap-2 transition-all";
+        btn.innerHTML = `<span class="w-5 h-5 rounded-full bg-amber-100 border border-ink flex items-center justify-center text-[10px] font-black">${String.fromCharCode(65 + oIdx)}</span> <span>${opt}</span>`;
+        btn.addEventListener('click', () => handleQuizSelect(oIdx, btn));
+        quizOptions.appendChild(btn);
+      });
+    }
+
+    function handleQuizSelect(selectedIdx, btnEl) {
+      const q = QuizData[currentQIdx];
+      const buttons = quizOptions.querySelectorAll('button');
+      buttons.forEach(b => b.disabled = true);
+
+      if (selectedIdx === q.correct) {
+        Sound.success();
+        quizScore++;
+        btnEl.className = "w-full text-left p-2.5 rounded-xl border-2 border-ink bg-emerald-100 font-bold text-xs flex items-center gap-2 text-emerald-900";
+        quizFeedback.className = "p-2.5 rounded-xl border-2 border-emerald-300 bg-emerald-50 text-emerald-900 text-xs font-bold leading-tight block";
+        quizFeedback.innerHTML = `<span>🎉 Harika Doğru!</span> <br><span class="text-[11px] font-medium text-emerald-800">${q.exp}</span>`;
+      } else {
+        Sound.crunch();
+        btnEl.className = "w-full text-left p-2.5 rounded-xl border-2 border-ink bg-rose-100 font-bold text-xs flex items-center gap-2 text-rose-900";
+        buttons[q.correct].className = "w-full text-left p-2.5 rounded-xl border-2 border-ink bg-emerald-100 font-bold text-xs flex items-center gap-2 text-emerald-900";
+        quizFeedback.className = "p-2.5 rounded-xl border-2 border-rose-300 bg-rose-50 text-rose-900 text-xs font-bold leading-tight block";
+        quizFeedback.innerHTML = `<span>❌ Yanlış Cevap.</span> <br><span class="text-[11px] font-medium text-rose-800">${q.exp}</span>`;
+      }
+
+      btnNextQuiz.classList.remove('hidden');
+      btnNextQuiz.classList.add('flex');
+    }
+
+    btnNextQuiz.addEventListener('click', () => {
+      Sound.click();
+      currentQIdx++;
+      if (currentQIdx < QuizData.length) {
+        loadQuiz(currentQIdx);
+      } else {
+        quizQuestion.textContent = `Tebrikler! Sınav Bitti! 🏆 Skorun: ${quizScore} / ${QuizData.length}`;
+        quizOptions.innerHTML = `
+          <div class="bg-amber-100 p-4 rounded-xl border-2 border-ink text-center">
+            <span class="text-4xl block mb-2">🥔</span>
+            <p class="text-xs font-bold text-ink mb-3">Basınç ve yüzey alanı prensiplerini harika şekilde öğrendin!</p>
+            <button onclick="restartQuiz()" class="pushable py-2 px-4 bg-amber-400 font-black text-xs">Tekrar Çöz</button>
+          </div>
+        `;
+        quizFeedback.className = "hidden";
+        btnNextQuiz.classList.add('hidden');
+        if (window.confetti && quizScore >= 3) {
+          confetti({ particleCount: 80, spread: 80, origin: { y: 0.5 } });
+        }
+      }
+    });
+
+    function restartQuiz() {
+      currentQIdx = 0;
+      quizScore = 0;
+      loadQuiz(0);
+    }
+    loadQuiz(0);
+
+
+    // Başlangıç Kurulumu
+    updateTipVisual();
+    updateHoleVisual();
+    updatePhysicsCalculations();
+  </script>
+</body>
+</html>
