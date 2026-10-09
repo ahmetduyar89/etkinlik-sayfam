@@ -17,6 +17,7 @@ import { existsSync } from 'node:fs';
 import { responsiveAppHtml } from './responsive-apps.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const appsDir = path.join(root, 'apps');
@@ -188,6 +189,20 @@ const swPath = path.join(distDir, 'sw.js');
 if (existsSync(swPath)) {
     const list = folders.map((f) => JSON.stringify(f.name)).join(', ');
     const sw = await readFile(swPath, 'utf8');
-    await writeFile(swPath, sw.replace('/*__APP_PATHS__*/', list));
+    const assets = (await readdir(path.join(distDir, 'assets')))
+        .filter((name) => !name.endsWith('.map'))
+        .sort()
+        .map((name) => '/assets/' + name);
+    assets.push('/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon-180.png');
+    const version = createHash('sha256')
+        .update(await readFile(indexPath))
+        .update(sw)
+        .update(list)
+        .update(JSON.stringify(assets))
+        .digest('hex').slice(0, 16);
+    await writeFile(swPath, sw
+        .replace('/*__APP_PATHS__*/', list)
+        .replace('/*__BUILD_VERSION__*/', version)
+        .replace('/*__SHELL_ASSETS__*/', assets.map((asset) => JSON.stringify(asset)).join(', ')));
     console.log(`[copy-apps] sw.js güncellendi (bağımsız yollar: ${list || 'yok'})`);
 }

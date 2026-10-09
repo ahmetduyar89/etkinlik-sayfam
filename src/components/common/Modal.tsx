@@ -16,13 +16,28 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     useEffect(() => {
         if (!isOpen) return;
         const previouslyFocused = document.activeElement as HTMLElement | null;
+        const focusable = () => Array.from(contentRef.current?.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
+        ) ?? []).filter((element) => element.getClientRects().length > 0);
+        const focusTimer = window.setTimeout(() => focusable()[0]?.focus(), 0);
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
+            if (e.key !== 'Tab') return;
+            const items = focusable();
+            const first = items[0];
+            const last = items[items.length - 1];
+            if (!first) { e.preventDefault(); return; }
+            if (e.shiftKey && (document.activeElement === first || !contentRef.current?.contains(document.activeElement))) {
+                e.preventDefault(); last.focus();
+            } else if (!e.shiftKey && (document.activeElement === last || !contentRef.current?.contains(document.activeElement))) {
+                e.preventDefault(); first.focus();
+            }
         };
         window.addEventListener('keydown', onKey);
         const prevOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
         return () => {
+            window.clearTimeout(focusTimer);
             window.removeEventListener('keydown', onKey);
             document.body.style.overflow = prevOverflow;
             previouslyFocused?.focus?.();

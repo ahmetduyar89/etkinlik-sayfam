@@ -8,6 +8,7 @@ import { ToastProvider } from './components/common/ToastProvider';
 import { ConfirmDialogProvider } from './components/common/ConfirmDialog';
 import { PromptDialogProvider } from './components/common/PromptDialog';
 import { PasswordGate } from './components/common/PasswordGate';
+import { ConnectionStatus } from './components/common/ConnectionStatus';
 import { listenForInstallPrompt, registerServiceWorker } from './lib/pwa';
 
 // Uygulama olarak kurulum istemi + otomatik güncelleme (service worker)
@@ -28,6 +29,7 @@ ReactDOM.createRoot(rootElement).render(
                         <PasswordGate>
                             <AppShell />
                         </PasswordGate>
+                        <ConnectionStatus />
                     </PromptDialogProvider>
                 </ConfirmDialogProvider>
             </ToastProvider>

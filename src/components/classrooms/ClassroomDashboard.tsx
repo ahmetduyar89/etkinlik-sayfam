@@ -1,4 +1,5 @@
 import { QrLoginHelpButton } from '../common/QrLogin';
+import { InstallAppButton } from '../common/InstallAppButton';
 // src/components/classrooms/ClassroomDashboard.tsx — Sınıf Odaklı Çalışma Alanı
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -190,8 +191,8 @@ export function ClassroomDashboard({
             )}
 
             {/* Üst Başlık (Header) */}
-            <header className="border-b border-slate-200/80 bg-white/80 backdrop-blur-xl sticky top-0 z-30">
-                <div className="mx-auto flex max-w-[1240px] items-center justify-between px-5 py-3.5 sm:px-8">
+            <header className="app-safe-header border-b border-slate-200/80 bg-white/80 backdrop-blur-xl sticky top-0 z-30">
+                <div className="mx-auto flex flex-wrap gap-3 max-w-[1240px] items-center justify-between px-5 py-3.5 sm:px-8">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-[16px] shadow-sm">
                             {activeClass.name.slice(0, 2).toUpperCase()}
@@ -212,6 +213,7 @@ export function ClassroomDashboard({
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <InstallAppButton />
                         {!isAdminPreview && <QrLoginHelpButton />}
                         {isAdminPreview ? (
                             <button

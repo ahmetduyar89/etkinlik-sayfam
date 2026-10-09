@@ -23,6 +23,7 @@ import { auth } from '../../lib/firebase';
 import { bootstrapTeacherRole, fetchDocById, signInClass } from '../../lib/firebase';
 import { readQrScan } from '../../lib/qrLogin';
 import { QrLoginApproval, QrLoginDisplay } from './QrLogin';
+import { InstallAppButton } from './InstallAppButton';
 
 interface PasswordGateProps {
     children: React.ReactNode;
@@ -183,8 +184,8 @@ export function PasswordGate({ children }: PasswordGateProps) {
     if (isUnlocked || isStudentLink() || isChessLink()) return <>{children}</>;
 
     return (
-        <div className="min-h-[100svh] bg-[#f8fafc] flex items-center justify-center p-4 sm:p-6 font-sans">
-            <div className="w-full max-w-[400px] bg-white border border-slate-200/80 rounded-[28px] shadow-[0_12px_40px_rgba(15,23,42,0.08)] p-6 sm:p-8 flex flex-col items-center">
+        <div className="app-safe-screen min-h-[100svh] bg-[#f8fafc] flex items-center justify-center font-sans">
+            <div className="w-full max-w-[400px] m-4 sm:m-6 bg-white border border-slate-200/80 rounded-[28px] shadow-[0_12px_40px_rgba(15,23,42,0.08)] p-6 sm:p-8 flex flex-col items-center">
                 {/* Logo & Başlık */}
                 <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100/80 text-indigo-600 flex items-center justify-center mb-3.5 shadow-sm">
                     {tab === 'admin' ? (
@@ -367,6 +368,8 @@ export function PasswordGate({ children }: PasswordGateProps) {
                 )}
 
                 {!qrScan && <QrLoginDisplay />}
+
+                <InstallAppButton className="mt-5 [&>span]:inline" />
 
                 <div className="mt-6 pt-5 border-t border-slate-100 w-full text-center">
                     <p className="text-[11.5px] text-slate-400">
