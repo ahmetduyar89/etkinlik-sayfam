@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, or, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export interface CloudMatch {
@@ -8,6 +8,8 @@ export interface CloudMatch {
     classId: string;
     whiteId: string;
     blackId: string;
+    whiteName?: string;
+    blackName?: string;
     result: '1-0' | '0-1' | '1/2-1/2';
     date?: string;
 }
@@ -32,6 +34,7 @@ export interface CloudProgress {
         completedLessons?: string[];
         solvedPuzzles?: string[];
         puzzleStats?: Record<string, { solved?: number; wrong?: number; hints?: number }>;
+        gamesArchive?: Array<{ id: string; result: string; playedAt?: string; level?: { id?: string }; moves?: unknown[] }>;
     };
 }
 
@@ -64,18 +67,25 @@ export const levelOf = (xp = 0) => Math.floor(xp / 120) + 1;
 export const pointsText = (points: number) => Number.isInteger(points) ? String(points) : `${Math.floor(points)}½`;
 
 /** Öğretmen ekranlarının kullandığı bütün satranç bulut akışlarını tek yerde toplar. */
-export function useCloudChess() {
+export function useCloudChess(classId?: string) {
     const [matches, setMatches] = useState<CloudMatch[]>([]);
     const [tournaments, setTournaments] = useState<CloudTournament[]>([]);
     const [progress, setProgress] = useState<CloudProgress[]>([]);
     const [devices, setDevices] = useState<SyncDevice[]>([]);
     const [presence, setPresence] = useState<LivePresence[]>([]);
     const [liveGames, setLiveGames] = useState<LiveGame[]>([]);
+    const [confirmed, setConfirmed] = useState<Record<string, boolean>>({});
+    const [lastConfirmedAt, setLastConfirmedAt] = useState<Date | null>(null);
     const [collectionErrors, setCollectionErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
+        setMatches([]); setTournaments([]); setProgress([]); setDevices([]); setPresence([]); setLiveGames([]); setConfirmed({}); setCollectionErrors({});
         const watch = <T extends { id: string }>(name: string, setter: (items: T[]) => void) =>
-            onSnapshot(collection(db, name), (snapshot) => {
+            onSnapshot(classId ? (name === 'liveChessGames' ? query(collection(db, name), or(where('whiteClassId', '==', classId), where('blackClassId', '==', classId))) : query(collection(db, name), where('classId', '==', classId))) : collection(db, name), { includeMetadataChanges: true }, (snapshot) => {
+                const ready = !snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites;
+                setConfirmed(current => ({ ...current, [name]: ready }));
+                if (!ready) return;
+                setLastConfirmedAt(new Date());
                 setter(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as T)));
                 setCollectionErrors((current) => {
                     if (!current[name]) return current;
@@ -94,12 +104,12 @@ export function useCloudChess() {
             watch<LiveGame>('liveChessGames', setLiveGames),
         ];
         return () => stops.forEach((stop) => stop());
-    }, []);
+    }, [classId]);
 
     const failedCollections = Object.keys(collectionErrors);
     const error = failedCollections.length > 0
         ? `${failedCollections.join(', ')}: ${collectionErrors[failedCollections[0]]}`
         : null;
 
-    return { matches, tournaments, progress, devices, presence, liveGames, error };
+    return { matches, tournaments, progress, devices, presence, liveGames, error, ready: Object.keys(confirmed).length === 6 && Object.values(confirmed).every(Boolean), lastConfirmedAt };
 }

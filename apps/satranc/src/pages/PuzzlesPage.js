@@ -41,6 +41,8 @@ export function PuzzlesPage({ progress, sound }) {
   // Derin bağlantı: #/puzzles?tema=acmaz — öğretmen dersin konusuna uygun
   // bulmacaları tek tıkla açabilsin diye.
   let theme = THEME_KEYS.includes(routeParam("tema")) ? routeParam("tema") : "hepsi";
+  const requestedPuzzle = puzzles.find(item => item.id === routeParam("id"));
+  let requestedLoaded = false;
   let puzzle = null;
   let chess = null;
   let step = 0; // kaç doğru hamle yapıldı
@@ -102,6 +104,7 @@ export function PuzzlesPage({ progress, sound }) {
    * kısıtını gevşetir, temayı koruruz — çünkü seçilen KONU önemlidir.
    */
   function pickPuzzle() {
+    if (requestedPuzzle && !requestedLoaded) { requestedLoaded = true; return requestedPuzzle; }
     const targetTheme = daily ? dailyThemes[dailySolved % dailyThemes.length] : theme;
     if (daily) theme = targetTheme;
     const byTheme = targetTheme === "hepsi" ? puzzles : puzzles.filter((item) => item.theme === targetTheme);

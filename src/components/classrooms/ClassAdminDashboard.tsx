@@ -1,3 +1,5 @@
+import { StudentLearningReport } from '../learning/StudentLearningReport';
+import { AssignmentManager } from '../learning/AssignmentManager';
 import { useMemo, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -119,6 +121,7 @@ function ClassWorkspace({ item, cloud, onEdit, onPreview }: {
     onEdit: () => void;
     onPreview: () => void;
 }) {
+    const [focusedStudent, setFocusedStudent] = useState<string | null>(null);
     const matches = cloud.matches.filter((match) => match.classId === item.id);
     const tournaments = cloud.tournaments.filter((tournament) => tournament.classId === item.id);
     const profiles = cloud.progress.filter((profile) => profile.classId === item.id && profile.profileId.startsWith('student:'));
@@ -201,13 +204,15 @@ function ClassWorkspace({ item, cloud, onEdit, onPreview }: {
 
                 <div className="mt-5 flex flex-wrap items-center gap-2 rounded-2xl bg-slate-50 p-3">
                     <span className="mr-auto text-xs font-semibold text-slate-500">
-                        {lastSync ? `Son bulut eşitleme: ${lastSync.toLocaleString('tr-TR')}` : 'Bu sınıftan henüz bulut eşitlemesi gelmedi.'}
+                        {cloud.ready ? `Sunucudan son güncelleme: ${(cloud.lastConfirmedAt || lastSync)?.toLocaleString('tr-TR') || 'Güncel'}` : 'Sunucu kayıtları bekleniyor…'}
                     </span>
                     <a href={chessUrl(item.id, 'reports')} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white">Satranç raporu <ExternalLink className="ml-1 inline h-3.5 w-3.5" /></a>
                     <a href={chessUrl(item.id, 'turnuva')} className="rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-white">Turnuva yönetimi</a>
                     <a href={chessUrl(item.id, 'siniflar')} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600">Satranç öğrencileri</a>
                 </div>
             </div>
+
+            <AssignmentManager key={item.id} classroom={item} />
 
             {cloud.error && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
@@ -232,7 +237,7 @@ function ClassWorkspace({ item, cloud, onEdit, onPreview }: {
                                 <tr key={row.student.id} className="hover:bg-slate-50/70">
                                     <td className="p-3 font-bold text-slate-400">{index + 1}</td>
                                     <td className="p-3 font-mono font-bold text-slate-600">{row.student.schoolNumber || '—'}</td>
-                                    <td className="p-3 font-bold">{row.student.name}</td>
+                                    <td className="p-3 font-bold"><button type="button" onClick={() => setFocusedStudent(row.student.id)} className="min-h-11 text-left text-indigo-700 underline decoration-indigo-200 underline-offset-4">{row.student.name}</button></td>
                                     <td className={`p-3 text-xs font-bold ${row.student.schoolNumber ? 'text-emerald-600' : 'text-amber-600'}`}>{row.student.schoolNumber ? 'Hazır' : 'Numara gerekli'}</td>
                                     <td className="p-3">{row.profile ? levelOf(row.profile.progress?.xp) : '—'}</td>
                                     <td className="p-3">{row.profile?.progress?.xp ?? '—'}</td>
@@ -247,6 +252,7 @@ function ClassWorkspace({ item, cloud, onEdit, onPreview }: {
                 </div>
             </div>
 
+            {focusedStudent && <StudentLearningReport key={focusedStudent} classroom={item} studentId={focusedStudent} cloud={cloud} onClose={() => setFocusedStudent(null)} />}
             {tournaments.length > 0 && (
                 <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
                     <h3 className="flex items-center gap-2 font-extrabold"><Trophy className="h-4 w-4 text-amber-500" /> Sınıf turnuvaları</h3>

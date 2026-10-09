@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
 import App from './App';
+import { StudentWorkspace } from './components/student/StudentWorkspace';
 import { ChessArena } from './components/chess/ChessArena';
 import { PortalHome } from './components/portal/PortalHome';
 import { ClassroomDashboard } from './components/classrooms/ClassroomDashboard';
@@ -39,11 +40,15 @@ export default function AppShell() {
         if (target) goToSection(target.id);
     }, []);
 
+    if (new URLSearchParams(location.search).get('view') === 'ogrenci') return <StudentWorkspace />;
+
     // Öğrenciye gönderilen bağlantılar atölye ekranını atlar.
     if (isStudentLink()) return <App />;
 
     // Canlı Satranç kendi başına bir sayfadır.
     if (isChessLink()) return <ChessArena />;
+
+    if (session?.role === 'student') return <StudentWorkspace />;
 
     // Sınıf oturumu açıldıysa veya Admin bir sınıfı önizliyorsa
     if (previewClass || isClassMode) {

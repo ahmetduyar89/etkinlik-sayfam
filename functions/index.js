@@ -3,8 +3,9 @@ const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { FieldValue, Timestamp, getFirestore } = require('firebase-admin/firestore');
 const { defineString } = require('firebase-functions/params');
+const { classMatchPlayerId } = require('./learning');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
-const { onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { onDocumentUpdated, onDocumentWritten } = require('firebase-functions/v2/firestore');
 
 initializeApp();
 
@@ -203,6 +204,15 @@ exports.loginStudent = onCall(callableOptions, async (request) => {
     throw new HttpsError('unauthenticated', 'Öğrenci numarası bulunamadı.');
   }
   const data = lookup.data();
+  const normalizeStudentName = value => cleanText(value, 80).toLocaleLowerCase('tr');
+  if ((request.data?.name && normalizeStudentName(request.data.name) !== normalizeStudentName(data.studentName)) ||
+      (request.data?.classId && request.data.classId !== data.classId)) {
+    throw new HttpsError('unauthenticated', 'Ad soyad, öğrenci numarası veya sınıf eşleşmedi.');
+  }
+  const classroom = await db.collection('classes').doc(data.classId).get();
+  if (!classroom.exists || !classroom.data()?.students?.some(s => s.id === data.studentId && s.active !== false)) {
+    throw new HttpsError('unauthenticated', 'Öğrenci kaydı artık etkin değil.');
+  }
   const uid = `student_${cleanId(data.classId)}_${cleanId(data.studentId)}`;
   const token = await getAuth().createCustomToken(uid, {
     role: 'student',
@@ -267,8 +277,10 @@ exports.archiveLiveChessGame = onDocumentUpdated({
       id: roomId,
       localId: roomId,
       classId,
-      whiteId: after.white.studentId,
-      blackId: after.black.studentId,
+      whiteId: classMatchPlayerId(after.white, classId),
+      whiteName: after.white.name,
+      blackId: classMatchPlayerId(after.black, classId),
+      blackName: after.black.name,
       result: after.result.code,
       moves,
       source: 'live-chess',
@@ -301,3 +313,22 @@ exports.cleanupQrLogins = onSchedule({ schedule: 'every 24 hours', region: 'euro
     }
   }
 });
+
+// Class/student assignments share one central result stream.
+const { createLearningHandlers } = require('./learning');
+const learning = createLearningHandlers({ db, HttpsError, FieldValue, requireTeacher });
+for (const name of ['saveLearningAssignment', 'archiveLearningAssignment', 'startLearningAssignment', 'completeLearningAssignment']) {
+  exports[name] = onCall(callableOptions, learning[name]);
+}
+exports.syncChessLearningResults = onDocumentWritten({ document: 'chess_progress/{profileId}', region: 'europe-west1' }, async event => {
+  const data = event.data?.after.data();
+  if (!data?.classId || !data?.profileId?.startsWith('student:')) return;
+  await learning.syncProgressResults(data.classId, data.profileId.slice(8));
+});
+
+const { createBotGameHandler } = require('./bot-games');
+exports.recordChessBotGame = onCall(callableOptions, createBotGameHandler({ db, HttpsError, FieldValue,
+  loadChess: async () => (await import('./chess-engine.mjs')).Chess }));
+
+const { createClassNotebookHandler } = require('./learning');
+exports.createClassLessonNotebook = onCall(callableOptions, createClassNotebookHandler({ db, HttpsError, FieldValue, requireTeacher }));

@@ -1,3 +1,4 @@
+import { routeParam } from '../utils/router.js';
 /**
  * PlayPage.js — "Bilgisayara Karşı Oyna" ekranı.
  *
@@ -43,7 +44,7 @@ function clockText(ms) {
 }
 
 export function PlayPage({ progress, sound }) {
-  const game = new GameService({ level: "kolay", playerColor: "w" });
+  const game = new GameService({ level: ["kolay", "orta", "zor"].includes(routeParam("seviye")) ? routeParam("seviye") : "kolay", playerColor: "w" });
   let resultRecorded = false;
   let rewardGranted = false;
   let currentGameId = newGameId();

@@ -1,11 +1,6 @@
-/**
- * CloudSyncService — Satranç Okulu'nun çevrimdışı kayıtlarını Firestore ile
- * iki yönlü eşitler.
- *
- * Bu dosya yalnızca http/https altında ve doğrulanmış Firebase öğretmen
- * oturumu bulunduğunda devreye girer. USB / file:// sürümü hiçbir ağ modülü
- * yüklemeden eski davranışıyla çalışmaya devam eder.
- */
+/** Central records are authoritative; local storage is only a display cache. */
+import { defaultProgress } from "../models/progress.js";
+import { recordData, changesBetween, serializeTournament, deserializeTournament } from "./CloudRecords.js";
 
 const SDK = "https://www.gstatic.com/firebasejs/10.8.0";
 const DEVICE_KEY = "satranc-okulu-device-id";
@@ -52,422 +47,210 @@ async function loadFirebase() {
   } catch {
     db = storeSdk.getFirestore(app);
   }
-  return { auth, db, storeSdk };
+  return { auth, db, storeSdk, authSdk };
 }
 
-function classIdForProfile(classroom, profileId) {
-  if (profileId.startsWith("class:")) return profileId.slice(6);
-  if (!profileId.startsWith("student:")) return null;
-  const studentId = profileId.slice(8);
-  return classroom.classes.find((item) => item.students.some((student) => student.id === studentId))?.id || null;
-}
-
-function repairOrphanedClassIds(classroom) {
-  const classIds = new Set(classroom.classes.map((item) => item.id));
-  const classByStudent = new Map();
-  for (const item of classroom.classes) {
-    for (const student of item.students || []) classByStudent.set(student.id, item.id);
-  }
-
-  const inferClassId = (studentIds) => {
-    const candidates = [...new Set(studentIds.map((id) => classByStudent.get(id)).filter(Boolean))];
-    return candidates.length === 1 ? candidates[0] : null;
-  };
-
-  let changed = false;
-  for (const match of classroom.state.matches || []) {
-    if (classIds.has(match.classId)) continue;
-    const inferred = inferClassId([match.whiteId, match.blackId]);
-    if (inferred) {
-      match.classId = inferred;
-      changed = true;
-    }
-  }
-  for (const tournament of classroom.state.tournaments || []) {
-    if (classIds.has(tournament.classId)) continue;
-    const boardIds = (tournament.rounds || []).flatMap((round) =>
-      (round || []).flatMap((board) => [board?.whiteId, board?.blackId])
-    );
-    const inferred = inferClassId([...(tournament.playerIds || []), ...boardIds].filter(Boolean));
-    if (inferred) {
-      tournament.classId = inferred;
-      changed = true;
-    }
-  }
-  if (changed) classroom.save();
-}
-
-export async function startCloudSync({ classroom, progress }) {
-  if (!location.protocol.startsWith("http")) return () => {};
-  announce("connecting");
-
-  let firebase;
+export async function startCloudSync({ classroom, progress, connect = loadFirebase }) {
+  announce("connecting", "Güncel sınıflar ve satranç kayıtları sunucudan alınıyor.");
+  // Keep the original offline data separately. Never upload it on startup.
   try {
-    firebase = await loadFirebase();
-  } catch (error) {
-    console.warn("[bulut] başlatılamadı:", error);
-    announce("offline", error.message || "Bulut bağlantısı kurulamadı.");
-    return () => {};
-  }
-
-  const { auth, db, storeSdk } = firebase;
-  if (typeof auth.authStateReady === "function") await auth.authStateReady();
-
-  const user = auth.currentUser;
-  let tokenClaims = {};
-  if (user) {
-    try {
-      const tokenResult = await user.getIdTokenResult();
-      tokenClaims = tokenResult.claims || {};
-    } catch (e) {
-      console.warn("[bulut] token okunamadı:", e);
-    }
-  }
-
-  // 1. Firebase Auth token içindeki doğrulanmış classId (en yetkili kaynak)
-  let sessionClassId = null;
-  if (tokenClaims.role === "class" && typeof tokenClaims.classId === "string") {
-    sessionClassId = tokenClaims.classId;
-  }
-  // 2. Portal oturum kaydı
-  if (!sessionClassId) {
-    try {
-      const session = JSON.parse(localStorage.getItem("etkinlik_oturum"));
-      if (session?.role === "class") sessionClassId = session.classId || null;
-    } catch { /* yok say */ }
-  }
-  // 3. URL parametresi (?classId=...)
-  if (!sessionClassId) {
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlClassId = urlParams.get("classId");
-      if (urlClassId) sessionClassId = urlClassId;
-    } catch { /* yok say */ }
-  }
-  // 4. Classroom aktif sınıfı
-  if (!sessionClassId && classroom.state.activeClassId) {
-    sessionClassId = classroom.state.activeClassId;
-  }
-
-  const isTeacherUser = tokenClaims.role === "teacher";
-  const isClassUser = tokenClaims.role === "class" || Boolean(sessionClassId);
-
-  // Doğrulanmış bir oturum yoksa veya anonimse hata fırlatmak yerine bulut senkronizasyonunu zararsızca durdururuz.
-  if (!user || user.isAnonymous) {
-    announce("signed-out", "Bulut senkronizasyonu için öğretmen veya sınıf oturumu gereklidir.");
-    return () => {};
-  }
-  if (!isTeacherUser && !sessionClassId) {
-    announce("signed-out", "Sınıf bilgisi bulunamadı; bulut senkronizasyonu bekletiliyor.");
-    return () => {};
-  }
-
-  repairOrphanedClassIds(classroom);
-
-  const {
-    collection,
-    doc,
-    getDoc,
-    onSnapshot,
-    query,
-    serverTimestamp,
-    setDoc,
-    where
-  } = storeSdk;
-
-  if (sessionClassId && !classroom.getClass(sessionClassId) && typeof getDoc === "function") {
-    try {
-      const classSnap = await getDoc(doc(db, "classes", sessionClassId));
-      if (classSnap.exists()) {
-        const d = classSnap.data();
-        const newClass = {
-          id: classSnap.id,
-          name: d.name || "Sınıf",
-          students: (Array.isArray(d.students) ? d.students : []).map((s) => ({
-            id: s.id,
-            name: s.name,
-            removed: Boolean(s.removed)
-          }))
-        };
-        classroom.state.classes.push(newClass);
-        classroom.setActiveClass(sessionClassId);
-        classroom.save();
-      }
-    } catch (e) {
-      console.warn("[bulut] sınıf bilgisi çekilemedi:", e);
-    }
-  } else if (sessionClassId && classroom.getClass(sessionClassId)) {
-    if (classroom.state.activeClassId !== sessionClassId) {
-      classroom.setActiveClass(sessionClassId);
-    }
-  }
-
-  let applyingRemote = false;
-  let classroomTimer = 0;
-  let progressTimer = 0;
-  let heartbeatTimer = 0;
-  const stops = [];
-  const device = deviceId();
-
-  const docKey = (classId, localId) => key(classId, localId);
-  const matchDoc = (item) => item._cloudDocId || docKey(item.classId, item.id);
-  const tournamentDoc = (item) => item._cloudDocId || docKey(item.classId, item.id);
-  const progressDoc = (classId, profileId) => docKey(classId, profileId);
-
-  const visibleCollection = (name) => {
-    if (sessionClassId) {
-      return query(collection(db, name), where("classId", "==", sessionClassId));
-    }
-    if (isTeacherUser) {
-      return collection(db, name);
-    }
-    return null;
-  };
-
-  const cloudData = (item) => {
-    const { _cloudDocId, ...data } = clean(item);
-    return data;
-  };
-
-  function serializeTournament(item) {
-    const data = clean(item);
-    // Firestore iç içe dizileri (nested arrays) desteklemez.
-    // rounds: [[board1], [board2]] yapısını nesne dizisine dönüştürürüz:
-    if (Array.isArray(data.rounds)) {
-      data.rounds = data.rounds.map((round, idx) => ({
-        roundNumber: idx + 1,
-        boards: Array.isArray(round)
-          ? round
-          : (round && Array.isArray(round.boards) ? round.boards : [])
+    if (!localStorage.getItem("satranc-online-migration-backup")) {
+      localStorage.setItem("satranc-online-migration-backup", JSON.stringify({
+        exportedAt: new Date().toISOString(), classroom: classroom.state, progress: progress.store
       }));
     }
-    return data;
+  } catch (error) { console.warn("[satranç] eski kayıt yedeği alınamadı", error); }
+  if (!location.protocol.startsWith("http")) {
+    announce("error", "Çevrimiçi satranç için Atölye web adresinden giriş yapın. Dosya üzerinden eşzamanlı kayıt yapılamaz.");
+    return () => {};
   }
-
-  function deserializeTournament(item) {
-    if (Array.isArray(item?.rounds)) {
-      item.rounds = item.rounds.map((r) => {
-        if (Array.isArray(r)) return r;
-        if (r && Array.isArray(r.boards)) return r.boards;
-        return [];
+  let firebase;
+  try { firebase = await connect(); }
+  catch (error) { announce("error", error.message); return () => {}; }
+  const { auth, db, storeSdk, authSdk } = firebase;
+  const { collection, doc, query, where, onSnapshot, runTransaction, serverTimestamp } = storeSdk;
+  const user = auth.currentUser;
+  if (!user || user.isAnonymous) {
+    announce("signed-out", "Atölye üzerinden öğretmen veya sınıf hesabınızla giriş yapın.");
+    return () => {};
+  }
+  let claims;
+  try { claims = (await user.getIdTokenResult()).claims; }
+  catch (error) { announce("error", error.message); return () => {}; }
+  const teacher = claims.role === "teacher";
+  const classId = ["class", "student"].includes(claims.role) ? claims.classId : null;
+  if (!teacher && !classId) {
+    announce("signed-out", "Bu oturumun satranç eğitim kayıtlarına erişimi bulunmuyor.");
+    return () => {};
+  }
+  window.dispatchEvent(new CustomEvent("satranc-cloud-session", { detail: claims }));
+  let stopped = false;
+  let applyingRemote = false;
+  let writing = false;
+  let timer;
+  let failure = "";
+  const stops = [];
+  const ready = new Set();
+  const cached = new Set(["classes", "chess_matches", "chess_tournaments", "chess_progress"]);
+  const base = { chess_matches: new Map(), chess_tournaments: new Map(), chess_progress: new Map() };
+  let serverClasses = [];
+  const device = deviceId();
+  const pending = new Map();
+  const scoped = (name) => teacher ? collection(db, name) : claims.role === "student" && name === "chess_progress"
+    ? query(collection(db, name), where("classId", "==", classId), where("profileId", "==", `student:${claims.studentId}`))
+    : query(collection(db, name), where("classId", "==", classId));
+  const writable = () => !stopped && !failure && navigator.onLine && ready.size === 4 && cached.size === 0;
+  const status = () => {
+    if (stopped) return;
+    if (failure) announce("error", failure);
+    else if (!navigator.onLine || cached.size && ready.size === 4) announce("offline", "Sunucu bağlantısı kesildi. Bağlantı gelene kadar yeni kayıt yapılamaz.");
+    else if (ready.size < 4) announce("connecting", "Sunucudan güncel kayıtlar bekleniyor.");
+    else if (writing || pending.size || timer) announce("saving", "Değişiklik sunucu onayı bekliyor.");
+    else announce("online", "Güncel kayıtlar sunucudan alındı; değişiklikler canlı izleniyor.");
+  };
+  function apply() {
+    applyingRemote = true;
+    try {
+      classroom.state.classes = clean(serverClasses);
+      if (!teacher) classroom.state.activeClassId = classId;
+      else if (!serverClasses.some(c => c.id === classroom.state.activeClassId)) classroom.state.activeClassId = serverClasses[0]?.id || null;
+      for (const [name, field] of [["chess_matches", "matches"], ["chess_tournaments", "tournaments"]]) {
+        const records = new Map(base[name]);
+        for (const change of pending.values()) if (change.collection === name) {
+          if (change.after) records.set(change.id, change.after); else records.delete(change.id);
+        }
+        classroom.state[field] = [...records].map(([id, data]) => ({
+          ...(name === "chess_tournaments" ? deserializeTournament(clean(data)) : clean(data)),
+          id: data.localId || data.id || id, _cloudDocId: id
+        }));
+      }
+      const profiles = { teacher: clean(defaultProgress) };
+      const names = { teacher: "Öğretmen" };
+      const records = new Map(base.chess_progress);
+      for (const change of pending.values()) if (change.collection === "chess_progress") {
+        if (change.after) records.set(change.id, change.after); else records.delete(change.id);
+      }
+      for (const data of records.values()) if (data.profileId && data.progress) {
+        profiles[data.profileId] = { ...clean(defaultProgress), ...clean(data.progress), settings: { ...defaultProgress.settings, ...data.progress.settings } };
+        names[data.profileId] = data.profileName || "Öğrenci";
+      }
+      progress.store.profiles = profiles;
+      progress.store.profileNames = names;
+      progress.state = profiles[progress.activeProfileId] || clean(defaultProgress);
+      classroom.save();
+      progress.state = profiles[progress.activeProfileId] || progress.state;
+      progress.save();
+    } finally { applyingRemote = false; }
+  }
+  function currentRecords() {
+    const values = { chess_matches: new Map(), chess_tournaments: new Map(), chess_progress: new Map() };
+    for (const [name, field] of [["chess_matches", "matches"], ["chess_tournaments", "tournaments"]]) {
+      for (const item of classroom.state[field]) if (item.classId && (teacher || item.classId === classId)) {
+        const data = name === "chess_tournaments" ? serializeTournament(item) : clean(item);
+        const id = item._cloudDocId || key(item.classId, item.id);
+        const existing = base[name].get(id);
+        const value = recordData({ ...data, localId: item.id });
+        if (existing && !("localId" in existing)) delete value.localId;
+        if (existing && !("id" in existing)) delete value.id;
+        values[name].set(id, value);
+      }
+    }
+    for (const [profileId, value] of Object.entries(progress.store.profiles)) {
+      const ownerClass = profileId.startsWith("class:") ? profileId.slice(6) : serverClasses.find(c => c.students.some(s => profileId === `student:${s.id}`))?.id;
+      if (!ownerClass || (!teacher && ownerClass !== classId) || (claims.role === "student" && profileId !== `student:${claims.studentId}`)) continue;
+      values.chess_progress.set(key(ownerClass, profileId), {
+        classId: ownerClass, profileId, profileName: progress.store.profileNames[profileId] || "Öğrenci", progress: clean(value)
       });
     }
-    return item;
+    return values;
   }
-
-  function mergeTournaments(local, remote) {
-    if (!local) return remote;
-    if (!remote) return local;
-
-    const localRounds = Array.isArray(local.rounds) ? local.rounds : [];
-    const remoteRounds = Array.isArray(remote.rounds) ? remote.rounds : [];
-
-    const countResults = (rounds) =>
-      rounds.reduce((acc, r) => acc + (Array.isArray(r) ? r.filter((b) => b?.matchId).length : 0), 0);
-
-    const localResults = countResults(localRounds);
-    const remoteResults = countResults(remoteRounds);
-
-    let chosenRounds;
-    if (localRounds.length > remoteRounds.length) {
-      chosenRounds = localRounds;
-    } else if (remoteRounds.length > localRounds.length) {
-      chosenRounds = remoteRounds;
-    } else if (localResults >= remoteResults) {
-      chosenRounds = localRounds;
-    } else {
-      chosenRounds = remoteRounds;
-    }
-
-    return {
-      ...remote,
-      ...local,
-      finished: Boolean(local.finished || remote.finished),
-      rounds: chosenRounds,
-      playerIds: Array.from(new Set([...(local.playerIds || []), ...(remote.playerIds || [])])),
-      _cloudDocId: remote._cloudDocId || local._cloudDocId
-    };
-  }
-
-  async function writeRecord(collectionName, id, data, _initial) {
-    const ref = doc(db, collectionName, id);
-    return setDoc(ref, data, { merge: true });
-  }
-
-  async function pushClassroom(initial = false) {
-    if (applyingRemote) return;
-    const matches = classroom.state.matches.filter((item) =>
-      item?.id && item?.classId && (!sessionClassId || item.classId === sessionClassId));
-    const tournaments = classroom.state.tournaments.filter((item) =>
-      item?.id && item?.classId && (!sessionClassId || item.classId === sessionClassId));
-
-    await Promise.all([
-      ...matches.map((item) => writeRecord("chess_matches", matchDoc(item), {
-        ...cloudData(item), localId: item.id, ownerUid: item.ownerUid || user?.uid || "shared",
-        deviceId: device, syncedAt: serverTimestamp()
-      }, initial).catch((err) => console.warn(`[bulut] maç aktarılamadı (${item.id}):`, err))),
-      ...tournaments.map((item) => writeRecord("chess_tournaments", tournamentDoc(item), {
-        ...cloudData(serializeTournament(item)), localId: item.id, ownerUid: item.ownerUid || user?.uid || "shared",
-        deviceId: device, syncedAt: serverTimestamp()
-      }, initial).catch((err) => console.warn(`[bulut] turnuva aktarılamadı (${item.id}):`, err)))
-    ]);
-  }
-
-  async function pushProgress(initial = false) {
-    if (applyingRemote) return;
-
-    if (sessionClassId) {
-      const classProfileId = `class:${sessionClassId}`;
-      const teacherProfile = progress.store.profiles?.teacher;
-      if (teacherProfile?.completedLessons?.length) {
-        if (!progress.store.profiles[classProfileId]) {
-          progress.store.profiles[classProfileId] = clean(teacherProfile);
-        } else {
-          const merged = new Set([
-            ...(progress.store.profiles[classProfileId].completedLessons || []),
-            ...(teacherProfile.completedLessons || [])
-          ]);
-          progress.store.profiles[classProfileId].completedLessons = Array.from(merged);
+  async function flush() {
+    timer = null;
+    if (!writable()) { pending.clear(); apply(); status(); return; }
+    writing = true;
+    status();
+    const changes = [...pending.values()];
+    try {
+      if (changes.length > 450) throw new Error("Çok fazla kayıt değişti. Yedek aktarımını küçük gruplar halinde yapın.");
+      await runTransaction(db, async transaction => {
+        const snapshots = await Promise.all(changes.map(c => transaction.get(doc(db, c.collection, c.id))));
+        snapshots.forEach((snapshot, index) => {
+          const c = changes[index];
+          const current = snapshot.exists() ? recordData(snapshot.data()) : null;
+          if (JSON.stringify(current) !== JSON.stringify(c.before)) throw new Error("Bu kayıt başka bir cihazda değişti. Güncel veri alındı; işlemi tekrar yapın.");
+        });
+        changes.forEach(c => {
+          const ref = doc(db, c.collection, c.id);
+          if (!c.after) transaction.delete(ref);
+          else transaction.set(ref, { ...c.after, ownerUid: user.uid, deviceId: device, syncedAt: serverTimestamp() });
+        });
+      });
+      // Listener may arrive before or after the transaction acknowledgement.
+      for (const c of changes) {
+        const seen = base[c.collection].get(c.id) || null;
+        if (JSON.stringify(recordData(seen)) === JSON.stringify(c.before)) {
+          if (c.after) base[c.collection].set(c.id, c.after); else base[c.collection].delete(c.id);
         }
       }
+    } catch (error) {
+      failure = error.message || "Kayıt sunucuya gönderilemedi.";
+    } finally {
+      pending.clear(); writing = false;
+      apply(); status();
     }
-
-    const writes = [];
-    for (const [profileId, value] of Object.entries(progress.store.profiles || {})) {
-      const classId = classIdForProfile(classroom, profileId) || (sessionClassId && profileId === `class:${sessionClassId}` ? sessionClassId : null);
-      if (!classId || (sessionClassId && classId !== sessionClassId)) continue;
-      writes.push(writeRecord("chess_progress", progressDoc(classId, profileId), {
-        classId,
-        profileId,
-        profileName: progress.store.profileNames?.[profileId] || (profileId.startsWith("class:") ? (classroom.activeClass?.name || "Sınıf") : "Öğrenci"),
-        progress: clean(value),
-        ownerUid: user?.uid || "shared",
-        deviceId: device,
-        syncedAt: serverTimestamp()
-      }, initial).catch((err) => console.warn(`[bulut] profil aktarılamadı (${profileId}):`, err)));
+  }
+  function changed() {
+    if (applyingRemote || stopped) return;
+    if (!writable() || writing) { apply(); status(); return; }
+    if (JSON.stringify(classroom.state.classes) !== JSON.stringify(serverClasses)) {
+      classroom.state.classes = clean(serverClasses);
+      window.alert("Sınıf ve öğrenci listesini Atölye’nin Sınıflar bölümünden düzenleyin. Satranç listesi oradan canlı güncellenir.");
+      apply();
+      return;
     }
-    await Promise.all(writes);
+    const values = currentRecords();
+    const previous = new Map(pending);
+    pending.clear();
+    for (const name of Object.keys(base)) for (const change of changesBetween(base[name], values[name])) {
+      const id = `${name}/${change.id}`;
+      pending.set(id, { collection: name, ...change, before: previous.has(id) ? previous.get(id).before : change.before });
+    }
+    if (timer) window.clearTimeout(timer);
+    timer = pending.size ? window.setTimeout(() => void flush(), 250) : null;
+    status();
   }
-
-  const syncRef = doc(db, "chess_sync", `${sessionClassId ? encodeURIComponent(sessionClassId) + "--" : ""}${encodeURIComponent(device)}`);
-  const writeHeartbeat = () => setDoc(syncRef, {
-    classId: sessionClassId || (isTeacherUser ? (classroom.state.activeClassId || null) : null),
-    deviceId: device,
-    userId: user?.uid || "anonymous",
-    ownerUid: user?.uid || "anonymous",
-    anonymous: Boolean(user?.isAnonymous),
-    classIds: sessionClassId ? [sessionClassId] : classroom.classes.map((item) => item.id),
-    activeClassId: sessionClassId || classroom.state.activeClassId || null,
-    lastSeenAt: serverTimestamp(),
-    userAgent: navigator.userAgent.slice(0, 180)
-  }, { merge: true }).catch((err) => {
-    console.warn("[bulut] kalp atışı gönderilemedi:", err);
-  });
-
-  // İlk işlem yereldeki kayıtları aktarmaktır
-  try {
-    await pushClassroom(true);
-    await pushProgress(true);
-    await writeHeartbeat();
-  } catch (error) {
-    console.warn("[bulut] ilk aktarım uyarısı:", error);
-  }
-
-  const matchesQuery = visibleCollection("chess_matches");
-  if (matchesQuery) {
-    stops.push(onSnapshot(matchesQuery, (snapshot) => {
-      const remote = snapshot.docs.map((snap) => {
-        const data = snap.data();
-        const { localId, deviceId: _device, syncedAt: _synced, ...item } = data;
-        return { ...item, id: localId || item.id, _cloudDocId: snap.id };
-      }).filter((item) => item.id && item.classId);
-
-      applyingRemote = true;
-      const matchMap = new Map();
-      for (const m of classroom.state.matches || []) {
-        if (m?.id) matchMap.set(m.id, m);
-      }
-      for (const r of remote) {
-        matchMap.set(r.id, r);
-      }
-      classroom.state.matches = Array.from(matchMap.values());
-      classroom.save();
-      applyingRemote = false;
-      announce("online");
-    }, (error) => {
-      console.warn("[bulut] maç dinleyici hatası:", error);
-      announce("error", error.message);
-    }));
-  }
-
-  const tournamentsQuery = visibleCollection("chess_tournaments");
-  if (tournamentsQuery) {
-    stops.push(onSnapshot(tournamentsQuery, (snapshot) => {
-      const remote = snapshot.docs.map((snap) => {
-        const data = deserializeTournament(snap.data());
-        const { localId, deviceId: _device, syncedAt: _synced, ...item } = data;
-        return { ...item, id: localId || item.id, _cloudDocId: snap.id };
-      }).filter((item) => item.id && item.classId);
-
-      applyingRemote = true;
-      const tourMap = new Map();
-      for (const t of classroom.state.tournaments || []) {
-        if (t?.id) tourMap.set(t.id, t);
-      }
-      for (const r of remote) {
-        const existing = tourMap.get(r.id);
-        tourMap.set(r.id, mergeTournaments(existing, r));
-      }
-      classroom.state.tournaments = Array.from(tourMap.values());
-      classroom.save();
-      applyingRemote = false;
-      announce("online");
-    }, (error) => {
-      console.warn("[bulut] turnuva dinleyici hatası:", error);
-      announce("error", error.message);
-    }));
-  }
-
-  const progressQuery = visibleCollection("chess_progress");
-  if (progressQuery) {
-    stops.push(onSnapshot(progressQuery, (snapshot) => {
-      applyingRemote = true;
-      for (const snap of snapshot.docs) {
-        const data = snap.data();
-        if (!data.profileId || !data.progress) continue;
-        progress.store.profiles[data.profileId] = data.progress;
-        progress.store.profileNames[data.profileId] = data.profileName || "Öğrenci";
-      }
-      progress.state = progress.store.profiles[progress.activeProfileId] || progress.state;
-      progress.save();
-      applyingRemote = false;
-      announce("online");
-    }, (error) => {
-      console.warn("[bulut] ilerleme dinleyici hatası:", error);
-      announce("error", error.message);
-    }));
-  }
-
-  stops.push(classroom.onChange(() => {
-    if (applyingRemote) return;
-    window.clearTimeout(classroomTimer);
-    classroomTimer = window.setTimeout(() => void pushClassroom().catch((error) => console.warn("[bulut] sınıf eşitleme hatası:", error)), 450);
+  // Initial state is hidden until all four authoritative server streams are ready.
+  const watch = (name, target) => stops.push(onSnapshot(target, { includeMetadataChanges: true }, snapshot => {
+    if (stopped) return;
+    if (snapshot.metadata.fromCache) { cached.add(name); status(); return; }
+    if (snapshot.metadata.hasPendingWrites) return;
+    cached.delete(name); ready.add(name);
+    if (name === "classes") {
+      const docs = Array.isArray(snapshot.docs) ? snapshot.docs : snapshot.exists() ? [snapshot] : [];
+      serverClasses = docs.map(d => ({ id: d.id, name: d.data().name || "Sınıf", students: (d.data().students || []).map(s => ({ id: s.id, name: s.name, removed: s.active === false || Boolean(s.removed) })) }));
+    } else base[name] = new Map(snapshot.docs.map(d => [d.id, recordData(d.data())]));
+    if (ready.size === 4) apply();
+    status();
+    window.dispatchEvent(new CustomEvent("satranc-cloud-data"));
+  }, error => { failure = error.message; status(); }));
+  watch("classes", teacher ? collection(db, "classes") : doc(db, "classes", classId));
+  for (const name of Object.keys(base)) watch(name, scoped(name));
+  stops.push(classroom.onChange(changed), progress.onChange(changed));
+  const networkChanged = () => status();
+  window.addEventListener("online", networkChanged);
+  window.addEventListener("offline", networkChanged);
+  const retry = () => window.location.reload();
+  window.addEventListener("satranc-cloud-retry", retry);
+  if (authSdk?.onIdTokenChanged) stops.push(authSdk.onIdTokenChanged(auth, next => {
+    if (!next || next.uid !== user.uid) { failure = "Oturum değişti. Atölye üzerinden tekrar giriş yapın."; status(); }
   }));
-  stops.push(progress.onChange(() => {
-    if (applyingRemote) return;
-    window.clearTimeout(progressTimer);
-    progressTimer = window.setTimeout(() => void pushProgress().catch((error) => console.warn("[bulut] ilerleme eşitleme hatası:", error)), 450);
-  }));
-
-  heartbeatTimer = window.setInterval(() => {
-    void writeHeartbeat();
-  }, 60_000);
-
-  announce("online");
+  status();
   return () => {
-    window.clearTimeout(classroomTimer);
-    window.clearTimeout(progressTimer);
-    window.clearInterval(heartbeatTimer);
+    stopped = true;
+    window.clearTimeout(timer);
     for (const stop of stops) stop();
+    window.removeEventListener("online", networkChanged);
+    window.removeEventListener("offline", networkChanged);
+    window.removeEventListener("satranc-cloud-retry", retry);
   };
 }

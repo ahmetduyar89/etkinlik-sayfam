@@ -92,6 +92,13 @@ export function PasswordGate({ children }: PasswordGateProps) {
                     saveSession({ role: 'class', classId: token.claims.classId,
                         className: classRoom.name, username: classRoom.username });
                     finish(true);
+                } else if (role === 'student' && typeof token.claims.classId === 'string' && typeof token.claims.studentId === 'string') {
+                    const classRoom = await fetchDocById<{ students: { id: string; name: string; active?: boolean }[] }>('classes', token.claims.classId);
+                    const student = classRoom?.students.find(s => s.id === token.claims.studentId && s.active !== false);
+                    if (revision !== current) return;
+                    if (!student) { finish(false); return; }
+                    saveSession({ role: 'student', classId: token.claims.classId, studentId: student.id, studentName: student.name });
+                    finish(true);
                 } else {
                     finish(false);
                 }
@@ -172,7 +179,7 @@ export function PasswordGate({ children }: PasswordGateProps) {
         [classUsername, classPassword]
     );
 
-    if (!authReady && !isStudentLink() && !isChessLink()) {
+    if (!authReady && !isStudentLink() && !isChessLink() && new URLSearchParams(location.search).get('view') !== 'ogrenci') {
         return (
             <div className="min-h-[100svh] bg-[#f8fafc] flex items-center justify-center text-slate-500">
                 <Loader2 className="h-6 w-6 animate-spin" aria-label="Oturum kontrol ediliyor" />
@@ -181,7 +188,7 @@ export function PasswordGate({ children }: PasswordGateProps) {
     }
 
     if (isUnlocked && qrScan) return <QrLoginApproval scan={qrScan} />;
-    if (isUnlocked || isStudentLink() || isChessLink()) return <>{children}</>;
+    if (isUnlocked || isStudentLink() || isChessLink() || new URLSearchParams(location.search).get('view') === 'ogrenci') return <>{children}</>;
 
     return (
         <div className="app-safe-screen min-h-[100svh] bg-[#f8fafc] flex items-center justify-center font-sans">
@@ -204,6 +211,7 @@ export function PasswordGate({ children }: PasswordGateProps) {
 
                 {qrScan && <p className="mb-4 rounded-xl bg-indigo-50 p-3 text-sm text-indigo-700">Tahtadaki girişi onaylamak için önce telefonunda kullanmak istediğin hesaba giriş yap.</p>}
 
+                <a href="/?view=ogrenci" className="mb-4 flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-50 px-3 text-sm font-bold text-amber-900">Öğrenci girişine git</a>
                 {/* Sekme Değiştirici */}
                 <div className="w-full grid grid-cols-2 p-1 bg-slate-100/80 rounded-xl mb-5 text-[13px] font-semibold text-slate-600">
                     <button

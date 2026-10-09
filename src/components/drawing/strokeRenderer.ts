@@ -1,3 +1,4 @@
+import { textLayout } from './textLayout';
 import { animatedElement, elementFrame } from './elements/animation';
 // src/components/drawing/strokeRenderer.ts
 // Çizim verisinin canvas'a aktarılması ve geometri yardımcıları.
@@ -163,11 +164,9 @@ export const getBB = (s: Stroke): BoundingBox => {
     }
 
     if (s.tool === 'text' && s.points.length > 0) {
-        const fontSize = s.width && s.width > 4 ? s.width : 20;
-        const lines = (s.text || '').split('\n');
-        const maxLen = Math.max(1, ...lines.map((l) => l.length));
-        const textW = Math.max(24, maxLen * fontSize * 0.62);
-        const textH = Math.max(fontSize, lines.length * fontSize * 1.25);
+        const layout = textLayout(s);
+        const textW = layout.width;
+        const textH = layout.height;
         if (s.textAlign === 'center') {
             x1 = s.points[0].x - textW / 2;
         } else if (s.textAlign === 'right') {
@@ -1159,24 +1158,14 @@ export const drawStroke = (tCtx: CanvasRenderingContext2D, s: Stroke, time = 0, 
     if (['highlighter', 'eraser'].includes(s.tool)) {
         drawSmoothPath(tCtx, s.points, s.width || 2);
     } else if (s.tool === 'text') {
-        // Yazı boyu `width` ile taşınır; eski kayıtlarda yoktur.
-        const fontSize = s.width && s.width > 4 ? s.width : 20;
-        const fontFam = s.fontFamily === 'serif'
-            ? 'Georgia, Cambria, "Times New Roman", serif'
-            : s.fontFamily === 'mono'
-            ? 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
-            : s.fontFamily === 'cursive'
-            ? 'Caveat, "Comic Sans MS", cursive'
-            : 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-        const weight = s.bold ? 'bold ' : '';
-        const style = s.italic ? 'italic ' : '';
-        tCtx.font = `${style}${weight}${fontSize}px ${fontFam}`;
+        const layout = textLayout(s);
+        tCtx.font = layout.font;
         tCtx.textAlign = (s.textAlign || 'left') as CanvasTextAlign;
         tCtx.textBaseline = 'top';
-        const lines = (s.text || '').split('\n');
-        const lineHeight = fontSize * 1.25;
-        lines.forEach((line, idx) => {
-            tCtx.fillText(line, s.points[0].x, s.points[0].y + idx * lineHeight);
+        const anchor = s.points[0];
+        // Hizalama, sarılmış her satırda aynı kutunun içinde uygulanır.
+        layout.lines.forEach((line, idx) => {
+            tCtx.fillText(line, anchor.x, anchor.y + idx * layout.fontSize * 1.25);
         });
     } else if (s.tool === 'stamp') {
         tCtx.font = '44px serif';

@@ -15,7 +15,8 @@ import { ChessLobby } from './ChessLobby';
 import { ChessTable } from './ChessTable';
 import { ChessBotTable } from './ChessBotTable';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDocFromServer, serverTimestamp, setDoc } from 'firebase/firestore';
+import { StudentIdentityGate } from '../student/StudentIdentityGate';
 import { auth, db, signInChessGuest } from '../../lib/firebase';
 import {
     clearStudentSession,
@@ -46,6 +47,7 @@ type Screen = { kind: 'salon' } | { kind: 'masa'; code: string } | { kind: 'bot'
 
 export function ChessArena() {
     const [student, setStudent] = useState<ChessStudentSession | null>(readStudentSession);
+    const [guestLogin, setGuestLogin] = useState(false);
     const [identityReady, setIdentityReady] = useState(false);
     const [screen, setScreen] = useState<Screen>(() => {
         const code = roomFromLocation();
@@ -57,27 +59,38 @@ export function ChessArena() {
         document.title = 'Canlı Satranç · Atölye';
     }, []);
 
-    useEffect(() => onAuthStateChanged(auth, async (user) => {
-        if (!student) {
-            setIdentityReady(true);
-            return;
-        }
-        const token = user ? await user.getIdTokenResult().catch(() => null) : null;
-        const valid = (token?.claims.role === 'student' || token?.claims.role === 'chessGuest') &&
-            token.claims.studentId === student.studentId &&
-            token.claims.classId === student.classId;
-        if (!valid) {
-            clearStudentSession();
-            setStudent(null);
-        }
-        setIdentityReady(true);
-    }), [student]);
+    useEffect(() => {
+        let revision = 0;
+        const stop = onAuthStateChanged(auth, async user => {
+            const current = ++revision;
+            setIdentityReady(false);
+            try {
+                const token = user ? await user.getIdTokenResult() : null;
+                if (token?.claims.role === 'student' && typeof token.claims.classId === 'string' && typeof token.claims.studentId === 'string') {
+                    const classroom = await getDocFromServer(doc(db, 'classes', token.claims.classId));
+                    const profile = classroom.data()?.students?.find((s: { id: string; active?: boolean }) => s.id === token.claims.studentId && s.active !== false);
+                    if (!profile) throw new Error('Öğrenci kaydı bulunamadı.');
+                    if (current !== revision) return;
+                    const session = { classId: token.claims.classId, studentId: token.claims.studentId, studentName: profile.name };
+                    saveStudentSession(session); setStudent(session);
+                } else {
+                    const saved = readStudentSession();
+                    const valid = token?.claims.role === 'chessGuest' && saved && token.claims.studentId === saved.studentId && token.claims.classId === saved.classId;
+                    if (current !== revision) return;
+                    if (!valid) clearStudentSession();
+                    setStudent(valid ? saved : null);
+                }
+            } catch { if (current === revision) { clearStudentSession(); setStudent(null); } }
+            finally { if (current === revision) setIdentityReady(true); }
+        });
+        return () => { revision++; stop(); };
+    }, []);
 
     // Öğretmen paneli ve salon çevrimiçi öğrencileri görebilsin diye kısa bir
     // yaşam sinyali bırakılır. Ad soyad hiçbir zaman bu belgeye yazılmaz.
     useEffect(() => {
         if (!student) return;
-        const ref = doc(db, 'liveChessPresence', student.studentId);
+        const ref = doc(db, 'liveChessPresence', `${student.classId}--${student.studentId}`);
         const heartbeat = () => setDoc(ref, {
             studentId: student.studentId,
             studentName: student.studentName,
@@ -104,6 +117,9 @@ export function ChessArena() {
         return <div className="flex min-h-[100svh] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" aria-label="Oyuncu oturumu kontrol ediliyor" /></div>;
     }
 
+    if (!student && !guestLogin) {
+        return <div><StudentIdentityGate title="Canlı satranç ve çalışmalarım" onAuthenticated={setStudent} expectedClassId={new URLSearchParams(location.search).get('classId') || undefined} /><div className="fixed bottom-4 left-0 right-0 text-center"><button type="button" onClick={() => setGuestLogin(true)} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-600">Öğrenci kaydım yok · Misafir olarak oyna</button></div></div>;
+    }
     if (!student) {
         return (
             <PlayerNameGate
@@ -133,10 +149,12 @@ export function ChessArena() {
     }
 
     if (screen.kind === 'bot') {
-        return <ChessBotTable playerName={name} onExit={backToLobby} />;
+        return <ChessBotTable trackResult={student.classId !== 'live-guests'} playerName={name} onExit={backToLobby} />;
     }
 
     return (
+        <div>
+        {student.classId !== 'live-guests' && <a href="/?view=ogrenci" className="mx-auto mt-4 block max-w-5xl rounded-xl bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700">Sana tanımlanan çalışmalar ve sonuçların →</a>}
         <ChessLobby
             playerId={id}
             studentId={student.studentId}
@@ -150,6 +168,7 @@ export function ChessArena() {
                 setStudent(null);
             }}
         />
+        </div>
     );
 }
 

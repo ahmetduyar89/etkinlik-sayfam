@@ -82,8 +82,10 @@ test('guest sign-in validates full names and grants only the chess role', async 
             if (id === 'firebase-admin/firestore') return { getFirestore: () => ({}) };
             if (id === 'firebase-functions/params') return { defineString: () => ({}) };
             if (id === 'firebase-functions/v2/https') return { HttpsError: Error, onCall: (_options, callback) => callback };
-            if (id === 'firebase-functions/v2/firestore') return { onDocumentUpdated() {} };
+            if (id === 'firebase-functions/v2/firestore') return { onDocumentUpdated() {}, onDocumentWritten() {} };
             if (id === 'firebase-functions/v2/scheduler') return { onSchedule() {} };
+            if (id === './learning') return { classMatchPlayerId: (seat, id) => seat.classId === id ? seat.studentId : `external:${seat.classId}:${seat.studentId}`, createLearningHandlers: () => ({}), createClassNotebookHandler: () => () => {} };
+            if (id === './bot-games') return { createBotGameHandler: () => () => {} };
             if (id === './qr-login') return { createQrHandlers: () => ({}) };
             throw new Error(`Unexpected import ${id}`);
         },

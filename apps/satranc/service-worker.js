@@ -6,7 +6,7 @@
  * önbellekten servis eder. Böylece sınıfta internet olmasa da platform açılır.
  */
 
-const CACHE_NAME = "satranc-okulu-v33";
+const CACHE_NAME = "satranc-okulu-online-v34";
 
 /** Uygulamanın açılması için gereken çekirdek dosyalar. */
 const APP_SHELL = [
@@ -43,6 +43,7 @@ const APP_SHELL = [
   "./src/services/SwissPairing.js",
   "./src/services/RosterCrypto.js",
   "./src/services/CloudSyncService.js",
+  "./src/services/CloudRecords.js",
   "./src/data/classRoster.js",
   "./src/audio/SoundService.js",
   "./src/animations/effects.js",
@@ -124,7 +125,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith("satranc-okulu-") && key !== CACHE_NAME).map((key) => caches.delete(key))))
   );
   self.clients.claim();
 });
@@ -132,6 +133,7 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
+  if (request.url.includes("firebase-config.json")) return;
   // Yalnızca kendi kaynaklarımızı önbelleğe alırız.
   if (new URL(request.url).origin !== self.location.origin) return;
 

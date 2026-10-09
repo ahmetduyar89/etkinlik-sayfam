@@ -18,6 +18,7 @@ export const SESSION_STORAGE_KEY = 'etkinlik_oturum';
 
 export type AuthSession =
     | { role: 'admin'; username: string }
+    | { role: 'student'; classId: string; studentId: string; studentName: string; schoolNumber?: string }
     | { role: 'class'; classId: string; className: string; username: string };
 
 /** Kayıtlı oturum bilgisini döner */
@@ -26,7 +27,7 @@ export function getSession(): AuthSession | null {
         const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY) || window.localStorage.getItem(SESSION_STORAGE_KEY);
         if (raw) {
             const parsed = JSON.parse(raw);
-            if (parsed && (parsed.role === 'admin' || parsed.role === 'class')) {
+            if (parsed && (parsed.role === 'admin' || parsed.role === 'class' || parsed.role === 'student')) {
                 return parsed as AuthSession;
             }
         }

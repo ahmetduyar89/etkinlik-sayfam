@@ -1,3 +1,4 @@
+import { ClassLearningOverview } from '../learning/ClassLearningOverview';
 import { QrLoginHelpButton } from '../common/QrLogin';
 import { InstallAppButton } from '../common/InstallAppButton';
 // src/components/classrooms/ClassroomDashboard.tsx — Sınıf Odaklı Çalışma Alanı
@@ -14,15 +15,16 @@ import {
     Sparkles,
     X,
     Maximize2,
-    CheckCircle2,
     Play,
     Plus,
 } from 'lucide-react';
 import { PORTAL_MODULES, type PortalModule } from '../../constants/portal';
-import { EXPERIMENTS_CATALOG, findExperimentByFile } from '../../constants/experiments';
+import { findExperimentByFile } from '../../constants/experiments';
 import { useClassrooms, syncClassesToChess } from '../../lib/classrooms';
 import { getSession, lockApp, saveSession } from '../../utils/auth';
-import { useFirestore } from '../../lib/firebase';
+import { useToast } from '../common/ToastProvider';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { createClassLessonNotebook, db } from '../../lib/firebase';
 import type { ClassRoom, Notebook } from '../../types';
 import { cn } from '../../utils/cn';
 
@@ -37,12 +39,13 @@ export function ClassroomDashboard({
     onOpenInternalModule,
     onReturnToAdmin,
 }: ClassroomDashboardProps) {
-    const { classes, updateClass } = useClassrooms();
+    const { classes, loading: classesLoading, error: classesError } = useClassrooms();
+    const toast = useToast();
     const session = getSession();
 
     // Aktif sınıfı bul: prop olarak geldiyse onu kullan, yoksa oturumdan bul
     const activeClass = useMemo(() => {
-        if (propClassRoom) return propClassRoom;
+        if (propClassRoom) return classes.find(c => c.id === propClassRoom.id) || null;
         if (session && session.role === 'class') {
             return classes.find((c) => c.id === session.classId) || null;
         }
@@ -50,14 +53,12 @@ export function ClassroomDashboard({
     }, [propClassRoom, session, classes]);
 
     // Defterleri çek
-    const notebooksHandler = useFirestore<Notebook>('notebooks');
     const [allNotebooks, setAllNotebooks] = useState<Notebook[]>([]);
 
     useEffect(() => {
-        const unsub = notebooksHandler.sync(
-            (data) => setAllNotebooks(data || []),
-            (err) => console.warn('Defterler yüklenemedi:', err)
-        );
+        const unsub = onSnapshot(collection(db, 'notebooks'), { includeMetadataChanges: true }, snapshot => {
+            if (!snapshot.metadata.fromCache) setAllNotebooks(snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Notebook)));
+        }, err => console.warn('Defterler yüklenemedi:', err));
         return () => unsub();
     }, []);
 
@@ -115,26 +116,11 @@ export function ClassroomDashboard({
         if (!activeClass || isCreatingNotebook) return;
         setIsCreatingNotebook(true);
         try {
-            const todayStr = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-            const title = `${activeClass.name} - ${todayStr} Dersi`;
-            const now = new Date().toISOString();
-            const newDoc = await notebooksHandler.add({
-                title,
-                kind: 'notebook',
-                parent_id: null,
-                paper: 'grid',
-                page_count: 1,
-                updated_at: now,
-            });
-            if (newDoc && newDoc.id) {
-                const currentNotebooks = activeClass.assignedNotebooks || [];
-                await updateClass(activeClass.id, {
-                    assignedNotebooks: [...currentNotebooks, newDoc.id],
-                });
-                window.location.href = `/?view=notebook&id=${newDoc.id}`;
-            }
+            const newDoc = await createClassLessonNotebook(activeClass.id);
+            window.location.href = `/?view=notebook&id=${newDoc.id}`;
         } catch (err) {
             console.error('Ders defteri oluşturulamadı:', err);
+            toast.error(err instanceof Error ? err.message : 'Ders defteri oluşturulamadı.');
         } finally {
             setIsCreatingNotebook(false);
         }
@@ -156,9 +142,9 @@ export function ClassroomDashboard({
         return (
             <div className="min-h-[100svh] bg-[#f8fafc] flex flex-col items-center justify-center p-6 text-center font-sans">
                 <School className="w-12 h-12 text-slate-400 mb-3" />
-                <h2 className="text-[20px] font-bold text-slate-800 mb-1">Sınıf Bilgisi Yükleniyor…</h2>
+                <h2 className="text-[20px] font-bold text-slate-800 mb-1">{classesLoading ? 'Sınıf Bilgisi Yükleniyor…' : 'Sınıf bulunamadı'}</h2>
                 <p className="text-[14px] text-slate-500 mb-6">
-                    Lütfen bekleyin veya tekrar giriş yapın.
+                    {classesError || 'Lütfen bekleyin veya tekrar giriş yapın.'}
                 </p>
                 <button
                     type="button"
@@ -260,6 +246,7 @@ export function ClassroomDashboard({
                     <div className="pointer-events-none absolute -bottom-16 right-32 h-64 w-64 rounded-full bg-blue-400/20 blur-2xl" />
                 </div>
 
+                <ClassLearningOverview classroom={activeClass} />
                 {/* BÖLÜM 1: ATANMIŞ PORTAL MODÜLLERİ */}
                 {assignedModulesList.length > 0 && (
                     <section className="mb-12">

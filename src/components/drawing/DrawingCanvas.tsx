@@ -1,3 +1,5 @@
+import { flushSync } from 'react-dom';
+import { InlineTextEditor, type TextDraft } from './InlineTextEditor';
 import { actualSizePageView } from './InkEngine/pageViewport';
 import { eraserContactRadius } from './InkEngine/physics';
 import React from 'react';
@@ -6,8 +8,6 @@ import {
     AlignLeft,
     AlignCenter,
     AlignRight,
-    Bold,
-    Italic,
     Check,
     Plus,
     Minus,
@@ -18,7 +18,6 @@ import {
     Edit3,
     FlipHorizontal,
     FlipVertical,
-    GripHorizontal,
     RotateCw,
     Sigma,
     Trash2,
@@ -184,52 +183,14 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const polyPointsRef = React.useRef<Point[]>([]);
         const [polyCount, setPolyCount] = React.useState<number>(0);
 
-        interface InlineTextState {
-            worldX: number;
-            worldY: number;
-            text: string;
-            fontSize: number;
-            color: string;
-            fontFamily?: string;
-            textAlign?: 'left' | 'center' | 'right';
-            bold?: boolean;
-            italic?: boolean;
-            strokeIdx?: number;
-        }
-        const [inlineText, setInlineText] = React.useState<InlineTextState | null>(null);
+        const [inlineText, setInlineText] = React.useState<TextDraft | null>(null);
         const lastTextClickRef = React.useRef<{ idx: number; time: number }>({ idx: -1, time: 0 });
         const activeStrokeBBRef = React.useRef<BoundingBox | null>(null);
-        const textareaRef = React.useRef<HTMLTextAreaElement>(null);
         const textBoxContainerRef = React.useRef<HTMLDivElement>(null);
-        const inlineTextRef = React.useRef<InlineTextState | null>(null);
+        const inlineTextRef = React.useRef<TextDraft | null>(null);
         inlineTextRef.current = inlineText;
 
-        React.useEffect(() => {
-            if (inlineText && textareaRef.current) {
-                // iPad / iOS klavye açılışı için anında odaklan
-                textareaRef.current.focus();
-                const len = textareaRef.current.value.length;
-                textareaRef.current.setSelectionRange(len, len);
-            }
-        }, [inlineText]);
-
-        // Araç çubuğundaki metin ayarları değiştiğinde aktif metin kutusunu gerçek zamanlı güncelle
-        React.useEffect(() => {
-            if (!inlineText) return;
-            setInlineText((prev) => {
-                if (!prev) return null;
-                return {
-                    ...prev,
-                    color: config.color,
-                    fontSize: config.width && config.width >= 10 ? config.width : prev.fontSize,
-                    fontFamily: config.fontFamily || prev.fontFamily,
-                    textAlign: config.textAlign || prev.textAlign,
-                    bold: config.bold !== undefined ? config.bold : prev.bold,
-                    italic: config.italic !== undefined ? config.italic : prev.italic,
-                };
-            });
-        }, [config.color, config.width, config.fontFamily, config.textAlign, config.bold, config.italic]);
-
+        const commitTextRef = React.useRef<() => void>(() => {});
         // Ölçü aracı açılıp kapanınca konumlanır ve üst katman tazelenir.
         React.useEffect(() => {
             if (!config.ruler) {
@@ -320,7 +281,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const [equationDraft, setEquationDraft] = React.useState<string | null>(null);
 
         /** Son kalem (stylus) olayının zamanı — avuç içi reddi için. */
-        const lastPenAtRef = React.useRef(0);
+        const lastPenAtRef = React.useRef(-Infinity);
         /** Kalem kullanıldıktan sonra parmağın yok sayılacağı süre. */
         const PEN_PRIORITY_MS = 1200;
         /** Sürücü temas alanı bildiriyorsa bu genişlikten büyüğü avuç sayılır. */
@@ -629,7 +590,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
             strokesRef.current.forEach((s, i) => {
                 if (exclude?.has(i)) return;
-                if (inlineTextRef.current?.strokeIdx === i) return;
+                if (inlineTextRef.current && (inlineTextRef.current.strokeId ? inlineTextRef.current.strokeId === s.id : inlineTextRef.current.strokeIdx === i)) return;
                 drawStroke(bCtx, s, simTimeRef.current, isDark);
             });
             if (page) bCtx.restore();
@@ -945,6 +906,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
         const switchPage = React.useCallback(
             (idx: number) => {
+                commitTextRef.current();
                 pagesRef.current[currentPageRef.current] = [...strokesRef.current];
                 currentPageRef.current = idx;
                 strokesRef.current = [...(pagesRef.current[idx] || [])];
@@ -1017,6 +979,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         }, [applyOps]);
 
         const doUndo = React.useCallback(() => {
+            commitTextRef.current();
             const previous = historyRef.current.undo(strokesRef.current);
             if (!previous) { notifyHistory(); return; }
             strokesRef.current = previous;
@@ -1028,6 +991,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         }, [commitStrokes, emitPage, notifyHistory, redraw]);
 
         const doRedo = React.useCallback(() => {
+            commitTextRef.current();
             const next = historyRef.current.redo(strokesRef.current);
             if (!next) { notifyHistory(); return; }
             strokesRef.current = next;
@@ -1038,96 +1002,75 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             redraw();
         }, [commitStrokes, emitPage, notifyHistory, redraw]);
 
-        const commitInlineText = React.useCallback(
-            (textValue?: string) => {
-                if (!inlineText) return;
-                const text = (textValue !== undefined ? textValue : inlineText.text).trim();
-                if (inlineText.strokeIdx !== undefined) {
-                    const idx = inlineText.strokeIdx;
-                    const existing = strokesRef.current[idx];
-                    if (existing) {
-                        pushHistory();
-                        if (!text) {
-                            const removedId = existing.id;
-                            strokesRef.current.splice(idx, 1);
-                            commitStrokes();
-                            if (removedId)
-                                emit({ type: 'remove', page: currentPageRef.current, ids: [removedId] });
-                            deselect();
-                        } else {
-                            const updated: Stroke = {
-                                ...existing,
-                                text,
-                                color: inlineText.color,
-                                width: inlineText.fontSize,
-                                fontFamily: inlineText.fontFamily,
-                                textAlign: inlineText.textAlign,
-                                bold: inlineText.bold,
-                                italic: inlineText.italic,
-                            };
-                            strokesRef.current[idx] = updated;
-                            commitStrokes();
-                            emit({ type: 'update', page: currentPageRef.current, strokes: [updated] });
-                        }
-                        redraw();
-                    }
-                } else if (text) {
-                    pushHistory();
-                    const s: Stroke = {
-                        id: newStrokeId(),
-                        tool: 'text',
-                        text,
-                        color: inlineText.color,
-                        width: inlineText.fontSize,
-                        fontFamily: inlineText.fontFamily,
-                        textAlign: inlineText.textAlign,
-                        bold: inlineText.bold,
-                        italic: inlineText.italic,
-                        points: [{ x: inlineText.worldX, y: inlineText.worldY }],
-                    };
-                    strokesRef.current.push(s);
-                    commitStrokes();
-                    emit({ type: 'add', page: currentPageRef.current, strokes: [s] });
-                    setSelection([strokesRef.current.length - 1]);
-                    redraw();
-                }
-                setInlineText(null);
-            },
-            [commitStrokes, deselect, emit, inlineText, pushHistory, redraw, setSelection]
-        );
-
-        // Metin modu dışına çıkıldığında açık metni kaydet
-        React.useEffect(() => {
-            if (config.tool !== 'text' && inlineTextRef.current) {
-                commitInlineText();
-            }
-        }, [config.tool, commitInlineText]);
-
-        // Sayfa dışına veya farklı bir alana tıklandığında metin kutusunu tamamla ve sayfaya işle
-        React.useEffect(() => {
-            if (!inlineText) return;
-            const onPointerDownOutside = (e: PointerEvent) => {
-                if (textBoxContainerRef.current?.contains(e.target as Node)) {
-                    return;
-                }
-                const target = e.target as HTMLElement | null;
-                // Toolbar veya araç butonlarına basıldığında (yazı tipi, renk, kalın vb. değiştirirken) kutuyu kapatma
-                if (
-                    target?.closest(
-                        '[data-drawing-toolbar], [aria-label*="araç"], [aria-label*="Araç"], [title*="Yazı"], [title*="Metin"], [title*="Font"], [title*="Renk"], [title*="Boyut"]'
-                    )
-                ) {
-                    return;
-                }
-                // Tuval üzerine basıldığında zaten startDrawing commitInlineText() çağırıp yeni kutuyu açacaktır
-                if (canvasRef.current && canvasRef.current === target) {
-                    return;
-                }
-                commitInlineText();
+        const beginTextEditing = (draft: TextDraft) => {
+            inlineTextRef.current = draft;
+            flushSync(() => setInlineText(draft));
+            deselect();
+            redraw();
+        };
+        const cancelInlineText = React.useCallback(() => {
+            inlineTextRef.current = null;
+            setInlineText(null);
+            redraw();
+        }, [redraw]);
+        const commitInlineText = React.useCallback((textValue?: string) => {
+            const draft = inlineTextRef.current;
+            if (!draft) return;
+            // Synchronous clear prevents outside-click and tool-change from saving twice.
+            inlineTextRef.current = null;
+            setInlineText(null);
+            const text = textValue ?? draft.text;
+            const idx = draft.strokeId
+                ? strokesRef.current.findIndex(stroke => stroke.id === draft.strokeId)
+                : draft.strokeIdx;
+            const existing = idx !== undefined && idx >= 0 ? strokesRef.current[idx] : undefined;
+            const value: Stroke = {
+                ...(existing ?? {id:newStrokeId(), tool:'text' as const}),
+                text, color:draft.color, width:draft.fontSize,
+                fontFamily:draft.fontFamily, textAlign:draft.textAlign,
+                bold:draft.bold, italic:draft.italic, textBoxWidth:draft.boxWidth,
+                points:[{x:draft.worldX, y:draft.worldY}],
             };
-            window.addEventListener('pointerdown', onPointerDownOutside);
-            return () => window.removeEventListener('pointerdown', onPointerDownOutside);
-        }, [inlineText, commitInlineText]);
+            if (existing?.tool === 'text' && idx !== undefined) {
+                if (!text.trim()) {
+                    pushHistory();
+                    strokesRef.current.splice(idx, 1);
+                    commitStrokes();
+                    if (existing.id) emit({type:'remove', page:currentPageRef.current, ids:[existing.id]});
+                } else if (JSON.stringify(existing) !== JSON.stringify(value)) {
+                    pushHistory();
+                    strokesRef.current[idx] = value;
+                    commitStrokes();
+                    emit({type:'update', page:currentPageRef.current, strokes:[value]});
+                }
+            } else if (draft.strokeIdx === undefined && text.trim()) {
+                pushHistory();
+                strokesRef.current.push(value);
+                commitStrokes();
+                emit({type:'add', page:currentPageRef.current, strokes:[value]});
+            }
+            deselect();
+            redraw();
+        }, [commitStrokes, deselect, emit, pushHistory, redraw]);
+        commitTextRef.current = commitInlineText;
+
+        // Editing via selection also works: only an actual tool transition saves.
+        const previousTool = React.useRef(config.tool);
+        React.useEffect(() => {
+            if (previousTool.current !== config.tool) commitTextRef.current();
+            previousTool.current = config.tool;
+        }, [config.tool]);
+
+        React.useEffect(() => {
+            const outside = (event: PointerEvent) => {
+                const target = event.target as HTMLElement | null;
+                if (!inlineTextRef.current || textBoxContainerRef.current?.contains(target)) return;
+                if (target === canvasRef.current || target?.closest('[data-drawing-toolbar]')) return;
+                commitTextRef.current();
+            };
+            window.addEventListener('pointerdown', outside, true);
+            return () => window.removeEventListener('pointerdown', outside, true);
+        }, []);
 
         const insertImageAt = React.useCallback(
             (src: string, width: number, height: number, cx?: number, cy?: number) => {
@@ -1167,6 +1110,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 canUndo: () => historyRef.current.canUndo,
                 canRedo: () => historyRef.current.canRedo,
                 clear: () => {
+                    commitTextRef.current();
                     if (strokesRef.current.length === 0) return;
                     pushHistory();
                     strokesRef.current = [];
@@ -1314,6 +1258,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     switchPage(pagesRef.current.length - 1);
                 },
                 duplicatePage: () => {
+                    commitTextRef.current();
                     pagesRef.current[currentPageRef.current] = [...strokesRef.current];
                     const copy: Stroke[] = JSON.parse(
                         JSON.stringify(pagesRef.current[currentPageRef.current])
@@ -1373,7 +1318,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 isBusy: () =>
                     isDrawingRef.current ||
                     dragStateRef.current !== null ||
-                    pointersRef.current.size > 0,
+                    pointersRef.current.size > 0 || inlineTextRef.current !== null,
                 getPages: () => {
                     pagesRef.current[currentPageRef.current] = [...strokesRef.current];
                     return pagesRef.current.map((page) =>
@@ -2743,7 +2688,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         lastTextClickRef.current = { idx: i, time: Date.now() };
 
                         if (isDoubleTextClick) {
-                            setInlineText({
+                            e.preventDefault();
+                            beginTextEditing({
+                                sessionId: newStrokeId(),
                                 worldX: hitStroke.points[0].x,
                                 worldY: hitStroke.points[0].y,
                                 text: hitStroke.text || '',
@@ -2754,6 +2701,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                 bold: Boolean(hitStroke.bold),
                                 italic: Boolean(hitStroke.italic),
                                 strokeIdx: i,
+                                strokeId: hitStroke.id,
+                                boxWidth: hitStroke.textBoxWidth,
                             });
                             return;
                         }
@@ -2800,9 +2749,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
 
             if (config.tool === 'text') {
-                if (inlineText) {
-                    commitInlineText();
-                }
+                // Metin alanına verilen odağı tarayıcının sonraki mousedown
+                // varsayılanı geri almasın (Safari ve Chromium).
+                e.preventDefault();
+                if (inlineTextRef.current) commitInlineText();
                 const pickTolerance = 14 / viewRef.current.scale;
                 for (let i = strokesRef.current.length - 1; i >= 0; i--) {
                     const st = strokesRef.current[i];
@@ -2813,7 +2763,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         const isBold = Boolean(st.bold);
                         const isItalic = Boolean(st.italic);
                         deselect();
-                        setInlineText({
+                        beginTextEditing({
+                            sessionId: newStrokeId(),
                             worldX: st.points[0].x,
                             worldY: st.points[0].y,
                             text: st.text || '',
@@ -2824,6 +2775,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                             bold: isBold,
                             italic: isItalic,
                             strokeIdx: i,
+                            strokeId: st.id,
+                            boxWidth: st.textBoxWidth,
                         });
                         onConfigChange?.({
                             color: st.color,
@@ -2838,9 +2791,11 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     }
                 }
                 deselect();
-                setInlineText({
-                    worldX: x,
-                    worldY: y,
+                beginTextEditing({
+                    sessionId: newStrokeId(),
+                    worldX: pageBox ? Math.min(x, Math.max(0, pageBox.w - 80)) : x,
+                    worldY: pageBox ? Math.min(y, Math.max(0, pageBox.h - 30)) : y,
+                    boxWidth: pageBox ? Math.max(80, Math.min(280, pageBox.w - x)) : 280,
                     text: '',
                     fontSize: config.width && config.width >= 10 ? config.width : 22,
                     color: config.color,
@@ -4594,7 +4549,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                             const idx = selectedIdxs[0];
                                             const st = strokesRef.current[idx];
                                             if (st) {
-                                                setInlineText({
+                                                beginTextEditing({
+                                                    sessionId: newStrokeId(),
                                                     worldX: st.points[0].x,
                                                     worldY: st.points[0].y,
                                                     text: st.text || '',
@@ -4605,6 +4561,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                                                     bold: Boolean(st.bold),
                                                     italic: Boolean(st.italic),
                                                     strokeIdx: idx,
+                                                    strokeId: st.id,
+                                                    boxWidth: st.textBoxWidth,
                                                 });
                                             }
                                         }}
@@ -4751,147 +4709,22 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     </div>
                 )}
 
-                {/* GoodNotes & Notability Standardı: Sayfa Üzerinde Doğrudan, Tam Tıklanan Noktada Metin Kutusu */}
-                {inlineText && (
-                    <div
-                        className="absolute left-0 top-0 w-full h-full z-[5000] pointer-events-none overflow-visible"
-                        aria-label="Metin kutusu katmanı"
-                    >
-                        <div
-                            ref={textBoxContainerRef}
-                            className="absolute pointer-events-auto flex flex-col items-start transition-none"
-                            style={{
-                                left: inlineText.worldX * view.scale + view.tx,
-                                top: inlineText.worldY * view.scale + view.ty,
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            onPointerDown={(e) => e.stopPropagation()}
-                        >
-                            {/* Üst Taşıma ve İşlem Başlığı (GoodNotes Minimal Tutamaç) */}
-                            <div
-                                className={cn(
-                                    'absolute flex items-center justify-between gap-1.5 select-none z-10',
-                                    inlineText.worldY * view.scale + view.ty < 36
-                                        ? 'top-full mt-1.5 left-0'
-                                        : '-top-7 left-0'
-                                )}
-                            >
-                                <div
-                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-sky-500 hover:bg-sky-600 text-white text-[11px] font-semibold cursor-move shadow-md active:opacity-80"
-                                    title="Metin Kutusunu Taşı"
-                                    onPointerDown={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        const startX = e.clientX;
-                                        const startY = e.clientY;
-                                        const origX = inlineText.worldX;
-                                        const origY = inlineText.worldY;
-                                        const scale = viewRef.current.scale;
-                                        const onMove = (me: PointerEvent) => {
-                                            const dx = (me.clientX - startX) / scale;
-                                            const dy = (me.clientY - startY) / scale;
-                                            setInlineText((p) =>
-                                                p ? { ...p, worldX: origX + dx, worldY: origY + dy } : null
-                                            );
-                                        };
-                                        const onUp = () => {
-                                            window.removeEventListener('pointermove', onMove);
-                                            window.removeEventListener('pointerup', onUp);
-                                        };
-                                        window.addEventListener('pointermove', onMove);
-                                        window.addEventListener('pointerup', onUp);
-                                    }}
-                                >
-                                    <GripHorizontal className="w-3.5 h-3.5 opacity-90" />
-                                    <span className="text-[10px] uppercase tracking-wider font-bold">Metin</span>
-                                </div>
+                {inlineText && <InlineTextEditor
+                    draft={inlineText} view={view} pageBox={pageBox} containerRef={textBoxContainerRef}
+                    viewport={{w:canvasRef.current?.clientWidth ?? window.innerWidth, h:canvasRef.current?.clientHeight ?? window.innerHeight}}
+                    onChange={patch => {
+                        const next = inlineTextRef.current;
+                        if (!next) return;
+                        const updated = {...next, ...patch};
+                        inlineTextRef.current = updated;
+                        setInlineText(updated);
+                        onConfigChange?.({color:updated.color, width:updated.fontSize, fontFamily:updated.fontFamily, textAlign:updated.textAlign, bold:updated.bold, italic:updated.italic});
+                    }}
+                    onSave={() => commitInlineText()}
+                    onCancel={cancelInlineText}
+                    onDelete={() => commitInlineText('')}
+                />}
 
-                                {inlineText.strokeIdx !== undefined && (
-                                    <button
-                                        type="button"
-                                        title="Metni Sil"
-                                        aria-label="Metni Sil"
-                                        className="p-1 text-red-500 hover:text-red-600 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors shadow-sm"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            const idx = inlineText.strokeIdx!;
-                                            pushHistory();
-                                            const removedId = strokesRef.current[idx]?.id;
-                                            strokesRef.current.splice(idx, 1);
-                                            commitStrokes();
-                                            if (removedId)
-                                                emit({
-                                                    type: 'remove',
-                                                    page: currentPageRef.current,
-                                                    ids: [removedId],
-                                                });
-                                            deselect();
-                                            redraw();
-                                            setInlineText(null);
-                                        }}
-                                    >
-                                        <Trash2 className="w-3 h-3" />
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Doğrudan Sayfa Üzerindeki Şeffaf Metin Kutusu Çerçevesi */}
-                            <div
-                                className="relative border-2 border-dashed border-sky-400/90 rounded-sm bg-transparent group"
-                                style={{
-                                    minWidth: `${Math.max(120, inlineText.fontSize * view.scale * 3)}px`,
-                                }}
-                            >
-                                {/* 4 Köşe GoodNotes Tutamacı */}
-                                <span className="absolute -top-1.5 -left-1.5 w-2.5 h-2.5 bg-sky-500 border-2 border-white rounded-full pointer-events-none shadow-sm" />
-                                <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-sky-500 border-2 border-white rounded-full pointer-events-none shadow-sm" />
-                                <span className="absolute -bottom-1.5 -left-1.5 w-2.5 h-2.5 bg-sky-500 border-2 border-white rounded-full pointer-events-none shadow-sm" />
-                                <span className="absolute -bottom-1.5 -right-1.5 w-2.5 h-2.5 bg-sky-500 border-2 border-white rounded-full pointer-events-none shadow-sm" />
-
-                                <textarea
-                                    ref={textareaRef}
-                                    autoFocus
-                                    value={inlineText.text}
-                                    placeholder="Metin yazın..."
-                                    rows={Math.max(1, inlineText.text.split('\n').length)}
-                                    className="w-full bg-transparent border-0 outline-none resize-none p-0.5 block leading-tight overflow-hidden text-slate-900 dark:text-white"
-                                    style={{
-                                        color: inlineText.color,
-                                        fontSize: `${inlineText.fontSize * view.scale}px`,
-                                        lineHeight: 1.25,
-                                        fontFamily:
-                                            inlineText.fontFamily === 'serif'
-                                                ? 'Georgia, Cambria, "Times New Roman", serif'
-                                                : inlineText.fontFamily === 'mono'
-                                                ? 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
-                                                : inlineText.fontFamily === 'cursive'
-                                                ? 'Caveat, "Comic Sans MS", cursive'
-                                                : 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                                        fontWeight: inlineText.bold ? 'bold' : 'normal',
-                                        fontStyle: inlineText.italic ? 'italic' : 'normal',
-                                        textAlign: inlineText.textAlign || 'left',
-                                        caretColor: '#0284c7',
-                                    }}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setInlineText((prev) => (prev ? { ...prev, text: val } : null));
-                                    }}
-                                    onInput={(e) => {
-                                        const target = e.currentTarget;
-                                        target.style.height = 'auto';
-                                        target.style.height = `${target.scrollHeight}px`;
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Escape') {
-                                            e.preventDefault();
-                                            commitInlineText();
-                                        }
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
             </>
         );
     }

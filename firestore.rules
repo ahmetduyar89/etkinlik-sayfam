@@ -36,7 +36,8 @@ service cloud.firestore {
 
     // Parola sınıf belgesinde bulunmaz. Sınıf yalnız kendi kaydını okuyabilir.
     match /classes/{classId} {
-      allow read: if isTeacher() || isClass(classId);
+      allow read: if isTeacher() || isClass(classId) ||
+        (role() == 'student' && request.auth.token.classId == classId);
       allow write: if false;
 
       match /students/{studentId} {
@@ -75,30 +76,65 @@ service cloud.firestore {
       allow read, write: if isTeacher() || role() == 'class';
     }
     match /submissions/{submissionId} {
-      allow create: if role() in ['teacher', 'class', 'student'];
-      allow read, update, delete: if isTeacher();
+      allow create: if (isTeacher() || role() == 'class' ||
+        (role() == 'student' && request.resource.data.student_id == request.auth.token.studentId &&
+         request.resource.data.class_id == request.auth.token.classId)) &&
+        request.resource.data.owner_uid == request.auth.uid && request.resource.data.answers is map &&
+        request.resource.data.submitted_at == null;
+      allow read: if isTeacher() || (signedIn() && resource.data.owner_uid == request.auth.uid);
+      allow update: if isTeacher() || (signedIn() && resource.data.owner_uid == request.auth.uid &&
+        resource.data.submitted_at == null &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answers', 'submitted_at']) &&
+        request.resource.data.answers is map);
+      allow delete: if isTeacher();
+    }
+
+    match /learning_assignments/{assignmentId} {
+      allow read: if isTeacher() || isClass(resource.data.classId) ||
+        (role() == 'student' && request.auth.token.classId == resource.data.classId);
+      allow write: if false;
+    }
+    match /learning_results/{resultId} {
+      allow read: if isTeacher() || isClass(resource.data.classId) ||
+        (isStudent(resource.data.studentId) && request.auth.token.classId == resource.data.classId);
+      allow write: if false;
     }
 
     match /chess_matches/{matchId} {
+      function ownMatch(data) {
+        return role() == 'student' && data.classId == request.auth.token.classId &&
+          (data.whiteId == request.auth.token.studentId || data.blackId == request.auth.token.studentId);
+      }
       allow read: if isTeacher() || belongsToOwnClass(resource.data);
-      allow create: if isTeacher() || belongsToOwnClass(request.resource.data);
+      allow create: if isTeacher() || isClass(request.resource.data.classId) || ownMatch(request.resource.data);
       allow update: if isTeacher() ||
-        (belongsToOwnClass(resource.data) && belongsToOwnClass(request.resource.data));
-      allow delete: if isTeacher() || belongsToOwnClass(resource.data);
+        (isClass(resource.data.classId) && isClass(request.resource.data.classId)) ||
+        (ownMatch(resource.data) && ownMatch(request.resource.data));
+      allow delete: if isTeacher() || isClass(resource.data.classId);
     }
     match /chess_tournaments/{tournamentId} {
       allow read: if isTeacher() || belongsToOwnClass(resource.data);
-      allow create: if isTeacher() || belongsToOwnClass(request.resource.data);
+      allow create: if isTeacher() || isClass(request.resource.data.classId);
       allow update: if isTeacher() ||
-        (belongsToOwnClass(resource.data) && belongsToOwnClass(request.resource.data));
-      allow delete: if isTeacher() || belongsToOwnClass(resource.data);
+        (isClass(resource.data.classId) && isClass(request.resource.data.classId));
+      allow delete: if isTeacher() || isClass(resource.data.classId);
     }
     match /chess_progress/{progressId} {
-      allow read: if isTeacher() || belongsToOwnClass(resource.data);
-      allow create: if isTeacher() || belongsToOwnClass(request.resource.data);
+      function ownProfile(data) {
+        return role() == 'student' && data.classId == request.auth.token.classId &&
+          data.profileId == 'student:' + request.auth.token.studentId;
+      }
+      allow read: if isTeacher() || isClass(resource.data.classId) || ownProfile(resource.data);
+      allow create: if isTeacher() || isClass(request.resource.data.classId) || ownProfile(request.resource.data);
       allow update: if isTeacher() ||
-        (belongsToOwnClass(resource.data) && belongsToOwnClass(request.resource.data));
-      allow delete: if isTeacher() || belongsToOwnClass(resource.data);
+        (isClass(resource.data.classId) && isClass(request.resource.data.classId)) ||
+        (ownProfile(resource.data) && ownProfile(request.resource.data));
+      allow delete: if isTeacher() || isClass(resource.data.classId) || ownProfile(resource.data);
+    }
+    match /chess_bot_games/{gameId} {
+      allow read: if isTeacher() || isClass(resource.data.classId) ||
+        (isStudent(resource.data.studentId) && request.auth.token.classId == resource.data.classId);
+      allow write: if false;
     }
     match /chess_sync/{syncId} {
       allow read: if isTeacher() || belongsToOwnClass(resource.data);
@@ -114,18 +150,24 @@ service cloud.firestore {
         isLiveParticipant(resource.data) || isLiveJoin(resource.data, request.resource.data);
       allow delete: if isTeacher() || isLiveParticipant(resource.data);
     }
-    match /liveChessPresence/{studentId} {
-      allow read: if signedIn() && role() in ['teacher', 'student', 'chessGuest'];
-      allow create, update, delete: if isTeacher() || isStudent(studentId) ||
-        (role() == 'chessGuest' && request.auth.token.studentId == studentId);
+    match /liveChessPresence/{presenceId} {
+      function ownPresence(data) {
+        return role() in ['student', 'chessGuest'] && data.studentId == request.auth.token.studentId &&
+          data.classId == request.auth.token.classId && presenceId == data.classId + '--' + data.studentId;
+      }
+      allow read: if (signedIn() && role() in ['teacher', 'student', 'chessGuest']) || isClass(resource.data.classId);
+      allow create: if isTeacher() || ownPresence(request.resource.data);
+      allow update: if isTeacher() || (ownPresence(resource.data) && ownPresence(request.resource.data));
+      allow delete: if isTeacher() || ownPresence(resource.data);
     }
     match /liveChessQueue/{studentId} {
       allow read: if isTeacher() || isStudent(studentId);
       allow create, update, delete: if isTeacher() || isStudent(studentId);
     }
     match /liveChessGames/{gameId} {
-      allow read: if isTeacher() ||
-        (role() == 'student' && request.auth.token.studentId in resource.data.playerIds);
+      allow read: if isTeacher() || isClass(resource.data.whiteClassId) || isClass(resource.data.blackClassId) ||
+        (role() == 'student' && ((resource.data.whiteId == request.auth.token.studentId && resource.data.whiteClassId == request.auth.token.classId) ||
+          (resource.data.blackId == request.auth.token.studentId && resource.data.blackClassId == request.auth.token.classId)));
       allow write: if false;
     }
 

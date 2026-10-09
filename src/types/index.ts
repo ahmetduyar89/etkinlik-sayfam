@@ -47,6 +47,10 @@ export interface Submission {
     id: string;
     activity_id: string;
     student_name: string;
+    owner_uid?: string;
+    student_id?: string;
+    class_id?: string;
+    assignment_id?: string;
     started_at: string;
     submitted_at: string | null;
     answers: Record<string, unknown>;
@@ -126,6 +130,8 @@ export interface Stroke {
     fillEnabled?: boolean;
     points: Point[];
     text?: string;
+    /** Metin kutusunun dünya birimindeki satır sarma genişliği; eski metinlerde yoktur. */
+    textBoxWidth?: number;
     stampIcon?: string;
     /** Serbest çizim kalemlerinde uç karakteri (varsayılan: ballpoint). */
     penType?: PenType;

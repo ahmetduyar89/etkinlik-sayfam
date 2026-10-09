@@ -59,11 +59,11 @@ export function Lab() {
             <output role="status">{verification}</output>
         </header>
         <DrawingToolbar onInsertElement={(src,w,h)=>ref.current?.insertImage(src,w,h)} fixed config={config} setConfig={setConfig} canUndo={history[0]} canRedo={history[1]}
-            onCommand={command=>{if(command==='UNDO_DRAWING')ref.current?.undo();if(command==='REDO_DRAWING')ref.current?.redo();}}
+            onCommand={command=>{if(command==='UNDO_DRAWING')ref.current?.undo();if(command==='REDO_DRAWING')ref.current?.redo();if(command==='CLEAR_DRAWING')ref.current?.clear();}}
             onInsertMath={math=>ref.current?.insertMath(math)} onSelectTool={id=>window.alert(`Laboratuvar aracı: ${id}`)}/>
         <div className="flex min-h-0 flex-1">
             <section className="relative min-w-0 flex-1 overflow-hidden" aria-label="Geçici çizim tahtası">
-                <DrawingCanvas ref={ref} config={config} enabled whiteboardMode panMode="viewport" onViewChange={view => setZoom(view.scale)} legacyInputFilter={legacyInputFilter} onInkDiagnostic={deviceTest ? record : undefined} onDirty={() => setCount(ref.current?.getPages()[0]?.length ?? 0)} onHistoryChange={(undo, redo) => setHistory([undo, redo])} />
+                <DrawingCanvas onConfigChange={patch => setConfig(prev => ({...prev, ...patch}))} ref={ref} config={config} enabled whiteboardMode panMode="viewport" onViewChange={view => setZoom(view.scale)} legacyInputFilter={legacyInputFilter} onInkDiagnostic={deviceTest ? record : undefined} onDirty={() => setCount(ref.current?.getPages()[0]?.length ?? 0)} onHistoryChange={(undo, redo) => setHistory([undo, redo])} />
             </section>
             {deviceTest && <DeviceTestPanel ref={deviceTestRef} legacy={legacyInputFilter} onModeChange={setLegacyInputFilter}/>}
         </div>

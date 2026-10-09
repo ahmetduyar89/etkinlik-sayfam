@@ -280,6 +280,8 @@ export class ProgressService {
     record.best = Math.max(record.best, score);
     record.plays += 1;
     record.total += score;
+    record.lastScore = score;
+    record.lastPlayedAt = new Date().toISOString();
     this.state.miniGames[gameId] = record;
 
     this.checkBadges();

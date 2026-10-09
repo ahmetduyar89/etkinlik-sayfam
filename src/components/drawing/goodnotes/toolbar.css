@@ -88,3 +88,9 @@
 .gn-lasso-trigger{color:var(--gn-blue)}
 .gn-popover .gn-pen-tabs button.is-active,.gn-eraser-types button.is-active{background:var(--gn-soft);border-color:var(--gn-edge);color:var(--gn-blue)}
 .gn-popover-heading{color:var(--gn-blue)}.gn-toggle input,.gn-range input{accent-color:var(--gn-blue)}
+
+.gn-clear-page{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;flex-shrink:0;padding:0 12px;border:1px solid #f3dce7;border-radius:11px;background:#fceef4;color:#a33c65;font-size:12px;font-weight:600;white-space:nowrap;touch-action:manipulation}
+.gn-clear-page:hover{background:#f8dfeb}.gn-clear-page:focus-visible{outline:2px solid #ad5076;outline-offset:2px}
+.gn-clear-page-option{width:100%;margin-top:14px}
+
+.gn-text-context{padding:8px 14px;font-size:12px;color:#4b66bd;gap:8px}.gn-text-context svg{flex-shrink:0}.gn-text-context span{white-space:normal;min-width:160px}

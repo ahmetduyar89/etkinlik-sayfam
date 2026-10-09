@@ -6,8 +6,8 @@
     "node": "22"
   },
   "scripts": {
-    "check": "node --check index.js && node --check qr-login.js",
-    "test": "node --test qr-login.test.js"
+    "check": "node --check index.js && node --check qr-login.js && node --check learning.js && node --check bot-games.js && node --check chess-engine.mjs",
+    "test": "node --test qr-login.test.js learning.test.js bot-games.test.js"
   },
   "dependencies": {
     "firebase-admin": "^14.5.0",

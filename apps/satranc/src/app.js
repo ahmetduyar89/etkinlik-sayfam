@@ -46,13 +46,18 @@ function readRole() {
 }
 
 let role = readRole();
+let verifiedStudentId = null;
+window.addEventListener("satranc-cloud-session", event => {
+  verifiedStudentId = event.detail?.role === "student" ? event.detail.studentId : null;
+  if (verifiedStudentId) setRole("student");
+});
 
 function readStudentId() {
   try { return localStorage.getItem(STUDENT_KEY) || ""; } catch { return ""; }
 }
 
 function selectedStudent() {
-  const id = readStudentId();
+  const id = verifiedStudentId || readStudentId();
   return classroom.students(classroom.state.activeClassId).find((student) => student.id === id) || null;
 }
 
@@ -67,7 +72,7 @@ function useRoleProfile() {
 }
 
 function setRole(next) {
-  role = next === "student" ? "student" : "teacher";
+  role = verifiedStudentId || next === "student" ? "student" : "teacher";
   try { localStorage.setItem(ROLE_KEY, role); } catch { /* Kısıtlı tarayıcıda oturumluk çalışır. */ }
   useRoleProfile();
   if (role === "student" && TEACHER_ROUTES.includes(currentRoute())) {
@@ -193,9 +198,10 @@ let cloudStatus = { status: "connecting", detail: "Bulut bağlantısı kuruluyor
 
 const cloudLabels = {
   connecting: "Bağlanıyor",
-  online: "Buluta kaydediliyor",
+  online: "Çevrimiçi · Güncel",
+  saving: "Sunucuya kaydediliyor",
   offline: "Çevrimdışı",
-  "signed-out": "Bulut kapalı",
+  "signed-out": "Giriş gerekli",
   error: "Senkronizasyon hatası"
 };
 
@@ -209,6 +215,51 @@ function syncCloudStatus() {
 window.addEventListener("satranc-cloud-status", (event) => {
   cloudStatus = event.detail || cloudStatus;
   syncCloudStatus();
+  syncOnlineGate();
+});
+
+let onlineGate = null;
+function syncOnlineGate() {
+  if (!onlineGate) {
+    onlineGate = document.createElement("section");
+    onlineGate.className = "online-gate";
+    onlineGate.setAttribute("role", "alert");
+    document.body.append(onlineGate);
+  }
+  const blocked = !["online", "saving"].includes(cloudStatus.status);
+  root.inert = blocked || cloudStatus.status === "saving";
+  onlineGate.hidden = !blocked;
+  if (!blocked) return;
+  onlineGate.replaceChildren();
+  const panel = document.createElement("div");
+  const heading = document.createElement("h2");
+  heading.textContent = cloudLabels[cloudStatus.status] || "Çevrimiçi satranç";
+  const detail = document.createElement("p");
+  detail.textContent = cloudStatus.detail || "Sunucudan güncel kayıtlar bekleniyor.";
+  const back = document.createElement("a");
+  back.href = location.protocol.startsWith("http") ? "/" : "https://atölye.tedrisedu.com/";
+  back.textContent = "Atölye’ye dön ve giriş yap";
+  const retry = document.createElement("button");
+  retry.textContent = "Tekrar bağlan";
+  retry.onclick = () => location.reload();
+  panel.append(heading, detail, back, retry);
+  let legacy = null;
+  try { legacy = localStorage.getItem("satranc-online-migration-backup"); } catch { /* Tarayıcı depolaması kapalı. */ }
+  if (legacy) {
+    const backup = document.createElement("button");
+    backup.textContent = "Eski cihaz kayıtlarını indir";
+    backup.onclick = () => {
+      const url = URL.createObjectURL(new Blob([legacy], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url; link.download = "satranc-eski-cihaz-kayitlari.json"; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    panel.append(backup);
+  }
+  onlineGate.append(panel);
+}
+window.addEventListener("satranc-cloud-data", () => {
+  if (["siniflar", "turnuva", "reports"].includes(currentRoute()) && cloudStatus.status === "online") render();
 });
 
 function renderTopbar() {
@@ -263,12 +314,21 @@ function renderTopbar() {
         className: role === "teacher" ? "active" : "",
         type: "button",
         text: "Öğretmen",
+        disabled: Boolean(verifiedStudentId),
         "aria-pressed": String(role === "teacher"),
         onClick: () => setRole("teacher")
       })
     ]),
     role === "teacher" ? renderClassPicker() : renderStudentPicker(),
     cloudStatusNode,
+    el("button", { type: "button", className: "icon-button", title: "Eski cihaz kayıtlarını indir", text: "Yedek", onClick: () => {
+      let backup;
+      try { backup = localStorage.getItem("satranc-online-migration-backup"); } catch { /* Depolama kapalı. */ }
+      if (!backup) { window.alert("Bu cihazda eski kayıt yedeği bulunamadı."); return; }
+      const url = URL.createObjectURL(new Blob([backup], { type: "application/json" }));
+      const link = document.createElement("a"); link.href = url; link.download = "satranc-eski-cihaz-kayitlari.json"; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } }),
     xpStat,
     starStat,
     el("button", { className: "icon-button", type: "button", title: "Ayarlar", onClick: () => navigate("settings"), html: icon("settings") })
@@ -280,6 +340,7 @@ function renderStudentPicker() {
   studentPicker = el("select", {
     className: "class-picker-select student-picker-select",
     "aria-label": "Öğrenci profili",
+    disabled: Boolean(verifiedStudentId),
     onChange: (event) => {
       if (event.target.value === "__manage") {
         setRole("teacher");
@@ -412,7 +473,7 @@ function bump(node, text) {
 // syncTopbar güncel referansları kullanır.
 progress.onChange(syncTopbar);
 classroom.onChange(() => {
-  if (role === "teacher") useRoleProfile();
+  useRoleProfile();
   syncClassPicker();
   syncStudentPicker();
 });
@@ -420,9 +481,8 @@ classroom.onChange(() => {
 onRouteChange(render);
 render();
 
-// Hosted sürümde doğrulanmış öğretmen oturumu varsa yerel kayıtları bulutla
-// eşitle. Başarısızlık uygulamayı durdurmaz; sınıf içindeki çevrimdışı akış
-// her zaman kullanılabilir kalır.
+// Sunucudan doğrulanmış kayıt gelene kadar eğitim ve kayıt işlemlerini beklet.
+syncOnlineGate();
 void startCloudSync({ classroom, progress });
 
 // Çevrimdışı önbellek yalnızca http/https üzerinden anlamlıdır.

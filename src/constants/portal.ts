@@ -109,7 +109,7 @@ export const PORTAL_MODULES: PortalModule[] = [
         id: 'satranc',
         title: 'Satranç Eğitimi',
         description:
-            'İlkokul için çevrimdışı satranç platformu: taş dersleri, bulmacalar, yapay zekâya karşı oyun ve 36 haftalık ders planı.',
+            'İlkokul için çevrimiçi satranç platformu: taş dersleri, bulmacalar, yapay zekâya karşı oyun ve 36 haftalık ders planı.',
         meta: '36 haftalık plan · Çevrimdışı',
         icon: Crown,
         accent: {

@@ -411,7 +411,7 @@ export async function importFromSatrancEncryptedRoster(password: string): Promis
 
 /** Sınıf yönetimi için canlı React Hook'u */
 export function useClassrooms() {
-    const [classes, setClasses] = useState<ClassRoom[]>(getCachedClasses);
+    const [classes, setClasses] = useState<ClassRoom[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -420,6 +420,7 @@ export function useClassrooms() {
         try {
             const apply = (list: ClassRoom[]) => {
                     setClasses(list);
+                    setError(null);
                     setCachedClasses(list);
                     syncClassesToChess(list);
                     setLoading(false);
@@ -430,22 +431,24 @@ export function useClassrooms() {
                     setLoading(false);
             };
             const session = getSession();
-            if (session?.role === 'class') {
+            if (session?.role === 'class' || session?.role === 'student') {
                 unsubscribe = onSnapshot(
                     doc(db, CLASSES_COLLECTION, session.classId),
-                    (snapshot) => apply(snapshot.exists() ? [{
+                    { includeMetadataChanges: true },
+                    (snapshot) => { if (snapshot.metadata.fromCache) { setLoading(true); return; } apply(snapshot.exists() ? [{
                         id: snapshot.id,
                         ...(snapshot.data() as Omit<ClassRoom, 'id'>),
-                    }] : []),
+                    }] : []); },
                     onError
                 );
             } else {
                 unsubscribe = onSnapshot(
                     collection(db, CLASSES_COLLECTION),
-                    (snapshot) => apply(snapshot.docs.map((docSnap) => ({
+                    { includeMetadataChanges: true },
+                    (snapshot) => { if (snapshot.metadata.fromCache) { setLoading(true); return; } apply(snapshot.docs.map((docSnap) => ({
                         id: docSnap.id,
                         ...(docSnap.data() as Omit<ClassRoom, 'id'>),
-                    }))),
+                    }))); },
                     onError
                 );
             }

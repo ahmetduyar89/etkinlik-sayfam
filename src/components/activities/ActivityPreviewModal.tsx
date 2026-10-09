@@ -573,6 +573,7 @@ export function ActivityPreviewModal({
                                 />
                             )}
                             <DrawingCanvas
+                                onConfigChange={patch => setPreviewDrawConfig(prev => ({...prev, ...patch}))}
                                 ref={canvasRef}
                                 config={previewDrawConfig}
                                 enabled={isPreviewDrawingMode}

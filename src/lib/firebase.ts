@@ -62,9 +62,9 @@ export async function signInClass(username: string, password: string): Promise<O
 }
 
 /** Öğrenci numarasını sunucuda doğrular ve öğrenciye sınırlandırılmış oturum açar. */
-export async function signInStudent(schoolNumber: string): Promise<Omit<StudentLoginResult, 'token'>> {
-    const call = httpsCallable<{ schoolNumber: string }, StudentLoginResult>(functions, 'loginStudent');
-    const { data } = await call({ schoolNumber });
+export async function signInStudent(schoolNumber: string, identity?: { name: string; classId?: string }): Promise<Omit<StudentLoginResult, 'token'>> {
+    const call = httpsCallable<{ schoolNumber: string; name?: string; classId?: string }, StudentLoginResult>(functions, 'loginStudent');
+    const { data } = await call({ schoolNumber, ...(identity?.name ? { name: identity.name } : {}), ...(identity?.classId ? { classId: identity.classId } : {}) });
     await signInWithCustomToken(auth, data.token);
     const { token: _token, ...session } = data;
     return session;
@@ -294,4 +294,10 @@ export async function deleteDocById(
     id: string
 ): Promise<void> {
     await deleteDoc(doc(db, collectionName, id));
+}
+
+/** Creates the notebook and its class assignment in one server transaction. */
+export async function createClassLessonNotebook(classId: string): Promise<{ id: string }> {
+    if (!navigator.onLine) throw new Error('Ders defteri açmak için internet bağlantısı gerekiyor.');
+    return (await httpsCallable<{ classId: string }, { id: string }>(functions, 'createClassLessonNotebook')({ classId })).data;
 }
