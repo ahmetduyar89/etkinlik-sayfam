@@ -1,6 +1,6 @@
 // src/lib/chess/player.ts — Canlı Satranç oyuncu kimliği
 // ─────────────────────────────────────────────────────────────────────
-// Bu sayfada giriş yoktur: çocuk adını yazar ve oynar. Yine de "bu hamleyi
+// Oyuncu ad soyadıyla, yalnız satranç erişimi olan sunucu oturumu açar. Yine de "bu hamleyi
 // kim yaptı, bu masada hangi koltuk benim" sorusunun yanıtı gerekir. Bunun
 // için tarayıcıda kalıcı, rastgele bir kimlik üretilir.
 //
@@ -10,6 +10,14 @@
 
 const ID_KEY = 'satranc_oyuncu_id';
 const NAME_KEY = 'satranc_oyuncu_ad';
+const STUDENT_KEY = 'satranc_ogrenci_oturumu';
+
+export interface ChessStudentSession {
+    studentId: string;
+    studentName: string;
+    classId: string;
+    schoolNumber?: string;
+}
 
 /** Tarayıcıda saklanan kalıcı oyuncu kimliği; yoksa üretilir. */
 export function playerId(): string {
@@ -45,20 +53,51 @@ export function savePlayerName(name: string): void {
     }
 }
 
+export function readStudentSession(): ChessStudentSession | null {
+    try {
+        const raw = window.localStorage.getItem(STUDENT_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as ChessStudentSession;
+        return parsed.studentId && parsed.classId && parsed.studentName ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+export function saveStudentSession(session: ChessStudentSession): void {
+    try {
+        window.localStorage.setItem(STUDENT_KEY, JSON.stringify(session));
+        savePlayerName(session.studentName);
+        window.localStorage.setItem(ID_KEY, session.studentId);
+    } catch {
+        // Depolama kapalıysa oturum bellekte devam eder.
+    }
+}
+
+export function clearStudentSession(): void {
+    try {
+        window.localStorage.removeItem(STUDENT_KEY);
+        window.localStorage.removeItem(NAME_KEY);
+        window.localStorage.removeItem(ID_KEY);
+    } catch {
+        // Oturum belleği kapalıysa sayfa durumu yine temizlenir.
+    }
+}
+
 /**
  * Ad soyadı temizler: baştaki/sondaki boşluklar gider, araya düşen fazla
  * boşluklar teke iner, uzunluk sınırlanır. Çocuklar bazen büyük harf kilidiyle
  * yazar; görünümü bozmasın diye baş harfler büyük, kalanı küçük yapılır.
  */
 export function normalizeName(raw: string): string {
-    const cleaned = raw.replace(/\s+/g, ' ').trim().slice(0, 28);
+    const cleaned = raw.replace(/\s+/g, ' ').trim().slice(0, 80);
     return cleaned.replace(
         /\p{L}+/gu,
         (word) => word[0].toLocaleUpperCase('tr') + word.slice(1).toLocaleLowerCase('tr')
     );
 }
 
-/** Ad soyad geçerli mi: en az iki harf. */
+/** Ad soyad en az iki sözcükten oluşmalı. */
 export function isValidName(raw: string): boolean {
-    return normalizeName(raw).replace(/[^\p{L}]/gu, '').length >= 2;
+    return /^[\p{L}][\p{L}\p{M}'’.-]*(?: [\p{L}][\p{L}\p{M}'’.-]*)+$/u.test(normalizeName(raw));
 }

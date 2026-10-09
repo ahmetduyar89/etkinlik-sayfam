@@ -138,6 +138,10 @@ export function DuelPage({ sound }) {
     names.b = classroom.studentName(players.b);
   }
   const tourBoard = tourCtx && tourCtx.board.blackId !== null ? tourCtx : null;
+  // Turnuva kuralları oluşturma ekranında belirlenir. Serbest iki kişilik
+  // oyunda öğretmen bu iki yardımı kurulum panelinden değiştirebilir.
+  let showMoveHints = !tourBoard || tourBoard.tournament.showMoveHints !== false;
+  let touchMoveRequired = tourBoard?.tournament.requireTouchMove === true;
 
   let savedMatch = null; // bu oyunun kaydı; oyun geri alınırsa silinir
   let tourRecorded = false; // turnuva masasına bir kez yazılır
@@ -897,6 +901,10 @@ export function DuelPage({ sound }) {
       chess,
       orientation: side || singleOrientation,
       interactive: phase === "play",
+      // Eski turnuvalarda alan bulunmaz; onlar önceki davranışla yardım açık
+      // çalışmaya devam eder. Turnuva dışındaki iki kişilik oyun da değişmez.
+      showLegalTargets: showMoveHints,
+      touchMoveRequired,
       onSquareClick: (square) => {
         if (phase === "setup") paint(square);
         else nudge(side, square);
@@ -1387,6 +1395,55 @@ export function DuelPage({ sound }) {
 
   const recordNote = el("p", { className: "duel-record-note" });
 
+  function assistanceOption({ input, title, note }) {
+    return el("label", { className: "duel-assistance-option" }, [
+      input,
+      el("span", { className: "duel-assistance-copy" }, [
+        el("strong", { text: title }),
+        el("small", { text: note })
+      ])
+    ]);
+  }
+
+  const moveHintsInput = el("input", {
+    type: "checkbox",
+    checked: showMoveHints ? "" : null,
+    disabled: tourBoard ? "" : null,
+    onChange: (event) => {
+      showMoveHints = event.target.checked;
+      for (const seat of seats) seat.api.setShowLegalTargets(showMoveHints);
+      sound.play("click");
+    }
+  });
+
+  const touchMoveInput = el("input", {
+    type: "checkbox",
+    checked: touchMoveRequired ? "" : null,
+    disabled: tourBoard ? "" : null,
+    onChange: (event) => {
+      touchMoveRequired = event.target.checked;
+      for (const seat of seats) seat.api.setTouchMoveRequired(touchMoveRequired);
+      sound.play("click");
+    }
+  });
+
+  const assistanceOptions = el("div", { className: "duel-assistance-options" }, [
+    assistanceOption({
+      input: moveHintsInput,
+      title: "Hamle yardımını göster",
+      note: tourBoard
+        ? "Bu seçenek turnuva oluşturulurken belirlendi."
+        : "Seçilen taşın gidebileceği kareleri nokta ve halkalarla gösterir."
+    }),
+    assistanceOption({
+      input: touchMoveInput,
+      title: "Dokunulan taşı oynama zorunluluğu",
+      note: tourBoard
+        ? "Bu kural turnuva oluşturulurken belirlendi."
+        : "Yasal hamlesi olan bir taşa dokunulunca başka taş seçilemez."
+    })
+  ]);
+
   /** Sonucun nereye kaydedileceğini söyler. */
   function updateRecordNote() {
     const active = classroom.activeClass;
@@ -1488,6 +1545,8 @@ export function DuelPage({ sound }) {
     timeButtonsContainer,
     customTimeBox,
     timeNote,
+    el("label", { className: "panel-label", text: "Yardım ve kurallar" }),
+    assistanceOptions,
     el("label", { className: "panel-label", text: tourBoard ? "Turnuva masası" : "Oyuncular" }),
     el("div", { className: "duel-names" }, [playerPicker("w"), playerPicker("b")]),
     recordNote,

@@ -25,7 +25,8 @@ import {
     Loader2,
 } from 'lucide-react';
 import { useFirestore } from '../../lib/firebase';
-import { savePdfToDB, getPdfDocument } from '../../lib/pdfStorage';
+import { savePdfToDB, getPdfDocument, uploadPdfToCloud } from '../../lib/pdfStorage';
+import { pdfBoxFromPoints } from '../../constants/pageSizes';
 import { cn } from '../../utils/cn';
 import { copyText } from '../../utils/clipboard';
 import { Modal } from '../common/Modal';
@@ -241,6 +242,9 @@ export function NotebooksView() {
                 kind,
                 parent_id: currentFolderId,
                 paper: isWb ? 'blank' : 'grid',
+                // Yeni defterler A4 yatay başlar: hem çıktıya hem tahtanın
+                // oranına yakın. Eski defterler sınırsız kalır.
+                page_size: 'a4l',
                 bg_color: '#ffffff',
                 page_count: 1,
                 updated_at: new Date().toISOString(),
@@ -270,9 +274,14 @@ export function NotebooksView() {
             // IndexedDB'ye yerel olarak kaydet (sıfır Firestore kotası)
             await savePdfToDB(pdfId, file.name, buffer);
 
-            // Sayfa sayısını dinamik algıla
+            // Sayfa sayısını ve ilk sayfanın ölçüsünü algıla
             const doc = await getPdfDocument(pdfId, buffer);
             const numPages = doc.numPages || 1;
+            // Sayfa kutusu PDF'in kendi punto ölçüsünden bir kez hesaplanır;
+            // böylece defter hangi ekranda açılırsa açılsın aynı boyutta durur.
+            const firstPage = await doc.getPage(1);
+            const pt = firstPage.getViewport({ scale: 1 });
+            const pdf_box = pdfBoxFromPoints(pt.width, pt.height);
 
             // GoodNotes tarzı defteri oluştur
             const ref = await notebooksHandler.add({
@@ -285,7 +294,18 @@ export function NotebooksView() {
                 pdf_id: pdfId,
                 pdf_name: file.name,
                 pdf_total_pages: numPages,
+                pdf_box,
                 updated_at: new Date().toISOString(),
+            });
+
+            // Buluta yükleme (Tüm cihazlarda otomatik görünür olması için)
+            uploadPdfToCloud(pdfId, file.name, buffer).then(({ url, path }) => {
+                if (url) {
+                    notebooksHandler.update(ref.id, {
+                        pdf_url: url,
+                        pdf_storage_path: path,
+                    });
+                }
             });
 
             toast.success(`"${file.name}" başarıyla açıldı (${numPages} sayfa).`);
@@ -687,7 +707,7 @@ export function NotebooksView() {
                     {isNewMenuOpen && (
                         <div
                             role="menu"
-                            className="absolute right-0 top-full mt-2 z-40 w-[340px] bg-white border border-outline-variant rounded-[20px] shadow-[0_18px_44px_rgba(15,23,42,0.16)] p-3"
+                            className="responsive-popover absolute right-0 top-full mt-2 z-40 w-[340px] max-w-[calc(100vw-1.5rem)] bg-white border border-outline-variant rounded-[20px] shadow-[0_18px_44px_rgba(15,23,42,0.16)] p-3"
                         >
                             <div className="grid grid-cols-2 gap-2.5">
                                 <button

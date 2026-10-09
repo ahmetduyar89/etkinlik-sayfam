@@ -16,13 +16,28 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     useEffect(() => {
         if (!isOpen) return;
         const previouslyFocused = document.activeElement as HTMLElement | null;
+        const focusable = () => Array.from(contentRef.current?.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
+        ) ?? []).filter((element) => element.getClientRects().length > 0);
+        const focusTimer = window.setTimeout(() => focusable()[0]?.focus(), 0);
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
+            if (e.key !== 'Tab') return;
+            const items = focusable();
+            const first = items[0];
+            const last = items[items.length - 1];
+            if (!first) { e.preventDefault(); return; }
+            if (e.shiftKey && (document.activeElement === first || !contentRef.current?.contains(document.activeElement))) {
+                e.preventDefault(); last.focus();
+            } else if (!e.shiftKey && (document.activeElement === last || !contentRef.current?.contains(document.activeElement))) {
+                e.preventDefault(); first.focus();
+            }
         };
         window.addEventListener('keydown', onKey);
         const prevOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
         return () => {
+            window.clearTimeout(focusTimer);
             window.removeEventListener('keydown', onKey);
             document.body.style.overflow = prevOverflow;
             previouslyFocused?.focus?.();
@@ -42,7 +57,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
                     // tıklanamıyor, tıklamalar kaleme gidip sayfaya çizik atıyordu.
                     // Onay/soru pencereleri (19000/19500) ve bildirimler (20000)
                     // bir modalın içinden açılabildiği için onların altında kalır.
-                    className="fixed inset-0 z-[13000] flex items-center justify-center px-4"
+                    className="fixed inset-0 z-[13000] flex items-center justify-center p-3 sm:p-4"
                 >
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -57,12 +72,12 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.98, y: 10 }}
                         transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
-                        className="relative bg-white border border-outline-variant rounded-3xl w-full max-w-3xl p-6 sm:p-8 shadow-[0_24px_60px_rgba(15,23,42,0.18)] overflow-hidden max-h-[90vh] flex flex-col"
+                        className="relative bg-white border border-outline-variant rounded-3xl w-full max-w-3xl p-4 sm:p-8 shadow-[0_24px_60px_rgba(15,23,42,0.18)] overflow-hidden max-h-[calc(100dvh-1.5rem)] sm:max-h-[90dvh] flex flex-col"
                     >
-                        <div className="flex justify-between items-center mb-6 shrink-0">
+                        <div className="flex justify-between items-start gap-3 mb-4 sm:mb-6 shrink-0">
                             <h3
                                 id={titleId}
-                                className="font-headline-md text-xl text-on-surface tracking-tight"
+                                className="min-w-0 break-words font-headline-md text-lg sm:text-xl text-on-surface tracking-tight"
                             >
                                 {title}
                             </h3>
@@ -70,12 +85,12 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
                                 type="button"
                                 onClick={onClose}
                                 aria-label="Kapat"
-                                className="p-2 hover:bg-surface-container-high rounded-xl transition-all text-on-surface-variant hover:text-on-surface"
+                                className="min-h-11 min-w-11 shrink-0 p-2 hover:bg-surface-container-high rounded-xl transition-all text-on-surface-variant hover:text-on-surface"
                             >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
-                        <div className="overflow-y-auto custom-scroll -mr-4 pr-4 flex-1">
+                        <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain custom-scroll sm:-mr-4 sm:pr-4 flex-1">
                             {children}
                         </div>
                     </motion.div>

@@ -1,6 +1,6 @@
 import { el, clear } from "./utils/dom.js";
 import { currentRoute, navigate, onRouteChange } from "./utils/router.js";
-import { navItems } from "./data/lessons.js";
+import { navGroups } from "./data/lessons.js";
 import { ProgressService } from "./services/ProgressService.js";
 import { SoundService } from "./audio/SoundService.js";
 import { icon } from "./components/Icon.js";
@@ -24,17 +24,112 @@ import { ProfilePage } from "./pages/ProfilePage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
 import { ClassesPage } from "./pages/ClassesPage.js";
 import { TournamentPage } from "./pages/TournamentPage.js";
+import { ReportsPage } from "./pages/ReportsPage.js";
+import { DailyPracticePage } from "./pages/DailyPracticePage.js";
+import { GameArchivePage } from "./pages/GameArchivePage.js";
 import { classroom } from "./services/ClassroomService.js";
+import { startCloudSync } from "./services/CloudSyncService.js";
 
 const progress = new ProgressService();
 const sound = new SoundService(progress);
 const root = document.querySelector("#app");
+const ROLE_KEY = "satranc-okulu-role";
+const STUDENT_KEY = "satranc-okulu-active-student";
+const TEACHER_ROUTES = ["siniflar", "turnuva", "reports"];
+
+function readRole() {
+  try {
+    return localStorage.getItem(ROLE_KEY) === "student" ? "student" : "teacher";
+  } catch {
+    return "teacher";
+  }
+}
+
+let role = readRole();
+let verifiedStudentId = null;
+window.addEventListener("satranc-cloud-session", event => {
+  verifiedStudentId = event.detail?.role === "student" ? event.detail.studentId : null;
+  if (verifiedStudentId) setRole("student");
+});
+
+function readStudentId() {
+  try { return localStorage.getItem(STUDENT_KEY) || ""; } catch { return ""; }
+}
+
+function selectedStudent() {
+  const id = verifiedStudentId || readStudentId();
+  return classroom.students(classroom.state.activeClassId).find((student) => student.id === id) || null;
+}
+
+function useRoleProfile() {
+  if (role === "teacher") {
+    const active = classroom.activeClass;
+    progress.switchProfile(active ? `class:${active.id}` : "teacher", active ? `${active.name} Sınıfı` : "Öğretmen");
+    return;
+  }
+  const student = selectedStudent();
+  progress.switchProfile(student ? `student:${student.id}` : "guest", student?.name || "Misafir Öğrenci");
+}
+
+function setRole(next) {
+  role = verifiedStudentId || next === "student" ? "student" : "teacher";
+  try { localStorage.setItem(ROLE_KEY, role); } catch { /* Kısıtlı tarayıcıda oturumluk çalışır. */ }
+  useRoleProfile();
+  if (role === "student" && TEACHER_ROUTES.includes(currentRoute())) {
+    navigate("home");
+    return;
+  }
+  render();
+}
+
+// URL üzerinden veya portal oturumundan sınıf parametresi geldiyse o sınıfı otomatik aktif yap
+try {
+  let targetClassId = new URLSearchParams(window.location.search).get("classId");
+  if (!targetClassId) {
+    const session = JSON.parse(localStorage.getItem("etkinlik_oturum"));
+    if (session?.role === "class") targetClassId = session.classId;
+  }
+  if (targetClassId && classroom.getClass(targetClassId)) {
+    classroom.setActiveClass(targetClassId);
+  }
+} catch {
+  // yoksay
+}
+
+// Eski tek profilli kayıt öğretmen profiline taşınır; uygulama öğrenci
+// modunda kapatıldıysa son seçilen öğrencinin profili yeniden açılır.
+useRoleProfile();
+
+export function getReturnNavigation() {
+  if (typeof window === "undefined" || window.location.protocol === "file:") {
+    return null;
+  }
+  let returnTo = "/";
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const param = urlParams.get("returnTo");
+    if (param) {
+      returnTo = decodeURIComponent(param);
+    }
+  } catch {
+    returnTo = "/";
+  }
+  const isClass = returnTo.includes("siniflar");
+  return {
+    url: returnTo,
+    label: isClass ? "Sınıflara Dön" : "Atölye'ye Dön",
+    title: isClass ? "Sınıf merkezine dön" : "Atölye ana sayfasına dön"
+  };
+}
 
 const pages = {
   home: HomePage,
   plan: PlanPage,
   siniflar: ClassesPage,
   turnuva: TournamentPage,
+  reports: ReportsPage,
+  daily: DailyPracticePage,
+  games: GameArchivePage,
   learn: LearnPage,
   board: BoardPage,
   pieces: PiecesPage,
@@ -53,19 +148,33 @@ const pages = {
 };
 
 function renderNav(route) {
+  const returnNav = getReturnNavigation();
   return el("nav", { className: "side-nav", "aria-label": "Ana menü" }, [
+    returnNav
+      ? el("a", {
+          className: "side-return-link",
+          href: returnNav.url,
+          title: returnNav.title,
+          html: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span>${returnNav.label}</span>`
+        })
+      : null,
     el("button", { className: "brand", type: "button", onClick: () => navigate("home"), html: `${icon("crown")}<span>Satranç Eğitimi</span>` }),
-    ...navItems.map(([id, label, iconName]) =>
-      el("button", {
-        className: `nav-link ${route === id ? "active" : ""}`,
-        type: "button",
-        onClick: () => {
-          sound.play("click");
-          navigate(id);
-        },
-        html: `${icon(iconName)}<span>${label}</span>`
-      })
-    ),
+    ...navGroups
+      .filter((group) => group.roles.includes(role))
+      .flatMap((group) => [
+        group.title ? el("p", { className: "nav-section-title", text: group.title }) : null,
+        ...group.items.map(([id, label, iconName]) =>
+          el("button", {
+            className: `nav-link ${route === id ? "active" : ""}`,
+            type: "button",
+            onClick: () => {
+              sound.play("click");
+              navigate(id);
+            },
+            html: `${icon(iconName)}<span>${label}</span>`
+          })
+        )
+      ]),
     // Menünün en altındaki imza — her ekranda görünür ama içeriği gölgelemez.
     el("footer", { className: "nav-credit" }, [
       el("span", { className: "credit-line", text: "Hazırlayan" }),
@@ -83,11 +192,92 @@ function renderNav(route) {
 let xpStat = null;
 let starStat = null;
 let classPicker = null;
+let studentPicker = null;
+let cloudStatusNode = null;
+let cloudStatus = { status: "connecting", detail: "Bulut bağlantısı kuruluyor." };
+
+const cloudLabels = {
+  connecting: "Bağlanıyor",
+  online: "Çevrimiçi · Güncel",
+  saving: "Sunucuya kaydediliyor",
+  offline: "Çevrimdışı",
+  "signed-out": "Giriş gerekli",
+  error: "Senkronizasyon hatası"
+};
+
+function syncCloudStatus() {
+  if (!cloudStatusNode) return;
+  cloudStatusNode.className = `cloud-status ${cloudStatus.status}`;
+  cloudStatusNode.textContent = `● ${cloudLabels[cloudStatus.status] || "Bulut durumu"}`;
+  cloudStatusNode.title = cloudStatus.detail || cloudStatusNode.textContent;
+}
+
+window.addEventListener("satranc-cloud-status", (event) => {
+  cloudStatus = event.detail || cloudStatus;
+  syncCloudStatus();
+  syncOnlineGate();
+});
+
+let onlineGate = null;
+function syncOnlineGate() {
+  if (!onlineGate) {
+    onlineGate = document.createElement("section");
+    onlineGate.className = "online-gate";
+    onlineGate.setAttribute("role", "alert");
+    document.body.append(onlineGate);
+  }
+  const blocked = !["online", "saving"].includes(cloudStatus.status);
+  root.inert = blocked || cloudStatus.status === "saving";
+  onlineGate.hidden = !blocked;
+  if (!blocked) return;
+  onlineGate.replaceChildren();
+  const panel = document.createElement("div");
+  const heading = document.createElement("h2");
+  heading.textContent = cloudLabels[cloudStatus.status] || "Çevrimiçi satranç";
+  const detail = document.createElement("p");
+  detail.textContent = cloudStatus.detail || "Sunucudan güncel kayıtlar bekleniyor.";
+  const back = document.createElement("a");
+  back.href = location.protocol.startsWith("http") ? "/" : "https://atölye.tedrisedu.com/";
+  back.textContent = "Atölye’ye dön ve giriş yap";
+  const retry = document.createElement("button");
+  retry.textContent = "Tekrar bağlan";
+  retry.onclick = () => location.reload();
+  panel.append(heading, detail, back, retry);
+  let legacy = null;
+  try { legacy = localStorage.getItem("satranc-online-migration-backup"); } catch { /* Tarayıcı depolaması kapalı. */ }
+  if (legacy) {
+    const backup = document.createElement("button");
+    backup.textContent = "Eski cihaz kayıtlarını indir";
+    backup.onclick = () => {
+      const url = URL.createObjectURL(new Blob([legacy], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url; link.download = "satranc-eski-cihaz-kayitlari.json"; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    panel.append(backup);
+  }
+  onlineGate.append(panel);
+}
+window.addEventListener("satranc-cloud-data", () => {
+  if (["siniflar", "turnuva", "reports"].includes(currentRoute()) && cloudStatus.status === "online") render();
+});
 
 function renderTopbar() {
   const collapsed = Boolean(progress.state.settings.navCollapsed);
+  const returnNav = getReturnNavigation();
   xpStat = el("div", { className: "top-stat", text: `XP ${progress.state.xp}` });
   starStat = el("div", { className: "top-stat", text: `★ ${progress.state.stars}` });
+  cloudStatusNode = el("div", {
+    className: "cloud-status",
+    role: "status",
+    style: "cursor: pointer;",
+    onClick: () => {
+      if (cloudStatus.detail) {
+        window.alert(`Bulut Durumu: ${cloudLabels[cloudStatus.status] || cloudStatus.status}\n\nDetay: ${cloudStatus.detail}`);
+      }
+    }
+  });
+  syncCloudStatus();
   return el("header", { className: "topbar" }, [
     // Menüyü aç/kapa — tercih kaydedilir, sayfalar arası korunur.
     el("button", {
@@ -103,11 +293,84 @@ function renderTopbar() {
       },
       html: icon(collapsed ? "menuOpen" : "menuClose")
     }),
-    renderClassPicker(),
+    returnNav
+      ? el("a", {
+          className: "top-return-btn",
+          href: returnNav.url,
+          title: returnNav.title,
+          "aria-label": returnNav.title,
+          html: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span>${returnNav.label}</span>`
+        })
+      : null,
+    el("div", { className: "role-switch", "aria-label": "Kullanım modu" }, [
+      el("button", {
+        className: role === "student" ? "active" : "",
+        type: "button",
+        text: "Öğrenci",
+        "aria-pressed": String(role === "student"),
+        onClick: () => setRole("student")
+      }),
+      el("button", {
+        className: role === "teacher" ? "active" : "",
+        type: "button",
+        text: "Öğretmen",
+        disabled: Boolean(verifiedStudentId),
+        "aria-pressed": String(role === "teacher"),
+        onClick: () => setRole("teacher")
+      })
+    ]),
+    role === "teacher" ? renderClassPicker() : renderStudentPicker(),
+    cloudStatusNode,
+    el("button", { type: "button", className: "icon-button", title: "Eski cihaz kayıtlarını indir", text: "Yedek", onClick: () => {
+      let backup;
+      try { backup = localStorage.getItem("satranc-online-migration-backup"); } catch { /* Depolama kapalı. */ }
+      if (!backup) { window.alert("Bu cihazda eski kayıt yedeği bulunamadı."); return; }
+      const url = URL.createObjectURL(new Blob([backup], { type: "application/json" }));
+      const link = document.createElement("a"); link.href = url; link.download = "satranc-eski-cihaz-kayitlari.json"; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } }),
     xpStat,
     starStat,
     el("button", { className: "icon-button", type: "button", title: "Ayarlar", onClick: () => navigate("settings"), html: icon("settings") })
   ]);
+}
+
+/** Öğrenci modunda seçili sınıftan kimin ilerlemesinin açılacağını belirler. */
+function renderStudentPicker() {
+  studentPicker = el("select", {
+    className: "class-picker-select student-picker-select",
+    "aria-label": "Öğrenci profili",
+    disabled: Boolean(verifiedStudentId),
+    onChange: (event) => {
+      if (event.target.value === "__manage") {
+        setRole("teacher");
+        navigate("siniflar");
+        return;
+      }
+      try { localStorage.setItem(STUDENT_KEY, event.target.value); } catch { /* Oturumluk seçim. */ }
+      const student = classroom.findStudent(event.target.value);
+      progress.switchProfile(student ? `student:${student.id}` : "guest", student?.name || "Misafir Öğrenci");
+      sound.play("click");
+      render();
+    }
+  });
+  syncStudentPicker();
+  return el("label", { className: "class-picker student-picker", title: "Öğrenci profili" }, [
+    el("span", { className: "class-picker-emoji", text: "🙂" }),
+    studentPicker
+  ]);
+}
+
+function syncStudentPicker() {
+  if (!studentPicker) return;
+  const students = classroom.students(classroom.state.activeClassId);
+  const selected = selectedStudent();
+  studentPicker.replaceChildren(
+    el("option", { value: "", text: students.length ? "Öğrenci seç" : "Misafir Öğrenci" }),
+    ...students.map((student) => el("option", { value: student.id, text: student.name })),
+    el("option", { value: "__manage", text: "＋ Öğrencileri yönet…" })
+  );
+  studentPicker.value = selected?.id || "";
 }
 
 /**
@@ -153,6 +416,10 @@ function syncClassPicker() {
 
 function render() {
   const route = pages[currentRoute()] ? currentRoute() : "home";
+  if (role === "student" && TEACHER_ROUTES.includes(route)) {
+    navigate("home");
+    return;
+  }
   document.body.classList.toggle("high-contrast", progress.state.settings.contrast);
   document.body.classList.toggle("reduced-motion", !progress.state.settings.motion);
   // Menü kapalıyken kabuk dar sütuna geçer; sayfa içeriği genişler.
@@ -162,7 +429,7 @@ function render() {
   clear(root);
   const content = el("div", { className: "content-shell" }, [
     renderTopbar(),
-    pages[route]({ progress, sound, rerender: render })
+    pages[route]({ progress, sound, rerender: render, role })
   ]);
   root.append(renderNav(route), content);
   reveal(content);
@@ -205,10 +472,18 @@ function bump(node, text) {
 // Abonelik BİR KEZ kurulur; render() her sayfa geçişinde yeni düğümler üretse de
 // syncTopbar güncel referansları kullanır.
 progress.onChange(syncTopbar);
-classroom.onChange(syncClassPicker);
+classroom.onChange(() => {
+  useRoleProfile();
+  syncClassPicker();
+  syncStudentPicker();
+});
 
 onRouteChange(render);
 render();
+
+// Sunucudan doğrulanmış kayıt gelene kadar eğitim ve kayıt işlemlerini beklet.
+syncOnlineGate();
+void startCloudSync({ classroom, progress });
 
 // Çevrimdışı önbellek yalnızca http/https üzerinden anlamlıdır.
 // Tek dosya sürümü file:// ile açıldığında service worker zaten kaydedilemez;

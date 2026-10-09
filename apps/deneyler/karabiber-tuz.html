@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Karabiber-Tuz Deneyi | Küçük Mucitler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#182b4d;--purple:#7c3aed;--pink:#f472b6;--yellow:#fde047}*{box-sizing:border-box}body{margin:0;padding:20px;background:#fffdf7;color:var(--ink);font:700 15px/1.6 'Nunito',sans-serif;background-image:radial-gradient(#dbe3ec 1px,transparent 1px);background-size:24px 24px}h1,h2,h3,.display{font-family:'Baloo 2',sans-serif;line-height:1.2}h1{font-size:28px;margin:0}h2{font-size:24px;margin:0 0 12px}h3{font-size:20px;margin:0 0 8px}p{margin:8px 0}button,a,input{touch-action:manipulation}button,a.button{font:900 14px 'Nunito',sans-serif;border:3px solid var(--ink);border-radius:12px;padding:12px 16px;box-shadow:3px 3px 0 var(--ink);color:var(--ink);background:white;cursor:pointer;text-decoration:none;display:inline-block;transition:transform .15s}button:hover,a.button:hover{transform:translateY(-2px)}button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #2563eb;outline-offset:5px}button:disabled{opacity:.5;cursor:default;transform:none}.card{border:3px solid var(--ink);border-radius:22px;box-shadow:5px 5px 0 var(--ink);background:white;padding:22px}header,main,footer{max-width:1180px;margin:auto}header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}.heading{display:flex;gap:15px;align-items:center}.heading p{font-size:13px;margin:4px 0}.tabs{display:flex;gap:8px;flex-wrap:wrap}button[aria-selected=true]{background:var(--purple);color:white}.layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(280px,1fr);gap:22px}.stack{display:flex;flex-direction:column;gap:20px}.badge{display:inline-block;border:2px solid var(--ink);border-radius:9px;padding:4px 10px;font-size:12px;background:var(--yellow)}.scene-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.scene-top h2{margin:0}svg{width:100%;height:auto;display:block;background:linear-gradient(#f5f3ff,#fffaf0);border:2px solid var(--ink);border-radius:18px;margin:16px 0}#balloon{cursor:grab;touch-action:none}#balloon:active{cursor:grabbing}svg text{font-family:'Nunito',sans-serif;font-weight:900;fill:var(--ink)}.controls{display:grid;grid-template-columns:1fr 1fr;gap:14px}.controls button{width:100%}.pink{background:#fbcfe8}.yellow{background:#fef08a}.lavender{background:#ede9fe}.green{background:#dcfce7}.hint{border:2px solid var(--ink);border-radius:12px;padding:13px;background:#f5f3ff}.meter{height:14px;border:2px solid var(--ink);border-radius:10px;background:white;overflow:hidden;margin:8px 0}.meter span{display:block;height:100%;background:var(--pink);width:0;transition:width .3s}.range-box{margin:18px 0 12px}input[type=range]{width:100%;accent-color:var(--purple);height:30px;cursor:pointer}.ends,.stats{display:flex;justify-content:space-between;gap:12px}.ends{font-size:12px}.stats{margin:14px 0;flex-wrap:wrap}.stat{flex:1;background:#fff;border:2px solid var(--ink);border-radius:12px;padding:8px 12px;font-size:13px;min-width:130px}.stat strong{font-size:22px}.steps{list-style:none;padding:0;margin:0;counter-reset:step}.steps li{counter-increment:step;display:flex;gap:10px;margin:13px 0}.steps li:before{content:counter(step);background:var(--yellow);border:2px solid var(--ink);border-radius:50%;flex:0 0 28px;height:28px;text-align:center;line-height:25px}.small{font-size:13px}.explain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin:22px 0}.big-icon{font-size:36px}.quiz{max-width:760px;margin:auto}.answers{display:grid;gap:12px;margin:18px 0}.answers button{text-align:left}table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;padding:8px 5px;border-bottom:1px solid #cbd5e1}footer{padding:28px 6px 10px;font-size:12px}footer a{color:var(--purple)}[hidden]{display:none!important}#cloth.rubbing{animation:rub .22s linear 8 alternate}@keyframes rub{from{transform:translate(-165px,-65px)}to{transform:translate(-195px,-45px) rotate(-6deg)}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}@media(max-width:850px){header{align-items:flex-start;flex-direction:column}.layout{grid-template-columns:1fr}.explain-grid{grid-template-columns:1fr}h1{font-size:24px}}@media(max-width:450px){body{padding:12px}.card{padding:15px}.heading{align-items:flex-start;flex-wrap:wrap}.controls{grid-template-columns:1fr}button,a.button{padding:10px 12px}.tabs button{font-size:12px}}
+</style>
+</head>
+<body>
+<header class="card">
+ <div class="heading"><a class="button yellow" href="index.html#deneyler" aria-label="İnteraktif deneylere dön">← Deneyler</a><div><h1>🎈 Karabiber-Tuz Deneyi</h1><p>Balon karabiberi dokunmadan nasıl çekiyor? Hadi keşfedelim!</p></div></div>
+ <div class="tabs" role="tablist" aria-label="Deney bölümleri"><button id="tab-lab" role="tab" aria-selected="true" aria-controls="lab">🧪 Deney Masası</button><button id="tab-why" role="tab" aria-selected="false" aria-controls="why" tabindex="-1">🔍 Neden Oluyor?</button><button id="tab-quiz" role="tab" aria-selected="false" aria-controls="quiz" tabindex="-1">🎯 Mini Test</button></div>
+</header>
+<main>
+<section id="lab" role="tabpanel" aria-labelledby="tab-lab">
+<div class="layout">
+<div class="stack">
+ <div class="card">
+  <div class="scene-top"><h2>Karabiberler, havalanın!</h2><span class="badge">1–4. sınıf · Statik elektrik</span></div>
+  <p class="small">Balonu yukarı-aşağı sürükle veya aşağıdaki mesafe çubuğunu kullan.</p>
+  <svg id="scene" viewBox="0 0 680 440" aria-label="Yün kumaş, balon ve tuz-karabiber karışımının bulunduğu deney düzeneği">
+   <defs><radialGradient id="balloonFill" cx="30%" cy="25%"><stop stop-color="#fbcfe8"/><stop offset="1" stop-color="#ec4899"/></radialGradient><pattern id="knit" width="14" height="14" patternUnits="userSpaceOnUse"><path d="M0 0L7 7L14 0M0 7L7 14L14 7" fill="none" stroke="#b45309" stroke-width="2"/></pattern></defs>
+   <path d="M0 394H680V440H0Z" fill="#fde68a"/><path d="M0 394H680" stroke="#182b4d" stroke-width="3"/>
+   <g id="cloth"><rect x="490" y="170" width="140" height="115" rx="16" fill="#fbbf24" stroke="#182b4d" stroke-width="3"/><rect x="498" y="178" width="124" height="99" rx="10" fill="url(#knit)"/><text x="560" y="315" text-anchor="middle" font-size="16">Yün kumaş</text></g>
+   <ellipse cx="300" cy="365" rx="206" ry="33" fill="#cbd5e1" stroke="#182b4d" stroke-width="3"/><ellipse cx="300" cy="357" rx="196" ry="25" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+   <g id="grains"></g>
+   <path id="gapLine" d="M430 200V350" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6 6"/><text id="gapText" x="442" y="335" font-size="14">Uzak</text>
+   <g id="balloon" transform="translate(300 112)"><ellipse rx="76" ry="86" fill="url(#balloonFill)" stroke="#182b4d" stroke-width="3.5"/><ellipse cx="-28" cy="-35" rx="14" ry="27" fill="white" opacity=".65" transform="rotate(25 -28 -35)"/><path d="M0 86L-9 98H9Z" fill="#ec4899" stroke="#182b4d" stroke-width="2"/><path d="M0 99Q-12 119 3 129" fill="none" stroke="#182b4d" stroke-width="2"/><circle cx="-20" cy="10" r="5" fill="#182b4d"/><circle cx="20" cy="10" r="5" fill="#182b4d"/><path d="M-13 30Q0 42 13 30" fill="none" stroke="#182b4d" stroke-width="3" stroke-linecap="round"/><g id="charges" hidden><text x="-45" y="-5" font-size="24">−</text><text x="34" y="-22" font-size="24">−</text><text x="-15" y="-48" font-size="24">−</text><text x="28" y="51" font-size="24">−</text></g><g id="attached"></g></g>
+   <text x="100" y="424" font-size="14">● Karabiber</text><rect x="256" y="413" width="10" height="10" fill="white" stroke="#64748b"/><text x="278" y="424" font-size="14">Tuz</text>
+  </svg>
+  <div class="stats"><div class="stat">Balondaki karabiber: <strong id="pepperCount">0</strong></div><div class="stat">Balondaki tuz: <strong id="saltCount">0</strong></div></div>
+  <div class="hint" id="observation" role="status" aria-live="polite">Önce balonu sürtmeden yaklaştır. Sence taneler hareket edecek mi?</div>
+  <div class="range-box"><label for="distance">↕ Balonun karışıma uzaklığı: <strong id="distanceLabel">Uzak</strong></label><input id="distance" type="range" min="0" max="100" value="100" aria-describedby="distanceHelp"><div class="ends" id="distanceHelp"><span>Çok yakın</span><span>Uzak</span></div></div>
+  <div class="controls"><button id="rub" class="pink">🧶 Balonu yüne sürt</button><button id="discharge" class="lavender">⚡ Yükü boşalt</button><button id="record" class="yellow">📝 Gözlemimi kaydet</button><button id="reset">↺ Yeniden başla</button></div>
+  <label class="small" style="display:block;margin-top:16px"><input id="showCharges" type="checkbox"> Balondaki yük işaretlerini göster (−)</label>
+  <p class="small">Bu bir modeldir. Mesafeler ve tane sayıları gerçekte değişebilir.</p>
+ </div>
+ <div class="card"><h3>📝 Gözlem defterim</h3><p id="emptyLog" class="small">Aynı mesafede, balonu sürtmeden ve sürttükten sonra dene. Ne değişti?</p><div style="overflow-x:auto"><table id="log" hidden><thead><tr><th scope="col">Balon</th><th scope="col">Mesafe</th><th scope="col">Karabiber</th><th scope="col">Tuz</th></tr></thead><tbody id="logBody"></tbody></table></div></div>
+</div>
+<aside class="stack">
+ <div class="card yellow"><h2>👩‍🔬 Nasıl yaparım?</h2><ol class="steps"><li>Tabakta tuz ve karabiber karışımı hazır. Önce balonu sürtmeden yaklaştır.</li><li>Balonu yün kumaşa sürt. Pembe düğmeye basarak yük biriktir.</li><li>Balonu yavaşça yaklaştır. Karabiberlerin sıçramasını izle!</li><li>Biraz daha yaklaştır. Tuz taneleri de çekiliyor mu?</li></ol></div>
+ <div class="card"><h3>⚡ Balonun yükü</h3><div class="meter" role="progressbar" aria-label="Balonun yükü" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0" id="chargeMeter"><span id="chargeFill"></span></div><p id="chargeLabel">Henüz sürtülmedi.</p><p class="small">Sürtünce elektrik yükü birikir. “Yükü boşalt” düğmesi bu yükün dağılmasını modeller.</p></div>
+ <div class="card green"><h3>🏠 Gerçekte de deneyelim</h3><p class="small"><strong>Malzemeler:</strong> Şişirilmiş balon, yün kumaş, kuru tabak, bir çay kaşığı tuz ve biraz ince karabiber.</p><p class="small">Karışımı ince bir tabaka hâlinde yay. Balonu kumaşa sürt ve karışıma değdirmeden yavaşça yaklaştır.</p><p class="small">Bir yetişkinle dene. Karabiberi üfleme veya gözüne yaklaştırma; balon parçalarını ağzına alma.</p></div>
+</aside>
+</div>
+</section>
+<section id="why" role="tabpanel" aria-labelledby="tab-why" hidden>
+<div class="card lavender"><span class="badge">Görünmeyen bir çekim!</span><h2 style="margin-top:12px">Balonun sırrı: statik elektrik</h2><p>Balonu yüne sürttüğümüzde, elektron denen çok küçük parçacıklar yünden balona geçebilir. Balonda eksi (−) elektrik yükü birikir. Bu biriken yüke <strong>statik elektrik</strong> deriz.</p></div>
+<div class="explain-grid"><div class="card"><div class="big-icon">🧶 → 🎈</div><h3>1. Sürt ve yükle</h3><p>Sürtünme, elektrik yüklerinin yer değiştirmesine yardım eder. Balonun çevresinde görünmeyen bir elektrik etkisi oluşur.</p></div><div class="card"><div class="big-icon">🎈 ⋯ ●</div><h3>2. Dokunmadan çek</h3><p>Yüklü balon yaklaşınca tanelerin içindeki artı ve eksi yüklerin dağılımı biraz değişir. Balona yakın taraf daha çok çekilir. Böylece tane balona doğru hareket edebilir.</p><p class="small">Buna <strong>kutuplaşma</strong> denir. Tanelerin baştan yüklü olması gerekmez.</p></div><div class="card"><div class="big-icon">● ↑ ◻</div><h3>3. Karabiber önce gelir</h3><p>Bu karışımdaki ince karabiber taneleri tuz tanelerinden daha hafiftir. Balonun çekimi onları daha kolay kaldırır. Çok yaklaşırsan daha ağır tuz taneleri de çekilebilir!</p></div></div>
+<div class="card yellow"><h3>💡 Küçük bilim insanının sonucu</h3><p>Balon hem karabiberi hem tuzu çekebilir. Uygun uzaklıkta, hafif karabiber taneleri önce sıçrar ve karışımı ayırabiliriz. Tanelerin büyüklüğü, balonun yükü ve havadaki nem sonucu etkiler.</p><button id="backToLab">🧪 Masaya dön, tekrar dene</button></div>
+</section>
+<section id="quiz" class="quiz card" role="tabpanel" aria-labelledby="tab-quiz" hidden><span class="badge" id="quizProgress">Soru 1 / 3</span><h2 id="question" style="margin-top:18px"></h2><div id="answers" class="answers"></div><p id="quizFeedback" role="status" aria-live="polite"></p><button id="nextQuestion" class="yellow" hidden>Sonraki soru →</button></section>
+</main>
+<footer>🧠 Bilimsel açıklama: <a href="https://www.scienceworld.ca/resource/attractive-balloons/" target="_blank" rel="noopener noreferrer">Science World · Attractive Balloons</a> · Küçük Mucitler Laboratuvarı</footer>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+let charge=0, distance=100, dragging=false, lastTime=0;
+const grains=[];
+const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function svgNode(tag,attrs,parent){const el=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,v));parent.appendChild(el);return el;}
+// Deterministic sizes and thresholds keep before/after comparisons reproducible.
+for(let i=0;i<64;i++){
+ const pepper=i<40, j=pepper?i:i-40, x=155+(j*47%285), y=345+(j*13%23);
+ const el=svgNode(pepper?'circle':'rect',pepper?{cx:0,cy:0,r:2.5+(j%3)*.4,fill:'#443326'}:{x:-3,y:-3,width:6,height:6,rx:1,fill:'#fff',stroke:'#94a3b8','stroke-width':1},$('grains'));
+ grains.push({el,pepper,homeX:x,homeY:y,x,y,attached:false,slotX:-54+(j*19%108),slotY:48+(j*7%29),threshold:pepper?34+(j%8)*3:3+(j%5),seed:j});
+}
+function balloonY(){return 260-distance*1.48;}
+function counts(){return {pepper:grains.filter(g=>g.attached&&g.pepper).length,salt:grains.filter(g=>g.attached&&!g.pepper).length};}
+function distanceName(){return distance<=12?'Çok yakın':distance<=55?'Yakın':'Uzak';}
+function update(){
+ const {pepper,salt}=counts();
+ $('pepperCount').textContent=pepper;$('saltCount').textContent=salt;
+ $('distanceLabel').textContent=distanceName();$('gapText').textContent=distanceName();
+ $('chargeFill').style.width=`${charge/3*100}%`;$('chargeMeter').setAttribute('aria-valuenow',charge);
+ $('chargeLabel').textContent=['Henüz sürtülmedi.','Az yük birikti.','Daha fazla yük birikti.','Balon iyice yüklendi!'][charge];
+ $('rub').disabled=charge===3;$('charges').setAttribute('visibility',charge&&$('showCharges').checked?'visible':'hidden');$('charges').removeAttribute('hidden');
+ $('observation').textContent=charge===0?(pepper||salt?'Yük boşaldı. Taneler tabağa geri dönüyor.':'Sürtülmemiş balon taneleri belirgin biçimde çekmiyor. Şimdi balonu yüne sürt!'):salt?'Çok yaklaştırdın! Tuz da çekildi. Balon yalnızca karabiberi çekmez.':pepper?'Karabiberler balona sıçradı! Hafif taneler bu uzaklıkta daha kolay kalkıyor.':distance>55?'Balon yüklendi ama uzakta. Yavaşça karışıma yaklaştır.':'Biraz daha yaklaştır veya balonu yeniden sürterek yükünü artır.';
+}
+function setDistance(value){distance=Math.max(0,Math.min(100,value));$('distance').value=distance;update();}
+function release(){grains.forEach(g=>{if(g.attached){g.x=300+g.slotX;g.y=balloonY()+g.slotY;$('grains').appendChild(g.el);g.attached=false;}});}
+$('rub').addEventListener('click',()=>{charge=Math.min(3,charge+1);$('cloth').classList.remove('rubbing');void $('cloth').getBoundingClientRect();$('cloth').classList.add('rubbing');update();});
+$('discharge').addEventListener('click',()=>{charge=0;release();update();});
+$('distance').addEventListener('input',e=>setDistance(Number(e.target.value)));
+$('showCharges').addEventListener('change',update);
+function pointerDistance(e){const rect=$('scene').getBoundingClientRect();const y=(e.clientY-rect.top)*440/rect.height;setDistance(Math.round((260-y)/1.48));}
+$('balloon').addEventListener('pointerdown',e=>{dragging=true;$('balloon').setPointerCapture(e.pointerId);pointerDistance(e);});
+$('balloon').addEventListener('pointermove',e=>{if(dragging)pointerDistance(e);});
+['pointerup','pointercancel','lostpointercapture'].forEach(event=>$('balloon').addEventListener(event,()=>{dragging=false;}));
+$('reset').addEventListener('click',()=>{charge=0;release();grains.forEach(g=>{g.x=g.homeX;g.y=g.homeY;});$('logBody').replaceChildren();$('log').hidden=true;$('emptyLog').hidden=false;$('showCharges').checked=false;setDistance(100);});
+$('record').addEventListener('click',()=>{const c=counts(),row=document.createElement('tr');[charge?'Sürtüldü ('+charge+'/3)':'Sürtülmedi',distanceName(),c.pepper,c.salt].forEach(value=>{const td=document.createElement('td');td.textContent=value;row.appendChild(td);});$('logBody').appendChild(row);$('log').hidden=false;$('emptyLog').hidden=true;});
+function animate(time){
+ const dt=lastTime?Math.min((time-lastTime)/1000,.05):.016;lastTime=time;
+ const by=balloonY();$('balloon').setAttribute('transform',`translate(300 ${by})`);$('gapLine').setAttribute('d',`M430 ${by+90}V350`);
+ let changed=false;
+ for(const g of grains){
+  if(g.attached){g.el.setAttribute('transform',`translate(${g.slotX} ${g.slotY})`);continue;}
+  const attracted=charge>0&&distance<g.threshold*(charge/3)&&Math.abs(g.homeX-300)<150;
+  const tx=attracted?300+g.slotX:g.homeX,ty=attracted?by+g.slotY:g.homeY;
+  const ease=reducedMotion?1:1-Math.exp(-dt*(attracted?5:8));g.x+=(tx-g.x)*ease;g.y+=(ty-g.y)*ease;
+  if(attracted&&Math.hypot(g.x-tx,g.y-ty)<4){g.attached=true;$('attached').appendChild(g.el);g.el.setAttribute('transform',`translate(${g.slotX} ${g.slotY})`);changed=true;}
+  else g.el.setAttribute('transform',`translate(${g.x} ${g.y})`);
+ }
+ if(changed)update();requestAnimationFrame(animate);
+}
+function showTab(name){['lab','why','quiz'].forEach(tab=>{$(tab).hidden=tab!==name;$('tab-'+tab).setAttribute('aria-selected',String(tab===name));$('tab-'+tab).tabIndex=tab===name?0:-1;});}
+const tabNames=['lab','why','quiz'];tabNames.forEach((name,index)=>{$('tab-'+name).addEventListener('click',()=>showTab(name));$('tab-'+name).addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?2:(index+(e.key==='ArrowRight'?1:2))%3;showTab(tabNames[next]);$('tab-'+tabNames[next]).focus();});});
+$('backToLab').addEventListener('click',()=>{showTab('lab');$('tab-lab').focus();});
+const questions=[{q:'Balonu yüne neden sürtüyoruz?',a:['Elektrik yükü biriktirmek için.','Balonun rengini değiştirmek için.','Tuzu eritmek için.'],correct:0,why:'Sürtünmeyle yükler yer değiştirebilir ve balonda statik elektrik birikir.'},{q:'Bu karışımda karabiber neden önce sıçrar?',a:['Karabiber canlı olduğu için.','İnce karabiber taneleri daha hafif olduğu için.','Tuz hiçbir zaman çekilmediği için.'],correct:1,why:'İnce karabiber taneleri daha hafiftir. Balonun çekimi onları daha kolay kaldırır.'},{q:'Yüklü balonu çok yaklaştırırsak ne olabilir?',a:['Tuz ve karabiber kaybolur.','Balon mıknatıs olur.','Bazı tuz taneleri de balona çekilir.'],correct:2,why:'Balon ikisini de çekebilir. Çok yakında çekim, tuz tanelerini de kaldırabilir.'}];
+let questionIndex=0, score=0;
+function renderQuestion(){const question=questions[questionIndex];$('quizProgress').textContent=`Soru ${questionIndex+1} / 3`;$('question').textContent=question.q;$('quizFeedback').textContent='';$('nextQuestion').hidden=true;$('answers').replaceChildren();question.a.forEach((answer,index)=>{const btn=document.createElement('button');btn.textContent=answer;btn.addEventListener('click',()=>{const correct=index===question.correct;if(correct)score++;Array.from($('answers').children).forEach((el,i)=>{el.disabled=true;if(i===question.correct)el.style.background='#dcfce7';});$('quizFeedback').textContent=(correct?'Harika! ':'Birlikte öğrenelim: ')+question.why;$('nextQuestion').textContent=questionIndex===2?'Sonucumu gör →':'Sonraki soru →';$('nextQuestion').hidden=false;});$('answers').appendChild(btn);});}
+$('nextQuestion').addEventListener('click',()=>{if(questionIndex===3){questionIndex=0;score=0;renderQuestion();return;}questionIndex++;if(questionIndex<3)renderQuestion();else{$('quizProgress').textContent='Test tamamlandı';$('question').textContent=`3 sorudan ${score} doğru!`;$('answers').replaceChildren();$('quizFeedback').textContent='Balonu sürt, yaklaştır ve gözlemle. Her deneme yeni bir keşif!';$('nextQuestion').textContent='↺ Tekrar dene';}});
+update();renderQuestion();requestAnimationFrame(animate);
+</script>
+</body>
+</html>

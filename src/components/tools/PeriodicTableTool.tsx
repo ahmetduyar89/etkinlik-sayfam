@@ -88,12 +88,12 @@ export function PeriodicTableTool({ onClose }: PeriodicTableToolProps) {
                 dragElastic={0}
                 className="pointer-events-auto select-none"
                 style={{
-                    touchAction: 'none',
+                    touchAction: 'pan-y',
                 }}
             >
-                <div className="bg-slate-900/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl text-white w-[min(94vw,640px)] overflow-hidden">
+                <div className="responsive-tool bg-slate-900/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl text-white w-[min(94vw,640px)] overflow-hidden">
                     {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 bg-white/5 border-b border-white/10">
+                    <div className="responsive-tool-header flex items-center justify-between px-4 py-3 bg-white/5 border-b border-white/10">
                         <div
                             onPointerDown={(e) => {
                                 if ((e.target as HTMLElement).closest('button, input, select, textarea')) return;
@@ -128,13 +128,13 @@ export function PeriodicTableTool({ onClose }: PeriodicTableToolProps) {
                     </div>
                 </div>
 
-                <div className="p-4 grid grid-cols-[1fr_210px] gap-4">
+                <div className="min-h-0 max-h-[calc(100dvh-150px)] overflow-y-auto overscroll-contain p-3 sm:p-4 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_210px] gap-4">
                     {/* Elements Grid */}
                     <div className="space-y-2">
                         <div className="text-[11px] text-slate-400 font-medium">
                             Element Seçin ({filteredElements.length} element):
                         </div>
-                        <div className="grid grid-cols-6 gap-1.5 max-h-[300px] overflow-y-auto pr-1 custom-scroll">
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 max-h-[300px] overflow-y-auto pr-1 custom-scroll">
                             {filteredElements.map((el) => {
                                 const cat = CATEGORY_COLORS[el.category];
                                 const isSelected = selectedElement.number === el.number;

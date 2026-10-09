@@ -38,7 +38,7 @@ export function PlayerBar({
     return (
         <div
             className={cn(
-                'flex items-center gap-3 rounded-2xl border px-3 py-2 transition-colors',
+                'flex min-w-0 items-center gap-2 rounded-2xl border px-2 py-2 sm:gap-3 sm:px-3 transition-colors',
                 active
                     ? 'border-primary/50 bg-primary-container/60'
                     : 'border-outline-variant bg-surface-container-low'
@@ -74,13 +74,13 @@ export function PlayerBar({
                         <WifiOff className="h-3 w-3 shrink-0 text-on-surface-variant" />
                     )}
                 </div>
-                <div className="mt-0.5 flex min-h-[18px] items-center gap-0.5">
+                <div className="mt-0.5 flex min-h-[18px] flex-wrap items-center gap-0.5">
                     {captured.map((type, index) => (
                         <ChessPiece
                             key={`${type}-${index}`}
                             type={type}
                             color={color === 'w' ? 'b' : 'w'}
-                            className="block h-4 w-4 [&>svg]:h-full [&>svg]:w-full"
+                            className="block h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 [&>svg]:h-full [&>svg]:w-full"
                         />
                     ))}
                     {advantage > 0 && (
@@ -94,7 +94,7 @@ export function PlayerBar({
             {clockMs !== null && (
                 <span
                     className={cn(
-                        'flex shrink-0 items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-base font-bold tabular-nums',
+                        'flex shrink-0 items-center gap-1 rounded-xl px-2 py-1.5 font-mono text-sm sm:px-2.5 sm:text-base font-bold tabular-nums',
                         low
                             ? 'bg-error-container text-on-error-container'
                             : active

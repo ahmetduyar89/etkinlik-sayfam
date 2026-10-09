@@ -4,7 +4,10 @@ import { Clock, Pencil, User, Zap } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { FullscreenToggle } from '../common/FullscreenToggle';
 import { getFormattedHtml } from '../../utils/format-html';
-import { useFirestore } from '../../lib/firebase';
+import { StudentIdentityGate } from './StudentIdentityGate';
+import { useStudentIdentity } from '../../lib/studentIdentity';
+import { completeLearningAssignment } from '../../lib/learning';
+import { auth, useFirestore } from '../../lib/firebase';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
 import { DrawingToolbar } from '../drawing/DrawingToolbar';
 import { CompassTool } from '../tools/CompassTool';
@@ -18,6 +21,7 @@ import { MoleculeBuilderTool } from '../tools/MoleculeBuilderTool';
 import { LinearGraphTool } from '../tools/LinearGraphTool';
 import { MathFormulaTool } from '../tools/MathFormulaTool';
 import { useToast } from '../common/ToastProvider';
+import { useSurfaceTint } from '../../utils/surfaceTint';
 import type { Activity, DrawConfig, DrawingCanvasHandle, Submission } from '../../types';
 
 interface StudentPortalProps {
@@ -25,6 +29,13 @@ interface StudentPortalProps {
 }
 
 export function StudentPortal({ act }: StudentPortalProps) {
+    const { student, loading: identityLoading } = useStudentIdentity();
+    const assignmentId = new URLSearchParams(location.search).get('assignmentId') || undefined;
+    const pendingAnswers = React.useRef<Promise<unknown>>(Promise.resolve());
+    const submissionSaved = React.useRef(false);
+    const timerSubmitAttempted = React.useRef(false);
+    const latestAnswers = React.useRef<Record<string, unknown>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [name, setName] = useState('');
     const [nameError, setNameError] = useState('');
     const [isStarted, setIsStarted] = useState(!act.is_test);
@@ -59,6 +70,10 @@ export function StudentPortal({ act }: StudentPortalProps) {
     const isMountedRef = React.useRef(true);
     const toast = useToast();
 
+    // Öğrenci ekranı tam ekran ve koyudur; kurulu uygulamada üstteki
+    // saat/pil şeridi de aynı renge boyanır.
+    useSurfaceTint('#0f172a');
+
     useEffect(() => {
         isMountedRef.current = true;
         return () => {
@@ -74,22 +89,25 @@ export function StudentPortal({ act }: StudentPortalProps) {
     }, [isStarted, act]);
 
     const handleSubmit = React.useCallback(async () => {
-        if (isFinished) return;
-        setIsFinished(true);
-        if (submissionId) {
-            try {
-                await submissionsHandler.update(submissionId, {
-                    submitted_at: new Date().toISOString(),
-                });
-            } catch (err) {
-                console.error('Submission update error:', err);
-                toast.error('Cevaplar kaydedilemedi. Lütfen tekrar deneyin.');
+        if (isFinished || isSubmitting) return;
+        if (!navigator.onLine) { toast.error('Sonucu kaydetmek için internete bağlanın.'); return; }
+        setIsSubmitting(true);
+        try {
+            await pendingAnswers.current.catch(() => undefined);
+            if (submissionId && !submissionSaved.current) {
+                await submissionsHandler.update(submissionId, { answers: latestAnswers.current, submitted_at: new Date().toISOString() });
+                submissionSaved.current = true;
             }
-        }
-    }, [isFinished, submissionId, submissionsHandler, toast]);
+            if (assignmentId) await completeLearningAssignment(assignmentId, submissionId || undefined);
+            setIsFinished(true);
+        } catch (err) {
+            console.error('Submission update error:', err);
+            toast.error('Sonuç kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.');
+        } finally { setIsSubmitting(false); }
+    }, [isFinished, isSubmitting, submissionId, submissionsHandler, toast, assignmentId]);
 
     useEffect(() => {
-        if (act.is_test && timeLeft === 0 && !isFinished) handleSubmit();
+        if (act.is_test && timeLeft === 0 && !isFinished && !timerSubmitAttempted.current) { timerSubmitAttempted.current = true; void handleSubmit(); }
         if (act.is_test && timeLeft !== null && timeLeft > 0 && !isFinished) {
             const timer = window.setInterval(
                 () => setTimeLeft((prev) => (prev !== null ? prev - 1 : null)),
@@ -142,16 +160,17 @@ export function StudentPortal({ act }: StudentPortalProps) {
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
+            if (event.source !== iframeRef.current?.contentWindow || !event.data || typeof event.data !== 'object') return;
             const data = event.data as { type?: string; height?: number; data?: unknown; error?: string };
             if (data?.type === 'IFRAME_HEIGHT_SYNC' && (data.height ?? 0) > 0) {
                 setIframeHeight(data.height as number);
             }
-            if (data?.type === 'SIM_ANSWER' && submissionId) {
-                submissionsHandler
-                    .update(submissionId, {
-                        answers: (data.data ?? {}) as Record<string, unknown>,
-                    })
-                    .catch((err) => console.error('Answer sync error:', err));
+            if (data?.type === 'SIM_ANSWER' && submissionId && !submissionSaved.current) {
+                if (!data.data || typeof data.data !== 'object' || Array.isArray(data.data)) return;
+                latestAnswers.current = data.data as Record<string, unknown>;
+                const answers = latestAnswers.current;
+                pendingAnswers.current = pendingAnswers.current.catch(() => undefined).then(() => submissionsHandler.update(submissionId, { answers }));
+                void pendingAnswers.current.catch(err => { console.error('Answer sync error:', err); toast.error('Cevaplar henüz kaydedilemedi. Bitirirken yeniden gönderilecek.'); });
             }
             if (data?.type === 'JS_ERROR') {
                 const msg = data.error || '';
@@ -172,7 +191,8 @@ export function StudentPortal({ act }: StudentPortalProps) {
     };
 
     const handleStart = async () => {
-        const trimmed = name.trim();
+        if (!navigator.onLine) { toast.error('Teste başlamak için internete bağlanın.'); return; }
+        const trimmed = student?.studentName || name.trim();
         if (!trimmed) {
             setNameError('Lütfen isminizi girin.');
             return;
@@ -183,6 +203,9 @@ export function StudentPortal({ act }: StudentPortalProps) {
             const res = await submissionsHandler.add({
                 activity_id: act.id,
                 student_name: trimmed,
+                owner_uid: auth.currentUser?.uid || '',
+                ...(student ? { student_id: student.studentId, class_id: student.classId } : {}),
+                ...(assignmentId ? { assignment_id: assignmentId } : {}),
                 started_at: new Date().toISOString(),
                 answers: {},
                 submitted_at: null,
@@ -199,16 +222,20 @@ export function StudentPortal({ act }: StudentPortalProps) {
         }
     };
 
+    if (identityLoading && act.is_test) return <div className="p-8 text-center">Öğrenci oturumu kontrol ediliyor…</div>;
+    if ((assignmentId || act.is_test && !auth.currentUser) && !student) return <StudentIdentityGate title="Etkinlik öğrenci girişi" />;
+
     if (isFinished) {
         return (
-            <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8 text-center space-y-6">
+            <div className="min-h-[100svh] bg-white flex flex-col items-center justify-center p-8 text-center space-y-6">
                 <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center shadow-xl shadow-emerald-100">
                     <Zap className="w-10 h-10" aria-hidden="true" />
                 </div>
                 <div className="space-y-2">
                     <h1 className="text-3xl font-black text-slate-800 tracking-tight">
-                        Test Tamamlandı!
+                        {act.is_test ? 'Test Tamamlandı!' : 'Çalışma Tamamlandı!'}
                     </h1>
+                    <a href="/?view=ogrenci" className="mt-3 block text-sm font-bold text-indigo-600">Çalışmalarıma dön</a>
                     <p className="text-slate-500 font-medium uppercase tracking-widest text-xs">
                         Cevaplarınız başarıyla kaydedildi.
                     </p>
@@ -222,7 +249,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
 
     if (!isStarted) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+            <div className="min-h-[100svh] bg-slate-50 flex items-center justify-center p-4">
                 <motion.form
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -250,7 +277,8 @@ export function StudentPortal({ act }: StudentPortalProps) {
                             </label>
                             <input
                                 id="student-name"
-                                value={name}
+                                value={student?.studentName || name}
+                                readOnly={Boolean(student)}
                                 onChange={(e) => {
                                     setName(e.target.value);
                                     if (nameError) setNameError('');
@@ -286,9 +314,11 @@ export function StudentPortal({ act }: StudentPortalProps) {
 
     return (
         <div
-            className="fixed inset-0 bg-[#0f172a] z-[3000] flex flex-col h-screen overflow-hidden"
-            onPointerDown={(e) => e.stopPropagation()}
+            className="app-safe-screen fixed inset-0 bg-[#0f172a] z-[3000] flex flex-col h-[100dvh] overflow-hidden"
+            onPointerDown={(e) =>
+ e.stopPropagation()}
         >
+            {assignmentId && !act.is_test && <div className="relative z-40 flex items-center justify-between gap-3 bg-white p-3 text-slate-800"><a href="/?view=ogrenci" className="text-sm font-bold text-indigo-600">Çalışmalarıma dön</a><button disabled={isSubmitting} onClick={() => void handleSubmit()} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{isSubmitting ? 'Kaydediliyor…' : 'Çalışmamı tamamladım'}</button></div>}
             <header
                 className="h-16 px-4 sm:px-6 border-b border-white/5 flex justify-between items-center bg-slate-900 z-[6000] shrink-0 gap-2"
                 onPointerDown={(e) => e.stopPropagation()}
@@ -339,10 +369,11 @@ export function StudentPortal({ act }: StudentPortalProps) {
                     {act.is_test && (
                         <button
                             type="button"
-                            onClick={handleSubmit}
+                            onClick={() => void handleSubmit()}
+                            disabled={isSubmitting}
                             className="px-4 sm:px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors"
                         >
-                            Bitir
+                            {isSubmitting ? 'Kaydediliyor…' : 'Bitir'}
                         </button>
                     )}
                 </div>
@@ -379,6 +410,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
                         />
                     )}
                     <DrawingCanvas
+                        onConfigChange={patch => setDrawConfig(prev => ({...prev, ...patch}))}
                         ref={canvasRef}
                         config={drawConfig}
                         enabled={isDrawingMode}
@@ -391,6 +423,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
                 <AnimatePresence>
                     {isDrawingMode && (
                         <DrawingToolbar
+                            onInsertElement={(src,w,h) => canvasRef.current?.insertImage(src,w,h)}
                             onCommand={handleToolbarCommand}
                             config={drawConfig}
                             setConfig={setDrawConfig}

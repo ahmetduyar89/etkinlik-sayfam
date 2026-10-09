@@ -13,7 +13,7 @@ interface LessonModeToolbarProps {
     onOverlayChange: (o: LessonOverlay) => void;
     presenting: boolean;
     onPresentingChange: (v: boolean) => void;
-    onShare: () => void;
+    onShare?: () => void;
     onOpenPdf?: () => void;
     /** Tam ekrana alınacak öğe; sunum modunda tüm çalışma alanı verilir. */
     fullscreenTarget?: RefObject<HTMLElement>;
@@ -32,7 +32,7 @@ export function LessonModeToolbar({
 
     const btn = (active: boolean) =>
         cn(
-            'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12.5px] font-semibold transition-colors',
+            'inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12.5px] font-semibold transition-colors',
             active
                 ? 'bg-primary text-white'
                 : 'text-on-surface-variant hover:bg-surface-container-high'
@@ -82,16 +82,20 @@ export function LessonModeToolbar({
                 <span className="hidden lg:inline">Sunum</span>
             </button>
             <FullscreenToggle target={fullscreenTarget} className="ml-0.5" />
-            <div className="w-px h-4 bg-outline-variant mx-1" />
-            <button
-                type="button"
-                onClick={onShare}
-                title="Öğrenciye gönder — QR kod ve bağlantı"
-                className={btn(false)}
-            >
-                <QrCode className="w-3.5 h-3.5" />
-                <span className="hidden lg:inline">Öğrenciye gönder</span>
-            </button>
+            {onShare && (
+                <>
+                    <div className="w-px h-4 bg-outline-variant mx-1" />
+                    <button
+                        type="button"
+                        onClick={onShare}
+                        title="Öğrenciye gönder — QR kod ve bağlantı"
+                        className={btn(false)}
+                    >
+                        <QrCode className="w-3.5 h-3.5" />
+                        <span className="hidden lg:inline">Öğrenciye gönder</span>
+                    </button>
+                </>
+            )}
         </div>
     );
 }

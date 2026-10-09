@@ -18,7 +18,7 @@ export function LessonModeBar({ activity, onOpenFullscreen, onShowQr, onEdit }: 
         .join(' · ');
 
     return (
-        <section className="flex flex-col md:flex-row md:items-center gap-[26px] bg-inverse-surface text-white rounded-[22px] px-7 py-[26px] mb-[26px]">
+        <section className="flex flex-col md:flex-row md:items-center gap-[26px] bg-inverse-surface text-white rounded-[22px] px-4 sm:px-7 py-5 sm:py-[26px] mb-[26px]">
             <div className="flex-1 min-w-0">
                 <span className="inline-flex items-center gap-2 text-[11.5px] font-bold uppercase tracking-[1.4px] text-[#a5b4fc]">
                     <span className="w-2 h-2 rounded-full bg-primary" />
@@ -30,11 +30,11 @@ export function LessonModeBar({ activity, onOpenFullscreen, onShowQr, onEdit }: 
                 )}
             </div>
 
-            <div className="flex gap-2.5 flex-shrink-0">
+            <div className="flex flex-wrap gap-2 sm:gap-2.5 flex-shrink-0">
                 <button
                     type="button"
                     onClick={() => onOpenFullscreen(activity)}
-                    className="inline-flex items-center gap-2 h-14 px-[26px] rounded-2xl bg-primary text-white text-[15.5px] font-bold hover:brightness-110 transition-all"
+                    className="inline-flex items-center gap-2 h-12 sm:h-14 px-4 sm:px-[26px] rounded-2xl bg-primary text-white text-[15.5px] font-bold hover:brightness-110 transition-all"
                 >
                     <Maximize2 className="w-[21px] h-[21px]" /> Tam ekran aç
                 </button>
@@ -43,7 +43,7 @@ export function LessonModeBar({ activity, onOpenFullscreen, onShowQr, onEdit }: 
                     onClick={() => onShowQr(activity)}
                     aria-label="QR ile öğrenciye gönder"
                     title="QR ile öğrenciye gönder"
-                    className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/[.08] text-slate-200 hover:bg-white/[.16] transition-colors"
+                    className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/[.08] text-slate-200 hover:bg-white/[.16] transition-colors"
                 >
                     <QrCode className="w-[21px] h-[21px]" />
                 </button>
@@ -52,7 +52,7 @@ export function LessonModeBar({ activity, onOpenFullscreen, onShowQr, onEdit }: 
                     onClick={() => onEdit(activity)}
                     aria-label="Etkinliği düzenle"
                     title="Etkinliği düzenle"
-                    className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/[.08] text-slate-200 hover:bg-white/[.16] transition-colors"
+                    className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/[.08] text-slate-200 hover:bg-white/[.16] transition-colors"
                 >
                     <Edit3 className="w-[21px] h-[21px]" />
                 </button>

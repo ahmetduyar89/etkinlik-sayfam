@@ -13,13 +13,16 @@
  *   • Firebase/Firestore istekleri hiçbir zaman ele geçirilmez.
  */
 
-const VERSION = 'v2';
+// İçerik özeti ve kabuk dosyaları yayın sırasında otomatik üretilir.
+const VERSION = '/*__BUILD_VERSION__*/';
 const HTML_CACHE = `ad-html-${VERSION}`;
-const ASSET_CACHE = `ad-assets-${VERSION}`;
-const FONT_CACHE = `ad-fonts-${VERSION}`;
+// Hash'li eski parçalar açık sekmeler tarafından kullanılabilir; yayınlar arasında korunur.
+const ASSET_CACHE = 'ad-assets-v3';
+const FONT_CACHE = 'ad-fonts-v3';
 const KEEP = [HTML_CACHE, ASSET_CACHE, FONT_CACHE];
 
 const APP_SHELL = '/index.html';
+const SHELL_ASSETS = [/*__SHELL_ASSETS__*/];
 
 /* `apps/` altındaki statik projelerin yol adları (ör. 'satranc', 'deneyler').
  * Liste yayın sırasında scripts/copy-apps.mjs tarafından otomatik doldurulur;
@@ -39,8 +42,10 @@ self.addEventListener('install', (event) => {
     event.waitUntil(
         caches
             .open(HTML_CACHE)
-            .then((cache) => cache.add(new Request(APP_SHELL, { cache: 'reload' })))
-            .catch(() => undefined)
+            .then(async (cache) => {
+                await (await caches.open(ASSET_CACHE)).addAll(SHELL_ASSETS);
+                await cache.add(new Request(APP_SHELL, { cache: 'reload' }));
+            })
     );
 });
 
@@ -48,10 +53,11 @@ self.addEventListener('activate', (event) => {
     event.waitUntil(
         (async () => {
             const keys = await caches.keys();
-            await Promise.all(keys.filter((k) => !KEEP.includes(k)).map((k) => caches.delete(k)));
-            if (self.registration.navigationPreload) {
-                await self.registration.navigationPreload.enable().catch(() => undefined);
-            }
+            // Aynı kökteki diğer uygulamaların önbelleklerini silme.
+            await Promise.all(keys.filter((k) => /^ad-(html|assets|fonts)-/.test(k) && !KEEP.includes(k)).map((k) => caches.delete(k)));
+            // Daha önce etkinleştirilmiş ön yüklemeyi kapat: zaman aşımı tek ağ
+            // isteğine uygulanır, yavaş bağlantıda önbelleğe dönüş gecikmez.
+            if (self.registration.navigationPreload) await self.registration.navigationPreload.disable().catch(() => undefined);
             await self.clients.claim();
         })()
     );
@@ -89,6 +95,8 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(handleNavigation(event));
         return;
     }
+    // Yönetimden yüklenen etkinlikler, API yanıtları ve adı sabit dosyalar
+    // her açılışta güncel alınır; çevrimdışıyken önceki kopya kullanılabilir.
     if (isFont) {
         event.respondWith(staleWhileRevalidate(req, FONT_CACHE));
         return;
@@ -97,19 +105,30 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(cacheFirst(req, ASSET_CACHE));
         return;
     }
-    event.respondWith(staleWhileRevalidate(req, ASSET_CACHE));
+    event.respondWith(networkFirst(req, ASSET_CACHE));
 });
 
 /** Gezinme: önce ağ (böylece yeni yayın anında görülür), olmazsa önbellek. */
 async function handleNavigation(event) {
     const cache = await caches.open(HTML_CACHE);
     try {
-        const preload = await event.preloadResponse;
-        const response = preload || (await fetchWithTimeout(event.request));
+        const response = await fetchWithTimeout(event.request);
+        if (!response.ok) throw new Error('navigation failed');
         if (response && response.ok) cache.put(APP_SHELL, response.clone());
         return response;
     } catch {
         return (await cache.match(APP_SHELL)) || (await cache.match(event.request)) || Response.error();
+    }
+}
+
+async function networkFirst(request, cacheName) {
+    const cache = await caches.open(cacheName);
+    try {
+        const response = await fetchWithTimeout(request);
+        if (response.ok) cache.put(request, response.clone()).catch(() => undefined);
+        return response;
+    } catch {
+        return (await cache.match(request)) || Response.error();
     }
 }
 

@@ -14,12 +14,43 @@
 // bu dosyayı değiştirmeye gerek yoktur.
 import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { responsiveAppHtml } from './responsive-apps.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const appsDir = path.join(root, 'apps');
 const distDir = path.join(root, 'dist');
+
+async function localEnv() {
+    const values = {};
+    for (const name of ['.env', '.env.local']) {
+        try {
+            const body = await readFile(path.join(root, name), 'utf8');
+            for (const line of body.split(/\r?\n/)) {
+                const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+                if (!match) continue;
+                values[match[1]] = match[2].replace(/^(['"])(.*)\1$/, '$2');
+            }
+        } catch {
+            // Yerel env dosyaları zorunlu değildir; CI değerleri process.env'den gelir.
+        }
+    }
+    return values;
+}
+
+const fileEnv = await localEnv();
+const envValue = (key) => process.env[key] || fileEnv[key] || '';
+
+const firebasePublicConfig = {
+    apiKey: envValue('VITE_FIREBASE_API_KEY'),
+    authDomain: envValue('VITE_FIREBASE_AUTH_DOMAIN'),
+    projectId: envValue('VITE_FIREBASE_PROJECT_ID'),
+    storageBucket: envValue('VITE_FIREBASE_STORAGE_BUCKET'),
+    messagingSenderId: envValue('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+    appId: envValue('VITE_FIREBASE_APP_ID'),
+};
 
 if (!existsSync(appsDir)) {
     console.log('[copy-apps] apps/ klasörü yok, atlanıyor.');
@@ -97,6 +128,18 @@ async function geriBaglantisiEkle(indexFile, appName) {
     console.log(`[copy-apps] ${appName}: "Atölye'ye dön" bağlantısı eklendi`);
 }
 
+// Nested experiment pages need the same viewport and mobile controls as entry pages.
+async function responsivePages(directory, appName) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+        const file = path.join(directory, entry.name);
+        if (entry.isDirectory()) await responsivePages(file, appName);
+        else if (entry.name.endsWith('.html')) {
+            const html = await readFile(file, 'utf8');
+            await writeFile(file, responsiveAppHtml(html, appName));
+        }
+    }
+}
+
 for (const folder of folders) {
     const from = path.join(appsDir, folder.name);
     const to = path.join(distDir, folder.name);
@@ -109,6 +152,8 @@ for (const folder of folders) {
         filter: (src) => !SKIP.has(path.basename(src)),
     });
 
+    await responsivePages(to, folder.name);
+
     const hasIndex = existsSync(path.join(from, 'index.html'));
     const warn = hasIndex ? '' : '  ⚠ index.html yok — /' + folder.name + '/ açılmayacak';
     console.log(`[copy-apps] apps/${folder.name} → dist/${folder.name}${warn}`);
@@ -116,6 +161,16 @@ for (const folder of folders) {
     // Portala dönüş yolu yalnızca yayındaki kopyaya yazılır; apps/ altındaki
     // kaynak klasör el değmemiş kalır.
     if (hasIndex) await geriBaglantisiEkle(path.join(to, 'index.html'), folder.name);
+
+    // Statik Satranç uygulaması Vite'ın import.meta.env alanına erişemez.
+    // Yalnızca Firebase'in zaten herkese açık web yapılandırmasını üretiriz;
+    // güvenlik anahtarla değil Authentication + Firestore Rules ile sağlanır.
+    if (folder.name === 'satranc') {
+        await writeFile(
+            path.join(to, 'firebase-config.json'),
+            JSON.stringify(firebasePublicConfig)
+        );
+    }
 }
 
 // GitHub Pages tek sayfalık uygulamalar için yönlendirme yapmaz: /etkinlikler
@@ -134,6 +189,20 @@ const swPath = path.join(distDir, 'sw.js');
 if (existsSync(swPath)) {
     const list = folders.map((f) => JSON.stringify(f.name)).join(', ');
     const sw = await readFile(swPath, 'utf8');
-    await writeFile(swPath, sw.replace('/*__APP_PATHS__*/', list));
+    const assets = (await readdir(path.join(distDir, 'assets')))
+        .filter((name) => !name.endsWith('.map'))
+        .sort()
+        .map((name) => '/assets/' + name);
+    assets.push('/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon-180.png');
+    const version = createHash('sha256')
+        .update(await readFile(indexPath))
+        .update(sw)
+        .update(list)
+        .update(JSON.stringify(assets))
+        .digest('hex').slice(0, 16);
+    await writeFile(swPath, sw
+        .replace('/*__APP_PATHS__*/', list)
+        .replace('/*__BUILD_VERSION__*/', version)
+        .replace('/*__SHELL_ASSETS__*/', assets.map((asset) => JSON.stringify(asset)).join(', ')));
     console.log(`[copy-apps] sw.js güncellendi (bağımsız yollar: ${list || 'yok'})`);
 }

@@ -13,6 +13,7 @@ import { MoveList, PlayerBar, ResultBanner } from './TableParts';
 import { advantageOf } from './tableUtils';
 import { cn } from '../../utils/cn';
 import { Chess, sanTr, type PieceColor } from '../../lib/chess/engine/Chess';
+import { recordChessBotGame } from '../../lib/learning';
 import { LEVELS, ai } from '../../lib/chess/engine/Ai';
 
 const LEVEL_IDS = ['kolay', 'orta', 'zor'] as const;
@@ -21,9 +22,14 @@ type LevelId = (typeof LEVEL_IDS)[number];
 interface ChessBotTableProps {
     playerName: string;
     onExit: () => void;
+    trackResult?: boolean;
 }
 
-export function ChessBotTable({ playerName, onExit }: ChessBotTableProps) {
+export function ChessBotTable({ playerName, onExit, trackResult = false }: ChessBotTableProps) {
+    const [gameId, setGameId] = useState(() => crypto.randomUUID());
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const [saveError, setSaveError] = useState('');
+    const submitted = useRef<string | null>(null);
     const [level, setLevel] = useState<LevelId>('kolay');
     const [myColor, setMyColor] = useState<PieceColor>('w');
     const [game, setGame] = useState(() => new Chess());
@@ -47,7 +53,9 @@ export function ChessBotTable({ playerName, onExit }: ChessBotTableProps) {
 
     const newGame = useCallback(
         (color: PieceColor = myColor, nextLevel: LevelId = level) => {
+            if (saveStatus === 'saving') return;
             const fresh = new Chess();
+            setGameId(crypto.randomUUID()); setSaveStatus('idle'); setSaveError(''); submitted.current = null;
             pending.current = null;
             setMyColor(color);
             setLevel(nextLevel);
@@ -55,7 +63,7 @@ export function ChessBotTable({ playerName, onExit }: ChessBotTableProps) {
             setThinking(false);
             sync(fresh, null);
         },
-        [myColor, level, sync]
+        [myColor, level, sync, saveStatus]
     );
 
     const handleMove = useCallback(
@@ -89,14 +97,22 @@ export function ChessBotTable({ playerName, onExit }: ChessBotTableProps) {
         };
     }, [turn, botColor, status.over, fen, game, level, sync]);
 
+    const saveResult = useCallback(async () => {
+        if (!trackResult || !game.status().over || submitted.current === gameId) return;
+        submitted.current = gameId; setSaveStatus('saving'); setSaveError('');
+        try { await recordChessBotGame({ id: gameId, moves: game.getHistory(), playerColor: myColor, level }); setSaveStatus('saved'); }
+        catch (e) { submitted.current = null; setSaveStatus('error'); setSaveError(e instanceof Error ? e.message : 'Sonuç kaydedilemedi.'); }
+    }, [trackResult, game, gameId, myColor, level]);
+    useEffect(() => { if (status.over && saveStatus === 'idle') void saveResult(); }, [status.over, saveStatus, saveResult]);
+
     /** Geri al: kendi hamlem ve bilgisayarın yanıtı birlikte geri alınır. */
     const undo = useCallback(() => {
-        if (thinking) return;
+        if (thinking || status.over) return;
         game.undo();
         if (game.turnColor() !== myColor) game.undo();
         pending.current = game.fen();
         sync(game, null);
-    }, [game, myColor, thinking, sync]);
+    }, [game, myColor, thinking, sync, status.over]);
 
     const lost = game.capturedPieces();
     const advantage = advantageOf(lost);
@@ -111,12 +127,13 @@ export function ChessBotTable({ playerName, onExit }: ChessBotTableProps) {
             : 'kaybettin';
 
     return (
-        <div className="mx-auto w-full max-w-5xl px-4 py-5">
-            <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mx-auto w-full max-w-5xl px-3 py-3 sm:px-6 sm:py-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-4">
                 <button
                     type="button"
                     onClick={onExit}
-                    className="flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:text-on-surface"
+                    disabled={saveStatus === 'saving'}
+                    className="flex min-h-11 items-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:text-on-surface"
                 >
                     <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                     Salon
@@ -127,8 +144,8 @@ export function ChessBotTable({ playerName, onExit }: ChessBotTableProps) {
                 </span>
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-                <div className="flex flex-col gap-2.5">
+            <div className="chess-game-layout grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+                <div className="chess-board-column mx-auto flex w-full min-w-0 max-w-[36rem] flex-col gap-2 lg:mx-0">
                     <PlayerBar
                         name={`Bilgisayar · ${LEVELS[level].label}`}
                         color={botColor}
@@ -157,7 +174,8 @@ export function ChessBotTable({ playerName, onExit }: ChessBotTableProps) {
                     />
                 </div>
 
-                <aside className="flex flex-col gap-3">
+                <aside className="flex min-w-0 flex-col gap-3">
+                    {trackResult && status.over && <div role="status" className="rounded-2xl border border-outline-variant bg-surface p-3 text-sm">{saveStatus === 'saved' ? 'Sonuç öğretmen paneline kaydedildi.' : saveStatus === 'error' ? saveError : 'Sonuç sunucuya kaydediliyor…'}{saveStatus === 'error' && <button type="button" onClick={() => void saveResult()} className="mt-2 block font-bold text-primary">Kaydı tekrar dene</button>}</div>}
                     {status.over ? (
                         <ResultBanner
                             result={
@@ -227,7 +245,7 @@ export function ChessBotTable({ playerName, onExit }: ChessBotTableProps) {
                         <button
                             type="button"
                             onClick={() => newGame()}
-                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2.5 text-xs font-bold text-on-primary transition hover:brightness-105"
+                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary min-h-11 px-3 py-2.5 text-sm font-bold text-on-primary transition hover:brightness-105"
                         >
                             <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
                             Yeni oyun
@@ -235,8 +253,8 @@ export function ChessBotTable({ playerName, onExit }: ChessBotTableProps) {
                         <button
                             type="button"
                             onClick={undo}
-                            disabled={san.length === 0 || thinking}
-                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-3 py-2.5 text-xs font-bold text-on-surface-variant transition hover:text-on-surface disabled:opacity-40"
+                            disabled={san.length === 0 || thinking || status.over}
+                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-outline-variant bg-surface min-h-11 px-3 py-2.5 text-sm font-bold text-on-surface-variant transition hover:text-on-surface disabled:opacity-40"
                         >
                             <Undo2 className="h-3.5 w-3.5" aria-hidden="true" />
                             Geri al
