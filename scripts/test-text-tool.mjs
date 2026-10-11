@@ -8,8 +8,15 @@ import { pathToFileURL } from 'node:url';
 const dir = await mkdtemp(join(tmpdir(), 'text-tool-'));
 try {
     const outfile = join(dir, 'test.mjs');
-    await build({stdin:{contents:"export {textLayout} from './src/components/drawing/textLayout';export {getBB} from './src/components/drawing/strokeRenderer';export {InkToolMemory} from './src/components/drawing/InkEngine/toolMemory';export {encodePages,decodePages} from './src/components/notebooks/pageCodec';",resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',outfile});
-    const { textLayout, getBB, InkToolMemory, encodePages, decodePages } = await import(pathToFileURL(outfile));
+    await build({stdin:{contents:"export {textLayout,fontUnitsToPoints,fontPointsToUnits,fontPointLabel} from './src/components/drawing/textLayout';export {getBB} from './src/components/drawing/strokeRenderer';export {InkToolMemory} from './src/components/drawing/InkEngine/toolMemory';export {encodePages,decodePages} from './src/components/notebooks/pageCodec';",resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',outfile});
+    const { textLayout, fontUnitsToPoints, fontPointsToUnits, fontPointLabel, getBB, InkToolMemory, encodePages, decodePages } = await import(pathToFileURL(outfile));
+    assert.equal(fontPointsToUnits(72),132.08,'72 points occupy one inch at the notebook scale (52 units per cm)');
+    assert.equal(fontPointLabel(22),'12','legacy 22-unit text is about 12 points, not 22 points');
+    for (const points of [6,12,22,36,120]) {
+        assert.ok(Math.abs(fontUnitsToPoints(fontPointsToUnits(points))-points)<1e-10);
+        const laidOut = textLayout({text:'Aa',width:fontPointsToUnits(points)});
+        assert.ok(Math.abs(laidOut.fontSize / 132.08 * 72-points)<1e-10,'renderer uses the point size in page coordinates');
+    }
     const memory = new InkToolMemory();
     const whitePen = {tool:'pencil',color:'#ffffff',width:2};
     const textConfig = memory.select(whitePen,'text');

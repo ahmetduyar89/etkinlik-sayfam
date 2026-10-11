@@ -2,7 +2,7 @@
 .text-editor{position:absolute;pointer-events:auto;color:#263244}
 .text-editor-field{transform-origin:top left;outline:1.5px dashed #6366f1;background:transparent}
 .text-editor-field textarea{display:block;box-sizing:border-box;width:100%;min-height:1.25em;padding:0;margin:0;border:0;border-radius:0;resize:none;background:transparent;outline:none;line-height:1.25;overflow:hidden;caret-color:#4f46e5;user-select:text;-webkit-user-select:text;touch-action:auto}
-.text-editor-field textarea::placeholder{color:#64748b;opacity:.8;font-size:16px}
+.text-editor-field textarea::placeholder{color:#64748b;opacity:.8;font:inherit}
 .text-editor-actions,.text-editor-format{position:absolute;display:flex;align-items:center;gap:4px;width:max-content;max-width:calc(100vw - 24px);padding:4px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;box-shadow:0 8px 28px #0f172a1a;z-index:2;font:12px/1.4 Inter,system-ui,sans-serif}
 .text-editor-actions button,.text-editor-format button{display:flex;align-items:center;justify-content:center;gap:5px;min-width:44px;height:44px;padding:0 8px;border-radius:8px;color:#475569;touch-action:manipulation}
 .text-editor-actions button:hover,.text-editor-format button:hover{background:#f1f5f9}.text-editor-actions button[aria-label="Metni kaydet"],.text-editor-format button[aria-pressed=true]{background:#eef2ff;color:#4f46e5}

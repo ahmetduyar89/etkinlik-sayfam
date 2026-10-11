@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlignCenter, AlignLeft, AlignRight, Bold, Check, GripHorizontal, Italic, Trash2, X } from 'lucide-react';
 import type { Viewport } from '../../types';
-import { textFontFamily, textLayout } from './textLayout';
+import { fontPointLabel, fontPointsToUnits, textFontFamily, textLayout } from './textLayout';
 import './text-editor.css';
 
 export interface TextDraft {
@@ -9,6 +9,7 @@ export interface TextDraft {
     worldX: number;
     worldY: number;
     text: string;
+    /** Font size in saved notebook coordinates, independent of zoom. */
     fontSize: number;
     color: string;
     fontFamily?: string;
@@ -32,8 +33,11 @@ interface Props {
 }
 
 export function InlineTextEditor({ draft, view, viewport, pageBox, containerRef, onChange, onSave, onCancel, onDelete }: Props) {
-    const [fontInput, setFontInput] = React.useState(String(draft.fontSize));
-    React.useEffect(() => setFontInput(String(draft.fontSize)), [draft.fontSize, draft.sessionId]);
+    const [fontInput, setFontInput] = React.useState(() => fontPointLabel(draft.fontSize));
+    React.useEffect(() => {
+        const label = fontPointLabel(draft.fontSize);
+        setFontInput(current => Number(current) === Number(label) ? current : label);
+    }, [draft.fontSize, draft.sessionId]);
     const textarea = React.useRef<HTMLTextAreaElement>(null);
     const drag = React.useRef<{ id: number; x: number; y: number; worldX: number; worldY: number } | null>(null);
     const resize = React.useRef<{id:number; x:number; width:number; left:number} | null>(null);
@@ -119,7 +123,28 @@ export function InlineTextEditor({ draft, view, viewport, pageBox, containerRef,
             </div>
             <div className="text-editor-format" style={{left:fitLeft(formatWidth), top:formatTop, width:formatWidth}} role="toolbar" aria-label="Metin biçimlendirme">
                 <label>Yazı tipi<select aria-label="Yazı tipi" value={draft.fontFamily ?? 'sans'} onChange={e => format({fontFamily:e.target.value})}><option value="sans">Modern</option><option value="serif">Klasik</option><option value="mono">Eş aralıklı</option><option value="cursive">El yazısı</option></select></label>
-                <label>Boyut<input aria-label="Yazı boyutu" type="number" min={10} max={120} value={fontInput} onChange={e => {setFontInput(e.target.value);const n=Number(e.target.value);if(n>=10 && n<=120)onChange({fontSize:n});}} onBlur={()=>{const n=Math.max(10,Math.min(120,Number(fontInput)||22));setFontInput(String(n));onChange({fontSize:n});}}/></label>
+                <label title="Punto (pt). Yakınlaştırma yazının sayfadaki boyutunu değiştirmez.">Boyut (pt)<input aria-label="Yazı boyutu (punto)" type="number" min={6} max={120} step={0.5} value={fontInput}
+                    onChange={e => {
+                        setFontInput(e.target.value);
+                        const points = Number(e.target.value);
+                        if (Number.isFinite(points) && points >= 6 && points <= 120)
+                            onChange({fontSize:fontPointsToUnits(points)});
+                    }}
+                    onBlur={() => {
+                        // Merely leaving the field must not round or resize legacy text.
+                        if (Number(fontInput) === Number(fontPointLabel(draft.fontSize))) {
+                            setFontInput(fontPointLabel(draft.fontSize));
+                            return;
+                        }
+                        const value = Number(fontInput);
+                        if (!fontInput.trim() || !Number.isFinite(value)) {
+                            setFontInput(fontPointLabel(draft.fontSize));
+                            return;
+                        }
+                        const points = Math.max(6, Math.min(120, value));
+                        setFontInput(String(points));
+                        onChange({fontSize:fontPointsToUnits(points)});
+                    }}/></label>
                 <label>Renk<input aria-label="Metin rengi" type="color" value={draft.color} onChange={e => format({color:e.target.value})}/></label>
                 <button type="button" aria-label="Kalın metin" aria-pressed={draft.bold ?? false} onPointerDown={e=>e.preventDefault()} onClick={()=>format({bold:!draft.bold})}><Bold size={18}/></button>
                 <button type="button" aria-label="İtalik metin" aria-pressed={draft.italic ?? false} onPointerDown={e=>e.preventDefault()} onClick={()=>format({italic:!draft.italic})}><Italic size={18}/></button>

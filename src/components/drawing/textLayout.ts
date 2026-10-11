@@ -1,4 +1,13 @@
 import type { Stroke } from '../../types';
+import { UNITS_PER_CM } from '../../constants/pageSizes';
+
+// A point is 1/72 inch. Keep saved text in the existing notebook coordinates.
+export const TEXT_UNITS_PER_POINT = UNITS_PER_CM * 2.54 / 72;
+export const fontUnitsToPoints = (units: number): number => units / TEXT_UNITS_PER_POINT;
+export const fontPointsToUnits = (points: number): number => points * TEXT_UNITS_PER_POINT;
+
+export const fontPointLabel = (units: number): string =>
+    String(Math.round(fontUnitsToPoints(units) * 10) / 10);
 
 export function textFontFamily(family?: string): string {
     if (family === 'serif') return 'Georgia, Cambria, "Times New Roman", serif';
