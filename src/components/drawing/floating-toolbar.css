@@ -1,0 +1,16 @@
+.content-ink-layer{position:absolute;inset:0;z-index:6000;pointer-events:none;overflow:hidden}
+.content-ink-palette{position:absolute;display:flex;align-items:center;width:max-content;max-width:calc(100% - 16px);padding:4px;border:1px solid #dce4f3;border-radius:16px;background:#ffffffed;box-shadow:0 4px 24px #253b5820;pointer-events:auto;color:#4b66bd}
+.content-ink-handle,.content-ink-collapse{display:grid;place-items:center;flex-shrink:0;width:40px;height:44px;border-radius:10px;touch-action:manipulation}
+.content-ink-handle{width:28px;cursor:grab;touch-action:none;color:#8592aa}
+.content-ink-handle:active{cursor:grabbing}
+.content-ink-collapse:hover{background:#eef2ff}
+.content-ink-palette>button:focus-visible{outline:2px solid #4b66bd;outline-offset:-2px}
+.content-ink-tools{flex:1;min-width:0}.content-ink-tools[hidden]{display:none}
+.content-ink-palette .gn-toolbar{position:static;min-width:0;flex:1;isolation:auto}
+.content-ink-palette .gn-notebook-main{min-height:44px;justify-content:flex-start}
+.content-ink-palette .gn-main-divider{margin:0 2px}
+/* Center settings in the visible viewport, even when the palette is at an edge. */
+.content-ink-palette .gn-popover,.content-ink-palette .gn-elements,.content-ink-palette .gn-library,.content-ink-palette .gn-lab{position:fixed;top:50%;left:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);max-width:calc(100vw - 24px);max-height:calc(100dvh - 160px);pointer-events:auto;z-index:6001}
+.content-ink-palette .gn-popover,.content-ink-palette .gn-elements{width:370px}
+.content-ink-palette .gn-library,.content-ink-palette .gn-lab{overflow:auto}
+@media(max-width:700px){.content-ink-palette .gn-notebook-main .gn-icon{width:44px}.content-ink-palette .gn-quick-colors .gn-color{width:36px}.content-ink-palette .gn-notebook-main{overflow-x:auto}}

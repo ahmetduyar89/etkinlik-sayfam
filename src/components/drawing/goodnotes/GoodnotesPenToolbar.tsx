@@ -125,7 +125,7 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
     };
     const button = (title: string, Icon: typeof PenTool, action: () => void, active = false, disabled = false) => <button type="button" key={title} data-tone={Icon === Eraser ? 'rose' : Icon === Highlighter ? 'amber' : Icon === Shapes || Icon === FlaskConical || Icon === Lasso || Icon === Sticker ? 'violet' : Icon === Hand || Icon === BookOpen ? 'teal' : 'blue'} className={`gn-icon ${active ? 'is-active' : ''}`} title={title} aria-label={title} aria-pressed={active ? true : undefined} onClick={action} disabled={disabled}><Icon size={21}/></button>;
     return <div ref={root} data-drawing-toolbar data-tool={config.tool} className={`gn-toolbar ${fixed ? 'gn-fixed' : 'gn-floating'} ${compact ? 'gn-compact gn-notebook' : ''} ${props.dockSide ? `gn-dock gn-dock-${props.dockSide}` : ''}`} onPointerDown={e => e.stopPropagation()}>
-        {compact ? <div className="gn-main gn-notebook-main" role="toolbar" aria-label="Defter çizim araçları">
+        {compact ? <div className="gn-main gn-notebook-main" role="toolbar" aria-label="Çizim araçları">
             {button('Kalem (P)', PenTool, () => config.tool === 'pencil' ? toggle('pen') : select('pencil'), config.tool === 'pencil')}
             {button('Fosforlu kalem (H)', Highlighter, () => config.tool === 'highlighter' ? toggle('width') : select('highlighter'), config.tool === 'highlighter')}
             {button('Silgi (E)', Eraser, () => config.tool === 'eraser' ? toggle('eraser') : select('eraser'), config.tool === 'eraser')}

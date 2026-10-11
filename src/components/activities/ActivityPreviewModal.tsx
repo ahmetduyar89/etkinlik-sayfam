@@ -16,7 +16,7 @@ import { getFormattedHtml } from '../../utils/format-html';
 import { HTML2CANVAS_CDN } from '../../constants/drawing';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
 import { bindContentScroll } from '../drawing/contentScroll';
-import { DrawingToolbar } from '../drawing/DrawingToolbar';
+import { FloatingDrawingToolbar } from '../drawing/FloatingDrawingToolbar';
 import { TextBoxLayer } from '../tools/TextBoxLayer';
 import { RulerTool } from '../tools/RulerTool';
 import { ProtractorTool } from '../tools/ProtractorTool';
@@ -483,9 +483,10 @@ export function ActivityPreviewModal({
                     </div>
                 </header>
 
+                <div className="flex-1 min-h-0 relative">
                 <AnimatePresence>
                     {isPreviewDrawingMode && (
-                        <DrawingToolbar
+                        <FloatingDrawingToolbar
                             onInsertElement={(src,w,h) => canvasRef.current?.insertImage(src,w,h)}
                             fixed
                             onInsertMath={(math) => canvasRef.current?.insertMath(math)}
@@ -525,7 +526,7 @@ export function ActivityPreviewModal({
 
                 <main
                     ref={mainRef}
-                    className="flex-1 min-h-0 relative isolate overflow-y-auto overflow-x-hidden custom-scroll"
+                    className="h-full min-h-0 relative isolate overflow-y-auto overflow-x-hidden custom-scroll"
                     style={{
                         backgroundColor: showWhiteboard ? bgColor || '#ffffff' : '#ffffff',
                     }}
@@ -641,6 +642,7 @@ export function ActivityPreviewModal({
                         )}
                     </AnimatePresence>
                 </main>
+                </div>
             </div>
 
             {showTimer && (

@@ -9,7 +9,7 @@ import { useStudentIdentity } from '../../lib/studentIdentity';
 import { completeLearningAssignment } from '../../lib/learning';
 import { auth, useFirestore } from '../../lib/firebase';
 import { DrawingCanvas } from '../drawing/DrawingCanvas';
-import { DrawingToolbar } from '../drawing/DrawingToolbar';
+import { FloatingDrawingToolbar } from '../drawing/FloatingDrawingToolbar';
 import { CompassTool } from '../tools/CompassTool';
 import { NumberLineTool } from '../tools/NumberLineTool';
 import { MiniCalculatorTool } from '../tools/MiniCalculatorTool';
@@ -379,7 +379,34 @@ export function StudentPortal({ act }: StudentPortalProps) {
                 </div>
             </header>
 
-            <main className="flex-1 relative bg-white overflow-y-auto overflow-x-hidden custom-scroll">
+            <div className="flex-1 min-h-0 relative">
+                <AnimatePresence>
+                    {isDrawingMode && (
+                        <FloatingDrawingToolbar
+                            onInsertElement={(src,w,h) => canvasRef.current?.insertImage(src,w,h)}
+                            onCommand={handleToolbarCommand}
+                            config={drawConfig}
+                            setConfig={setDrawConfig}
+                            showWhiteboard={showWhiteboard}
+                            setShowWhiteboard={setShowWhiteboard}
+                            canUndo={drawHistory.canUndo}
+                            canRedo={drawHistory.canRedo}
+                            onSelectTool={(toolId) => {
+                                if (toolId === 'compass') setShowCompass(true);
+                                else if (toolId === 'numberLine' || toolId === 'number_line') setShowNumberLine(true);
+                                else if (toolId === 'calculator') setShowCalculator(true);
+                                else if (toolId === 'periodicTable' || toolId === 'periodic_table') setShowPeriodicTable(true);
+                                else if (toolId === 'geogebra' || toolId === 'tool_geogebra') setShowGeogebra(true);
+                                else if (toolId === 'simpleMachines' || toolId === 'simple_machines' || toolId === 'tool_simple_machines') setShowSimpleMachines(true);
+                                else if (toolId === 'dnaGenetics' || toolId === 'dna_genetics' || toolId === 'tool_dna_genetics') setShowDnaGenetics(true);
+                                else if (toolId === 'moleculeBuilder' || toolId === 'molecule_builder' || toolId === 'tool_molecule_builder') setShowMoleculeBuilder(true);
+                                else if (toolId === 'linearGraph' || toolId === 'linear_graph' || toolId === 'tool_linear_graph') setShowLinearGraph(true);
+                                else if (toolId === 'mathFormula' || toolId === 'math_formula' || toolId === 'tool_math_formula') setShowMathFormula(true);
+                            }}
+                        />
+                    )}
+                </AnimatePresence>
+            <main className="h-full relative bg-white overflow-y-auto overflow-x-hidden custom-scroll">
                 <div
                     style={{
                         position: 'relative',
@@ -420,32 +447,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
                         }
                     />
                 </div>
-                <AnimatePresence>
-                    {isDrawingMode && (
-                        <DrawingToolbar
-                            onInsertElement={(src,w,h) => canvasRef.current?.insertImage(src,w,h)}
-                            onCommand={handleToolbarCommand}
-                            config={drawConfig}
-                            setConfig={setDrawConfig}
-                            showWhiteboard={showWhiteboard}
-                            setShowWhiteboard={setShowWhiteboard}
-                            canUndo={drawHistory.canUndo}
-                            canRedo={drawHistory.canRedo}
-                            onSelectTool={(toolId) => {
-                                if (toolId === 'compass') setShowCompass(true);
-                                else if (toolId === 'numberLine' || toolId === 'number_line') setShowNumberLine(true);
-                                else if (toolId === 'calculator') setShowCalculator(true);
-                                else if (toolId === 'periodicTable' || toolId === 'periodic_table') setShowPeriodicTable(true);
-                                else if (toolId === 'geogebra' || toolId === 'tool_geogebra') setShowGeogebra(true);
-                                else if (toolId === 'simpleMachines' || toolId === 'simple_machines' || toolId === 'tool_simple_machines') setShowSimpleMachines(true);
-                                else if (toolId === 'dnaGenetics' || toolId === 'dna_genetics' || toolId === 'tool_dna_genetics') setShowDnaGenetics(true);
-                                else if (toolId === 'moleculeBuilder' || toolId === 'molecule_builder' || toolId === 'tool_molecule_builder') setShowMoleculeBuilder(true);
-                                else if (toolId === 'linearGraph' || toolId === 'linear_graph' || toolId === 'tool_linear_graph') setShowLinearGraph(true);
-                                else if (toolId === 'mathFormula' || toolId === 'math_formula' || toolId === 'tool_math_formula') setShowMathFormula(true);
-                            }}
-                        />
-                    )}
-                </AnimatePresence>
+
 
                 {showCompass && (
                     <CompassTool
@@ -513,6 +515,7 @@ export function StudentPortal({ act }: StudentPortalProps) {
                     />
                 )}
             </main>
+            </div>
         </div>
     );
 }
