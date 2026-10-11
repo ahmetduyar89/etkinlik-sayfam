@@ -18,14 +18,28 @@ import { ClassroomDashboard } from './components/classrooms/ClassroomDashboard';
 import { ClassAdminDashboard } from './components/classrooms/ClassAdminDashboard';
 import { findFolder, findModule, findModuleByView } from './constants/portal';
 import { goToSection, sectionFromLocation, type Section } from './lib/navigation';
-import { isChessLink, isStudentLink, getSession } from './utils/auth';
+import { isChessLink, isStudentLink, getSession, SESSION_CHANGED_EVENT, SESSION_STORAGE_KEY, AUTH_STORAGE_KEY } from './utils/auth';
 import type { MainView, ClassRoom } from './types';
 
 export default function AppShell() {
     const [section, setSection] = useState<Section>(sectionFromLocation);
     const [previewClass, setPreviewClass] = useState<ClassRoom | null>(null);
-    const session = getSession();
+    const [session, setSession] = useState(getSession);
     const isClassMode = session?.role === 'class';
+
+    useEffect(() => {
+        const sync = () => { setSession(getSession()); setPreviewClass(null); };
+        const onStorage = (event: StorageEvent) => {
+            if (event.key === SESSION_STORAGE_KEY || event.key === AUTH_STORAGE_KEY || event.key === null) sync();
+        };
+        window.addEventListener(SESSION_CHANGED_EVENT, sync);
+        window.addEventListener('storage', onStorage);
+        sync();
+        return () => {
+            window.removeEventListener(SESSION_CHANGED_EVENT, sync);
+            window.removeEventListener('storage', onStorage);
+        };
+    }, []);
 
     // Tarayıcının geri/ileri tuşları ve goToSection() aynı olayı tetikler.
     useEffect(() => {

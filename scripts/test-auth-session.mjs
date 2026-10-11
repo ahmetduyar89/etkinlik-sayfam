@@ -16,13 +16,14 @@ function storage() {
 }
 function setup() {
     const exports = {};
-    const window = { localStorage: storage(), sessionStorage: storage(), location: { search: '', href: '/' } };
+    const events = [];
+    const window = { dispatchEvent: event => events.push(event.type), localStorage: storage(), sessionStorage: storage(), location: { search: '', href: '/' } };
     const source = readFileSync(new URL('../src/utils/auth.ts', import.meta.url), 'utf8').replaceAll('import.meta.env', 'testEnv');
     const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
-    vm.runInNewContext(compiled, { exports, window, testEnv: {}, console,
+    vm.runInNewContext(compiled, { exports, window, testEnv: {}, console, Event,
         require: (name) => name === 'firebase/auth' ? { signOut: async () => {} } : { auth: {} },
     });
-    return { api: exports, window };
+    return { api: exports, window, events };
 }
 
 test('QR screen metadata stays in session storage, including after auth restoration', () => {
@@ -65,4 +66,23 @@ test('logout clears both persistence modes and the legacy marker', () => {
     api.clearSession();
     assert.equal(api.getSession(), null);
     assert.equal(window.localStorage.getItem(api.AUTH_STORAGE_KEY), null);
+});
+
+
+test('student restoration is stable and announces metadata changes without page reload', () => {
+    const { api, window, events } = setup();
+    const session = { role: 'student', classId: 'c1', studentId: 's1', studentName: 'Ali Kaya', schoolNumber: '0012' };
+    api.saveSession(session, 'local');
+    const writes = window.localStorage.mutations;
+    api.saveSession({ ...session });
+    api.saveSession({ ...session });
+    assert.equal(window.localStorage.mutations, writes);
+    assert.deepEqual(events, [api.SESSION_CHANGED_EVENT]);
+    api.saveSession({ ...session, schoolNumber: '0013' });
+    assert.equal(api.getSession().schoolNumber, '0013');
+    assert.equal(events.length, 2);
+    api.clearSession();
+    assert.equal(events.length, 3);
+    assert.equal(api.getSession(), null);
+    assert.equal(window.location.href, '/');
 });

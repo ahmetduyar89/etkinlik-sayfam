@@ -7,6 +7,8 @@ export interface DrawingToolbarProps {
     fixed?: boolean;
     /** Single writing row for the notebook workspace. */
     compact?: boolean;
+    /** Floating vertical tools for the notebook focus mode. */
+    dockSide?: 'left' | 'right';
     showWhiteboard?: boolean;
     setShowWhiteboard?: (val: boolean) => void;
     bgColor?: string;

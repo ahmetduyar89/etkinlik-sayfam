@@ -1,6 +1,6 @@
 // src/components/notebooks/NotebookEditor.tsx
 // Tam ekran defter / beyaz tahta editörü.
-// Üstte kompakt belge başlığı ve tek satırlı yazma araçları bulunur. İçerik Firestore'a
+// Belge başlığı ve yazma araçları tek satırı paylaşır; odak modunda kenara taşınır. İçerik Firestore'a
 // otomatik kaydedilir (yazma sonrası ~1.2 sn beklenir).
 import React from 'react';
 import './notebook-editor.css';
@@ -8,12 +8,12 @@ import {
     Activity,
     AlertTriangle,
     ArrowLeft,
+    ArrowLeftRight,
     Bookmark,
     Check,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
-    ChevronUp,
     FileDown,
     FileText,
     FileUp,
@@ -24,7 +24,8 @@ import {
     Loader2,
     Plus,
     MoreHorizontal,
-    Tv,
+    Maximize2,
+    Minimize2,
     Printer,
     QrCode,
     RotateCw,
@@ -226,7 +227,15 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     }, [config.penType, config.width]);
 
     const [hideHeader, setHideHeader] = React.useState(false);
-    const [editorMenu, setEditorMenu] = React.useState<'document' | 'lesson' | null>(null);
+    const [dockSide, setDockSide] = React.useState<'left' | 'right'>(() => {
+        try { return localStorage.getItem('notebook-dock-side') === 'right' ? 'right' : 'left'; } catch { return 'left'; }
+    });
+    const changeDockSide = () => setDockSide(side => {
+        const next = side === 'left' ? 'right' : 'left';
+        try { localStorage.setItem('notebook-dock-side', next); } catch { /* optional */ }
+        return next;
+    });
+    const [editorMenu, setEditorMenu] = React.useState<'document' | null>(null);
     const documentHeaderRef = React.useRef<HTMLElement>(null);
     React.useEffect(() => {
         if (!editorMenu) return;
@@ -1488,6 +1497,59 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         </div>
     );
 
+    const renderDrawingToolbar = () => (
+        <DrawingToolbar
+            onInsertElement={(src,w,h) => canvasRef.current?.insertImage(src,w,h)}
+            fixed
+            compact
+            dockSide={hideHeader ? dockSide : undefined}
+            onCommand={(type) => {
+                if (type === 'UNDO_DRAWING') handleUndo();
+                if (type === 'REDO_DRAWING') handleRedo();
+                if (type === 'CLEAR_DRAWING') {
+                    canvasRef.current?.clear();
+                    scheduleSave();
+                }
+            }}
+            config={config}
+            setConfig={setConfig}
+            bgColor={bgColor}
+            onBgColorChange={changeBg}
+            paper={paper}
+            onPaperChange={changePaper}
+            onScreenshot={() =>
+                canvasRef.current?.screenshot(true, bgColor, paper, pdfCanvasRef.current)
+            }
+            isTextBoxMode={isTextBoxMode}
+            onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
+            onInsertMath={handleInsertMath}
+            canUndo={history.canUndo}
+            canRedo={history.canRedo}
+            onInsertImages={(files) => void handleInsertImages(files)}
+            isInsertingImage={isInsertingImage}
+            zoom={view.scale}
+            onZoomIn={() => canvasRef.current?.zoomBy(1.25)}
+            onZoomOut={() => canvasRef.current?.zoomBy(0.8)}
+            onZoomReset={() => canvasRef.current?.resetView()}
+            onZoomFit={
+                pageBox ? () => canvasRef.current?.fitPage() : undefined
+            }
+            onSelectTool={handleSelectTool}
+        />
+    );
+
+    const renderPageNavigation = () => (
+        <div className="nb-page-navigation" role="group" aria-label="Defter sayfaları">
+            <button type="button" className={`nb-icon ${showPages ? 'is-active' : ''}`} onClick={() => setShowPages(v => !v)} title="Sayfalar" aria-label="Sayfalar" aria-pressed={showPages}><Layers size={17}/></button>
+            <span className="nb-separator"/>
+            <button type="button" className="nb-icon" onClick={() => canvasRef.current?.prevPage()} disabled={pageInfo.current === 0} aria-label="Önceki sayfa"><ChevronLeft size={16}/></button>
+            <button type="button" className="nb-page-count" onClick={handleJumpToPage} title="Sayfaya git">{pageInfo.current + 1}<span> / {pageInfo.total}</span></button>
+            <button type="button" className="nb-icon" onClick={() => canvasRef.current?.nextPage()} disabled={pageInfo.current >= pageInfo.total - 1} aria-label="Sonraki sayfa"><ChevronRight size={16}/></button>
+            <button type="button" className="nb-icon" onClick={handleAddPage} title="Yeni sayfa" aria-label="Yeni sayfa"><Plus size={17}/></button>
+        </div>
+    );
+
+
     const renderDocumentHeader = () => (
         <header ref={documentHeaderRef} className="notebook-document-header" aria-label="Defter ve sayfa işlemleri">
             <div className="nb-document-identity">
@@ -1503,27 +1565,23 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         {saveState === 'saving' ? <Loader2 size={12} className="animate-spin"/> : <span/>}<small>{saveState === 'saving' ? 'Kaydediliyor' : 'Kayıtlı'}</small>
                     </span>}
             </div>
-            <div className="nb-page-navigation" role="group" aria-label="Defter sayfaları">
-                <button type="button" className={`nb-icon ${showPages ? 'is-active' : ''}`} onClick={() => setShowPages(v => !v)} title="Sayfalar" aria-label="Sayfalar" aria-pressed={showPages}><Layers size={17}/></button>
-                <span className="nb-separator"/>
-                <button type="button" className="nb-icon" onClick={() => canvasRef.current?.prevPage()} disabled={pageInfo.current === 0} aria-label="Önceki sayfa"><ChevronLeft size={16}/></button>
-                <button type="button" className="nb-page-count" onClick={handleJumpToPage} title="Sayfaya git">{pageInfo.current + 1}<span> / {pageInfo.total}</span></button>
-                <button type="button" className="nb-icon" onClick={() => canvasRef.current?.nextPage()} disabled={pageInfo.current >= pageInfo.total - 1} aria-label="Sonraki sayfa"><ChevronRight size={16}/></button>
-                <button type="button" className="nb-icon" onClick={handleAddPage} title="Yeni sayfa" aria-label="Yeni sayfa"><Plus size={17}/></button>
-            </div>
+            {renderDrawingToolbar()}
             <div className="nb-document-actions">
-                <div className="nb-paper-control">{renderPaperDropdown(false)}</div>
-                <div className="nb-menu-anchor">
-                    <button type="button" className={`nb-icon ${editorMenu === 'lesson' ? 'is-active' : ''}`} onClick={() => setEditorMenu(editorMenu === 'lesson' ? null : 'lesson')} title="Ders ve sunum araçları" aria-label="Ders ve sunum araçları" aria-expanded={editorMenu === 'lesson'}><Tv size={18}/></button>
-                    {editorMenu === 'lesson' && <div className="nb-menu-panel nb-lesson-panel"><b>Ders ve sunum</b><LessonModeToolbar overlay={overlay} onOverlayChange={setOverlay} presenting={presenting} onPresentingChange={setPresenting} fullscreenTarget={stageRef}/></div>}
+                <button type="button" className="nb-icon nb-focus-toggle" onClick={() => {setHideHeader(true);setEditorMenu(null);setShowPages(false);}} title="Odak modu" aria-label="Odak modunu aç"><Maximize2 size={18}/></button>
+                <div className="nb-inline-pages" role="group" aria-label="Hızlı sayfa geçişi">
+                    <button type="button" className="nb-icon" onClick={() => canvasRef.current?.prevPage()} disabled={pageInfo.current === 0} aria-label="Önceki sayfa"><ChevronLeft size={16}/></button>
+                    <button type="button" className="nb-page-shortcut" onClick={handleJumpToPage} aria-label="Sayfaya git">{pageInfo.current + 1} / {pageInfo.total}</button>
+                    <button type="button" className="nb-icon" onClick={() => canvasRef.current?.nextPage()} disabled={pageInfo.current >= pageInfo.total - 1} aria-label="Sonraki sayfa"><ChevronRight size={16}/></button>
                 </div>
-                <button type="button" className="nb-icon nb-save-button" onClick={() => void save()} title="Kaydet" aria-label="Kaydet"><Save size={17}/></button>
                 <div className="nb-menu-anchor">
                     <button type="button" className={`nb-icon ${editorMenu === 'document' ? 'is-active' : ''}`} onClick={() => setEditorMenu(editorMenu === 'document' ? null : 'document')} title="Diğer defter işlemleri" aria-label="Diğer defter işlemleri" aria-expanded={editorMenu === 'document'}><MoreHorizontal size={21}/></button>
                     {editorMenu === 'document' && <div className="nb-menu-panel">
                         <b>Belge işlemleri</b>
+                        <label className="nb-menu-title">Defter adı<input value={title} onChange={e => setTitle(e.target.value)} onBlur={handleTitleCommit} onKeyDown={e => {if(e.key === 'Enter') (e.target as HTMLInputElement).blur();}} aria-label="Menüde defter adı"/></label>
+                        {renderPageNavigation()}
+                        <button type="button" className="nb-menu-item" onClick={() => void save()}><Save size={16}/> Kaydet</button>
                         <div className="nb-file-actions">{renderPdfDropdown(true)}{renderExportDropdown(true)}</div>
-                        <div className="nb-mobile-paper">{renderPaperDropdown(false)}</div>
+                        <div className="nb-menu-paper">{renderPaperDropdown(false)}</div>
                         <p>Kağıt rengi</p><div className="nb-paper-colors">{BG_COLORS.map(b => <button type="button" key={b.color} style={{background:b.color}} aria-label={`Zemin rengi: ${b.label}`} title={b.label} className={bgColor === b.color ? 'is-selected' : ''} onClick={() => changeBg(b.color)}/>)}</div>
                         <hr/>
                         <button type="button" className="nb-menu-item" onClick={() => handleToggleBookmark(pageInfo.current + 1)}><Bookmark size={16}/> {notebook.pdf_bookmarks?.includes(pageInfo.current + 1) ? 'Yer imini kaldır' : 'Sayfayı yer imlerine ekle'}</button>
@@ -1535,7 +1593,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         </>}
                         {pageInfo.total > 1 && <button type="button" className="nb-menu-item nb-danger" onClick={() => void handleDeletePage()}><Trash2 size={16}/> Bu sayfayı sil</button>}
                         <hr/>
-                        <button type="button" className="nb-menu-item" onClick={() => {setHideHeader(true);setEditorMenu(null);}}><ChevronUp size={16}/> Başlığı gizle</button>
+                        <div className="nb-menu-lesson"><LessonModeToolbar overlay={overlay} onOverlayChange={setOverlay} presenting={presenting} onPresentingChange={v => {setPresenting(v);setEditorMenu(null);}} fullscreenTarget={stageRef}/></div>
+                        <button type="button" className="nb-menu-item" onClick={() => {setHideHeader(true);setEditorMenu(null);setShowPages(false);}}><Maximize2 size={16}/> Odak modunu aç</button>
                     </div>}
                 </div>
             </div>
@@ -1543,62 +1602,17 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     );
 
     return (
-        <div className="notebook-editor app-safe-screen fixed inset-0 z-[9000] h-[100dvh] flex flex-col bg-surface-container-low">
-            {/* Tam Tuval / Üst Menü Gizli İken Yüzen Mini Menü Kapsülü */}
-            {hideHeader && !presenting && (
-                <div className="nb-hidden-header-controls absolute top-2 left-3 z-[6500] flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md text-white border border-white/20 px-2.5 py-1 rounded-xl shadow-xl text-xs select-none">
-                    <button
-                        type="button"
-                        onClick={handleClose}
-                        title="Defterlerime dön"
-                        className="p-1 hover:bg-white/15 rounded-lg text-slate-300 hover:text-white transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                    </button>
-                    <div className="w-px h-3.5 bg-white/20" />
-                    <button
-                        type="button"
-                        onClick={() => canvasRef.current?.prevPage()}
-                        disabled={pageInfo.current === 0}
-                        className="p-1 hover:bg-white/15 rounded-lg disabled:opacity-30 text-slate-300 hover:text-white"
-                    >
-                        <ChevronLeft className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleJumpToPage}
-                        className="px-1.5 py-0.5 rounded text-[11px] font-bold tabular-nums hover:bg-white/15 text-white"
-                    >
-                        {pageInfo.current + 1} / {pageInfo.total}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => canvasRef.current?.nextPage()}
-                        disabled={pageInfo.current >= pageInfo.total - 1}
-                        className="p-1 hover:bg-white/15 rounded-lg disabled:opacity-30 text-slate-300 hover:text-white"
-                    >
-                        <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleAddPage}
-                        title="Sayfa Ekle"
-                        className="p-1 hover:bg-white/15 rounded-lg text-emerald-400"
-                    >
-                        <Plus className="w-3.5 h-3.5" />
-                    </button>
-                    <div className="w-px h-3.5 bg-white/20" />
-                    <button
-                        type="button"
-                        onClick={() => setHideHeader(false)}
-                        title="Üst Menüyü Göster"
-                        className="flex items-center gap-1 px-2 py-0.5 hover:bg-white/15 rounded-lg font-medium text-sky-400 text-xs transition-colors"
-                    >
-                        <ChevronDown className="w-3.5 h-3.5" />
-                        <span>Menü</span>
-                    </button>
+        <div data-focus-mode={hideHeader && !presenting ? dockSide : undefined} className="notebook-editor app-safe-screen fixed inset-0 z-[9000] h-[100dvh] flex flex-col bg-surface-container-low">
+            {hideHeader && !presenting && <>
+                <div className="nb-focus-controls" role="group" aria-label="Odak modu işlemleri">
+                    <button type="button" className="nb-icon" onClick={handleClose} aria-label="Defterlerime dön"><ArrowLeft size={20}/></button>
+                    <button type="button" className="nb-icon" onClick={() => setHideHeader(false)} title="Odak modundan çık" aria-label="Odak modundan çık"><Minimize2 size={20}/></button>
+                    <button type="button" className="nb-icon" onClick={changeDockSide} title="Araçları diğer yana taşı" aria-label="Araçları diğer yana taşı"><ArrowLeftRight size={20}/></button>
+                    {saveBlock && <button type="button" className="nb-icon nb-save-warning" title="Otomatik kayıt durdu" aria-label="Kayıt sorununu göster" onClick={() => {setHideHeader(false);if(saveBlock === 'conflict') void resolveConflict();}}><AlertTriangle size={20}/></button>}
                 </div>
-            )}
+                {renderDrawingToolbar()}
+                <div className="nb-focus-pages">{renderPageNavigation()}</div>
+            </>}
 
             {!hideHeader && !presenting && renderDocumentHeader()}
 
@@ -1610,47 +1624,6 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         onChange={handleAttachPdf}
         className="hidden"
     />
-
-            {/* GoodNotes Tarzı Sabit Çizim Araç Çubuğu */}
-            {!presenting && (
-                <DrawingToolbar
-                            onInsertElement={(src,w,h) => canvasRef.current?.insertImage(src,w,h)}
-                    fixed
-                    compact
-                    onCommand={(type) => {
-                        if (type === 'UNDO_DRAWING') handleUndo();
-                        if (type === 'REDO_DRAWING') handleRedo();
-                        if (type === 'CLEAR_DRAWING') {
-                            canvasRef.current?.clear();
-                            scheduleSave();
-                        }
-                    }}
-                    config={config}
-                    setConfig={setConfig}
-                    bgColor={bgColor}
-                    onBgColorChange={changeBg}
-                    paper={paper}
-                    onPaperChange={changePaper}
-                    onScreenshot={() =>
-                        canvasRef.current?.screenshot(true, bgColor, paper, pdfCanvasRef.current)
-                    }
-                    isTextBoxMode={isTextBoxMode}
-                    onTextBoxModeToggle={() => setIsTextBoxMode((m) => !m)}
-                    onInsertMath={handleInsertMath}
-                    canUndo={history.canUndo}
-                    canRedo={history.canRedo}
-                    onInsertImages={(files) => void handleInsertImages(files)}
-                    isInsertingImage={isInsertingImage}
-                    zoom={view.scale}
-                    onZoomIn={() => canvasRef.current?.zoomBy(1.25)}
-                    onZoomOut={() => canvasRef.current?.zoomBy(0.8)}
-                    onZoomReset={() => canvasRef.current?.resetView()}
-                    onZoomFit={
-                        pageBox ? () => canvasRef.current?.fitPage() : undefined
-                    }
-                    onSelectTool={handleSelectTool}
-                />
-            )}
 
             {/* Çalışma alanı */}
             <div ref={stageRef} className="flex-1 min-h-0 flex bg-background relative z-0">

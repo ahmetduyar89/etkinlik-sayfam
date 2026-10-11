@@ -11,8 +11,6 @@ import { cn } from '../../utils/cn';
 import {
     APP_PASSWORD,
     FIREBASE_ADMIN_EMAIL,
-    AUTH_STORAGE_KEY,
-    SESSION_STORAGE_KEY,
     isAuthenticated,
     getSession,
     isChessLink,
@@ -54,18 +52,7 @@ export function PasswordGate({ children }: PasswordGateProps) {
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
-    // Başka bir sekmede çıkış/giriş yapılırsa bu sekme de güncellensin.
-    useEffect(() => {
-        const onStorage = (e: StorageEvent) => {
-            if (e.key === AUTH_STORAGE_KEY || e.key === SESSION_STORAGE_KEY) {
-                window.location.reload();
-            }
-        };
-        window.addEventListener('storage', onStorage);
-        return () => window.removeEventListener('storage', onStorage);
-    }, []);
-
-    // Firebase is the authority for both teacher and class identities.
+    // Firebase synchronizes sign-in/out across tabs; metadata changes must not reload the page.
     useEffect(() => {
         let revision = 0;
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -93,11 +80,11 @@ export function PasswordGate({ children }: PasswordGateProps) {
                         className: classRoom.name, username: classRoom.username });
                     finish(true);
                 } else if (role === 'student' && typeof token.claims.classId === 'string' && typeof token.claims.studentId === 'string') {
-                    const classRoom = await fetchDocById<{ students: { id: string; name: string; active?: boolean }[] }>('classes', token.claims.classId);
+                    const classRoom = await fetchDocById<{ students: { id: string; name: string; schoolNumber?: string; active?: boolean }[] }>('classes', token.claims.classId);
                     const student = classRoom?.students.find(s => s.id === token.claims.studentId && s.active !== false);
                     if (revision !== current) return;
                     if (!student) { finish(false); return; }
-                    saveSession({ role: 'student', classId: token.claims.classId, studentId: student.id, studentName: student.name });
+                    saveSession({ role: 'student', classId: token.claims.classId, studentId: student.id, studentName: student.name, schoolNumber: student.schoolNumber });
                     finish(true);
                 } else {
                     finish(false);

@@ -1,5 +1,5 @@
 // src/components/classrooms/ClassManagerModal.tsx — Admin Sınıf Yönetim Paneli
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
     School,
     Plus,
@@ -12,7 +12,10 @@ import {
     FlaskConical,
     Sparkles,
     BookOpen,
+    Eye,
+    EyeOff,
 } from 'lucide-react';
+import { StudentRosterEditor } from './StudentRosterEditor';
 import { Modal } from '../common/Modal';
 import { useToast } from '../common/ToastProvider';
 import { useConfirm } from '../common/ConfirmDialog';
@@ -75,7 +78,8 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [grade, setGrade] = useState('');
-    const [studentsRaw, setStudentsRaw] = useState('');
+    const [students, setStudents] = useState<ClassStudent[]>([]);
+    const [showPassword, setShowPassword] = useState(false);
     const [assignedModules, setAssignedModules] = useState<string[]>([]);
     const [assignedExperiments, setAssignedExperiments] = useState<string[]>([]);
     const [assignedNotebooks, setAssignedNotebooks] = useState<string[]>([]);
@@ -88,7 +92,8 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
         setUsername(c.username);
         setPassword('');
         setGrade(c.grade || '');
-        setStudentsRaw((c.students || []).map((s) => s.schoolNumber ? `${s.schoolNumber}\t${s.name}` : s.name).join('\n'));
+        setStudents((c.students || []).map(s => ({ ...s })));
+        setShowPassword(false);
         setAssignedModules(c.assignedModules || ['satranc', 'deneyler']);
         setAssignedExperiments(c.assignedExperiments || []);
         setAssignedNotebooks(c.assignedNotebooks || []);
@@ -112,35 +117,14 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
         setUsername('');
         setPassword('');
         setGrade('');
-        setStudentsRaw('');
+        setStudents([]);
+        setShowPassword(false);
         // Varsayılan olarak popüler modüller seçili gelsin
         setAssignedModules(['satranc', 'deneyler', 'akil-oyunlari']);
         setAssignedExperiments(['basit-pusula.html', 'isildayan-devre.html', 'termometre.html']);
         setAssignedNotebooks([]);
         setView('form');
     };
-
-    // Öğrenci metnini diziye dönüştür
-    const parsedStudents: ClassStudent[] = useMemo(() => {
-        return studentsRaw
-            .split('\n')
-            .map((line) => line.trim())
-            .filter((line) => line.length > 0)
-            .map((line, idx) => {
-                const match = line.match(/^(\d{1,20})\s*(?:\t|\||-|;)\s*(.+)$/);
-                const schoolNumber = match?.[1] || '';
-                const name = (match?.[2] || line).trim();
-                const existing = editingClass?.students?.find((student) =>
-                    (schoolNumber && student.schoolNumber === schoolNumber) || student.name === name
-                );
-                return {
-                    id: existing?.id || `st_${idx + 1}_${name.toLocaleLowerCase('tr').replace(/[^a-z0-9]/g, '')}`,
-                    name,
-                    schoolNumber: schoolNumber || undefined,
-                    active: existing?.active !== false,
-                };
-            });
-    }, [studentsRaw, editingClass]);
 
     // Modül seçimi aç/kapat
     const toggleModule = (modId: string) => {
@@ -178,10 +162,15 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
             toast.error('Lütfen geçerli bir kullanıcı adı girin.');
             return;
         }
-        if ((!editingClass || !editingClass.credentialConfigured) && cleanPass.length < 6) {
-            toast.error('Yeni sınıf için en az 6 karakterli bir şifre belirleyin.');
+        if (((!editingClass || !editingClass.credentialConfigured) || cleanPass.length > 0) && cleanPass.length < 6) {
+            toast.error('Şifre en az 6 karakter olmalı.');
             return;
         }
+
+        const cleanStudents = students.map(s => ({ ...s, name: s.name.trim(), schoolNumber: s.schoolNumber?.trim() || undefined }));
+        if (cleanStudents.some(s => !s.name)) { toast.error('Öğrenci adını doldurun veya boş satırı kaldırın.'); return; }
+        const numbers = cleanStudents.map(s => s.schoolNumber).filter(Boolean);
+        if (new Set(numbers).size !== numbers.length) { toast.error('Aynı okul numarası birden fazla öğrenciye verilemez.'); return; }
 
         // Kullanıcı adı çakışma kontrolü
         const duplicate = classes.find(
@@ -199,7 +188,7 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
                 username: cleanUser,
                 password: cleanPass || undefined,
                 grade: grade.trim() || undefined,
-                students: parsedStudents,
+                students: cleanStudents,
                 assignedModules,
                 assignedExperiments,
                 assignedNotebooks,
@@ -214,9 +203,9 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
                 toast.success(`"${trimmedName}" sınıfı başarıyla eklendi.`);
             }
             setView('list');
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Sınıf kaydedilemedi:', err);
-            toast.error('Sınıf kaydedilirken bir hata oluştu.');
+            toast.error(err instanceof Error ? err.message : 'Sınıf kaydedilirken bir hata oluştu.');
         } finally {
             setIsSaving(false);
         }
@@ -301,7 +290,7 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
             }}
             title={view === 'list' ? 'Sınıflarım ve Çalışma Alanları' : editingClass ? 'Sınıfı Düzenle' : 'Yeni Sınıf Ekle'}
         >
-            <div className="flex flex-col flex-1 overflow-y-auto max-h-[75dvh] pr-1">
+            <div className="flex flex-col flex-1 min-h-0">
                 {/* LİSTE GÖRÜNÜMÜ */}
                 {view === 'list' && (
                     <div className="flex flex-col gap-5">
@@ -516,6 +505,7 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
                 {/* FORM GÖRÜNÜMÜ (YENİ / DÜZENLE) */}
                 {view === 'form' && (
                     <form onSubmit={handleSave} className="flex flex-col gap-6">
+                        <fieldset disabled={isSaving} className="contents">
                         <button
                             type="button"
                             onClick={() => setView('list')}
@@ -534,12 +524,13 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
 
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div>
-                                    <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                                    <label htmlFor="class-name" className="block text-[12px] font-semibold text-slate-600 mb-1">
                                         Sınıf Adı *
                                     </label>
                                     <input
                                         type="text"
-                                        required={!editingClass || !editingClass.credentialConfigured}
+                                        required
+                                        id="class-name"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
                                         placeholder="Örn: 4-A"
@@ -547,12 +538,14 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                                    <label htmlFor="class-username" className="block text-[12px] font-semibold text-slate-600 mb-1">
                                         Kullanıcı Adı (Giriş İçin) *
                                     </label>
                                     <input
                                         type="text"
                                         required
+                                        id="class-username"
+                                        autoComplete="off"
                                         value={username}
                                         onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
                                         placeholder="Örn: 4a"
@@ -560,17 +553,24 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[12px] font-semibold text-slate-600 mb-1">
-                                        Şifre *
+                                    <label htmlFor="class-password" className="block text-[12px] font-semibold text-slate-600 mb-1">
+                                        {editingClass?.credentialConfigured ? 'Yeni şifre (isteğe bağlı)' : 'Şifre *'}
                                     </label>
-                                    <input
-                                        type="text"
-                                        required={!editingClass || !editingClass.credentialConfigured}
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        placeholder={editingClass?.credentialConfigured ? 'Değiştirmek istemiyorsanız boş bırakın' : 'En az 6 karakter'}
-                                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-[14px] font-mono outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                                    />
+                                    <div className="relative">
+                                        <input
+                                            id="class-password"
+                                            type={showPassword ? 'text' : 'password'}
+                                            autoComplete="new-password"
+                                            minLength={6}
+                                            required={!editingClass || !editingClass.credentialConfigured}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="En az 6 karakter"
+                                            className="min-h-11 w-full bg-white border border-slate-200 rounded-xl pl-3 pr-11 text-[14px] outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                        />
+                                        <button type="button" onClick={() => setShowPassword(v => !v)} aria-label={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'} className="absolute right-0 top-0 flex min-h-11 min-w-11 items-center justify-center text-slate-500">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                                    </div>
+                                    <p className="mt-2 text-xs text-slate-500">{editingClass?.credentialConfigured ? 'Boş bırakırsanız mevcut şifre korunur. Değiştirmek için yeni şifre yazın.' : 'Sınıf girişi için bir şifre belirleyin.'}</p>
                                 </div>
                             </div>
                         </div>
@@ -580,22 +580,13 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                 <h4 className="text-[14px] font-extrabold text-slate-800 flex items-center gap-2">
                                     <Users className="w-4 h-4 text-indigo-600" />
-                                    Öğrenci Kadrosu ({parsedStudents.length} Öğrenci)
+                                    Öğrenci Kadrosu ({students.length} Öğrenci)
                                 </h4>
                                 <span className="text-[11.5px] text-slate-400 font-medium">
                                     Satranç maçlarında ve etkinliklerde kullanılır
                                 </span>
                             </div>
-                            <p className="text-[12px] text-slate-500">
-                                Her satıra önce öğrenci numarasını, sonra ad soyadı yazın. Excel'den iki sütunu doğrudan yapıştırabilirsiniz. Numarasız eski kayıtlar korunur ancak canlı satranca giremez.
-                            </p>
-                            <textarea
-                                rows={5}
-                                value={studentsRaw}
-                                onChange={(e) => setStudentsRaw(e.target.value)}
-                                placeholder="1024&#9;Ahmet Yılmaz&#10;1025&#9;Zeynep Kaya"
-                                className="w-full bg-white border border-slate-200 rounded-xl p-3 text-[13.5px] font-sans leading-relaxed outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                            />
+                            <StudentRosterEditor students={students} onChange={setStudents} disabled={isSaving} />
                         </div>
 
                         {/* Açılacak Portal Modülleri */}
@@ -735,7 +726,7 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
                         )}
 
                         {/* Kaydet Butonları */}
-                        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                        <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t border-slate-100 bg-white py-3">
                             <button
                                 type="button"
                                 onClick={() => setView('list')}
@@ -751,6 +742,7 @@ export function ClassManagerModal({ isOpen, onClose, onSwitchToClass, initialCla
                                 {isSaving ? 'Kaydediliyor…' : editingClass ? 'Değişiklikleri Kaydet' : 'Sınıfı Oluştur'}
                             </button>
                         </div>
+                        </fieldset>
                     </form>
                 )}
             </div>

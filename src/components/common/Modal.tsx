@@ -11,6 +11,8 @@ interface ModalProps {
 
 export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     const contentRef = useRef<HTMLDivElement>(null);
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
     const titleId = React.useId();
 
     useEffect(() => {
@@ -21,7 +23,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
         ) ?? []).filter((element) => element.getClientRects().length > 0);
         const focusTimer = window.setTimeout(() => focusable()[0]?.focus(), 0);
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
+            if (e.key === 'Escape') onCloseRef.current();
             if (e.key !== 'Tab') return;
             const items = focusable();
             const first = items[0];
@@ -42,7 +44,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
             document.body.style.overflow = prevOverflow;
             previouslyFocused?.focus?.();
         };
-    }, [isOpen, onClose]);
+    }, [isOpen]);
 
     return (
         <AnimatePresence>

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { PenTool, Highlighter, Eraser, Lasso, Hand, Type, Shapes, Undo, Redo, BookOpen, FlaskConical, ChevronDown, SlidersHorizontal, ImagePlus, Camera, Minus, Plus, Scan, X, Grid2X2, Ruler, Circle, Square, Triangle, Diamond, ArrowUpRight, Paintbrush, Pencil, Check, Sticker } from 'lucide-react';
+import { PenTool, Highlighter, Eraser, Lasso, Hand, Type, Shapes, Undo, Redo, BookOpen, FlaskConical, ChevronDown, SlidersHorizontal, ImagePlus, Camera, Minus, Plus, Scan, X, Grid2X2, Ruler, Circle, Square, Triangle, Diamond, ArrowUpRight, Paintbrush, Pencil, Check, Sticker, MoreHorizontal } from 'lucide-react';
 import type { DrawConfig, DrawingTool, PaperStyle } from '../../../types';
 import type { DrawingToolbarProps } from './toolbarTypes';
 import { ObjectLibraryPanel } from '../ObjectLibraryPanel';
@@ -11,7 +11,7 @@ import './toolbar.css';
 import { ElementsPanel } from '../elements/ElementsPanel';
 const names: Record<GoodnotesPen, string> = { fountain: 'Dolma Kalem', ballpoint: 'Tükenmez Kalem', brush: 'Fırça Kalem' };
 const pastel = ['#182230', '#2563eb', '#e34c55', '#8a5cf5', '#28a878', '#f4bb44', '#f5a6bd', '#b7d9f2', '#b9ddc6', '#dec9f0', '#ffffff', '#000000'];
-type Panel = 'elements' | 'pen' | 'lasso' | 'eraser' | 'color' | 'width' | 'library' | 'lab' | 'page' | 'shapes' | null;
+type Panel = 'elements' | 'pen' | 'lasso' | 'eraser' | 'color' | 'width' | 'library' | 'lab' | 'page' | 'shapes' | 'more' | null;
 interface Preferences {
     colors: string[];
     widths: number[];
@@ -101,7 +101,11 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
         window.addEventListener('keydown', key);
         return () => window.removeEventListener('keydown', key);
     }, [select, onOpenLibrary]);
-    const toggle = (p: Panel) => setPanel(panel === p ? null : p);
+    const toggle = (p: Panel) => {
+        // Colors and widths share a slot selector, but widths only have three slots.
+        if (p === 'width') setSlot(current => Math.min(current, prefs.widths.length - 1));
+        setPanel(panel === p ? null : p);
+    };
     const clearPage = () => {
         setPanel(null);
         props.onCommand('CLEAR_DRAWING');
@@ -120,7 +124,24 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
         patch({ color: value });
     };
     const button = (title: string, Icon: typeof PenTool, action: () => void, active = false, disabled = false) => <button type="button" key={title} data-tone={Icon === Eraser ? 'rose' : Icon === Highlighter ? 'amber' : Icon === Shapes || Icon === FlaskConical || Icon === Lasso || Icon === Sticker ? 'violet' : Icon === Hand || Icon === BookOpen ? 'teal' : 'blue'} className={`gn-icon ${active ? 'is-active' : ''}`} title={title} aria-label={title} aria-pressed={active ? true : undefined} onClick={action} disabled={disabled}><Icon size={21}/></button>;
-    return <div ref={root} data-drawing-toolbar data-tool={config.tool} className={`gn-toolbar ${fixed ? 'gn-fixed' : 'gn-floating'} ${compact ? 'gn-compact' : ''}`} onPointerDown={e => e.stopPropagation()}>
+    return <div ref={root} data-drawing-toolbar data-tool={config.tool} className={`gn-toolbar ${fixed ? 'gn-fixed' : 'gn-floating'} ${compact ? 'gn-compact gn-notebook' : ''} ${props.dockSide ? `gn-dock gn-dock-${props.dockSide}` : ''}`} onPointerDown={e => e.stopPropagation()}>
+        {compact ? <div className="gn-main gn-notebook-main" role="toolbar" aria-label="Defter çizim araçları">
+            {button('Kalem (P)', PenTool, () => config.tool === 'pencil' ? toggle('pen') : select('pencil'), config.tool === 'pencil')}
+            {button('Fosforlu kalem (H)', Highlighter, () => config.tool === 'highlighter' ? toggle('width') : select('highlighter'), config.tool === 'highlighter')}
+            {button('Silgi (E)', Eraser, () => config.tool === 'eraser' ? toggle('eraser') : select('eraser'), config.tool === 'eraser')}
+            {button('Kement (L)', Lasso, () => config.tool === 'lasso' ? toggle('lasso') : select('lasso'), config.tool === 'lasso')}
+            {!props.dockSide && button('Metin (T)', Type, () => select('text'), config.tool === 'text')}
+            {props.dockSide && button('Sayfayı taşı', Hand, () => select('pan'), config.tool === 'pan')}
+            <span className="gn-main-divider"/>
+            <div className="gn-quick-colors" role="group" aria-label="Hızlı renkler">
+                {prefs.colors.map((c,i) => ({c,i})).filter(({c}) => c.toLowerCase() !== '#ffffff').slice(0,4).map(({c,i}) => <button type="button" key={i} className={`gn-color ${config.color.toLowerCase() === c.toLowerCase() ? 'is-selected' : ''}`} style={{'--ink':c} as React.CSSProperties} aria-label={`Renk ${i+1}: ${c}`} aria-pressed={config.color.toLowerCase() === c.toLowerCase()} onClick={() => { if(config.color.toLowerCase() === c.toLowerCase()) {setSlot(i);setHex(c);toggle('color');} else patch({color:c}); }}><span/></button>)}
+            </div>
+            {button('Araç ayarları', SlidersHorizontal, () => toggle(config.tool === 'eraser' ? 'eraser' : config.tool === 'lasso' ? 'lasso' : config.tool === 'pencil' ? 'pen' : ['line','arrow','circle','ellipse','rect','triangle','diamond'].includes(config.tool) ? 'shapes' : 'width'))}
+            <span className="gn-main-divider"/>
+            {button('Geri al', Undo, () => props.onCommand('UNDO_DRAWING'), false, props.canUndo === false)}
+            {!props.dockSide && button('İleri al', Redo, () => props.onCommand('REDO_DRAWING'), false, props.canRedo === false)}
+            {button('Diğer çizim araçları', MoreHorizontal, () => toggle('more'), panel === 'more')}
+        </div> : <>
         <div className="gn-main" role="toolbar" aria-label="Ana çizim araçları">
             {button('Kement (L)', Lasso, () => config.tool === 'lasso' ? toggle('lasso') : select('lasso'), config.tool === 'lasso')}
             {button('Kalem (P)', PenTool, () => config.tool === 'pencil' ? toggle('pen') : select('pencil'), config.tool === 'pencil')}
@@ -136,7 +157,8 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
             {props.onSelectTool && button('Dinamik Laboratuvar', FlaskConical, () => toggle('lab'), panel === 'lab')}
             {button('Sayfa ve yazma ayarları', Grid2X2, () => toggle('page'), panel === 'page')}
         </div>
-        <div className="gn-context-row">
+        </>}
+        {!compact && <div className="gn-context-row">
             <div className="gn-history" role="toolbar" aria-label="Çizim geçmişi">
                 {button('Geri al', Undo, () => props.onCommand('UNDO_DRAWING'), false, props.canUndo === false)}
                 {button('İleri al', Redo, () => props.onCommand('REDO_DRAWING'), false, props.canRedo === false)}
@@ -177,8 +199,23 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
             </div>}
             {config.tool === 'lasso' && <button type="button" className="gn-context gn-lasso-trigger" onClick={() => toggle('lasso')} aria-expanded={panel === 'lasso'}><Lasso size={23}/><span>{config.lassoMode === 'rect' ? 'Dikdörtgen seçim' : 'Serbest seçim'}</span><ChevronDown size={16}/></button>}
             {props.onZoomOut && <div className="gn-zoom">{button('Uzaklaştır', Minus, () => props.onZoomOut?.())}<button type="button" onClick={props.onZoomReset}>%{Math.round((props.zoom ?? 1)*100)}</button>{button('Yakınlaştır', Plus, () => props.onZoomIn?.())}{props.onZoomFit && button('Sayfaya sığdır', Scan, props.onZoomFit)}</div>}
-        </div>
-        {panel && panel !== 'library' && panel !== 'lab' && panel !== 'elements' && <div className="gn-popover" role="dialog" aria-label="Araç ayarları"><div className="gn-popover-heading"><b>{({ pen: 'Kalem', lasso: 'Kement', eraser: 'Silgi', color: 'Renk paleti', width: 'Çizgi kalınlığı', page: 'Sayfa ve yazma', shapes: 'Şekiller' })[panel]}</b><button type="button" onClick={() => setPanel(null)} aria-label="Ayarları kapat"><X size={17}/></button></div>
+        </div>}
+        {compact && props.onZoomOut && <div className="gn-zoom">{button('Uzaklaştır', Minus, () => props.onZoomOut?.())}<button type="button" aria-label="Yakınlaştırmayı sıfırla" onClick={props.onZoomReset}>%{Math.round((props.zoom ?? 1)*100)}</button>{button('Yakınlaştır', Plus, () => props.onZoomIn?.())}{props.onZoomFit && button('Sayfaya sığdır', Scan, props.onZoomFit)}</div>}
+        {panel && panel !== 'library' && panel !== 'lab' && panel !== 'elements' && <div className="gn-popover" role="dialog" aria-label="Araç ayarları"><div className="gn-popover-heading"><b>{({ pen: 'Kalem', lasso: 'Kement', eraser: 'Silgi', color: 'Renk paleti', width: 'Çizgi kalınlığı', page: 'Sayfa ve yazma', shapes: 'Şekiller', more: 'Diğer çizim araçları' })[panel]}</b><button type="button" onClick={() => setPanel(null)} aria-label="Ayarları kapat"><X size={17}/></button></div>
+            {panel === 'more' && <div className="gn-more-tools">
+                {props.dockSide && <><button type="button" onClick={() => select('text')}><Type/>Metin</button><button type="button" disabled={props.canRedo === false} onClick={() => props.onCommand('REDO_DRAWING')}><Redo/>İleri al</button></>}
+                {props.onInsertElement && <button type="button" onClick={() => setPanel('elements')}><Sticker/>Öğeler</button>}
+                {props.onInsertImages && <button type="button" disabled={props.isInsertingImage} onClick={() => {file.current?.click();setPanel(null);}}><ImagePlus/>Görsel ekle</button>}
+                <button type="button" onClick={() => setPanel('shapes')}><Shapes/>Şekiller</button>
+                <button type="button" onClick={() => select('pan')}><Hand/>Sayfayı taşı</button>
+                <button type="button" onClick={() => {if(onOpenLibrary) {onOpenLibrary();setPanel(null);} else setPanel('library');}}><BookOpen/>Kütüphane</button>
+                {props.onSelectTool && <button type="button" onClick={() => setPanel('lab')}><FlaskConical/>Dinamik Laboratuvar</button>}
+                <button type="button" onClick={() => setPanel('page')}><Grid2X2/>Sayfa ve yazma</button>
+                <button type="button" onClick={() => {setSlot(0);setHex(config.color);setPanel('color');}}><SlidersHorizontal/>Renk paleti</button>
+            </div>}
+            {compact && (panel === 'pen' || panel === 'width' || panel === 'shapes') && <div className="gn-quick-widths" role="group" aria-label="Üç hızlı kalınlık">
+                {prefs.widths.map((w,i) => <button type="button" key={i} className={Math.abs(config.width-w*MM_TO_PX)<.05 ? 'is-active' : ''} aria-pressed={Math.abs(config.width-w*MM_TO_PX)<.05} onClick={() => {patch({width:w*MM_TO_PX});setSlot(i);}}><span style={{height:Math.max(2,w*8)}}/>{w} mm</button>)}
+            </div>}
             {panel === 'pen' && <>
                 <div className="gn-pen-tabs">{(['fountain', 'ballpoint', 'brush'] as const).map(p => <button type="button" className={pen === p ? 'is-active' : ''} key={p} onClick={() => patch({ tool: 'pencil', penType: p, tipSharpness: prefs.pens[p]?.tipSharpness ?? .5, pressureResponse: prefs.pens[p]?.pressureResponse ?? .65 })}><PenTool size={22}/>{names[p]}</button>)}</div>
                 <svg viewBox="0 0 280 55" className="gn-preview" aria-label="Kalem karakteri ön izlemesi"><polygon points={preview} fill={config.color}/><path d="M12 50h256" stroke="#e7eaf0"/></svg>
@@ -192,6 +229,7 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
             {panel === 'color' && <><div className="gn-palette">{pastel.map(c => <button type="button" key={c} style={{ background: c }} title={c} aria-label={c} onClick={() => color(c)}/>)}</div><label className="gn-hex">HEX<input value={hex} onChange={e => color(e.target.value)} maxLength={7} aria-invalid={!/^#[0-9a-f]{6}$/i.test(hex)}/><input type="color" value={prefs.colors[slot]} onChange={e => color(e.target.value)} aria-label="Özel renk"/></label><p>{slot + 1}. hızlı renk slotu düzenleniyor.</p></>}
             {panel === 'width' && <><Range label={`${slot + 1}. kalınlık slotu`} min={.1} max={5} step={.05} unit=" mm" value={prefs.widths[slot]} onChange={w => { const widths = [...prefs.widths]; widths[slot] = w; setPrefs({ ...prefs, widths }); patch({ width: w * MM_TO_PX }); }}/><p>1 mm = {MM_TO_PX.toFixed(2)} sayfa pikseli. Görünüm yakınlaştırması çizgi boyutunu değiştirmez.</p></>}
             {panel === 'eraser' && <>
+                {compact && <div className="gn-options">{(['small','medium','large'] as const).map((size,i) => <button type="button" key={size} className={config.eraserSize === size ? 'is-active' : ''} aria-pressed={config.eraserSize === size} onClick={() => patch({eraserSize:size})}>{['Küçük','Orta','Büyük'][i]} silgi</button>)}</div>}
                 <div className="gn-eraser-types">{([['precision','Detaylı Silgi'],['pixel','Standart Silgi'],['stroke','Çizgi Silgisi']] as const).map(([mode,label]) => <button type="button" key={mode} className={(config.eraserMode ?? 'pixel') === mode ? 'is-active' : ''} aria-pressed={(config.eraserMode ?? 'pixel') === mode} onClick={() => patch({eraserMode:mode})}><Eraser size={32}/><span>{label}</span>{(config.eraserMode ?? 'pixel') === mode && <Check size={15}/>}</button>)}</div>
                 <p>{config.eraserMode === 'stroke' ? 'Dokunduğun fırça darbesinin tamamını sil.' : config.eraserMode === 'precision' ? 'Küçük temas alanıyla çizginin istediğin bölümünü hassasça sil.' : 'Silginin geçtiği bölümlerdeki mürekkebi sil.'}</p>
                 <label className="gn-toggle">Silme sonrası kaleme dön<input type="checkbox" checked={config.autoSwitchBackEraser ?? false} onChange={e => patch({autoSwitchBackEraser:e.target.checked})}/></label>
@@ -202,7 +240,7 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
                 <div className="gn-options"><button type="button" className={config.lassoMode !== 'rect' ? 'is-active' : ''} onClick={() => patch({ lassoMode: 'freeform' })}>Serbest seçim</button><button type="button" className={config.lassoMode === 'rect' ? 'is-active' : ''} onClick={() => patch({ lassoMode: 'rect' })}>Dikdörtgen seçim</button></div>
                 {([['lassoFilterHandwriting', 'El yazısı'], ['lassoFilterShapes', 'Şekiller'], ['lassoFilterText', 'Metin'], ['lassoFilterImages', 'Görseller']] as const).map(([key, label]) => <label className="gn-toggle" key={key}>{label}<input type="checkbox" checked={config[key] !== false} onChange={e => patch({ [key]: e.target.checked })}/></label>)}
             </>}
-            {panel === 'shapes' && <div className="gn-options">{([['line', 'Çizgi'], ['circle', 'Daire'], ['ellipse', 'Elips'], ['triangle', 'Üçgen'], ['rect', 'Dikdörtgen'], ['arrow', 'Ok']] as const).map(([t, n]) => <button type="button" key={t} onClick={() => select(t)}>{n}</button>)}</div>}
+            {panel === 'shapes' && <><label className="gn-toggle">Şekli doldur<input type="checkbox" checked={config.fillEnabled ?? false} onChange={e => patch({fillEnabled:e.target.checked})}/></label><div className="gn-options">{([['line', 'Çizgi'], ['circle', 'Daire'], ['ellipse', 'Elips'], ['triangle', 'Üçgen'], ['rect', 'Dikdörtgen'], ['arrow', 'Ok'], ['diamond', 'Eşkenar dörtgen']] as const).map(([t, n]) => <button type="button" key={t} onClick={() => {setLastShape(t);select(t);}}>{n}</button>)}</div></>}
             {panel === 'page' && <>
                 <label className="gn-toggle">Avuç içi reddi<input type="checkbox" checked={config.palmRejection ?? true} onChange={e => patch({ palmRejection: e.target.checked })}/></label>
                 <label className="gn-toggle">Çiz ve bekle<input type="checkbox" checked={config.snapShapes ?? true} onChange={e => patch({ snapShapes: e.target.checked })}/></label>

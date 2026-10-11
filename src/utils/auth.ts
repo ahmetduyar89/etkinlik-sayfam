@@ -15,6 +15,7 @@ export const APP_PASSWORD = import.meta.env.VITE_APP_PASSWORD || '951852';
 export const FIREBASE_ADMIN_EMAIL = (import.meta.env.VITE_FIREBASE_ADMIN_EMAIL || '').trim();
 export const AUTH_STORAGE_KEY = 'etkinlik_giris';
 export const SESSION_STORAGE_KEY = 'etkinlik_oturum';
+export const SESSION_CHANGED_EVENT = 'etkinlik:session-changed';
 
 export type AuthSession =
     | { role: 'admin'; username: string }
@@ -69,12 +70,16 @@ export function saveSession(session: AuthSession, persistence?: 'tab' | 'local')
     try {
         const tab = persistence === 'tab' || (persistence !== 'local' && Boolean(window.sessionStorage.getItem(SESSION_STORAGE_KEY)));
         (tab ? window.localStorage : window.sessionStorage).removeItem(SESSION_STORAGE_KEY);
-        (tab ? window.sessionStorage : window.localStorage).setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+        const target = tab ? window.sessionStorage : window.localStorage;
+        const serialized = JSON.stringify(session);
+        const changed = target.getItem(SESSION_STORAGE_KEY) !== serialized;
+        if (changed) target.setItem(SESSION_STORAGE_KEY, serialized);
         if (session.role === 'admin' && !tab) {
             window.localStorage.setItem(AUTH_STORAGE_KEY, APP_PASSWORD);
         } else {
             window.localStorage.removeItem(AUTH_STORAGE_KEY);
         }
+        if (changed) window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
     } catch (e) {
         console.warn('Oturum kaydedilemedi:', e);
     }
@@ -90,6 +95,7 @@ export function clearSession(): void {
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
     window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
     window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
 }
 
 /** Çıkış yap: tüm oturumu temizle ve giriş ekranına dön */
