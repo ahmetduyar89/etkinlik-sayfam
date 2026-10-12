@@ -10,6 +10,7 @@
     "export:dna": "node scripts/export-dna-lesson.mjs",
     "type-check": "tsc --noEmit",
     "test:chess-cloud": "node --test scripts/test-chess-cloud.mjs",
+    "test:chess-rules": "node --test scripts/test-chess-rules.mjs",
     "test:live-chess": "node --test scripts/test-live-chess.mjs",
     "test:pwa": "node --test scripts/test-pwa.mjs",
     "test:text": "node scripts/test-text-tool.mjs",
@@ -30,6 +31,7 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
     "@tailwindcss/forms": "^0.5.7",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",

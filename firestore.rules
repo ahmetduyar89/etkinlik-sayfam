@@ -28,6 +28,11 @@ service cloud.firestore {
     function belongsToOwnClass(data) {
       return role() in ['teacher', 'class', 'student'] && data.classId == request.auth.token.classId;
     }
+    // Transactions read new document IDs before creating them. A missing record
+    // has no classId; allow only this empty get, never an unscoped list/read.
+    function canCheckMissingChessRecord() {
+      return role() in ['class', 'student'] && resource == null;
+    }
 
     match /teachers/{teacherId} {
       allow read: if isTeacher() && request.auth.uid == teacherId;
@@ -106,6 +111,7 @@ service cloud.firestore {
           (data.whiteId == request.auth.token.studentId || data.blackId == request.auth.token.studentId);
       }
       allow read: if isTeacher() || belongsToOwnClass(resource.data);
+      allow get: if canCheckMissingChessRecord();
       allow create: if isTeacher() || isClass(request.resource.data.classId) || ownMatch(request.resource.data);
       allow update: if isTeacher() ||
         (isClass(resource.data.classId) && isClass(request.resource.data.classId)) ||
@@ -114,6 +120,7 @@ service cloud.firestore {
     }
     match /chess_tournaments/{tournamentId} {
       allow read: if isTeacher() || belongsToOwnClass(resource.data);
+      allow get: if canCheckMissingChessRecord();
       allow create: if isTeacher() || isClass(request.resource.data.classId);
       allow update: if isTeacher() ||
         (isClass(resource.data.classId) && isClass(request.resource.data.classId));
@@ -125,6 +132,7 @@ service cloud.firestore {
           data.profileId == 'student:' + request.auth.token.studentId;
       }
       allow read: if isTeacher() || isClass(resource.data.classId) || ownProfile(resource.data);
+      allow get: if canCheckMissingChessRecord();
       allow create: if isTeacher() || isClass(request.resource.data.classId) || ownProfile(request.resource.data);
       allow update: if isTeacher() ||
         (isClass(resource.data.classId) && isClass(request.resource.data.classId)) ||
