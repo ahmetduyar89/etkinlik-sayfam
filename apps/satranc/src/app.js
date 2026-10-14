@@ -28,7 +28,7 @@ import { ReportsPage } from "./pages/ReportsPage.js";
 import { DailyPracticePage } from "./pages/DailyPracticePage.js";
 import { GameArchivePage } from "./pages/GameArchivePage.js";
 import { classroom } from "./services/ClassroomService.js";
-import { startCloudSync } from "./services/CloudSyncService.js";
+import { startCloudSync, LONG_POLLING_KEY } from "./services/CloudSyncService.js";
 
 const progress = new ProgressService();
 const sound = new SoundService(progress);
@@ -272,14 +272,27 @@ function syncCloudBanner(blocked) {
     cloudBanner.setAttribute("role", "status");
     document.body.append(cloudBanner);
   }
-  const visible = !blocked && ["error", "offline", "no-class"].includes(cloudStatus.status);
+  const visible = !blocked && (["error", "offline", "no-class"].includes(cloudStatus.status) || Boolean(cloudStatus.stalled));
   cloudBanner.hidden = !visible;
   if (!visible) return;
   cloudBanner.className = `cloud-banner ${cloudStatus.status}`;
   const text = document.createElement("p");
   text.textContent = cloudStatus.detail;
   cloudBanner.replaceChildren(text);
-  if (cloudStatus.status === "error") {
+  if (cloudStatus.stalled) {
+    // Bekleyen kayıtlar cihazın kalıcı kuyruğunda; yenilemek onları silmez.
+    const alt = document.createElement("button");
+    alt.type = "button";
+    alt.textContent = cloudStatus.longPolling ? "Otomatik bağlantıya dön" : "Alternatif bağlantıyla dene";
+    alt.onclick = () => {
+      try {
+        if (cloudStatus.longPolling) localStorage.removeItem(LONG_POLLING_KEY);
+        else localStorage.setItem(LONG_POLLING_KEY, "1");
+      } catch { /* Depolama kapalı. */ }
+      location.reload();
+    };
+    cloudBanner.append(alt);
+  } else if (cloudStatus.status === "error") {
     const retry = document.createElement("button");
     retry.type = "button";
     retry.textContent = "Yeniden bağlan";

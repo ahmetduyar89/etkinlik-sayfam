@@ -15,7 +15,12 @@
 import { defaultProgress } from "../models/progress.js";
 import { recordData, changesBetween, serializeTournament, deserializeTournament, progressPatch, tidyArchive } from "./CloudRecords.js";
 
-const SDK = "https://www.gstatic.com/firebasejs/10.8.0";
+// Ana Atölye uygulamasıyla aynı sürüm (package.json › firebase).
+const SDK = "https://www.gstatic.com/firebasejs/10.14.1";
+// Bazı okul ağları/proxy'ler Firestore'un akış bağlantısını sessizce askıda
+// bırakır. Kullanıcı "Alternatif bağlantı" derse uzun yoklama zorunlu olur.
+export const LONG_POLLING_KEY = "satranc-force-long-polling";
+const STALL_MS = 20_000;
 const DEVICE_KEY = "satranc-okulu-device-id";
 const STREAMS = ["classes", "chess_matches", "chess_tournaments", "chess_progress"];
 
@@ -61,13 +66,17 @@ async function loadFirebase() {
     // Okul ağları akış bağlantısını sık keser; uzun yoklamaya kendiliğinden geçer.
     db = storeSdk.initializeFirestore(app, {
       ignoreUndefinedProperties: true,
-      experimentalAutoDetectLongPolling: true,
+      ...(forceLongPolling() ? { experimentalForceLongPolling: true } : { experimentalAutoDetectLongPolling: true }),
       localCache: storeSdk.persistentLocalCache({ tabManager: storeSdk.persistentMultipleTabManager() })
     });
   } catch {
     db = storeSdk.getFirestore(app);
   }
   return { auth, db, storeSdk, authSdk };
+}
+
+function forceLongPolling() {
+  try { return localStorage.getItem(LONG_POLLING_KEY) === "1"; } catch { return false; }
 }
 
 /** Öğretmen bir sınıf bağlantısıyla geldiyse (…?classId=) o sınıf açılır. */
@@ -119,6 +128,8 @@ export async function startCloudSync({ classroom, progress, connect = loadFireba
   let readFailure = "";
   let pickedWanted = false;
   let readyAnnounced = false;
+  const startedAt = Date.now();
+  const stallTimer = window.setTimeout(() => status(), STALL_MS + 100);
   const stops = [];
   const loaded = new Set();     // akıştan en az bir anlık görüntü geldi (önbellek dahil)
   const confirmed = new Set();  // sunucu onaylı anlık görüntü geldi
@@ -179,6 +190,11 @@ export async function startCloudSync({ classroom, progress, connect = loadFireba
         : "İnternet yok. Yaptığınız çalışmalar bu cihazda saklanır, bağlantı gelince gönderilir.", counts);
     }
     if (confirmed.size < STREAMS.length) {
+      if (Date.now() - startedAt > STALL_MS) {
+        const waiting = STREAMS.filter(name => !confirmed.has(name)).join(", ");
+        return announce("connecting", `Sunucuya ulaşılamıyor${inflight ? `; ${inflight} kayıt bu cihazda bekliyor, kaybolmaz` : ""}. Okul ağı bağlantıyı engelliyor olabilir. ` +
+          `Bekleyen: ${waiting}. Bağlantı: ${forceLongPolling() ? "uzun yoklama" : "otomatik"}.`, { ...counts, stalled: true, longPolling: forceLongPolling() });
+      }
       return announce("connecting", inflight
         ? `Sunucuya bağlanılıyor. ${inflight} kayıt gönderilmeyi bekliyor; çalışmaya devam edebilirsiniz.`
         : "Sunucudan güncel kayıtlar alınıyor; çalışmaya devam edebilirsiniz.", counts);
@@ -354,6 +370,7 @@ export async function startCloudSync({ classroom, progress, connect = loadFireba
   return () => {
     flush();
     stopped = true;
+    window.clearTimeout(stallTimer);
     for (const stop of stops) stop();
     window.removeEventListener("online", networkChanged);
     window.removeEventListener("offline", networkChanged);
