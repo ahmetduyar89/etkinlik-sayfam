@@ -10,8 +10,12 @@ export interface CloudMatch {
     blackId: string;
     whiteName?: string;
     blackName?: string;
-    result: '1-0' | '0-1' | '1/2-1/2';
+    result: '1-0' | '0-1' | '1/2-1/2' | '½-½';
     date?: string;
+    source?: string;
+    reason?: string;
+    tournamentId?: string | null;
+    round?: number | null;
 }
 
 export interface CloudTournament {
@@ -20,8 +24,10 @@ export interface CloudTournament {
     classId: string;
     name: string;
     finished?: boolean;
-    rounds?: Array<unknown[]>;
+    rounds?: unknown[];
     playerIds?: string[];
+    plannedRounds?: number;
+    createdAt?: string;
 }
 
 export interface CloudProgress {

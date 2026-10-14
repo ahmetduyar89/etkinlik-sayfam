@@ -88,6 +88,8 @@ export interface ChessRoom {
     draw_offer: PieceColor | null;
     /** Yeniden oynama isteği: iki taraf da isteyince yeni oyun kurulur. */
     rematch: { w: boolean; b: boolean };
+    /** Bu masadaki güncel oyunun başlangıcı; sonuç kaydının kimliğidir (rövanşlar ayrı kaydedilir). */
+    game_started_at?: number;
     created_at: number;
     updated_at: number;
 }
@@ -219,6 +221,7 @@ function toRoom(id: string, data: Record<string, unknown>): ChessRoom {
         result: raw.result ?? null,
         draw_offer: raw.draw_offer ?? null,
         rematch: raw.rematch ?? { w: false, b: false },
+        game_started_at: raw.game_started_at,
         created_at: raw.created_at ?? 0,
         updated_at: raw.updated_at ?? 0,
     };
@@ -387,6 +390,7 @@ export async function startGame(code: string, id: string): Promise<void> {
             rematch: { w: false, b: false },
             white: { ...room.white, ready: true },
             black: { ...room.black, ready: true },
+            game_started_at: Date.now(),
             clock: room.clock ? { ...room.clock, w_ms: room.clock.initial_ms, b_ms: room.clock.initial_ms, since: Date.now() } : null,
         };
     });
@@ -531,6 +535,7 @@ export async function requestRematch(code: string, id: string): Promise<void> {
             result: null,
             draw_offer: null,
             rematch: { w: false, b: false },
+            game_started_at: Date.now(),
             clock: room.clock
                 ? {
                       ...room.clock,

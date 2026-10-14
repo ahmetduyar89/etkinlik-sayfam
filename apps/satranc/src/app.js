@@ -198,17 +198,19 @@ let cloudStatus = { status: "connecting", detail: "Bulut bağlantısı kuruluyor
 
 const cloudLabels = {
   connecting: "Bağlanıyor",
-  online: "Çevrimiçi · Güncel",
-  saving: "Sunucuya kaydediliyor",
+  online: "Kaydedildi",
+  saving: "Kaydediliyor",
   offline: "Çevrimdışı",
+  "no-class": "Sınıf seçin",
   "signed-out": "Giriş gerekli",
-  error: "Senkronizasyon hatası"
+  error: "Kayıt hatası"
 };
 
 function syncCloudStatus() {
   if (!cloudStatusNode) return;
+  const pending = cloudStatus.pending ? ` (${cloudStatus.pending})` : "";
   cloudStatusNode.className = `cloud-status ${cloudStatus.status}`;
-  cloudStatusNode.textContent = `● ${cloudLabels[cloudStatus.status] || "Bulut durumu"}`;
+  cloudStatusNode.textContent = `${cloudStatus.status === "online" ? "✓" : "●"} ${cloudLabels[cloudStatus.status] || "Bulut durumu"}${pending}`;
   cloudStatusNode.title = cloudStatus.detail || cloudStatusNode.textContent;
 }
 
@@ -226,9 +228,13 @@ function syncOnlineGate() {
     onlineGate.setAttribute("role", "alert");
     document.body.append(onlineGate);
   }
-  const blocked = !["online", "saving"].includes(cloudStatus.status);
-  root.inert = blocked || cloudStatus.status === "saving";
+  // Yalnız kayıt yapılamayacak durumlar (giriş yok, sunucuya hiç ulaşılamadı)
+  // ekranı kilitler. Bağlanma, kaydetme ve çevrimdışılık çalışmayı durdurmaz:
+  // yapılan iş cihazda bekler ve bağlantı gelince gönderilir.
+  const blocked = Boolean(cloudStatus.blocking);
+  root.inert = blocked;
   onlineGate.hidden = !blocked;
+  syncCloudBanner(blocked);
   if (!blocked) return;
   onlineGate.replaceChildren();
   const panel = document.createElement("div");
@@ -237,7 +243,7 @@ function syncOnlineGate() {
   const detail = document.createElement("p");
   detail.textContent = cloudStatus.detail || "Sunucudan güncel kayıtlar bekleniyor.";
   const back = document.createElement("a");
-  back.href = location.protocol.startsWith("http") ? "/" : "https://atölye.tedrisedu.com/";
+  back.href = location.protocol.startsWith("http") ? "/" : "https://atolye.ahmetduyar.com/";
   back.textContent = "Atölye’ye dön ve giriş yap";
   const retry = document.createElement("button");
   retry.textContent = "Tekrar bağlan";
@@ -258,9 +264,34 @@ function syncOnlineGate() {
   }
   onlineGate.append(panel);
 }
+let cloudBanner = null;
+function syncCloudBanner(blocked) {
+  if (!cloudBanner) {
+    cloudBanner = document.createElement("section");
+    cloudBanner.className = "cloud-banner";
+    cloudBanner.setAttribute("role", "status");
+    document.body.append(cloudBanner);
+  }
+  const visible = !blocked && ["error", "offline", "no-class"].includes(cloudStatus.status);
+  cloudBanner.hidden = !visible;
+  if (!visible) return;
+  cloudBanner.className = `cloud-banner ${cloudStatus.status}`;
+  const text = document.createElement("p");
+  text.textContent = cloudStatus.detail;
+  cloudBanner.replaceChildren(text);
+  if (cloudStatus.status === "error") {
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.textContent = "Yeniden bağlan";
+    retry.onclick = () => location.reload();
+    cloudBanner.append(retry);
+  }
+}
 window.addEventListener("satranc-cloud-data", () => {
-  if (["siniflar", "turnuva", "reports"].includes(currentRoute()) && cloudStatus.status === "online") render();
+  if (["siniflar", "turnuva", "reports"].includes(currentRoute()) && ["online", "saving"].includes(cloudStatus.status)) render();
 });
+// Sunucu kayıtları ilk kez geldiğinde ekran (ör. tamamlanan haftalar) bir kez tazelenir.
+window.addEventListener("satranc-cloud-ready", () => render(), { once: true });
 
 function renderTopbar() {
   const collapsed = Boolean(progress.state.settings.navCollapsed);

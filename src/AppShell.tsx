@@ -1,6 +1,6 @@
 // src/AppShell.tsx — ATÖLYE KABUĞU (Admin ve Sınıf Yönlendiricisi)
 // ─────────────────────────────────────────────────────────────────────
-// Kök adres (atölye.tedrisedu.com) oturum türüne göre açılır:
+// Kök adres (atolye.ahmetduyar.com) oturum türüne göre açılır:
 //   • Admin / Öğretmen oturumu: Tüm bölüm kartlarının olduğu "Atölye" ana sayfası
 //     ve Sınıf Yönetim Paneli.
 //   • Sınıf oturumu: Yalnızca o sınıfa tanımlanmış satranç, deney, defter ve

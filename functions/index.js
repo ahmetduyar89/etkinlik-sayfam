@@ -251,6 +251,10 @@ exports.archiveLiveChessGame = onDocumentUpdated({
   if (!after.white?.studentId || !after.black?.studentId) return;
 
   const roomId = event.params.roomId;
+  // Aynı masada rövanş oynanır ve dört haneli masa kodları zamanla yeniden
+  // kullanılır; her oyun kendi kaydını almalı, öncekinin üzerine yazmamalı.
+  // event.id yeniden denemelerde aynı kalır, böylece kayıt çiftlenmez.
+  const gameId = `${roomId}-${after.game_started_at || event.id}`;
   const finishedAt = FieldValue.serverTimestamp();
   const moves = Array.isArray(after.moves) ? after.moves : [];
   const game = {
@@ -270,12 +274,12 @@ exports.archiveLiveChessGame = onDocumentUpdated({
   };
 
   const batch = db.batch();
-  batch.set(db.collection('liveChessGames').doc(roomId), game);
+  batch.set(db.collection('liveChessGames').doc(gameId), game);
   const classIds = [...new Set([after.white.classId, after.black.classId].filter((id) => id && id !== 'live-guests'))];
   for (const classId of classIds) {
-    batch.set(db.collection('chess_matches').doc(`${roomId}--${classId}`), {
-      id: roomId,
-      localId: roomId,
+    batch.set(db.collection('chess_matches').doc(`${gameId}--${classId}`), {
+      id: gameId,
+      localId: gameId,
       classId,
       whiteId: classMatchPlayerId(after.white, classId),
       whiteName: after.white.name,

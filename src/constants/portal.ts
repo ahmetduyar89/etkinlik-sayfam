@@ -1,6 +1,6 @@
 // src/constants/portal.ts — ATÖLYE KAYIT DEFTERİ
 // ─────────────────────────────────────────────────────────────────────
-// Ana sayfadaki (atölye.tedrisedu.com) bölüm kartları BURADAN okunur.
+// Ana sayfadaki (atolye.ahmetduyar.com) bölüm kartları BURADAN okunur.
 // İleride yeni bir çalışma eklemek için tek yapman gereken, aşağıdaki
 // listeye bir satır daha yazmak:
 //

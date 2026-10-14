@@ -3,7 +3,7 @@
 // `npm run build` sırasında çalışır. `apps/<isim>/` klasörlerinin her biri
 // olduğu gibi `dist/<isim>/` içine kopyalanır; böylece satranç ve deneyler
 // gibi HTML tabanlı çalışmalar atölye ile aynı adreste yayınlanır:
-//   apps/satranc/index.html  →  https://atölye.tedrisedu.com/satranc/
+//   apps/satranc/index.html  →  https://atolye.ahmetduyar.com/satranc/
 //
 // Kopyalama sırasında her uygulamanın giriş sayfasına küçük bir "Atölye'ye
 // dön" bağlantısı eklenir: bu projeler kendi başına açılabilen bağımsız

@@ -191,9 +191,23 @@
 
 .cloud-status.online { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
 .cloud-status.connecting { color: #6d28d9; background: #f5f3ff; border-color: #ddd6fe; }
+.cloud-status.saving { color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
 .cloud-status.offline,
-.cloud-status.signed-out,
-.cloud-status.error { color: #b45309; background: #fffbeb; border-color: #fde68a; }
+.cloud-status.no-class,
+.cloud-status.signed-out { color: #b45309; background: #fffbeb; border-color: #fde68a; }
+.cloud-status.error { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+
+/* Ekranı kilitlemeyen durum şeridi: hata, çevrimdışı ve sınıf seçilmedi. */
+.cloud-banner {
+  position: fixed; left: 50%; bottom: 16px; z-index: 9000; transform: translateX(-50%);
+  width: min(640px, calc(100% - 32px)); display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; border-radius: 16px; border: 2px solid #fde68a; background: #fffbeb; color: #78350f;
+  box-shadow: 0 12px 40px #78350f26; font-weight: 700; font-size: 0.9rem; line-height: 1.4;
+}
+.cloud-banner[hidden] { display: none; }
+.cloud-banner.error { border-color: #fecaca; background: #fef2f2; color: #7f1d1d; }
+.cloud-banner p { margin: 0; flex: 1; }
+.cloud-banner button { flex: none; min-height: 2.4rem; padding: 0 14px; border-radius: 12px; border: 0; background: #7c2d12; color: #fff; font-weight: 800; cursor: pointer; }
 
 /* XP ve yıldız rozetleri: soldan sağa iki neşeli renk. */
 .top-stat:nth-of-type(1) {

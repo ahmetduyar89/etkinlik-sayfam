@@ -10,6 +10,8 @@ import { useClassrooms } from '../../lib/classrooms';
 import type { ClassRoom } from '../../types';
 import { levelOf, pointsText, useCloudChess } from '../../lib/chess/adminCloud';
 import { ClassManagerModal } from './ClassManagerModal';
+import { ChessClassReport } from './ChessClassReport';
+import { classWeeks } from '../../lib/chess/classReport';
 
 interface ClassAdminDashboardProps {
     onBack: () => void;
@@ -125,18 +127,7 @@ function ClassWorkspace({ item, cloud, onEdit, onPreview }: {
     const matches = cloud.matches.filter((match) => match.classId === item.id);
     const tournaments = cloud.tournaments.filter((tournament) => tournament.classId === item.id);
     const profiles = cloud.progress.filter((profile) => profile.classId === item.id && profile.profileId.startsWith('student:'));
-    const course = cloud.progress.find((profile) => profile.classId === item.id && (profile.profileId === `class:${item.id}` || profile.profileId === 'teacher' || profile.profileId === `class_${item.id}`));
-    const classCompletedWeeks = new Set<string>(
-        (course?.progress?.completedLessons || []).filter((id) => /^week-\d+$/.test(id))
-    );
-    cloud.progress
-        .filter((profile) => profile.classId === item.id)
-        .forEach((profile) => {
-            profile.progress?.completedLessons?.forEach((id) => {
-                if (/^week-\d+$/.test(id)) classCompletedWeeks.add(id);
-            });
-        });
-    const weeks = classCompletedWeeks.size;
+    const weeks = classWeeks(cloud.progress, item.id).size;
     const liveGames = cloud.liveGames.filter((game) => game.whiteClassId === item.id || game.blackClassId === item.id);
     const online = cloud.presence.filter((presence) => {
         const seen = presence.lastSeenAt?.toDate?.();
@@ -253,22 +244,7 @@ function ClassWorkspace({ item, cloud, onEdit, onPreview }: {
             </div>
 
             {focusedStudent && <StudentLearningReport key={focusedStudent} classroom={item} studentId={focusedStudent} cloud={cloud} onClose={() => setFocusedStudent(null)} />}
-            {tournaments.length > 0 && (
-                <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-                    <h3 className="flex items-center gap-2 font-extrabold"><Trophy className="h-4 w-4 text-amber-500" /> Sınıf turnuvaları</h3>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        {tournaments.map((tournament) => (
-                            <div key={tournament.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                <div>
-                                    <strong className="text-sm">{tournament.name}</strong>
-                                    <p className="mt-1 text-xs text-slate-500">{tournament.rounds?.length || 0} tur · {tournament.finished ? 'Tamamlandı' : 'Devam ediyor'}</p>
-                                </div>
-                                <a href={chessUrl(item.id, `turnuva?id=${encodeURIComponent(tournament.localId || tournament.id)}`)} className="rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-white">Aç</a>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+            <ChessClassReport item={item} matches={matches} tournaments={tournaments} progress={cloud.progress} chessUrl={(route) => chessUrl(item.id, route)} />
         </div>
     );
 }
