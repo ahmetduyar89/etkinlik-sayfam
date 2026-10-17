@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minik Meteoroloji Sunucusu | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .pushable:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+    .opt-on { background: #facc15 !important; }
+    input[type=range] { accent-color: #0ea5e9; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin linear infinite; transform-box: fill-box; transform-origin: center; }
+    @keyframes fall { from { transform: translateY(-20px); } to { transform: translateY(120px); } }
+    .fall { animation: fall linear infinite; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-sm font-black flex items-center gap-1"><span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span></a>
+      <div>
+        <div class="flex items-center gap-2"><span class="text-2xl sm:text-3xl">🌦️</span><h1 class="display text-lg sm:text-2xl font-black tracking-wide">Minik Meteoroloji Sunucusu</h1></div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Ölçüm aletlerini oku, doğru sembolleri seç ve hava durumunu sun! 🌡️🌧️🧭📺</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab">📺 1. Stüdyo</button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white">🔬 2. Ölçüm İstasyonu</button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">BÖLÜM 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">Sembol Seç</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 p-2.5 bg-sky-50 rounded-xl border-2 border-ink">
+          <p id="taskText" class="text-xs sm:text-sm font-black">🎯 Görev</p>
+          <div class="text-right shrink-0">
+            <p class="text-[10px] font-black text-gray-500">TUR</p>
+            <p id="roundText" class="display text-xl font-black leading-none">1/5</p>
+          </div>
+        </div>
+
+        <!-- İSTASYON GÖRÜNÜMÜ -->
+        <div id="stationWrap" class="relative rounded-2xl border-3 border-ink overflow-hidden">
+          <svg id="station" viewBox="0 0 560 280" class="w-full h-auto block"></svg>
+        </div>
+
+        <!-- HARİTA (canlı yayın) -->
+        <div id="mapWrap" class="hidden relative rounded-2xl border-3 border-ink overflow-hidden bg-sky-200">
+          <svg id="map" viewBox="0 0 560 270" class="w-full h-auto block"></svg>
+        </div>
+
+        <div id="answerBox" class="p-3 bg-slate-50 rounded-xl border-2 border-ink"></div>
+
+        <!-- Test modu kontrolleri -->
+        <div id="sandboxControls" class="hidden flex-col gap-2 p-3 bg-slate-50 rounded-xl border-2 border-ink">
+          <div class="flex items-center gap-2"><span class="text-xs font-black w-28">🌡️ Sıcaklık</span><input id="sT" type="range" min="-15" max="40" value="18" class="flex-1"><span id="sTv" class="font-black w-12 text-right">18°</span></div>
+          <div class="flex items-center gap-2"><span class="text-xs font-black w-28">💨 Rüzgâr hızı</span><input id="sW" type="range" min="0" max="90" value="15" class="flex-1"><span id="sWv" class="font-black w-16 text-right">15 km/sa</span></div>
+          <div class="flex flex-wrap items-center gap-1.5"><span class="text-xs font-black w-28">☁️ Bulut</span><div id="sCloud" class="flex gap-1.5"></div></div>
+          <div class="flex flex-wrap items-center gap-1.5"><span class="text-xs font-black w-28">🧭 Rüzgâr yönü</span><div id="sDir" class="flex flex-wrap gap-1"></div></div>
+          <div class="flex flex-wrap items-center gap-2"><span class="text-xs font-black w-28">🌧️ Yağış</span><button id="btnRain" class="pushable px-3 py-1.5 bg-sky-200 text-xs font-black">🌧️ Yağdır (+5 mm)</button><button id="btnEmpty" class="pushable px-3 py-1.5 bg-white text-xs font-black">🫗 Yağmurölçeri Boşalt</button></div>
+          <div class="p-2 bg-white rounded-lg border-2 border-ink text-sm font-black text-center">Bu verilere göre hava: <span id="sSymbol">☀️ Güneşli</span></div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-xs font-black">🔄 Baştan</button>
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black">💡 İpucu</button>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-sky-50 to-indigo-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">Hava durumunu inceleyen bilim insanlarına <b>meteorolog</b> denir. Sıcaklığı <b>termometre</b>, yağış miktarını <b>yağmurölçer</b>, rüzgârın yönünü <b>rüzgârgülü</b> ile ölçerler.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">Sunucu Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Fen Bilgisi Rehberi</h3></div>
+        <div class="space-y-2 text-xs">
+          <div class="p-2 bg-amber-50 rounded-lg border border-amber-300"><p class="font-extrabold text-amber-900">🌦️ Hava Durumu Sembolleri</p><p class="text-[11px] text-amber-800 font-semibold mt-0.5">☀️ Güneşli · ⛅ Parçalı bulutlu · ☁️ Bulutlu · 🌧️ Yağmurlu · ⛈️ Fırtınalı · 🌨️ Karlı</p></div>
+          <div class="p-2 bg-sky-50 rounded-lg border border-sky-300"><p class="font-extrabold text-sky-900">❄️ Kar mı, Yağmur mu?</p><p class="text-[11px] text-sky-800 font-semibold mt-0.5">Hava sıcaklığı <b>0 °C</b> ya da daha düşükse yağış kar olarak düşer.</p></div>
+          <div class="p-2 bg-indigo-50 rounded-lg border border-indigo-300"><p class="font-extrabold text-indigo-900">🧭 Rüzgârgülü</p><p class="text-[11px] text-indigo-800 font-semibold mt-0.5">Rüzgârgülünün oku rüzgârın <b>geldiği</b> yönü gösterir. Rüzgârlar geldikleri yöne göre adlandırılır.</p></div>
+          <div class="p-2 bg-slate-50 rounded-lg border border-slate-300"><p class="font-extrabold">🌬️ Rüzgâr Adları</p><p class="text-[11px] text-gray-700 font-semibold mt-0.5">Kuzey: Yıldız · Kuzeydoğu: Poyraz · Doğu: Gündoğusu · Güneydoğu: Keşişleme · Güney: Kıble · Güneybatı: Lodos · Batı: Günbatısı · Kuzeybatı: Karayel</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Yayın Başarılı!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-sky-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-sky-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      correct() { tone('triangle', 660, 990, 0.12, 0.2); tone('triangle', 990, 1320, 0.15, 0.18, 0.08); },
+      wrong() { tone('sawtooth', 220, 110, 0.3, 0.15); },
+      jingle() { [659, 784, 988, 1319].forEach((f, i) => tone('sine', f, f, 0.15, 0.15, i * 0.1)); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. VERİ ---
+    const SYMBOLS = {
+      gunesli: { e: '☀️', n: 'Güneşli' },
+      parcali: { e: '⛅', n: 'Parçalı Bulutlu' },
+      bulutlu: { e: '☁️', n: 'Bulutlu' },
+      yagmurlu: { e: '🌧️', n: 'Yağmurlu' },
+      firtinali: { e: '⛈️', n: 'Fırtınalı' },
+      karli: { e: '🌨️', n: 'Karlı' }
+    };
+    const DIRS = [
+      { k: 'K', n: 'Kuzey', w: 'Yıldız', a: 0 },
+      { k: 'KD', n: 'Kuzeydoğu', w: 'Poyraz', a: 45 },
+      { k: 'D', n: 'Doğu', w: 'Gündoğusu', a: 90 },
+      { k: 'GD', n: 'Güneydoğu', w: 'Keşişleme', a: 135 },
+      { k: 'G', n: 'Güney', w: 'Kıble', a: 180 },
+      { k: 'GB', n: 'Güneybatı', w: 'Lodos', a: 225 },
+      { k: 'B', n: 'Batı', w: 'Günbatısı', a: 270 },
+      { k: 'KB', n: 'Kuzeybatı', w: 'Karayel', a: 315 }
+    ];
+    const CITIES = {
+      istanbul: { n: 'İstanbul', loc: "İstanbul'da", lon: 29.0, lat: 41.0, allow: ['gunesli', 'parcali', 'bulutlu', 'yagmurlu', 'firtinali', 'karli'] },
+      izmir: { n: 'İzmir', loc: "İzmir'de", lon: 27.1, lat: 38.4, allow: ['gunesli', 'parcali', 'bulutlu', 'yagmurlu', 'firtinali'] },
+      antalya: { n: 'Antalya', loc: "Antalya'da", lon: 30.7, lat: 36.9, allow: ['gunesli', 'parcali', 'yagmurlu', 'firtinali'] },
+      ankara: { n: 'Ankara', loc: "Ankara'da", lon: 32.9, lat: 39.9, allow: ['gunesli', 'parcali', 'bulutlu', 'yagmurlu', 'karli'] },
+      trabzon: { n: 'Trabzon', loc: "Trabzon'da", lon: 39.7, lat: 41.0, allow: ['parcali', 'bulutlu', 'yagmurlu', 'firtinali'] },
+      erzurum: { n: 'Erzurum', loc: "Erzurum'da", lon: 41.3, lat: 39.9, allow: ['gunesli', 'parcali', 'bulutlu', 'karli'] },
+      van: { n: 'Van', loc: "Van'da", lon: 43.4, lat: 38.5, allow: ['gunesli', 'parcali', 'karli', 'bulutlu'] }
+    };
+    const rnd = (a, b) => Math.round(a + Math.random() * (b - a));
+    const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+    function symbolOf(w) {
+      if (w.rain > 0 && w.T <= 0) return 'karli';
+      if (w.rain > 0 && w.wind >= 50) return 'firtinali';
+      if (w.rain > 0) return 'yagmurlu';
+      if (w.cloud === 'kapali') return 'bulutlu';
+      if (w.cloud === 'parcali') return 'parcali';
+      return 'gunesli';
+    }
+
+    function makeWeather(sym, cityKey) {
+      const gen = {
+        gunesli: () => ({ cloud: 'acik', rain: 0, T: rnd(15, 35), wind: rnd(5, 25) }),
+        parcali: () => ({ cloud: 'parcali', rain: 0, T: rnd(8, 28), wind: rnd(5, 30) }),
+        bulutlu: () => ({ cloud: 'kapali', rain: 0, T: rnd(2, 20), wind: rnd(5, 30) }),
+        yagmurlu: () => ({ cloud: 'kapali', rain: rnd(3, 20), T: rnd(5, 20), wind: rnd(10, 35) }),
+        firtinali: () => ({ cloud: 'kapali', rain: rnd(10, 30), T: rnd(8, 22), wind: rnd(55, 80) }),
+        karli: () => ({ cloud: 'kapali', rain: rnd(2, 15), T: rnd(-12, 0), wind: rnd(5, 30) })
+      }[sym]();
+      // Termometre 2 °C aralıklı olduğu için sıcaklığı çift sayıya yuvarla
+      gen.T = Math.round(gen.T / 2) * 2;
+      if (sym === 'karli' && gen.T > 0) gen.T = 0;
+      return { ...gen, dir: pick(DIRS), city: cityKey };
+    }
+
+    function randomRound() {
+      const cityKey = pick(Object.keys(CITIES));
+      const sym = pick(CITIES[cityKey].allow);
+      return makeWeather(sym, cityKey);
+    }
+
+    // --- 3. BÖLÜMLER ---
+    const LEVELS = [
+      { title: 'Sembol Seç', type: 'symbol', rounds: 5, task: '🎯 Gökyüzüne, yağmurölçere ve termometreye bak. Doğru hava durumu sembolünü seç!', hint: 'Yağmurölçerde su var mı? Varsa yağış olmuş demektir. Sıcaklık 0 °C ya da altındaysa kar, rüzgâr çok güçlüyse fırtınadır.', fact: 'Hava durumu tahmini yapmak için meteorologlar yüzlerce istasyondan gelen ölçümleri ve uydu görüntülerini birlikte inceler.' },
+      { title: 'Termometre Oku', type: 'temp', rounds: 5, task: '🎯 Termometredeki kırmızı sıvının ucuna bak ve sıcaklığı doğru oku!', hint: 'Her çizgi 2 °C\'dir. Sıfırın altındaki sayılar eksidir, yani sıfırdan soğuktur.', fact: 'Termometredeki sıvı ısınınca <b>genleşir</b> ve yükselir, soğuyunca <b>daralır</b> ve alçalır. Deney bölümündeki Sihirli Termometre de böyle çalışır!' },
+      { title: 'Rüzgârın Adı', type: 'wind', rounds: 6, task: '🎯 Rüzgârgülünün okuna bak. Rüzgâr hangi yönden esiyor ve adı ne?', hint: 'Ok rüzgârın GELDİĞİ yönü gösterir. Lodos güneybatıdan, poyraz kuzeydoğudan eser.', fact: 'İstanbul\'da <b>lodos</b> denizi dalgalandırır, <b>poyraz</b> ise serinlik getirir. Denizciler rüzgârları yüzyıllardır bu adlarla tanır.' },
+      { title: 'Canlı Yayın', type: 'broadcast', rounds: 4, task: '🎯 4 şehrin ölçümlerini oku, haritaya doğru sembolü ve sıcaklığı yerleştir. Sonra yayına çık!', hint: 'Her şehir için önce sembolü, sonra sıcaklığı seç. Bütün şehirler bitince "Yayına Çık" düğmesi açılır.', fact: 'Televizyondaki hava durumu sunucuları, meteoroloji uzmanlarının hazırladığı haritaları anlaşılır bir dille izleyicilere anlatır.' }
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: Sembol Uzmanı', text: 'Sembol Seç bölümünü tamamla.' },
+      { id: 'm2', title: '2. Görev: Rüzgâr Bilgesi', text: 'Rüzgârın Adı bölümünü hatasız bitir.' },
+      { id: 'm3', title: '3. Görev: Hava Yapıcı', text: 'Ölçüm İstasyonunda hem kar hem fırtına oluştur.', progress: true },
+      { id: 'm4', title: '4. Görev: Baş Sunucu', text: '4 bölümün hepsini tamamla.' }
+    ];
+
+    // --- 4. DURUM ---
+    const $ = id => document.getElementById(id);
+    let mode = 'levels';
+    let levelIndex = 0;
+    let round = 0;
+    let mistakes = 0;
+    let finished = false;
+    let current = null;
+    let broadcast = [];
+    let bIdx = 0;
+    let bStep = 'symbol';
+    let score = 0;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    const madeWeather = new Set();
+    let sandbox = { T: 18, wind: 15, cloud: 'acik', rain: 0, dir: DIRS[5] };
+    let modalTimer = null;
+
+    function L() { return LEVELS[levelIndex]; }
+    function note(html) { $('scienceNote').innerHTML = html; }
+
+    // --- 5. İSTASYON ÇİZİMİ ---
+    function stationSvg(w, opts = {}) {
+      const city = w.city ? CITIES[w.city].n : 'Okul Bahçesi';
+      let h = '';
+      // Gökyüzü paneli
+      const skyC = w.cloud === 'kapali' ? (w.T <= 0 ? '#cbd5e1' : '#94a3b8') : '#7dd3fc';
+      h += `<rect width="200" height="280" fill="${skyC}" /><text x="100" y="18" font-size="11" font-weight="900" text-anchor="middle">📍 ${city.toUpperCase()}</text>`;
+      if (w.cloud !== 'kapali') h += `<circle cx="${w.cloud === 'parcali' ? 70 : 100}" cy="80" r="28" fill="#facc15" stroke="#0f172a" stroke-width="2.5" />`;
+      const cloud = (x, y, s, c) => `<g transform="translate(${x},${y}) scale(${s})"><circle cx="-22" cy="4" r="16" fill="${c}" stroke="#0f172a" stroke-width="2.5" /><circle cx="0" cy="-8" r="22" fill="${c}" stroke="#0f172a" stroke-width="2.5" /><circle cx="24" cy="4" r="16" fill="${c}" stroke="#0f172a" stroke-width="2.5" /><rect x="-34" y="2" width="68" height="18" fill="${c}" /></g>`;
+      if (w.cloud === 'parcali') h += cloud(125, 95, 0.9, '#f8fafc');
+      if (w.cloud === 'kapali') { const c = w.wind >= 50 && w.rain > 0 ? '#475569' : '#e2e8f0'; h += cloud(60, 70, 0.9, c) + cloud(140, 80, 1, c); }
+      if (w.rain > 0) {
+        const snow = w.T <= 0;
+        for (let i = 0; i < 14; i++) {
+          const x = 20 + (i * 13) % 170, d = (i % 5) * 0.25;
+          h += snow ? `<text class="fall" style="animation-duration:${2 + i % 3 * 0.4}s;animation-delay:-${d}s" x="${x}" y="130" font-size="12">❄</text>`
+            : `<line class="fall" style="animation-duration:${0.8 + i % 3 * 0.2}s;animation-delay:-${d}s" x1="${x}" y1="120" x2="${x - 4}" y2="132" stroke="#1d4ed8" stroke-width="2.5" stroke-linecap="round" />`;
+        }
+        if (w.wind >= 50) h += `<path d="M110 110 L96 140 L108 140 L94 170 L124 132 L112 132 L122 110 Z" fill="#facc15" stroke="#0f172a" stroke-width="2" />`;
+      }
+      h += `<rect y="230" width="200" height="50" fill="${w.T <= 0 && w.rain > 0 ? '#f8fafc' : '#86efac'}" /><line x1="0" y1="230" x2="200" y2="230" stroke="#0f172a" stroke-width="2.5" />`;
+      h += `<line x1="200" y1="0" x2="200" y2="280" stroke="#0f172a" stroke-width="3" />`;
+      h += `<rect x="200" width="360" height="280" fill="#f8fafc" />`;
+
+      // Termometre
+      const tx = 250, tTop = 40, tBot = 230, tMin = -20, tMax = 40;
+      const ty = v => tBot - (v - tMin) / (tMax - tMin) * (tBot - tTop);
+      h += `<text x="${tx}" y="24" font-size="10" font-weight="900" text-anchor="middle">TERMOMETRE</text>`;
+      h += `<rect x="${tx - 8}" y="${tTop - 6}" width="16" height="${tBot - tTop + 12}" rx="8" fill="#fff" stroke="#0f172a" stroke-width="2.5" />`;
+      h += `<rect x="${tx - 4}" y="${ty(w.T)}" width="8" height="${tBot + 6 - ty(w.T)}" fill="#ef4444" />`;
+      h += `<circle cx="${tx}" cy="${tBot + 14}" r="12" fill="#ef4444" stroke="#0f172a" stroke-width="2.5" />`;
+      for (let v = tMin; v <= tMax; v += 2) {
+        const major = v % 10 === 0;
+        h += `<line x1="${tx + 8}" y1="${ty(v)}" x2="${tx + (major ? 18 : 13)}" y2="${ty(v)}" stroke="#0f172a" stroke-width="${major ? 2 : 1}" />`;
+        if (major) h += `<text x="${tx + 22}" y="${ty(v) + 4}" font-size="10" font-weight="800">${v}</text>`;
+      }
+      if (!opts.hideTemp) h += `<text x="${tx}" y="276" font-size="11" font-weight="900" text-anchor="middle">${w.T} °C</text>`;
+
+      // Yağmurölçer
+      const rx = 355, rTop = 60, rBot = 220, rMax = 30;
+      const ry = v => rBot - v / rMax * (rBot - rTop);
+      h += `<text x="${rx}" y="24" font-size="10" font-weight="900" text-anchor="middle">YAĞMURÖLÇER</text>`;
+      h += `<path d="M${rx - 30} 40 L${rx + 30} 40 L${rx + 16} ${rTop}" fill="#e0f2fe" stroke="#0f172a" stroke-width="2.5" /><path d="M${rx - 30} 40 L${rx - 16} ${rTop}" stroke="#0f172a" stroke-width="2.5" />`;
+      h += `<rect x="${rx - 16}" y="${rTop}" width="32" height="${rBot - rTop}" fill="#f8fafc" stroke="#0f172a" stroke-width="2.5" />`;
+      if (w.rain > 0) h += `<rect x="${rx - 14}" y="${ry(w.rain)}" width="28" height="${rBot - ry(w.rain) - 1}" fill="#38bdf8" opacity="0.85" />`;
+      for (let v = 0; v <= rMax; v += 5) { h += `<line x1="${rx + 16}" y1="${ry(v)}" x2="${rx + 24}" y2="${ry(v)}" stroke="#0f172a" stroke-width="1.5" /><text x="${rx + 27}" y="${ry(v) + 4}" font-size="9" font-weight="800">${v}</text>`; }
+      h += `<text x="${rx}" y="244" font-size="11" font-weight="900" text-anchor="middle">${w.rain} mm</text>`;
+
+      // Rüzgârgülü
+      const vx = 480, vy = 120;
+      h += `<text x="${vx}" y="24" font-size="10" font-weight="900" text-anchor="middle">RÜZGÂRGÜLÜ</text>`;
+      h += `<circle cx="${vx}" cy="${vy}" r="58" fill="#fff" stroke="#0f172a" stroke-width="2.5" />`;
+      [['K', 0], ['D', 90], ['G', 180], ['B', 270]].forEach(([l, a]) => { const r = 46; h += `<text x="${vx + r * Math.sin(a * Math.PI / 180)}" y="${vy - r * Math.cos(a * Math.PI / 180) + 5}" font-size="13" font-weight="900" text-anchor="middle" fill="#1d4ed8">${l}</text>`; });
+      [45, 135, 225, 315].forEach(a => { h += `<line x1="${vx + 30 * Math.sin(a * Math.PI / 180)}" y1="${vy - 30 * Math.cos(a * Math.PI / 180)}" x2="${vx + 38 * Math.sin(a * Math.PI / 180)}" y2="${vy - 38 * Math.cos(a * Math.PI / 180)}" stroke="#94a3b8" stroke-width="2" />`; });
+      // Ok: ucu rüzgârın geldiği yönü gösterir
+      h += `<g transform="translate(${vx},${vy}) rotate(${w.dir.a})"><line x1="0" y1="28" x2="0" y2="-26" stroke="#0f172a" stroke-width="4" /><polygon points="0,-36 -9,-20 9,-20" fill="#ef4444" stroke="#0f172a" stroke-width="2" /><path d="M0 26 L-10 36 L-10 24 Z M0 26 L10 36 L10 24 Z" fill="#facc15" stroke="#0f172a" stroke-width="1.5" /></g><circle cx="${vx}" cy="${vy}" r="4" fill="#0f172a" />`;
+      h += `<g transform="translate(${vx},215)"><g class="spin" style="animation-duration:${Math.max(0.25, 3 - w.wind / 30)}s">${[0, 120, 240].map(a => `<g transform="rotate(${a})"><line x1="0" y1="0" x2="0" y2="-18" stroke="#0f172a" stroke-width="2" /><circle cx="0" cy="-20" r="6" fill="#f97316" stroke="#0f172a" stroke-width="1.5" /></g>`).join('')}</g><circle r="3" fill="#0f172a" /></g>`;
+      h += `<text x="${vx}" y="262" font-size="11" font-weight="900" text-anchor="middle">💨 ${w.wind} km/sa</text>`;
+      return h;
+    }
+
+    // --- 6. TURKİYE HARİTASI ---
+    const MAPX = lon => (lon - 25.5) * 28;
+    const MAPY = lat => (42.3 - lat) * 40;
+    const TR = [[26.0, 40.6], [26.3, 41.7], [28.0, 42.0], [29.1, 41.2], [31.2, 41.1], [33.3, 42.0], [35.2, 42.0], [36.9, 41.3], [38.3, 40.95], [40.3, 41.0], [41.5, 41.5], [42.8, 41.5], [43.6, 40.9], [44.8, 39.7], [44.4, 38.4], [44.2, 37.3], [42.3, 37.1], [40.8, 37.1], [38.9, 36.7], [36.6, 36.8], [36.2, 35.8], [35.9, 36.6], [34.6, 36.8], [32.7, 36.1], [30.6, 36.3], [29.2, 36.6], [28.0, 36.6], [27.2, 37.3], [26.3, 38.3], [26.6, 39.3], [26.2, 39.5]];
+    function renderMap() {
+      let h = `<rect width="560" height="270" fill="#7dd3fc" /><polygon points="${TR.map(([lo, la]) => `${MAPX(lo)},${MAPY(la)}`).join(' ')}" fill="#bbf7d0" stroke="#0f172a" stroke-width="3" stroke-linejoin="round" />`;
+      h += `<text x="250" y="16" font-size="11" font-weight="900" text-anchor="middle" fill="#0c4a6e">KARADENİZ</text><text x="40" y="250" font-size="11" font-weight="900" fill="#0c4a6e">AKDENİZ</text>`;
+      broadcast.forEach((b, i) => {
+        const c = CITIES[b.w.city];
+        const x = MAPX(c.lon), y = MAPY(c.lat);
+        const active = i === bIdx && !finished;
+        h += `<g transform="translate(${x},${y})">${active ? '<circle r="26" fill="#facc15" opacity="0.5" />' : ''}<circle r="5" fill="#0f172a" />
+          <text y="-12" font-size="10" font-weight="900" text-anchor="middle">${c.n}</text>
+          ${b.sym ? `<text x="0" y="24" font-size="22" text-anchor="middle">${SYMBOLS[b.sym].e}</text>` : ''}${b.temp !== null ? `<text x="18" y="8" font-size="11" font-weight="900" fill="#b91c1c">${b.temp}°</text>` : ''}</g>`;
+      });
+      $('map').innerHTML = h;
+    }
+
+    // --- 7. BÖLÜM MANTIĞI ---
+    function renderRound() {
+      const lv = L();
+      $('roundText').textContent = `${Math.min(round + 1, lv.rounds)}/${lv.rounds}`;
+      if (lv.type === 'broadcast') { renderBroadcast(); return; }
+      $('station').innerHTML = stationSvg(current, { hideTemp: lv.type === 'temp' });
+      const box = $('answerBox');
+      if (lv.type === 'symbol') {
+        box.innerHTML = `<p class="text-xs font-black mb-2">Hangi sembol?</p><div class="grid grid-cols-3 gap-2">${Object.entries(SYMBOLS).map(([k, s]) => `<button data-a="${k}" class="ans pushable bg-white py-2 flex flex-col items-center"><span class="text-2xl">${s.e}</span><span class="text-[10px] font-black">${s.n}</span></button>`).join('')}</div>`;
+      } else if (lv.type === 'temp') {
+        const opts = new Set([current.T]);
+        while (opts.size < 4) opts.add(current.T + pick([-10, -6, -4, -2, 2, 4, 6, 10]));
+        box.innerHTML = `<p class="text-xs font-black mb-2">Termometre kaç derece gösteriyor?</p><div class="grid grid-cols-4 gap-2">${[...opts].sort((a, b) => a - b).map(v => `<button data-a="${v}" class="ans pushable bg-white py-2 text-lg font-black">${v} °C</button>`).join('')}</div>`;
+      } else if (lv.type === 'wind') {
+        const opts = new Set([current.dir.k]);
+        while (opts.size < 4) opts.add(pick(DIRS).k);
+        box.innerHTML = `<p class="text-xs font-black mb-2">Rüzgâr nereden esiyor?</p><div class="grid grid-cols-2 gap-2">${[...opts].sort(() => Math.random() - 0.5).map(k => { const d = DIRS.find(x => x.k === k); return `<button data-a="${k}" class="ans pushable bg-white py-2 text-sm font-black">🌬️ ${d.w} <span class="text-[10px] text-gray-500">(${d.n})</span></button>`; }).join('')}</div>`;
+      }
+      box.querySelectorAll('.ans').forEach(b => b.addEventListener('click', () => answer(b.dataset.a, b)));
+    }
+
+    function answer(a, btn) {
+      if (finished) return;
+      initAudio();
+      const lv = L();
+      let ok = false, msg = '';
+      if (lv.type === 'symbol') {
+        const right = symbolOf(current);
+        ok = a === right;
+        msg = ok ? `✅ ${SYMBOLS[right].e} <b>${SYMBOLS[right].n}</b>! ${explainSymbol(current)}` : `❌ ${explainSymbol(current)}`;
+      } else if (lv.type === 'temp') {
+        ok = +a === current.T;
+        msg = ok ? `✅ Evet, <b>${current.T} °C</b>. ${current.T < 0 ? 'Sıfırın altında, çok soğuk!' : current.T > 28 ? 'Çok sıcak, bol su iç!' : ''}` : '❌ Kırmızı sıvının ucunu en yakın çizgiyle karşılaştır. Her küçük çizgi 2 °C.';
+      } else if (lv.type === 'wind') {
+        ok = a === current.dir.k;
+        msg = ok ? `✅ Rüzgâr <b>${current.dir.n}</b> yönünden esiyor. Adı <b>${current.dir.w}</b>!` : '❌ Kırmızı okun ucu rüzgârın geldiği yönü gösterir. Ok hangi harfe bakıyor?';
+      }
+      note(msg);
+      if (ok) { Sound.correct(); round++; if (round >= lv.rounds) { winLevel(); return; } current = randomRound(); renderRound(); }
+      else { mistakes++; Sound.wrong(); btn.disabled = true; btn.classList.add('bg-rose-200'); }
+    }
+
+    function explainSymbol(w) {
+      if (w.rain > 0 && w.T <= 0) return `Yağmurölçerde ${w.rain} mm yağış var ve sıcaklık ${w.T} °C. Sıfır ya da altında yağış <b>kar</b> olur.`;
+      if (w.rain > 0 && w.wind >= 50) return `Yağış var ve rüzgâr ${w.wind} km/sa ile çok güçlü: <b>fırtına</b>!`;
+      if (w.rain > 0) return `Yağmurölçerde ${w.rain} mm su birikmiş: <b>yağmur</b> yağıyor.`;
+      if (w.cloud === 'kapali') return 'Gökyüzü tamamen bulutlu ama yağış yok.';
+      if (w.cloud === 'parcali') return 'Güneş var ama gökyüzünde bulutlar da var.';
+      return 'Gökyüzü açık, yağış yok: güneşli bir gün.';
+    }
+
+    function renderBroadcast() {
+      const b = broadcast[bIdx];
+      renderMap();
+      if (!b) {
+        $('station').innerHTML = stationSvg(broadcast[broadcast.length - 1].w);
+        $('answerBox').innerHTML = `<button id="btnOnAir" class="pushable w-full py-3 bg-red-500 text-white display text-lg font-black">🔴 YAYINA ÇIK!</button>`;
+        $('btnOnAir').addEventListener('click', onAir);
+        return;
+      }
+      $('station').innerHTML = stationSvg(b.w, { hideTemp: bStep === 'temp' });
+      const box = $('answerBox');
+      if (bStep === 'symbol') {
+        box.innerHTML = `<p class="text-xs font-black mb-2">📍 ${CITIES[b.w.city].n} için sembol seç:</p><div class="grid grid-cols-3 gap-2">${Object.entries(SYMBOLS).map(([k, s]) => `<button data-a="${k}" class="bans pushable bg-white py-2 flex flex-col items-center"><span class="text-2xl">${s.e}</span><span class="text-[10px] font-black">${s.n}</span></button>`).join('')}</div>`;
+      } else {
+        const opts = new Set([b.w.T]);
+        while (opts.size < 3) opts.add(b.w.T + pick([-6, -4, -2, 2, 4, 6]));
+        box.innerHTML = `<p class="text-xs font-black mb-2">📍 ${CITIES[b.w.city].n} sıcaklığı:</p><div class="grid grid-cols-3 gap-2">${[...opts].sort((x, y) => x - y).map(v => `<button data-a="${v}" class="bans pushable bg-white py-2 text-lg font-black">${v} °C</button>`).join('')}</div>`;
+      }
+      box.querySelectorAll('.bans').forEach(btn => btn.addEventListener('click', () => answerBroadcast(btn.dataset.a, btn)));
+      $('roundText').textContent = `${bIdx + 1}/${broadcast.length}`;
+    }
+
+    function answerBroadcast(a, btn) {
+      const b = broadcast[bIdx];
+      initAudio();
+      if (bStep === 'symbol') {
+        if (a === symbolOf(b.w)) { b.sym = a; bStep = 'temp'; Sound.correct(); note(`✅ ${explainSymbol(b.w)}`); }
+        else { mistakes++; Sound.wrong(); btn.disabled = true; btn.classList.add('bg-rose-200'); note(`❌ ${explainSymbol(b.w)}`); return; }
+      } else {
+        if (+a === b.w.T) { b.temp = b.w.T; bStep = 'symbol'; bIdx++; Sound.correct(); note('✅ Sıcaklık haritaya eklendi!'); }
+        else { mistakes++; Sound.wrong(); btn.disabled = true; btn.classList.add('bg-rose-200'); return; }
+      }
+      renderBroadcast();
+    }
+
+    function onAir() {
+      Sound.jingle();
+      const text = 'İyi akşamlar sevgili izleyiciler! ' + broadcast.map(b => {
+        const c = CITIES[b.w.city].loc, s = SYMBOLS[b.sym].n.toLowerCase();
+        return `${c} hava ${s}, sıcaklık ${b.w.T} derece${b.w.wind >= 40 ? ', rüzgâr kuvvetli' : ''}.`;
+      }).join(' ') + ' Sağlıklı günler dileriz!';
+      $('answerBox').innerHTML = `<div class="p-2 bg-red-50 rounded-lg border-2 border-ink"><p class="text-[10px] font-black text-red-600">🔴 CANLI YAYIN</p><p class="text-sm font-bold leading-relaxed">${text}</p></div>`;
+      try {
+        if (soundEnabled && 'speechSynthesis' in window) {
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = 'tr-TR'; u.rate = 0.95;
+          speechSynthesis.cancel(); speechSynthesis.speak(u);
+        }
+      } catch (e) {}
+      winLevel();
+    }
+
+    function winLevel() {
+      finished = true;
+      const s = mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20;
+      if (levelIndex === 0) completeMission('m1');
+      if (L().type === 'wind' && mistakes === 0) completeMission('m2');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      updateScore(); renderLevelDots();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+      showModal({ emoji: '📺', title: 'Yayın Başarılı!', stars: '⭐'.repeat(s) + '☆'.repeat(3 - s), info: mistakes === 0 ? 'Hiç hata yapmadın!' : `${mistakes} hata yaptın.`, fact: L().fact, next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Ölçüm İstasyonu 🔬' });
+    }
+
+    // --- 8. ÖLÇÜM İSTASYONU ---
+    function renderSandbox() {
+      $('station').innerHTML = stationSvg(sandbox);
+      const sym = symbolOf(sandbox);
+      $('sSymbol').textContent = `${SYMBOLS[sym].e} ${SYMBOLS[sym].n}`;
+      if (sym === 'karli' || sym === 'firtinali') { madeWeather.add(sym); renderMissions(); if (madeWeather.size >= 2) completeMission('m3'); }
+      $('sTv').textContent = `${sandbox.T}°`;
+      $('sWv').textContent = `${sandbox.wind} km/sa`;
+      $('sCloud').innerHTML = [['acik', '☀️ Açık'], ['parcali', '⛅ Parçalı'], ['kapali', '☁️ Kapalı']].map(([k, n]) => `<button data-c="${k}" class="sc pushable px-2 py-1 text-[11px] font-black bg-white ${sandbox.cloud === k ? 'opt-on' : ''}">${n}</button>`).join('');
+      $('sCloud').querySelectorAll('.sc').forEach(b => b.addEventListener('click', () => { sandbox.cloud = b.dataset.c; if (sandbox.cloud !== 'kapali') sandbox.rain = 0; Sound.click(); renderSandbox(); }));
+      $('sDir').innerHTML = DIRS.map(d => `<button data-k="${d.k}" class="sd pushable px-1.5 py-1 text-[10px] font-black bg-white ${sandbox.dir.k === d.k ? 'opt-on' : ''}">${d.k}</button>`).join('');
+      $('sDir').querySelectorAll('.sd').forEach(b => b.addEventListener('click', () => { sandbox.dir = DIRS.find(d => d.k === b.dataset.k); Sound.click(); note(`🌬️ ${sandbox.dir.n} yönünden esen rüzgârın adı <b>${sandbox.dir.w}</b>.`); renderSandbox(); }));
+    }
+    $('sT').addEventListener('input', e => { sandbox.T = +e.target.value; renderSandbox(); });
+    $('sW').addEventListener('input', e => { sandbox.wind = +e.target.value; renderSandbox(); });
+    $('btnRain').addEventListener('click', () => {
+      initAudio(); Sound.click();
+      if (sandbox.cloud !== 'kapali') { note('☁️ Bulut olmadan yağış olmaz! Önce gökyüzünü <b>kapalı</b> yap.'); return; }
+      sandbox.rain = Math.min(30, sandbox.rain + 5); renderSandbox();
+    });
+    $('btnEmpty').addEventListener('click', () => { Sound.click(); sandbox.rain = 0; renderSandbox(); });
+
+    // --- 9. AKIŞ ---
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info; $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next); if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, L().type === 'broadcast' ? 2500 : 700);
+    }
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        const extra = m.progress && !done ? ` <b class="text-sky-700">(${madeWeather.size}/2)</b>` : '';
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5"><span class="text-lg">${done ? '✅' : '⬜'}</span><div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}${extra}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Bölümler:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function loadLevel(i) {
+      closeModal();
+      try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) {}
+      mode = 'levels'; levelIndex = i; round = 0; mistakes = 0; finished = false;
+      $('levelBadge').textContent = `BÖLÜM ${i + 1}`;
+      $('levelTitle').textContent = L().title;
+      $('taskText').textContent = L().task;
+      $('mapWrap').classList.toggle('hidden', L().type !== 'broadcast');
+      if (L().type === 'broadcast') {
+        const keys = Object.keys(CITIES).sort(() => Math.random() - 0.5).slice(0, 4);
+        broadcast = keys.map(k => ({ w: makeWeather(pick(CITIES[k].allow), k), sym: null, temp: null }));
+        bIdx = 0; bStep = 'symbol';
+      } else current = randomRound();
+      renderLevelDots(); renderRound();
+    }
+
+    function switchMode(m) {
+      const isS = m === 'sandbox';
+      $('tabLevels').classList.toggle('active-tab', !isS); $('tabLevels').classList.toggle('bg-white', isS);
+      $('tabSandbox').classList.toggle('active-tab', isS); $('tabSandbox').classList.toggle('bg-white', !isS);
+      $('levelDots').classList.toggle('hidden', isS);
+      $('answerBox').classList.toggle('hidden', isS);
+      $('sandboxControls').classList.toggle('hidden', !isS); $('sandboxControls').classList.toggle('flex', isS);
+      if (isS) {
+        closeModal();
+        mode = 'sandbox';
+        $('mapWrap').classList.add('hidden');
+        $('levelBadge').textContent = 'İSTASYON';
+        $('levelTitle').textContent = 'Kendi Havanı Oluştur';
+        $('taskText').textContent = '🎯 Sıcaklığı, bulutları, rüzgârı ve yağışı değiştir. Hava durumu sembolü nasıl değişiyor?';
+        $('roundText').textContent = '∞';
+        renderSandbox();
+      } else loadLevel(levelIndex);
+    }
+
+    $('btnReset').addEventListener('click', () => { Sound.click(); if (mode === 'levels') loadLevel(levelIndex); else { sandbox = { T: 18, wind: 15, cloud: 'acik', rain: 0, dir: DIRS[5] }; $('sT').value = 18; $('sW').value = 15; renderSandbox(); } });
+    $('btnHint').addEventListener('click', () => {
+      Sound.click();
+      note(mode === 'levels' ? `<b>İpucu:</b> ${L().hint}` : '<b>Deney fikri:</b> Gökyüzünü kapat, yağış ekle ve sıcaklığı yavaşça 0 °C\'nin altına indir. Yağmur kara dönüşüyor mu? Sonra rüzgârı 50 km/sa üstüne çıkar!');
+    });
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('sandbox'); });
+    $('btnModalRetry').addEventListener('click', () => loadLevel(levelIndex));
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('sandbox'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; if (!soundEnabled) { try { speechSynthesis.cancel(); } catch (e) {} } Sound.click(); });
+
+    renderMissions(); updateScore(); loadLevel(0);
+  </script>
+</body>
+</html>

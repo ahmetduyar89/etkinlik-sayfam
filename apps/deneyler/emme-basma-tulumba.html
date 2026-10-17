@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Emme-Basma Tulumba Modeli: Basınç Farkıyla Su Taşınması - Küçük Mucitler</title>
+
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- GSAP Animation Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            paper: '#fffdfa',
+            ink: '#182b4d',
+            sun: '#facc15',
+            waterBlue: '#0284c7',
+            waterDark: '#0369a1',
+            clayOrange: '#ea580c',
+            clayLight: '#fed7aa',
+            bottlePlastic: '#e0f2fe'
+          },
+          fontFamily: {
+            display: ['"Baloo 2"', 'cursive'],
+            body: ['Nunito', 'sans-serif']
+          },
+          borderWidth: {
+            '3': '3px'
+          },
+          boxShadow: {
+            card: '0 8px 0 #182b4d',
+            'card-sm': '0 4px 0 #182b4d',
+            'card-lg': '0 12px 0 #182b4d',
+            'card-pressed': '0 2px 0 #182b4d'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #f0f9ff;
+      color: #182b4d;
+      background-image:
+        radial-gradient(#bae6fd 1.5px, transparent 1.5px),
+        radial-gradient(#e0f2fe 1.5px, transparent 1.5px);
+      background-size: 28px 28px;
+      background-position: 0 0, 14px 14px;
+    }
+
+    .display {
+      font-family: 'Baloo 2', cursive;
+      font-weight: 800;
+    }
+
+    .chunky {
+      border: 3px solid #182b4d;
+      border-radius: 20px;
+      box-shadow: 0 6px 0 #182b4d;
+    }
+
+    .pushable {
+      border: 3px solid #182b4d;
+      border-radius: 14px;
+      box-shadow: 0 4px 0 #182b4d;
+      transition: all 0.12s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .pushable:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 #182b4d;
+    }
+
+    .pushable:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #182b4d;
+    }
+
+    /* Su Akışı Çizgili Efekti */
+    @keyframes waterFlow {
+      0% { stroke-dashoffset: 40; }
+      100% { stroke-dashoffset: 0; }
+    }
+    .water-flow-active {
+      stroke-dasharray: 8 4;
+      animation: waterFlow 0.8s linear infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-3 sm:p-5 md:p-6 select-none">
+
+  <!-- ÜST GEZİNME VE BAŞLIK ÇUBUĞU -->
+  <header class="max-w-6xl w-full mx-auto mb-4">
+    <div class="bg-white px-4 py-3 chunky flex flex-wrap items-center justify-between gap-3 shadow-card">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-ink text-sm font-black flex items-center gap-1.5" title="Ana Sayfaya Dön">
+          <span>🏠</span>
+          <span class="hidden sm:inline">Deneyler</span>
+        </a>
+        <div class="h-6 w-0.5 bg-gray-200"></div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 bg-sky-100 text-sky-900 border-2 border-ink rounded-full text-[11px] font-black uppercase tracking-wider">
+              Deney 21 • Sıvı & Gaz Basıncı
+            </span>
+            <span class="hidden md:inline text-xs font-bold text-gray-500">
+              MEB 4. & 8. Sınıf Fen Bilimleri
+            </span>
+          </div>
+          <h1 class="display text-xl sm:text-2xl md:text-3xl text-ink leading-tight">
+            🚰 Emme-Basma Tulumba Modeli (Basınç Farkı)
+          </h1>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <!-- Ses Aç/Kapat -->
+        <button id="btnToggleSound" class="pushable px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-ink font-bold text-xs flex items-center gap-1">
+          <span id="soundIcon">🔊</span>
+          <span class="hidden sm:inline">Ses Açık</span>
+        </button>
+
+        <!-- Sıfırla -->
+        <button id="btnResetExperiment" class="pushable px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-900 font-bold text-xs flex items-center gap-1">
+          <span>🔄</span>
+          <span>Sıfırla</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ANA İÇERİK: 2 KOLONLU DÜZEN -->
+  <main class="max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
+
+    <!-- SOL KOLON: İNTERAKTİF SİMÜLASYON SAHNESİ VE KONTROLLER (7 Kolon) -->
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      
+      <!-- SİMÜLASYON KARTI -->
+      <section class="bg-white p-4 chunky flex-1 flex flex-col justify-between relative shadow-card">
+        
+        <div>
+          <!-- Durum ve Rehberlik İpucu Bandı -->
+          <div id="tipBanner" class="mb-3 px-3 py-2 bg-sky-50 border-2 border-ink rounded-xl text-xs sm:text-sm font-bold text-sky-950 flex items-center gap-2">
+            <span id="tipIcon" class="text-xl shrink-0">💡</span>
+            <span id="tipText">Şişeyi sıkarak 'Basma' (yüksek basınç), bırakarak 'Emme' (vakum) oluştur! Suyun basınç farkıyla nasıl taşındığını gör!</span>
+          </div>
+
+          <!-- SVG DENEY SAHNESİ: Kaynak Kap, Pet Şişe Tulumba, Oyun Hamuru, Çıkış Bardağı -->
+          <div class="relative w-full aspect-[520/340] bg-gradient-to-b from-sky-50 via-amber-50/30 to-amber-100 rounded-2xl border-3 border-ink overflow-hidden flex items-center justify-center shadow-inner">
+            
+            <!-- Masa Tablası -->
+            <div class="absolute bottom-0 left-0 right-0 h-12 bg-amber-200 border-t-2 border-ink/40"></div>
+
+            <svg id="pumpSvg" viewBox="0 0 520 340" class="w-full h-full overflow-visible select-none">
+              
+              <defs>
+                <!-- Pet Şişe Plastik Degradesi -->
+                <linearGradient id="bottleGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.8"/>
+                  <stop offset="25%" stop-color="#bae6fd" stop-opacity="0.3"/>
+                  <stop offset="75%" stop-color="#bae6fd" stop-opacity="0.15"/>
+                  <stop offset="100%" stop-color="#ffffff" stop-opacity="0.7"/>
+                </linearGradient>
+
+                <!-- Su Degradesi -->
+                <linearGradient id="waterGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#38bdf8"/>
+                  <stop offset="100%" stop-color="#0284c7"/>
+                </linearGradient>
+
+                <!-- Oyun Hamuru Degradesi (Turuncu) -->
+                <radialGradient id="clayGrad" cx="40%" cy="35%" r="65%">
+                  <stop offset="0%" stop-color="#fdba74"/>
+                  <stop offset="60%" stop-color="#f97316"/>
+                  <stop offset="100%" stop-color="#c2410c"/>
+                </radialGradient>
+
+                <!-- Klip Maskesi: Pet Şişe İçi Sıvı -->
+                <clipPath id="bottleClip">
+                  <path id="bottleClipPath" d="M -42 20 C -42 -40 -25 -70 -16 -95 L 16 -95 C 25 -70 42 -40 42 20 C 42 75 35 110 30 120 L -30 120 C -35 110 -42 75 -42 20 Z" />
+                </clipPath>
+              </defs>
+
+              <!-- MASA ÜSTÜ GÖLGELERİ -->
+              <ellipse cx="90" cy="292" rx="45" ry="8" fill="#94a3b8" opacity="0.4" />
+              <ellipse cx="260" cy="295" rx="55" ry="9" fill="#94a3b8" opacity="0.4" />
+              <ellipse cx="430" cy="292" rx="42" ry="8" fill="#94a3b8" opacity="0.4" />
+
+              <!-- 1. SOL: SU KAYNAK HAZNESİ (Geniş Su Kabı) -->
+              <g id="sourceBasinGroup" transform="translate(90, 240)">
+                <!-- Cam Kase Gövdesi -->
+                <path d="M -50 -40 L -42 45 Q 0 55 42 45 L 50 -40 Z" fill="#e0f2fe" stroke="#0284c7" stroke-width="2.5" opacity="0.6" />
+                <!-- Kaynak Su Seviyesi -->
+                <path id="sourceWaterPath" d="M -48 -10 L -42 45 Q 0 55 42 45 L 48 -10 Z" fill="url(#waterGrad)" opacity="0.85" />
+                <ellipse id="sourceWaterSurface" cx="0" cy="-10" rx="48" ry="6" fill="#7dd3fc" />
+                <ellipse cx="0" cy="-40" rx="50" ry="7" fill="none" stroke="#0284c7" stroke-width="2" />
+                <text x="0" y="30" text-anchor="middle" font-size="10" font-weight="900" fill="#ffffff" font-family="'Baloo 2'">Su Kaynağı 🌊</text>
+              </g>
+
+              <!-- 2. SAĞ: HEDEF SU BARDAĞI (Tulumbayla Dolan Bardak) -->
+              <g id="targetGlassGroup" transform="translate(430, 245)">
+                <!-- Cam Bardak -->
+                <path d="M -34 -45 L -26 42 Q 0 48 26 42 L 34 -45 Z" fill="#e0f2fe" stroke="#0284c7" stroke-width="2.5" opacity="0.6" />
+                <!-- Bardaktaki Toplanan Su (Dinamik Yükselir) -->
+                <path id="targetWaterPath" d="M -27 35 L -26 42 Q 0 48 26 42 L 27 35 Z" fill="url(#waterGrad)" opacity="0.85" />
+                <ellipse id="targetWaterSurface" cx="0" cy="35" rx="27" ry="4" fill="#7dd3fc" />
+                <ellipse cx="0" cy="-45" rx="34" ry="5" fill="none" stroke="#0284c7" stroke-width="2" />
+                <text x="0" y="25" text-anchor="middle" font-size="9" font-weight="900" fill="#1e3a8a" font-family="'Baloo 2'">Toplanan Su 🥛</text>
+                <text id="collectedVolumeText" x="0" y="-55" text-anchor="middle" font-size="11" font-weight="900" fill="#0369a1" font-family="'Baloo 2'">0 mL</text>
+              </g>
+
+              <!-- 3. PİPET 1: EMME BORUSU (Kaynak Kaptan Pet Şişenin Dibine Uzanır) -->
+              <!-- Kaynak: (90, 240) -> Şişe: (260, 165) -->
+              <g id="suctionPipeGroup">
+                <!-- Pipet Dış Hattı (Mavi Şeffaf) -->
+                <path id="suctionPipePath" d="M 90 260 L 90 120 Q 90 85 130 85 L 240 85 Q 248 85 248 100 L 248 270" 
+                      fill="none" stroke="#38bdf8" stroke-width="7" stroke-linecap="round" opacity="0.5" />
+                <!-- Pipet İç Su Akışı (Emme anında mavi noktalar akar) -->
+                <path id="suctionFlowStream" d="M 90 260 L 90 120 Q 90 85 130 85 L 240 85 Q 248 85 248 100 L 248 270" 
+                      fill="none" stroke="#0284c7" stroke-width="4" stroke-linecap="round" opacity="0" class="water-flow-active" />
+                <!-- Pipet Giriş Okları -->
+                <text x="135" y="76" font-size="9" font-weight="900" fill="#0284c7" font-family="'Baloo 2'">1. Pipet (Emme)</text>
+              </g>
+
+              <!-- 4. PİPET 2: BASMA / ÇIKIŞ BORUSU (Şişeden Sağdaki Bardağa Fışkırtır) -->
+              <g id="dischargePipeGroup">
+                <!-- Pipet Dış Hattı (Kırmızı Şeffaf) -->
+                <path id="dischargePipePath" d="M 270 200 L 270 95 Q 270 75 310 75 L 390 75 Q 430 75 430 120 L 430 180" 
+                      fill="none" stroke="#fb7185" stroke-width="7" stroke-linecap="round" opacity="0.5" />
+                <!-- Su Çıkış Akışı (Basma anında akar) -->
+                <path id="dischargeFlowStream" d="M 270 200 L 270 95 Q 270 75 310 75 L 390 75 Q 430 75 430 120 L 430 180" 
+                      fill="none" stroke="#0284c7" stroke-width="4" stroke-linecap="round" opacity="0" class="water-flow-active" />
+                <text x="320" y="68" font-size="9" font-weight="900" fill="#e11d48" font-family="'Baloo 2'">2. Pipet (Basma 💦)</text>
+              </g>
+
+              <!-- PİPETTEN BARDAĞA DÖKÜLEN SU ŞELALESİ (Basma Anında) -->
+              <g id="dischargeWaterfall" opacity="0" transform="translate(430, 180)">
+                <line x1="0" y1="0" x2="0" y2="70" stroke="#0284c7" stroke-width="4.5" stroke-linecap="round" />
+                <circle cx="-4" cy="65" r="3" fill="#38bdf8" />
+                <circle cx="5" cy="68" r="3.5" fill="#38bdf8" />
+                <circle cx="1" cy="72" r="2.5" fill="#0284c7" />
+              </g>
+
+              <!-- 5. MERKEZ: PET ŞİŞE TULUMBA GÖVDESİ (260, 175) -->
+              <g id="bottleAssembly" transform="translate(260, 175)">
+                
+                <!-- Şişe İçi Sıvı Kütlesi (Klip Maskeli) -->
+                <g clip-path="url(#bottleClip)">
+                  <!-- Su Bloğu -->
+                  <rect id="bottleWaterRect" x="-45" y="30" width="90" height="95" fill="url(#waterGrad)" />
+                  <ellipse id="bottleWaterSurface" cx="0" cy="30" rx="38" ry="5" fill="#7dd3fc" />
+                  
+                  <!-- Şişe İçi Hava Boşluğu (Basınç Renk Göstergesi) -->
+                  <!-- Normal: Mavi/Beyaz, Sıkıldığında: Kırmızı parlar, Bırakıldığında: Mor/Mavi parlar -->
+                  <rect id="bottleAirVolume" x="-45" y="-95" width="90" height="125" fill="#38bdf8" opacity="0.08" />
+                  
+                  <!-- Hava Basıncı Okları (Şişe İçinde Sıkışma / Genleşme) -->
+                  <g id="innerPressureArrows" opacity="0">
+                    <path d="M 0 -20 L 0 15" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="3 2" />
+                    <polygon points="-4,15 0,22 4,15" fill="#ef4444" />
+                    <text x="8" y="0" font-size="9" font-weight="900" fill="#ef4444" font-family="'Baloo 2'">P_iç ⬇ İter</text>
+                  </g>
+                </g>
+
+                <!-- Şeffaf Pet Şişe Dış Konturu (Sıkıldığında yanlardan daralır) -->
+                <path id="bottleBodyPath" d="M -42 20 C -42 -40 -25 -70 -16 -95 L 16 -95 C 25 -70 42 -40 42 20 C 42 75 35 110 30 120 L -30 120 C -35 110 -42 75 -42 20 Z" 
+                      fill="url(#bottleGrad)" stroke="#0284c7" stroke-width="3" stroke-linejoin="round" />
+
+                <!-- Şişe Boğazı ve Ağzı -->
+                <rect x="-16" y="-105" width="32" height="12" rx="2" fill="#0284c7" stroke="#182b4d" stroke-width="2" />
+
+                <!-- 6. OYUN HAMURU CONTA (Şişe Kapağındaki Sızdırmaz Hamur) -->
+                <g id="claySealGroup" transform="translate(0, -108)">
+                  <!-- Hamur Gövdesi (Organik kavisli şekil) -->
+                  <path id="clayBody" d="M -24 -2 C -28 -15 -15 -25 0 -24 C 15 -25 28 -15 24 -2 C 20 6 -20 6 -24 -2 Z" 
+                        fill="url(#clayGrad)" stroke="#182b4d" stroke-width="2.2" />
+                  <!-- Hamur Kıvrımları ve Parmak İzleri -->
+                  <path d="M -12 -12 Q 0 -6 12 -12" fill="none" stroke="#c2410c" stroke-width="1.8" />
+                  <ellipse cx="-8" cy="-16" rx="3" ry="2" fill="#fed7aa" opacity="0.6" />
+                  <text id="clayLabel" x="0" y="-28" text-anchor="middle" font-size="9" font-weight="900" fill="#c2410c" font-family="'Baloo 2'">Oyun Hamuru (Sızdırmaz)</text>
+                </g>
+
+                <!-- Hava Kaçış Efekti (Hamur delindiğinde 'Fısss' yapar) -->
+                <g id="clayLeakGroup" opacity="0" transform="translate(20, -115)">
+                  <path d="M 0 0 Q 10 -15 20 -10" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="3 2" />
+                  <text x="25" y="-10" font-size="10" font-weight="900" fill="#dc2626" font-family="'Baloo 2'">💨 FISSS! (Hava Kaçtı)</text>
+                </g>
+
+                <!-- 7. ŞİŞEYİ SIKAN EL / PARMAKLAR (Animasyon esnasında görünür) -->
+                <g id="squeezingHands" opacity="0">
+                  <!-- Sol El Parmağı -->
+                  <g transform="translate(-46, 20)">
+                    <rect x="-12" y="-18" width="16" height="36" rx="8" fill="#fed7aa" stroke="#182b4d" stroke-width="2" />
+                    <text x="-5" y="5" font-size="10">👈</text>
+                  </g>
+                  <!-- Sağ El Parmağı -->
+                  <g transform="translate(46, 20)">
+                    <rect x="-4" y="-18" width="16" height="36" rx="8" fill="#fed7aa" stroke="#182b4d" stroke-width="2" />
+                    <text x="2" y="5" font-size="10">👉</text>
+                  </g>
+                </g>
+
+              </g>
+
+              <!-- BAŞARI / AKIŞ ROZETİ (Üst Merkez) -->
+              <g id="successBadge" opacity="0" style="opacity: 0; pointer-events: none;" transform="translate(260, 24)">
+                <rect x="-120" y="-14" width="240" height="28" rx="8" fill="#16a34a" stroke="#182b4d" stroke-width="2.5" />
+                <text id="successBadgeText" x="0" y="5" text-anchor="middle" font-size="11" font-weight="900" fill="#ffffff" font-family="'Baloo 2'">🎉 BASINÇ FARKIYLA SU TAŞINDI!</text>
+              </g>
+
+            </svg>
+          </div>
+
+          <!-- CANLI FİZİK SENSÖRLERİ PANELİ (P_iç, P_0, Faz, Debi) -->
+          <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 bg-sky-50/80 p-2.5 rounded-xl border-2 border-ink text-center">
+            
+            <!-- 1. Şişe İçi Basınç -->
+            <div class="bg-white p-2 rounded-lg border border-ink shadow-sm">
+              <span class="text-[10px] font-black text-gray-500 uppercase block">Şişe İçi Basınç (P_iç)</span>
+              <span id="innerPressureText" class="display text-base sm:text-lg font-black text-sky-600">101.3 kPa (Denge)</span>
+            </div>
+
+            <!-- 2. Açık Hava Basıncı -->
+            <div class="bg-white p-2 rounded-lg border border-ink shadow-sm">
+              <span class="text-[10px] font-black text-gray-500 uppercase block">Açık Hava (P₀)</span>
+              <span class="display text-base sm:text-lg font-black text-purple-600">101.3 kPa</span>
+            </div>
+
+            <!-- 3. Tulumba Fazı -->
+            <div class="bg-white p-2 rounded-lg border border-ink shadow-sm">
+              <span class="text-[10px] font-black text-gray-500 uppercase block">Tulumba Fazı</span>
+              <span id="pumpPhaseText" class="display text-xs sm:text-sm font-black text-amber-600 block mt-0.5">Beklemede ⏸️</span>
+            </div>
+
+            <!-- 4. Conta Durumu -->
+            <div class="bg-white p-2 rounded-lg border border-ink shadow-sm">
+              <span class="text-[10px] font-black text-gray-500 uppercase block">Oyun Hamuru</span>
+              <span id="sealStatusText" class="display text-xs sm:text-sm font-black text-emerald-600 block mt-0.5">Hava Sızdırmaz ✅</span>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- AKSİYON VE DENEY KONTROL PANELİ -->
+        <div class="mt-3 pt-3 border-t-2 border-dashed border-gray-300 space-y-3">
+          
+          <!-- Butonlar: Sık (Basma), Bırak (Emme), Otomatik Pompa, Hamur Ayarı -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            
+            <!-- 1. Şişeyi Sık (Basma Fazı) -->
+            <button id="btnSqueeze" class="pushable py-2.5 px-2 bg-rose-500 hover:bg-rose-600 text-white font-black text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-card">
+              <span class="text-base">✊</span>
+              <span>1. Şişeyi Sık! (Basma)</span>
+            </button>
+
+            <!-- 2. Şişeyi Bırak (Emme Fazı) -->
+            <button id="btnRelease" style="background-color: #0284c7; color: #ffffff;" class="pushable py-2.5 px-2 bg-sky-600 hover:bg-sky-700 text-white font-black text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-card">
+              <span class="text-base">👐</span>
+              <span>2. Şişeyi Bırak! (Emme)</span>
+            </button>
+
+            <!-- 3. Otomatik Tulumba Döngüsü -->
+            <button id="btnAutoPump" class="pushable py-2.5 px-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-card">
+              <span id="autoPumpIcon" class="text-base">🔄</span>
+              <span id="autoPumpText">Otomatik Pompa</span>
+            </button>
+
+            <!-- 4. Oyun Hamuru Sızdırmazlık Aç/Kapa -->
+            <button id="btnToggleSeal" class="pushable py-2.5 px-2 bg-amber-200 hover:bg-amber-300 text-ink font-black text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5">
+              <span id="sealBtnIcon" class="text-base">🟡</span>
+              <span id="sealBtnText">Hamuru Gevşet</span>
+            </button>
+
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+
+
+    <!-- SAĞ KOLON: BİLİMSEL İLKELER, GRAFİK, GÖREVLER VE TEST (5 Kolon) -->
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      
+      <!-- REHBER VE SEKMELER -->
+      <div class="grid grid-cols-3 gap-1 bg-sky-100 p-1.5 rounded-2xl border-3 border-ink text-xs font-black">
+        <button id="tabTheory" class="side-tab-btn py-1.5 rounded-xl bg-white border-2 border-ink shadow-sm text-ink">
+          📖 Nasıl Çalışır?
+        </button>
+        <button id="tabPressure" class="side-tab-btn py-1.5 rounded-xl text-gray-700 hover:bg-white/60">
+          🔬 Emme vs Basma
+        </button>
+        <button id="tabQuiz" class="side-tab-btn py-1.5 rounded-xl text-gray-700 hover:bg-white/60">
+          ⭐ Bilgi Testi
+        </button>
+      </div>
+
+      <!-- SEÇENEK 1: BİLİMSEL İLKELER VE GÖREVLER -->
+      <div id="sideViewTheory" class="space-y-3 flex-1 flex flex-col">
+        
+        <!-- Görev Listesi -->
+        <div class="bg-white p-3.5 chunky">
+          <div class="flex items-center justify-between border-b-2 border-gray-100 pb-2 mb-2">
+            <h3 class="display text-sm sm:text-base font-black text-ink flex items-center gap-1.5">
+              <span>🎯</span> <span>Tulumba Mühendisi Görevleri</span>
+            </h3>
+            <span id="missionProgressText" class="px-2 py-0.5 bg-sky-100 border border-ink rounded-full text-[10px] font-black text-sky-900">
+              0 / 3 Görev
+            </span>
+          </div>
+
+          <ul class="space-y-2 text-xs font-bold text-gray-700">
+            <li id="m1" class="flex items-start gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50 transition-colors">
+              <span class="m-check text-base">⭕</span>
+              <div>
+                <span class="text-ink font-black block">1. Görev: Şişeyi Sık ve Suyu Fışkırt</span>
+                <span class="text-[11px] text-gray-600 font-medium">Pozitif iç basınç ($P_{\text{iç}} > P_0$) oluşturarak suyu 2. pipetten bardağa fışkırt!</span>
+              </div>
+            </li>
+            <li id="m2" class="flex items-start gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50 transition-colors">
+              <span class="m-check text-base">⭕</span>
+              <div>
+                <span class="text-ink font-black block">2. Görev: Şişeyi Bırak ve Su Çek (Vakum)</span>
+                <span class="text-[11px] text-gray-600 font-medium">Şişeyi serbest bırak; düşen iç basınç ($P_{\text{iç}} < P_0$) sayesinde kaynaktan su emilmesini sağla!</span>
+              </div>
+            </li>
+            <li id="m3" class="flex items-start gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50 transition-colors">
+              <span class="m-check text-base">⭕</span>
+              <div>
+                <span class="text-ink font-black block">3. Görev: Oyun Hamurunu Gevşet (Hava Kaçağı)</span>
+                <span class="text-[11px] text-gray-600 font-medium">Hamuru gevşet ve hava kaçtığında basınç farkı oluşamadığı için tulumbanın durduğunu gör!</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Bilimsel İlke Açıklaması -->
+        <div class="bg-gradient-to-br from-sky-50 to-blue-50 p-3.5 chunky flex-1">
+          <h3 class="display text-sm sm:text-base font-black text-sky-950 flex items-center gap-1 mb-1.5">
+            <span>🔬</span> <span>Akışkanlar Neden Hareket Eder?</span>
+          </h3>
+          <div class="space-y-2 text-xs text-sky-900 font-medium leading-relaxed">
+            <p>
+              Doğadaki temel fizik kurallarından birine göre: <strong>Bütün akışkanlar daima YÜKSEK BASINÇTAN ALÇAK BASINCA DOĞRU akar!</strong>
+            </p>
+            <div class="bg-white p-2.5 rounded-xl border border-sky-200 shadow-sm space-y-1 text-[11px]">
+              <div class="flex justify-between font-black">
+                <span class="text-rose-600">Basma Fazı:</span>
+                <span class="text-rose-700">P_şişe (130 kPa) > P₀ (101.3 kPa) ➔ Su Fışkırır!</span>
+              </div>
+              <div class="flex justify-between font-black">
+                <span class="text-sky-600">Emme Fazı:</span>
+                <span class="text-sky-700">P_şişe (85 kPa) < P₀ (101.3 kPa) ➔ Su Çekilir!</span>
+              </div>
+              <p class="text-[10px] text-gray-500 pt-1 border-t border-gray-100">
+                Oyun hamuru şişe ağzında hava sızdırmaz bir <strong>conta</strong> görevi görür. Hamur olmasaydı içeri hava kaçar ve tulumba çalışmazdı!
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- SEÇENEK 2: EMME VS BASMA BASINÇ GRAFİĞİ -->
+      <div id="sideViewPressure" class="space-y-3 flex-1 flex flex-col hidden">
+        
+        <div class="bg-white p-3.5 chunky flex-1">
+          <h3 class="display text-sm sm:text-base font-black text-ink flex items-center gap-1.5 mb-2 border-b pb-1.5">
+            <span>⚖️</span> <span>Emme ve Basma Mekanizması Karşılaştırması</span>
+          </h3>
+
+          <div class="space-y-2.5 text-xs text-gray-700 font-medium">
+            
+            <div class="p-2.5 bg-rose-50 rounded-xl border border-rose-200">
+              <span class="font-black text-rose-900 block text-[11px] mb-1">🔴 1. Basma Fazı (Pozitif Basınç)</span>
+              <p class="text-[10px] text-rose-800 leading-snug">
+                Şişe sıkıldığında hacim küçülür, içindeki hava molekülleri sıkışarak su yüzeyine şiddetle bastırır. Sıvı kaçacak tek yol olan 2. pipetten bardağa fırlar.
+              </p>
+            </div>
+
+            <div class="p-2.5 bg-sky-50 rounded-xl border border-sky-200">
+              <span class="font-black text-sky-900 block text-[11px] mb-1">🔵 2. Emme Fazı (Negatif Basınç / Vakum)</span>
+              <p class="text-[10px] text-sky-800 leading-snug">
+                Şişe bırakıldığında plastik eski haline genişler. İçerideki hava genleştiği için iç basınç atmosfer basıncının altına düşer. Dışarıdaki açık hava basıncı ($P_0$) kaynak kaptaki suyu iterek 1. pipetten şişeye doldurur.
+              </p>
+            </div>
+
+            <div class="p-2.5 bg-amber-50 rounded-xl border border-amber-300 text-[11px] text-amber-950 font-bold">
+              <span>💡 Günlük Hayatta Nerede Var?</span> Köy tulumbalarında, bisiklet pompalarında, yangın söndürme araçlarında, tıbbi enjektörlerde ve parfüm püskürtücülerinde aynı basınç farkı ilkesi kullanılır!
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- SEÇENEK 3: 5 SORULUK MEB BİLGİ TESTİ (QUIZ) -->
+      <div id="sideViewQuiz" class="bg-white p-3.5 chunky flex-1 flex flex-col justify-between hidden">
+        
+        <div>
+          <!-- Quiz Üst Başlık -->
+          <div class="flex items-center justify-between border-b-2 border-gray-100 pb-2 mb-3">
+            <h3 class="display text-sm sm:text-base font-black text-ink flex items-center gap-1.5">
+              <span>⭐</span> <span>Tulumba Ustası Bilgi Testi</span>
+            </h3>
+            <span id="quizScoreText" class="px-2 py-0.5 bg-yellow-100 border border-ink rounded-full text-[10px] font-black text-amber-900">
+              Soru 1 / 5
+            </span>
+          </div>
+
+          <!-- Soru Kutusu -->
+          <div id="quizContainer">
+            <p id="quizQuestion" class="text-xs sm:text-sm font-black text-ink mb-3 leading-snug">
+              Soru yükleniyor...
+            </p>
+
+            <!-- Şıklar -->
+            <div id="quizOptions" class="space-y-2">
+              <!-- JS ile doldurulacak -->
+            </div>
+
+            <!-- Geri Bildirim Açıklaması -->
+            <div id="quizFeedback" class="mt-3 p-2.5 rounded-xl border text-xs font-bold hidden"></div>
+          </div>
+        </div>
+
+        <!-- İleri Butonu -->
+        <div class="mt-3 pt-2 border-t border-gray-100 flex justify-end">
+          <button id="btnNextQuestion" class="pushable px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-black text-xs flex items-center gap-1 hidden">
+            <span>Sonraki Soru</span> <span>➡️</span>
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ALT BİLGİ: PEDAGOJİK KAZANIM NOTU -->
+  <footer class="max-w-6xl w-full mx-auto mt-4 text-center text-xs font-bold text-gray-500">
+    <span>🧪 Küçük Mucitler Laboratuvarı — Deney 21: Emme-Basma Tulumba Modeli</span>
+    <span class="mx-1">•</span>
+    <span class="text-sky-700">MEB Fen Bilimleri Kazanımı: "Basınç farkıyla suyun taşındığını modeller."</span>
+  </footer>
+
+
+  <!-- JAVASCRIPT MOTORU: WEB AUDIO SESLERİ, ANİMASYONLAR VE TULUMBA MOTORU -->
+  <script>
+    // --- 1. WEB AUDIO API SENTETİK SESLER ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    const Sound = {
+      click() {
+        if (!soundEnabled) return;
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.setValueAtTime(450, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(750, audioCtx.currentTime + 0.05);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.05);
+      },
+
+      squirt() {
+        if (!soundEnabled) return;
+        initAudio();
+        // Fışkırma / basınçlı su sesi
+        const bufferSize = audioCtx.sampleRate * 0.3;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * 0.15));
+        }
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1200, audioCtx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.3);
+        const gain = audioCtx.createGain();
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        noise.start();
+      },
+
+      slurp() {
+        if (!soundEnabled) return;
+        initAudio();
+        // Vakumla su çekme fokurtusu
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(280, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(540, audioCtx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+      },
+
+      airLeak() {
+        if (!soundEnabled) return;
+        initAudio();
+        // Hava kaçağı fısıltısı
+        const bufferSize = audioCtx.sampleRate * 0.25;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        const gain = audioCtx.createGain();
+        noise.connect(gain);
+        gain.connect(audioCtx.destination);
+        gain.gain.setValueAtTime(0.14, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+        noise.start();
+      },
+
+      success() {
+        if (!soundEnabled) return;
+        initAudio();
+        const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
+        notes.forEach((freq, i) => {
+          setTimeout(() => {
+            if (!soundEnabled || !audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.18);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.18);
+          }, i * 70);
+        });
+      }
+    };
+
+    // Ses Aç / Kapat Butonu
+    const btnToggleSound = document.getElementById('btnToggleSound');
+    const soundIcon = document.getElementById('soundIcon');
+    btnToggleSound.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundIcon.textContent = soundEnabled ? '🔊' : '🔇';
+      btnToggleSound.querySelector('span:nth-child(2)').textContent = soundEnabled ? 'Ses Açık' : 'Sessiz';
+    });
+
+
+    // --- 2. DENEY DURUMU VE DEĞİŞKENLERİ ---
+    const State = {
+      isSealed: true,          // Oyun hamuru sızdırmaz mı?
+      isSqueezed: false,       // Şişe sıkılı mı?
+      isAutoPumping: false,    // Otomatik döngü aktif mi?
+      autoPumpInterval: null,
+      collectedVolume: 0,      // mL (0 - 200)
+      bottleWaterLevel: 60,    // Şişedeki su seviyesi %
+      missions: {
+        m1: false,             // Şişeyi sıkıp basma yapma
+        m2: false,             // Şişeyi bırakıp su emme
+        m3: false              // Hamuru gevşetip hava kaçağı görme
+      }
+    };
+
+    // DOM Elementleri
+    const bottleAssembly = document.getElementById('bottleAssembly');
+    const bottleBodyPath = document.getElementById('bottleBodyPath');
+    const bottleClipPath = document.getElementById('bottleClipPath');
+    const bottleWaterRect = document.getElementById('bottleWaterRect');
+    const bottleWaterSurface = document.getElementById('bottleWaterSurface');
+    const bottleAirVolume = document.getElementById('bottleAirVolume');
+    const innerPressureArrows = document.getElementById('innerPressureArrows');
+    const claySealGroup = document.getElementById('claySealGroup');
+    const clayBody = document.getElementById('clayBody');
+    const clayLabel = document.getElementById('clayLabel');
+    const clayLeakGroup = document.getElementById('clayLeakGroup');
+    const squeezingHands = document.getElementById('squeezingHands');
+    const suctionFlowStream = document.getElementById('suctionFlowStream');
+    const dischargeFlowStream = document.getElementById('dischargeFlowStream');
+    const dischargeWaterfall = document.getElementById('dischargeWaterfall');
+    const targetWaterPath = document.getElementById('targetWaterPath');
+    const targetWaterSurface = document.getElementById('targetWaterSurface');
+    const collectedVolumeText = document.getElementById('collectedVolumeText');
+    const successBadge = document.getElementById('successBadge');
+    const successBadgeText = document.getElementById('successBadgeText');
+
+    // Paneller ve Metinler
+    const tipIcon = document.getElementById('tipIcon');
+    const tipText = document.getElementById('tipText');
+    const innerPressureText = document.getElementById('innerPressureText');
+    const pumpPhaseText = document.getElementById('pumpPhaseText');
+    const sealStatusText = document.getElementById('sealStatusText');
+
+    // Butonlar
+    const btnSqueeze = document.getElementById('btnSqueeze');
+    const btnRelease = document.getElementById('btnRelease');
+    const btnAutoPump = document.getElementById('btnAutoPump');
+    const autoPumpIcon = document.getElementById('autoPumpIcon');
+    const autoPumpText = document.getElementById('autoPumpText');
+    const btnToggleSeal = document.getElementById('btnToggleSeal');
+    const sealBtnIcon = document.getElementById('sealBtnIcon');
+    const sealBtnText = document.getElementById('sealBtnText');
+    const btnResetExperiment = document.getElementById('btnResetExperiment');
+
+
+    // Normal ve Sıkılmış Şişe SVG Yolları (Deformasyon)
+    const normalBottleD = "M -42 20 C -42 -40 -25 -70 -16 -95 L 16 -95 C 25 -70 42 -40 42 20 C 42 75 35 110 30 120 L -30 120 C -35 110 -42 75 -42 20 Z";
+    const squeezedBottleD = "M -26 20 C -30 -40 -20 -70 -16 -95 L 16 -95 C 20 -70 30 -40 26 20 C 24 75 32 110 30 120 L -30 120 C -32 110 -24 75 -26 20 Z";
+
+
+    // --- 3. EMME VE BASMA MOTORU ---
+
+    // BASMA FAZI: Şişe Sıkılır, Pozitif Basınç Oluşur, Su Çıkış Pipetinden Bardağa Fırlar
+    function squeezeBottle() {
+      if (State.isSqueezed) return;
+      State.isSqueezed = true;
+
+      // 1. Şişenin deformasyonu (Sıkışma)
+      gsap.to(bottleBodyPath, { attr: { d: squeezedBottleD }, duration: 0.2, ease: "power2.out" });
+      gsap.to(bottleClipPath, { attr: { d: squeezedBottleD }, duration: 0.2, ease: "power2.out" });
+      squeezingHands.setAttribute('opacity', '1');
+
+      if (!State.isSealed) {
+        // Hamur gevşek / hava kaçırıyor: Basınç oluşamaz!
+        Sound.airLeak();
+        clayLeakGroup.setAttribute('opacity', '1');
+        innerPressureText.textContent = "101.3 kPa (Kaçak Var)";
+        innerPressureText.className = "display text-base sm:text-lg font-black text-rose-600";
+        pumpPhaseText.textContent = "Hava Kaçtı! 💨";
+        pumpPhaseText.className = "display text-xs sm:text-sm font-black text-rose-600 block mt-0.5";
+
+        tipIcon.textContent = "💨";
+        tipText.textContent = "Oyun hamuru gevşek olduğu için hava kaçtı! Şişe içinde basınç artamadı ve su taşınamadı!";
+        completeMission('m3');
+        return;
+      }
+
+      // Sızdırmaz Durum: Yüksek Basınç Oluşur
+      Sound.squirt();
+      innerPressureText.textContent = "132.0 kPa (Yüksek Basınç)";
+      innerPressureText.className = "display text-base sm:text-lg font-black text-rose-600";
+      pumpPhaseText.textContent = "Basma Fazı! 💦";
+      pumpPhaseText.className = "display text-xs sm:text-sm font-black text-rose-600 block mt-0.5";
+      innerPressureArrows.setAttribute('opacity', '1');
+
+      // Çıkış pipetinde su akışı başlar
+      dischargeFlowStream.setAttribute('opacity', '1');
+      dischargeWaterfall.setAttribute('opacity', '1');
+
+      // Hedef bardağa su eklenir
+      State.collectedVolume = Math.min(250, State.collectedVolume + 25);
+      updateTargetWaterLevel();
+
+      tipIcon.textContent = "💦";
+      tipText.textContent = `Şişe sıkılınca iç basınç (132 kPa) açık havayı (101.3 kPa) yendi! Su 2. pipetten bardağa fışkırdı! Şimdi şişeyi bırakarak su çek!`;
+      completeMission('m1');
+
+      // Başarı Rozeti
+      if (State.collectedVolume >= 75) {
+        showSuccessBadge("🎉 BASINÇ FARKIYLA SU TAŞINDI!");
+      }
+    }
+
+    // EMME FAZI: Şişe Bırakılır, Negatif Basınç (Vakum) Oluşur, Kaynaktan Su Çekilir
+    function releaseBottle() {
+      if (!State.isSqueezed) return;
+      State.isSqueezed = false;
+
+      // 1. Şişenin eski formuna dönmesi (Genişleme)
+      gsap.to(bottleBodyPath, { attr: { d: normalBottleD }, duration: 0.3, ease: "elastic.out(1, 0.5)" });
+      gsap.to(bottleClipPath, { attr: { d: normalBottleD }, duration: 0.3, ease: "elastic.out(1, 0.5)" });
+      squeezingHands.setAttribute('opacity', '0');
+      innerPressureArrows.setAttribute('opacity', '0');
+      clayLeakGroup.setAttribute('opacity', '0');
+
+      // Çıkış pipetindeki akış durur
+      dischargeFlowStream.setAttribute('opacity', '0');
+      dischargeWaterfall.setAttribute('opacity', '0');
+
+      if (!State.isSealed) {
+        // Hamur gevşek: Vakum oluşamaz
+        Sound.airLeak();
+        innerPressureText.textContent = "101.3 kPa (Denge)";
+        innerPressureText.className = "display text-base sm:text-lg font-black text-sky-600";
+        pumpPhaseText.textContent = "Beklemede ⏸️";
+        pumpPhaseText.className = "display text-xs sm:text-sm font-black text-amber-600 block mt-0.5";
+        return;
+      }
+
+      // Sızdırmaz Durum: Düşük Basınç (Vakum) Oluşur!
+      Sound.slurp();
+      innerPressureText.textContent = "84.5 kPa (Vakum / Düşük)";
+      innerPressureText.className = "display text-base sm:text-lg font-black text-purple-600";
+      pumpPhaseText.textContent = "Emme Fazı! 🔄";
+      pumpPhaseText.className = "display text-xs sm:text-sm font-black text-purple-600 block mt-0.5";
+
+      // 1. Pipetten su emilme akışı
+      suctionFlowStream.setAttribute('opacity', '1');
+      setTimeout(() => {
+        suctionFlowStream.setAttribute('opacity', '0');
+        innerPressureText.textContent = "101.3 kPa (Denge)";
+        innerPressureText.className = "display text-base sm:text-lg font-black text-sky-600";
+        pumpPhaseText.textContent = "Hazır ✅";
+        pumpPhaseText.className = "display text-xs sm:text-sm font-black text-emerald-600 block mt-0.5";
+      }, 700);
+
+      tipIcon.textContent = "🔄";
+      tipText.textContent = "Şişe genişleyince iç basınç (84.5 kPa) açık hava basıncının altına düştü! Dış basınç suyu 1. pipetten şişeye iterek doldurdu!";
+      completeMission('m2');
+    }
+
+    btnSqueeze.addEventListener('click', squeezeBottle);
+    btnRelease.addEventListener('click', releaseBottle);
+
+    // Hedef Bardaktaki Su Yüksekliğini Güncelle
+    function updateTargetWaterLevel() {
+      collectedVolumeText.textContent = `${State.collectedVolume} mL`;
+      // Hacme göre su derinliği (35 mm'den -30 mm'ye yükselir)
+      const targetY = 35 - (State.collectedVolume / 250) * 65;
+      gsap.to(targetWaterPath, {
+        attr: { d: `M -27 ${targetY} L -26 42 Q 0 48 26 42 L 27 ${targetY} Z` },
+        duration: 0.3
+      });
+      gsap.to(targetWaterSurface, { cy: targetY, duration: 0.3 });
+    }
+
+    // Oyun Hamuru Sızdırmazlık Anahtarı
+    function toggleSeal() {
+      Sound.click();
+      State.isSealed = !State.isSealed;
+
+      if (State.isSealed) {
+        // Sızdırmaz
+        clayBody.setAttribute('fill', 'url(#clayGrad)');
+        clayLabel.textContent = "Oyun Hamuru (Sızdırmaz)";
+        clayLabel.setAttribute('fill', '#c2410c');
+        clayLeakGroup.setAttribute('opacity', '0');
+        sealStatusText.textContent = "Hava Sızdırmaz ✅";
+        sealStatusText.className = "display text-xs sm:text-sm font-black text-emerald-600 block mt-0.5";
+        sealBtnIcon.textContent = "🟡";
+        sealBtnText.textContent = "Hamuru Gevşet";
+        btnToggleSeal.className = "pushable py-2.5 px-2 bg-amber-200 hover:bg-amber-300 text-ink font-black text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5";
+        tipIcon.textContent = "✅";
+        tipText.textContent = "Oyun hamuru sımsıkı kapatıldı! Artık basınç farkı oluşabilir; şişeyi sıkıp bırakarak su pompalayabilirsin!";
+      } else {
+        // Gevşek / Kaçak
+        clayBody.setAttribute('fill', '#fca5a5');
+        clayLabel.textContent = "Oyun Hamuru (Hava Kaçırıyor!)";
+        clayLabel.setAttribute('fill', '#dc2626');
+        clayLeakGroup.setAttribute('opacity', '1');
+        sealStatusText.textContent = "Kaçak Var ❌";
+        sealStatusText.className = "display text-xs sm:text-sm font-black text-rose-600 block mt-0.5";
+        sealBtnIcon.textContent = "💨";
+        sealBtnText.textContent = "Hamuru Sıkıla";
+        btnToggleSeal.className = "pushable py-2.5 px-2 bg-rose-200 hover:bg-rose-300 text-rose-950 font-black text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5";
+        tipIcon.textContent = "⚠️";
+        tipText.textContent = "Oyun hamurunda delik açıldı! Şimdi şişeyi sıkmayı dene; havanın kaçtığını ve suyun taşınamadığını gözlemle!";
+        completeMission('m3');
+      }
+    }
+
+    btnToggleSeal.addEventListener('click', toggleSeal);
+
+    // Otomatik Pompalama (Ritmik Emme-Basma Döngüsü)
+    function toggleAutoPump() {
+      Sound.click();
+      State.isAutoPumping = !State.isAutoPumping;
+
+      if (State.isAutoPumping) {
+        autoPumpIcon.textContent = "⏹️";
+        autoPumpText.textContent = "Pompayı Durdur";
+        btnAutoPump.className = "pushable py-2.5 px-2 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-card animate-pulse";
+        
+        let cycle = true;
+        State.autoPumpInterval = setInterval(() => {
+          if (cycle) {
+            squeezeBottle();
+          } else {
+            releaseBottle();
+          }
+          cycle = !cycle;
+        }, 650);
+
+      } else {
+        clearInterval(State.autoPumpInterval);
+        State.autoPumpInterval = null;
+        autoPumpIcon.textContent = "🔄";
+        autoPumpText.textContent = "Otomatik Pompa";
+        btnAutoPump.className = "pushable py-2.5 px-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 shadow-card";
+        releaseBottle();
+      }
+    }
+
+    btnAutoPump.addEventListener('click', toggleAutoPump);
+
+    // Başarı Rozeti Gösterimi
+    function showSuccessBadge(text) {
+      successBadgeText.textContent = text;
+      gsap.killTweensOf(successBadge);
+      gsap.fromTo(successBadge, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35, ease: "back.out(2)" });
+      Sound.success();
+      if (window.confetti) {
+        confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
+      }
+    }
+
+    // Deneyi Sıfırla
+    function resetExperiment() {
+      Sound.click();
+      if (State.isAutoPumping) {
+        toggleAutoPump();
+      }
+
+      gsap.killTweensOf(bottleBodyPath);
+      gsap.killTweensOf(bottleClipPath);
+      gsap.killTweensOf(successBadge);
+
+      gsap.set(successBadge, { opacity: 0 });
+      gsap.set(bottleBodyPath, { attr: { d: normalBottleD } });
+      gsap.set(bottleClipPath, { attr: { d: normalBottleD } });
+
+      squeezingHands.setAttribute('opacity', '0');
+      innerPressureArrows.setAttribute('opacity', '0');
+      suctionFlowStream.setAttribute('opacity', '0');
+      dischargeFlowStream.setAttribute('opacity', '0');
+      dischargeWaterfall.setAttribute('opacity', '0');
+      clayLeakGroup.setAttribute('opacity', '0');
+
+      State.isSqueezed = false;
+      State.collectedVolume = 0;
+      updateTargetWaterLevel();
+
+      if (!State.isSealed) {
+        toggleSeal();
+      }
+
+      innerPressureText.textContent = "101.3 kPa (Denge)";
+      innerPressureText.className = "display text-base sm:text-lg font-black text-sky-600";
+      pumpPhaseText.textContent = "Beklemede ⏸️";
+      pumpPhaseText.className = "display text-xs sm:text-sm font-black text-amber-600 block mt-0.5";
+
+      tipIcon.textContent = "💡";
+      tipText.textContent = "Deney sıfırlandı. Şişeyi sıkarak basma, bırakarak emme yapabilirsin!";
+    }
+
+    btnResetExperiment.addEventListener('click', resetExperiment);
+
+
+    // --- 4. GÖREV TAKİP SİSTEMİ ---
+    function completeMission(key) {
+      if (!State.missions[key]) {
+        State.missions[key] = true;
+        const item = document.getElementById(key);
+        if (item) {
+          item.className = "flex items-start gap-2 p-2 rounded-xl border-2 border-emerald-500 bg-emerald-50 transition-colors";
+          item.querySelector('.m-check').textContent = "✅";
+        }
+        
+        // İlerleme Sayacı
+        const completedCount = Object.values(State.missions).filter(Boolean).length;
+        document.getElementById('missionProgressText').textContent = `${completedCount} / 3 Görev`;
+
+        if (completedCount === 3) {
+          setTimeout(() => {
+            if (window.confetti) {
+              confetti({ particleCount: 90, spread: 80, origin: { y: 0.5 } });
+            }
+          }, 400);
+        }
+      }
+    }
+
+
+    // --- 5. SEKME GEÇİŞLERİ ---
+    const tabTheory = document.getElementById('tabTheory');
+    const tabPressure = document.getElementById('tabPressure');
+    const tabQuiz = document.getElementById('tabQuiz');
+    const sideViewTheory = document.getElementById('sideViewTheory');
+    const sideViewPressure = document.getElementById('sideViewPressure');
+    const sideViewQuiz = document.getElementById('sideViewQuiz');
+
+    function switchTab(activeTab, activeView) {
+      Sound.click();
+      [tabTheory, tabPressure, tabQuiz].forEach(tab => {
+        tab.className = "side-tab-btn py-1.5 rounded-xl text-gray-700 hover:bg-white/60";
+      });
+      activeTab.className = "side-tab-btn py-1.5 rounded-xl bg-white border-2 border-ink shadow-sm text-ink";
+
+      [sideViewTheory, sideViewPressure, sideViewQuiz].forEach(view => {
+        view.classList.add('hidden');
+      });
+      activeView.classList.remove('hidden');
+    }
+
+    tabTheory.addEventListener('click', () => switchTab(tabTheory, sideViewTheory));
+    tabPressure.addEventListener('click', () => switchTab(tabPressure, sideViewPressure));
+    tabQuiz.addEventListener('click', () => {
+      switchTab(tabQuiz, sideViewQuiz);
+      if (currentQuestionIdx === 0 && !hasAnswered) {
+        renderQuestion();
+      }
+    });
+
+
+    // --- 6. 5 SORULUK MEB BASINÇ TESTİ (QUIZ) ---
+    const quizData = [
+      {
+        question: "Emme-basma tulumba modelinde suyun borular boyunca hareket etmesini sağlayan temel fiziksel ilke nedir?",
+        options: [
+          "Suyun kendiliğinden yer çekimini yenerek buharlaşması",
+          "Akışkanların yüksek basınçtan alçak basınca doğru hareket etmesi",
+          "Pipetlerin manyetik bir çekim kuvveti üretmesi",
+          "Oyun hamurunun suyu kimyasal olarak çekmesi"
+        ],
+        correct: 1,
+        explanation: "Harika! Akışkanlar (sıvı ve gazlar) daima yüksek basınçlı bölgeden alçak basınçlı bölgeye doğru akar."
+      },
+      {
+        question: "Şişe sıkıldığında (Basma fazında) suyun 2. pipetten dışarı fışkırmasının nedeni nedir?",
+        options: [
+          "Şişe içindeki havanın sıkışarak iç basıncı artırması ve su yüzeyini aşağı itmesi",
+          "Dışarıdaki açık hava basıncının aniden sıfıra inmesi",
+          "Şişedeki suyun sıcaklığının kaynama noktasına ulaşması",
+          "Pipetin genişleyip suyu emmesi"
+        ],
+        correct: 0,
+        explanation: "Tebrikler! Sıkılan şişede hacim küçülür, iç basınç açık hava basıncından büyük olur (P_iç > P₀) ve su fışkırır."
+      },
+      {
+        question: "Şişe serbest bırakıldığında (Emme fazında) kaynaktaki suyun 1. pipetten şişeye dolmasını sağlayan kuvvet nedir?",
+        options: [
+          "Şişenin içindeki havanın suyu çekmesi",
+          "Açık hava basıncının kaynak kaptaki su yüzeyine bastırması",
+          "Pipetin içindeki havanın suyu itmesi",
+          "Masa tablasının manyetik kuvveti"
+        ],
+        correct: 1,
+        explanation: "Kesinlikle doğru! Şişe genişleyince iç basınç düşer (vakum oluşur). Dışarıdaki 101.3 kPa açık hava basıncı suyu pipetten yukarı iter."
+      },
+      {
+        question: "Pet şişenin kapağındaki oyun hamuru gevşetilirse veya hava kaçırırsa ne olur?",
+        options: [
+          "Tulumba 2 kat daha hızlı su pompalar",
+          "İçeri hava gireceği için basınç farkı oluşamaz ve tulumba çalışmaz",
+          "Suyun rengi aniden değişir",
+          "Pipetler kendi kendine tıkanır"
+        ],
+        correct: 1,
+        explanation: "Mükemmel! Oyun hamuru hava sızdırmaz conta görevi görür. Kaçak olursa basınç farkı (ΔP = 0) oluşamaz ve tulumba durur."
+      },
+      {
+        question: "Aşağıdakilerden hangisi emme-basma tulumbalarla aynı basınç farkı ilkesiyle çalışan bir araçtır?",
+        options: [
+          "Tıbbi enjektör (iğne)",
+          "Bisiklet el pompası",
+          "Parfüm püskürtücü (sprey)",
+          "Hepsi (A, B ve C)"
+        ],
+        correct: 3,
+        explanation: "Harikasın! Enjektörler, bisiklet pompaları ve parfüm spreyleri tamamen basınç farkı (emme-basma) prensibiyle çalışır."
+      }
+    ];
+
+    let currentQuestionIdx = 0;
+    let quizScore = 0;
+    let hasAnswered = false;
+
+    const quizQuestion = document.getElementById('quizQuestion');
+    const quizOptions = document.getElementById('quizOptions');
+    const quizFeedback = document.getElementById('quizFeedback');
+    const btnNextQuestion = document.getElementById('btnNextQuestion');
+    const quizScoreText = document.getElementById('quizScoreText');
+
+    function renderQuestion() {
+      hasAnswered = false;
+      quizFeedback.classList.add('hidden');
+      btnNextQuestion.classList.add('hidden');
+
+      const q = quizData[currentQuestionIdx];
+      quizScoreText.textContent = `Soru ${currentQuestionIdx + 1} / ${quizData.length}`;
+      quizQuestion.textContent = q.question;
+      quizOptions.innerHTML = '';
+
+      q.options.forEach((optText, index) => {
+        const btn = document.createElement('button');
+        btn.className = "w-full text-left p-2.5 rounded-xl border-2 border-ink bg-gray-50 hover:bg-sky-50 text-xs font-bold transition-colors flex items-center gap-2";
+        btn.innerHTML = `<span class="w-5 h-5 rounded-full bg-white border border-ink flex items-center justify-center text-[10px] font-black shrink-0">${['A','B','C','D'][index]}</span> <span>${optText}</span>`;
+        btn.addEventListener('click', () => handleOptionClick(index, btn));
+        quizOptions.appendChild(btn);
+      });
+    }
+
+    function handleOptionClick(selectedIdx, btnElement) {
+      if (hasAnswered) return;
+      hasAnswered = true;
+      initAudio();
+
+      const q = quizData[currentQuestionIdx];
+      const isCorrect = (selectedIdx === q.correct);
+
+      if (isCorrect) {
+        quizScore++;
+        Sound.success();
+        btnElement.className = "w-full text-left p-2.5 rounded-xl border-2 border-emerald-600 bg-emerald-100 text-emerald-950 text-xs font-black";
+        quizFeedback.className = "mt-3 p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-50 text-emerald-900 text-xs font-bold block";
+        quizFeedback.innerHTML = `✅ <strong>DOĞRU!</strong> ${q.explanation}`;
+      } else {
+        Sound.airLeak();
+        btnElement.className = "w-full text-left p-2.5 rounded-xl border-2 border-rose-600 bg-rose-100 text-rose-950 text-xs font-black";
+        quizFeedback.className = "mt-3 p-2.5 rounded-xl border-2 border-rose-500 bg-rose-50 text-rose-900 text-xs font-bold block";
+        quizFeedback.innerHTML = `❌ <strong>BİLGİ:</strong> Doğru cevap: <em>${q.options[q.correct]}</em>.<br>${q.explanation}`;
+      }
+
+      btnNextQuestion.classList.remove('hidden');
+      if (currentQuestionIdx === quizData.length - 1) {
+        btnNextQuestion.innerHTML = `<span>Sonuçları Gör</span> <span>🏆</span>`;
+      }
+    }
+
+    btnNextQuestion.addEventListener('click', () => {
+      Sound.click();
+      if (currentQuestionIdx < quizData.length - 1) {
+        currentQuestionIdx++;
+        renderQuestion();
+      } else {
+        // Quiz Tamamlandı
+        quizQuestion.textContent = "Tebrikler! Tulumba Ustası Bilgi Testini Tamamladın! 🏆";
+        quizOptions.innerHTML = `
+          <div class="p-4 bg-sky-50 border-2 border-sky-500 rounded-2xl text-center space-y-2">
+            <span class="text-4xl block">🎖️</span>
+            <span class="display text-lg font-black text-sky-900 block">Skorun: ${quizScore} / ${quizData.length}</span>
+            <p class="text-xs text-sky-800 font-bold">
+              ${quizScore >= 4 ? 'Harikasın! Gerçek bir Akışkanlar ve Basınç Mühendisisin!' : 'Güzel deneme! Bilgilerini pekiştirmek için simülasyonu tekrar inceleyebilirsin!'}
+            </p>
+          </div>
+        `;
+        quizFeedback.classList.add('hidden');
+        btnNextQuestion.classList.add('hidden');
+        if (window.confetti && quizScore >= 3) {
+          confetti({ particleCount: 70, spread: 70, origin: { y: 0.6 } });
+        }
+      }
+    });
+
+    // Başlangıç Kurulumu
+    renderQuestion();
+  </script>
+</body>
+</html>

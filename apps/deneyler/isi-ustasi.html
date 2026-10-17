@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Isı Ustası: Maddenin Hâlleri | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'sans-serif'],
+            display: ['Baloo 2', 'cursive'],
+          },
+          colors: {
+            bgMain: '#fffbeb',
+            ink: '#0f172a',
+            heatRed: '#ef4444',
+            iceBlue: '#38bdf8',
+          },
+          borderWidth: { '3': '3px' },
+          boxShadow: {
+            'hard': '4px 4px 0px #0f172a',
+            'hard-sm': '2px 2px 0px #0f172a',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky {
+      border: 3.5px solid #0f172a;
+      border-radius: 1.25rem;
+      box-shadow: 4px 4px 0px #0f172a;
+    }
+    .pushable {
+      border: 3px solid #0f172a;
+      border-radius: 0.85rem;
+      box-shadow: 3px 3px 0px #0f172a;
+      transition: all 0.12s ease;
+      cursor: pointer;
+    }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .active-tab {
+      background-color: #facc15 !important;
+      color: #0f172a !important;
+      border-color: #0f172a !important;
+    }
+    .heat-active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #0f172a !important;
+      outline: 3px solid #facc15;
+      outline-offset: 2px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <!-- Üst Başlık -->
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-ink text-sm font-black flex items-center gap-1">
+        <span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span>
+      </a>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">🧊</span>
+          <h1 class="display text-lg sm:text-2xl font-black text-ink tracking-wide">
+            Isı Ustası: Maddenin Hâlleri
+          </h1>
+        </div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">
+          Isıt, soğut, siparişleri yetiştir! Büyüteçle taneciklerin dansını izle. 🔥❄️
+        </p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1">
+          <span>🎯</span> <span>1. Siparişler</span>
+        </button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1">
+          <span>🔬</span> <span>2. Test Masası</span>
+        </button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1" title="Sesi Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <!-- SOL PANEL -->
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3 relative">
+
+        <!-- Seviye Çubuğu -->
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black text-ink shadow-sm">SİPARİŞ 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black text-ink">Buzu Erit</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+          <!-- Madde Seçici (Test Masası) -->
+          <div id="substancePicker" class="hidden items-center gap-1.5"></div>
+        </div>
+
+        <!-- Hedef Kartı -->
+        <div id="goalCard" class="flex items-center justify-between gap-2 p-2.5 bg-sky-50 rounded-xl border-2 border-ink">
+          <div class="flex items-center gap-2">
+            <span id="goalIcon" class="text-2xl">🧊</span>
+            <div>
+              <p class="text-[10px] font-black text-sky-700 uppercase tracking-wider">Sipariş</p>
+              <p id="goalText" class="text-xs sm:text-sm font-black text-ink">Buzun tamamını eritip su yap.</p>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <p class="text-[10px] font-black text-gray-500">SÜRE</p>
+            <p id="timerText" class="display text-xl font-black text-ink leading-none">0.0 sn</p>
+          </div>
+        </div>
+
+        <!-- Süreç Rozeti -->
+        <div class="flex items-center -mb-1">
+          <div class="bg-white px-2.5 py-1 rounded-xl border-2 border-ink text-[11px] sm:text-xs font-black shadow-sm">
+            <span id="processText">⏸️ Ocak kapalı</span>
+          </div>
+        </div>
+
+        <!-- CANVAS SAHNE -->
+        <div class="relative w-full rounded-2xl border-3 border-ink overflow-hidden bg-orange-50 shadow-inner">
+          <canvas id="stage" class="w-full h-auto block"></canvas>
+          <div id="burnBadge" class="absolute top-2 right-2 bg-red-500 text-white px-2.5 py-1 rounded-xl border-2 border-ink text-[11px] font-black shadow-sm pointer-events-none hidden">
+            🔥 Yanıyor!
+          </div>
+        </div>
+
+        <!-- ISITICI KONTROLLERİ -->
+        <div>
+          <label class="text-xs font-black text-gray-700 flex items-center gap-1.5 mb-2">
+            <span>🎛️</span> <span>Isı Düğmesi:</span>
+          </label>
+          <div class="grid grid-cols-5 gap-2" id="heatButtons">
+            <button data-heat="-2" class="heat-btn pushable py-2 bg-sky-300 hover:bg-sky-200 text-ink font-black text-xs flex flex-col items-center"><span class="text-lg">❄️❄️</span><span>Çok Soğut</span></button>
+            <button data-heat="-1" class="heat-btn pushable py-2 bg-sky-100 hover:bg-sky-50 text-ink font-black text-xs flex flex-col items-center"><span class="text-lg">❄️</span><span>Soğut</span></button>
+            <button data-heat="0" class="heat-btn pushable py-2 bg-gray-100 hover:bg-gray-50 text-ink font-black text-xs flex flex-col items-center heat-active"><span class="text-lg">⏸️</span><span>Kapalı</span></button>
+            <button data-heat="1" class="heat-btn pushable py-2 bg-orange-100 hover:bg-orange-50 text-ink font-black text-xs flex flex-col items-center"><span class="text-lg">🔥</span><span>Isıt</span></button>
+            <button data-heat="2" class="heat-btn pushable py-2 bg-orange-300 hover:bg-orange-200 text-ink font-black text-xs flex flex-col items-center"><span class="text-lg">🔥🔥</span><span>Çok Isıt</span></button>
+          </div>
+        </div>
+
+        <!-- AKSİYON BUTONLARI -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <div class="flex items-center gap-2">
+            <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-ink text-xs font-black flex items-center gap-1">
+              <span>🔄</span> <span>Baştan Başla</span>
+            </button>
+            <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black flex items-center gap-1">
+              <span>💡</span> <span>İpucu</span>
+            </button>
+          </div>
+          <button id="btnNextLevel" class="pushable px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black hidden items-center gap-1">
+            <span>Sonraki Sipariş</span> <span>➔</span>
+          </button>
+        </div>
+
+        <!-- BİLİM NOTU -->
+        <div class="p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shadow-sm shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black text-ink">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">
+              Bütün maddeler minicik <b>taneciklerden</b> oluşur. Isı alan tanecikler daha hızlı hareket eder. Bu yüzden katılar erir, sıvılar da buharlaşır!
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- SAĞ PANEL -->
+    <div class="lg:col-span-5 flex flex-col gap-3">
+
+      <!-- GÖREVLER -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🎯</span>
+            <h3 class="display text-base font-black text-ink">Isı Ustası Görevleri</h3>
+          </div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <!-- GÖSTERGELER & GRAFİK -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">📈</span>
+            <h3 class="display text-base font-black text-ink">Sıcaklık – Zaman Grafiği</h3>
+          </div>
+          <span id="tempBig" class="display text-lg font-black text-red-600">-15 °C</span>
+        </div>
+        <canvas id="graph" class="w-full h-auto block rounded-xl border-2 border-ink bg-slate-50"></canvas>
+        <p class="text-[10px] font-bold text-gray-500 mt-1.5">📌 Çizginin <b>düz</b> kaldığı yerlere dikkat et: Madde o sırada hâl değiştiriyor!</p>
+
+        <div class="mt-3 space-y-1.5">
+          <div class="flex items-center gap-2 text-[11px] font-black">
+            <span class="w-14" id="lblSolid">🧊 Katı</span>
+            <div class="flex-1 h-3.5 bg-gray-100 rounded-full border-2 border-ink overflow-hidden"><div id="barSolid" class="h-full bg-sky-300 transition-all duration-150" style="width:100%"></div></div>
+            <span class="w-9 text-right" id="pctSolid">100%</span>
+          </div>
+          <div class="flex items-center gap-2 text-[11px] font-black">
+            <span class="w-14" id="lblLiquid">💧 Sıvı</span>
+            <div class="flex-1 h-3.5 bg-gray-100 rounded-full border-2 border-ink overflow-hidden"><div id="barLiquid" class="h-full bg-blue-500 transition-all duration-150" style="width:0%"></div></div>
+            <span class="w-9 text-right" id="pctLiquid">0%</span>
+          </div>
+          <div class="flex items-center gap-2 text-[11px] font-black">
+            <span class="w-14" id="lblGas">☁️ Gaz</span>
+            <div class="flex-1 h-3.5 bg-gray-100 rounded-full border-2 border-ink overflow-hidden"><div id="barGas" class="h-full bg-slate-400 transition-all duration-150" style="width:0%"></div></div>
+            <span class="w-9 text-right" id="pctGas">0%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- FEN BİLGİSİ REHBERİ -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <span class="text-xl">📚</span>
+          <h3 class="display text-base font-black text-ink">Fen Bilgisi Rehberi</h3>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-xs font-bold">
+          <div class="p-2 bg-sky-50 rounded-lg border border-sky-300">
+            <p class="text-sky-900 font-extrabold">🧊➔💧 Erime</p>
+            <p class="text-[11px] text-sky-800 font-semibold">Katı, ısı alarak sıvı olur.</p>
+          </div>
+          <div class="p-2 bg-indigo-50 rounded-lg border border-indigo-300">
+            <p class="text-indigo-900 font-extrabold">💧➔🧊 Donma</p>
+            <p class="text-[11px] text-indigo-800 font-semibold">Sıvı, ısı vererek katı olur.</p>
+          </div>
+          <div class="p-2 bg-orange-50 rounded-lg border border-orange-300">
+            <p class="text-orange-900 font-extrabold">💧➔☁️ Buharlaşma</p>
+            <p class="text-[11px] text-orange-800 font-semibold">Sıvı, ısı alarak gaz olur.</p>
+          </div>
+          <div class="p-2 bg-emerald-50 rounded-lg border border-emerald-300">
+            <p class="text-emerald-900 font-extrabold">☁️➔💧 Yoğuşma</p>
+            <p class="text-[11px] text-emerald-800 font-semibold">Gaz, ısı vererek sıvı olur.</p>
+          </div>
+        </div>
+        <div class="p-2 mt-2 bg-amber-50 rounded-lg border border-amber-300 text-xs">
+          <p class="text-amber-900 font-extrabold">🌡️ Isı ve Sıcaklık Aynı Şey mi?</p>
+          <p class="text-[11px] text-amber-800 font-semibold mt-0.5"><b>Isı</b> sıcak maddeden soğuk maddeye aktarılan enerjidir. <b>Sıcaklık</b> ise termometreyle ölçtüğümüz değerdir. Hâl değişimi sırasında madde ısı almaya devam eder ama sıcaklığı değişmez!</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- SONUÇ PENCERESİ -->
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black text-ink">Sipariş Hazır!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-sky-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-sky-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-ink text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() {
+      if (!audioCtx) audioCtx = new AudioCtx();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(f1, t);
+        osc.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        gain.gain.setValueAtTime(vol, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(t); osc.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      fire() { tone('sawtooth', 120, 260, 0.2, 0.08); },
+      ice() { tone('sine', 1400, 900, 0.15, 0.1); },
+      bubble() { tone('sine', 300 + Math.random() * 300, 900, 0.07, 0.05); },
+      phase() { tone('triangle', 660, 990, 0.15, 0.15); },
+      fail() { tone('sawtooth', 300, 90, 0.5, 0.2); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. MADDELER VE SİPARİŞLER ---
+    const TMIN = -30, TMAX = 130, ROOM = 22;
+    const HEAT_RATE = 14; // °C/sn (1. kademe)
+
+    const SUBSTANCES = {
+      su: {
+        name: 'Su', icon: '💧', mp: 0, bp: 100, burn: null, Lm: 140, Lb: 220,
+        solid: 'Buz', liquid: 'Su', gas: 'Su Buharı',
+        cSolid: '#bae6fd', cLiquid: '#38bdf8', cGas: '#e2e8f0', cParticle: '#0ea5e9'
+      },
+      cikolata: {
+        name: 'Çikolata', icon: '🍫', mp: 34, bp: null, burn: 60, Lm: 90, Lb: 0,
+        solid: 'Katı Çikolata', liquid: 'Erimiş Çikolata', gas: '-',
+        cSolid: '#78350f', cLiquid: '#92400e', cGas: '#a8a29e', cParticle: '#b45309'
+      },
+      mum: {
+        name: 'Mum', icon: '🕯️', mp: 58, bp: null, burn: null, Lm: 100, Lb: 0,
+        solid: 'Katı Mum', liquid: 'Sıvı Mum', gas: '-',
+        cSolid: '#fde68a', cLiquid: '#fbbf24', cGas: '#e5e7eb', cParticle: '#f59e0b'
+      }
+    };
+
+    const LEVELS = [
+      {
+        title: 'Buzu Erit', icon: '🧊', sub: 'su', T0: -15, par: 7,
+        goal: 'Buzun tamamını eritip su yap.',
+        check: s => s.melt >= 1 && s.boil <= 0,
+        hint: 'Isıt düğmesine bas ve termometreyi izle. 0 °C\'ye gelince sıcaklık bir süre değişmeyecek. Sabret, buz o sırada eriyor!',
+        fact: 'Buz 0 °C\'de erir. Buz eriyene kadar suyun sıcaklığı 0 °C\'de kalır, çünkü alınan ısı tanecikleri birbirinden ayırmak için harcanır.'
+      },
+      {
+        title: 'Çaydanlığı Öttür', icon: '🫖', sub: 'su', T0: 20, par: 13,
+        goal: 'Suyun tamamını buharlaştır.',
+        check: s => s.boil >= 1,
+        hint: 'Çok Isıt düğmesiyle suyu 100 °C\'ye getir. Su kaynarken sıcaklık 100 °C\'de kalır. Suyun hepsi buhar olana kadar ısıtmaya devam et.',
+        fact: 'Deniz seviyesinde su 100 °C\'de kaynar. Kaynayan suyun içinde oluşan kabarcıklar su buharıyla doludur!'
+      },
+      {
+        title: 'Buharı Yakala', icon: '☁️', sub: 'su', T0: 115, par: 10,
+        goal: 'Kavanozdaki su buharını soğutup tekrar suya dönüştür.',
+        check: s => s.boil <= 0,
+        hint: 'Buhar soğudukça yoğuşur. Soğut düğmesine bas ve kavanozun duvarlarında damlacıkların oluşmasını izle.',
+        fact: 'Sıcak duştan sonra aynanın buğulanması <b>yoğuşmadır</b>. Havadaki su buharı soğuk aynaya değince su damlacıklarına dönüşür.'
+      },
+      {
+        title: 'Buz Kalıbı', icon: '🧊', sub: 'su', T0: 25, par: 8,
+        goal: 'Suyun tamamını dondurup buz yap.',
+        check: s => s.melt <= 0,
+        hint: 'Çok Soğut ile suyu 0 °C\'ye indir. Su donarken sıcaklık yine 0 °C\'de sabit kalacak!',
+        fact: 'Su donunca hacmi biraz artar. Bu yüzden ağzına kadar suyla doldurulup dondurucuya konan cam şişe çatlayabilir!'
+      },
+      {
+        title: 'Ilık Banyo Suyu', icon: '🛁', sub: 'su', T0: -10, par: 13,
+        goal: 'Buzu erit ve suyu 35–40 °C arasında 3 saniye tut.',
+        hold: 3,
+        check: s => s.melt >= 1 && s.boil <= 0 && s.T >= 35 && s.T <= 40,
+        hint: 'Önce buzu erit. Su 30 °C\'ye yaklaşınca ısıyı azalt. Sıcaklık hedef aralıktayken ocağı kapat ve bekle.',
+        fact: 'Termometre, sıcaklığı ölçen araçtır. Vücut sıcaklığımız yaklaşık 36–37 °C\'dir. Bu yüzden 35–40 °C arasındaki su bize ılık gelir.'
+      },
+      {
+        title: 'Çikolata Şelalesi', icon: '🍫', sub: 'cikolata', T0: 15, par: 13,
+        goal: 'Çikolatayı erit ve 45–55 °C arasında 2 saniye tut. 60 °C\'yi geçersen yanar!',
+        hold: 2,
+        check: s => s.melt >= 1 && s.T >= 45 && s.T <= 55,
+        hint: 'Çikolata yaklaşık 34 °C\'de erimeye başlar. Tamamen eriyince sıcaklık hızla yükselir. Çok Isıt yerine yavaş Isıt kullan, 45 °C\'yi geçince ocağı kapat.',
+        fact: 'Her maddenin erime sıcaklığı farklıdır: Buz 0 °C\'de, çikolata yaklaşık 34 °C\'de, mum yaklaşık 58 °C\'de erir. Erime sıcaklığı maddeyi tanımamızı sağlayan bir özelliktir.'
+      }
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: İlk Erime', text: 'İlk siparişte buzu eritip su yap.' },
+      { id: 'm2', title: '2. Görev: Sabit Sıcaklık Dedektifi', text: 'Hâl değişirken sıcaklığın 2 saniye boyunca sabit kaldığını grafikte gör.' },
+      { id: 'm3', title: '3. Görev: Dört Hâl Değişimi', text: 'Erime, donma, buharlaşma ve yoğuşmanın hepsini gerçekleştir.', progress: true },
+      { id: 'm4', title: '4. Görev: Usta Şef', text: '6 siparişin hepsini tamamla.' }
+    ];
+
+    // --- 3. DURUM ---
+    let mode = 'levels';
+    let levelIndex = 0;
+    let sub = SUBSTANCES.su;
+    const S = { T: -15, melt: 0, boil: 0 };
+    let heat = 0;
+    let elapsed = 0;
+    let holdTime = 0;
+    let finished = false;
+    let score = 0;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    const seenProcesses = new Set();
+    let plateauTime = 0;
+    let history = [];
+    let historyTimer = 0;
+
+    // --- 4. ENERJİ MODELİ ---
+    function setInitialState(T0) {
+      S.T = T0;
+      S.melt = T0 > sub.mp ? 1 : 0;
+      S.boil = sub.bp !== null && T0 > sub.bp ? 1 : 0;
+    }
+
+    function addHeat(q) {
+      let guard = 0;
+      while (q > 1e-9 && guard++ < 10) {
+        if (S.melt < 1) {
+          if (S.T < sub.mp) { const d = Math.min(q, sub.mp - S.T); S.T += d; q -= d; }
+          else { S.T = sub.mp; const d = Math.min(q, (1 - S.melt) * sub.Lm); S.melt += d / sub.Lm; q -= d; if (S.melt > 0.9995) S.melt = 1; }
+        } else if (sub.bp !== null && S.boil < 1) {
+          if (S.T < sub.bp) { const d = Math.min(q, sub.bp - S.T); S.T += d; q -= d; }
+          else { S.T = sub.bp; const d = Math.min(q, (1 - S.boil) * sub.Lb); S.boil += d / sub.Lb; q -= d; if (S.boil > 0.9995) S.boil = 1; }
+        } else {
+          S.T = Math.min(TMAX, S.T + q); q = 0;
+        }
+      }
+    }
+
+    function removeHeat(q) {
+      let guard = 0;
+      while (q > 1e-9 && guard++ < 10) {
+        if (sub.bp !== null && S.boil > 0) {
+          if (S.T > sub.bp) { const d = Math.min(q, S.T - sub.bp); S.T -= d; q -= d; }
+          else { S.T = sub.bp; const d = Math.min(q, S.boil * sub.Lb); S.boil -= d / sub.Lb; q -= d; if (S.boil < 0.0005) S.boil = 0; }
+        } else if (S.melt > 0) {
+          if (S.T > sub.mp) { const d = Math.min(q, S.T - sub.mp); S.T -= d; q -= d; }
+          else { S.T = sub.mp; const d = Math.min(q, S.melt * sub.Lm); S.melt -= d / sub.Lm; q -= d; if (S.melt < 0.0005) S.melt = 0; }
+        } else {
+          S.T = Math.max(TMIN, S.T - q); q = 0;
+        }
+      }
+    }
+
+    function fractions() {
+      const solid = 1 - S.melt;
+      const gas = S.boil;
+      const liquid = Math.max(0, 1 - solid - gas);
+      return { solid, liquid, gas };
+    }
+
+    // --- 5. CANVAS SAHNE ---
+    const stage = document.getElementById('stage');
+    const ctx = stage.getContext('2d');
+    const W = 560, H = 360;
+    const graph = document.getElementById('graph');
+    const gctx = graph.getContext('2d');
+    const GW = 320, GH = 150;
+
+    function setupCanvas(c, context, w, h) {
+      const dpr = window.devicePixelRatio || 1;
+      c.width = w * dpr; c.height = h * dpr;
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    setupCanvas(stage, ctx, W, H);
+    setupCanvas(graph, gctx, GW, GH);
+
+    const JAR = { x: 60, y: 92, w: 172, h: 196 };
+    const MAG = { x: 440, y: 172, r: 98 };
+
+    // Tanecikler
+    const N = 30;
+    const particles = [];
+    function initParticles() {
+      particles.length = 0;
+      for (let i = 0; i < N; i++) {
+        const col = i % 6, row = Math.floor(i / 6);
+        particles.push({
+          x: MAG.x - 65 + col * 26, y: MAG.y - 40 + row * 24,
+          vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
+          sx: MAG.x - 65 + col * 26, sy: MAG.y - 40 + row * 24,
+          blink: Math.random() * 5
+        });
+      }
+    }
+    initParticles();
+
+    const bubbles = [];
+    const steamPuffs = Array.from({ length: 7 }, (_, i) => ({ x: JAR.x + 30 + i * 22, y: JAR.y + 40 + (i % 3) * 18, p: Math.random() * 6 }));
+    let flameT = 0;
+
+    function roundRect(c, x, y, w, h, r) {
+      c.beginPath();
+      c.moveTo(x + r, y);
+      c.arcTo(x + w, y, x + w, y + h, r);
+      c.arcTo(x + w, y + h, x, y + h, r);
+      c.arcTo(x, y + h, x, y, r);
+      c.arcTo(x, y, x + w, y, r);
+      c.closePath();
+    }
+
+    function drawScene(dt) {
+      flameT += dt;
+      const f = fractions();
+      ctx.clearRect(0, 0, W, H);
+
+      // Arka plan
+      const bg = ctx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, heat > 0 ? '#fff7ed' : heat < 0 ? '#eff6ff' : '#fefce8');
+      bg.addColorStop(1, '#fde68a');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+      // Tezgah
+      ctx.fillStyle = '#d6a36b';
+      ctx.fillRect(0, 318, W, 42);
+      ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(0, 318); ctx.lineTo(W, 318); ctx.stroke();
+
+      // Ocak / Soğutucu gövdesi
+      roundRect(ctx, 45, 296, 240, 30, 8);
+      ctx.fillStyle = heat < 0 ? '#bfdbfe' : '#475569';
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '900 11px Nunito';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = heat < 0 ? '#1e3a8a' : '#f8fafc';
+      ctx.fillText(heat > 0 ? 'OCAK AÇIK' : heat < 0 ? 'SOĞUTUCU AÇIK' : 'KAPALI', 165, 316);
+
+      // Alevler veya buz kristalleri
+      if (heat > 0) {
+        for (let i = 0; i < 7; i++) {
+          const fx = 80 + i * 28;
+          const hgt = (14 + heat * 8) * (0.75 + 0.25 * Math.sin(flameT * 12 + i * 1.7));
+          ctx.beginPath();
+          ctx.moveTo(fx - 9, 296);
+          ctx.quadraticCurveTo(fx - 8, 296 - hgt * 0.6, fx, 296 - hgt);
+          ctx.quadraticCurveTo(fx + 8, 296 - hgt * 0.6, fx + 9, 296);
+          ctx.closePath();
+          ctx.fillStyle = '#f97316'; ctx.fill();
+          ctx.lineWidth = 2; ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(fx - 4, 296);
+          ctx.quadraticCurveTo(fx, 296 - hgt * 0.7, fx + 4, 296);
+          ctx.fillStyle = '#fde047'; ctx.fill();
+        }
+      } else if (heat < 0) {
+        ctx.font = `${14 + (-heat) * 4}px serif`;
+        for (let i = 0; i < 6; i++) {
+          const fx = 85 + i * 32;
+          const fy = 292 - 6 * Math.abs(Math.sin(flameT * 2 + i));
+          ctx.fillText('❄️', fx, fy);
+        }
+      }
+
+      // Kavanoz içeriği
+      const bottom = JAR.y + JAR.h - 8;
+      const innerX = JAR.x + 8, innerW = JAR.w - 16;
+      const liquidH = f.liquid * 130;
+
+      // Sıvı
+      if (liquidH > 0.5) {
+        ctx.save();
+        roundRect(ctx, JAR.x + 4, JAR.y + 4, JAR.w - 8, JAR.h - 8, 22);
+        ctx.clip();
+        const topY = bottom - liquidH;
+        ctx.beginPath();
+        ctx.moveTo(innerX - 6, bottom + 6);
+        ctx.lineTo(innerX - 6, topY);
+        for (let x = 0; x <= innerW + 12; x += 8) {
+          ctx.lineTo(innerX - 6 + x, topY + Math.sin(flameT * 3 + x * 0.08) * (1.5 + Math.max(0, heat)));
+        }
+        ctx.lineTo(innerX + innerW + 6, bottom + 6);
+        ctx.closePath();
+        ctx.fillStyle = sub.cLiquid; ctx.globalAlpha = 0.85; ctx.fill(); ctx.globalAlpha = 1;
+        ctx.restore();
+
+        // Kaynama kabarcıkları
+        if (sub.bp !== null && S.T >= sub.bp - 0.01 && heat > 0 && S.boil < 1) {
+          if (Math.random() < 0.35 * heat) {
+            bubbles.push({ x: innerX + 10 + Math.random() * (innerW - 20), y: bottom - 4, r: 3 + Math.random() * 4 });
+            if (Math.random() < 0.3) Sound.bubble();
+          }
+        }
+        for (let i = bubbles.length - 1; i >= 0; i--) {
+          const b = bubbles[i];
+          b.y -= 70 * dt; b.x += Math.sin(b.y * 0.1) * 0.4;
+          if (b.y < topY) { bubbles.splice(i, 1); continue; }
+          ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fill();
+          ctx.lineWidth = 1.5; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+        }
+      } else {
+        bubbles.length = 0;
+      }
+
+      // Katı bloklar
+      if (f.solid > 0.001) {
+        const size = 18 + 30 * Math.sqrt(f.solid);
+        const count = 3;
+        const floatY = sub === SUBSTANCES.su ? bottom - liquidH - size * 0.55 : bottom - size;
+        for (let i = 0; i < count; i++) {
+          const bx = JAR.x + JAR.w / 2 - (count * (size + 6)) / 2 + i * (size + 6) + 3;
+          const by = Math.min(bottom - size, floatY) + Math.sin(flameT * 2 + i) * (liquidH > 5 ? 1.5 : 0);
+          ctx.save();
+          ctx.translate(bx + size / 2, by + size / 2);
+          ctx.rotate((i - 1) * 0.12);
+          roundRect(ctx, -size / 2, -size / 2, size, size, 6 * f.solid + 2);
+          ctx.fillStyle = sub.cSolid; ctx.fill();
+          ctx.lineWidth = 2.5; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          roundRect(ctx, -size / 2 + 4, -size / 2 + 4, size * 0.35, size * 0.18, 3); ctx.fill();
+          if (sub === SUBSTANCES.cikolata) {
+            ctx.strokeStyle = '#451a03'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(0, -size / 2 + 3); ctx.lineTo(0, size / 2 - 3); ctx.moveTo(-size / 2 + 3, 0); ctx.lineTo(size / 2 - 3, 0); ctx.stroke();
+          }
+          ctx.restore();
+        }
+      }
+
+      // Gaz bulutları
+      if (f.gas > 0.01) {
+        steamPuffs.forEach((p, i) => {
+          p.p += dt * (1 + Math.max(0, S.T - 90) / 30);
+          const px = p.x + Math.sin(p.p * 1.3) * 12;
+          const py = p.y + Math.cos(p.p) * 18;
+          ctx.globalAlpha = Math.min(0.9, f.gas * 0.9);
+          ctx.beginPath();
+          ctx.arc(px, py, 16, 0, Math.PI * 2);
+          ctx.arc(px + 14, py + 4, 12, 0, Math.PI * 2);
+          ctx.arc(px - 12, py + 5, 11, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff'; ctx.fill();
+          ctx.globalAlpha = 1;
+        });
+      }
+
+      // Yoğuşma damlacıkları
+      if (sub.bp !== null && f.gas > 0.02 && heat < 0) {
+        ctx.fillStyle = '#7dd3fc';
+        for (let i = 0; i < 10; i++) {
+          const side = i % 2 ? JAR.x + 12 : JAR.x + JAR.w - 12;
+          const dy = ((flameT * 25 + i * 37) % 140);
+          ctx.beginPath(); ctx.arc(side, JAR.y + 30 + dy, 3.5, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      // Yanma dumanı
+      if (sub.burn !== null && S.T >= sub.burn) {
+        ctx.fillStyle = 'rgba(71,85,105,0.55)';
+        for (let i = 0; i < 5; i++) {
+          const sy = JAR.y + 60 - ((flameT * 40 + i * 25) % 90);
+          ctx.beginPath(); ctx.arc(JAR.x + 60 + i * 18 + Math.sin(flameT + i) * 6, sy, 12, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      // Kavanoz camı
+      roundRect(ctx, JAR.x, JAR.y, JAR.w, JAR.h, 26);
+      ctx.fillStyle = 'rgba(224,242,254,0.25)'; ctx.fill();
+      ctx.lineWidth = 4; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(JAR.x + 20, JAR.y + 40); ctx.lineTo(JAR.x + 20, JAR.y + 120); ctx.stroke();
+      // Kapak
+      roundRect(ctx, JAR.x + 15, JAR.y - 20, JAR.w - 30, 24, 6);
+      ctx.fillStyle = '#ef4444'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.font = '900 11px Nunito'; ctx.textAlign = 'center';
+      ctx.fillText(`${sub.icon} ${sub.name.toUpperCase()}`, JAR.x + JAR.w / 2, JAR.y - 4);
+
+      drawThermometer();
+      drawMagnifier(dt, f);
+    }
+
+    function tempToY(T) {
+      return 290 - ((T - TMIN) / (TMAX - TMIN)) * 220;
+    }
+
+    function drawThermometer() {
+      const x = 300;
+      roundRect(ctx, x - 9, 62, 18, 238, 9);
+      ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+      const y = tempToY(S.T);
+      ctx.fillStyle = S.T < 0 ? '#3b82f6' : '#ef4444';
+      roundRect(ctx, x - 4, y, 8, 298 - y, 4); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, 304, 14, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 3; ctx.stroke();
+
+      ctx.font = '800 9px Nunito'; ctx.textAlign = 'left'; ctx.fillStyle = '#0f172a';
+      [-20, 0, 50, 100].forEach(t => {
+        const ty = tempToY(t);
+        ctx.fillRect(x + 9, ty - 1, 6, 2);
+        ctx.fillText(`${t}°`, x + 17, ty + 3);
+      });
+      // Erime ve kaynama işaretleri
+      const marks = [{ t: sub.mp, c: '#0284c7', l: 'erime' }];
+      if (sub.bp !== null) marks.push({ t: sub.bp, c: '#ea580c', l: 'kaynama' });
+      if (sub.burn !== null) marks.push({ t: sub.burn, c: '#dc2626', l: 'yanma!' });
+      marks.forEach(m => {
+        const ty = tempToY(m.t);
+        ctx.fillStyle = m.c;
+        ctx.beginPath(); ctx.moveTo(x - 10, ty); ctx.lineTo(x - 18, ty - 5); ctx.lineTo(x - 18, ty + 5); ctx.fill();
+        ctx.font = '900 8px Nunito'; ctx.textAlign = 'right';
+        ctx.fillText(m.l, x - 20, ty + 3);
+      });
+
+      // Sıcaklık etiketi
+      roundRect(ctx, x - 30, 30, 60, 24, 8);
+      ctx.fillStyle = '#fef08a'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+      ctx.fillStyle = '#0f172a'; ctx.font = '900 13px Nunito'; ctx.textAlign = 'center';
+      ctx.fillText(`${Math.round(S.T)} °C`, x, 47);
+    }
+
+    function drawMagnifier(dt, f) {
+      const nSolid = Math.round(N * f.solid);
+      const nGas = Math.round(N * f.gas);
+      const energy = Math.max(0.2, (S.T - TMIN) / 60);
+
+      // Bağlantı çizgisi
+      ctx.setLineDash([6, 5]); ctx.lineWidth = 2; ctx.strokeStyle = '#0f172a';
+      ctx.beginPath(); ctx.moveTo(JAR.x + JAR.w - 10, JAR.y + 120); ctx.lineTo(MAG.x - MAG.r + 4, MAG.y + 20); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Sap
+      ctx.save();
+      ctx.translate(MAG.x, MAG.y); ctx.rotate(Math.PI / 4);
+      roundRect(ctx, MAG.r - 4, -11, 56, 22, 8);
+      ctx.fillStyle = '#a16207'; ctx.fill(); ctx.lineWidth = 3; ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.beginPath(); ctx.arc(MAG.x, MAG.y, MAG.r, 0, Math.PI * 2);
+      ctx.fillStyle = '#f8fafc'; ctx.fill();
+      ctx.clip();
+
+      // Tanecik hareketi
+      particles.forEach((p, i) => {
+        let kind = 'liquid';
+        if (i < nSolid) kind = 'solid';
+        else if (i >= N - nGas) kind = 'gas';
+        p.kind = kind;
+        if (kind === 'solid') {
+          const amp = 0.6 + energy * 0.9;
+          p.x += (p.sx - p.x) * 0.2 + (Math.random() - 0.5) * amp;
+          p.y += (p.sy - p.y) * 0.2 + (Math.random() - 0.5) * amp;
+          p.vx *= 0.5; p.vy *= 0.5;
+        } else {
+          const speed = kind === 'gas' ? 2.2 + energy * 1.6 : 0.6 + energy * 0.7;
+          if (kind === 'liquid') p.vy += 0.06;
+          p.vx += (Math.random() - 0.5) * 0.3;
+          p.vy += (Math.random() - 0.5) * 0.3;
+          const sp = Math.hypot(p.vx, p.vy) || 1;
+          const target = speed;
+          p.vx = p.vx / sp * (sp + (target - sp) * 0.1);
+          p.vy = p.vy / sp * (sp + (target - sp) * 0.1);
+          p.x += p.vx; p.y += p.vy;
+          if (kind === 'liquid' && p.y < MAG.y - 15) p.vy += 0.25;
+        }
+        // Daire sınırı
+        const dx = p.x - MAG.x, dy = p.y - MAG.y;
+        const d = Math.hypot(dx, dy);
+        const lim = MAG.r - 11;
+        if (d > lim) {
+          const nx = dx / d, ny = dy / d;
+          p.x = MAG.x + nx * lim; p.y = MAG.y + ny * lim;
+          const dot = p.vx * nx + p.vy * ny;
+          p.vx -= 2 * dot * nx; p.vy -= 2 * dot * ny;
+        }
+      });
+      // İtme (akışkanlar birbirinin içine girmesin)
+      for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+        const a = particles[i], b = particles[j];
+        if (a.kind === 'solid' && b.kind === 'solid') continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const d = Math.hypot(dx, dy);
+        if (d > 0 && d < 20) {
+          const push = (20 - d) / 2 / d;
+          if (a.kind !== 'solid') { a.x -= dx * push; a.y -= dy * push; }
+          if (b.kind !== 'solid') { b.x += dx * push; b.y += dy * push; }
+        }
+      }
+
+      particles.forEach(p => {
+        p.blink += dt;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+        ctx.fillStyle = p.kind === 'solid' ? sub.cSolid : p.kind === 'gas' ? '#e2e8f0' : sub.cParticle;
+        ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+        // Gözler
+        ctx.fillStyle = '#0f172a';
+        if ((p.blink % 4) < 3.85) {
+          ctx.beginPath(); ctx.arc(p.x - 3.5, p.y - 1.5, 1.6, 0, Math.PI * 2); ctx.arc(p.x + 3.5, p.y - 1.5, 1.6, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.fillRect(p.x - 5.5, p.y - 2, 4, 1.5); ctx.fillRect(p.x + 1.5, p.y - 2, 4, 1.5);
+        }
+      });
+      ctx.restore();
+
+      ctx.beginPath(); ctx.arc(MAG.x, MAG.y, MAG.r, 0, Math.PI * 2);
+      ctx.lineWidth = 7; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+      ctx.lineWidth = 3; ctx.strokeStyle = '#facc15'; ctx.stroke();
+
+      // Etiket
+      let label = 'Sıvı: tanecikler kayarak akar';
+      if (f.solid >= 0.5) label = 'Katı: tanecikler dizili, yerinde titreşir';
+      else if (f.gas >= 0.5) label = 'Gaz: tanecikler çok hızlı ve dağınık';
+      roundRect(ctx, MAG.x - 110, MAG.y + MAG.r + 12, 220, 26, 10);
+      ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+      ctx.fillStyle = '#0f172a'; ctx.font = '900 11px Nunito'; ctx.textAlign = 'center';
+      ctx.fillText(`🔍 ${label}`, MAG.x, MAG.y + MAG.r + 29);
+      roundRect(ctx, MAG.x - 62, MAG.y - MAG.r - 26, 124, 22, 8);
+      ctx.fillStyle = '#fef08a'; ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#0f172a'; ctx.font = '900 11px Nunito';
+      ctx.fillText('TANECİK BÜYÜTECİ', MAG.x, MAG.y - MAG.r - 11);
+    }
+
+    function drawGraph() {
+      gctx.clearRect(0, 0, GW, GH);
+      gctx.fillStyle = '#f8fafc'; gctx.fillRect(0, 0, GW, GH);
+      const padL = 30, padB = 16, padT = 8;
+      const gy = T => padT + (1 - (T - TMIN) / (TMAX - TMIN)) * (GH - padT - padB);
+      gctx.font = '800 9px Nunito'; gctx.fillStyle = '#64748b'; gctx.textAlign = 'right';
+      [0, 50, 100].forEach(t => {
+        gctx.strokeStyle = '#e2e8f0'; gctx.lineWidth = 1;
+        gctx.beginPath(); gctx.moveTo(padL, gy(t)); gctx.lineTo(GW - 4, gy(t)); gctx.stroke();
+        gctx.fillText(`${t}°`, padL - 4, gy(t) + 3);
+      });
+      const refs = [{ t: sub.mp, c: '#0284c7' }];
+      if (sub.bp !== null) refs.push({ t: sub.bp, c: '#ea580c' });
+      if (sub.burn !== null) refs.push({ t: sub.burn, c: '#dc2626' });
+      refs.forEach(r => {
+        gctx.setLineDash([4, 3]); gctx.strokeStyle = r.c; gctx.lineWidth = 1.5;
+        gctx.beginPath(); gctx.moveTo(padL, gy(r.t)); gctx.lineTo(GW - 4, gy(r.t)); gctx.stroke();
+        gctx.setLineDash([]);
+      });
+      gctx.fillStyle = '#64748b'; gctx.textAlign = 'center';
+      gctx.fillText('zaman ➔', GW / 2, GH - 4);
+
+      if (history.length > 1) {
+        const maxPts = 240;
+        const pts = history.slice(-maxPts);
+        const step = (GW - padL - 6) / (maxPts - 1);
+        gctx.lineWidth = 3; gctx.strokeStyle = '#ef4444'; gctx.lineJoin = 'round';
+        gctx.beginPath();
+        pts.forEach((T, i) => {
+          const x = padL + i * step;
+          if (i === 0) gctx.moveTo(x, gy(T)); else gctx.lineTo(x, gy(T));
+        });
+        gctx.stroke();
+        const lx = padL + (pts.length - 1) * step;
+        gctx.beginPath(); gctx.arc(lx, gy(pts[pts.length - 1]), 4, 0, Math.PI * 2);
+        gctx.fillStyle = '#ef4444'; gctx.fill(); gctx.lineWidth = 2; gctx.strokeStyle = '#0f172a'; gctx.stroke();
+      }
+    }
+
+    // --- 6. OYUN DÖNGÜSÜ ---
+    let lastTime = performance.now();
+    let lastSoundT = 0;
+
+    function loop(now) {
+      const dt = Math.max(0, Math.min(0.05, (now - lastTime) / 1000));
+      lastTime = now;
+
+      const prev = { melt: S.melt, boil: S.boil, T: S.T };
+      const burned = sub.burn !== null && S.T >= sub.burn;
+
+      if (!finished) {
+        // Isıtıcı
+        if (heat > 0) addHeat(heat * HEAT_RATE * dt);
+        else if (heat < 0) removeHeat(-heat * HEAT_RATE * dt);
+        // Ortam sıcaklığına yavaş yaklaşma
+        const drift = (ROOM - S.T) * 0.03 * dt;
+        if (drift > 0) addHeat(drift); else if (drift < 0) removeHeat(-drift);
+        if (mode === 'levels') elapsed += dt;
+      }
+
+      detectProcess(prev, dt);
+
+      historyTimer += dt;
+      if (historyTimer > 0.1) { history.push(S.T); historyTimer = 0; if (history.length > 600) history.shift(); }
+
+      drawScene(dt);
+      drawGraph();
+      updateHud();
+
+      if (mode === 'levels' && !finished) checkLevel(dt);
+      if (burned !== (sub.burn !== null && S.T >= sub.burn)) {
+        document.getElementById('burnBadge').classList.toggle('hidden', !(sub.burn !== null && S.T >= sub.burn));
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    function detectProcess(prev, dt) {
+      const el = document.getElementById('processText');
+      let text;
+      let proc = null;
+      if (S.melt > prev.melt + 1e-6) proc = 'erime';
+      else if (S.melt < prev.melt - 1e-6) proc = 'donma';
+      else if (S.boil > prev.boil + 1e-6) proc = 'buharlasma';
+      else if (S.boil < prev.boil - 1e-6) proc = 'yogusma';
+
+      const names = {
+        erime: `🧊➔💧 Eriyor (${sub.mp} °C'de sabit)`,
+        donma: `💧➔🧊 Donuyor (${sub.mp} °C'de sabit)`,
+        buharlasma: `💧➔☁️ Kaynıyor (${sub.bp} °C'de sabit)`,
+        yogusma: `☁️➔💧 Yoğuşuyor (${sub.bp} °C'de sabit)`
+      };
+
+      if (proc && heat !== 0) {
+        text = names[proc];
+        plateauTime += dt;
+        if (!seenProcesses.has(proc)) {
+          seenProcesses.add(proc);
+          Sound.phase();
+          renderMissions();
+          if (seenProcesses.size === 4) completeMission('m3');
+        }
+        if (plateauTime >= 2) completeMission('m2');
+      } else {
+        plateauTime = 0;
+        if (heat > 0) text = '🌡️⬆️ Isınıyor';
+        else if (heat < 0) text = '🌡️⬇️ Soğuyor';
+        else text = '⏸️ Ocak kapalı (oda sıcaklığına yaklaşıyor)';
+      }
+      if (sub.burn !== null && S.T >= sub.burn) text = '🔥 Çok sıcak! Madde yanıyor!';
+      if (el.textContent !== text) el.textContent = text;
+    }
+
+    function updateHud() {
+      const f = fractions();
+      const set = (id, v) => {
+        document.getElementById('bar' + id).style.width = `${Math.round(v * 100)}%`;
+        document.getElementById('pct' + id).textContent = `${Math.round(v * 100)}%`;
+      };
+      set('Solid', f.solid); set('Liquid', f.liquid); set('Gas', f.gas);
+      document.getElementById('tempBig').textContent = `${Math.round(S.T)} °C`;
+      document.getElementById('timerText').textContent = mode === 'levels' ? `${elapsed.toFixed(1)} sn` : '∞';
+    }
+
+    // --- 7. SİPARİŞ KONTROLÜ ---
+    function checkLevel(dt) {
+      const L = LEVELS[levelIndex];
+      if (L.sub === 'cikolata' && S.T >= sub.burn) {
+        failLevel();
+        return;
+      }
+      if (L.check(S)) {
+        if (L.hold) {
+          holdTime += dt;
+          document.getElementById('goalText').textContent = `Harika! Sıcaklığı koru: ${Math.max(0, L.hold - holdTime).toFixed(1)} sn`;
+          if (holdTime >= L.hold) winLevel();
+        } else {
+          winLevel();
+        }
+      } else if (L.hold && holdTime > 0) {
+        holdTime = 0;
+        document.getElementById('goalText').textContent = L.goal;
+      }
+    }
+
+    function winLevel() {
+      finished = true;
+      setHeat(0, true);
+      const L = LEVELS[levelIndex];
+      const s = elapsed <= L.par ? 3 : elapsed <= L.par * 1.8 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20;
+      updateScore();
+      renderLevelDots();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+      if (levelIndex === 0) completeMission('m1');
+      if (stars.every(v => v > 0)) completeMission('m4');
+
+      const nb = document.getElementById('btnNextLevel');
+      if (levelIndex < LEVELS.length - 1) { nb.classList.remove('hidden'); nb.classList.add('flex'); }
+
+      showModal({
+        emoji: L.icon,
+        title: 'Sipariş Hazır!',
+        stars: '⭐'.repeat(s) + '☆'.repeat(3 - s),
+        info: `${elapsed.toFixed(1)} saniyede tamamladın. (3 yıldız için hedef: ${L.par} sn)`,
+        fact: L.fact,
+        next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Test Masası 🔬'
+      });
+    }
+
+    function failLevel() {
+      finished = true;
+      setHeat(0, true);
+      Sound.fail();
+      showModal({
+        emoji: '🔥',
+        title: 'Eyvah, Çikolata Yandı!',
+        stars: '☆☆☆',
+        info: 'Sıcaklık 60 °C\'ye ulaştı. Çikolatayı yavaş ısıtmayı dene.',
+        fact: 'Bazı maddeler çok ısınınca <b>yanar</b> ve bambaşka maddelere dönüşür. Yanma geri dönüşü olmayan bir değişimdir. Erime ise geri döndürülebilir: Erimiş çikolata soğuyunca yine katılaşır!',
+        next: null
+      });
+    }
+
+    function showModal(o) {
+      document.getElementById('resultEmoji').textContent = o.emoji;
+      document.getElementById('resultTitle').textContent = o.title;
+      document.getElementById('resultStars').textContent = o.stars;
+      document.getElementById('resultInfo').textContent = o.info;
+      document.getElementById('resultFact').innerHTML = o.fact;
+      const next = document.getElementById('btnModalNext');
+      next.classList.toggle('hidden', !o.next);
+      if (o.next) next.textContent = o.next;
+      setTimeout(() => {
+        const m = document.getElementById('resultModal');
+        m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 700);
+    }
+
+    function closeModal() {
+      const m = document.getElementById('resultModal');
+      m.classList.add('hidden'); m.classList.remove('flex');
+    }
+
+    // --- 8. ARAYÜZ ---
+    function renderMissions() {
+      document.getElementById('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        const extra = m.progress && !done ? ` <b class="text-sky-700">(${seenProcesses.size}/4)</b>` : '';
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5">
+          <span class="text-lg">${done ? '✅' : '⬜'}</span>
+          <div class="flex-1 text-xs">
+            <p class="font-extrabold text-ink">${m.title}</p>
+            <p class="text-gray-600 font-semibold text-[11px]">${m.text}${extra}</p>
+          </div>
+        </li>`;
+      }).join('');
+    }
+
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true;
+      score += 50;
+      updateScore();
+      renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+      if (id === 'm2') {
+        document.getElementById('scienceNote').innerHTML = '<b>Keşfettin!</b> Madde hâl değiştirirken ısı almaya ya da vermeye devam eder, ama sıcaklığı <b>değişmez</b>. Grafikteki düz çizgi bunu gösteriyor!';
+      }
+    }
+
+    function updateScore() {
+      document.getElementById('scoreBadge').textContent = `${score} Puan`;
+    }
+
+    function renderLevelDots() {
+      const wrap = document.getElementById('levelDots');
+      wrap.innerHTML = '<span class="text-xs font-bold text-gray-500">Siparişler:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      wrap.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function setHeat(h, silent) {
+      heat = h;
+      document.querySelectorAll('.heat-btn').forEach(b => b.classList.toggle('heat-active', +b.dataset.heat === h));
+      if (silent) return;
+      if (h > 0) Sound.fire(); else if (h < 0) Sound.ice(); else Sound.click();
+    }
+
+    document.querySelectorAll('.heat-btn').forEach(b => b.addEventListener('click', () => {
+      if (finished) return;
+      setHeat(+b.dataset.heat);
+    }));
+
+    function applySubstanceLabels() {
+      document.getElementById('lblSolid').textContent = '🧊 Katı';
+      document.getElementById('lblLiquid').textContent = '💧 Sıvı';
+      document.getElementById('lblGas').textContent = '☁️ Gaz';
+    }
+
+    function loadLevel(i) {
+      mode = 'levels';
+      levelIndex = i;
+      const L = LEVELS[i];
+      sub = SUBSTANCES[L.sub];
+      setInitialState(L.T0);
+      elapsed = 0; holdTime = 0; finished = false;
+      history = [];
+      bubbles.length = 0;
+      setHeat(0, true);
+      document.getElementById('levelBadge').textContent = `SİPARİŞ ${i + 1}`;
+      document.getElementById('levelTitle').textContent = L.title;
+      document.getElementById('goalIcon').textContent = L.icon;
+      document.getElementById('goalText').textContent = L.goal;
+      document.getElementById('burnBadge').classList.add('hidden');
+      const nb = document.getElementById('btnNextLevel');
+      nb.classList.add('hidden'); nb.classList.remove('flex');
+      applySubstanceLabels();
+      renderLevelDots();
+    }
+
+    function loadSandbox(key = 'su') {
+      mode = 'sandbox';
+      sub = SUBSTANCES[key];
+      setInitialState(key === 'su' ? -20 : 15);
+      finished = false;
+      history = [];
+      bubbles.length = 0;
+      setHeat(0, true);
+      document.getElementById('levelBadge').textContent = 'TEST MASASI';
+      document.getElementById('levelTitle').textContent = 'Serbest Deney';
+      document.getElementById('goalIcon').textContent = sub.icon;
+      document.getElementById('goalText').textContent = `${sub.name}: erime ${sub.mp} °C${sub.bp !== null ? `, kaynama ${sub.bp} °C` : ''}. Isıt, soğut ve grafiği incele!`;
+      document.getElementById('burnBadge').classList.add('hidden');
+      renderSubstancePicker(key);
+    }
+
+    function renderSubstancePicker(active) {
+      const wrap = document.getElementById('substancePicker');
+      wrap.innerHTML = Object.entries(SUBSTANCES).map(([k, s]) =>
+        `<button data-sub="${k}" class="sub-btn pushable px-2.5 py-1 text-xs font-black ${k === active ? 'active-tab' : 'bg-white'}">${s.icon} ${s.name}</button>`
+      ).join('');
+      wrap.querySelectorAll('.sub-btn').forEach(b => b.addEventListener('click', () => { Sound.click(); loadSandbox(b.dataset.sub); }));
+    }
+
+    function switchMode(m) {
+      const isSand = m === 'sandbox';
+      const lt = document.getElementById('tabLevels'), st = document.getElementById('tabSandbox');
+      lt.classList.toggle('active-tab', !isSand); lt.classList.toggle('bg-white', isSand);
+      st.classList.toggle('active-tab', isSand); st.classList.toggle('bg-white', !isSand);
+      document.getElementById('levelDots').classList.toggle('hidden', isSand);
+      const sp = document.getElementById('substancePicker');
+      sp.classList.toggle('hidden', !isSand); sp.classList.toggle('flex', isSand);
+      document.getElementById('btnNextLevel').classList.add('hidden');
+      if (isSand) loadSandbox('su'); else loadLevel(levelIndex);
+    }
+
+    document.getElementById('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    document.getElementById('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('sandbox'); });
+
+    document.getElementById('btnReset').addEventListener('click', () => {
+      Sound.click();
+      if (mode === 'levels') loadLevel(levelIndex); else loadSandbox(Object.keys(SUBSTANCES).find(k => SUBSTANCES[k] === sub));
+    });
+
+    document.getElementById('btnHint').addEventListener('click', () => {
+      Sound.click();
+      const note = document.getElementById('scienceNote');
+      note.innerHTML = mode === 'levels'
+        ? `<b>İpucu:</b> ${LEVELS[levelIndex].hint}`
+        : '<b>Deney fikri:</b> Buzu -20 °C\'den 130 °C\'ye kadar ısıt ve grafiği izle. Kaç tane düz bölüm görüyorsun? Sonra aynı şeyi çikolata ve mumla dene. Erime sıcaklıkları aynı mı?';
+    });
+
+    document.getElementById('btnNextLevel').addEventListener('click', () => {
+      Sound.click();
+      if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1);
+    });
+    document.getElementById('btnModalRetry').addEventListener('click', () => { closeModal(); loadLevel(levelIndex); });
+    document.getElementById('btnModalNext').addEventListener('click', () => {
+      closeModal();
+      if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('sandbox');
+    });
+
+    document.getElementById('soundToggle').addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+      Sound.click();
+    });
+
+    // --- 9. BAŞLAT ---
+    renderMissions();
+    updateScore();
+    loadLevel(0);
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

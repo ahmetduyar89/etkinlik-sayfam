@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Şeker Eriyor mu? Sıcaklığın Çözünmeye Etkisi | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'sans-serif'],
+            display: ['Baloo 2', 'cursive'],
+          },
+          colors: {
+            bgMain: '#fffdf7',
+            ink: '#0f172a',
+            coldBlue: '#38bdf8',
+            warmOrange: '#f97316',
+            hotRed: '#ef4444',
+            mintGreen: '#10b981',
+          },
+          borderWidth: {
+            '3': '3px',
+            '3.5': '3.5px',
+          },
+          boxShadow: {
+            'hard': '4px 4px 0px #0f172a',
+            'hard-lg': '6px 6px 0px #0f172a',
+            'hard-sm': '2px 2px 0px #0f172a',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    html {
+      overflow-y: scroll;
+      scrollbar-gutter: stable;
+    }
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffdf7;
+      color: #0f172a;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow-x: hidden;
+    }
+    .display {
+      font-family: 'Baloo 2', cursive;
+    }
+    .chunky {
+      border: 3.5px solid #0f172a;
+      border-radius: 1.25rem;
+      box-shadow: 4px 4px 0px #0f172a;
+    }
+    .pushable {
+      border: 3px solid #0f172a;
+      border-radius: 0.85rem;
+      box-shadow: 3px 3px 0px #0f172a;
+      transition: all 0.12s ease;
+      cursor: pointer;
+    }
+    .pushable:hover {
+      transform: translate(-1.5px, -1.5px);
+      box-shadow: 4.5px 4.5px 0px #0f172a;
+    }
+    .pushable:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #0f172a;
+    }
+    .active-tab {
+      background-color: #f97316 !important;
+      color: #ffffff !important;
+      border-color: #0f172a !important;
+    }
+
+    /* Buhar Tütsü Animasyonu */
+    @keyframes steamFloat {
+      0% { transform: translateY(0) scaleX(1); opacity: 0; }
+      50% { opacity: 0.7; }
+      100% { transform: translateY(-24px) scaleX(1.4); opacity: 0; }
+    }
+    .steam-bubble-1 { animation: steamFloat 2.2s infinite ease-out; }
+    .steam-bubble-2 { animation: steamFloat 2.6s infinite ease-out 0.8s; }
+    .steam-bubble-3 { animation: steamFloat 2s infinite ease-out 1.4s; }
+
+    /* Su Girdap Animasyonu */
+    @keyframes swirlSpin {
+      0% { transform: rotate(0deg); opacity: 0.4; }
+      50% { opacity: 0.8; }
+      100% { transform: rotate(360deg); opacity: 0.4; }
+    }
+    .swirl-anim {
+      transform-origin: 80px 145px;
+      animation: swirlSpin 2s linear infinite;
+    }
+
+    #labContainer {
+      contain: layout paint;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6">
+
+  <!-- Üst Başlık & Navigasyon Çubuğu -->
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-ink text-sm font-black flex items-center gap-1" title="Ana Sayfaya Dön">
+        <span>🔙</span> <span class="hidden sm:inline">Portala Dön</span>
+      </a>
+      <div>
+        <h1 class="display text-lg sm:text-2xl font-black text-ink flex items-center gap-2">
+          <span>☕</span> <span>Şeker Eriyor mu? Çözünme Laboratuvarı</span>
+        </h1>
+        <p class="text-xs text-gray-600 font-bold hidden sm:block">
+          Sıcaklık ve karıştırmanın çözünme hızına etkisini keşfet! Erime ile çözünme arasındaki farkı öğren! 🔬✨
+        </p>
+      </div>
+    </div>
+
+    <!-- Mod Sekmeleri & Ses Butonu -->
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLab" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1">
+          <span>🧪</span> <span>1. Çözünme Yarışı</span>
+        </button>
+        <button id="tabMicro" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1">
+          <span>🔬</span> <span>2. Molekül Dürbünü</span>
+        </button>
+        <button id="tabQuiz" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1">
+          <span>🎯</span> <span>3. Erime mi Çözünme mi?</span>
+        </button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1" title="Sesi Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Ana Çalışma Alanı -->
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+    
+    <!-- SOL PANEL: İNTERAKTİF LABORATUVAR SAHNESİ (8 SÜTUN) -->
+    <div class="lg:col-span-8 flex flex-col gap-3">
+      
+      <!-- 1. MOD: ÇİFT BARDAKLI ÇÖZÜNME YARIŞI -->
+      <section id="viewLab" class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3 relative">
+        
+        <!-- Üst Bilgi Barı -->
+        <div class="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2 min-h-[46px]">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-xl shrink-0">⚖️</span>
+            <h2 class="display text-base sm:text-lg font-black text-ink truncate">İki Bardağı Karşılaştır</h2>
+          </div>
+          <!-- Ortak Ayarlar: Şeker Türü -->
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="text-xs font-black text-gray-700 hidden sm:inline">🍬 Şeker Türü:</span>
+            <div class="flex items-center gap-1">
+              <button id="btnSugarCube" class="pushable px-2 py-1 bg-amber-100 ring-2 ring-ink text-xs font-black text-ink">
+                🧊 Küp
+              </button>
+              <button id="btnSugarGranule" class="pushable px-2 py-1 bg-white text-xs font-black text-ink">
+                🧂 Toz
+              </button>
+              <button id="btnSugarPowder" class="pushable px-2 py-1 bg-white text-xs font-black text-ink">
+                🧁 Pudra
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- İKİ BARDAKLI LABORATUVAR ALANI -->
+        <div id="labContainer" class="relative w-full h-[360px] rounded-2xl border-3 border-ink overflow-hidden bg-gradient-to-b from-sky-50 via-amber-50 to-orange-50 select-none p-3 flex flex-col justify-between">
+          
+          <!-- Arka Plan Laboratuvar Rafı & Cetvel -->
+          <div class="absolute top-2 left-4 right-4 h-6 border-b-2 border-dashed border-amber-300 flex items-center justify-between text-[11px] font-bold text-amber-700/60 pointer-events-none">
+            <span>🔬 Hassas Çözünme Testi (200 ml Su)</span>
+            <span>⏱️ Eşzamanlı Kronometre</span>
+          </div>
+
+          <!-- Bardaklar Grid Alanı -->
+          <div class="grid grid-cols-2 gap-4 h-full pt-6 pb-2 items-end">
+            
+            <!-- ===== BARDAK A ===== -->
+            <div class="flex flex-col items-center justify-end h-full relative">
+              
+              <!-- Sıcaklık & Durum Rozeti -->
+              <div class="mb-1 flex items-center gap-1.5 bg-white/95 px-2.5 py-1 rounded-xl border-2 border-ink shadow-sm z-10">
+                <span id="badgeAIcon" class="text-sm">🧊</span>
+                <span id="badgeATemp" class="text-xs font-black text-sky-700">10°C (Soğuk)</span>
+              </div>
+
+              <!-- Bardak A SVG -->
+              <div class="relative w-[140px] sm:w-[170px] h-[220px]">
+                <svg viewBox="0 0 160 220" class="w-full h-full overflow-visible">
+                  <!-- Buhar Animasyonu (Yalnızca Sıcakken görünür) -->
+                  <g id="steamA" opacity="0">
+                    <path class="steam-bubble-1" d="M60 40 Q55 25 65 10" stroke="#cbd5e1" stroke-width="3" fill="none" stroke-linecap="round" />
+                    <path class="steam-bubble-2" d="M80 45 Q85 28 75 12" stroke="#cbd5e1" stroke-width="3" fill="none" stroke-linecap="round" />
+                    <path class="steam-bubble-3" d="M100 42 Q95 24 105 8" stroke="#cbd5e1" stroke-width="3" fill="none" stroke-linecap="round" />
+                  </g>
+
+                  <!-- Cam Bardak Dış Çeperi -->
+                  <path d="M25 50 L35 200 Q36 210 50 210 L110 210 Q124 210 125 200 L135 50 Z" 
+                        fill="none" stroke="#0f172a" stroke-width="4" stroke-linejoin="round" />
+                  
+                  <!-- Sıvı / Su Dolgusu -->
+                  <path id="liquidA" d="M28 80 L35 200 Q36 208 50 208 L110 208 Q124 208 125 200 L132 80 Z" 
+                        fill="#bae6fd" opacity="0.75" />
+                  
+                  <!-- Su Yüzeyi Dalgalanması -->
+                  <ellipse cx="80" cy="80" rx="52" ry="7" fill="#7dd3fc" opacity="0.6" />
+
+                  <!-- Cam Ölçü Çizgileri -->
+                  <line x1="38" y1="110" x2="52" y2="110" stroke="#0f172a" stroke-width="2" opacity="0.6" />
+                  <text x="56" y="113" font-size="8" font-weight="900" fill="#0f172a" opacity="0.6">150ml</text>
+                  <line x1="36" y1="145" x2="48" y2="145" stroke="#0f172a" stroke-width="2" opacity="0.6" />
+                  <text x="52" y="148" font-size="8" font-weight="900" fill="#0f172a" opacity="0.6">100ml</text>
+                  <line x1="35" y1="180" x2="44" y2="180" stroke="#0f172a" stroke-width="2" opacity="0.6" />
+                  <text x="48" y="183" font-size="8" font-weight="900" fill="#0f172a" opacity="0.6">50ml</text>
+
+                  <!-- Karıştırma Kaşığı ve Girdap A -->
+                  <g id="spoonHolderA" class="opacity-0 transition-opacity duration-200 pointer-events-none">
+                    <!-- Su Girdap Efekti A -->
+                    <g id="swirlA" class="hidden swirl-anim">
+                      <ellipse cx="80" cy="140" rx="36" ry="6" fill="none" stroke="#ffffff" stroke-width="2" stroke-dasharray="8 6" opacity="0.75" />
+                      <ellipse cx="80" cy="165" rx="25" ry="4" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.6" />
+                    </g>
+                    <!-- Kaşık Grubu A -->
+                    <g id="spoonA">
+                      <!-- Kaşık Sapı -->
+                      <line x1="108" y1="20" x2="72" y2="175" stroke="#94a3b8" stroke-width="5" stroke-linecap="round" />
+                      <line x1="106" y1="20" x2="70" y2="175" stroke="#e2e8f0" stroke-width="1.8" stroke-linecap="round" />
+                      <!-- Kaşık Haznesi / Ucu -->
+                      <ellipse cx="68" cy="180" rx="10" ry="16" fill="#64748b" stroke="#0f172a" stroke-width="2" transform="rotate(22 68 180)" />
+                      <ellipse cx="66" cy="178" rx="6" ry="11" fill="#cbd5e1" opacity="0.7" transform="rotate(22 68 180)" />
+                    </g>
+                  </g>
+
+                  <!-- Çözünen Şeker Kristali A (Dipte veya suyun içinde) -->
+                  <g id="sugarGroupA" transform="translate(80, 195)">
+                    <!-- Küp Şeker Görünümü -->
+                    <rect id="sugarCubeA" x="-14" y="-14" width="28" height="28" rx="4" fill="#ffffff" stroke="#0f172a" stroke-width="2.5" />
+                    <!-- Şeker Yansıma Çizgileri -->
+                    <path id="sugarFacetA" d="M-14 -4 L0 -14 L14 -4 L0 6 Z" fill="#f8fafc" opacity="0.7" />
+                  </g>
+
+                  <!-- Dağılan Parçacıklar Canvası (SVG içine gömülü) -->
+                  <g id="particlesA"></g>
+
+                  <!-- Bardak Cam Işık Parlaması -->
+                  <path d="M122 65 L116 195" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+                </svg>
+              </div>
+
+              <!-- Bardak A Çözünme İlerleme Çubuğu & Sayaç -->
+              <div class="w-full max-w-[150px] mt-1 bg-white p-1.5 rounded-xl border-2 border-ink shadow-sm text-center">
+                <div class="flex items-center justify-between text-[10px] font-black mb-1">
+                  <span>Çözünme:</span>
+                  <span id="percentA" class="text-sky-700 tabular-nums">0%</span>
+                </div>
+                <div class="w-full h-2.5 bg-gray-200 rounded-full border border-ink overflow-hidden">
+                  <div id="barA" class="h-full bg-sky-500 transition-all duration-100" style="width: 0%"></div>
+                </div>
+                <div class="text-[10px] font-bold text-gray-500 mt-0.5 tabular-nums">
+                  Süre: <b id="timerA" class="text-ink font-black">0.0s</b>
+                </div>
+              </div>
+
+            </div>
+
+
+            <!-- ===== BARDAK B ===== -->
+            <div class="flex flex-col items-center justify-end h-full relative">
+              
+              <!-- Sıcaklık & Durum Rozeti -->
+              <div class="mb-1 flex items-center gap-1.5 bg-white/95 px-2.5 py-1 rounded-xl border-2 border-ink shadow-sm z-10">
+                <span id="badgeBIcon" class="text-sm">🔥</span>
+                <span id="badgeBTemp" class="text-xs font-black text-red-600">80°C (Sıcak)</span>
+              </div>
+
+              <!-- Bardak B SVG -->
+              <div class="relative w-[140px] sm:w-[170px] h-[220px]">
+                <svg viewBox="0 0 160 220" class="w-full h-full overflow-visible">
+                  <!-- Buhar Animasyonu (Sıcakken görünür) -->
+                  <g id="steamB" opacity="1">
+                    <path class="steam-bubble-1" d="M60 40 Q55 25 65 10" stroke="#cbd5e1" stroke-width="3" fill="none" stroke-linecap="round" />
+                    <path class="steam-bubble-2" d="M80 45 Q85 28 75 12" stroke="#cbd5e1" stroke-width="3" fill="none" stroke-linecap="round" />
+                    <path class="steam-bubble-3" d="M100 42 Q95 24 105 8" stroke="#cbd5e1" stroke-width="3" fill="none" stroke-linecap="round" />
+                  </g>
+
+                  <!-- Cam Bardak Dış Çeperi -->
+                  <path d="M25 50 L35 200 Q36 210 50 210 L110 210 Q124 210 125 200 L135 50 Z" 
+                        fill="none" stroke="#0f172a" stroke-width="4" stroke-linejoin="round" />
+                  
+                  <!-- Sıvı / Su Dolgusu (Sıcak su hafif amber/turuncu parıltılı) -->
+                  <path id="liquidB" d="M28 80 L35 200 Q36 208 50 208 L110 208 Q124 208 125 200 L132 80 Z" 
+                        fill="#fed7aa" opacity="0.8" />
+                  
+                  <!-- Su Yüzeyi Dalgalanması -->
+                  <ellipse cx="80" cy="80" rx="52" ry="7" fill="#fdba74" opacity="0.6" />
+
+                  <!-- Cam Ölçü Çizgileri -->
+                  <line x1="38" y1="110" x2="52" y2="110" stroke="#0f172a" stroke-width="2" opacity="0.6" />
+                  <text x="56" y="113" font-size="8" font-weight="900" fill="#0f172a" opacity="0.6">150ml</text>
+                  <line x1="36" y1="145" x2="48" y2="145" stroke="#0f172a" stroke-width="2" opacity="0.6" />
+                  <text x="52" y="148" font-size="8" font-weight="900" fill="#0f172a" opacity="0.6">100ml</text>
+                  <line x1="35" y1="180" x2="44" y2="180" stroke="#0f172a" stroke-width="2" opacity="0.6" />
+                  <text x="48" y="183" font-size="8" font-weight="900" fill="#0f172a" opacity="0.6">50ml</text>
+
+                  <!-- Karıştırma Kaşığı ve Girdap B -->
+                  <g id="spoonHolderB" class="opacity-0 transition-opacity duration-200 pointer-events-none">
+                    <!-- Su Girdap Efekti B -->
+                    <g id="swirlB" class="hidden swirl-anim">
+                      <ellipse cx="80" cy="140" rx="36" ry="6" fill="none" stroke="#ffffff" stroke-width="2" stroke-dasharray="8 6" opacity="0.75" />
+                      <ellipse cx="80" cy="165" rx="25" ry="4" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.6" />
+                    </g>
+                    <!-- Kaşık Grubu B -->
+                    <g id="spoonB">
+                      <!-- Kaşık Sapı -->
+                      <line x1="108" y1="20" x2="72" y2="175" stroke="#94a3b8" stroke-width="5" stroke-linecap="round" />
+                      <line x1="106" y1="20" x2="70" y2="175" stroke="#e2e8f0" stroke-width="1.8" stroke-linecap="round" />
+                      <!-- Kaşık Haznesi / Ucu -->
+                      <ellipse cx="68" cy="180" rx="10" ry="16" fill="#64748b" stroke="#0f172a" stroke-width="2" transform="rotate(22 68 180)" />
+                      <ellipse cx="66" cy="178" rx="6" ry="11" fill="#cbd5e1" opacity="0.7" transform="rotate(22 68 180)" />
+                    </g>
+                  </g>
+
+                  <!-- Çözünen Şeker Kristali B -->
+                  <g id="sugarGroupB" transform="translate(80, 195)">
+                    <rect id="sugarCubeB" x="-14" y="-14" width="28" height="28" rx="4" fill="#ffffff" stroke="#0f172a" stroke-width="2.5" />
+                    <path id="sugarFacetB" d="M-14 -4 L0 -14 L14 -4 L0 6 Z" fill="#f8fafc" opacity="0.7" />
+                  </g>
+
+                  <!-- Dağılan Parçacıklar Canvası -->
+                  <g id="particlesB"></g>
+
+                  <!-- Bardak Cam Işık Parlaması -->
+                  <path d="M122 65 L116 195" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+                </svg>
+              </div>
+
+              <!-- Bardak B Çözünme İlerleme Çubuğu & Sayaç -->
+              <div class="w-full max-w-[150px] mt-1 bg-white p-1.5 rounded-xl border-2 border-ink shadow-sm text-center">
+                <div class="flex items-center justify-between text-[10px] font-black mb-1">
+                  <span>Çözünme:</span>
+                  <span id="percentB" class="text-red-600 tabular-nums">0%</span>
+                </div>
+                <div class="w-full h-2.5 bg-gray-200 rounded-full border border-ink overflow-hidden">
+                  <div id="barB" class="h-full bg-red-500 transition-all duration-100" style="width: 0%"></div>
+                </div>
+                <div class="text-[10px] font-bold text-gray-500 mt-0.5 tabular-nums">
+                  Süre: <b id="timerB" class="text-ink font-black">0.0s</b>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+          <!-- Kazanan & Bilimsel Karşılaştırma Bildirim Şeridi -->
+          <div id="winnerBanner" class="bg-amber-100 border-2 border-ink rounded-xl px-3 py-1.5 text-center text-xs font-black text-ink shadow-sm flex items-center justify-center gap-2 hidden">
+            <span class="text-base">🏆</span>
+            <span id="winnerText">Sıcak sudaki şeker tam 4 kat daha hızlı çözündü!</span>
+          </div>
+
+        </div>
+
+        <!-- BAĞIMSIZ DEĞİŞKEN KONTROLLERİ: SICAKLIK VE KARIŞTIRMA SEÇİMLERİ -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          
+          <!-- Bardak A Kontrolleri -->
+          <div class="bg-sky-50/70 p-2.5 rounded-xl border-2 border-ink flex flex-col gap-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-sky-900">🔵 Bardak A Sıcaklığı:</span>
+              <button id="btnStirA" class="pushable px-2 py-0.5 bg-white text-[11px] font-black text-ink flex items-center gap-1">
+                <span>🥄</span> <span id="textStirA">Karıştırma: Kapalı</span>
+              </button>
+            </div>
+            <div class="grid grid-cols-3 gap-1">
+              <button id="btnTempA10" class="pushable p-1.5 bg-sky-200 ring-2 ring-ink text-center">
+                <p class="text-[11px] font-black text-sky-950">10°C</p>
+                <p class="text-[9px] font-bold text-sky-700">Buzlu Soğuk</p>
+              </button>
+              <button id="btnTempA40" class="pushable p-1.5 bg-white text-center">
+                <p class="text-[11px] font-black text-ink">40°C</p>
+                <p class="text-[9px] font-bold text-gray-500">Ilık Su</p>
+              </button>
+              <button id="btnTempA80" class="pushable p-1.5 bg-white text-center">
+                <p class="text-[11px] font-black text-ink">80°C</p>
+                <p class="text-[9px] font-bold text-gray-500">Sıcak Su</p>
+              </button>
+            </div>
+          </div>
+
+          <!-- Bardak B Kontrolleri -->
+          <div class="bg-orange-50/70 p-2.5 rounded-xl border-2 border-ink flex flex-col gap-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-orange-900">🔴 Bardak B Sıcaklığı:</span>
+              <button id="btnStirB" class="pushable px-2 py-0.5 bg-white text-[11px] font-black text-ink flex items-center gap-1">
+                <span>🥄</span> <span id="textStirB">Karıştırma: Kapalı</span>
+              </button>
+            </div>
+            <div class="grid grid-cols-3 gap-1">
+              <button id="btnTempB10" class="pushable p-1.5 bg-white text-center">
+                <p class="text-[11px] font-black text-ink">10°C</p>
+                <p class="text-[9px] font-bold text-gray-500">Buzlu Soğuk</p>
+              </button>
+              <button id="btnTempB40" class="pushable p-1.5 bg-white text-center">
+                <p class="text-[11px] font-black text-ink">40°C</p>
+                <p class="text-[9px] font-bold text-gray-500">Ilık Su</p>
+              </button>
+              <button id="btnTempB80" class="pushable p-1.5 bg-red-100 ring-2 ring-ink text-center">
+                <p class="text-[11px] font-black text-red-950">80°C</p>
+                <p class="text-[9px] font-bold text-red-700">Sıcak Su 🔥</p>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ANA AKSİYON BUTONLARI -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t-2 border-dashed border-gray-200">
+          <div class="flex items-center gap-2">
+            <!-- BAŞLAT / ŞEKERLERİ AT BUTONU -->
+            <button id="btnStartDissolve" class="pushable px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm sm:text-base flex items-center gap-2 shadow-hard">
+              <span>🚀</span> <span>Şekerleri At ve Yarışı Başlat!</span>
+            </button>
+
+            <!-- Sıfırla Butonu -->
+            <button id="btnResetLab" class="pushable px-3.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-ink text-xs font-black flex items-center gap-1">
+              <span>🔄</span> <span>Yeniden Kur</span>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <!-- Molekül Görünümüne Geçiş Kısayolu -->
+            <button id="btnOpenMicroQuick" class="pushable px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-900 text-xs font-black flex items-center gap-1 border-2 border-ink">
+              <span>🔬</span> <span>Molekül Dürbünü</span>
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+
+      <!-- 2. MOD: MOLEKÜL DÜRBÜNÜ (MİKROSKOPİK BAKIŞ) -->
+      <section id="viewMicro" class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3 relative hidden">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🔬</span>
+            <h2 class="display text-lg font-black text-ink">Molekül Dürbünü: Suyun İçinde Neler Oluyor?</h2>
+          </div>
+          <span class="px-2.5 py-0.5 bg-purple-100 border-2 border-ink rounded-full text-[11px] font-black text-purple-900">
+            Mikroskobik Model
+          </span>
+        </div>
+
+        <!-- Mikroskop Canvas Simülasyonu -->
+        <div class="relative w-full h-[320px] rounded-2xl border-3 border-ink overflow-hidden bg-slate-900 flex items-center justify-center">
+          <canvas id="microCanvas" width="600" height="320" class="w-full h-full"></canvas>
+          
+          <!-- Büyüteç Dürbün Çerçevesi Efekti -->
+          <div class="absolute inset-0 pointer-events-none rounded-2xl border-8 border-slate-800/40 shadow-inner"></div>
+
+          <!-- Canlı Sıcaklık Seçici (Mikroskop içinde) -->
+          <div class="absolute top-3 left-3 bg-white/90 backdrop-blur-sm p-1.5 rounded-xl border-2 border-ink flex items-center gap-1.5 text-xs font-black">
+            <span>Sıcaklık:</span>
+            <button id="btnMicroCold" class="pushable px-2 py-0.5 bg-sky-200 text-[11px]">10°C (Yavaş)</button>
+            <button id="btnMicroHot" class="pushable px-2 py-0.5 bg-white text-[11px]">80°C (Çılgın Hızlı!)</button>
+          </div>
+
+          <!-- Tanecik Açıklama Lejantı -->
+          <div class="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm p-2 rounded-xl border-2 border-ink text-[11px] font-black flex items-center gap-3">
+            <div class="flex items-center gap-1">
+              <span class="w-3 h-3 rounded-full bg-sky-400 border border-ink inline-block"></span>
+              <span>Su Molekülü (H₂O)</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="w-3.5 h-3.5 rounded-sm bg-amber-300 border border-ink inline-block"></span>
+              <span>Şeker Kristali / Molekülü</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bilimsel İzah -->
+        <div class="p-3 bg-purple-50 rounded-xl border-2 border-ink text-xs font-bold text-purple-950 leading-relaxed">
+          💡 <b>Neden Sıcak Suda Daha Hızlı Çözünür?</b> Sıcak su molekülleri yüksek kinetik enerjiye (ısı enerjisine) sahiptir ve çok daha hızlı hareket eder. Hızla titreşen su molekülleri, şeker kristallerine saniyede milyonlarca kez çarparak şeker taneciklerini tek tek koparır ve aralarına alır!
+        </div>
+      </section>
+
+
+      <!-- 3. MOD: "ERİME Mİ? ÇÖZÜNME Mİ?" KAVRAM YARIŞMASI -->
+      <section id="viewQuiz" class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3 relative hidden">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🎯</span>
+            <h2 class="display text-lg font-black text-ink">Büyük Bilim Sınavı: Erime mi, Çözünme mi?</h2>
+          </div>
+          <span id="quizScoreBadge" class="px-2.5 py-0.5 bg-emerald-100 border-2 border-ink rounded-full text-xs font-black text-emerald-900">
+            Skor: 0 / 5
+          </span>
+        </div>
+
+        <!-- Soru Kartı -->
+        <div id="quizCard" class="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-2xl border-2 border-ink text-center flex flex-col items-center justify-center gap-2 min-h-[150px]">
+          <span id="quizIcon" class="text-4xl">🍦</span>
+          <h3 id="quizQuestion" class="display text-lg font-black text-ink">Güneşte bekletilen dondurmanın sıvılaşması:</h3>
+          <p id="quizHint" class="text-xs text-gray-500 font-bold">Tek bir madde mi var, yoksa başka bir maddenin içinde mi kayboluyor?</p>
+        </div>
+
+        <!-- İki Büyük Seçim Butonu -->
+        <div class="grid grid-cols-2 gap-3">
+          <button id="btnAnswerMelt" class="pushable py-4 bg-amber-200 hover:bg-amber-300 text-ink font-black text-base flex flex-col items-center gap-1">
+            <span class="text-2xl">🔥</span>
+            <span>ERİME</span>
+            <span class="text-[10px] text-gray-600 font-bold">(Isı alıp hal değiştirme)</span>
+          </button>
+          
+          <button id="btnAnswerDissolve" class="pushable py-4 bg-sky-200 hover:bg-sky-300 text-ink font-black text-base flex flex-col items-center gap-1">
+            <span class="text-2xl">💧</span>
+            <span>ÇÖZÜNME</span>
+            <span class="text-[10px] text-gray-600 font-bold">(Başka sıvının içine dağılma)</span>
+          </button>
+        </div>
+
+        <!-- Geri Bildirim Kutusu -->
+        <div id="quizFeedback" class="hidden p-3 rounded-xl border-2 border-ink text-xs font-black text-center"></div>
+      </section>
+
+      <!-- Bilim İnsanı Notu: MEB Kazanım Rehberi -->
+      <section class="chunky bg-gradient-to-r from-sky-50 via-amber-50 to-orange-50 p-3.5 sm:p-4">
+        <div class="flex items-start gap-3">
+          <span class="text-3xl sm:text-4xl p-1 bg-white border-2 border-ink rounded-xl shadow-sm">💡</span>
+          <div class="flex-1">
+            <h3 class="display text-sm sm:text-base font-black text-ink flex items-center justify-between">
+              <span>Bilim İnsanı Kuralı: Erime ≠ Çözünme</span>
+              <span class="text-[10px] px-2 py-0.5 bg-amber-200 text-amber-900 border border-ink rounded-full font-bold">
+                Fen Bilimleri 5. Sınıf
+              </span>
+            </h3>
+            <p class="text-xs text-gray-800 font-bold leading-relaxed mt-1">
+              <b>"Şeker çayda erimez, çözünür!"</b> Erime; tek bir katı maddenin (buz, mum, dondurma) ısı alarak sıvılaşmasıdır. Çözünme ise bir katının (şeker, tuz) sıvı bir çözücü (su, çay) içine girerek taneciklerinin suyun her yerine homojen şekilde yayılmasıdır. Şeker yok olmaz, su moleküllerinin arasındaki boşluklara gizlenir!
+            </p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+
+    <!-- SAĞ PANEL: GÖREVLER, BİLİMSEL VERİLER & İPUÇLARI (4 SÜTUN) -->
+    <div class="lg:col-span-4 flex flex-col gap-3">
+      
+      <!-- 1. KÜÇÜK MUCİT GÖREVLERİ (CHECKLIST) -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🎯</span>
+            <h3 class="display text-base font-black text-ink">Küçük Mucit Görevleri</h3>
+          </div>
+          <span class="text-xs font-black px-2 py-0.5 bg-amber-100 text-amber-900 rounded-full border border-ink">
+            3 Görev
+          </span>
+        </div>
+
+        <div class="space-y-2">
+          <!-- Görev 1 -->
+          <div id="mission1" class="p-2.5 bg-amber-50 rounded-xl border-2 border-ink flex items-start gap-2.5 transition-all">
+            <span id="m1Check" class="text-lg">⏳</span>
+            <div>
+              <p class="text-xs font-black text-ink">1. Görev: İlk Çözünme Yarışını Yap</p>
+              <p class="text-[10px] text-gray-600 font-bold">İki bardağa şeker atarak çözünme sürecini tamamla.</p>
+            </div>
+          </div>
+
+          <!-- Görev 2 -->
+          <div id="mission2" class="p-2.5 bg-gray-50 rounded-xl border-2 border-ink flex items-start gap-2.5 transition-all">
+            <span id="m2Check" class="text-lg">⏳</span>
+            <div>
+              <p class="text-xs font-black text-ink">2. Görev: Sıcaklığın Gücünü Kanıtla</p>
+              <p class="text-[10px] text-gray-600 font-bold">Bir bardağı 10°C, diğerini 80°C yap ve farkı gözlemle.</p>
+            </div>
+          </div>
+
+          <!-- Görev 3 -->
+          <div id="mission3" class="p-2.5 bg-gray-50 rounded-xl border-2 border-ink flex items-start gap-2.5 transition-all">
+            <span id="m3Check" class="text-lg">⏳</span>
+            <div>
+              <p class="text-xs font-black text-ink">3. Görev: Süper Hız! Kaşıkla Karıştır</p>
+              <p class="text-[10px] text-gray-600 font-bold">Kaşığı açarak çözünmeyi 3 kat daha hızlandır.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. ÇÖZÜNME HIZINI ETKİLEYEN 3 FAKTÖR -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <span class="text-xl">📊</span>
+          <h3 class="display text-base font-black text-ink">Çözünmeyi Hızlandıran 3 Şey</h3>
+        </div>
+
+        <div class="space-y-2 text-xs font-bold">
+          <div class="p-2 bg-red-50 rounded-lg border border-red-200 flex items-center justify-between">
+            <span class="flex items-center gap-1.5 text-red-900"><span>🔥</span> Sıcaklık Artışı</span>
+            <span class="text-xs font-black text-red-600">+%300 Hız</span>
+          </div>
+          <div class="p-2 bg-amber-50 rounded-lg border border-amber-200 flex items-center justify-between">
+            <span class="flex items-center gap-1.5 text-amber-900"><span>🥄</span> Kaşıkla Karıştırma</span>
+            <span class="text-xs font-black text-amber-600">+%250 Hız</span>
+          </div>
+          <div class="p-2 bg-emerald-50 rounded-lg border border-emerald-200 flex items-center justify-between">
+            <span class="flex items-center gap-1.5 text-emerald-900"><span>🧂</span> Temas Yüzeyi (Toz/Pudra)</span>
+            <span class="text-xs font-black text-emerald-600">+%200 Hız</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. GÜNLÜK HAYAT KARTLARI -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <span class="text-xl">☕</span>
+          <h3 class="display text-base font-black text-ink">Gerçek Hayatta Nerede Var?</h3>
+        </div>
+
+        <div class="space-y-2 text-xs font-bold text-gray-700">
+          <p class="leading-snug">
+            ☕ <b>Neden çay sıcak içilir?</b> Çay sıcakken şeker saniyeler içinde çözünür; soğuk buzlu çayda ise şeker dipte birikir ve çok yavaş çözünür.
+          </p>
+          <p class="leading-snug">
+            🍲 <b>Çorbaya tuz atarken:</b> Annelerimiz çorba kaynarken tuzu atıp kepçeyle karıştırır; hem sıcaklık hem karıştırma tuzu anında çözer!
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- JAVASCRIPT: SES, FİZİK, ÇÖZÜNME VE ETKİLEŞİM MOTORU -->
+  <script>
+    // --- 1. WEB AUDIO API SES MOTORU ---
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    const Sound = {
+      // Su Şıpırtısı / Şeker Atılışı
+      splash() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(320, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(140, audioCtx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.18);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.2);
+        } catch (e) {}
+      },
+
+      // Kaşık Şıngırtısı (Cam çınlaması)
+      clink() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(1800, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.13);
+        } catch (e) {}
+      },
+
+      // Başarı Dingi
+      ding() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(784, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.45);
+        } catch (e) {}
+      },
+
+      // Zafer Fanfarı
+      fanfare() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.12);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime + idx * 0.12);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + idx * 0.12 + 0.28);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime + idx * 0.12);
+            osc.stop(audioCtx.currentTime + idx * 0.12 + 0.3);
+          });
+        } catch (e) {}
+      }
+    };
+
+    // Ses Aç/Kapat Butonu
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    soundToggle.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundIcon.textContent = soundEnabled ? '🔊' : '🔇';
+      soundToggle.className = soundEnabled 
+        ? 'pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1'
+        : 'pushable p-2 bg-gray-200 hover:bg-gray-300 text-xs font-black flex items-center gap-1';
+    });
+
+
+    // --- 2. SİMÜLASYON DURUMU (STATE) ---
+    const State = {
+      activeTab: 'lab', // 'lab' | 'micro' | 'quiz'
+      sugarType: 'cube', // 'cube' | 'granule' | 'powder'
+      
+      beakerA: {
+        temp: 10, // 10, 40, 80
+        stir: false,
+        dissolvedPercent: 0,
+        elapsedSeconds: 0,
+        isDone: false
+      },
+
+      beakerB: {
+        temp: 80, // 10, 40, 80
+        stir: false,
+        dissolvedPercent: 0,
+        elapsedSeconds: 0,
+        isDone: false
+      },
+
+      isRunning: false,
+      hasCelebrated: false,
+
+      // Görevler
+      missions: {
+        m1: false,
+        m2: false,
+        m3: false
+      }
+    };
+
+    // Çözünme Hızı Hesaplayıcısı (Sıcaklık, Şeker türü ve karıştırma katsayıları)
+    const PhysicsRates = {
+      sugar: {
+        cube: 1.0,      // Baz hız
+        granule: 1.8,   // Toz şeker daha hızlı
+        powder: 3.2     // Pudra şekeri çok hızlı
+      },
+      tempFactor(celsius) {
+        if (celsius === 10) return 0.45; // Soğuk su çok yavaş
+        if (celsius === 40) return 1.2;  // Ilık su
+        return 3.6;                     // Sıcak su (80°C) aşırı hızlı!
+      },
+      stirFactor(isStirring) {
+        return isStirring ? 2.5 : 1.0;
+      }
+    };
+
+
+    // --- 3. MOD GEÇİŞLERİ (SEKMELER) ---
+    const tabLab = document.getElementById('tabLab');
+    const tabMicro = document.getElementById('tabMicro');
+    const tabQuiz = document.getElementById('tabQuiz');
+    const viewLab = document.getElementById('viewLab');
+    const viewMicro = document.getElementById('viewMicro');
+    const viewQuiz = document.getElementById('viewQuiz');
+    const btnOpenMicroQuick = document.getElementById('btnOpenMicroQuick');
+
+    function switchTab(tab) {
+      State.activeTab = tab;
+      [tabLab, tabMicro, tabQuiz].forEach(t => t.classList.remove('active-tab'));
+      [viewLab, viewMicro, viewQuiz].forEach(v => v.classList.add('hidden'));
+
+      if (tab === 'lab') {
+        tabLab.classList.add('active-tab');
+        viewLab.classList.remove('hidden');
+      } else if (tab === 'micro') {
+        tabMicro.classList.add('active-tab');
+        viewMicro.classList.remove('hidden');
+        startMicroAnimation();
+      } else if (tab === 'quiz') {
+        tabQuiz.classList.add('active-tab');
+        viewQuiz.classList.remove('hidden');
+      }
+      Sound.splash();
+    }
+
+    tabLab.addEventListener('click', () => switchTab('lab'));
+    tabMicro.addEventListener('click', () => switchTab('micro'));
+    tabQuiz.addEventListener('click', () => switchTab('quiz'));
+    btnOpenMicroQuick.addEventListener('click', () => switchTab('micro'));
+
+
+    // --- 4. BARDAK AYARLARI VE ETKİLEŞİMLERİ ---
+    const btnSugarCube = document.getElementById('btnSugarCube');
+    const btnSugarGranule = document.getElementById('btnSugarGranule');
+    const btnSugarPowder = document.getElementById('btnSugarPowder');
+
+    function setSugarType(type) {
+      State.sugarType = type;
+      [btnSugarCube, btnSugarGranule, btnSugarPowder].forEach(b => {
+        b.classList.remove('bg-amber-100', 'ring-2', 'ring-ink');
+        b.classList.add('bg-white');
+      });
+
+      if (type === 'cube') btnSugarCube.classList.add('bg-amber-100', 'ring-2', 'ring-ink');
+      if (type === 'granule') btnSugarGranule.classList.add('bg-amber-100', 'ring-2', 'ring-ink');
+      if (type === 'powder') btnSugarPowder.classList.add('bg-amber-100', 'ring-2', 'ring-ink');
+
+      updateSugarVisuals();
+      Sound.splash();
+    }
+
+    btnSugarCube.addEventListener('click', () => setSugarType('cube'));
+    btnSugarGranule.addEventListener('click', () => setSugarType('granule'));
+    btnSugarPowder.addEventListener('click', () => setSugarType('powder'));
+
+    function updateSugarVisuals() {
+      const rx = State.sugarType === 'cube' ? 4 : (State.sugarType === 'granule' ? 10 : 14);
+      document.getElementById('sugarCubeA').setAttribute('rx', rx);
+      document.getElementById('sugarCubeB').setAttribute('rx', rx);
+    }
+
+    // Sıcaklık Butonları A
+    const btnTempA10 = document.getElementById('btnTempA10');
+    const btnTempA40 = document.getElementById('btnTempA40');
+    const btnTempA80 = document.getElementById('btnTempA80');
+    const badgeAIcon = document.getElementById('badgeAIcon');
+    const badgeATemp = document.getElementById('badgeATemp');
+    const liquidA = document.getElementById('liquidA');
+    const steamA = document.getElementById('steamA');
+
+    function setTempA(t) {
+      State.beakerA.temp = t;
+      [btnTempA10, btnTempA40, btnTempA80].forEach(b => {
+        b.classList.remove('bg-sky-200', 'bg-amber-200', 'bg-red-200', 'ring-2', 'ring-ink');
+        b.classList.add('bg-white');
+      });
+
+      if (t === 10) {
+        btnTempA10.classList.add('bg-sky-200', 'ring-2', 'ring-ink');
+        badgeAIcon.textContent = '🧊';
+        badgeATemp.textContent = '10°C (Soğuk)';
+        badgeATemp.className = 'text-xs font-black text-sky-700';
+        liquidA.setAttribute('fill', '#bae6fd');
+        steamA.setAttribute('opacity', '0');
+      } else if (t === 40) {
+        btnTempA40.classList.add('bg-amber-200', 'ring-2', 'ring-ink');
+        badgeAIcon.textContent = '💧';
+        badgeATemp.textContent = '40°C (Ilık)';
+        badgeATemp.className = 'text-xs font-black text-amber-700';
+        liquidA.setAttribute('fill', '#fde68a');
+        steamA.setAttribute('opacity', '0');
+      } else {
+        btnTempA80.classList.add('bg-red-200', 'ring-2', 'ring-ink');
+        badgeAIcon.textContent = '🔥';
+        badgeATemp.textContent = '80°C (Sıcak)';
+        badgeATemp.className = 'text-xs font-black text-red-600';
+        liquidA.setAttribute('fill', '#fed7aa');
+        steamA.setAttribute('opacity', '1');
+      }
+      Sound.splash();
+    }
+
+    btnTempA10.addEventListener('click', () => setTempA(10));
+    btnTempA40.addEventListener('click', () => setTempA(40));
+    btnTempA80.addEventListener('click', () => setTempA(80));
+
+    // Sıcaklık Butonları B
+    const btnTempB10 = document.getElementById('btnTempB10');
+    const btnTempB40 = document.getElementById('btnTempB40');
+    const btnTempB80 = document.getElementById('btnTempB80');
+    const badgeBIcon = document.getElementById('badgeBIcon');
+    const badgeBTemp = document.getElementById('badgeBTemp');
+    const liquidB = document.getElementById('liquidB');
+    const steamB = document.getElementById('steamB');
+
+    function setTempB(t) {
+      State.beakerB.temp = t;
+      [btnTempB10, btnTempB40, btnTempB80].forEach(b => {
+        b.classList.remove('bg-sky-200', 'bg-amber-200', 'bg-red-100', 'ring-2', 'ring-ink');
+        b.classList.add('bg-white');
+      });
+
+      if (t === 10) {
+        btnTempB10.classList.add('bg-sky-200', 'ring-2', 'ring-ink');
+        badgeBIcon.textContent = '🧊';
+        badgeBTemp.textContent = '10°C (Soğuk)';
+        badgeBTemp.className = 'text-xs font-black text-sky-700';
+        liquidB.setAttribute('fill', '#bae6fd');
+        steamB.setAttribute('opacity', '0');
+      } else if (t === 40) {
+        btnTempB40.classList.add('bg-amber-200', 'ring-2', 'ring-ink');
+        badgeBIcon.textContent = '💧';
+        badgeBTemp.textContent = '40°C (Ilık)';
+        badgeBTemp.className = 'text-xs font-black text-amber-700';
+        liquidB.setAttribute('fill', '#fde68a');
+        steamB.setAttribute('opacity', '0');
+      } else {
+        btnTempB80.classList.add('bg-red-100', 'ring-2', 'ring-ink');
+        badgeBIcon.textContent = '🔥';
+        badgeBTemp.textContent = '80°C (Sıcak)';
+        badgeBTemp.className = 'text-xs font-black text-red-600';
+        liquidB.setAttribute('fill', '#fed7aa');
+        steamB.setAttribute('opacity', '1');
+      }
+      Sound.splash();
+    }
+
+    btnTempB10.addEventListener('click', () => setTempB(10));
+    btnTempB40.addEventListener('click', () => setTempB(40));
+    btnTempB80.addEventListener('click', () => setTempB(80));
+
+    // Karıştırma Kaşığı Toggle A
+    const btnStirA = document.getElementById('btnStirA');
+    const textStirA = document.getElementById('textStirA');
+    const spoonHolderA = document.getElementById('spoonHolderA');
+    const swirlA = document.getElementById('swirlA');
+    let tweenStirA = null;
+
+    btnStirA.addEventListener('click', () => {
+      State.beakerA.stir = !State.beakerA.stir;
+      const active = State.beakerA.stir;
+      textStirA.textContent = active ? 'Karıştırma: Açık 🥄' : 'Karıştırma: Kapalı';
+      btnStirA.classList.toggle('bg-amber-200', active);
+      spoonHolderA.classList.toggle('opacity-0', !active);
+      swirlA.classList.toggle('hidden', !active);
+
+      if (active) {
+        if (!tweenStirA) {
+          tweenStirA = gsap.to('#spoonA', {
+            rotation: 14,
+            transformOrigin: "108px 20px",
+            repeat: -1,
+            yoyo: true,
+            duration: 0.25,
+            ease: "sine.inOut"
+          });
+        } else {
+          tweenStirA.play();
+        }
+      } else {
+        if (tweenStirA) tweenStirA.pause();
+        gsap.set('#spoonA', { rotation: 0, transformOrigin: "108px 20px" });
+      }
+
+      Sound.clink();
+      checkMission3();
+    });
+
+    // Karıştırma Kaşığı Toggle B
+    const btnStirB = document.getElementById('btnStirB');
+    const textStirB = document.getElementById('textStirB');
+    const spoonHolderB = document.getElementById('spoonHolderB');
+    const swirlB = document.getElementById('swirlB');
+    let tweenStirB = null;
+
+    btnStirB.addEventListener('click', () => {
+      State.beakerB.stir = !State.beakerB.stir;
+      const active = State.beakerB.stir;
+      textStirB.textContent = active ? 'Karıştırma: Açık 🥄' : 'Karıştırma: Kapalı';
+      btnStirB.classList.toggle('bg-amber-200', active);
+      spoonHolderB.classList.toggle('opacity-0', !active);
+      swirlB.classList.toggle('hidden', !active);
+
+      if (active) {
+        if (!tweenStirB) {
+          tweenStirB = gsap.to('#spoonB', {
+            rotation: 14,
+            transformOrigin: "108px 20px",
+            repeat: -1,
+            yoyo: true,
+            duration: 0.25,
+            ease: "sine.inOut"
+          });
+        } else {
+          tweenStirB.play();
+        }
+      } else {
+        if (tweenStirB) tweenStirB.pause();
+        gsap.set('#spoonB', { rotation: 0, transformOrigin: "108px 20px" });
+      }
+
+      Sound.clink();
+      checkMission3();
+    });
+
+    function checkMission3() {
+      if ((State.beakerA.stir || State.beakerB.stir) && !State.missions.m3) {
+        State.missions.m3 = true;
+        checkMissions();
+      }
+    }
+
+
+    // --- 5. ÇÖZÜNME FİZİK MOTORU & SİMÜLASYON DÖNGÜSÜ ---
+    const btnStartDissolve = document.getElementById('btnStartDissolve');
+    const btnResetLab = document.getElementById('btnResetLab');
+    const percentA = document.getElementById('percentA');
+    const barA = document.getElementById('barA');
+    const timerA = document.getElementById('timerA');
+    const sugarGroupA = document.getElementById('sugarGroupA');
+
+    const percentB = document.getElementById('percentB');
+    const barB = document.getElementById('barB');
+    const timerB = document.getElementById('timerB');
+    const sugarGroupB = document.getElementById('sugarGroupB');
+    const winnerBanner = document.getElementById('winnerBanner');
+    const winnerText = document.getElementById('winnerText');
+
+    function resetLabState() {
+      State.isRunning = false;
+      State.hasCelebrated = false;
+
+      State.beakerA.dissolvedPercent = 0;
+      State.beakerA.elapsedSeconds = 0;
+      State.beakerA.isDone = false;
+
+      State.beakerB.dissolvedPercent = 0;
+      State.beakerB.elapsedSeconds = 0;
+      State.beakerB.isDone = false;
+
+      percentA.textContent = '0%';
+      barA.style.width = '0%';
+      timerA.textContent = '0.0s';
+      sugarGroupA.setAttribute('transform', 'translate(80, 195) scale(1)');
+
+      percentB.textContent = '0%';
+      barB.style.width = '0%';
+      timerB.textContent = '0.0s';
+      sugarGroupB.setAttribute('transform', 'translate(80, 195) scale(1)');
+
+      winnerBanner.classList.add('hidden');
+      btnStartDissolve.disabled = false;
+      btnStartDissolve.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+
+    btnResetLab.addEventListener('click', () => {
+      resetLabState();
+      Sound.splash();
+    });
+
+    btnStartDissolve.addEventListener('click', () => {
+      if (State.isRunning) return;
+      resetLabState();
+      State.isRunning = true;
+      btnStartDissolve.disabled = true;
+      btnStartDissolve.classList.add('opacity-50', 'cursor-not-allowed');
+
+      Sound.splash();
+
+      // Görev 1 kontrolü
+      if (!State.missions.m1) {
+        State.missions.m1 = true;
+        checkMissions();
+      }
+
+      // Görev 2 kontrolü: sıcaklık farkı var mı?
+      if ((State.beakerA.temp !== State.beakerB.temp) && !State.missions.m2) {
+        State.missions.m2 = true;
+        checkMissions();
+      }
+    });
+
+    let lastTime = performance.now();
+
+    function labLoop(now) {
+      let dt = (now - lastTime) / 1000;
+      lastTime = now;
+      if (dt > 0.1) dt = 0.1;
+
+      if (State.isRunning) {
+        const sugarFactor = PhysicsRates.sugar[State.sugarType];
+
+        // --- Bardak A Güncellemesi ---
+        if (!State.beakerA.isDone) {
+          State.beakerA.elapsedSeconds += dt;
+          const rateA = PhysicsRates.tempFactor(State.beakerA.temp) * 
+                        PhysicsRates.stirFactor(State.beakerA.stir) * 
+                        sugarFactor * 7.5; // Yüzde artış hızı
+          State.beakerA.dissolvedPercent = Math.min(100, State.beakerA.dissolvedPercent + rateA * dt);
+          
+          percentA.textContent = `${Math.round(State.beakerA.dissolvedPercent)}%`;
+          barA.style.width = `${State.beakerA.dissolvedPercent}%`;
+          timerA.textContent = `${State.beakerA.elapsedSeconds.toFixed(1)}s`;
+
+          // Şeker küçülme animasyonu
+          const scaleA = Math.max(0, 1 - (State.beakerA.dissolvedPercent / 100));
+          sugarGroupA.setAttribute('transform', `translate(80, 195) scale(${scaleA})`);
+
+          if (State.beakerA.dissolvedPercent >= 100) {
+            State.beakerA.isDone = true;
+            Sound.ding();
+          }
+        }
+
+        // --- Bardak B Güncellemesi ---
+        if (!State.beakerB.isDone) {
+          State.beakerB.elapsedSeconds += dt;
+          const rateB = PhysicsRates.tempFactor(State.beakerB.temp) * 
+                        PhysicsRates.stirFactor(State.beakerB.stir) * 
+                        sugarFactor * 7.5;
+          State.beakerB.dissolvedPercent = Math.min(100, State.beakerB.dissolvedPercent + rateB * dt);
+          
+          percentB.textContent = `${Math.round(State.beakerB.dissolvedPercent)}%`;
+          barB.style.width = `${State.beakerB.dissolvedPercent}%`;
+          timerB.textContent = `${State.beakerB.elapsedSeconds.toFixed(1)}s`;
+
+          // Şeker küçülme animasyonu
+          const scaleB = Math.max(0, 1 - (State.beakerB.dissolvedPercent / 100));
+          sugarGroupB.setAttribute('transform', `translate(80, 195) scale(${scaleB})`);
+
+          if (State.beakerB.dissolvedPercent >= 100) {
+            State.beakerB.isDone = true;
+            Sound.ding();
+          }
+        }
+
+        // İkisi de bittiğinde sonuç değerlendirmesi
+        if (State.beakerA.isDone && State.beakerB.isDone) {
+          State.isRunning = false;
+          if (!State.hasCelebrated) {
+            State.hasCelebrated = true;
+            Sound.fanfare();
+            winnerBanner.classList.remove('hidden');
+
+            const timeA = State.beakerA.elapsedSeconds;
+            const timeB = State.beakerB.elapsedSeconds;
+
+            if (Math.abs(timeA - timeB) < 0.3) {
+              winnerText.textContent = `🤝 İki bardaktaki şeker de yaklaşık aynı sürede (${timeA.toFixed(1)}s) tamamen çözündü!`;
+            } else if (timeA < timeB) {
+              const diff = (timeB / timeA).toFixed(1);
+              winnerText.textContent = `🏆 Bardak A (${timeA.toFixed(1)}s), Bardak B'den tam ${diff} kat daha hızlı çözündü!`;
+            } else {
+              const diff = (timeA / timeB).toFixed(1);
+              winnerText.textContent = `🏆 Bardak B (${timeB.toFixed(1)}s), Bardak A'dan tam ${diff} kat daha hızlı çözündü!`;
+            }
+
+            if (window.confetti) {
+              confetti({
+                particleCount: 50,
+                spread: 60,
+                origin: { y: 0.6 },
+                disableForReducedMotion: true
+              });
+            }
+          }
+        }
+      }
+
+      requestAnimationFrame(labLoop);
+    }
+    requestAnimationFrame(labLoop);
+
+
+    // --- 6. MOLEKÜL DÜRBÜNÜ (CANVAS PARÇACIK ANİMASYONU) ---
+    const microCanvas = document.getElementById('microCanvas');
+    const mctx = microCanvas.getContext('2d');
+    let microParticles = [];
+    let microTemp = 10; // 10 veya 80
+
+    function initMicroParticles() {
+      microParticles = [];
+      // 50 Su Molekülü
+      for (let i = 0; i < 50; i++) {
+        microParticles.push({
+          x: Math.random() * microCanvas.width,
+          y: Math.random() * microCanvas.height,
+          vx: (Math.random() - 0.5) * (microTemp === 10 ? 1.5 : 6),
+          vy: (Math.random() - 0.5) * (microTemp === 10 ? 1.5 : 6),
+          radius: 6,
+          type: 'water'
+        });
+      }
+      // 12 Çözünen Şeker Molekülü
+      for (let i = 0; i < 12; i++) {
+        microParticles.push({
+          x: microCanvas.width / 2 + (Math.random() - 0.5) * 60,
+          y: microCanvas.height / 2 + (Math.random() - 0.5) * 60,
+          vx: (Math.random() - 0.5) * (microTemp === 10 ? 0.6 : 3),
+          vy: (Math.random() - 0.5) * (microTemp === 10 ? 0.6 : 3),
+          radius: 9,
+          type: 'sugar'
+        });
+      }
+    }
+
+    const btnMicroCold = document.getElementById('btnMicroCold');
+    const btnMicroHot = document.getElementById('btnMicroHot');
+
+    btnMicroCold.addEventListener('click', () => {
+      microTemp = 10;
+      btnMicroCold.classList.add('bg-sky-200');
+      btnMicroHot.classList.remove('bg-red-200');
+      btnMicroHot.classList.add('bg-white');
+      initMicroParticles();
+      Sound.splash();
+    });
+
+    btnMicroHot.addEventListener('click', () => {
+      microTemp = 80;
+      btnMicroHot.classList.add('bg-red-200');
+      btnMicroCold.classList.remove('bg-sky-200');
+      btnMicroCold.classList.add('bg-white');
+      initMicroParticles();
+      Sound.splash();
+    });
+
+    let microAnimActive = false;
+    function startMicroAnimation() {
+      if (microAnimActive) return;
+      microAnimActive = true;
+      initMicroParticles();
+      microLoop();
+    }
+
+    function microLoop() {
+      if (State.activeTab !== 'micro') {
+        microAnimActive = false;
+        return;
+      }
+
+      mctx.fillStyle = '#0f172a';
+      mctx.fillRect(0, 0, microCanvas.width, microCanvas.height);
+
+      // Parçacıkları Çiz ve Çarpıştır
+      microParticles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+
+        // Duvarlardan Sekme
+        if (p.x < p.radius) { p.x = p.radius; p.vx *= -1; }
+        if (p.x > microCanvas.width - p.radius) { p.x = microCanvas.width - p.radius; p.vx *= -1; }
+        if (p.y < p.radius) { p.y = p.radius; p.vy *= -1; }
+        if (p.y > microCanvas.height - p.radius) { p.y = microCanvas.height - p.radius; p.vy *= -1; }
+
+        mctx.beginPath();
+        if (p.type === 'water') {
+          mctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          mctx.fillStyle = '#38bdf8';
+          mctx.fill();
+          mctx.strokeStyle = '#0284c7';
+          mctx.lineWidth = 1.5;
+          mctx.stroke();
+        } else {
+          // Şeker Küresi
+          mctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          mctx.fillStyle = '#fef08a';
+          mctx.fill();
+          mctx.strokeStyle = '#eab308';
+          mctx.lineWidth = 2;
+          mctx.stroke();
+        }
+      });
+
+      requestAnimationFrame(microLoop);
+    }
+
+
+    // --- 7. "ERİME Mİ ÇÖZÜNME Mİ?" KAVRAM YARIŞMASI ---
+    const QuizQuestions = [
+      {
+        question: "Güneşte bekletilen dondurmanın sıvılaşması:",
+        icon: "🍦",
+        hint: "Dondurma tek bir maddedir, ısı alarak katıdan sıvıya geçer.",
+        answer: "melt",
+        explain: "Doğru! Dondurma ısı alarak sıvı hale geçer. Bu bir ERİME olayıdır!"
+      },
+      {
+        question: "Sıcak çaya atılan küp şekerin kaybolması:",
+        icon: "☕",
+        hint: "Şeker çayın içinde küçük taneciklerine ayrılarak homojen dağılır.",
+        answer: "dissolve",
+        explain: "Harika! Şeker erimez, su moleküllerinin arasına dağılarak ÇÖZÜNÜR!"
+      },
+      {
+        question: "Tencerede ateşe konan tereyağının sıvılaşması:",
+        icon: "🧈",
+        hint: "Katı yağ ısı alarak sıvı yağa dönüşür.",
+        answer: "melt",
+        explain: "Tebrikler! Katı bir maddenin ısı alarak sıvılaşması ERİME olayıdır!"
+      },
+      {
+        question: "Çorbaya atılan tuzun görünmez olması:",
+        icon: "🥣",
+        hint: "Tuz kristalleri çorbanın her yerine eşit dağılır.",
+        answer: "dissolve",
+        explain: "Süpersin! Tuz çorba içinde ÇÖZÜNÜR, çorbanın tadı tuzlu olur ama tanecikler görünmez!"
+      },
+      {
+        question: "Yanan mumun kenarlarından aşağı sıvı damlalar akması:",
+        icon: "🕯️",
+        hint: "Mum alevin sıcaklığıyla katıdan sıvıya geçer.",
+        answer: "melt",
+        explain: "Kesinlikle doğru! Mum ateşi ısı vererek katı mumu ERİTİR!"
+      }
+    ];
+
+    let currentQuizIndex = 0;
+    let quizScore = 0;
+
+    const quizQuestion = document.getElementById('quizQuestion');
+    const quizIcon = document.getElementById('quizIcon');
+    const quizHint = document.getElementById('quizHint');
+    const quizFeedback = document.getElementById('quizFeedback');
+    const quizScoreBadge = document.getElementById('quizScoreBadge');
+    const btnAnswerMelt = document.getElementById('btnAnswerMelt');
+    const btnAnswerDissolve = document.getElementById('btnAnswerDissolve');
+
+    function loadQuizQuestion(index) {
+      const q = QuizQuestions[index];
+      quizQuestion.textContent = q.question;
+      quizIcon.textContent = q.icon;
+      quizHint.textContent = q.hint;
+      quizFeedback.classList.add('hidden');
+      btnAnswerMelt.disabled = false;
+      btnAnswerDissolve.disabled = false;
+    }
+
+    function checkAnswer(userChoice) {
+      const q = QuizQuestions[currentQuizIndex];
+      btnAnswerMelt.disabled = true;
+      btnAnswerDissolve.disabled = true;
+      quizFeedback.classList.remove('hidden');
+
+      if (userChoice === q.answer) {
+        quizScore++;
+        Sound.ding();
+        quizFeedback.className = 'p-3 rounded-xl border-2 border-ink text-xs font-black text-center bg-emerald-100 text-emerald-950';
+        quizFeedback.textContent = `✅ ${q.explain}`;
+      } else {
+        Sound.splash();
+        quizFeedback.className = 'p-3 rounded-xl border-2 border-ink text-xs font-black text-center bg-red-100 text-red-950';
+        quizFeedback.textContent = `❌ Yanıldın! ${q.explain}`;
+      }
+
+      quizScoreBadge.textContent = `Skor: ${quizScore} / ${QuizQuestions.length}`;
+
+      setTimeout(() => {
+        currentQuizIndex = (currentQuizIndex + 1) % QuizQuestions.length;
+        loadQuizQuestion(currentQuizIndex);
+      }, 2500);
+    }
+
+    btnAnswerMelt.addEventListener('click', () => checkAnswer('melt'));
+    btnAnswerDissolve.addEventListener('click', () => checkAnswer('dissolve'));
+
+    loadQuizQuestion(0);
+
+
+    // --- 8. GÖREVLER KONTROLÜ ---
+    const m1Check = document.getElementById('m1Check');
+    const m2Check = document.getElementById('m2Check');
+    const m3Check = document.getElementById('m3Check');
+    const mission1 = document.getElementById('mission1');
+    const mission2 = document.getElementById('mission2');
+    const mission3 = document.getElementById('mission3');
+
+    function checkMissions() {
+      if (State.missions.m1) {
+        m1Check.textContent = '✅';
+        mission1.classList.replace('bg-amber-50', 'bg-emerald-100');
+      }
+      if (State.missions.m2) {
+        m2Check.textContent = '✅';
+        mission2.classList.replace('bg-gray-50', 'bg-emerald-100');
+      }
+      if (State.missions.m3) {
+        m3Check.textContent = '✅';
+        mission3.classList.replace('bg-gray-50', 'bg-emerald-100');
+      }
+    }
+
+
+    // --- 9. BAŞLANGIÇ AYARLARI ---
+    window.addEventListener('DOMContentLoaded', () => {
+      setTempA(10);
+      setTempB(80);
+      setSugarType('cube');
+    });
+  </script>
+</body>
+</html>

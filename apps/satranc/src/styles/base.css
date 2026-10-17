@@ -1,0 +1,135 @@
+/* ==================================================================== *
+ * base.css — Tasarım sistemi: renkler, yazı tipi, zemin
+ *
+ * Hedef kitle ilkokul 1-4. sınıf olduğu için tasarım "çıkartma" (sticker)
+ * mantığındadır: beyaz kartlar, kalın yuvarlak köşeler, altında sert bir
+ * gölge dudağı ve her bölüme ayrı bir canlı renk. Tüm renkler burada tek
+ * kaynaktan gelir; sayfalar yalnızca değişkenleri kullanır.
+ * ==================================================================== */
+
+:root {
+  /* --- Ana mürekkep --- */
+  --ink: #262450;
+  --ink-soft: #3f3c72;
+  --muted: #6d6a95;
+
+  /* --- Oyun renkleri: her bölüm kendi rengini buradan alır --- */
+  --primary: #12a594;        /* deniz yeşili — marka rengi */
+  --primary-dark: #0a7c6f;
+  --primary-soft: #d6f5ef;
+
+  --grape: #7b5cf0;  --grape-dark: #5a3ad2;  --grape-soft: #ece6ff;
+  --sky: #2e9bf0;    --sky-dark: #1673bd;    --sky-soft: #ddefff;
+  --sun: #ffb020;    --sun-dark: #dd8b00;    --sun-soft: #fff0d4;
+  --coral: #ff6f61;  --coral-dark: #dc4a3c;  --coral-soft: #ffe4df;
+  --pink: #ff5fa2;   --pink-dark: #d63d80;   --pink-soft: #ffe2ee;
+  --lime: #5cc74c;   --lime-dark: #3d9d30;   --lime-soft: #e2f8dc;
+
+  /* Eski isimler korunur — başka dosyalar bunları kullanıyor. */
+  --primary-2: var(--sun);
+  --rose: var(--pink);
+  --blue: var(--sky);
+
+  /* --- Yüzeyler --- */
+  --bg: #fdf8ef;
+  --panel: #ffffff;
+  --panel-2: #fffdf7;
+  --line: rgba(38, 36, 80, 0.10);
+  --line-strong: rgba(38, 36, 80, 0.18);
+
+  /* --- Yuvarlaklık ölçeği: köşeler bilinçli olarak çok yumuşak --- */
+  --r-sm: 0.85rem;
+  --r-md: 1.15rem;
+  --r-lg: 1.6rem;
+  --r-xl: 2.2rem;
+
+  /* --- Gölgeler: alt dudak + yumuşak bulut --- */
+  --shadow: 0 3px 0 rgba(38, 36, 80, 0.05), 0 14px 28px rgba(66, 60, 125, 0.10);
+  --shadow-lift: 0 6px 0 rgba(38, 36, 80, 0.06), 0 24px 46px rgba(66, 60, 125, 0.18);
+  --shadow-pop: 0 10px 22px rgba(66, 60, 125, 0.18);
+
+  /* Yuvarlak hatlı sistem yazı tipleri; hiçbir dış dosya indirilmez. */
+  font-family: ui-rounded, "SF Pro Rounded", "Nunito", "Quicksand", "Varela Round",
+    system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background-color: var(--bg);
+  /* Köşelere dağılmış renkli ışık lekeleri — ekran hiçbir zaman boş görünmez. */
+  background-image:
+    radial-gradient(circle at 10% -6%, rgba(123, 92, 240, 0.20), transparent 32%),
+    radial-gradient(circle at 94% 2%, rgba(46, 155, 240, 0.18), transparent 30%),
+    radial-gradient(circle at 82% 98%, rgba(255, 176, 32, 0.22), transparent 34%),
+    radial-gradient(circle at 2% 92%, rgba(18, 165, 148, 0.18), transparent 32%);
+  background-attachment: fixed;
+}
+
+button, input, select, textarea { font: inherit; }
+
+button {
+  cursor: pointer;
+  border: 0;
+  font-weight: 800;
+}
+
+h1, h2, h3, h4 {
+  font-weight: 900;
+  letter-spacing: -0.015em;
+}
+
+/* Simgeler kalın ve yuvarlak uçlu — küçük ekranda bile net görünür. */
+.icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+/* ------------------------------------------------------------------ *
+ * Yüksek kontrast: renkler koyulaşır, saydamlık kalkar, çizgiler kalınlaşır.
+ * ------------------------------------------------------------------ */
+.high-contrast {
+  --bg: #ffffff;
+  --ink: #0a0d22;
+  --ink-soft: #101533;
+  --muted: #1d2140;
+  --panel: #ffffff;
+  --panel-2: #ffffff;
+  --line: rgba(0, 0, 0, 0.34);
+  --line-strong: rgba(0, 0, 0, 0.5);
+  --primary: #04695d;
+  --grape: #4a26b8;
+  --sky: #0b5c9c;
+  --sun: #a15f00;
+  --coral: #b32b1e;
+  --pink: #a81a5c;
+  --lime: #2a6f1f;
+}
+
+body.high-contrast { background-image: none; }
+
+/*
+ * "Akıcı animasyonlar" kapatıldığında hareketi durdururuz.
+ *
+ * DİKKAT: Süreyi kısaltmak TEK BAŞINA yetmez. `infinite` tekrarlı bir animasyon
+ * (👋 el, ♞ at, öğretmen avatarı, rozet parıltısı...) 0.01 ms'lik süreyle sonsuza
+ * kadar dönmeye devam eder; her karede rastgele bir aşamaya düşer ve taş yerinde
+ * TİTRER — durmak yerine daha da hareketli görünür.
+ * Bu yüzden tekrar sayısını da 1'e çekeriz: animasyon bir kez, göz açıp kapayana
+ * kadar çalışır ve son karesinde (yani taşın kendi doğal yerinde) durur.
+ */
+.reduced-motion *, .reduced-motion *::before, .reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}

@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Balonu Şişiren Gaz: Kimyasal Değişimle Gaz Oluşumu | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'sans-serif'],
+            display: ['Baloo 2', 'cursive'],
+          },
+          colors: {
+            bgMain: '#fffdf7',
+            ink: '#0f172a',
+            fizzGreen: '#10b981',
+            acidOrange: '#f97316',
+            co2Purple: '#8b5cf6',
+          },
+          borderWidth: {
+            '3': '3px',
+            '3.5': '3.5px',
+          },
+          boxShadow: {
+            'hard': '4px 4px 0px #0f172a',
+            'hard-lg': '6px 6px 0px #0f172a',
+            'hard-sm': '2px 2px 0px #0f172a',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    html {
+      overflow-y: scroll;
+      scrollbar-gutter: stable;
+    }
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffdf7;
+      color: #0f172a;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow-x: hidden;
+    }
+    .display {
+      font-family: 'Baloo 2', cursive;
+    }
+    .chunky {
+      border: 3.5px solid #0f172a;
+      border-radius: 1.25rem;
+      box-shadow: 4px 4px 0px #0f172a;
+    }
+    .pushable {
+      border: 3px solid #0f172a;
+      border-radius: 0.85rem;
+      box-shadow: 3px 3px 0px #0f172a;
+      transition: all 0.12s ease;
+      cursor: pointer;
+    }
+    .pushable:hover {
+      transform: translate(-1.5px, -1.5px);
+      box-shadow: 4.5px 4.5px 0px #0f172a;
+    }
+    .pushable:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #0f172a;
+    }
+    .active-tab {
+      background-color: #8b5cf6 !important;
+      color: #ffffff !important;
+      border-color: #0f172a !important;
+    }
+
+    /* Baloncuk Kaynama Animasyonu */
+    @keyframes bubbleRise {
+      0% { transform: translateY(0) scale(0.8); opacity: 0; }
+      50% { opacity: 0.9; }
+      100% { transform: translateY(-50px) scale(1.2); opacity: 0; }
+    }
+    .bubble-anim-1 { animation: bubbleRise 1.1s infinite ease-out; }
+    .bubble-anim-2 { animation: bubbleRise 1.4s infinite ease-out 0.3s; }
+    .bubble-anim-3 { animation: bubbleRise 0.9s infinite ease-out 0.6s; }
+
+    /* Mum Alevi Titreşimi */
+    @keyframes flameFlicker {
+      0% { transform: scale(1) rotate(-1deg); }
+      50% { transform: scale(1.1, 0.9) rotate(2deg); }
+      100% { transform: scale(0.95, 1.05) rotate(-1deg); }
+    }
+    .flame-anim {
+      animation: flameFlicker 0.4s infinite ease-in-out;
+      transform-origin: 50% 100%;
+    }
+
+    #labContainer {
+      contain: layout paint;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6">
+
+  <!-- Üst Başlık & Navigasyon Çubuğu -->
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-ink text-sm font-black flex items-center gap-1" title="Ana Sayfaya Dön">
+        <span>🔙</span> <span class="hidden sm:inline">Portala Dön</span>
+      </a>
+      <div>
+        <h1 class="display text-lg sm:text-2xl font-black text-ink flex items-center gap-2">
+          <span>🧪</span> <span>Balonu Şişiren Gaz: Kimyasal Değişim</span>
+        </h1>
+        <p class="text-xs text-gray-600 font-bold hidden sm:block">
+          Sirke ve karbonat tepkimesiyle oluşan karbondioksit gazını gözlemle! Nefes üflemeden balonu şişir! 🎈✨
+        </p>
+      </div>
+    </div>
+
+    <!-- Mod Sekmeleri & Ses Butonu -->
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLab" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1">
+          <span>🎈</span> <span>1. Deney Masası</span>
+        </button>
+        <button id="tabFire" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1">
+          <span>🕯️</span> <span>2. Mum Söndürme</span>
+        </button>
+        <button id="tabMicro" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1">
+          <span>🔬</span> <span>3. Molekül Modeli</span>
+        </button>
+        <button id="tabQuiz" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1">
+          <span>🎯</span> <span>4. Değişim Testi</span>
+        </button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1" title="Sesi Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Ana Çalışma Alanı -->
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+    
+    <!-- SOL PANEL: İNTERAKTİF DENEY SAHNESİ (8 SÜTUN) -->
+    <div class="lg:col-span-8 flex flex-col gap-3">
+      
+      <!-- 1. MOD: KİMYASAL TEPKİME & ŞİŞEN BALON DENEY MASASI -->
+      <section id="viewLab" class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3 relative">
+        
+        <!-- Üst Bilgi & Ölçüm Çubuğu -->
+        <div class="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2 min-h-[46px]">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-xl shrink-0">🧴</span>
+            <h2 class="display text-base sm:text-lg font-black text-ink truncate">Asit + Baz Tepkimesi</h2>
+          </div>
+          <!-- Canlı Sensörler (Gaz & Sıcaklık) -->
+          <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div class="w-[95px] sm:w-[105px] px-2 py-1 bg-purple-100 border-2 border-ink rounded-lg text-xs font-black text-ink flex items-center justify-between">
+              <span>💨 Gaz:</span>
+              <span class="tabular-nums font-black text-purple-900"><span id="sensorGas">0</span> <span class="text-[10px] text-gray-600 font-bold">ml</span></span>
+            </div>
+            <div class="w-[90px] sm:w-[100px] px-2 py-1 bg-sky-100 border-2 border-ink rounded-lg text-xs font-black text-ink flex items-center justify-between">
+              <span>🌡️ Isı:</span>
+              <span class="tabular-nums font-black text-sky-900"><span id="sensorTemp">24.0</span><span class="text-[10px] text-gray-600 font-bold">°C</span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- DENEY APARATI SAHNESİ (PET ŞİŞE + BALON + KÖPÜKLER) -->
+        <div id="labContainer" class="relative w-full h-[370px] rounded-2xl border-3 border-ink overflow-hidden bg-gradient-to-b from-purple-50 via-sky-50 to-amber-50 select-none p-3 flex flex-col items-center justify-between">
+          
+          <!-- Arka Plan Laboratuvar Bilgi Şeridi -->
+          <div class="w-full flex items-center justify-between text-[11px] font-bold text-gray-500 border-b border-dashed border-purple-200 pb-1 pointer-events-none">
+            <span>🧴 Pet Şişe (Asetik Asit: Sirke)</span>
+            <span>🧂 Huni ile Doldurulan Sodyum Bikarbonat (Karbonat)</span>
+            <span>🎈 CO₂ Gaz Basıncı</span>
+          </div>
+
+          <!-- Merkez SVG Sahne: Pet Şişe, Balon ve Köpürme Reaksiyonu -->
+          <div class="relative w-[280px] h-[300px] flex items-center justify-center">
+            <svg id="stageSvg" viewBox="0 0 280 300" class="w-full h-full overflow-visible">
+              
+              <!-- Gölgelendirme Filtresi -->
+              <defs>
+                <filter id="shadow">
+                  <feDropShadow dx="2" dy="4" stdDeviation="3" flood-opacity="0.15" />
+                </filter>
+              </defs>
+
+              <!-- Zemin / Masa Yüzeyi -->
+              <ellipse cx="140" cy="285" rx="100" ry="12" fill="#e2e8f0" />
+
+              <!-- ===== PET ŞİŞE GÖVDESİ ===== -->
+              <!-- Sıvı Sirke Dolgusu (Yüksekliği sirke miktarına göre değişir) -->
+              <path id="vinegarLiquid" d="M104 220 C104 275 106 280 140 280 C174 280 176 275 176 220 Z" 
+                    fill="#fef08a" opacity="0.85" />
+
+              <!-- Şiddetli Beyaz Köpük Sütunu (Tepkime başlayınca yukarı fışkırır) -->
+              <path id="foamPillar" d="M104 280 L104 260 Q140 255 176 260 L176 280 Z" 
+                    fill="#ffffff" opacity="0" stroke="#cbd5e1" stroke-width="1.5" />
+              
+              <!-- Köpük Baloncukları -->
+              <g id="bubbleGroup" opacity="0">
+                <circle class="bubble-anim-1" cx="125" cy="250" r="4.5" fill="#ffffff" stroke="#94a3b8" stroke-width="1" />
+                <circle class="bubble-anim-2" cx="150" cy="240" r="6" fill="#ffffff" stroke="#94a3b8" stroke-width="1" />
+                <circle class="bubble-anim-3" cx="138" cy="230" r="5" fill="#ffffff" stroke="#94a3b8" stroke-width="1" />
+                <circle class="bubble-anim-1" cx="145" cy="210" r="3.5" fill="#ffffff" stroke="#94a3b8" stroke-width="1" />
+              </g>
+
+              <!-- Dökülen Karbonat Tozu Akışı (Animasyon esnasında görünür) -->
+              <g id="powderStream" opacity="0">
+                <line x1="140" y1="135" x2="140" y2="240" stroke="#ffffff" stroke-width="6" stroke-dasharray="5 3" />
+                <circle cx="138" cy="160" r="2.5" fill="#f8fafc" />
+                <circle cx="142" cy="185" r="3" fill="#f8fafc" />
+                <circle cx="139" cy="210" r="2.5" fill="#f8fafc" />
+                <ellipse cx="140" cy="245" rx="14" ry="5" fill="#ffffff" />
+              </g>
+
+              <!-- Saydam Plastik Pet Şişe Konturu -->
+              <path d="M132 140 L132 150 C132 165 102 185 102 215 L102 265 C102 278 112 284 140 284 C168 284 178 278 178 265 L178 215 C178 185 148 165 148 150 L148 140 Z" 
+                    fill="none" stroke="#0f172a" stroke-width="3.5" stroke-linejoin="round" />
+
+              <!-- Şişe Boyun Boğumu & Dişleri -->
+              <rect x="130" y="136" width="20" height="6" rx="2" fill="#94a3b8" stroke="#0f172a" stroke-width="2" />
+              <rect x="131" y="130" width="18" height="6" fill="#cbd5e1" stroke="#0f172a" stroke-width="2" />
+
+              <!-- Şişe Cam Işık Yansıması -->
+              <path d="M110 205 L110 265" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+
+              <!-- ===== BALON SİSTEMİ ===== -->
+              <!-- Balon Şişe Boğazı Bağlantı Lastiği (Şişe ağzına sabitlenmiş kauçuk halka) -->
+              <ellipse id="balloonNeckRing" cx="140" cy="132" rx="11" ry="4" fill="#ef4444" stroke="#0f172a" stroke-width="2.5" />
+
+              <!-- Tek Parça Entegre Balon Mekanizması (Pivot: Şişe Ağzı 140, 132) -->
+              <g id="balloonArm" class="cursor-pointer" transform="translate(140, 132) rotate(-95)">
+                <!-- Balon Boğazı / Borusu (Şişe ağzından balon gövdesine esneyen bağlantı) -->
+                <path id="balloonNeck" d="M -7,0 L 7,0 L 6,-14 L -6,-14 Z" fill="#ef4444" stroke="#0f172a" stroke-width="2.5" stroke-linejoin="round" />
+                
+                <!-- Balon Gövdesi (Sönük halde başlar, gaz doldukça elastik şişer) -->
+                <ellipse id="balloonBody" cx="0" cy="-38" rx="16" ry="24" fill="#ef4444" stroke="#0f172a" stroke-width="3" />
+                
+                <!-- Balon Yüzey Parlaması -->
+                <ellipse id="balloonGloss" cx="-5" cy="-44" rx="4.5" ry="10" fill="#ffffff" opacity="0.45" transform="rotate(-15 -5 -44)" />
+                
+                <!-- Balon İçindeki Karbonat Tozu (Balon dikilince şişeye dökülür) -->
+                <g id="balloonPowderGroup">
+                  <ellipse id="balloonPowder" cx="0" cy="-34" rx="11" ry="15" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" />
+                  <text id="balloonPowderText" x="0" y="-32" text-anchor="middle" font-size="7" font-weight="900" fill="#64748b">Karbonat</text>
+                </g>
+
+                <!-- Şişince Beliren CO₂ Gazı İşareti -->
+                <text id="balloonText" x="0" y="-55" text-anchor="middle" font-size="14" font-weight="900" fill="#ffffff" opacity="0">CO₂</text>
+              </g>
+
+            </svg>
+          </div>
+
+          <!-- Canlı Durum & Karbonatı Boşalt İpucu Kutusu -->
+          <div id="statusTipBox" class="bg-white/95 px-3 py-1.5 rounded-xl border-2 border-ink shadow-sm text-center text-xs font-black flex items-center gap-2">
+            <span id="tipIcon">👇</span>
+            <span id="tipText">Aşağıdan sirke ve karbonat miktarını seç, ardından "Karbonatı Dök" butonuna bas!</span>
+          </div>
+
+        </div>
+
+        <!-- DENEY MALZEME VE MİKTAR SEÇİMLERİ -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+          
+          <!-- 1. Sirke Miktarı -->
+          <div class="bg-amber-50/80 p-2.5 rounded-xl border-2 border-ink flex flex-col gap-1.5">
+            <label class="text-xs font-black text-amber-950 flex items-center justify-between">
+              <span>🧴 Sirke (Asit):</span>
+              <span id="labelVinegar" class="text-amber-800 font-extrabold">100 ml</span>
+            </label>
+            <div class="grid grid-cols-3 gap-1">
+              <button id="btnVinegarLow" class="pushable p-1.5 bg-white text-center">
+                <p class="text-[11px] font-black text-ink">50 ml</p>
+                <p class="text-[9px] font-bold text-gray-500">Az</p>
+              </button>
+              <button id="btnVinegarMed" class="pushable p-1.5 bg-amber-200 ring-2 ring-ink text-center">
+                <p class="text-[11px] font-black text-amber-950">100 ml</p>
+                <p class="text-[9px] font-bold text-amber-800">Orta</p>
+              </button>
+              <button id="btnVinegarHigh" class="pushable p-1.5 bg-white text-center">
+                <p class="text-[11px] font-black text-ink">150 ml</p>
+                <p class="text-[9px] font-bold text-gray-500">Bol 🔥</p>
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. Karbonat Miktarı -->
+          <div class="bg-purple-50/80 p-2.5 rounded-xl border-2 border-ink flex flex-col gap-1.5">
+            <label class="text-xs font-black text-purple-950 flex items-center justify-between">
+              <span>🧂 Karbonat (Baz):</span>
+              <span id="labelBaking" class="text-purple-800 font-extrabold">2 Kaşık</span>
+            </label>
+            <div class="grid grid-cols-3 gap-1">
+              <button id="btnBaking1" class="pushable p-1.5 bg-white text-center">
+                <p class="text-[11px] font-black text-ink">1 Kaşık</p>
+                <p class="text-[9px] font-bold text-gray-500">15g</p>
+              </button>
+              <button id="btnBaking2" class="pushable p-1.5 bg-purple-200 ring-2 ring-ink text-center">
+                <p class="text-[11px] font-black text-purple-950">2 Kaşık</p>
+                <p class="text-[9px] font-bold text-purple-800">30g</p>
+              </button>
+              <button id="btnBaking3" class="pushable p-1.5 bg-white text-center">
+                <p class="text-[11px] font-black text-ink">3 Kaşık</p>
+                <p class="text-[9px] font-bold text-gray-500">45g 🔥</p>
+              </button>
+            </div>
+          </div>
+
+          <!-- 3. Balon Rengi -->
+          <div class="bg-red-50/80 p-2.5 rounded-xl border-2 border-ink flex flex-col gap-1.5">
+            <label class="text-xs font-black text-red-950 flex items-center justify-between">
+              <span>🎈 Balon Rengi:</span>
+              <span id="labelBalloonColor" class="text-red-700 font-extrabold">Kırmızı</span>
+            </label>
+            <div class="flex items-center justify-between gap-1 pt-1">
+              <button data-color="#ef4444" class="btn-color w-8 h-8 rounded-full bg-red-500 border-2 border-ink ring-2 ring-ink"></button>
+              <button data-color="#3b82f6" class="btn-color w-8 h-8 rounded-full bg-blue-500 border-2 border-ink"></button>
+              <button data-color="#eab308" class="btn-color w-8 h-8 rounded-full bg-yellow-500 border-2 border-ink"></button>
+              <button data-color="#10b981" class="btn-color w-8 h-8 rounded-full bg-emerald-500 border-2 border-ink"></button>
+              <button data-color="#8b5cf6" class="btn-color w-8 h-8 rounded-full bg-purple-500 border-2 border-ink"></button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ANA AKSİYON BUTONLARI -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t-2 border-dashed border-gray-200">
+          <div class="flex items-center gap-2">
+            <!-- Balonu Kaldır & Karbonatı Dök -->
+            <button id="btnDumpBaking" class="pushable px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-black text-sm sm:text-base flex items-center gap-2 shadow-hard">
+              <span>🚀</span> <span>Balonu Kaldır & Karbonatı Dök!</span>
+            </button>
+
+            <!-- Yeniden Kur / Sıfırla -->
+            <button id="btnReset" class="pushable px-3.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-ink text-xs font-black flex items-center gap-1">
+              <span>🔄</span> <span>Yeniden Kur</span>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <!-- Mumu Söndür Moduna Geçiş Kısayolu -->
+            <button id="btnQuickFireTest" class="pushable px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-black flex items-center gap-1 border-2 border-ink">
+              <span>🕯️</span> <span>Mum Söndürme Testi</span>
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+
+      <!-- 2. MOD: KARBONDİOKSİT İLE MUM SÖNDÜRME TESTİ -->
+      <section id="viewFire" class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3 relative hidden">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🕯️</span>
+            <h2 class="display text-lg font-black text-ink">Karbondioksit Yangın Söndürücüsü</h2>
+          </div>
+          <span class="px-2.5 py-0.5 bg-amber-100 border-2 border-ink rounded-full text-xs font-black text-amber-950">
+            CO₂ Testi
+          </span>
+        </div>
+
+        <!-- Mum ve Gaz Üfleme Alanı -->
+        <div class="relative w-full h-[320px] rounded-2xl border-3 border-ink overflow-hidden bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center select-none">
+          
+          <svg viewBox="0 0 400 300" class="w-full h-full">
+            <!-- Masa -->
+            <rect x="40" y="250" width="320" height="20" rx="4" fill="#334155" stroke="#0f172a" stroke-width="3" />
+
+            <!-- Yanan Mum -->
+            <g id="candleGroup" transform="translate(260, 160)">
+              <!-- Mum Gövdesi -->
+              <rect x="-16" y="20" width="32" height="70" rx="4" fill="#f8fafc" stroke="#0f172a" stroke-width="2.5" />
+              <!-- Mum Fitili -->
+              <line x1="0" y1="20" x2="0" y2="8" stroke="#0f172a" stroke-width="3" stroke-linecap="round" />
+              
+              <!-- Mum Alevi -->
+              <g id="candleFlame" class="flame-anim">
+                <path d="M0 8 C-12 -2 -8 -26 0 -36 C8 -26 12 -2 0 8 Z" fill="#f59e0b" opacity="0.9" />
+                <path d="M0 8 C-7 0 -5 -18 0 -24 C5 -18 7 0 0 8 Z" fill="#ef4444" />
+                <circle cx="0" cy="2" r="3" fill="#38bdf8" />
+              </g>
+
+              <!-- Duman (Söndüğünde görünür) -->
+              <g id="candleSmoke" opacity="0">
+                <path d="M0 5 Q-10 -15 0 -35 Q10 -55 0 -75" stroke="#94a3b8" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="4 4" />
+              </g>
+            </g>
+
+            <!-- Şişmiş Balon ve Gaz Nozulu -->
+            <g id="fireTestBalloon" transform="translate(90, 150)">
+              <!-- Balon Gövdesi -->
+              <ellipse cx="0" cy="0" rx="45" ry="40" fill="#ef4444" stroke="#0f172a" stroke-width="3" />
+              <!-- Balon Ağzı -->
+              <polygon points="45,-8 60,-4 60,4 45,8" fill="#ef4444" stroke="#0f172a" stroke-width="2" />
+              <!-- Mandallı / Açılan Gaz Akışı Oku -->
+              <g id="gasFlowStream" opacity="0">
+                <path d="M60 0 L150 0" stroke="#a78bfa" stroke-width="8" stroke-dasharray="8 6" opacity="0.8" />
+                <text x="100" y="-12" fill="#c4b5fd" font-size="11" font-weight="900">💨 CO₂ Gazı</text>
+              </g>
+            </g>
+
+            <!-- Zemin Işık Parıltısı -->
+            <circle id="flameLight" cx="260" cy="145" r="50" fill="#f59e0b" opacity="0.15" />
+          </svg>
+
+          <!-- Mum Söndürme Butonu -->
+          <div class="absolute bottom-4 left-1/2 -translate-x-1/2">
+            <button id="btnExtinguish" class="pushable px-6 py-2.5 bg-amber-400 hover:bg-amber-300 text-ink font-black text-sm flex items-center gap-2">
+              <span>💨</span> <span>Karbondioksiti Muma Doğru Püskürt!</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Bilimsel Açıklama -->
+        <div class="p-3 bg-amber-50 rounded-xl border-2 border-ink text-xs font-bold text-amber-950 leading-relaxed">
+          💡 <b>Neden Söndü?</b> Ateşin yanabilmesi için oksijene (O₂) ihtiyacı vardır. Karbondioksit gazı (CO₂) havadan ve oksijenden daha ağır olduğu için mumun etrafına çöker, alevin oksijenle temasını tamamen keser ve ateşi anında boğarak söndürür. Yangın söndürme tüplerinin içinde de tam olarak bu gaz bulunur!
+        </div>
+      </section>
+
+
+      <!-- 3. MOD: MOLEKÜL DÜRBÜNÜ (KİMYASAL TEPKİME MODELİ) -->
+      <section id="viewMicro" class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3 relative hidden">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🔬</span>
+            <h2 class="display text-lg font-black text-ink">Molekül Dürbünü: Atomlar Nasıl Yeniden Dizilir?</h2>
+          </div>
+          <span class="px-2.5 py-0.5 bg-purple-100 border-2 border-ink rounded-full text-[11px] font-black text-purple-900">
+            Kimyasal Tepkime
+          </span>
+        </div>
+
+        <!-- Mikroskop Canvas -->
+        <div class="relative w-full h-[320px] rounded-2xl border-3 border-ink overflow-hidden bg-slate-900 flex items-center justify-center">
+          <canvas id="microCanvas" width="600" height="320" class="w-full h-full"></canvas>
+          <div class="absolute inset-0 pointer-events-none rounded-2xl border-8 border-slate-800/40 shadow-inner"></div>
+
+          <!-- Tepkime Denklemi Rozeti -->
+          <div class="absolute top-3 left-3 bg-white/95 backdrop-blur-sm p-2 rounded-xl border-2 border-ink text-xs font-black">
+            <span>Tepkime:</span>
+            <b class="text-amber-700">Sirke</b> + <b class="text-purple-700">Karbonat</b> ➔ 
+            <b class="text-emerald-700">CO₂ Gazı 💨</b> + <b class="text-blue-700">Su</b>
+          </div>
+
+          <!-- Lejant -->
+          <div class="absolute bottom-3 right-3 bg-white/95 backdrop-blur-sm p-2 rounded-xl border-2 border-ink text-[11px] font-black flex items-center gap-3">
+            <div class="flex items-center gap-1">
+              <span class="w-3 h-3 rounded-full bg-amber-400 border border-ink inline-block"></span>
+              <span>Asit Molekülü</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="w-3 h-3 rounded-full bg-purple-400 border border-ink inline-block"></span>
+              <span>Karbonat Molekülü</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="w-3 h-3 rounded-full bg-emerald-400 border border-ink inline-block"></span>
+              <span>CO₂ Baloncuğu</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 bg-purple-50 rounded-xl border-2 border-ink text-xs font-bold text-purple-950 leading-relaxed">
+          🔬 <b>Kimyasal Değişim Nedir?</b> Moleküller birbirine çarptığında aralarındaki bağlar kopar ve atomlar yepyeni maddeler oluşturmak üzere birleşir. Katı karbonat ve sıvı sirke kaybolmaz; yeni bir gaz olan karbondioksite dönüşür!
+        </div>
+      </section>
+
+
+      <!-- 4. MOD: "FİZİKSEL Mİ, KİMYASAL MI?" BİLİM SINAVI -->
+      <section id="viewQuiz" class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3 relative hidden">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🎯</span>
+            <h2 class="display text-lg font-black text-ink">Büyük Fen Sınavı: Fiziksel mi, Kimyasal mı?</h2>
+          </div>
+          <span id="quizScoreBadge" class="px-2.5 py-0.5 bg-emerald-100 border-2 border-ink rounded-full text-xs font-black text-emerald-900">
+            Skor: 0 / 5
+          </span>
+        </div>
+
+        <!-- Soru Kartı -->
+        <div id="quizCard" class="bg-gradient-to-r from-purple-50 to-emerald-50 p-4 rounded-2xl border-2 border-ink text-center flex flex-col items-center justify-center gap-2 min-h-[140px]">
+          <span id="quizIcon" class="text-4xl">📄</span>
+          <h3 id="quizQuestion" class="display text-lg font-black text-ink">Kağıdın makasla küçük parçalara kesilmesi:</h3>
+          <p id="quizHint" class="text-xs text-gray-500 font-bold">Maddenin kimliği değişti mi, yoksa sadece şekli mi değişti?</p>
+        </div>
+
+        <!-- Cevap Butonları -->
+        <div class="grid grid-cols-2 gap-3">
+          <button id="btnAnswerPhys" class="pushable py-4 bg-sky-200 hover:bg-sky-300 text-ink font-black text-base flex flex-col items-center gap-1">
+            <span class="text-2xl">✂️</span>
+            <span>FİZİKSEL DEĞİŞİM</span>
+            <span class="text-[10px] text-gray-600 font-bold">(Yalnızca şekil/hal değişir)</span>
+          </button>
+          
+          <button id="btnAnswerChem" class="pushable py-4 bg-purple-200 hover:bg-purple-300 text-ink font-black text-base flex flex-col items-center gap-1">
+            <span class="text-2xl">🧪</span>
+            <span>KİMYASAL DEĞİŞİM</span>
+            <span class="text-[10px] text-gray-600 font-bold">(Yepyeni maddeler oluşur!)</span>
+          </button>
+        </div>
+
+        <!-- Geri Bildirim -->
+        <div id="quizFeedback" class="hidden p-3 rounded-xl border-2 border-ink text-xs font-black text-center"></div>
+      </section>
+
+      <!-- Bilim İnsanı Notu: MEB Kazanım Rehberi -->
+      <section class="chunky bg-gradient-to-r from-purple-50 via-sky-50 to-emerald-50 p-3.5 sm:p-4">
+        <div class="flex items-start gap-3">
+          <span class="text-3xl sm:text-4xl p-1 bg-white border-2 border-ink rounded-xl shadow-sm">💡</span>
+          <div class="flex-1">
+            <h3 class="display text-sm sm:text-base font-black text-ink flex items-center justify-between">
+              <span>Bilim İnsanı Notu: Kimyasal Değişimin İpuçları</span>
+              <span class="text-[10px] px-2 py-0.5 bg-purple-200 text-purple-900 border border-ink rounded-full font-bold">
+                Fen Bilimleri Müfredatı
+              </span>
+            </h3>
+            <p class="text-xs text-gray-800 font-bold leading-relaxed mt-1">
+              Bir olayda <b>gaz çıkışı (köpürme)</b>, <b>renk değişimi</b>, <b>ısı açığa çıkması ya da soğuma</b> veya <b>çökelek oluşumu</b> varsa orada bir <b>KİMYASAL DEĞİŞİM</b> gerçekleşmiştir! Sirke ve karbonat karışımında şişenin hafifçe soğuması ve fışkıran köpükler, yeni bir maddenin (Karbondioksit gazı) doğduğunun kesin kanıtıdır.
+            </p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+
+    <!-- SAĞ PANEL: GÖREVLER & VERİLER (4 SÜTUN) -->
+    <div class="lg:col-span-4 flex flex-col gap-3">
+      
+      <!-- 1. KÜÇÜK MUCİT GÖREVLERİ -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🎯</span>
+            <h3 class="display text-base font-black text-ink">Küçük Mucit Görevleri</h3>
+          </div>
+          <span class="text-xs font-black px-2 py-0.5 bg-purple-100 text-purple-900 rounded-full border border-ink">
+            3 Görev
+          </span>
+        </div>
+
+        <div class="space-y-2">
+          <!-- Görev 1 -->
+          <div id="mission1" class="p-2.5 bg-amber-50 rounded-xl border-2 border-ink flex items-start gap-2.5 transition-all">
+            <span id="m1Check" class="text-lg">⏳</span>
+            <div>
+              <p class="text-xs font-black text-ink">1. Görev: İlk Kimyasal Gazı Üret</p>
+              <p class="text-[10px] text-gray-600 font-bold">Balonu kaldırıp karbonatı sirkeye dök ve balonu şişir.</p>
+            </div>
+          </div>
+
+          <!-- Görev 2 -->
+          <div id="mission2" class="p-2.5 bg-gray-50 rounded-xl border-2 border-ink flex items-start gap-2.5 transition-all">
+            <span id="m2Check" class="text-lg">⏳</span>
+            <div>
+              <p class="text-xs font-black text-ink">2. Görev: Süper Balon Rekoru (Bol Gaz)</p>
+              <p class="text-[10px] text-gray-600 font-bold">150 ml sirke ve 3 kaşık karbonatla balonu maksimum şişir.</p>
+            </div>
+          </div>
+
+          <!-- Görev 3 -->
+          <div id="mission3" class="p-2.5 bg-gray-50 rounded-xl border-2 border-ink flex items-start gap-2.5 transition-all">
+            <span id="m3Check" class="text-lg">⏳</span>
+            <div>
+              <p class="text-xs font-black text-ink">3. Görev: Yangın Söndürücü Testi</p>
+              <p class="text-[10px] text-gray-600 font-bold">Mum Söndürme moduna geçip CO₂ ile mumu söndür.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. REAKSİYON FORMÜLÜ & BİLGİ KARTI -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <span class="text-xl">⚗️</span>
+          <h3 class="display text-base font-black text-ink">Kimyasal Reaksiyon Formülü</h3>
+        </div>
+
+        <div class="space-y-2 text-xs font-bold">
+          <div class="p-2.5 bg-purple-50 rounded-xl border border-purple-200">
+            <p class="font-black text-purple-900 mb-1">Giren Maddeler:</p>
+            <p class="text-gray-700 leading-tight">🍏 Sirke (Asetik Asit: CH₃COOH)</p>
+            <p class="text-gray-700 leading-tight">🧂 Karbonat (Sodyum Bikarbonat: NaHCO₃)</p>
+          </div>
+
+          <div class="text-center text-purple-600 font-black text-base">⬇️ KİMYASAL TEPKİME ⬇️</div>
+
+          <div class="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200">
+            <p class="font-black text-emerald-900 mb-1">Çıkan Yeni Maddeler:</p>
+            <p class="text-emerald-800 font-extrabold leading-tight">💨 Karbondioksit Gazı (CO₂ - Balonu şişirir!)</p>
+            <p class="text-gray-700 leading-tight">💧 Su (H₂O)</p>
+            <p class="text-gray-700 leading-tight">🧂 Sodyum Asetat Tuzu</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. GÜNLÜK HAYAT KARTLARI -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <span class="text-xl">🌍</span>
+          <h3 class="display text-base font-black text-ink">Gerçek Dünyada Nerede Var?</h3>
+        </div>
+
+        <div class="space-y-2 text-xs font-bold text-gray-700">
+          <p class="leading-snug">
+            🍰 <b>Keklerin Kabarması:</b> Kek hamuruna konan kabartma tozu fırının sıcağında CO₂ gazı çıkarır, kekin içinde binlerce minik delik açarak onu yumuşacık kabartır!
+          </p>
+          <p class="leading-snug">
+            🧯 <b>Yangın Söndürücüler:</b> CO₂ gazı oksijeni kovup ateşi boğduğu için elektrikli cihaz ve benzin yangınlarında en güvenli söndürücüdür.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- JAVASCRIPT: SES, FİZİK, KİMYA VE ETKİLEŞİM MOTORU -->
+  <script>
+    // --- 1. WEB AUDIO API SES MOTORU ---
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    const Sound = {
+      // Sıvı dökülüşü
+      pour() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(380, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(160, audioCtx.currentTime + 0.2);
+          gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.26);
+        } catch (e) {}
+      },
+
+      // Şiddetli Asit-Baz Köpürme & Fışırtı
+      fizz(duration = 2.5) {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          // Beyaz gürültü / köpürme sesi
+          const bufferSize = audioCtx.sampleRate * duration;
+          const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.7));
+          }
+          const noise = audioCtx.createBufferSource();
+          noise.buffer = buffer;
+
+          const filter = audioCtx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(1400, audioCtx.currentTime);
+          filter.Q.setValueAtTime(1.8, audioCtx.currentTime);
+
+          const gain = audioCtx.createGain();
+          gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(audioCtx.destination);
+          noise.start();
+        } catch (e) {}
+      },
+
+      // Balon Şişme / Esneme Sesi
+      balloonInflate() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+          osc.frequency.linearRampToValueAtTime(320, audioCtx.currentTime + 1.2);
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 1.5);
+        } catch (e) {}
+      },
+
+      // Ding / Başarı
+      ding() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.45);
+        } catch (e) {}
+      },
+
+      // Zafer Fanfarı
+      fanfare() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.12);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime + idx * 0.12);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + idx * 0.12 + 0.28);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime + idx * 0.12);
+            osc.stop(audioCtx.currentTime + idx * 0.12 + 0.3);
+          });
+        } catch (e) {}
+      }
+    };
+
+    // Ses Aç/Kapat
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    soundToggle.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundIcon.textContent = soundEnabled ? '🔊' : '🔇';
+      soundToggle.className = soundEnabled 
+        ? 'pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1'
+        : 'pushable p-2 bg-gray-200 hover:bg-gray-300 text-xs font-black flex items-center gap-1';
+    });
+
+
+    // --- 2. SİMÜLASYON DURUMU (STATE) ---
+    const State = {
+      activeTab: 'lab',
+      vinegarMl: 100, // 50, 100, 150
+      bakingSpoons: 2, // 1, 2, 3
+      balloonColor: '#ef4444',
+      isReacting: false,
+      isInflated: false,
+      hasCelebrated: false,
+
+      // Sensörler
+      gasProducedMl: 0,
+      temperatureC: 24.0,
+
+      // Görevler
+      missions: {
+        m1: false,
+        m2: false,
+        m3: false
+      }
+    };
+
+
+    // --- 3. MOD SEKMELERİ GEÇİŞİ ---
+    const tabLab = document.getElementById('tabLab');
+    const tabFire = document.getElementById('tabFire');
+    const tabMicro = document.getElementById('tabMicro');
+    const tabQuiz = document.getElementById('tabQuiz');
+
+    const viewLab = document.getElementById('viewLab');
+    const viewFire = document.getElementById('viewFire');
+    const viewMicro = document.getElementById('viewMicro');
+    const viewQuiz = document.getElementById('viewQuiz');
+    const btnQuickFireTest = document.getElementById('btnQuickFireTest');
+
+    function switchTab(tab) {
+      State.activeTab = tab;
+      [tabLab, tabFire, tabMicro, tabQuiz].forEach(t => t.classList.remove('active-tab'));
+      [viewLab, viewFire, viewMicro, viewQuiz].forEach(v => v.classList.add('hidden'));
+
+      if (tab === 'lab') {
+        tabLab.classList.add('active-tab');
+        viewLab.classList.remove('hidden');
+      } else if (tab === 'fire') {
+        tabFire.classList.add('active-tab');
+        viewFire.classList.remove('hidden');
+      } else if (tab === 'micro') {
+        tabMicro.classList.add('active-tab');
+        viewMicro.classList.remove('hidden');
+        startMicroAnimation();
+      } else if (tab === 'quiz') {
+        tabQuiz.classList.add('active-tab');
+        viewQuiz.classList.remove('hidden');
+      }
+      Sound.pour();
+    }
+
+    tabLab.addEventListener('click', () => switchTab('lab'));
+    tabFire.addEventListener('click', () => switchTab('fire'));
+    tabMicro.addEventListener('click', () => switchTab('micro'));
+    tabQuiz.addEventListener('click', () => switchTab('quiz'));
+    btnQuickFireTest.addEventListener('click', () => switchTab('fire'));
+
+
+    // --- 4. MALZEME AYARLARI & SEÇİMLER ---
+    const btnVinegarLow = document.getElementById('btnVinegarLow');
+    const btnVinegarMed = document.getElementById('btnVinegarMed');
+    const btnVinegarHigh = document.getElementById('btnVinegarHigh');
+    const labelVinegar = document.getElementById('labelVinegar');
+    const vinegarLiquid = document.getElementById('vinegarLiquid');
+
+    function setVinegar(ml) {
+      if (State.isReacting) return;
+      State.vinegarMl = ml;
+      [btnVinegarLow, btnVinegarMed, btnVinegarHigh].forEach(b => {
+        b.classList.remove('bg-amber-200', 'ring-2', 'ring-ink');
+        b.classList.add('bg-white');
+      });
+
+      let yTop = 220;
+      if (ml === 50) {
+        btnVinegarLow.classList.add('bg-amber-200', 'ring-2', 'ring-ink');
+        labelVinegar.textContent = '50 ml (Az)';
+        yTop = 245;
+      } else if (ml === 100) {
+        btnVinegarMed.classList.add('bg-amber-200', 'ring-2', 'ring-ink');
+        labelVinegar.textContent = '100 ml (Orta)';
+        yTop = 220;
+      } else {
+        btnVinegarHigh.classList.add('bg-amber-200', 'ring-2', 'ring-ink');
+        labelVinegar.textContent = '150 ml (Bol)';
+        yTop = 195;
+      }
+
+      vinegarLiquid.setAttribute('d', `M104 ${yTop} C104 275 106 280 140 280 C174 280 176 275 176 ${yTop} Z`);
+      Sound.pour();
+    }
+
+    btnVinegarLow.addEventListener('click', () => setVinegar(50));
+    btnVinegarMed.addEventListener('click', () => setVinegar(100));
+    btnVinegarHigh.addEventListener('click', () => setVinegar(150));
+
+    // Karbonat Miktarı
+    const btnBaking1 = document.getElementById('btnBaking1');
+    const btnBaking2 = document.getElementById('btnBaking2');
+    const btnBaking3 = document.getElementById('btnBaking3');
+    const labelBaking = document.getElementById('labelBaking');
+
+    function setBaking(spoons) {
+      if (State.isReacting) return;
+      State.bakingSpoons = spoons;
+      [btnBaking1, btnBaking2, btnBaking3].forEach(b => {
+        b.classList.remove('bg-purple-200', 'ring-2', 'ring-ink');
+        b.classList.add('bg-white');
+      });
+
+      if (spoons === 1) {
+        btnBaking1.classList.add('bg-purple-200', 'ring-2', 'ring-ink');
+        labelBaking.textContent = '1 Kaşık (15g)';
+      } else if (spoons === 2) {
+        btnBaking2.classList.add('bg-purple-200', 'ring-2', 'ring-ink');
+        labelBaking.textContent = '2 Kaşık (30g)';
+      } else {
+        btnBaking3.classList.add('bg-purple-200', 'ring-2', 'ring-ink');
+        labelBaking.textContent = '3 Kaşık (45g)';
+      }
+      Sound.pour();
+    }
+
+    btnBaking1.addEventListener('click', () => setBaking(1));
+    btnBaking2.addEventListener('click', () => setBaking(2));
+    btnBaking3.addEventListener('click', () => setBaking(3));
+
+    // Balon Rengi Seçimi
+    const balloonBody = document.getElementById('balloonBody');
+    const balloonNeck = document.getElementById('balloonNeck');
+    const balloonNeckRing = document.getElementById('balloonNeckRing');
+    const balloonGloss = document.getElementById('balloonGloss');
+    const balloonPowderGroup = document.getElementById('balloonPowderGroup');
+    const balloonPowder = document.getElementById('balloonPowder');
+    const balloonPowderText = document.getElementById('balloonPowderText');
+    const balloonArm = document.getElementById('balloonArm');
+    const balloonText = document.getElementById('balloonText');
+    const labelBalloonColor = document.getElementById('labelBalloonColor');
+    const colorButtons = document.querySelectorAll('.btn-color');
+
+    colorButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const color = btn.getAttribute('data-color');
+        State.balloonColor = color;
+        colorButtons.forEach(b => b.classList.remove('ring-2', 'ring-ink'));
+        btn.classList.add('ring-2', 'ring-ink');
+
+        balloonBody.setAttribute('fill', color);
+        balloonNeck.setAttribute('fill', color);
+        balloonNeckRing.setAttribute('fill', color);
+
+        const colorNameMap = {
+          '#ef4444': 'Kırmızı',
+          '#3b82f6': 'Mavi',
+          '#eab308': 'Sarı',
+          '#10b981': 'Yeşil',
+          '#8b5cf6': 'Mor'
+        };
+        labelBalloonColor.textContent = colorNameMap[color] || 'Özel';
+        Sound.pour();
+      });
+    });
+
+
+    // --- 5. KİMYASAL TEPKİME FİZİK MOTORU ---
+    const btnDumpBaking = document.getElementById('btnDumpBaking');
+    const btnReset = document.getElementById('btnReset');
+    const foamPillar = document.getElementById('foamPillar');
+    const bubbleGroup = document.getElementById('bubbleGroup');
+    const powderStream = document.getElementById('powderStream');
+    const sensorGas = document.getElementById('sensorGas');
+    const sensorTemp = document.getElementById('sensorTemp');
+    const statusTipBox = document.getElementById('statusTipBox');
+    const tipIcon = document.getElementById('tipIcon');
+    const tipText = document.getElementById('tipText');
+
+    function resetLab() {
+      State.isReacting = false;
+      State.isInflated = false;
+      State.hasCelebrated = false;
+      State.gasProducedMl = 0;
+      State.temperatureC = 24.0;
+
+      sensorGas.textContent = '0';
+      sensorTemp.textContent = '24.0';
+
+      // Animasyonları sıfırla
+      gsap.killTweensOf([balloonBody, foamPillar, balloonArm, balloonNeck, balloonPowderGroup]);
+
+      // Balon başlangıçta yana yatık, şişenin ağzına sıkıca kenetli
+      balloonArm.setAttribute('transform', 'translate(140, 132) rotate(-95)');
+      balloonNeck.setAttribute('d', 'M -7,0 L 7,0 L 6,-14 L -6,-14 Z');
+      balloonBody.setAttribute('rx', '16');
+      balloonBody.setAttribute('ry', '24');
+      balloonBody.setAttribute('cy', '-38');
+
+      balloonGloss.setAttribute('cx', '-5');
+      balloonGloss.setAttribute('cy', '-44');
+      balloonGloss.setAttribute('rx', '4.5');
+      balloonGloss.setAttribute('ry', '10');
+      balloonGloss.setAttribute('transform', 'rotate(-15 -5 -44)');
+
+      balloonPowderGroup.style.opacity = '1';
+      gsap.set(balloonPowderGroup, { scaleY: 1, opacity: 1, transformOrigin: '0px -34px' });
+
+      balloonText.style.opacity = '0';
+
+      foamPillar.setAttribute('opacity', '0');
+      bubbleGroup.setAttribute('opacity', '0');
+      powderStream.setAttribute('opacity', '0');
+
+      btnDumpBaking.disabled = false;
+      btnDumpBaking.classList.remove('opacity-50', 'cursor-not-allowed');
+
+      tipIcon.textContent = '👇';
+      tipText.textContent = 'Aşağıdan sirke ve karbonat miktarını seç, ardından "Karbonatı Dök" butonuna bas!';
+    }
+
+    btnReset.addEventListener('click', () => {
+      resetLab();
+      Sound.pour();
+    });
+
+    function startReaction() {
+      if (State.isReacting || State.isInflated) return;
+      State.isReacting = true;
+      btnDumpBaking.disabled = true;
+      btnDumpBaking.classList.add('opacity-50', 'cursor-not-allowed');
+
+      tipIcon.textContent = '⏳';
+      tipText.textContent = 'Balon dikeliyor, karbonat sirkeye dökülüyor!';
+
+      // 1. Adım: Balon şişe ağzı merkezinde (140, 132) dik konuma kaldırılır
+      const tiltObj = { angle: -95 };
+      gsap.to(tiltObj, {
+        angle: 0,
+        duration: 0.8,
+        ease: "power2.inOut",
+        onUpdate: () => {
+          balloonArm.setAttribute('transform', `translate(140, 132) rotate(${tiltObj.angle})`);
+        },
+        onComplete: () => {
+          // 2. Adım: Balon içindeki toz şişe boğazından aşağı dökülür
+          gsap.to(balloonPowderGroup, {
+            scaleY: 0.1,
+            opacity: 0,
+            duration: 0.4,
+            ease: "power2.in",
+            transformOrigin: "0px -34px"
+          });
+
+          // Şişe içinde dökülen toz akışı görünür
+          powderStream.setAttribute('opacity', '1');
+          Sound.pour();
+          Sound.fizz(3.2);
+
+          // 3. Adım: Köpürme yükselir
+          foamPillar.setAttribute('opacity', '0.9');
+          bubbleGroup.setAttribute('opacity', '1');
+
+          gsap.fromTo(foamPillar, 
+            { attr: { d: "M104 275 L104 270 Q140 268 176 270 L176 275 Z" } },
+            { 
+              attr: { d: "M104 275 L104 165 Q140 160 176 165 L176 275 Z" },
+              duration: 1.2,
+              ease: "power1.out"
+            }
+          );
+
+          // 4. Adım: Karbonat eridikçe CO2 gazı balonu şişirir
+          setTimeout(() => {
+            powderStream.setAttribute('opacity', '0');
+
+            // Hedef Balon Boyutu (Sirke ve karbonata göre hesaplanır)
+            const power = (State.vinegarMl / 50) * (State.bakingSpoons / 1); // 1 to 9
+            const targetRx = 26 + (power * 3.4); // ~30 to 57
+            const targetRy = 32 + (power * 4.0); // ~36 to 68
+            const targetCy = -40 - (power * 3.8); // ~-44 to -74
+            const targetGas = Math.round(power * 140); // 140 ml to 1260 ml CO2
+
+            tipIcon.textContent = '🎈';
+            tipText.textContent = 'KİMYASAL TEPKİME BAŞLADI! CO₂ gazı balonu hızla şişiriyor!';
+            Sound.balloonInflate();
+
+            // Balon boynunun esneyip genişlemesi
+            const neckW = 6 + Math.min(power * 0.8, 5);
+            gsap.to(balloonNeck, {
+              attr: { d: `M -7,0 L 7,0 L ${neckW},-14 L -${neckW},-14 Z` },
+              duration: 1.8,
+              ease: "power1.out"
+            });
+
+            // Balon gövdesinin şişmesi
+            gsap.fromTo(balloonBody, 
+              { attr: { rx: 16, ry: 24, cy: -38 } },
+              { 
+                attr: { rx: targetRx, ry: targetRy, cy: targetCy },
+                duration: 2.2,
+                ease: "elastic.out(1, 0.4)",
+                onUpdate: function() {
+                  const prog = this.progress();
+                  const curGas = Math.round(targetGas * prog);
+                  sensorGas.textContent = curGas;
+                  // Endotermik soğuma
+                  const curTemp = (24.0 - (prog * 5.2)).toFixed(1);
+                  sensorTemp.textContent = curTemp;
+
+                  // Işıltıyı balonla orantılı taşı
+                  const curCy = -38 + (targetCy - (-38)) * prog;
+                  const curRx = 16 + (targetRx - 16) * prog;
+                  const curRy = 24 + (targetRy - 24) * prog;
+                  balloonGloss.setAttribute('cx', -curRx * 0.25);
+                  balloonGloss.setAttribute('cy', curCy - (curRy * 0.2));
+                  balloonGloss.setAttribute('rx', Math.max(curRx * 0.22, 4.5));
+                  balloonGloss.setAttribute('ry', Math.max(curRy * 0.35, 9));
+                  balloonGloss.setAttribute('transform', `rotate(-15 ${-curRx * 0.25} ${curCy - (curRy * 0.2)})`);
+
+                  // CO2 yazısını ortala
+                  balloonText.setAttribute('y', curCy + 5);
+                },
+                onComplete: () => {
+                  balloonText.style.opacity = '1';
+                  State.isReacting = false;
+                  State.isInflated = true;
+                  Sound.ding();
+                  Sound.fanfare();
+
+                  tipIcon.textContent = '🎉';
+                  tipText.textContent = `Tebrikler! ${targetGas} ml Karbondioksit gazı oluştu ve balon devasa şişti!`;
+
+                  if (window.confetti) {
+                    confetti({
+                      particleCount: 60,
+                      spread: 70,
+                      origin: { y: 0.6 }
+                    });
+                  }
+
+                  // Görev Kontrolleri
+                  if (!State.missions.m1) {
+                    State.missions.m1 = true;
+                    checkMissions();
+                  }
+
+                  if (State.vinegarMl === 150 && State.bakingSpoons === 3 && !State.missions.m2) {
+                    State.missions.m2 = true;
+                    checkMissions();
+                  }
+                }
+              }
+            );
+
+          }, 800);
+        }
+      });
+    }
+
+    btnDumpBaking.addEventListener('click', startReaction);
+    balloonArm.addEventListener('click', startReaction);
+
+
+    // --- 6. MUM SÖNDÜRME TESTİ ---
+    const btnExtinguish = document.getElementById('btnExtinguish');
+    const candleFlame = document.getElementById('candleFlame');
+    const flameLight = document.getElementById('flameLight');
+    const candleSmoke = document.getElementById('candleSmoke');
+    const gasFlowStream = document.getElementById('gasFlowStream');
+
+    btnExtinguish.addEventListener('click', () => {
+      Sound.fizz(1.2);
+      gasFlowStream.setAttribute('opacity', '1');
+
+      setTimeout(() => {
+        candleFlame.style.display = 'none';
+        flameLight.style.opacity = '0';
+        candleSmoke.setAttribute('opacity', '0.9');
+        gasFlowStream.setAttribute('opacity', '0');
+        Sound.ding();
+
+        // Görev 3 Kontrolü
+        if (!State.missions.m3) {
+          State.missions.m3 = true;
+          checkMissions();
+          Sound.fanfare();
+        }
+      }, 700);
+    });
+
+
+    // --- 7. MOLEKÜL DÜRBÜNÜ (CANVAS PARTICLE ENGINE) ---
+    const microCanvas = document.getElementById('microCanvas');
+    const mctx = microCanvas.getContext('2d');
+    let microParticles = [];
+    let microAnimActive = false;
+
+    function initMicroParticles() {
+      microParticles = [];
+      // 25 Asit Molekülü (Turuncu)
+      for (let i = 0; i < 25; i++) {
+        microParticles.push({
+          x: Math.random() * microCanvas.width,
+          y: Math.random() * microCanvas.height,
+          vx: (Math.random() - 0.5) * 3,
+          vy: (Math.random() - 0.5) * 3,
+          radius: 7,
+          type: 'acid'
+        });
+      }
+      // 25 Bikarbonat Molekülü (Mor)
+      for (let i = 0; i < 25; i++) {
+        microParticles.push({
+          x: Math.random() * microCanvas.width,
+          y: Math.random() * microCanvas.height,
+          vx: (Math.random() - 0.5) * 3,
+          vy: (Math.random() - 0.5) * 3,
+          radius: 8,
+          type: 'base'
+        });
+      }
+      // 10 Oluşan CO2 Gazı (Yeşil, yukarı yüzer)
+      for (let i = 0; i < 10; i++) {
+        microParticles.push({
+          x: Math.random() * microCanvas.width,
+          y: Math.random() * microCanvas.height,
+          vx: (Math.random() - 0.5) * 2,
+          vy: -(Math.random() * 2.5 + 1.5), // Yukarı uçar
+          radius: 10,
+          type: 'co2'
+        });
+      }
+    }
+
+    function startMicroAnimation() {
+      if (microAnimActive) return;
+      microAnimActive = true;
+      initMicroParticles();
+      microLoop();
+    }
+
+    function microLoop() {
+      if (State.activeTab !== 'micro') {
+        microAnimActive = false;
+        return;
+      }
+
+      mctx.fillStyle = '#0f172a';
+      mctx.fillRect(0, 0, microCanvas.width, microCanvas.height);
+
+      microParticles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < p.radius) { p.x = p.radius; p.vx *= -1; }
+        if (p.x > microCanvas.width - p.radius) { p.x = microCanvas.width - p.radius; p.vx *= -1; }
+        
+        if (p.type === 'co2') {
+          if (p.y < p.radius) { p.y = microCanvas.height - p.radius; } // Yukarıdan çıkıp alttan girer
+        } else {
+          if (p.y < p.radius) { p.y = p.radius; p.vy *= -1; }
+          if (p.y > microCanvas.height - p.radius) { p.y = microCanvas.height - p.radius; p.vy *= -1; }
+        }
+
+        mctx.beginPath();
+        mctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+
+        if (p.type === 'acid') {
+          mctx.fillStyle = '#f59e0b';
+          mctx.fill();
+          mctx.strokeStyle = '#d97706';
+          mctx.lineWidth = 2;
+          mctx.stroke();
+        } else if (p.type === 'base') {
+          mctx.fillStyle = '#a855f7';
+          mctx.fill();
+          mctx.strokeStyle = '#7e22ce';
+          mctx.lineWidth = 2;
+          mctx.stroke();
+        } else {
+          // CO2
+          mctx.fillStyle = '#10b981';
+          mctx.fill();
+          mctx.strokeStyle = '#059669';
+          mctx.lineWidth = 2;
+          mctx.stroke();
+          mctx.fillStyle = '#ffffff';
+          mctx.font = '9px Nunito, sans-serif';
+          mctx.textAlign = 'center';
+          mctx.fillText('CO₂', p.x, p.y + 3);
+        }
+      });
+
+      requestAnimationFrame(microLoop);
+    }
+
+
+    // --- 8. FİZİKSEL Mİ KİMYASAL MI BİLİM SINAVI ---
+    const QuizQuestions = [
+      {
+        question: "Kağıdın makasla küçük parçalara kesilmesi:",
+        icon: "✂️",
+        hint: "Kağıt hala kağıttır, sadece şekli ve boyutu küçülmüştür.",
+        answer: "phys",
+        explain: "Doğru! Kağıdın kimliği değişmez, sadece şekli değişir. Bu bir FİZİKSEL değişimdir!"
+      },
+      {
+        question: "Sirke ile karbonatın karışıp gaz ve köpük çıkarması:",
+        icon: "🧪",
+        hint: "Karbondioksit adında yepyeni bir madde doğar.",
+        answer: "chem",
+        explain: "Harika! Yepyeni bir madde olan CO₂ gazı oluştuğu için bu bir KİMYASAL değişimdir!"
+      },
+      {
+        question: "Demir çivinin nemli havada paslanması:",
+        icon: "🔩",
+        hint: "Demir oksijenle birleşerek rengi ve yapısı bozulur.",
+        answer: "chem",
+        explain: "Tebrikler! Paslanma oksijenle gerçekleşen bir KİMYASAL değişimdir, eski haline geri dönemez!"
+      },
+      {
+        question: "Buz küpünün güneşte eriyip su olması:",
+        icon: "🧊",
+        hint: "Buz da sudur, sıvı su da sudur; sadece hal değişmiştir.",
+        answer: "phys",
+        explain: "Kesinlikle doğru! Hal değişimleri (erime, donma, buharlaşma) FİZİKSEL değişimdir!"
+      },
+      {
+        question: "Kibritin yakılıp küle dönüşmesi:",
+        icon: "🔥",
+        hint: "Duman, ışık, kül ve ısı açığa çıkar.",
+        answer: "chem",
+        explain: "Süpersin! Yanma olayları geri döndürülemez birer KİMYASAL değişimdir!"
+      }
+    ];
+
+    let currentQuizIndex = 0;
+    let quizScore = 0;
+
+    const quizQuestion = document.getElementById('quizQuestion');
+    const quizIcon = document.getElementById('quizIcon');
+    const quizHint = document.getElementById('quizHint');
+    const quizFeedback = document.getElementById('quizFeedback');
+    const quizScoreBadge = document.getElementById('quizScoreBadge');
+    const btnAnswerPhys = document.getElementById('btnAnswerPhys');
+    const btnAnswerChem = document.getElementById('btnAnswerChem');
+
+    function loadQuizQuestion(index) {
+      const q = QuizQuestions[index];
+      quizQuestion.textContent = q.question;
+      quizIcon.textContent = q.icon;
+      quizHint.textContent = q.hint;
+      quizFeedback.classList.add('hidden');
+      btnAnswerPhys.disabled = false;
+      btnAnswerChem.disabled = false;
+    }
+
+    function checkAnswer(userChoice) {
+      const q = QuizQuestions[currentQuizIndex];
+      btnAnswerPhys.disabled = true;
+      btnAnswerChem.disabled = true;
+      quizFeedback.classList.remove('hidden');
+
+      if (userChoice === q.answer) {
+        quizScore++;
+        Sound.ding();
+        quizFeedback.className = 'p-3 rounded-xl border-2 border-ink text-xs font-black text-center bg-emerald-100 text-emerald-950';
+        quizFeedback.textContent = `✅ ${q.explain}`;
+      } else {
+        Sound.pour();
+        quizFeedback.className = 'p-3 rounded-xl border-2 border-ink text-xs font-black text-center bg-red-100 text-red-950';
+        quizFeedback.textContent = `❌ Yanıldın! ${q.explain}`;
+      }
+
+      quizScoreBadge.textContent = `Skor: ${quizScore} / ${QuizQuestions.length}`;
+
+      setTimeout(() => {
+        currentQuizIndex = (currentQuizIndex + 1) % QuizQuestions.length;
+        loadQuizQuestion(currentQuizIndex);
+      }, 2500);
+    }
+
+    btnAnswerPhys.addEventListener('click', () => checkAnswer('phys'));
+    btnAnswerChem.addEventListener('click', () => checkAnswer('chem'));
+    loadQuizQuestion(0);
+
+
+    // --- 9. GÖREVLER KONTROLÜ ---
+    const m1Check = document.getElementById('m1Check');
+    const m2Check = document.getElementById('m2Check');
+    const m3Check = document.getElementById('m3Check');
+    const mission1 = document.getElementById('mission1');
+    const mission2 = document.getElementById('mission2');
+    const mission3 = document.getElementById('mission3');
+
+    function checkMissions() {
+      if (State.missions.m1) {
+        m1Check.textContent = '✅';
+        mission1.classList.replace('bg-amber-50', 'bg-emerald-100');
+      }
+      if (State.missions.m2) {
+        m2Check.textContent = '✅';
+        mission2.classList.replace('bg-gray-50', 'bg-emerald-100');
+      }
+      if (State.missions.m3) {
+        m3Check.textContent = '✅';
+        mission3.classList.replace('bg-gray-50', 'bg-emerald-100');
+      }
+    }
+
+    // Başlangıç Ayarları
+    window.addEventListener('DOMContentLoaded', () => {
+      setVinegar(100);
+      setBaking(2);
+    });
+  </script>
+</body>
+</html>

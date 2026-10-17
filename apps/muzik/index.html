@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
+  <title>Akustik & Müzik Atölyesi | Sanal Enstrümanlar & Dalga Fiziği</title>
+  <meta name="description" content="Sanal piyano, ksilofon ve davul seti, ses dalgası osiloskopu ve poliritmik ritim stüdyosu.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%238b5cf6'/><path d='M35 70 A10 10 0 1 1 35 50 L35 25 L75 15 L75 45 M75 60 A10 10 0 1 1 75 40' stroke='white' stroke-width='6' fill='white'/></svg>">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+    
+    * {
+      box-sizing: border-box;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      background-color: #030712;
+      color: #f3f4f6;
+    }
+
+    /* Glassmorphism */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(139, 92, 246, 0.2);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+    }
+
+    .glass-card {
+      background: rgba(17, 27, 49, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+    }
+
+    /* Piano Key Styling */
+    .white-key {
+      background: linear-gradient(to bottom, #f8fafc 0%, #e2e8f0 100%);
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), inset 0 -4px 0 #94a3b8;
+      transition: all 0.08s ease;
+    }
+    .white-key:active, .white-key.active-key {
+      background: #c7d2fe;
+      transform: translateY(3px);
+      box-shadow: 0 2px 3px -1px rgba(0, 0, 0, 0.3), inset 0 -2px 0 #6366f1;
+    }
+    .black-key {
+      background: linear-gradient(to bottom, #1e293b 0%, #0f172a 100%);
+      border: 1px solid #020617;
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.6), inset 0 -2px 0 #334155;
+      transition: all 0.08s ease;
+    }
+    .black-key:active, .black-key.active-key {
+      background: #4338ca;
+      transform: translateY(2px);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Guided Note Glow */
+    .guide-target {
+      animation: guide-pulse 1s infinite alternate ease-in-out;
+      border-color: #10b981 !important;
+      background: #a7f3d0 !important;
+    }
+    @keyframes guide-pulse {
+      0% { box-shadow: 0 0 8px #10b981; }
+      100% { box-shadow: 0 0 20px #10b981; }
+    }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen text-slate-100">
+
+  <!-- TOP HEADER / NAV BAR -->
+  <header class="sticky top-0 z-30 flex items-center justify-between px-4 py-3 sm:px-6 glass-panel border-b border-white/10">
+    <!-- Left: Brand & Return -->
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2 h-9 px-3.5 rounded-xl glass-card text-xs sm:text-sm font-semibold text-slate-300 hover:text-white hover:border-violet-400/50 transition-all active:scale-95 shadow-md">
+        <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        <span class="hidden sm:inline">Atölye'ye Dön</span>
+      </a>
+      
+      <div class="flex items-center gap-2.5 h-9 px-3.5 rounded-xl bg-violet-500/10 border border-violet-500/30 text-white font-bold text-xs sm:text-sm tracking-wide">
+        <span class="w-2.5 h-2.5 rounded-full bg-violet-400 animate-pulse"></span>
+        <span class="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-violet-300 via-fuchsia-300 to-indigo-300">
+          🎵 Akustik & Müzik Atölyesi
+        </span>
+        <span class="hidden md:inline-block text-[11px] font-medium text-slate-400 border-l border-slate-700 pl-2">
+          Enstrümanlar & Dalga Fiziği
+        </span>
+      </div>
+    </div>
+
+    <!-- Center: View Mode Tabs -->
+    <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-900/80 border border-white/10">
+      <button onclick="setMusicMode('inst')" id="mmode-inst" class="mmode-btn active px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all text-violet-300 bg-violet-500/20 border border-violet-400/40">
+        🎹 Sanal Enstrümanlar
+      </button>
+      <button onclick="setMusicMode('scope')" id="mmode-scope" class="mmode-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5">
+        🌊 Dalga Osiloskopu
+      </button>
+      <button onclick="setMusicMode('rhythm')" id="mmode-rhythm" class="mmode-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5">
+        🥁 Ritim Stüdyosu
+      </button>
+    </div>
+
+    <!-- Right: Quick Tools -->
+    <div class="flex items-center gap-2">
+      <!-- Master Volume Control -->
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-card text-xs">
+        <button id="audio-mute-btn" onclick="toggleMute()" class="text-sm text-violet-400 hover:scale-110 transition cursor-pointer" title="Sesi Aç/Kapat">🔊</button>
+        <span class="hidden md:inline text-slate-400 text-[11px] font-bold">Ses:</span>
+        <input type="range" id="master-volume-slider" min="0" max="100" value="90" oninput="setMasterVolume(this.value)" class="w-16 sm:w-20 accent-violet-500 cursor-pointer" title="Ana Ses Seviyesi">
+        <span id="master-volume-text" class="font-mono text-violet-300 font-bold text-[11px] w-7 text-right">90%</span>
+      </div>
+
+      <button onclick="toggleFullscreen()" title="Tam Ekran" class="h-9 w-9 rounded-xl glass-card flex items-center justify-center text-slate-300 hover:text-violet-400 transition cursor-pointer">
+        ⛶
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 flex flex-col gap-4">
+
+    <!-- ─────────────────────────────────────────────────────────────
+         MODE 1: SANAL ENSTRÜMANLAR
+         ───────────────────────────────────────────────────────────── -->
+    <section id="msec-inst" class="w-full flex flex-col gap-4">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-3 sm:p-4 rounded-2xl">
+        <div class="flex items-center gap-3">
+          <!-- Instrument Toggle -->
+          <div class="flex items-center gap-1.5 bg-slate-900/80 p-1.5 rounded-xl border border-white/10 text-xs">
+            <span class="text-slate-400 pl-1 font-bold">Enstrüman:</span>
+            <button onclick="setInstrument('piano')" id="inst-piano" class="px-2.5 py-1 rounded-lg bg-violet-600 text-white font-bold transition">🎹 Piyano</button>
+            <button onclick="setInstrument('xylophone')" id="inst-xylophone" class="px-2.5 py-1 rounded-lg glass-card text-slate-300 hover:text-white transition">🪵 Ksilofon</button>
+            <button onclick="setInstrument('drums')" id="inst-drums" class="px-2.5 py-1 rounded-lg glass-card text-slate-300 hover:text-white transition">🥁 Bateri</button>
+          </div>
+        </div>
+
+        <!-- Guided Song Player -->
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1.5 bg-slate-900/80 p-1.5 rounded-xl border border-white/10 text-xs">
+            <span class="text-slate-400 pl-1 font-bold">Rehberli Şarkı:</span>
+            <select id="song-select" onchange="loadGuidedSong()" class="bg-transparent text-violet-300 font-bold pr-2 focus:outline-none cursor-pointer">
+              <option value="none" class="bg-slate-900">Serbest Çalma</option>
+              <option value="anne" class="bg-slate-900">Daha Dün Annemizin</option>
+              <option value="neseli" class="bg-slate-900">Neşeli Ol Genç Arkadaş</option>
+              <option value="jingle" class="bg-slate-900">Jingle Bells</option>
+            </select>
+          </div>
+          <button onclick="resetSongGuide()" class="h-9 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">
+            🔄 Şarkıyı Başa Al
+          </button>
+        </div>
+      </div>
+
+      <!-- PIANO KEYBOARD VIEW -->
+      <div id="piano-view" class="glass-panel p-6 rounded-3xl flex flex-col items-center justify-center gap-5">
+        <!-- Live Sound & Note Feedback Indicator -->
+        <div id="active-note-indicator" class="flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-slate-900/90 border border-violet-500/30 text-xs text-violet-200 font-mono transition-all shadow-md">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="active-note-text">Notaları çalmak için piyano tuşlarına tıklayın veya klavyenizi (A-S-D-F...) kullanın</span>
+        </div>
+
+        <div class="relative flex items-start justify-center select-none overflow-x-auto p-2" id="keyboard-container">
+          <!-- White & Black Keys Generated by JS -->
+        </div>
+
+        <!-- Feedback badge -->
+        <div id="song-feedback-badge" class="px-4 py-2 rounded-xl bg-slate-900/80 border border-white/10 text-xs font-bold text-slate-300">
+          Tuşlara tıklayarak veya klavyeden (A-S-D-F-G-H-J-K) notaları çalın.
+        </div>
+      </div>
+
+      <!-- DRUMS VIEW -->
+      <div id="drums-view" class="hidden glass-panel p-6 rounded-3xl flex flex-col items-center justify-center gap-5">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-2xl">
+          <button onclick="playDrum('kick')" class="h-36 rounded-2xl bg-gradient-to-tr from-rose-900 to-rose-700 hover:from-rose-800 hover:to-rose-600 border border-rose-500/30 flex flex-col items-center justify-center gap-2 active:scale-95 shadow-xl transition">
+            <span class="text-3xl">🥁</span>
+            <span class="font-bold text-sm text-white">Bas Davul (Kick)</span>
+            <span class="text-[10px] text-rose-200 font-mono">[Tuş: Boşluk]</span>
+          </button>
+          <button onclick="playDrum('snare')" class="h-36 rounded-2xl bg-gradient-to-tr from-amber-900 to-amber-700 hover:from-amber-800 hover:to-amber-600 border border-amber-500/30 flex flex-col items-center justify-center gap-2 active:scale-95 shadow-xl transition">
+            <span class="text-3xl">🪘</span>
+            <span class="font-bold text-sm text-white">Trampet (Snare)</span>
+            <span class="text-[10px] text-amber-200 font-mono">[Tuş: S]</span>
+          </button>
+          <button onclick="playDrum('hihat')" class="h-36 rounded-2xl bg-gradient-to-tr from-sky-900 to-sky-700 hover:from-sky-800 hover:to-sky-600 border border-sky-500/30 flex flex-col items-center justify-center gap-2 active:scale-95 shadow-xl transition">
+            <span class="text-3xl">🪙</span>
+            <span class="font-bold text-sm text-white">Zil (Hi-Hat)</span>
+            <span class="text-[10px] text-sky-200 font-mono">[Tuş: H]</span>
+          </button>
+          <button onclick="playDrum('tom')" class="h-36 rounded-2xl bg-gradient-to-tr from-purple-900 to-purple-700 hover:from-purple-800 hover:to-purple-600 border border-purple-500/30 flex flex-col items-center justify-center gap-2 active:scale-95 shadow-xl transition">
+            <span class="text-3xl">🥣</span>
+            <span class="font-bold text-sm text-white">Tom Davul</span>
+            <span class="text-[10px] text-purple-200 font-mono">[Tuş: T]</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────
+         MODE 2: DALGA OSİLOSKOPU (SES FİZİĞİ)
+         ───────────────────────────────────────────────────────────── -->
+    <section id="msec-scope" class="w-full hidden flex-col gap-4">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-3 sm:p-4 rounded-2xl">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2"><span>🌊</span> Ses Dalgası Osiloskopu</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Frekans ve genlik değiştikçe ses dalgalarının formunu ve ses perdesini gözlemleyin.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="toggleOscillatorSound()" id="btn-osc-play" class="h-9 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-violet-600/30">
+            <span id="osc-play-icon">▶</span> <span id="osc-play-text">Sesi Başlat</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        <!-- Live Wave Canvas (8 cols) -->
+        <div class="lg:col-span-8 glass-panel p-4 rounded-3xl flex flex-col items-center justify-center gap-3">
+          <div class="relative bg-slate-950/90 rounded-2xl p-2 border border-white/10 shadow-2xl flex items-center justify-center w-full">
+            <canvas id="scope-canvas" width="560" height="280" class="w-full max-w-[560px] h-[280px] rounded-xl select-none"></canvas>
+          </div>
+          <div class="flex items-center justify-between w-full px-4 text-xs font-mono text-slate-400">
+            <span>Zaman Ekseni (ms)</span>
+            <span class="text-violet-400 font-bold">f = 1 / T</span>
+            <span>Genlik (Basınç)</span>
+          </div>
+        </div>
+
+        <!-- Controls & Waveform Selector (4 cols) -->
+        <div class="lg:col-span-4 glass-panel p-5 rounded-3xl flex flex-col gap-4">
+          <span class="text-xs font-bold text-violet-400 uppercase tracking-wider border-b border-white/10 pb-2">Dalga Parametreleri</span>
+
+          <!-- Waveform Type Buttons -->
+          <div class="flex flex-col gap-1.5">
+            <span class="text-xs text-slate-300 font-bold">Dalga Türü:</span>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="setOscType('sine')" id="wtype-sine" class="wtype-btn active py-2 rounded-xl text-xs font-bold bg-violet-500/20 text-violet-300 border border-violet-500/40">∿ Sinüs</button>
+              <button onclick="setOscType('square')" id="wtype-square" class="wtype-btn py-2 rounded-xl text-xs font-semibold text-slate-400 glass-card hover:text-white">⊓ Kare</button>
+              <button onclick="setOscType('triangle')" id="wtype-triangle" class="wtype-btn py-2 rounded-xl text-xs font-semibold text-slate-400 glass-card hover:text-white">∧ Üçgen</button>
+              <button onclick="setOscType('sawtooth')" id="wtype-sawtooth" class="wtype-btn py-2 rounded-xl text-xs font-semibold text-slate-400 glass-card hover:text-white">◺ Testere</button>
+            </div>
+          </div>
+
+          <!-- Frequency Slider -->
+          <div class="glass-card p-4 rounded-2xl flex flex-col gap-2">
+            <div class="flex items-center justify-between text-xs font-bold text-slate-300">
+              <span>Frekans (Ses Perdesi):</span>
+              <span id="freq-display" class="font-mono text-violet-400 font-bold text-sm">440 Hz (La4)</span>
+            </div>
+            <input type="range" id="freq-slider" min="110" max="880" value="440" oninput="updateFrequency(this.value)" class="w-full accent-violet-500 cursor-pointer" />
+            <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+              <span>110 Hz (Pes)</span>
+              <span>440 Hz (La)</span>
+              <span>880 Hz (Tiz)</span>
+            </div>
+          </div>
+
+          <!-- Amplitude Slider -->
+          <div class="glass-card p-4 rounded-2xl flex flex-col gap-2">
+            <div class="flex items-center justify-between text-xs font-bold text-slate-300">
+              <span>Genlik (Ses Şiddeti):</span>
+              <span id="amp-display" class="font-mono text-violet-400 font-bold text-sm">50%</span>
+            </div>
+            <input type="range" id="amp-slider" min="0" max="100" value="50" oninput="updateAmplitude(this.value)" class="w-full accent-violet-500 cursor-pointer" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────
+         MODE 3: RİTİM STÜDYOSU (STEP SEQUENCER)
+         ───────────────────────────────────────────────────────────── -->
+    <section id="msec-rhythm" class="w-full hidden flex-col gap-4">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 glass-panel p-3 sm:p-4 rounded-2xl">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2"><span>🥁</span> Poliritmik Ritim Stüdyosu</h2>
+          <p class="text-xs text-slate-400 mt-0.5">16 adımlı bateri davul kutusu ile ritim kalıpları ve vuruş kombinasyonları tasarlayın.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs">
+            <span class="text-slate-400 font-bold">Tempo (BPM):</span>
+            <input type="number" id="tempo-input" min="60" max="180" value="110" onchange="updateTempo(this.value)" class="w-14 bg-black/40 text-violet-300 font-mono font-bold px-1.5 py-0.5 rounded text-center" />
+          </div>
+          <button onclick="toggleSequencerPlay()" id="btn-seq-play" class="h-9 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-violet-600/30">
+            <span id="seq-play-icon">▶</span> <span id="seq-play-text">Ritmi Çal</span>
+          </button>
+          <button onclick="clearSequencer()" class="h-9 px-3 rounded-xl glass-card text-xs font-bold text-slate-300 hover:text-white transition">
+            🔄 Temizle
+          </button>
+        </div>
+      </div>
+
+      <!-- 16-Step Sequencer Grid -->
+      <div class="glass-panel p-6 rounded-3xl flex flex-col gap-4 overflow-x-auto">
+        <div id="sequencer-grid" class="flex flex-col gap-2 min-w-max">
+          <!-- 4 Drum tracks (Kick, Snare, Hi-Hat, Tom) x 16 steps -->
+        </div>
+      </div>
+    </section>
+
+    <!-- EDUCATIONAL NOTE CARD -->
+    <div class="w-full glass-card p-4 rounded-2xl text-xs text-slate-300 flex items-start gap-3 mt-2">
+      <span class="text-xl">💡</span>
+      <div>
+        <strong class="text-white">Müzik & Ses Fiziği Kazanımı:</strong> Ses, maddesel ortamda yayılan mekanik bir dalgadır. Dalganın saniyedeki titreşim sayısı olan <strong>frekans (Hz)</strong> sesin inceliğini (tizliğini) belirlerken, dalganın tepe yüksekliği olan <strong>genlik</strong> sesin gürlüğünü (şiddetini) belirler. Müzik notaları belirli frekans oranlarına (örneğin La = 440 Hz, bir oktav üstü La = 880 Hz) tam matematiksel uyum gösterir.
+      </div>
+    </div>
+
+  </main>
+
+  <!-- JAVASCRIPT ENGINE -->
+  <script>
+    let audioCtx = null;
+    let masterGainNode = null;
+    let masterVolume = 0.9;
+    let isMuted = false;
+
+    function getAudio() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+          masterGainNode = audioCtx.createGain();
+          masterGainNode.gain.setValueAtTime(masterVolume, audioCtx.currentTime);
+          masterGainNode.connect(audioCtx.destination);
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+      return audioCtx;
+    }
+
+    function setMasterVolume(val) {
+      masterVolume = Number(val) / 100;
+      const label = document.getElementById('master-volume-text');
+      if (label) label.innerText = `${val}%`;
+      if (masterGainNode && audioCtx) {
+        masterGainNode.gain.setValueAtTime(isMuted ? 0 : masterVolume, audioCtx.currentTime);
+      }
+      const icon = document.getElementById('audio-mute-btn');
+      if (icon) {
+        icon.innerText = val == 0 || isMuted ? '🔇' : (val > 50 ? '🔊' : '🔉');
+      }
+    }
+
+    function toggleMute() {
+      isMuted = !isMuted;
+      if (masterGainNode && audioCtx) {
+        masterGainNode.gain.setValueAtTime(isMuted ? 0 : masterVolume, audioCtx.currentTime);
+      }
+      const icon = document.getElementById('audio-mute-btn');
+      if (icon) icon.innerText = isMuted ? '🔇' : '🔊';
+    }
+
+    function unlockAudio(callback) {
+      const ctx = getAudio();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') {
+        ctx.resume().then(() => {
+          if (callback) callback(ctx);
+        }).catch(() => {
+          if (callback) callback(ctx);
+        });
+      } else {
+        if (callback) callback(ctx);
+      }
+    }
+
+    // Wake up Web Audio API proactively on first user interaction across the page
+    const unlockUserEvents = ['pointerdown', 'touchstart', 'touchend', 'mousedown', 'keydown', 'click'];
+    const proactiveUnlock = () => unlockAudio();
+    unlockUserEvents.forEach(e => window.addEventListener(e, proactiveUnlock, { passive: true }));
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    /* MODE NAVIGATION */
+    let currentMusicMode = 'inst';
+
+    function setMusicMode(mode) {
+      currentMusicMode = mode;
+      document.querySelectorAll('.mmode-btn').forEach(btn => {
+        btn.classList.remove('active', 'text-violet-300', 'bg-violet-500/20', 'border', 'border-violet-400/40');
+        btn.classList.add('text-slate-300');
+      });
+      const activeBtn = document.getElementById(`mmode-${mode}`);
+      if (activeBtn) {
+        activeBtn.classList.add('active', 'text-violet-300', 'bg-violet-500/20', 'border', 'border-violet-400/40');
+        activeBtn.classList.remove('text-slate-300');
+      }
+
+      document.getElementById('msec-inst').classList.add('hidden');
+      document.getElementById('msec-scope').classList.add('hidden');
+      document.getElementById('msec-rhythm').classList.add('hidden');
+
+      const targetSec = document.getElementById(`msec-${mode}`);
+      if (targetSec) targetSec.classList.remove('hidden');
+
+      if (mode === 'scope') startScopeDrawing();
+      else stopOscillatorSound();
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       1. INSTRUMENT & PIANO ENGINE
+       ───────────────────────────────────────────────────────────── */
+    let currentInstrument = 'piano'; // piano, xylophone, drums
+
+    const NOTES = [
+      { note: 'C4', freq: 261.63, name: 'Do', key: 'A', isBlack: false },
+      { note: 'C#4', freq: 277.18, name: 'Do#', key: 'W', isBlack: true },
+      { note: 'D4', freq: 293.66, name: 'Re', key: 'S', isBlack: false },
+      { note: 'D#4', freq: 311.13, name: 'Re#', key: 'E', isBlack: true },
+      { note: 'E4', freq: 329.63, name: 'Mi', key: 'D', isBlack: false },
+      { note: 'F4', freq: 349.23, name: 'Fa', key: 'F', isBlack: false },
+      { note: 'F#4', freq: 369.99, name: 'Fa#', key: 'T', isBlack: true },
+      { note: 'G4', freq: 392.00, name: 'Sol', key: 'G', isBlack: false },
+      { note: 'G#4', freq: 415.30, name: 'Sol#', key: 'Y', isBlack: true },
+      { note: 'A4', freq: 440.00, name: 'La', key: 'H', isBlack: false },
+      { note: 'A#4', freq: 466.16, name: 'La#', key: 'U', isBlack: true },
+      { note: 'B4', freq: 493.88, name: 'Si', key: 'J', isBlack: false },
+      { note: 'C5', freq: 523.25, name: 'Do', key: 'K', isBlack: false }
+    ];
+
+    function setInstrument(inst) {
+      currentInstrument = inst;
+      document.getElementById('inst-piano').className = inst === 'piano' ? 'px-2.5 py-1 rounded-lg bg-violet-600 text-white font-bold transition' : 'px-2.5 py-1 rounded-lg glass-card text-slate-300 hover:text-white transition';
+      document.getElementById('inst-xylophone').className = inst === 'xylophone' ? 'px-2.5 py-1 rounded-lg bg-violet-600 text-white font-bold transition' : 'px-2.5 py-1 rounded-lg glass-card text-slate-300 hover:text-white transition';
+      document.getElementById('inst-drums').className = inst === 'drums' ? 'px-2.5 py-1 rounded-lg bg-violet-600 text-white font-bold transition' : 'px-2.5 py-1 rounded-lg glass-card text-slate-300 hover:text-white transition';
+
+      if (inst === 'drums') {
+        document.getElementById('piano-view').classList.add('hidden');
+        document.getElementById('drums-view').classList.remove('hidden');
+      } else {
+        document.getElementById('piano-view').classList.remove('hidden');
+        document.getElementById('drums-view').classList.add('hidden');
+      }
+    }
+
+    function emitNoteSound(ctx, freq, noteName) {
+      try {
+        const now = ctx.currentTime;
+        const dest = masterGainNode || ctx.destination;
+
+        if (currentInstrument === 'piano') {
+          // Acoustic Grand Piano simulation:
+          // Triangle fundamental + natural exponential decay using setTargetAtTime
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now);
+
+          gain.gain.setValueAtTime(0.001, now);
+          gain.gain.linearRampToValueAtTime(0.4, now + 0.012);
+          gain.gain.setTargetAtTime(0.0001, now + 0.02, 0.35);
+
+          osc.connect(gain);
+          gain.connect(dest);
+          osc.start(now);
+          osc.stop(now + 1.5);
+
+          // Subtle secondary harmonic for rich acoustic timbre
+          try {
+            const overtone = ctx.createOscillator();
+            const overGain = ctx.createGain();
+            overtone.type = 'sine';
+            overtone.frequency.setValueAtTime(freq * 2, now);
+            overGain.gain.setValueAtTime(0.001, now);
+            overGain.gain.linearRampToValueAtTime(0.08, now + 0.01);
+            overGain.gain.setTargetAtTime(0.0001, now + 0.015, 0.16);
+            overtone.connect(overGain);
+            overGain.connect(dest);
+            overtone.start(now);
+            overtone.stop(now + 0.85);
+          } catch (_) {}
+        } else if (currentInstrument === 'xylophone') {
+          // Bright, chimey wooden bar sound
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+
+          gain.gain.setValueAtTime(0.001, now);
+          gain.gain.linearRampToValueAtTime(0.5, now + 0.006);
+          gain.gain.setTargetAtTime(0.0001, now + 0.01, 0.13);
+
+          osc.connect(gain);
+          gain.connect(dest);
+          osc.start(now);
+          osc.stop(now + 0.6);
+        }
+
+        // Live visual note feedback
+        if (noteName) showActiveNoteFeedback(noteName, freq);
+      } catch (e) {
+        console.warn('emitNoteSound error:', e);
+      }
+    }
+
+    function showActiveNoteFeedback(noteName, freq) {
+      const el = document.getElementById('active-note-text');
+      if (el) {
+        el.innerHTML = `Çalınan Nota: <strong class="text-white font-bold text-sm">${noteName}</strong> &bull; <span class="text-violet-300 font-mono font-bold">${freq.toFixed(1)} Hz</span> &bull; <span class="text-emerald-400 font-bold">♪ Ses Açık</span>`;
+      }
+      const indicator = document.getElementById('active-note-indicator');
+      if (indicator) {
+        indicator.classList.remove('border-violet-500/30');
+        indicator.classList.add('border-emerald-400', 'shadow-lg', 'shadow-emerald-500/20');
+        setTimeout(() => {
+          indicator.classList.remove('border-emerald-400', 'shadow-lg', 'shadow-emerald-500/20');
+          indicator.classList.add('border-violet-500/30');
+        }, 350);
+      }
+    }
+
+    function playNote(freq, noteName) {
+      unlockAudio((ctx) => {
+        emitNoteSound(ctx, freq, noteName);
+      });
+      handleGuidedStep(noteName);
+    }
+
+    function emitDrumSound(ctx, type) {
+      try {
+        const now = ctx.currentTime;
+        const dest = masterGainNode || ctx.destination;
+
+        if (type === 'kick') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(150, now);
+          osc.frequency.exponentialRampToValueAtTime(35, now + 0.14);
+
+          gain.gain.setValueAtTime(0.001, now);
+          gain.gain.linearRampToValueAtTime(0.7, now + 0.004);
+          gain.gain.setTargetAtTime(0.0001, now + 0.01, 0.08);
+
+          osc.connect(gain);
+          gain.connect(dest);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        } else if (type === 'snare') {
+          // Tone
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(180, now);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.setTargetAtTime(0.0001, now + 0.01, 0.04);
+          osc.connect(gain);
+          gain.connect(dest);
+          osc.start(now);
+          osc.stop(now + 0.2);
+
+          // Snare rattle (white noise)
+          const bufferSize = Math.floor(ctx.sampleRate * 0.12);
+          const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+          const noise = ctx.createBufferSource();
+          noise.buffer = buffer;
+          const noiseGain = ctx.createGain();
+          noiseGain.gain.setValueAtTime(0.35, now);
+          noiseGain.gain.setTargetAtTime(0.0001, now + 0.01, 0.04);
+          noise.connect(noiseGain);
+          noiseGain.connect(dest);
+          noise.start(now);
+        } else if (type === 'hihat') {
+          const bufferSize = Math.floor(ctx.sampleRate * 0.05);
+          const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+          const noise = ctx.createBufferSource();
+          noise.buffer = buffer;
+
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'highpass';
+          filter.frequency.setValueAtTime(7000, now);
+
+          const hGain = ctx.createGain();
+          hGain.gain.setValueAtTime(0.25, now);
+          hGain.gain.setTargetAtTime(0.0001, now + 0.005, 0.02);
+
+          noise.connect(filter);
+          filter.connect(hGain);
+          hGain.connect(dest);
+          noise.start(now);
+        } else if (type === 'tom') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.exponentialRampToValueAtTime(85, now + 0.2);
+
+          gain.gain.setValueAtTime(0.001, now);
+          gain.gain.linearRampToValueAtTime(0.5, now + 0.005);
+          gain.gain.setTargetAtTime(0.0001, now + 0.01, 0.09);
+
+          osc.connect(gain);
+          gain.connect(dest);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        }
+      } catch (e) {
+        console.warn('emitDrumSound error:', e);
+      }
+    }
+
+    function playDrum(type) {
+      unlockAudio((ctx) => {
+        emitDrumSound(ctx, type);
+      });
+    }
+
+    function renderKeyboard() {
+      const container = document.getElementById('keyboard-container');
+      container.innerHTML = '';
+
+      // 1. Render white keys first
+      NOTES.filter(n => !n.isBlack).forEach(n => {
+        const btn = document.createElement('button');
+        btn.id = `key-${n.note}`;
+        btn.className = 'white-key relative w-12 sm:w-14 h-48 rounded-b-xl flex flex-col justify-end items-center pb-3 text-slate-800 font-bold text-xs select-none shadow-md transition-all active:scale-[0.98] cursor-pointer';
+        btn.innerHTML = `<span class="text-xs text-slate-500 font-mono">${n.key}</span><span class="text-sm font-bold text-slate-900">${n.name}</span>`;
+        
+        const trigger = (e) => {
+          btn.classList.add('active-key');
+          playNote(n.freq, n.note);
+          if (e && e.type === 'touchstart') e.preventDefault();
+        };
+        const release = () => btn.classList.remove('active-key');
+
+        btn.onmousedown = trigger;
+        btn.onmouseup = release;
+        btn.onmouseleave = release;
+
+        btn.ontouchstart = trigger;
+        btn.ontouchend = release;
+
+        container.appendChild(btn);
+      });
+
+      // 2. Render black keys positioned dynamically relative to white keys
+      const blackMap = {
+        'C#4': 'C4',
+        'D#4': 'D4',
+        'F#4': 'F4',
+        'G#4': 'G4',
+        'A#4': 'A4'
+      };
+
+      function updateBlackKeyPositions() {
+        NOTES.filter(n => n.isBlack).forEach(n => {
+          let btn = document.getElementById(`key-${n.note}`);
+          if (!btn) {
+            btn = document.createElement('button');
+            btn.id = `key-${n.note}`;
+            btn.className = 'black-key absolute z-10 w-7 sm:w-9 h-30 rounded-b-lg flex flex-col justify-end items-center pb-2 text-white font-bold text-[10px] select-none shadow-xl cursor-pointer';
+            btn.innerHTML = `<span class="text-[9px] text-slate-400 font-mono">${n.key}</span><span class="text-xs font-bold text-white">${n.name}</span>`;
+
+            const trigger = (e) => {
+              btn.classList.add('active-key');
+              playNote(n.freq, n.note);
+              if (e && e.type === 'touchstart') e.preventDefault();
+            };
+            const release = () => btn.classList.remove('active-key');
+
+            btn.onmousedown = trigger;
+            btn.onmouseup = release;
+            btn.onmouseleave = release;
+
+            btn.ontouchstart = trigger;
+            btn.ontouchend = release;
+
+            container.appendChild(btn);
+          }
+
+          const baseWhiteId = blackMap[n.note];
+          const baseWhite = document.getElementById(`key-${baseWhiteId}`);
+          if (baseWhite) {
+            const leftPos = baseWhite.offsetLeft + baseWhite.offsetWidth - (btn.offsetWidth || 34) / 2;
+            btn.style.left = `${leftPos}px`;
+          }
+        });
+      }
+
+      setTimeout(updateBlackKeyPositions, 20);
+      window.addEventListener('resize', updateBlackKeyPositions);
+    }
+
+    // Keyboard support
+    window.addEventListener('keydown', (e) => {
+      if (currentMusicMode !== 'inst') return;
+      if (e.repeat) return; // Prevent repeated key stutter on key hold
+      const keyUpper = e.key.toUpperCase();
+      const noteObj = NOTES.find(n => n.key === keyUpper);
+      if (noteObj) {
+        const el = document.getElementById(`key-${noteObj.note}`);
+        if (el) el.classList.add('active-key');
+        playNote(noteObj.freq, noteObj.note);
+      } else if (e.code === 'Space') {
+        playDrum('kick');
+      } else if (keyUpper === 'T') {
+        playDrum('tom');
+      } else if (keyUpper === 'H') {
+        playDrum('hihat');
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      const keyUpper = e.key.toUpperCase();
+      const noteObj = NOTES.find(n => n.key === keyUpper);
+      if (noteObj) {
+        const el = document.getElementById(`key-${noteObj.note}`);
+        if (el) el.classList.remove('active-key');
+      }
+    });
+
+    /* GUIDED SONGS ENGINE */
+    const songs = {
+      anne: [
+        'C4', 'C4', 'G4', 'G4', 'A4', 'A4', 'G4', // Da-ha dün an-ne-mi-zin
+        'F4', 'F4', 'E4', 'E4', 'D4', 'D4', 'C4'  // Kol-la-rın-da ya-şar-ken
+      ],
+      neseli: [
+        'C4', 'D4', 'E4', 'C4', 'C4', 'D4', 'E4', 'C4', // Ne-şe-li ol genç ar-ka-daş
+        'E4', 'F4', 'G4', 'E4', 'F4', 'G4'
+      ],
+      jingle: [
+        'E4', 'E4', 'E4', 'E4', 'E4', 'E4', 'E4', 'G4', 'C4', 'D4', 'E4'
+      ]
+    };
+
+    let activeSong = null;
+    let songIndex = 0;
+
+    function loadGuidedSong() {
+      const val = document.getElementById('song-select').value;
+      if (val === 'none') {
+        activeSong = null;
+        songIndex = 0;
+        clearGuideHighlight();
+        document.getElementById('song-feedback-badge').innerText = 'Serbest çalma modundasınız.';
+      } else {
+        activeSong = songs[val];
+        songIndex = 0;
+        updateGuideHighlight();
+      }
+    }
+
+    function resetSongGuide() {
+      songIndex = 0;
+      updateGuideHighlight();
+    }
+
+    function updateGuideHighlight() {
+      clearGuideHighlight();
+      if (!activeSong || songIndex >= activeSong.length) return;
+      const targetNote = activeSong[songIndex];
+      const el = document.getElementById(`key-${targetNote}`);
+      if (el) el.classList.add('guide-target');
+      document.getElementById('song-feedback-badge').innerHTML = `Sıradaki Nota: <strong class="text-emerald-400">${targetNote}</strong> (${songIndex + 1} / ${activeSong.length})`;
+    }
+
+    function handleGuidedStep(playedNote) {
+      if (!activeSong) return;
+      if (songIndex < activeSong.length && activeSong[songIndex] === playedNote) {
+        songIndex++;
+        if (songIndex >= activeSong.length) {
+          clearGuideHighlight();
+          document.getElementById('song-feedback-badge').innerHTML = '🎉 <strong>TEBRİKLER! Şarkıyı Kusursuz Tamamladınız!</strong>';
+          if (typeof confetti === 'function') confetti({ particleCount: 70, spread: 60 });
+        } else {
+          updateGuideHighlight();
+        }
+      }
+    }
+
+    function clearGuideHighlight() {
+      document.querySelectorAll('.guide-target').forEach(k => k.classList.remove('guide-target'));
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       2. OSCILLOSCOPE & SOUND PHYSICS ENGINE
+       ───────────────────────────────────────────────────────────── */
+    let oscNode = null;
+    let oscGain = null;
+    let oscFreq = 440;
+    let oscAmp = 0.5;
+    let oscType = 'sine';
+    let isOscPlaying = false;
+    let scopeAnimId = null;
+
+    function setOscType(t) {
+      oscType = t;
+      document.querySelectorAll('.wtype-btn').forEach(b => {
+        b.classList.remove('active', 'bg-violet-500/20', 'text-violet-300', 'border-violet-500/40');
+        b.classList.add('text-slate-400');
+      });
+      const btn = document.getElementById(`wtype-${t}`);
+      if (btn) {
+        btn.classList.add('active', 'bg-violet-500/20', 'text-violet-300', 'border-violet-500/40');
+        btn.classList.remove('text-slate-400');
+      }
+      if (oscNode) oscNode.type = t;
+    }
+
+    function updateFrequency(f) {
+      oscFreq = Number(f);
+      document.getElementById('freq-display').innerText = `${oscFreq} Hz`;
+      if (oscNode && audioCtx) oscNode.frequency.setValueAtTime(oscFreq, audioCtx.currentTime);
+    }
+
+    function updateAmplitude(a) {
+      oscAmp = Number(a) / 100;
+      document.getElementById('amp-display').innerText = `${a}%`;
+      if (oscGain && audioCtx) oscGain.gain.setValueAtTime(oscAmp * 0.35, audioCtx.currentTime);
+    }
+
+    function toggleOscillatorSound() {
+      if (!isOscPlaying) {
+        startOscillatorSound();
+      } else {
+        stopOscillatorSound();
+      }
+    }
+
+    function startOscillatorSound() {
+      unlockAudio((ctx) => {
+        if (oscNode) stopOscillatorSound();
+        oscNode = ctx.createOscillator();
+        oscGain = ctx.createGain();
+
+        oscNode.type = oscType;
+        oscNode.frequency.setValueAtTime(oscFreq, ctx.currentTime);
+        oscGain.gain.setValueAtTime(oscAmp * 0.35, ctx.currentTime);
+
+        oscNode.connect(oscGain);
+        oscGain.connect(masterGainNode || ctx.destination);
+        oscNode.start();
+
+        isOscPlaying = true;
+        const icon = document.getElementById('osc-play-icon');
+        const text = document.getElementById('osc-play-text');
+        if (icon) icon.innerText = '⏸';
+        if (text) text.innerText = 'Sesi Durdur';
+      });
+    }
+
+    function stopOscillatorSound() {
+      if (oscNode) {
+        try {
+          oscNode.stop();
+          oscNode.disconnect();
+        } catch (e) {}
+        oscNode = null;
+      }
+      isOscPlaying = false;
+      const btnIcon = document.getElementById('osc-play-icon');
+      const btnText = document.getElementById('osc-play-text');
+      if (btnIcon && btnText) {
+        btnIcon.innerText = '▶';
+        btnText.innerText = 'Sesi Başlat';
+      }
+    }
+
+    function startScopeDrawing() {
+      const cvs = document.getElementById('scope-canvas');
+      if (!cvs) return;
+      const ctx = cvs.getContext('2d');
+      let t = 0;
+
+      function draw() {
+        if (currentMusicMode !== 'scope') return;
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+
+        // Grid lines
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < cvs.width; x += 40) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, cvs.height); ctx.stroke();
+        }
+        for (let y = 0; y < cvs.height; y += 40) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cvs.width, y); ctx.stroke();
+        }
+
+        // Center line
+        ctx.strokeStyle = 'rgba(139, 92, 246, 0.25)';
+        ctx.beginPath(); ctx.moveTo(0, cvs.height / 2); ctx.lineTo(cvs.width, cvs.height / 2); ctx.stroke();
+
+        // Wave path
+        ctx.strokeStyle = '#a855f7';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+
+        const cy = cvs.height / 2;
+        const amplitude = (cvs.height * 0.38) * oscAmp;
+        const cycles = (oscFreq / 40);
+
+        for (let x = 0; x < cvs.width; x++) {
+          const phase = (x / cvs.width) * cycles * Math.PI * 2 + t;
+          let y = cy;
+
+          if (oscType === 'sine') {
+            y = cy - Math.sin(phase) * amplitude;
+          } else if (oscType === 'square') {
+            y = cy - (Math.sin(phase) >= 0 ? 1 : -1) * amplitude;
+          } else if (oscType === 'triangle') {
+            y = cy - (Math.asin(Math.sin(phase)) / (Math.PI / 2)) * amplitude;
+          } else if (oscType === 'sawtooth') {
+            y = cy - (2 * ((phase / (Math.PI * 2)) % 1) - 1) * amplitude;
+          }
+
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+
+        ctx.stroke();
+        t += isOscPlaying ? 0.08 : 0.01;
+        scopeAnimId = requestAnimationFrame(draw);
+      }
+
+      draw();
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       3. STEP SEQUENCER ENGINE
+       ───────────────────────────────────────────────────────────── */
+    const TRACKS = [
+      { id: 'kick', name: 'Kick (Bas Davul)', icon: '🥁', color: '#f43f5e' },
+      { id: 'snare', name: 'Snare (Trampet)', icon: '🪘', color: '#f59e0b' },
+      { id: 'hihat', name: 'Hi-Hat (Zil)', icon: '🪙', color: '#38bdf8' },
+      { id: 'tom', name: 'Tom Davul', icon: '🥣', color: '#a855f7' }
+    ];
+
+    let seqSteps = 16;
+    let seqBPM = 110;
+    let seqGrid = {
+      kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+      snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+      hihat: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+      tom: [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0]
+    };
+
+    let isSeqPlaying = false;
+    let seqCurrentStep = 0;
+    let seqIntervalId = null;
+
+    function renderSequencer() {
+      const container = document.getElementById('sequencer-grid');
+      container.innerHTML = '';
+
+      TRACKS.forEach(tr => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2';
+
+        // Track header
+        const label = document.createElement('div');
+        label.className = 'w-32 text-xs font-bold text-slate-300 flex items-center gap-2 truncate';
+        label.innerHTML = `<span>${tr.icon}</span> <span>${tr.name}</span>`;
+        row.appendChild(label);
+
+        // 16 Step buttons
+        for (let s = 0; s < seqSteps; s++) {
+          const btn = document.createElement('button');
+          btn.id = `seq-${tr.id}-${s}`;
+          const isActive = seqGrid[tr.id][s] === 1;
+
+          btn.className = `w-8 h-10 rounded-lg font-mono text-[10px] font-bold transition-all ${
+            isActive ? 'border border-white/40 shadow-md' : 'bg-slate-900 border border-white/5 hover:border-white/20 text-slate-600'
+          }`;
+          if (isActive) btn.style.backgroundColor = tr.color;
+
+          btn.onclick = () => {
+            seqGrid[tr.id][s] = seqGrid[tr.id][s] === 1 ? 0 : 1;
+            renderSequencer();
+            playDrum(tr.id);
+          };
+
+          row.appendChild(btn);
+        }
+
+        container.appendChild(row);
+      });
+    }
+
+    function toggleSequencerPlay() {
+      if (!isSeqPlaying) {
+        startSequencer();
+      } else {
+        stopSequencer();
+      }
+    }
+
+    function startSequencer() {
+      unlockAudio(() => {
+        isSeqPlaying = true;
+        document.getElementById('seq-play-icon').innerText = '⏸';
+        document.getElementById('seq-play-text').innerText = 'Durdur';
+
+        const intervalMs = (60 / seqBPM / 4) * 1000;
+        clearInterval(seqIntervalId);
+        seqIntervalId = setInterval(stepSequencer, intervalMs);
+      });
+    }
+
+    function stopSequencer() {
+      isSeqPlaying = false;
+      clearInterval(seqIntervalId);
+      document.getElementById('seq-play-icon').innerText = '▶';
+      document.getElementById('seq-play-text').innerText = 'Ritmi Çal';
+      clearStepHighlights();
+    }
+
+    function stepSequencer() {
+      clearStepHighlights();
+
+      // Highlight column
+      TRACKS.forEach(tr => {
+        const el = document.getElementById(`seq-${tr.id}-${seqCurrentStep}`);
+        if (el) el.classList.add('ring-2', 'ring-white');
+
+        if (seqGrid[tr.id][seqCurrentStep] === 1) {
+          playDrum(tr.id);
+        }
+      });
+
+      seqCurrentStep = (seqCurrentStep + 1) % seqSteps;
+    }
+
+    function clearStepHighlights() {
+      document.querySelectorAll('[id^="seq-"]').forEach(b => b.classList.remove('ring-2', 'ring-white'));
+    }
+
+    function updateTempo(val) {
+      seqBPM = Math.max(60, Math.min(180, parseInt(val) || 110));
+      if (isSeqPlaying) {
+        clearInterval(seqIntervalId);
+        const intervalMs = (60 / seqBPM / 4) * 1000;
+        seqIntervalId = setInterval(stepSequencer, intervalMs);
+      }
+    }
+
+    function clearSequencer() {
+      TRACKS.forEach(tr => {
+        seqGrid[tr.id] = new Array(seqSteps).fill(0);
+      });
+      renderSequencer();
+    }
+
+    /* INITIALIZE */
+    window.addEventListener('DOMContentLoaded', () => {
+      renderKeyboard();
+      renderSequencer();
+    });
+  </script>
+</body>
+</html>
