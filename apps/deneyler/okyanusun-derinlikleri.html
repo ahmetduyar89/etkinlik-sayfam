@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Okyanusun Derinlikleri & Mariana Çukuru | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#030f26', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #030f26;
+      color: #f8fafc;
+      background-image: radial-gradient(#1e293b 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .depth-gradient {
+      background: linear-gradient(180deg, #38bdf8 0%, #0284c7 15%, #1e3a8a 35%, #0f172a 60%, #020617 100%);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-4 flex flex-wrap items-center justify-between gap-3 chunky bg-slate-900/90 p-3 sm:p-4 text-white">
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="pushable p-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-black flex items-center gap-1">
+        <span>⬅️</span> <span class="hidden sm:inline">Deneylere Dön</span>
+      </a>
+      <div>
+        <h1 class="display text-xl sm:text-2xl font-black tracking-wide text-sky-400 flex items-center gap-2">
+          <span>🌊</span> Okyanusun Derinlikleri (The Deep Sea)
+        </h1>
+        <p class="text-xs text-slate-300 font-medium">Yüzeyden 11.000 metredeki Mariana Çukuru'na su altı katmanları ve biyoçeşitlilik</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <a href="https://neal.fun/deep-sea/" target="_blank" rel="noopener noreferrer" class="pushable px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-black flex items-center gap-2">
+        <span>🚀 Neal.fun Orijinal Simülasyonu Aç</span>
+        <span>↗</span>
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 flex flex-col lg:flex-row gap-5">
+    
+    <!-- LEFT: Interactive Depth Slider & Explorer -->
+    <div class="flex-1 chunky bg-slate-900/80 p-4 sm:p-6 flex flex-col justify-between border-2 border-slate-700">
+      <div>
+        <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl" id="zone-emoji">🐬</span>
+            <div>
+              <div class="text-xs font-extrabold uppercase tracking-wider text-sky-400" id="zone-tag">0 - 200 m</div>
+              <h2 class="text-lg font-black text-white" id="zone-title">Güneş Işığı Bölgesi (Epipelajik)</h2>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-slate-400">Derinlik</span>
+            <div class="font-mono text-xl font-black text-cyan-300" id="depth-val">100 m</div>
+          </div>
+        </div>
+
+        <!-- Range Slider -->
+        <div class="mb-5">
+          <label class="text-xs text-slate-300 font-bold mb-1.5 flex justify-between">
+            <span>Derinliğe Dal (0 - 11.000 m):</span>
+            <span class="text-amber-400 font-mono" id="pressure-val">Basınç: 11 atm (11 kat)</span>
+          </label>
+          <input 
+            type="range" 
+            id="depth-slider" 
+            min="0" 
+            max="11000" 
+            step="50" 
+            value="100" 
+            oninput="updateDepth(this.value)"
+            class="w-full h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+          >
+          <div class="flex justify-between text-[10px] text-slate-400 font-mono mt-1">
+            <span>0m (Yüzey)</span>
+            <span>200m</span>
+            <span>1.000m</span>
+            <span>4.000m</span>
+            <span>6.000m</span>
+            <span>11.000m (Mariana)</span>
+          </div>
+        </div>
+
+        <!-- Zone Description Card -->
+        <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs leading-relaxed text-slate-200 mb-4" id="zone-desc">
+          Güneş ışığının ulaştığı bu katmanda fotosentez gerçekleşir. Deniz canlılarının %90'ı, yunuslar, mercan resifleri, deniz kaplumbağaları ve ton balıkları bu derinlikte yaşar.
+        </div>
+
+        <!-- Featured Sea Creatures in Zone -->
+        <div class="mb-4">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Bu Derinlikteki Canlılar & Keşifler:</span>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2" id="creatures-list">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Launch Banner -->
+      <div class="p-4 rounded-2xl bg-gradient-to-r from-blue-900/60 to-indigo-950/80 border border-cyan-500/30 flex flex-wrap items-center justify-between gap-3 mt-4">
+        <div>
+          <div class="text-xs font-bold text-cyan-300">Neal.fun İnteraktif Dikey Kaydırma</div>
+          <div class="text-[11px] text-slate-300">Tüm canlıları tek tek görerek Mariana Çukuru'nun dibine kadar kaydırın.</div>
+        </div>
+        <a href="https://neal.fun/deep-sea/" target="_blank" rel="noopener noreferrer" class="pushable px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs flex items-center gap-1.5">
+          <span>Derinlik Simülatörünü Başlat 🌊</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- RIGHT: 5 Main Oceanic Zones Info Column -->
+    <div class="w-full lg:w-80 flex flex-col gap-3">
+      <div class="chunky bg-slate-900/90 p-4 border-2 border-slate-700 text-xs">
+        <h3 class="font-extrabold text-sm text-white mb-2 flex items-center gap-1.5">
+          <span>📊</span> Okyanus Katmanları (Zonlar)
+        </h3>
+        <div class="flex flex-col gap-2">
+          <button onclick="setZone(0)" class="zone-btn text-left p-2.5 rounded-xl border border-sky-400/40 bg-sky-500/20 text-sky-200 hover:bg-sky-500/30 transition">
+            <div class="font-bold">☀️ Güneş Işığı (0 - 200m)</div>
+            <div class="text-[10px] text-slate-300">Işık var, mercanlar, yunuslar</div>
+          </button>
+          <button onclick="setZone(500)" class="zone-btn text-left p-2.5 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-300 hover:bg-slate-800 transition">
+            <div class="font-bold">🌅 Alacakaranlık (200 - 1.000m)</div>
+            <div class="text-[10px] text-slate-400">Işık azalır, fener balıkları</div>
+          </button>
+          <button onclick="setZone(2000)" class="zone-btn text-left p-2.5 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-300 hover:bg-slate-800 transition">
+            <div class="font-bold">🌑 Gece Yarısı (1.000 - 4.000m)</div>
+            <div class="text-[10px] text-slate-400">Zifiri karanlık, dev ahtapotlar</div>
+          </button>
+          <button onclick="setZone(5000)" class="zone-btn text-left p-2.5 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-300 hover:bg-slate-800 transition">
+            <div class="font-bold">🧊 Abisal Bölge (4.000 - 6.000m)</div>
+            <div class="text-[10px] text-slate-400">Sıcaklık 1-4°C, devasa basınç</div>
+          </button>
+          <button onclick="setZone(10000)" class="zone-btn text-left p-2.5 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-300 hover:bg-slate-800 transition">
+            <div class="font-bold">🕳️ Hadal / Mariana (6.000 - 11.000m)</div>
+            <div class="text-[10px] text-slate-400">Challenger Derinliği, 1086 atm basınç</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="chunky bg-slate-900/90 p-4 border-2 border-slate-700 text-xs text-slate-300">
+        <h3 class="font-extrabold text-sm text-amber-300 mb-1.5 flex items-center gap-1.5">
+          <span>💡</span> Bilimsel Kazanım
+        </h3>
+        <p class="leading-relaxed text-[11px]">
+          Her 10 metrede su basıncı yaklaşık 1 atmosfer (1 bar) artar. Mariana Çukuru'nun dibinde (11.000 m) basınç, deniz seviyesinin 1.100 katına ulaşır. Bu basınç, bir insanın üzerine onlarca jumbo jet uçağının binmesi gibidir!
+        </p>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const zones = [
+      {
+        max: 200,
+        emoji: '🐬',
+        tag: '0 - 200 m',
+        title: 'Güneş Işığı Bölgesi (Epipelajik)',
+        desc: "Güneş ışığının ulaştığı bu katmanda fotosentez gerçekleşir. Deniz canlılarının %90'ı, yunuslar, mercan resifleri, yeşil deniz kaplumbağaları ve ton balıkları bu derinlikte yaşar.",
+        creatures: [
+          { name: 'Yunus', emoji: '🐬', depth: '40 m' },
+          { name: 'Yeşil Kaplumbağa', emoji: '🐢', depth: '120 m' },
+          { name: 'Mavi Balina', emoji: '🐋', depth: '180 m' }
+        ]
+      },
+      {
+        max: 1000,
+        emoji: '🦑',
+        tag: '200 - 1.000 m',
+        title: 'Alacakaranlık Bölgesi (Mezopelajik)',
+        desc: 'Işık çok zayıftır, bitkiler yaşayamaz. Canlılar birbirlerini görmek veya avlanmak için kendi ışıklarını (biyolüminesans) üretirler. Dev mürekkepbalıkları ve fener balıklarının yuvasıdır.',
+        creatures: [
+          { name: 'Kılıç Balığı', emoji: '🗡️', depth: '550 m' },
+          { name: 'Dev Mürekkepbalığı', emoji: '🦑', depth: '900 m' },
+          { name: 'İmparator Penguen Dalışı', emoji: '🐧', depth: '535 m' }
+        ]
+      },
+      {
+        max: 4000,
+        emoji: '🏮',
+        tag: '1.000 - 4.000 m',
+        title: 'Gece Yarısı Bölgesi (Batipelajik)',
+        desc: 'Zifiri karanlıktır. Basınç yüzeyin 100 ila 400 katıdır. Fener balıkları kafalarındaki ışıklı çıkıntıyla avlarını çeker. Titanic batığı 3.800 metrede yatmaktadır.',
+        creatures: [
+          { name: 'Fener Balığı', emoji: '🏮', depth: '1.500 m' },
+          { name: 'İspermeçet Balinası Dalışı', emoji: '🐳', depth: '2.250 m' },
+          { name: 'Titanic Batığı', emoji: '🚢', depth: '3.800 m' }
+        ]
+      },
+      {
+        max: 6000,
+        emoji: '🧊',
+        tag: '4.000 - 6.000 m',
+        title: 'Abisal Bölge (Uçurum Bölgesi)',
+        desc: 'Sıcaklık 1 ila 4°C arasındadır. Devasa su basıncına dayanabilen özel omurgasızlar, kör yengeçler ve hidrotermal bacalar çevresindeki kemosentetik bakteriler yaşar.',
+        creatures: [
+          { name: 'Dumbo Ahtapotu', emoji: '🐙', depth: '4.500 m' },
+          { name: 'Engerek Balığı', emoji: '🐍', depth: '4.000 m' },
+          { name: 'Hayalet Balık', emoji: '👻', depth: '5.200 m' }
+        ]
+      },
+      {
+        max: 11000,
+        emoji: '🕳️',
+        tag: '6.000 - 11.000 m',
+        title: 'Hadal Bölgesi & Mariana Çukuru',
+        desc: 'Okyanus tabanındaki dev kanyonlar ve çukurlardır. En derin nokta Mariana Çukuru / Challenger Derinliği (10.928 m). Buraya yalnızca James Cameron ve özel araştırma denizaltıları inebilmiştir.',
+        creatures: [
+          { name: 'Salyangoz Balığı (En Derin Canlı)', emoji: '🐟', depth: '8.145 m' },
+          { name: 'Amfipot Kabuklular', emoji: '🦐', depth: '10.000 m' },
+          { name: 'Trieste / Deepsea Challenger', emoji: '🛸', depth: '10.928 m' }
+        ]
+      }
+    ];
+
+    function updateDepth(val) {
+      val = parseInt(val);
+      document.getElementById('depth-val').textContent = val.toLocaleString('tr-TR') + ' m';
+      
+      const atm = Math.round(1 + (val / 10));
+      document.getElementById('pressure-val').textContent = `Basınç: ${atm} atm (${atm} kat)`;
+
+      const currentZone = zones.find(z => val <= z.max) || zones[zones.length - 1];
+      document.getElementById('zone-emoji').textContent = currentZone.emoji;
+      document.getElementById('zone-tag').textContent = currentZone.tag;
+      document.getElementById('zone-title').textContent = currentZone.title;
+      document.getElementById('zone-desc').textContent = currentZone.desc;
+
+      const listContainer = document.getElementById('creatures-list');
+      listContainer.innerHTML = currentZone.creatures.map(c => `
+        <div class="p-2 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center gap-2">
+          <span class="text-xl">${c.emoji}</span>
+          <div>
+            <div class="text-[11px] font-bold text-white leading-tight">${c.name}</div>
+            <div class="text-[9px] text-cyan-300 font-mono">${c.depth}</div>
+          </div>
+        </div>
+      `).join('');
+
+      if (val >= 10900) {
+        confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
+      }
+    }
+
+    function setZone(targetDepth) {
+      document.getElementById('depth-slider').value = targetDepth;
+      updateDepth(targetDepth);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      updateDepth(100);
+    });
+  </script>
+</body>
+</html>

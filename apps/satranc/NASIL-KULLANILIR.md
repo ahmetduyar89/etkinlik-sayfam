@@ -114,6 +114,28 @@ Bu yüzden ara sıra **Yedekle** ile dosya al; başka bilgisayara taşımak içi
 orada **Geri Yükle** kullan (geri yükleme o bilgisayardaki sınıf kayıtlarının
 yerine geçer).
 
+### Öğretmen ve öğrenci modu
+
+Üst çubuktaki **Öğretmen / Öğrenci** seçimi aynı bilgisayarı güvenle paylaşmayı
+kolaylaştırır:
+
+- **Öğretmen** modunda sınıf, turnuva ve rapor araçları görünür.
+- **Öğrenci** modunda yönetim araçları gizlenir ve üst çubuktan öğrenci seçilir.
+- Her öğrencinin XP, yıldız, rozet, ders, bulmaca, oyun ve mini oyun ilerlemesi
+  ayrı bir profilde tutulur.
+- Öğretmen modundaki eski ilerleme kaydı korunur; güncellemeden sonra otomatik
+  olarak **Öğretmen** profiline taşınır.
+- **Raporlar** ekranı seçili sınıfın maçlarını, turnuvalarını ve öğrenci
+  profillerindeki XP/ders ilerlemesini birlikte gösterir.
+
+### Bugünkü Çalışmam
+
+Öğrenci modundaki **Bugünkü Çalışmam** bölümü her gün beş bulmacalık kısa bir
+set hazırlar. Sistem, öğrencinin yanlış yaptığı, ipucu kullandığı veya henüz
+çalışmadığı konulara öncelik verir. Çocuk geliştikçe önerilen konular da
+kendiliğinden değişir. Öğretmen, **Raporlar → Bulmaca konuları** bölümünde
+sınıfın tema bazındaki doğru, yanlış ve ipucu sayılarını görebilir.
+
 ### Turnuva (İsviçre sistemi)
 
 Sol menüdeki **Turnuva** bölümü seçili sınıfla çalışır:
@@ -187,8 +209,9 @@ bilgisayara** özeldir; başka bilgisayarda sıfırdan başlar. Tarayıcı geçm
 temizlenirse ilerleme de silinir.
 
 **Aynı bilgisayarda birden çok öğrenci varsa?**
-İlerleme tarayıcı profiline bağlıdır. Her öğrenci için ayrı tarayıcı profili
-kullanabilir, ya da *Ayarlar → İlerlemeyi Sıfırla* ile temiz başlangıç yapabilirsin.
+Üst çubuktan **Öğrenci** moduna geç ve öğrencinin adını seç. Her öğrencinin
+ilerlemesi ayrı tutulur; tarayıcı profili değiştirmeye veya önceki ilerlemeyi
+sıfırlamaya gerek yoktur.
 
 **Ses çıkmıyor.**
 Tarayıcılar, sayfaya ilk kez tıklanmadan ses çalmaya izin vermez. Ekranda
@@ -234,3 +257,7 @@ Uygulama **36 haftalık** bir programa göre düzenlenmiştir (haftada 1 ders sa
 
 Belirli bir haftaya doğrudan gitmek için: **Ders Programı** menüsünden
 istediğin hafta kartına tıkla.
+
+## Oyun arşivi ve inceleme
+
+Bilgisayara karşı tamamlanan oyunlar, o anda seçili olan öğretmen veya öğrenci profiline otomatik kaydedilir. **Gelişimim → Oyun Arşivim** ekranında sonuç, zorluk, renk, süre ve doğruluk bilgisi görülebilir. **Hamleleri incele** ile oyun tahta üzerinde ileri-geri oynatılır; öğrencinin analiz edilen hamlelerinde kalite etiketi ve öğretmen önerisi gösterilir. İstenirse oyun standart `.pgn` dosyası olarak indirilebilir. Her profil için son 100 oyun saklanır ve sınıf yedeğine dahildir.

@@ -112,10 +112,10 @@ export function MiniCalculatorTool({ onClose }: MiniCalculatorToolProps) {
                 dragElastic={0}
                 className="pointer-events-auto select-none"
                 style={{
-                    touchAction: 'none',
+                    touchAction: 'pan-y',
                 }}
             >
-                <div className="bg-slate-900/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl text-white w-64 overflow-hidden">
+                <div className="responsive-tool bg-slate-900/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl text-white w-64 overflow-hidden">
                     {/* Header */}
                     <div className="flex items-center justify-between px-3 py-2 bg-white/5 border-b border-white/10">
                         <div

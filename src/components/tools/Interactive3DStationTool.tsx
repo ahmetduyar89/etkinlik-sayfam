@@ -282,12 +282,12 @@ export function Interactive3DStationTool({ onClose, onInsertImage }: Interactive
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                style={{ touchAction: 'none' }}
+                style={{ touchAction: 'pan-y' }}
                 className={cn(
-                    'pointer-events-auto flex flex-col bg-[#0b101b]/95 backdrop-blur-2xl border border-indigo-500/30 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] rounded-2xl overflow-hidden select-none text-white',
+                    'responsive-tool pointer-events-auto flex flex-col bg-[#0b101b]/95 backdrop-blur-2xl border border-indigo-500/30 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] rounded-2xl overflow-hidden select-none text-white',
                     isMaximized
                         ? 'w-full h-full'
-                        : 'w-[min(94vw,760px)] h-[min(90vh,620px)]'
+                        : 'w-[min(94vw,760px)] h-[min(90dvh,620px)]'
                 )}
             >
                 {/* Üst Bar */}
@@ -298,7 +298,7 @@ export function Interactive3DStationTool({ onClose, onInsertImage }: Interactive
                         if (!isMaximized) dragControls.start(e);
                     }}
                     className={cn(
-                        'flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-slate-900/90 via-slate-800/80 to-slate-900/90 border-b border-white/10 select-none cursor-grab active:cursor-grabbing',
+                        'responsive-tool-header flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-slate-900/90 via-slate-800/80 to-slate-900/90 border-b border-white/10 select-none cursor-grab active:cursor-grabbing',
                         isMaximized && 'cursor-default'
                     )}
                 >

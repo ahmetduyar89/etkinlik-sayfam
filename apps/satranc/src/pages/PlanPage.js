@@ -18,6 +18,7 @@ import { icon } from "../components/Icon.js";
 import { symbolHTML } from "../components/PieceGlyph.js";
 import { burst } from "../animations/effects.js";
 import { pageShell } from "./pageUtils.js";
+import { classroom } from "../services/ClassroomService.js";
 
 /** Tamamlanan haftalar ilerleme kaydında bu önekle tutulur. */
 const weekId = (week) => `week-${week}`;
@@ -169,7 +170,23 @@ export function PlanPage({ progress, sound }) {
             text: isDone ? "✓ Bu hafta tamamlandı" : "Bu haftayı tamamladım",
             onClick: (event) => {
               if (isDone) return;
-              progress.completeLesson(weekId(entry.week), 20, 1);
+              const wId = weekId(entry.week);
+              progress.completeLesson(wId, 20, 1);
+              const activeClass = classroom.activeClass;
+              if (activeClass) {
+                const classProfId = `class:${activeClass.id}`;
+                if (progress.activeProfileId !== classProfId) {
+                  if (!progress.store.profiles[classProfId]) {
+                    progress.switchProfile(classProfId, `${activeClass.name} Sınıfı`);
+                    progress.completeLesson(wId, 20, 1);
+                  } else {
+                    const list = new Set(progress.store.profiles[classProfId].completedLessons || []);
+                    list.add(wId);
+                    progress.store.profiles[classProfId].completedLessons = Array.from(list);
+                    progress.save();
+                  }
+                }
+              }
               sound.play("badge");
               burst(event.currentTarget);
               renderWeek(entry);

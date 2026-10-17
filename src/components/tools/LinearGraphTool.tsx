@@ -308,10 +308,10 @@ export function LinearGraphTool({ onClose, onInsertImage }: LinearGraphToolProps
                     scale: 1,
                 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                style={{ touchAction: 'none' }}
+                style={{ touchAction: 'pan-y' }}
                 className={cn(
-                    'pointer-events-auto flex flex-col bg-[#13151f]/95 backdrop-blur-xl border border-indigo-500/30 rounded-2xl shadow-2xl overflow-hidden select-none',
-                    isMaximized ? 'w-full h-full' : 'w-[min(96vw,840px)] h-[min(90vh,600px)]'
+                    'responsive-tool pointer-events-auto flex flex-col bg-[#13151f]/95 backdrop-blur-xl border border-indigo-500/30 rounded-2xl shadow-2xl overflow-hidden select-none',
+                    isMaximized ? 'w-full h-full' : 'w-[min(96vw,840px)] h-[min(90dvh,600px)]'
                 )}
             >
                 {/* Üst Başlık Çubuğu */}
@@ -322,7 +322,7 @@ export function LinearGraphTool({ onClose, onInsertImage }: LinearGraphToolProps
                         if (!isMaximized) dragControls.start(e);
                     }}
                     className={cn(
-                        'flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-blue-950/80 via-[#181a29] to-[#13151f] border-b border-white/10 select-none cursor-grab active:cursor-grabbing',
+                        'responsive-tool-header flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-blue-950/80 via-[#181a29] to-[#13151f] border-b border-white/10 select-none cursor-grab active:cursor-grabbing',
                         isMaximized && 'cursor-default'
                     )}
                 >

@@ -11,6 +11,7 @@ const FOCUS_CHECK_THROTTLE = 60 * 1000; // aynı dakikada tekrar tekrar sormayal
 let deferredPrompt: BeforeInstallPromptEvent | null = null;
 let lastCheck = 0;
 let reloading = false;
+let applyingUpdate = false;
 
 export interface BeforeInstallPromptEvent extends Event {
     readonly platforms: string[];
@@ -38,6 +39,12 @@ export function isRunningStandalone(): boolean {
 /** Tarayıcı kurulum istemi hazır mı? */
 export function canInstall(): boolean {
     return deferredPrompt !== null;
+}
+
+/** iPadOS masaüstü kimliği kullanabildiği için dokunmatik Mac kimliğini de tanır. */
+export function isAppleMobile(): boolean {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
 /** Kurulum istemini gösterir; kullanıcı kabul ederse true döner. */
@@ -73,7 +80,7 @@ export function registerServiceWorker() {
 
     window.addEventListener('load', () => {
         navigator.serviceWorker
-            .register('/sw.js', { scope: '/' })
+            .register('/sw.js', { scope: '/', updateViaCache: 'none' })
             .then((registration) => {
                 if (registration.waiting && navigator.serviceWorker.controller) {
                     showUpdateBanner(registration.waiting);
@@ -98,6 +105,7 @@ export function registerServiceWorker() {
                 };
 
                 window.setInterval(check, UPDATE_CHECK_INTERVAL);
+                window.addEventListener('online', check);
                 window.addEventListener('focus', check);
                 document.addEventListener('visibilitychange', () => {
                     if (document.visibilityState === 'visible') check();
@@ -106,7 +114,7 @@ export function registerServiceWorker() {
             .catch(() => undefined);
 
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (reloading) return;
+            if (reloading || !applyingUpdate) return;
             reloading = true;
             window.location.reload();
         });
@@ -123,12 +131,13 @@ function showUpdateBanner(worker: ServiceWorker) {
     bar.style.cssText = [
         'position:fixed',
         'left:50%',
-        'bottom:20px',
+        'bottom:calc(16px + env(safe-area-inset-bottom, 0px))',
         'transform:translateX(-50%)',
         'z-index:2147483000',
         'display:flex',
         'align-items:center',
         'gap:14px',
+        'flex-wrap:wrap',
         'max-width:calc(100vw - 32px)',
         'padding:12px 14px 12px 18px',
         'border-radius:16px',
@@ -139,15 +148,20 @@ function showUpdateBanner(worker: ServiceWorker) {
     ].join(';');
 
     const text = document.createElement('span');
-    text.textContent = 'Yeni sürüm hazır.';
-    text.style.cssText = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    text.textContent = 'Yeni sürüm hazır. Çalışmanızı kaydedip güncelleyin.';
+    text.style.cssText = 'flex:1 1 180px;line-height:1.5';
 
     const apply = document.createElement('button');
     apply.type = 'button';
     apply.textContent = 'Güncelle';
     apply.style.cssText =
-        'flex-shrink:0;background:#6366f1;color:#fff;border:0;border-radius:10px;padding:8px 14px;font:inherit;cursor:pointer';
+        'min-height:44px;flex-shrink:0;background:#6366f1;color:#fff;border:0;border-radius:10px;padding:8px 14px;font:inherit;cursor:pointer';
     apply.onclick = () => {
+        applyingUpdate = true;
+        if (worker.state === 'activated' || worker.state === 'redundant') {
+            window.location.reload();
+            return;
+        }
         apply.disabled = true;
         apply.textContent = 'Güncelleniyor…';
         worker.postMessage({ type: 'SKIP_WAITING' });
@@ -158,7 +172,7 @@ function showUpdateBanner(worker: ServiceWorker) {
     later.setAttribute('aria-label', 'Kapat');
     later.textContent = '✕';
     later.style.cssText =
-        'flex-shrink:0;background:transparent;color:#c7d2fe;border:0;font:inherit;cursor:pointer;padding:8px';
+        'min-height:44px;min-width:44px;flex-shrink:0;background:transparent;color:#c7d2fe;border:0;font:inherit;cursor:pointer;padding:8px';
     later.onclick = () => bar.remove();
 
     bar.append(text, apply, later);

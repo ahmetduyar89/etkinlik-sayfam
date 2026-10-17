@@ -4,8 +4,8 @@ Bu klasör, atölyede kendi adresiyle yayınlanan **bağımsız projeleri** bar�
 Bu projeler hiçbir derlemeden geçmez; dosyaları olduğu gibi yayınlanır.
 
 ```
-apps/satranc/index.html   →   https://atölye.tedrisedu.com/satranc/
-apps/deneyler/index.html  →   https://atölye.tedrisedu.com/deneyler/
+apps/satranc/index.html   →   https://atolye.ahmetduyar.com/satranc/
+apps/deneyler/index.html  →   https://atolye.ahmetduyar.com/deneyler/
 ```
 
 Hepsi **bu depoda** durur. Satranç ve deneyler eskiden kendi depolarında yaşıyor,

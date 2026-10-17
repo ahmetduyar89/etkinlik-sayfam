@@ -55,7 +55,7 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="confirm-title"
-                        className="fixed inset-0 z-[19000] flex items-center justify-center px-4"
+                        className="fixed inset-0 z-[19000] flex items-center justify-center p-3 sm:p-4"
                     >
                         <motion.div
                             initial={{ opacity: 0 }}
@@ -68,7 +68,7 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
                             initial={{ opacity: 0, scale: 0.96, y: 8 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.96, y: 8 }}
-                            className="relative bg-white rounded-2xl shadow-2xl border border-neutral-200 w-full max-w-md p-6 space-y-5"
+                            className="relative bg-white rounded-2xl shadow-2xl border border-neutral-200 w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-4 sm:p-6 space-y-5"
                         >
                             <div className="flex gap-4">
                                 <div
@@ -93,11 +93,11 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-2">
+                            <div className="flex flex-wrap justify-end gap-2">
                                 <button
                                     type="button"
                                     onClick={() => resolve(false)}
-                                    className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                    className="min-h-11 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                                 >
                                     {state.cancelLabel || 'Vazgeç'}
                                 </button>
@@ -106,7 +106,7 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
                                     type="button"
                                     onClick={() => resolve(true)}
                                     className={
-                                        'px-4 py-2 text-sm font-bold text-white rounded-lg transition-colors ' +
+                                        'min-h-11 px-4 py-2 text-sm font-bold text-white rounded-lg transition-colors ' +
                                         (isDanger
                                             ? 'bg-red-600 hover:bg-red-700'
                                             : 'bg-indigo-600 hover:bg-indigo-700')

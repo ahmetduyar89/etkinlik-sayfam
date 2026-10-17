@@ -122,10 +122,10 @@ export function NumberLineTool({ onClose }: NumberLineToolProps) {
                 dragElastic={0}
                 className="pointer-events-auto select-none"
                 style={{
-                    touchAction: 'none',
+                    touchAction: 'pan-y',
                 }}
             >
-                <div className="bg-slate-900/95 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-2xl text-white w-[min(94vw,560px)]">
+                <div className="responsive-tool bg-slate-900/95 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-2xl text-white w-[min(94vw,560px)]">
                     {/* Header */}
                     <div className="flex items-center justify-between pb-3 border-b border-white/10 gap-2">
                         <div

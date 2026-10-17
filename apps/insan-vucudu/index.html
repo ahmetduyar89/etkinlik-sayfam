@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
+  <title>İnsan Vücudu Atlası | 3D Anatomi & Biyoloji Laboratuvarı</title>
+  <meta name="description" content="İnteraktif 3D insan anatomisi, dinamik kalp ve dolaşım simülatörü, sanal mikroskop hücre laboratuvarı.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23f43f5e'/><path d='M50 30 C40 15 20 20 20 40 C20 60 50 85 50 85 C50 85 80 60 80 40 C80 20 60 15 50 30 Z' fill='white'/></svg>">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js and OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+    
+    * {
+      box-sizing: border-box;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #030712;
+      color: #f3f4f6;
+    }
+
+    /* Glassmorphism */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(244, 63, 94, 0.2);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+    }
+
+    .glass-card {
+      background: rgba(17, 27, 49, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+    }
+
+    /* Pulse animation */
+    @keyframes heartbeat-glow {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(244, 63, 94, 0.4)); }
+      50% { transform: scale(1.05); filter: drop-shadow(0 0 25px rgba(244, 63, 94, 0.8)); }
+    }
+    .heart-beat-anim {
+      animation: heartbeat-glow 0.85s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="relative w-full h-full flex flex-col overflow-hidden text-slate-100 select-none">
+
+  <!-- TOP HEADER / NAV BAR -->
+  <header class="sticky top-0 z-30 flex items-center justify-between px-4 py-2.5 sm:px-6 glass-panel border-b border-white/10">
+    <!-- Left: Brand & Return -->
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2 h-9 px-3.5 rounded-xl glass-card text-xs sm:text-sm font-semibold text-slate-300 hover:text-white hover:border-rose-400/50 transition-all active:scale-95 shadow-md">
+        <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        <span class="hidden sm:inline">Atölye'ye Dön</span>
+      </a>
+      
+      <div class="flex items-center gap-2.5 h-9 px-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-white font-bold text-xs sm:text-sm tracking-wide">
+        <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+        <span class="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-pink-400 to-amber-300">
+          🫀 İnsan Vücudu Atlası
+        </span>
+        <span class="hidden md:inline-block text-[11px] font-medium text-slate-400 border-l border-slate-700 pl-2">
+          3D Anatomi & Laboratuvar
+        </span>
+      </div>
+    </div>
+
+    <!-- Center: View Mode Tabs -->
+    <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-900/80 border border-white/10">
+      <button onclick="setVucutMode('3d')" id="vmode-3d" class="vmode-btn active px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all text-rose-300 bg-rose-500/20 border border-rose-400/40">
+        🧬 3D Vücut Katmanları
+      </button>
+      <button onclick="setVucutMode('circ')" id="vmode-circ" class="vmode-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5">
+        ❤️ Kalp & Dolaşım
+      </button>
+      <button onclick="setVucutMode('micro')" id="vmode-micro" class="vmode-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-white/5">
+        🔬 Sanal Mikroskop
+      </button>
+    </div>
+
+    <!-- Right: Quick Tools -->
+    <div class="flex items-center gap-2">
+      <button id="sound-btn" onclick="toggleAudio()" title="Kalp / Laboratuvar Sesi" class="h-9 w-9 rounded-xl glass-card flex items-center justify-center text-slate-300 hover:text-rose-400 transition">
+        <span id="sound-icon">🔊</span>
+      </button>
+      <button onclick="toggleFullscreen()" title="Tam Ekran" class="h-9 w-9 rounded-xl glass-card flex items-center justify-center text-slate-300 hover:text-rose-400 transition">
+        ⛶
+      </button>
+    </div>
+  </header>
+
+  <!-- ─────────────────────────────────────────────────────────────
+       MODE 1: 3D ANATOMİ KATMANLARI (Three.js)
+       ───────────────────────────────────────────────────────────── -->
+  <section id="sec-3d" class="relative flex-1 w-full h-full overflow-hidden">
+    <!-- ThreeJS Viewport -->
+    <div id="three-container" class="absolute inset-0 w-full h-full z-0 cursor-grab active:cursor-grabbing"></div>
+
+    <!-- Floating Left Tool: Layer Controls -->
+    <div class="absolute top-4 left-4 z-10 glass-panel p-3.5 rounded-2xl flex flex-col gap-2 max-w-[200px] pointer-events-auto">
+      <span class="text-xs font-bold text-rose-300 uppercase tracking-wider">Görünen Katmanlar</span>
+      
+      <label class="flex items-center gap-2 text-xs text-slate-200 cursor-pointer hover:text-white">
+        <input type="checkbox" id="chk-skeleton" checked onchange="toggleAnatomyLayer('skeleton', this.checked)" class="accent-rose-500 rounded" />
+        <span>🦴 İskelet Sistemi</span>
+      </label>
+      <label class="flex items-center gap-2 text-xs text-slate-200 cursor-pointer hover:text-white">
+        <input type="checkbox" id="chk-organs" checked onchange="toggleAnatomyLayer('organs', this.checked)" class="accent-rose-500 rounded" />
+        <span>🫁 İç Organlar</span>
+      </label>
+      <label class="flex items-center gap-2 text-xs text-slate-200 cursor-pointer hover:text-white">
+        <input type="checkbox" id="chk-muscles" onchange="toggleAnatomyLayer('muscles', this.checked)" class="accent-rose-500 rounded" />
+        <span>💪 Kas & Ten Dokusu</span>
+      </label>
+
+      <div class="pt-2 border-t border-white/10 text-[10px] text-slate-400">
+        🖱️ <strong>Döndürmek için:</strong> Sol tıkla sürükle.<br>
+        🔍 <strong>Yakınlaşmak için:</strong> Tekerlek.<br>
+        👆 <strong>Detay için:</strong> Organa tıkla!
+      </div>
+    </div>
+
+    <!-- Floating Right Tool: Organ Info Card (Appears on click) -->
+    <div id="organ-info-card" class="absolute top-4 right-4 z-10 glass-panel p-5 rounded-3xl w-80 shadow-2xl flex flex-col gap-3 transition-all transform translate-x-96 pointer-events-auto">
+      <div class="flex items-center justify-between border-b border-white/10 pb-2">
+        <div>
+          <h3 id="organ-name" class="text-base font-extrabold text-white">Kalp</h3>
+          <span id="organ-latin" class="text-[11px] text-rose-300 font-mono italic">Cor</span>
+        </div>
+        <button onclick="closeOrganCard()" class="text-slate-400 hover:text-white text-lg">✕</button>
+      </div>
+
+      <div class="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-rose-500/20 text-rose-300 font-bold text-[11px]">
+        <span id="organ-system">Dolaşım Sistemi</span>
+      </div>
+
+      <div class="text-xs text-slate-300 leading-relaxed" id="organ-desc">
+        Oksijenli kanı tüm vücuda pompalar, dakikada ortalama 70 kez atarak yaşamı sürdürür.
+      </div>
+
+      <div class="p-3 rounded-2xl bg-slate-900/80 border border-white/5 text-[11px] text-amber-300 leading-relaxed" id="organ-fun-fact">
+        💡 <strong>Biliyor muydunuz?</strong> Kalbiniz günde yaklaşık 100.000 kez atar ve 7.500 litre kan pompalar!
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────────────────
+       MODE 2: KALP & DOLAŞIM SİSTEMİ
+       ───────────────────────────────────────────────────────────── -->
+  <section id="sec-circ" class="hidden relative flex-1 w-full h-full overflow-y-auto p-4 sm:p-6 flex flex-col items-center justify-center gap-6">
+    <div class="glass-panel p-6 sm:p-8 rounded-3xl max-w-4xl w-full flex flex-col items-center gap-6">
+      <div class="w-full flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>❤️</span> Kalp Atışı & Çift Dolaşım Simülasyonu</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Kalp kapakçıklarının senkronize açılıp kapanmasını ve kanın vücut ile akciğer arasındaki yolculuğunu keşfedin.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold">
+            <span>Nabız:</span>
+            <span id="bpm-val" class="font-mono text-base text-white">72</span>
+            <span>BPM</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 w-full items-center">
+        <!-- Left: Heart SVG Animation -->
+        <div class="md:col-span-7 flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-950/80 border border-white/10 relative">
+          <!-- Heart Interactive Cross-section Canvas/SVG -->
+          <svg id="heart-svg" viewBox="0 0 400 360" class="w-full max-w-[360px] h-[320px] select-none">
+            <!-- Background Outline -->
+            <path d="M200 80 C150 10, 60 30, 60 140 C60 220, 200 320, 200 320 C200 320, 340 220, 340 140 C340 30, 250 10, 200 80 Z" fill="#881337" stroke="#f43f5e" stroke-width="4" />
+            
+            <!-- Left & Right Chambers Divider -->
+            <line x1="200" y1="80" x2="200" y2="310" stroke="#f43f5e" stroke-width="6" stroke-dasharray="2 4" />
+            
+            <!-- Atrium/Ventricle Horizontal Divider -->
+            <line x1="90" y1="160" x2="310" y2="160" stroke="#f43f5e" stroke-width="4" stroke-dasharray="4 4" />
+
+            <!-- Labels -->
+            <text x="130" y="125" fill="#93c5fd" font-size="11" font-weight="bold" text-anchor="middle">Sağ Kulakçık (Kirli)</text>
+            <text x="270" y="125" fill="#fca5a5" font-size="11" font-weight="bold" text-anchor="middle">Sol Kulakçık (Temiz)</text>
+            <text x="130" y="220" fill="#60a5fa" font-size="11" font-weight="bold" text-anchor="middle">Sağ Karıncık</text>
+            <text x="270" y="220" fill="#ef4444" font-size="11" font-weight="bold" text-anchor="middle">Sol Karıncık</text>
+
+            <!-- Valves (Interactive Animated Lines) -->
+            <!-- Tricuspid Valve -->
+            <line id="valve-right" x1="100" y1="160" x2="160" y2="160" stroke="#fbbf24" stroke-width="5" stroke-linecap="round" />
+            <!-- Mitral Valve -->
+            <line id="valve-left" x1="240" y1="160" x2="300" y2="160" stroke="#fbbf24" stroke-width="5" stroke-linecap="round" />
+
+            <!-- Animated Blood Particles Container -->
+            <g id="blood-particles"></g>
+          </svg>
+        </div>
+
+        <!-- Right: Controls & Medical Facts -->
+        <div class="md:col-span-5 flex flex-col gap-4">
+          <!-- BPM Slider -->
+          <div class="glass-card p-4 rounded-2xl flex flex-col gap-2">
+            <div class="flex items-center justify-between text-xs font-bold text-slate-300">
+              <span>Kalp Hızı (Tempo):</span>
+              <span id="bpm-state-label" class="text-rose-400">Normal (Dinlenme)</span>
+            </div>
+            <input type="range" id="bpm-slider" min="40" max="160" value="72" oninput="updateBPM(this.value)" class="w-full accent-rose-500 cursor-pointer" />
+            <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+              <span>40 (Uyku)</span>
+              <span>72 (Normal)</span>
+              <span>120 (Yürüyüş)</span>
+              <span>160 (Koşu)</span>
+            </div>
+          </div>
+
+          <!-- Stethoscope Sound Indicator -->
+          <div class="glass-card p-4 rounded-2xl flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl heart-beat-anim" id="pulse-heart-emoji">💓</span>
+              <div>
+                <div class="text-xs font-bold text-white">Stetoskop Tınısı: "Lup-Dup"</div>
+                <div class="text-[11px] text-slate-400">Kapakçıkların kapanma sesi</div>
+              </div>
+            </div>
+            <button onclick="toggleAudio()" class="px-3 py-1.5 rounded-xl bg-rose-500/20 text-rose-300 text-xs font-bold border border-rose-500/30 hover:bg-rose-500/30">
+              Sesi Dinle
+            </button>
+          </div>
+
+          <!-- Circulation Legend -->
+          <div class="p-3.5 rounded-2xl bg-slate-900/80 border border-white/10 flex flex-col gap-2 text-xs">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+              <span class="text-slate-300"><strong>Küçük Dolaşım:</strong> Kirli kan kalpten akciğerlere gider, oksijenle temizlenir.</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+              <span class="text-slate-300"><strong>Büyük Dolaşım:</strong> Oksijenli temiz kan sol karıncıktan aortla tüm organlara dağıtılır.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────────────────
+       MODE 3: SANAL MİKROSKOP LABORATUVARI
+       ───────────────────────────────────────────────────────────── -->
+  <section id="sec-micro" class="hidden relative flex-1 w-full h-full overflow-y-auto p-4 sm:p-6 flex flex-col items-center justify-center gap-4">
+    <div class="glass-panel p-6 sm:p-8 rounded-3xl max-w-4xl w-full flex flex-col items-center gap-5">
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>🔬</span> Sanal Mikroskop Hücre Laboratuvarı</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Preparatınızı seçin, odak tekeri ve lensleri ayarlayarak hücre organellerini keşfedin.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="micro-specimen-select" onchange="changeSpecimen()" class="bg-slate-900 border border-white/10 text-xs text-rose-300 font-bold px-3 py-1.5 rounded-xl cursor-pointer">
+            <option value="onion">🧅 Soğan Zarı (Bitki Hücresi)</option>
+            <option value="cheek">👄 Ağız İçi Epiteli (Hayvan Hücresi)</option>
+            <option value="amoeba">🦠 Amip & Terliksi Hayvan</option>
+            <option value="blood">🩸 İnsan Kanı (Alyuvar & Akyuvar)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 w-full items-center">
+        <!-- Eyepiece Viewport (7 cols) -->
+        <div class="md:col-span-7 flex flex-col items-center justify-center">
+          <div class="relative w-72 h-72 sm:w-80 sm:h-80 rounded-full border-8 border-slate-800 shadow-[0_0_50px_rgba(0,0,0,0.9)] overflow-hidden bg-slate-950 flex items-center justify-center">
+            <!-- Specimen Canvas -->
+            <canvas id="microscope-canvas" width="340" height="340" class="transition-all"></canvas>
+            
+            <!-- Lens Glass Vignette & Reticle Overlay -->
+            <div class="absolute inset-0 pointer-events-none rounded-full shadow-[inset_0_0_40px_rgba(0,0,0,0.8)] border border-white/10"></div>
+            <!-- Center Reticle crosshair -->
+            <div class="absolute inset-0 pointer-events-none flex items-center justify-center opacity-20">
+              <div class="w-full h-px bg-white"></div>
+              <div class="h-full w-px bg-white absolute"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Microscope Controls (5 cols) -->
+        <div class="md:col-span-5 flex flex-col gap-4">
+          <!-- Objective Magnification -->
+          <div class="glass-card p-4 rounded-2xl flex flex-col gap-2">
+            <span class="text-xs font-bold text-slate-300">Objektif Büyütme:</span>
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="setMagnification(10)" id="mag-10" class="mag-btn active py-2 rounded-xl text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">10x</button>
+              <button onclick="setMagnification(40)" id="mag-40" class="mag-btn py-2 rounded-xl text-xs font-semibold text-slate-400 glass-card hover:text-white">40x</button>
+              <button onclick="setMagnification(100)" id="mag-100" class="mag-btn py-2 rounded-xl text-xs font-semibold text-slate-400 glass-card hover:text-white">100x</button>
+            </div>
+          </div>
+
+          <!-- Focus Slider -->
+          <div class="glass-card p-4 rounded-2xl flex flex-col gap-2">
+            <div class="flex items-center justify-between text-xs font-bold text-slate-300">
+              <span>Fokus (Netlik) Ayarı:</span>
+              <span id="focus-status" class="text-amber-400">Net Değil</span>
+            </div>
+            <input type="range" id="focus-slider" min="0" max="100" value="30" oninput="updateFocus(this.value)" class="w-full accent-rose-500 cursor-pointer" />
+            <div class="text-[10px] text-slate-400">Sürgüyü %70 civarına getirerek görüntüyü netleştirin.</div>
+          </div>
+
+          <!-- Toggle Labels -->
+          <button onclick="toggleOrganelleLabels()" id="btn-toggle-labels" class="h-10 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center justify-center gap-2 border border-white/10">
+            <span>🏷️</span> <span id="label-btn-text">Organel Etiketlerini Göster</span>
+          </button>
+
+          <!-- Specimen Info Box -->
+          <div id="specimen-info-box" class="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 text-xs text-slate-300 leading-relaxed">
+            <strong class="text-white block mb-1">🧅 Soğan Zarı Hücresi (Bitki):</strong>
+            Hücre çeperi sayesinde köşeli ve düzenli bir yapıya sahiptir. Çekirdek ve belirgin kofulları gözlemleyebilirsiniz.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    let audioCtx = null;
+    let isSoundOn = true;
+
+    function getAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+      return audioCtx;
+    }
+
+    function playTone(freq, duration = 0.1, type = 'sine') {
+      if (!isSoundOn) return;
+      try {
+        const ctx = getAudio();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function playHeartBeatSound() {
+      if (!isSoundOn) return;
+      try {
+        const ctx = getAudio();
+        // Lup (low thud)
+        const osc1 = ctx.createOscillator();
+        const g1 = ctx.createGain();
+        osc1.frequency.setValueAtTime(65, ctx.currentTime);
+        osc1.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.12);
+        g1.gain.setValueAtTime(0.3, ctx.currentTime);
+        g1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+        osc1.connect(g1);
+        g1.connect(ctx.destination);
+        osc1.start();
+        osc1.stop(ctx.currentTime + 0.12);
+
+        // Dup (second slightly higher thud after 140ms)
+        setTimeout(() => {
+          if (!isSoundOn) return;
+          const osc2 = ctx.createOscillator();
+          const g2 = ctx.createGain();
+          osc2.frequency.setValueAtTime(80, ctx.currentTime);
+          osc2.frequency.exponentialRampToValueAtTime(45, ctx.currentTime + 0.1);
+          g2.gain.setValueAtTime(0.25, ctx.currentTime);
+          g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+          osc2.connect(g2);
+          g2.connect(ctx.destination);
+          osc2.start();
+          osc2.stop(ctx.currentTime + 0.1);
+        }, 140);
+      } catch (e) {}
+    }
+
+    function toggleAudio() {
+      isSoundOn = !isSoundOn;
+      document.getElementById('sound-icon').innerText = isSoundOn ? '🔊' : '🔇';
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    /* VIEW NAVIGATION */
+    let currentVucutMode = '3d';
+
+    function setVucutMode(mode) {
+      currentVucutMode = mode;
+      document.querySelectorAll('.vmode-btn').forEach(btn => {
+        btn.classList.remove('active', 'text-rose-300', 'bg-rose-500/20', 'border', 'border-rose-400/40');
+        btn.classList.add('text-slate-300');
+      });
+      const activeBtn = document.getElementById(`vmode-${mode}`);
+      if (activeBtn) {
+        activeBtn.classList.add('active', 'text-rose-300', 'bg-rose-500/20', 'border', 'border-rose-400/40');
+        activeBtn.classList.remove('text-slate-300');
+      }
+
+      document.getElementById('sec-3d').classList.add('hidden');
+      document.getElementById('sec-circ').classList.add('hidden');
+      document.getElementById('sec-micro').classList.add('hidden');
+
+      const targetSec = document.getElementById(`sec-${mode}`);
+      if (targetSec) targetSec.classList.remove('hidden');
+
+      playTone(450, 0.08);
+
+      if (mode === '3d') {
+        if (renderer && camera) {
+          renderer.setSize(window.innerWidth, window.innerHeight - 60);
+          camera.aspect = window.innerWidth / (window.innerHeight - 60);
+          camera.updateProjectionMatrix();
+        }
+      }
+      if (mode === 'circ') initHeartCirculation();
+      if (mode === 'micro') drawMicroscope();
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       1. THREE.JS 3D ANATOMY ENGINE
+       ───────────────────────────────────────────────────────────── */
+    let scene, camera, renderer, controls;
+    let skeletonGroup, organsGroup, musclesGroup;
+    let interactiveObjects = [];
+    let raycaster = null;
+    let mouse = null;
+
+    const organData = {
+      brain: {
+        name: "Beyin",
+        latin: "Cerebrum",
+        system: "Merkezi Sinir Sistemi",
+        desc: "Vücudumuzun komuta merkezidir. Düşünme, hafıza, duygular, hareket kontrolü ve tüm duyu organlarından gelen verileri işler.",
+        funFact: "Beyin yaklaşık 86 milyar nörondan oluşur ve vücudun enerjisinin %20'sini tek başına tüketir!"
+      },
+      heart: {
+        name: "Kalp",
+        latin: "Cor",
+        system: "Dolaşım Sistemi",
+        desc: "Güçlü bir kastan oluşan pompa organımızdır. Oksijenli kanı tüm vücuda, kirli kanı ise oksijenlenmek üzere akciğerlere pompalar.",
+        funFact: "Kalbiniz bir günde yaklaşık 100.000 kez atar ve yaklaşık 7.500 litre kan pompalar!"
+      },
+      lungs: {
+        name: "Akciğerler",
+        latin: "Pulmones",
+        system: "Solunum Sistemi",
+        desc: "Havadaki oksijeni kana aktarır ve kandaki karbondioksiti dışarı atar. İçinde milyonlarca mikroskobik alveol keseciği bulunur.",
+        funFact: "Her iki akciğerdeki tüm alveoller açılsaydı, bir tenis kortu büyüklüğünde alan kaplardı!"
+      },
+      stomach: {
+        name: "Mide",
+        latin: "Gaster",
+        system: "Sindirim Sistemi",
+        desc: "Yutulan besinleri güçlü mide asidi (HCl) ve enzimlerle kimyasal ve mekanik olarak sindirerek bulamaç (kimus) haline getirir.",
+        funFact: "Mide asidi o kadar güçlüdür ki metalleri çözebilir! Bu yüzden mide duvarı her birkaç günde bir kendini yeniler."
+      },
+      liver: {
+        name: "Karaciğer",
+        latin: "Hepar",
+        system: "Sindirim & Boşaltım",
+        desc: "Vücudun kimya fabrikasıdır. Toksinleri filtreler, safra üretir, vitaminleri depolar ve kan şekerini dengeler.",
+        funFact: "Karaciğer, vücudumuzda kendini tamamen sıfırdan yenileyebilen (rejenerasyon) tek iç organdır!"
+      },
+      intestines: {
+        name: "Bağırsaklar (İnce & Kalın)",
+        latin: "Intestinum",
+        system: "Sindirim Sistemi",
+        desc: "Sindirilmiş besinlerin villuslar yoluyla kana emilmesini sağlar. Kalın bağırsak ise su ve mineralleri geri emer.",
+        funFact: "İnce bağırsağın ortalama uzunluğu yaklaşık 6-7 metredir!"
+      }
+    };
+
+    function init3DAnatomy() {
+      const container = document.getElementById('three-container');
+      if (!container) return;
+      if (typeof THREE === 'undefined') {
+        container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2"><span class="text-3xl">🦴</span><span>3D Anatomi motoru yükleniyor veya tarayıcınız WebGL desteklemiyor. Lütfen Kalp veya Mikroskop moduna geçin.</span></div>';
+        return;
+      }
+
+      try {
+        raycaster = new THREE.Raycaster();
+        mouse = new THREE.Vector2();
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x030712);
+        scene.fog = new THREE.FogExp2(0x030712, 0.04);
+
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / (window.innerHeight - 60), 0.1, 100);
+        camera.position.set(0, 1.2, 5.5);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight - 60);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        if (THREE.OrbitControls) {
+          controls = new THREE.OrbitControls(camera, renderer.domElement);
+          controls.enableDamping = true;
+          controls.dampingFactor = 0.05;
+          controls.maxDistance = 9;
+          controls.minDistance = 1.5;
+          controls.target.set(0, 0.5, 0);
+        }
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+      dirLight.position.set(5, 10, 7);
+      scene.add(dirLight);
+
+      const blueBackLight = new THREE.PointLight(0x38bdf8, 1, 10);
+      blueBackLight.position.set(-3, 2, -3);
+      scene.add(blueBackLight);
+
+      // Groups
+      skeletonGroup = new THREE.Group();
+      organsGroup = new THREE.Group();
+      musclesGroup = new THREE.Group();
+
+      scene.add(skeletonGroup);
+      scene.add(organsGroup);
+      scene.add(musclesGroup);
+
+      buildSkeleton();
+      buildOrgans();
+      buildMuscles();
+
+      musclesGroup.visible = false; // Initially hidden
+
+      // Raycast click
+      renderer.domElement.addEventListener('pointerdown', onPointerDown);
+
+      window.addEventListener('resize', () => {
+        if (renderer && camera) {
+          renderer.setSize(window.innerWidth, window.innerHeight - 60);
+          camera.aspect = window.innerWidth / (window.innerHeight - 60);
+          camera.updateProjectionMatrix();
+        }
+      });
+
+      animate3D();
+      } catch (err) {
+        console.error('Three.js başlatma hatası:', err);
+        container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2"><span class="text-3xl">⚠️</span><span>3D Anatomi motoru başlatılamadı. Lütfen Kalp Simülasyonu veya Mikroskop modlarını deneyin.</span></div>';
+      }
+    }
+
+    function buildSkeleton() {
+      const boneMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.4, metalness: 0.1 });
+
+      // Skull
+      const skull = new THREE.Mesh(new THREE.SphereGeometry(0.38, 24, 24), boneMat);
+      skull.position.set(0, 2.2, 0);
+      skeletonGroup.add(skull);
+
+      // Spine
+      const spine = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 1.6, 16), boneMat);
+      spine.position.set(0, 1.0, -0.05);
+      skeletonGroup.add(spine);
+
+      // Ribcage (Torso ribs)
+      for (let i = 0; i < 6; i++) {
+        const rib = new THREE.Mesh(new THREE.TorusGeometry(0.36 - i * 0.015, 0.025, 8, 24, Math.PI * 1.5), boneMat);
+        rib.rotation.x = Math.PI / 2;
+        rib.rotation.z = Math.PI * 0.25;
+        rib.position.set(0, 1.5 - i * 0.12, 0);
+        skeletonGroup.add(rib);
+      }
+
+      // Pelvis (Hips)
+      const pelvis = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.08, 12, 24), boneMat);
+      pelvis.rotation.x = Math.PI / 2;
+      pelvis.position.set(0, 0.2, 0);
+      skeletonGroup.add(pelvis);
+
+      // Legs
+      const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.05, 1.8, 12), boneMat);
+      leftLeg.position.set(-0.25, -0.8, 0);
+      const rightLeg = leftLeg.clone();
+      rightLeg.position.set(0.25, -0.8, 0);
+      skeletonGroup.add(leftLeg, rightLeg);
+
+      // Arms
+      const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 1.5, 12), boneMat);
+      leftArm.position.set(-0.65, 0.9, 0);
+      leftArm.rotation.z = 0.15;
+      const rightArm = leftArm.clone();
+      rightArm.position.set(0.65, 0.9, 0);
+      rightArm.rotation.z = -0.15;
+      skeletonGroup.add(leftArm, rightArm);
+    }
+
+    function buildOrgans() {
+      // 1. Brain
+      const brainMat = new THREE.MeshStandardMaterial({ color: 0xf472b6, roughness: 0.6 });
+      const brain = new THREE.Mesh(new THREE.SphereGeometry(0.3, 20, 20), brainMat);
+      brain.position.set(0, 2.2, 0);
+      brain.scale.set(0.9, 1.1, 1);
+      brain.userData = { id: 'brain' };
+      organsGroup.add(brain);
+      interactiveObjects.push(brain);
+
+      // 2. Heart
+      const heartMat = new THREE.MeshStandardMaterial({ color: 0xe11d48, roughness: 0.3, metalness: 0.2 });
+      const heart = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), heartMat);
+      heart.position.set(-0.06, 1.25, 0.08);
+      heart.userData = { id: 'heart' };
+      organsGroup.add(heart);
+      interactiveObjects.push(heart);
+
+      // 3. Lungs
+      const lungMat = new THREE.MeshStandardMaterial({ color: 0xf87171, roughness: 0.5, transparent: true, opacity: 0.85 });
+      const lungGeo = (typeof THREE.CapsuleGeometry !== 'undefined') ? new THREE.CapsuleGeometry(0.14, 0.35, 8, 16) : new THREE.CylinderGeometry(0.14, 0.12, 0.45, 16);
+      const leftLung = new THREE.Mesh(lungGeo, lungMat);
+      leftLung.position.set(-0.25, 1.3, 0.02);
+      leftLung.userData = { id: 'lungs' };
+      const rightLung = leftLung.clone();
+      rightLung.position.set(0.25, 1.3, 0.02);
+      rightLung.userData = { id: 'lungs' };
+      organsGroup.add(leftLung, rightLung);
+      interactiveObjects.push(leftLung, rightLung);
+
+      // 4. Stomach
+      const stomachMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.5 });
+      const stomach = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), stomachMat);
+      stomach.position.set(0.12, 0.82, 0.08);
+      stomach.scale.set(1.3, 0.9, 0.9);
+      stomach.userData = { id: 'stomach' };
+      organsGroup.add(stomach);
+      interactiveObjects.push(stomach);
+
+      // 5. Liver
+      const liverMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.4 });
+      const liver = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), liverMat);
+      liver.position.set(-0.15, 0.88, 0.07);
+      liver.scale.set(1.4, 0.7, 0.9);
+      liver.userData = { id: 'liver' };
+      organsGroup.add(liver);
+      interactiveObjects.push(liver);
+
+      // 6. Intestines
+      const intestineMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.7 });
+      const intestine = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.09, 12, 24), intestineMat);
+      intestine.position.set(0, 0.45, 0.06);
+      intestine.userData = { id: 'intestines' };
+      organsGroup.add(intestine);
+      interactiveObjects.push(intestine);
+    }
+
+    function buildMuscles() {
+      // Semi-transparent muscle silhouette
+      const muscleMat = new THREE.MeshStandardMaterial({ color: 0xbe123c, transparent: true, opacity: 0.35, roughness: 0.8 });
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.32, 1.8, 24), muscleMat);
+      body.position.set(0, 1.1, 0);
+      musclesGroup.add(body);
+    }
+
+    function toggleAnatomyLayer(layer, isVisible) {
+      if (layer === 'skeleton') skeletonGroup.visible = isVisible;
+      if (layer === 'organs') organsGroup.visible = isVisible;
+      if (layer === 'muscles') musclesGroup.visible = isVisible;
+      playTone(440, 0.05);
+    }
+
+    function onPointerDown(event) {
+      if (!renderer || !raycaster || !mouse || !camera) return;
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(interactiveObjects);
+
+      if (intersects.length > 0) {
+        const hit = intersects[0].object;
+        const organId = hit.userData.id;
+        if (organId && organData[organId]) {
+          showOrganInfo(organData[organId]);
+          playTone(600, 0.1);
+        }
+      }
+    }
+
+    function showOrganInfo(data) {
+      document.getElementById('organ-name').innerText = data.name;
+      document.getElementById('organ-latin').innerText = data.latin;
+      document.getElementById('organ-system').innerText = data.system;
+      document.getElementById('organ-desc').innerText = data.desc;
+      document.getElementById('organ-fun-fact').innerHTML = `💡 <strong>Biliyor muydunuz?</strong> ${data.funFact}`;
+      document.getElementById('organ-info-card').classList.remove('translate-x-96');
+    }
+
+    function closeOrganCard() {
+      document.getElementById('organ-info-card').classList.add('translate-x-96');
+    }
+
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+      if (currentVucutMode === '3d') {
+        if (controls) controls.update();
+        // Subtle idle breathing
+        const time = Date.now() * 0.002;
+        if (organsGroup) {
+          const heart = organsGroup.children.find(c => c.userData && c.userData.id === 'heart');
+          if (heart) {
+            const scale = 1 + Math.sin(time * 3) * 0.04;
+            heart.scale.set(scale, scale, scale);
+          }
+        }
+        if (renderer && scene && camera) renderer.render(scene, camera);
+      }
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       2. HEART & CIRCULATION ENGINE
+       ───────────────────────────────────────────────────────────── */
+    let bpm = 72;
+    let heartInterval = null;
+    let heartStep = 0;
+
+    function initHeartCirculation() {
+      updateBPM(bpm);
+    }
+
+    function updateBPM(val) {
+      bpm = parseInt(val) || 72;
+      document.getElementById('bpm-val').innerText = bpm;
+
+      let stateText = 'Normal (Dinlenme)';
+      if (bpm < 60) stateText = 'Düşük (Uyku/Dinlenme)';
+      else if (bpm > 130) stateText = 'Çok Yüksek (Ağır Efor)';
+      else if (bpm > 95) stateText = 'Yüksek (Hafif Efor/Koşu)';
+      document.getElementById('bpm-state-label').innerText = stateText;
+
+      const heartSvg = document.getElementById('heart-svg');
+      if (heartSvg) {
+        heartSvg.style.animationDuration = `${60 / bpm}s`;
+      }
+
+      if (heartInterval) clearInterval(heartInterval);
+      const intervalMs = (60 / bpm) * 1000;
+      heartInterval = setInterval(() => {
+        playHeartBeatSound();
+        triggerValveBeat();
+      }, intervalMs);
+    }
+
+    function triggerValveBeat() {
+      const vLeft = document.getElementById('valve-left');
+      const vRight = document.getElementById('valve-right');
+      if (!vLeft || !vRight) return;
+
+      // Animate valve opening
+      vLeft.setAttribute('y2', '180');
+      vRight.setAttribute('y2', '180');
+      setTimeout(() => {
+        vLeft.setAttribute('y2', '160');
+        vRight.setAttribute('y2', '160');
+      }, 180);
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       3. VIRTUAL MICROSCOPE ENGINE
+       ───────────────────────────────────────────────────────────── */
+    let currentMagnification = 10;
+    let currentFocus = 30;
+    let showOrganelleLabels = false;
+    let currentSpecimen = 'onion';
+
+    function setMagnification(mag) {
+      currentMagnification = mag;
+      document.querySelectorAll('.mag-btn').forEach(b => {
+        b.classList.remove('active', 'bg-rose-500/20', 'text-rose-300', 'border-rose-500/40');
+        b.classList.add('text-slate-400');
+      });
+      const activeBtn = document.getElementById(`mag-${mag}`);
+      if (activeBtn) {
+        activeBtn.classList.add('active', 'bg-rose-500/20', 'text-rose-300', 'border-rose-500/40');
+        activeBtn.classList.remove('text-slate-400');
+      }
+      playTone(500, 0.08);
+      drawMicroscope();
+    }
+
+    function updateFocus(val) {
+      currentFocus = parseInt(val);
+      const isSharp = currentFocus >= 65 && currentFocus <= 75;
+      const statusEl = document.getElementById('focus-status');
+      if (isSharp) {
+        statusEl.innerText = '✨ Kristal Netlik';
+        statusEl.className = 'text-emerald-400 font-bold';
+      } else {
+        statusEl.innerText = 'Bulanık';
+        statusEl.className = 'text-amber-400 font-bold';
+      }
+      drawMicroscope();
+    }
+
+    function toggleOrganelleLabels() {
+      showOrganelleLabels = !showOrganelleLabels;
+      document.getElementById('label-btn-text').innerText = showOrganelleLabels ? 'Etiketleri Gizle' : 'Organel Etiketlerini Göster';
+      playTone(480, 0.05);
+      drawMicroscope();
+    }
+
+    function changeSpecimen() {
+      currentSpecimen = document.getElementById('micro-specimen-select').value;
+      const infoBox = document.getElementById('specimen-info-box');
+
+      if (currentSpecimen === 'onion') {
+        infoBox.innerHTML = '<strong class="text-white block mb-1">🧅 Soğan Zarı Hücresi (Bitki):</strong> Hücre çeperi sayesinde köşeli tuğla benzeri düzenli yapıdadır. Büyük koful ve belirgin çekirdek görünür.';
+      } else if (currentSpecimen === 'cheek') {
+        infoBox.innerHTML = '<strong class="text-white block mb-1">👄 Ağız İçi Epiteli (Hayvan):</strong> Hücre çeperi yoktur; esnek hücre zarı ile çevrili yuvarlakımsı ve dağınık hücrelerdir. Ortasında çekirdek belirgindir.';
+      } else if (currentSpecimen === 'amoeba') {
+        infoBox.innerHTML = '<strong class="text-white block mb-1">🦠 Amip & Terliksi Hayvan:</strong> Tek hücreli mikroskobik canlılardır. Yalancı ayaklarıyla (psödopod) hareket eder ve besin kofulu oluştururlar.';
+      } else if (currentSpecimen === 'blood') {
+        infoBox.innerHTML = '<strong class="text-white block mb-1">🩸 İnsan Kan Yayması:</strong> Sayıca çok olan çekirdeksiz kırmızı alyuvarlar ve mikroplarla savaşan büyük çekirdekli akyuvarlar (lökositler) görünür.';
+      }
+
+      playTone(550, 0.08);
+      drawMicroscope();
+    }
+
+    function drawMicroscope() {
+      const canvas = document.getElementById('microscope-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Blur filter based on focus slider (optimal at 70)
+      const blurAmount = Math.abs(currentFocus - 70) * 0.25;
+      ctx.filter = `blur(${blurAmount}px)`;
+
+      // Draw specimen graphics
+      if (currentSpecimen === 'onion') {
+        drawOnionCells(ctx, w, h);
+      } else if (currentSpecimen === 'cheek') {
+        drawCheekCells(ctx, w, h);
+      } else if (currentSpecimen === 'amoeba') {
+        drawAmoeba(ctx, w, h);
+      } else if (currentSpecimen === 'blood') {
+        drawBloodCells(ctx, w, h);
+      }
+
+      ctx.filter = 'none';
+
+      // Draw organelle labels if enabled and focus is reasonably sharp
+      if (showOrganelleLabels && blurAmount < 3) {
+        drawMicroscopeLabels(ctx, w, h);
+      }
+    }
+
+    function drawOnionCells(ctx, w, h) {
+      const scale = currentMagnification === 10 ? 1 : (currentMagnification === 40 ? 1.8 : 2.8);
+      const cols = Math.floor(6 / scale);
+      const rows = Math.floor(8 / scale);
+      const cw = w / cols;
+      const ch = h / rows;
+
+      ctx.fillStyle = '#fef08a15';
+      ctx.fillRect(0, 0, w, h);
+
+      for (let r = 0; r <= rows + 1; r++) {
+        for (let c = 0; c <= cols + 1; c++) {
+          const x = c * cw;
+          const y = r * ch;
+
+          // Cell wall
+          ctx.strokeStyle = '#ca8a04';
+          ctx.lineWidth = 3 * scale;
+          ctx.strokeRect(x, y, cw, ch);
+
+          // Cytoplasm
+          ctx.fillStyle = 'rgba(254, 240, 138, 0.3)';
+          ctx.fillRect(x + 2, y + 2, cw - 4, ch - 4);
+
+          // Nucleus
+          ctx.fillStyle = '#854d0e';
+          ctx.beginPath();
+          ctx.arc(x + cw * 0.65, y + ch * 0.45, 7 * scale, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    function drawCheekCells(ctx, w, h) {
+      const scale = currentMagnification === 10 ? 0.8 : (currentMagnification === 40 ? 1.4 : 2.2);
+      ctx.fillStyle = '#fbcfe815';
+      ctx.fillRect(0, 0, w, h);
+
+      const positions = [
+        [w * 0.35, h * 0.35, 45],
+        [w * 0.65, h * 0.5, 55],
+        [w * 0.4, h * 0.7, 50],
+        [w * 0.75, h * 0.25, 40]
+      ];
+
+      positions.forEach(([cx, cy, rad]) => {
+        const r = rad * scale;
+        // Irregular cell membrane
+        ctx.fillStyle = 'rgba(244, 114, 182, 0.35)';
+        ctx.strokeStyle = '#db2777';
+        ctx.lineWidth = 2 * scale;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, r, r * 0.8, Math.PI * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Nucleus
+        ctx.fillStyle = '#831843';
+        ctx.beginPath();
+        ctx.arc(cx + 4, cy - 2, 8 * scale, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function drawAmoeba(ctx, w, h) {
+      const scale = currentMagnification === 10 ? 0.9 : (currentMagnification === 40 ? 1.6 : 2.4);
+      ctx.fillStyle = '#ccfbf115';
+      ctx.fillRect(0, 0, w, h);
+
+      // Amoeba body with pseudopods
+      ctx.fillStyle = 'rgba(20, 184, 166, 0.4)';
+      ctx.strokeStyle = '#0d9488';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      const cx = w / 2;
+      const cy = h / 2;
+      const baseR = 70 * scale;
+
+      for (let a = 0; a <= Math.PI * 2; a += 0.2) {
+        const offset = Math.sin(a * 5) * 15 * scale + Math.cos(a * 3) * 10 * scale;
+        const px = cx + (baseR + offset) * Math.cos(a);
+        const py = cy + (baseR + offset) * Math.sin(a);
+        if (a === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Nucleus
+      ctx.fillStyle = '#115e59';
+      ctx.beginPath();
+      ctx.arc(cx - 15 * scale, cy + 10 * scale, 12 * scale, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Food vacuole
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.arc(cx + 25 * scale, cy - 20 * scale, 8 * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawBloodCells(ctx, w, h) {
+      const scale = currentMagnification === 10 ? 0.7 : (currentMagnification === 40 ? 1.2 : 2.0);
+      ctx.fillStyle = '#ffe4e615';
+      ctx.fillRect(0, 0, w, h);
+
+      // Red blood cells (Erythrocytes)
+      for (let i = 0; i < 35; i++) {
+        const rx = (Math.sin(i * 99) * 0.4 + 0.5) * w;
+        const ry = (Math.cos(i * 33) * 0.4 + 0.5) * h;
+        const r = 10 * scale;
+
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(rx, ry, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Doughnut indent
+        ctx.fillStyle = '#b91c1c';
+        ctx.beginPath();
+        ctx.arc(rx, ry, r * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 1 White blood cell (Leukocyte)
+      ctx.fillStyle = '#a855f7';
+      ctx.strokeStyle = '#c084fc';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(w * 0.52, h * 0.48, 16 * scale, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Lobed nucleus inside WBC
+      ctx.fillStyle = '#581c87';
+      ctx.beginPath();
+      ctx.arc(w * 0.50, h * 0.46, 6 * scale, 0, Math.PI * 2);
+      ctx.arc(w * 0.54, h * 0.50, 6 * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawMicroscopeLabels(ctx, w, h) {
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+
+      function drawTag(text, x, y) {
+        ctx.strokeText(text, x, y);
+        ctx.fillText(text, x, y);
+      }
+
+      if (currentSpecimen === 'onion') {
+        drawTag('📍 Hücre Çeperi', w * 0.15, h * 0.3);
+        drawTag('📍 Çekirdek', w * 0.65, h * 0.42);
+        drawTag('📍 Sitoplazma', w * 0.45, h * 0.65);
+      } else if (currentSpecimen === 'cheek') {
+        drawTag('📍 Çekirdek', w * 0.65, h * 0.48);
+        drawTag('📍 Hücre Zarı', w * 0.3, h * 0.28);
+      } else if (currentSpecimen === 'amoeba') {
+        drawTag('📍 Yalancı Ayak (Psödopod)', w * 0.18, h * 0.25);
+        drawTag('📍 Çekirdek', w * 0.4, h * 0.58);
+        drawTag('📍 Besin Kofulu', w * 0.65, h * 0.4);
+      } else if (currentSpecimen === 'blood') {
+        drawTag('📍 Alyuvar (Eritrosit)', w * 0.25, h * 0.35);
+        drawTag('📍 Akyuvar (Lökosit)', w * 0.55, h * 0.45);
+      }
+    }
+
+    /* INITIALIZE */
+    window.addEventListener('DOMContentLoaded', () => {
+      init3DAnatomy();
+      initHeartCirculation();
+      drawMicroscope();
+    });
+  </script>
+</body>
+</html>

@@ -68,6 +68,7 @@ try {
         await writeFile(path.join(target, to), HEADER + body);
         console.log(`[sync-chess-engine] ${to} güncellendi`);
     }
+    await writeFile(path.join(root, 'functions', 'chess-engine.mjs'), HEADER + await readFile(path.join(source.dir, 'src/engine/Chess.js'), 'utf8'));
     console.log(
         '[sync-chess-engine] Bitti. Motorun yüzeyi değiştiyse *.d.ts dosyalarını da gözden geçirin.'
     );

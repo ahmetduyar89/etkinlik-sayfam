@@ -18,7 +18,16 @@ const r1 = (n: number): number => Math.round(n * 10) / 10;
 const r2 = (n: number): number => Math.round(n * 100) / 100;
 
 /** Kodlanmış nokta: `[x, y]` veya baskılı kalemlerde `[x, y, p]`. */
-type PackedPoint = [number, number] | [number, number, number];
+type PackedPoint = [number, number] | [number, number, number] | Point;
+const telemetryKeys = ['timestamp', 'pressure', 'velocity', 'tiltX', 'tiltY', 'twist'] as const;
+function telemetry(pt: Point): Partial<Point> {
+    const result: Partial<Point> = {};
+    for (const key of telemetryKeys) {
+        const value = pt[key];
+        if (typeof value === 'number' && Number.isFinite(value)) result[key] = value;
+    }
+    return result;
+}
 
 const isFinitePoint = (pt: Point | undefined): pt is Point =>
     !!pt && Number.isFinite(pt.x) && Number.isFinite(pt.y);
@@ -32,8 +41,13 @@ function encodePoints(points: Point[]): PackedPoint[] {
         if (!isFinitePoint(pt)) continue;
         const x = r1(pt.x);
         const y = r1(pt.y);
+        // Rich input keeps timing/pressure changes even at identical positions.
+        if (telemetryKeys.some(key => Number.isFinite(pt[key]))) {
+            out.push({ x: pt.x, y: pt.y, ...(Number.isFinite(pt.p) ? { p: pt.p } : {}), ...telemetry(pt) });
+            continue;
+        }
         const prev = out[out.length - 1];
-        if (dedupe && prev && prev[0] === x && prev[1] === y) continue;
+        if (dedupe && Array.isArray(prev) && prev[0] === x && prev[1] === y && prev[2] === (Number.isFinite(pt.p) ? r2(pt.p!) : undefined)) continue;
         out.push(
             typeof pt.p === 'number' && Number.isFinite(pt.p) ? [x, y, r2(pt.p)] : [x, y]
         );
@@ -59,8 +73,8 @@ function decodePoints(raw: unknown): Point[] {
             if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y)) continue;
             out.push(
                 typeof pt.p === 'number' && Number.isFinite(pt.p)
-                    ? { x: pt.x, y: pt.y, p: pt.p }
-                    : { x: pt.x, y: pt.y }
+                    ? { x: pt.x, y: pt.y, p: pt.p, ...telemetry(pt) }
+                    : { x: pt.x, y: pt.y, ...telemetry(pt) }
             );
         }
     }

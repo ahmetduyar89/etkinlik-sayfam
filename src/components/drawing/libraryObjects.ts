@@ -1,3 +1,4 @@
+import { animatedElement } from './elements/animation';
 // src/components/drawing/libraryObjects.ts
 // Matematik ve fen nesne kütüphanelerini tek bir katalogda birleştirir.
 // Tuval ve kütüphane paneli yalnızca bu modülü tanır.
@@ -331,6 +332,7 @@ export const getSimSpec = (kind: MathObjectKind): SimSpec | undefined => SIM_SPE
 
 /** Bu çizim şu anda her karede yeniden çizilmeli mi? */
 export function isAnimated(stroke: Stroke): boolean {
+    if (stroke.tool === 'image') return !!animatedElement(stroke.src);
     if (stroke.tool !== 'math' || !stroke.math) return false;
     const flag = getSimSpec(stroke.math.kind)?.animated;
     return typeof flag === 'function' ? flag(stroke.math) : !!flag;

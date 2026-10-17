@@ -14,6 +14,7 @@ import { watchDocById } from '../../lib/firebase';
 import { loadNotebookPages } from './notebookContent';
 import { watchOps } from './notebookOps';
 import { paperBackground } from './paper';
+import { pageDims } from '../../constants/pageSizes';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
@@ -47,6 +48,10 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
     const [pages, setPages] = React.useState<Stroke[][] | null>(null);
     const [boxesByPage, setBoxesByPage] = React.useState<TextBoxData[][]>([[]]);
     const [pageInfo, setPageInfo] = React.useState({ current: 0, total: 1 });
+
+    // Sayfa ölçüsü tanımlıysa açılışta sayfanın tamamı görünür; öğrenci
+    // yakınlaştırmayı yine serbestçe değiştirebilir.
+    const fittedRef = React.useRef(false);
     const [view, setView] = React.useState<Viewport>({ scale: 1, tx: 0, ty: 0 });
     const [canvasSize, setCanvasSize] = React.useState({ w: 0, h: 0 });
     const [error, setError] = React.useState<string | null>(null);
@@ -182,7 +187,7 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
 
     if (error) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+            <div className="min-h-[100svh] flex flex-col items-center justify-center gap-3 bg-background px-6 text-center">
                 <p className="text-[15px] font-bold text-on-surface">Defter açılamadı</p>
                 <p className="text-[13.5px] text-on-surface-variant max-w-[420px]">{error}</p>
             </div>
@@ -191,7 +196,7 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
 
     if (!notebook || pages === null) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+            <div className="min-h-[100svh] flex flex-col items-center justify-center gap-4 bg-background">
                 <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                 <p className="text-on-surface-variant font-bold uppercase tracking-widest text-xs">
                     Defter açılıyor…
@@ -202,11 +207,15 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
 
     const bgColor = notebook.bg_color || '#ffffff';
     const paper = notebook.paper || 'grid';
+    // Öğrenci de öğretmenle aynı sayfayı görsün: kağıt ölçüsü varsa desen ve
+    // yaprak aynı kutuya oturur.
+    const pdfBox = notebook.pdf_id ? notebook.pdf_box ?? null : null;
+    const pageBox = pdfBox ?? pageDims(notebook.page_size);
     const canGoPrev = pageInfo.current > 0;
     const canGoNext = pageInfo.current < pageInfo.total - 1;
 
     return (
-        <div ref={stageRef} className="h-screen flex flex-col bg-background">
+        <div ref={stageRef} className="h-[100dvh] flex flex-col bg-background">
             <header className="flex items-center gap-3 px-4 h-14 bg-white border-b border-outline-variant flex-shrink-0">
                 <h1 className="flex-1 min-w-0 truncate text-[15px] font-extrabold text-on-surface">
                     {notebook.title}
@@ -218,10 +227,28 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
             </header>
 
             <div className="flex-1 min-h-0 relative overflow-hidden">
-                <div
-                    className="absolute inset-0"
-                    style={paperBackground(paper, bgColor, view, canvasSize)}
-                />
+                {pageBox ? (
+                    <div
+                        className="absolute shadow-[0_8px_30px_rgba(15,23,42,0.18)] ring-1 ring-black/10"
+                        style={{
+                            left: view.tx,
+                            top: view.ty,
+                            width: pageBox.w * view.scale,
+                            height: pageBox.h * view.scale,
+                            ...paperBackground(
+                                paper,
+                                bgColor,
+                                { scale: view.scale, tx: 0, ty: 0 },
+                                pageBox
+                            ),
+                        }}
+                    />
+                ) : (
+                    <div
+                        className="absolute inset-0"
+                        style={paperBackground(paper, bgColor, view, canvasSize)}
+                    />
+                )}
                 <DrawingCanvas
                     ref={canvasRef}
                     config={VIEW_CONFIG}
@@ -230,10 +257,16 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
                     bgColor={bgColor}
                     initialPages={pages}
                     panMode="viewport"
+                    pageBox={pageBox}
                     onPageChange={(current, total) => setPageInfo({ current, total })}
                     onViewChange={(v, size) => {
                         setView(v);
                         setCanvasSize(size);
+                        // Tuval ölçüsünü ilk kez öğrendiğimizde sayfayı oturt.
+                        if (pageBox && !fittedRef.current && size.w > 0) {
+                            fittedRef.current = true;
+                            window.setTimeout(() => canvasRef.current?.fitPage(), 0);
+                        }
                     }}
                 />
                 <TextBoxLayer
