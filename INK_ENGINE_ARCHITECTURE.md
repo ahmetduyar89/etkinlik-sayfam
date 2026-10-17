@@ -415,3 +415,49 @@ Validation: Automated tests in `scripts/test-ink-engine.mjs` verify collinear po
 preservation, barrel roll twist nib modulation, and native bridge event dispatching. Type-check and full
 production build pass.
 
+
+## Smart-board ink (v5): latency, board profile, capsule geometry
+
+Target hardware: classroom boards running Windows (OPS) with Chrome/Edge and a
+passive plastic pen. These report `pointerType: 'touch'` (or `pen` with binary
+pressure), sample at roughly 60–100 Hz with several pixels of IR jitter, and can
+emit short "ghost" secondary contacts.
+
+Implemented:
+- `InkEngine/deviceProfile.ts`: `stylus` / `board` profiles. Auto mode treats
+  touch ink as board, and also a binary-pressure, tilt-less pen on a large
+  (≥1600 px, ≥10 touch points) display. Toolbar override: Otomatik/Tahta/Tablet.
+- `InkInput` takes the profile and the view scale. Filtering runs in screen
+  pixels, so jitter removal does not change with zoom. Board settings: minCutoff
+  3 Hz, beta .03, corner bypass only above 220 px/s low-passed speed (slow
+  jitter can no longer fake a corner and skip the filter), prediction horizon 20 ms.
+  No predictions are made right after a board corner.
+- Geometry v5 (`InkEngine/geometry.ts`): centripetal Catmull–Rom centreline (no
+  hook past the tip on fast turnarounds). The ballpoint is drawn as a round-joined,
+  round-capped `ctx.stroke()`. Fountain/brush ink fills a union of per-segment capsules
+  that all share one winding direction. Neither can self-intersect the way offset
+  ribbons do in small letters. New strokes carry `inkVersion: 5`. v2–v4 strokes
+  render unchanged.
+- Latency: main canvas uses `desynchronized: true` when the setting is on (keyed
+  remount when toggled). On a desynchronized surface, active ink paints in the input
+  event instead of the next rAF. `pointerrawupdate` samples are processed as they
+  arrive. Delegated Ink Trail (`InkEngine/delegatedInk.ts`) applies to opaque
+  ballpoint/fountain ink on trusted pointermove events.
+- Gestures: once a board stroke has run longer than 90 ms or 14 px, a second contact
+  is ignored rather than becoming a pinch that cancelled the line. Board palm limit
+  is 90 px. Pen/touch context menus are suppressed on the canvas.
+- Toolbar: live v5 preview (same geometry rendered to SVG), up to 4 favourite pens,
+  Doğal/Dengeli/Güçlü stabilisation, board mode, low-latency toggle with Ink API status.
+  All of these persist in `goodnotes-toolbar-v3`. On boards the targets are 56 px.
+
+Validation: `node scripts/test-ink-engine.mjs` adds profile detection, jitter RMS
+(board < 0.65× stylus), fast-stroke lag < 10 px, zoom independence, corner
+bypass, prediction horizon, centripetal hairpin bound, capsule winding/bounds,
+v5 stroke/fill selection, cache and persistence. Browser lab: jittery touch and
+pen strokes rendered, a stroke survived a mid-stroke ghost contact, low-latency
+toggle remounted the canvas with ink intact, no console errors.
+
+Not verified: real board hardware, Delegated Ink on Windows (the Mac dev browser
+exposes `navigator.ink` but has no OS presenter), desynchronized flicker on board
+GPUs, and whether the profile constants suit specific IR frames. Tune these from
+the lab panel on the board and switch "Düşük gecikmeli mürekkep" off if it flickers.

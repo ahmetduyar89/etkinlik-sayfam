@@ -6,22 +6,28 @@ import { ObjectLibraryPanel } from '../ObjectLibraryPanel';
 import { DynamicLabPanel } from './DynamicLabPanel';
 import { InkToolMemory } from '../InkEngine/toolMemory';
 import { MM_TO_PX, type GoodnotesPen } from './types';
-import { ribbonOutline } from './InkEngine';
+import { isConstantWidth, traceCapsules, traceCentreline, type PathSink } from '../InkEngine/geometry';
+import { looksLikeBoard, type BoardMode } from '../InkEngine/deviceProfile';
+import { delegatedInkSupported } from '../InkEngine/delegatedInk';
 import './toolbar.css';
 import { ElementsPanel } from '../elements/ElementsPanel';
 const names: Record<GoodnotesPen, string> = { fountain: 'Dolma Kalem', ballpoint: 'Tükenmez Kalem', brush: 'Fırça Kalem' };
 const pastel = ['#182230', '#2563eb', '#e34c55', '#8a5cf5', '#28a878', '#f4bb44', '#f5a6bd', '#b7d9f2', '#b9ddc6', '#dec9f0', '#ffffff', '#000000'];
 type Panel = 'elements' | 'pen' | 'lasso' | 'eraser' | 'color' | 'width' | 'library' | 'lab' | 'page' | 'shapes' | 'more' | null;
+interface FavoritePen { penType: GoodnotesPen; color: string; width: number }
+interface InkPreferences { streamlineLevel?: DrawConfig['streamlineLevel']; boardMode?: BoardMode; lowLatencyInk?: boolean }
 interface Preferences {
     colors: string[];
     widths: number[];
+    favorites: FavoritePen[];
+    ink: InkPreferences;
     pens: Partial<Record<GoodnotesPen, {
         tipSharpness: number;
         pressureResponse: number;
     }>>;
 }
 function readPreferences(): Preferences {
-    const defaults = { colors: ['#ffffff', '#182230', '#0085ff', '#008565', '#ff302b', '#ff9f1c', '#8a5cf5'], widths: [.3, .5, .7], pens: {} };
+    const defaults: Preferences = { colors: ['#ffffff', '#182230', '#0085ff', '#008565', '#ff302b', '#ff9f1c', '#8a5cf5'], widths: [.3, .5, .7], pens: {}, favorites: [], ink: {} };
     try {
         const p = JSON.parse(localStorage.getItem('goodnotes-toolbar-v3') || 'null');
         if (!p)
@@ -31,12 +37,61 @@ function readPreferences(): Preferences {
                 const saved = p.pens?.[pen];
                 if (!saved || !Number.isFinite(saved.tipSharpness) || !Number.isFinite(saved.pressureResponse)) return [];
                 return [[pen, {tipSharpness: Math.max(0,Math.min(1,saved.tipSharpness)), pressureResponse: Math.max(0,Math.min(1,saved.pressureResponse))}]];
-            })) };
+            })), favorites: Array.isArray(p.favorites) ? p.favorites.filter((f: Partial<FavoritePen> | null) => !!f &&
+                (f.penType === 'ballpoint' || f.penType === 'fountain' || f.penType === 'brush') && typeof f.color === 'string' &&
+                /^#[0-9a-f]{6}$/i.test(f.color) && typeof f.width === 'number' && f.width >= .1 && f.width <= 5)
+                .map((f: FavoritePen) => ({ penType: f.penType, color: f.color, width: f.width })).slice(0, MAX_FAVORITES) : [],
+            ink: {
+                ...(['natural', 'smooth', 'calligraphy'].includes(p.ink?.streamlineLevel) ? { streamlineLevel: p.ink.streamlineLevel } : {}),
+                ...(['auto', 'on', 'off'].includes(p.ink?.boardMode) ? { boardMode: p.ink.boardMode } : {}),
+                ...(typeof p.ink?.lowLatencyInk === 'boolean' ? { lowLatencyInk: p.ink.lowLatencyInk } : {}),
+            } };
     }
     catch {
         return defaults;
     }
 }
+const MAX_FAVORITES = 4;
+
+/** SVG path data from the same v5 geometry the canvas uses (arcs as SVG arcs). */
+class SvgSink implements PathSink {
+    d = '';
+    private at = { x: 0, y: 0 };
+    private f = (n: number) => Number(n.toFixed(2));
+    moveTo(x: number, y: number) { this.d += `M${this.f(x)} ${this.f(y)}`; this.at = { x, y }; }
+    lineTo(x: number, y: number) { this.d += `L${this.f(x)} ${this.f(y)}`; this.at = { x, y }; }
+    closePath() { this.d += 'Z'; }
+    arc(x: number, y: number, r: number, start: number, end: number, ccw = false) {
+        const sx = x + Math.cos(start) * r, sy = y + Math.sin(start) * r;
+        if (Math.hypot(sx - this.at.x, sy - this.at.y) > 1e-3) this.lineTo(sx, sy);
+        const sweep = end - start, parts = Math.max(1, Math.ceil(Math.abs(sweep) / Math.PI));
+        for (let i = 1; i <= parts; i++) {
+            const a = start + sweep * i / parts, ex = x + Math.cos(a) * r, ey = y + Math.sin(a) * r;
+            this.d += `A${this.f(r)} ${this.f(r)} 0 0 ${ccw ? 0 : 1} ${this.f(ex)} ${this.f(ey)}`;
+            this.at = { x: ex, y: ey };
+        }
+    }
+}
+
+/** Cursive "eeee" loops: small turns are where ink engines usually break down. */
+const PREVIEW_SAMPLES = Array.from({ length: 140 }, (_, i) => {
+    const a = i / 139 * Math.PI * 9;
+    return { x: 22 + a * 8.4 - 12 * Math.sin(a), y: 33 - 12 * Math.cos(a), p: .35 + .55 * (.5 + .5 * Math.sin(a / 3)), velocity: 420, timestamp: i * 8 };
+});
+
+function InkPreview({ pen, width, color, sharpness, sensitivity }: { pen: GoodnotesPen; width: number; color: string; sharpness: number; sensitivity: number }) {
+    const sink = new SvgSink();
+    if (isConstantWidth(pen)) traceCentreline(sink, PREVIEW_SAMPLES);
+    else traceCapsules(sink, PREVIEW_SAMPLES, { pen, width, sharpness, sensitivity, complete: true });
+    const ink = color.toLowerCase() === '#ffffff' ? '#182230' : color;
+    return <svg viewBox="0 0 280 62" className="gn-preview" role="img" aria-label="Kalem karakteri ön izlemesi">
+        <path d="M12 56h256" stroke="#e7eaf0"/>
+        {isConstantWidth(pen)
+            ? <path d={sink.d} fill="none" stroke={ink} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round"/>
+            : <path d={sink.d} fill={ink}/>}
+    </svg>;
+}
+
 function Range({ label, value, min = 0, max = 100, step = 1, unit = '%', onChange }: {
     label: string;
     value: number;
@@ -58,11 +113,12 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
     // Migrate retired tips only for new input; saved strokes retain their engine.
     useEffect(() => { if (config.penType && !['ballpoint', 'fountain', 'brush'].includes(config.penType))
         setConfig({ ...config, penType: 'ballpoint' }); }, [config, setConfig]);
-    const preview = ribbonOutline(Array.from({ length: 80 }, (_, i) => ({ x: 12 + i * 3.2, y: 28 + Math.sin(i / 8) * 14, p: .2 + .8 * (.5 + .5 * Math.sin(i / 13)), velocity: 400 })), { pen, width: 3, sharpness: config.tipSharpness ?? .5, sensitivity: config.pressureResponse ?? .65, complete: true }).map(p => `${p.x},${p.y}`).join(' ');
+    const board = config.boardMode === 'on' || (config.boardMode !== 'off' && looksLikeBoard());
     const restored = useRef(false);
     useEffect(() => { if (restored.current)
-        return; restored.current = true; const saved = prefs.pens[pen]; if (saved)
-        setConfig({ ...config, ...saved }); }, [config, pen, prefs.pens, setConfig]);
+        return; restored.current = true; const saved = prefs.pens[pen];
+        if (saved || Object.keys(prefs.ink).length)
+        setConfig({ ...config, ...saved, ...prefs.ink }); }, [config, pen, prefs.pens, prefs.ink, setConfig]);
     useEffect(() => { memory.current.remember(config); }, [config]);
     useEffect(() => { try {
         localStorage.setItem('goodnotes-toolbar-v3', JSON.stringify(prefs));
@@ -114,6 +170,20 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
         patch(p);
         setPrefs({ ...prefs, pens: { ...prefs.pens, [pen]: { tipSharpness: config.tipSharpness ?? .5, pressureResponse: config.pressureResponse ?? .65, ...p } } });
     };
+    const inkSetting = (p: InkPreferences) => {
+        patch(p);
+        setPrefs({ ...prefs, ink: { ...prefs.ink, ...p } });
+    };
+    const isFavorite = (f: FavoritePen) => f.penType === pen && f.color.toLowerCase() === config.color.toLowerCase() &&
+        Math.abs(f.width * MM_TO_PX - config.width) < .05;
+    const saveFavorite = () => {
+        const favorite = { penType: pen, color: config.color.toLowerCase(), width: Number((config.width / MM_TO_PX).toFixed(2)) };
+        if (!/^#[0-9a-f]{6}$/i.test(favorite.color) || prefs.favorites.some(isFavorite)) return;
+        setPrefs({ ...prefs, favorites: [favorite, ...prefs.favorites].slice(0, MAX_FAVORITES) });
+    };
+    const applyFavorite = (f: FavoritePen) => patch({ tool: 'pencil', penType: f.penType, color: f.color, width: f.width * MM_TO_PX,
+        tipSharpness: prefs.pens[f.penType]?.tipSharpness ?? .5, pressureResponse: prefs.pens[f.penType]?.pressureResponse ?? .65 });
+    const removeFavorite = (index: number) => setPrefs({ ...prefs, favorites: prefs.favorites.filter((_, i) => i !== index) });
     const color = (value: string) => {
         setHex(value);
         if (!/^#[0-9a-f]{6}$/i.test(value))
@@ -124,7 +194,7 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
         patch({ color: value });
     };
     const button = (title: string, Icon: typeof PenTool, action: () => void, active = false, disabled = false) => <button type="button" key={title} data-tone={Icon === Eraser ? 'rose' : Icon === Highlighter ? 'amber' : Icon === Shapes || Icon === FlaskConical || Icon === Lasso || Icon === Sticker ? 'violet' : Icon === Hand || Icon === BookOpen ? 'teal' : 'blue'} className={`gn-icon ${active ? 'is-active' : ''}`} title={title} aria-label={title} aria-pressed={active ? true : undefined} onClick={action} disabled={disabled}><Icon size={21}/></button>;
-    return <div ref={root} data-drawing-toolbar data-tool={config.tool} className={`gn-toolbar ${fixed ? 'gn-fixed' : 'gn-floating'} ${compact ? 'gn-compact gn-notebook' : ''} ${props.dockSide ? `gn-dock gn-dock-${props.dockSide}` : ''}`} onPointerDown={e => e.stopPropagation()}>
+    return <div ref={root} data-drawing-toolbar data-tool={config.tool} className={`gn-toolbar ${fixed ? 'gn-fixed' : 'gn-floating'} ${compact ? 'gn-compact gn-notebook' : ''} ${board ? 'gn-board' : ''} ${props.dockSide ? `gn-dock gn-dock-${props.dockSide}` : ''}`} onPointerDown={e => e.stopPropagation()}>
         {compact ? <div className="gn-main gn-notebook-main" role="toolbar" aria-label="Çizim araçları">
             {button('Kalem (P)', PenTool, () => config.tool === 'pencil' ? toggle('pen') : select('pencil'), config.tool === 'pencil')}
             {button('Fosforlu kalem (H)', Highlighter, () => config.tool === 'highlighter' ? toggle('width') : select('highlighter'), config.tool === 'highlighter')}
@@ -218,11 +288,40 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
             </div>}
             {panel === 'pen' && <>
                 <div className="gn-pen-tabs">{(['fountain', 'ballpoint', 'brush'] as const).map(p => <button type="button" className={pen === p ? 'is-active' : ''} key={p} onClick={() => patch({ tool: 'pencil', penType: p, tipSharpness: prefs.pens[p]?.tipSharpness ?? .5, pressureResponse: prefs.pens[p]?.pressureResponse ?? .65 })}><PenTool size={22}/>{names[p]}</button>)}</div>
-                <svg viewBox="0 0 280 55" className="gn-preview" aria-label="Kalem karakteri ön izlemesi"><polygon points={preview} fill={config.color}/><path d="M12 50h256" stroke="#e7eaf0"/></svg>
+                <InkPreview pen={pen} width={Math.max(.8, config.width)} color={config.color} sharpness={config.tipSharpness ?? .5} sensitivity={config.pressureResponse ?? .65}/>
                 <p>{pen === 'ballpoint' ? 'Sabit genişlik. Net ve dengeli el yazısı.' : pen === 'fountain' ? 'Açılı uç. Hıza, basınca ve kalem eğimine duyarlı.' : 'Dinamik basınç. Dolgun vuruşlar ve ince bitişler.'}</p>
                 <Range label="Çizgi kalınlığı" min={.1} max={5} step={.05} unit=" mm" value={config.width / MM_TO_PX} onChange={w => patch({ width: w * MM_TO_PX })}/>
                 {pen === 'fountain' && <Range label="Uç keskinliği" value={(config.tipSharpness ?? .5) * 100} onChange={v => brushSetting({ tipSharpness: v / 100 })}/>}
                 {pen !== 'ballpoint' && <Range label="Basınç duyarlılığı" value={(config.pressureResponse ?? .65) * 100} onChange={v => brushSetting({ pressureResponse: v / 100 })}/>}
+                <div className="gn-favorites" role="group" aria-label="Favori kalemler">
+                    <span className="gn-section-label">Favori kalemler</span>
+                    <div>
+                        {prefs.favorites.map((f, i) => <span className="gn-favorite-slot" key={`${f.penType}-${f.color}-${f.width}`}>
+                            <button type="button" className={`gn-favorite ${isFavorite(f) ? 'is-active' : ''}`} aria-pressed={isFavorite(f)}
+                                aria-label={`${names[f.penType]}, ${f.width} mm, ${f.color}`} title={`${names[f.penType]} · ${f.width} mm`} onClick={() => applyFavorite(f)}>
+                                <span style={{ '--ink': f.color, height: Math.max(3, Math.min(14, f.width * 6)) } as React.CSSProperties}/>
+                            </button>
+                            <button type="button" className="gn-favorite-remove" aria-label={`${i + 1}. favori kalemi kaldır`} onClick={() => removeFavorite(i)}><X size={12}/></button>
+                        </span>)}
+                        {prefs.favorites.length < MAX_FAVORITES && <button type="button" className="gn-favorite gn-favorite-add" onClick={saveFavorite}
+                            disabled={prefs.favorites.some(isFavorite)} aria-label="Bu kalemi favorilere ekle" title="Bu kalemi favorilere ekle"><Plus size={18}/></button>}
+                    </div>
+                </div>
+                <span className="gn-section-label">Yazma hassasiyeti</span>
+                <div className="gn-options gn-segmented" role="radiogroup" aria-label="Titreme düzeltme">
+                    {([['natural', 'Doğal'], ['smooth', 'Dengeli'], ['calligraphy', 'Güçlü']] as const).map(([level, label]) =>
+                        <button type="button" role="radio" key={level} aria-checked={(config.streamlineLevel ?? 'smooth') === level}
+                            className={(config.streamlineLevel ?? 'smooth') === level ? 'is-active' : ''} onClick={() => inkSetting({ streamlineLevel: level })}>{label}</button>)}
+                </div>
+                <p>Güçlü düzeltme, akıllı tahtada el ve kalem titremesini en çok azaltır.</p>
+                <div className="gn-options gn-segmented" role="radiogroup" aria-label="Akıllı tahta modu">
+                    {([['auto', 'Otomatik'], ['on', 'Tahta'], ['off', 'Tablet']] as const).map(([mode, label]) =>
+                        <button type="button" role="radio" key={mode} aria-checked={(config.boardMode ?? 'auto') === mode}
+                            className={(config.boardMode ?? 'auto') === mode ? 'is-active' : ''} onClick={() => inkSetting({ boardMode: mode })}>{label}</button>)}
+                </div>
+                <label className="gn-toggle">Düşük gecikmeli mürekkep<input type="checkbox" checked={config.lowLatencyInk !== false} onChange={e => inkSetting({ lowLatencyInk: e.target.checked })}/></label>
+                <p>{config.lowLatencyInk === false ? 'Kapalı: mürekkep standart ekran yenilemesiyle çizilir.' : delegatedInkSupported()
+                    ? 'Açık: kalem ucundaki iz işletim sistemi tarafından hızlandırılıyor.' : 'Açık: hızlı çizim yüzeyi kullanılıyor. İşletim sistemi hızlandırması bu tarayıcıda yok.'}</p>
                 <label className="gn-toggle">Çiz ve bekle<input type="checkbox" checked={config.snapShapes ?? true} onChange={e => patch({ snapShapes: e.target.checked })}/></label>
                 <label className="gn-toggle">Karalayarak sil<input type="checkbox" checked={config.smartScribbleErase ?? true} onChange={e => patch({ smartScribbleErase: e.target.checked })}/></label>
             </>}

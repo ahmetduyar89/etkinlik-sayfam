@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import { DRAWING_COLORS, HANDLE_CURSORS } from '../../constants/drawing';
 import { InkInput, actualSamples, predictedSamples } from './InkEngine/input';
+import { detectInputProfile, INK_PROFILES, type InkInputProfile } from './InkEngine/deviceProfile';
+import { DelegatedInk } from './InkEngine/delegatedInk';
 import { InkFrameQueue } from './InkEngine/frameQueue';
 import { DocumentSpatialIndex } from './InkEngine/spatialIndex';
 import { InkHistory } from './InkEngine/history';
@@ -284,8 +286,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const lastPenAtRef = React.useRef(-Infinity);
         /** Kalem kullanıldıktan sonra parmağın yok sayılacağı süre. */
         const PEN_PRIORITY_MS = 1200;
+        /** Two-finger gestures must start within this window / travel of the first contact. */
+        const GHOST_TOUCH_MS = 90;
+        const GHOST_TOUCH_TRAVEL_PX = 14;
         /** Sürücü temas alanı bildiriyorsa bu genişlikten büyüğü avuç sayılır. */
-        const PALM_CONTACT_PX = 45;
 
         /** Çok parmak dokunuşu (2 = geri al, 3 = ileri al) izleme. */
         const tapRef = React.useRef<{
@@ -333,6 +337,15 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const inkMetricsRef = React.useRef(emptyInkMetrics());
         const legacyInkRef = React.useRef(false);
         const inkInputRef = React.useRef(new InkInput());
+        /** Profile of the most recent ink contact; drives palm and ghost-touch rules. */
+        const inputProfileRef = React.useRef<InkInputProfile>('stylus');
+        const inkStartRef = React.useRef<{ time: number; x: number; y: number } | null>(null);
+        const lowLatencyEnabled = config.lowLatencyInk !== false;
+        /** True only when the browser granted a desynchronized (low-latency) context. */
+        const lowLatencyRef = React.useRef(false);
+        const delegatedInkRef = React.useRef(new DelegatedInk());
+        /** Latest draw handler, for native listeners React does not expose. */
+        const drawRef = React.useRef<((e: React.PointerEvent) => void) | null>(null);
         const inkFrameRef = React.useRef(new InkFrameQueue());
         const pendingInkRegionRef = React.useRef<BoundingBox | null>(null);
         const cancelInkFrame = React.useCallback(() => {
@@ -1572,7 +1585,14 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 c.style.height = h + 'px';
             });
 
-            ctxRef.current = canvas.getContext('2d');
+            // desynchronized: Chrome/Edge present this canvas outside the compositor
+            // queue (≈1 frame less ink latency). The attribute is fixed per element,
+            // so the canvas is remounted (keyed) when the setting changes.
+            ctxRef.current = lowLatencyEnabled
+                ? canvas.getContext('2d', { desynchronized: true }) as CanvasRenderingContext2D | null
+                : canvas.getContext('2d');
+            lowLatencyRef.current = !!ctxRef.current?.getContextAttributes?.().desynchronized;
+            if (lowLatencyEnabled) delegatedInkRef.current.attach(canvas);
             bufferCtxRef.current = buffer.getContext('2d');
             if (overlay) overlayCtxRef.current = overlay.getContext('2d');
             [ctxRef.current, bufferCtxRef.current, overlayCtxRef.current].forEach((c) => {
@@ -1580,11 +1600,29 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             });
             onViewChangeRef.current?.(viewRef.current, { w, h });
             redraw();
-        }, [redraw]);
+        }, [redraw, lowLatencyEnabled]);
 
         React.useEffect(() => {
             resizeRef.current = resize;
         }, [resize]);
+
+        // pointerrawupdate (Chrome, secure contexts) delivers pen samples as soon as
+        // they arrive instead of once per animation frame. Later pointermove events
+        // replay the same samples; InkInput drops them as stale timestamps.
+        React.useEffect(() => {
+            const canvas = canvasRef.current;
+            if (!canvas || !lowLatencyEnabled || !('onpointerrawupdate' in canvas)) return;
+            const raw = (event: Event) => {
+                const e = event as PointerEvent;
+                if (!isDrawingRef.current || inkPointerRef.current !== e.pointerId || rulerRef.current) return;
+                const stroke = currentStrokeRef.current;
+                if (!stroke || (stroke.tool !== 'pencil' && stroke.tool !== 'highlighter')) return;
+                drawRef.current?.({ pointerId: e.pointerId, pointerType: e.pointerType, clientX: e.clientX, clientY: e.clientY,
+                    timeStamp: e.timeStamp, nativeEvent: e } as unknown as React.PointerEvent);
+            };
+            canvas.addEventListener('pointerrawupdate', raw);
+            return () => canvas.removeEventListener('pointerrawupdate', raw);
+        }, [lowLatencyEnabled]);
 
         // Açılışta mevcut sayfa bilgisini bir kez dışarıya bildir.
         React.useEffect(() => {
@@ -2283,7 +2321,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             }
             if (config.palmRejection === false || e.pointerType !== 'touch') return false;
             if (performance.now() - lastPenAtRef.current < PEN_PRIORITY_MS) return true;
-            return (e.width ?? 0) > PALM_CONTACT_PX || (e.height ?? 0) > PALM_CONTACT_PX;
+            // Board frames report wide contacts for an ordinary pen tip; use the profile's limit.
+            const limit = INK_PROFILES[detectInputProfile(e.nativeEvent, config.boardMode ?? 'auto')].palmContactPx;
+            return (e.width ?? 0) > limit || (e.height ?? 0) > limit;
         };
 
         /** Çok parmak dokunuşunu izlemeye başlar/genişletir. */
@@ -2450,6 +2490,15 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             };
         };
 
+        /** A pinch must begin with both fingers together; later contacts are not gestures. */
+        const inkStrokeEstablished = (): boolean => {
+            const start = inkStartRef.current, id = inkPointerRef.current;
+            if (!start || id === null) return false;
+            const now = touchPointersRef.current.get(id) ?? pointersRef.current.get(id);
+            return performance.now() - start.time > GHOST_TOUCH_MS ||
+                (!!now && Math.hypot(now.x - start.x, now.y - start.y) > GHOST_TOUCH_TRAVEL_PX);
+        };
+
         const startDrawing = async (e: React.PointerEvent) => {
             if (!enabled) return;
             // Track contacts for viewport gestures before palm classification.
@@ -2459,6 +2508,11 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 // Keep fingers off the page while an actual Pencil stroke is active.
                 if (isDrawingRef.current && inkPointerRef.current !== null &&
                     !touchPointersRef.current.has(inkPointerRef.current)) return;
+                // Smart-board frames emit short "ghost" contacts beside the pen. Once a
+                // board stroke is under way, a second contact is ignored instead of
+                // turning the stroke into a pinch (which cancelled the line).
+                if (isDrawingRef.current && inkPointerRef.current !== null && inputProfileRef.current === 'board' &&
+                    (!viewportEnabled || inkStrokeEstablished())) return;
                 touchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
                 trackTapStart(e);
                 try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* optional capture */ }
@@ -2879,8 +2933,12 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 : (SHAPE_TOOLS.includes(config.tool) || config.tool === 'tape')
                   ? snapPoint({ x, y })
                   : { x, y };
-            inkInputRef.current = new InkInput(config.streamlineLevel === 'natural' ? 0.5 : config.streamlineLevel === 'calligraphy' ? 1.35 : 1, legacyInputFilter ?? (inkDebugEnabled && legacyInkRef.current));
+            const inputProfile = detectInputProfile(e.nativeEvent, config.boardMode ?? 'auto');
+            inputProfileRef.current = inputProfile;
+            inkInputRef.current = new InkInput(config.streamlineLevel === 'natural' ? 0.5 : config.streamlineLevel === 'calligraphy' ? 1.35 : 1,
+                legacyInputFilter ?? (inkDebugEnabled && legacyInkRef.current), inputProfile, viewRef.current.scale);
             inkPointerRef.current = e.pointerId;
+            inkStartRef.current = { time: performance.now(), x: e.clientX, y: e.clientY };
             if (config.tool === 'pencil' || config.tool === 'highlighter') onInkDiagnostic?.({stage: 'begin', id: String(e.pointerId), pointerType: e.pointerType, trusted: e.nativeEvent.isTrusted, legacy: legacyInputFilter ?? (inkDebugEnabled && legacyInkRef.current)});
             if (inkDebugEnabled) {
                 const samples = inkMetricsRef.current.samples;
@@ -2896,7 +2954,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 width: config.tool === 'highlighter' ? config.width * 5 : config.width,
                 fillEnabled: config.fillEnabled,
                 penType: config.tool === 'pencil' ? config.penType ?? 'ballpoint' : undefined,
-                inkVersion: config.tool === 'pencil' && isGoodnotesPen(config.penType ?? 'ballpoint') ? 4 : 2,
+                inkVersion: config.tool === 'pencil' && isGoodnotesPen(config.penType ?? 'ballpoint') ? 5 : 2,
                 tipSharpness: config.tipSharpness ?? .5,
                 pressureResponse: config.pressureResponse ?? .65,
                 pressureSensitivity: config.pressureSensitivity ?? 'normal',
@@ -2931,6 +2989,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
         const draw = (e: React.PointerEvent) => {
             if (e.pointerType === 'pen') lastPenAtRef.current = performance.now();
+            // Ignored (ghost/palm) contacts must not move the active stroke or shape.
+            if (isDrawingRef.current && inkPointerRef.current !== null && e.pointerId !== inkPointerRef.current &&
+                !touchPointersRef.current.has(e.pointerId) && !pointersRef.current.has(e.pointerId)) return;
             if (pointersRef.current.has(e.pointerId)) {
                 pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
             }
@@ -3239,7 +3300,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
             // Predictions are a disposable presentation buffer, never part of stroke.points.
             const prediction = inkInputRef.current.fork();
-            const predictedPoints: Point[] = rulerRef.current ? [] : predictedSamples(e.nativeEvent)
+            // Board jitter makes predictions overshoot on turns; predict only along steady motion there.
+            const predictionAllowed = !rulerRef.current && !(inkInputRef.current.profile === 'board' && inkInputRef.current.corner);
+            const predictedPoints: Point[] = !predictionAllowed ? [] : predictedSamples(e.nativeEvent, INK_PROFILES[inkInputRef.current.profile].predictionHorizonMs)
                 .map(sample => prediction.sample(sample, toWorld(sample.clientX, sample.clientY), stroke.penType))
                 .filter((point): point is Point => point !== null);
             if (addedPoints > 0 || predictedPoints.length) {
@@ -3254,7 +3317,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 const region = dirty ? unionBB(pending ? [pending, dirty] : [dirty]) : pending;
                 pendingInkRegionRef.current = region;
                 const queuedAt = onInkDiagnostic ? performance.now() : 0;
-                inkFrameRef.current.schedule(() => {
+                const paint = () => {
                     pendingInkRegionRef.current = null;
                     const renderStarted = inkDebugEnabled || onInkDiagnostic ? performance.now() : 0;
                     // Copy the full point list only for the presentation that actually reaches a frame.
@@ -3263,7 +3326,21 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     const completedAt = inkDebugEnabled || onInkDiagnostic ? performance.now() : 0;
                     if (inkDebugEnabled) inkMetricsRef.current.renderMs = completedAt - renderStarted;
                     onInkDiagnostic?.({stage:'frame', renderMs:completedAt-renderStarted, queueMs:renderStarted-queuedAt, sampleAgeMs:sampleAge(completedAt, stroke.points.at(-1)?.timestamp ?? e.timeStamp)});
-                });
+                };
+                // A desynchronized surface shows pixels as soon as they are drawn, so
+                // painting in the event beats waiting for the next animation frame.
+                if (lowLatencyRef.current) {
+                    inkFrameRef.current.cancel();
+                    paint();
+                } else {
+                    inkFrameRef.current.schedule(paint);
+                }
+            }
+
+            // OS-drawn trail from the rendered tip to the live pen position (Windows).
+            if (lowLatencyEnabled && stroke.tool === 'pencil' && !stroke.dash && !config.ephemeral &&
+                (stroke.penType === 'ballpoint' || stroke.penType === 'fountain') && !rulerEdgeRef.current) {
+                delegatedInkRef.current.update(e.nativeEvent, stroke.color, (stroke.width || 2) * viewRef.current.scale);
             }
 
             onInkDiagnostic?.({stage:'process', durationMs:performance.now()-inkStartedAt});
@@ -3287,6 +3364,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 }
             }
         };
+
+        drawRef.current = draw;
 
         const stopDrawing = (e?: React.PointerEvent) => {
             if (e) touchPointersRef.current.delete(e.pointerId);
@@ -3496,7 +3575,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 stroke = {...stroke, inkComplete: true};
                 if (heldShapeRef.current) {
                     heldShapeRef.current = false;
-                } else if ((stroke.tool === 'pencil' || stroke.tool === 'highlighter') && stroke.inkVersion !== 3 && stroke.inkVersion !== 4 && stroke.points.length > 5) {
+                } else if ((stroke.tool === 'pencil' || stroke.tool === 'highlighter') && (stroke.inkVersion ?? 2) < 3 && stroke.points.length > 5) {
                     stroke = {
                         ...stroke,
                         points: simplifyStroke(stroke.points, 0.4),
@@ -3846,11 +3925,16 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 {inkDebugEnabled && <InkDebugLab metrics={inkMetricsRef} legacy={legacyInkRef} />}
                 <canvas ref={bufferCanvasRef} style={{ display: 'none' }} aria-hidden="true" />
                 <canvas
+                    key={lowLatencyEnabled ? 'ink-low-latency' : 'ink'}
                     ref={canvasRef}
                     onPointerDown={startDrawing}
                     onPointerMove={draw}
                     onPointerUp={stopDrawing}
                     onPointerCancel={stopDrawing}
+                    // Windows turns a held pen/finger into a right-click menu mid-stroke.
+                    onContextMenu={(e) => {
+                        if ((e.nativeEvent as PointerEvent).pointerType !== 'mouse') e.preventDefault();
+                    }}
                     onDragOver={(e) => {
                         if (
                             e.dataTransfer.types.includes('Files') ||
@@ -3933,7 +4017,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     }}
                     aria-label="Çizim alanı"
                     className={cn(
-                        'absolute left-0 z-[4000] touch-none transition-opacity',
+                        'absolute left-0 z-[4000] touch-none select-none transition-opacity',
                         enabled
                             ? config.tool === 'pan' && !viewportEnabled
                                 ? 'pointer-events-none opacity-100'

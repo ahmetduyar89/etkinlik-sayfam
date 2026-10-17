@@ -130,3 +130,26 @@
 .gn-notebook.gn-dock .gn-elements{position:absolute;transform:none;bottom:auto;top:0;left:calc(100% + 10px);right:auto;max-width:calc(100vw - 100px);max-height:100%;pointer-events:auto}
 .gn-notebook.gn-dock-right .gn-elements{right:calc(100% + 10px);left:auto}
 @media(max-width:1000px){.gn-notebook .gn-notebook-main{justify-content:flex-start}.gn-notebook:not(.gn-dock) .gn-notebook-main .gn-icon{width:40px}.gn-notebook:not(.gn-dock) .gn-quick-colors .gn-color{width:34px}}
+/* Pen panel: favourites and writing precision */
+.gn-section-label{display:block;margin:14px 0 8px;font-size:11px;font-weight:600;letter-spacing:.02em;color:#596779}
+.gn-favorites>div{display:flex;flex-wrap:wrap;gap:8px}
+.gn-favorite-slot{position:relative;display:inline-flex}
+.gn-favorite{display:grid;place-items:center;width:52px;height:44px;border-radius:10px;background:#f2f5f9;box-shadow:inset 0 0 0 1px #e1e7f2}
+.gn-favorite span{width:30px;border-radius:999px;background:var(--ink);box-shadow:inset 0 0 0 1px #00000018}
+.gn-favorite.is-active{box-shadow:inset 0 0 0 2px var(--gn-blue)}
+.gn-favorite-add{color:#596779;border:1px dashed #b8c3d4;background:transparent;box-shadow:none}
+.gn-favorite-add:disabled{opacity:.4}
+.gn-favorite-remove{position:absolute;top:-6px;right:-6px;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#fff;color:#7d8899;box-shadow:0 1px 3px #253b5833}
+.gn-segmented{grid-template-columns:repeat(3,1fr);margin-bottom:4px}
+.gn-segmented button.is-active,.gn-segmented button[aria-checked="true"]{background:var(--gn-blue);color:#fff}
+/* Classroom boards: the teacher stands at arm's length, so targets grow to 56px. */
+.gn-board.gn-notebook .gn-notebook-main{min-height:60px}
+.gn-board .gn-notebook-main .gn-icon{width:56px;height:56px;min-width:56px;min-height:56px;border-radius:12px}
+.gn-board .gn-notebook-main .gn-icon svg{width:26px;height:26px}
+.gn-board .gn-quick-colors .gn-color{width:52px;height:56px}
+.gn-board .gn-quick-colors .gn-color span{width:26px;height:26px}
+.gn-board .gn-popover button,.gn-board .gn-options button{min-height:52px;font-size:14px}
+.gn-board .gn-popover{font-size:14px}
+.gn-board .gn-popover p{font-size:13px}
+.gn-board .gn-favorite{width:64px;height:52px}
+.gn-board .gn-favorite-remove{width:26px;height:26px}

@@ -139,7 +139,7 @@ export interface Stroke {
     /** Normalized Goodnotes brush settings, captured on each stroke. */
     tipSharpness?: number;
     pressureResponse?: number;
-    inkVersion?: 2 | 3 | 4;
+    inkVersion?: 2 | 3 | 4 | 5;
     inkComplete?: boolean;
     /** Preserve highlighter compositing after Draw & Hold morphing. */
     shapeInk?: 'highlighter';
@@ -458,6 +458,10 @@ export interface DrawConfig {
     ephemeral?: boolean;
     /** Kalem kullanılırken parmak/avuç dokunuşlarını yok say. */
     palmRejection?: boolean;
+    /** Akıllı tahta giriş profili: otomatik algıla, her zaman açık ya da kapalı. */
+    boardMode?: 'auto' | 'on' | 'off';
+    /** İşletim sistemi destekliyorsa kalem ucundaki gecikmeyi kapatan mürekkep izi. */
+    lowLatencyInk?: boolean;
     /** Izgaraya ve diğer nesnelere yapışma. */
     snapToGrid?: boolean;
     /** Ekranda duran ölçü aracı (cetvel / gönye / açıölçer). */

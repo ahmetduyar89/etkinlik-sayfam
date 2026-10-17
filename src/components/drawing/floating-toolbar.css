@@ -14,3 +14,7 @@
 .content-ink-palette .gn-popover,.content-ink-palette .gn-elements{width:370px}
 .content-ink-palette .gn-library,.content-ink-palette .gn-lab{overflow:auto}
 @media(max-width:700px){.content-ink-palette .gn-notebook-main .gn-icon{width:44px}.content-ink-palette .gn-quick-colors .gn-color{width:36px}.content-ink-palette .gn-notebook-main{overflow-x:auto}}
+/* Board-sized handle and collapse targets match the enlarged tools. */
+.content-ink-palette:has(.gn-board) .content-ink-handle{width:40px;height:60px}
+.content-ink-palette:has(.gn-board) .content-ink-collapse{width:56px;height:60px}
+.content-ink-palette:has(.gn-board) .gn-popover,.content-ink-palette:has(.gn-board) .gn-elements{width:440px}

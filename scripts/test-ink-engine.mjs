@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 const dir = await mkdtemp(join(tmpdir(), 'ink-test-'));
 try {
-    await build({ entryPoints: ['src/components/drawing/InkEngine/input.ts', 'src/components/drawing/InkEngine/pageViewport.ts', 'src/components/notebooks/pageCodec.ts', 'src/components/drawing/InkEngine/physics.ts', 'src/components/drawing/penEngine.ts', 'src/components/drawing/InkEngine/graphite.ts', 'src/components/drawing/InkEngine/frameQueue.ts', 'src/components/drawing/InkEngine/spatialIndex.ts', 'src/components/drawing/InkEngine/history.ts', 'src/components/drawing/InkEngine/activeBounds.ts', 'src/components/drawing/InkEngine/presets.ts', 'src/components/drawing/InkEngine/toolMemory.ts', 'src/components/drawing/InkEngine/simplification.ts', 'src/components/drawing/InkEngine/nativeBridge.ts'], outdir: dir, bundle: true, platform: 'node', format: 'esm', outExtension: { '.js': '.mjs' } });
+    await build({ entryPoints: ['src/components/drawing/InkEngine/input.ts', 'src/components/drawing/InkEngine/pageViewport.ts', 'src/components/notebooks/pageCodec.ts', 'src/components/drawing/InkEngine/physics.ts', 'src/components/drawing/penEngine.ts', 'src/components/drawing/InkEngine/graphite.ts', 'src/components/drawing/InkEngine/frameQueue.ts', 'src/components/drawing/InkEngine/spatialIndex.ts', 'src/components/drawing/InkEngine/history.ts', 'src/components/drawing/InkEngine/activeBounds.ts', 'src/components/drawing/InkEngine/presets.ts', 'src/components/drawing/InkEngine/toolMemory.ts', 'src/components/drawing/InkEngine/simplification.ts', 'src/components/drawing/InkEngine/nativeBridge.ts', 'src/components/drawing/InkEngine/geometry.ts', 'src/components/drawing/InkEngine/deviceProfile.ts', 'src/components/drawing/InkEngine/delegatedInk.ts', 'src/components/drawing/goodnotes/InkEngine.ts'], outdir: dir, bundle: true, platform: 'node', format: 'esm', outExtension: { '.js': '.mjs' } });
     const { actualSizePageView } = await import(pathToFileURL(join(dir, 'drawing/InkEngine/pageViewport.mjs')));
     for (const [page, canvas] of [
         [{x:0,y:0,w:794,h:1123},{w:1373,h:700}],
@@ -235,6 +235,104 @@ try {
     assert.equal(receivedStroke?.id, 'test-1');
     assert.equal(receivedStroke?.color, '#ff0000');
     unsub();
+
+    // ---- Ink v5: smart-board profile, centripetal centreline, capsule union ----
+    const { centripetalSpline, inkRadii, traceCapsules, traceCentreline } = await import(pathToFileURL(join(dir, 'drawing/InkEngine/geometry.mjs')));
+    const { detectInputProfile, INK_PROFILES } = await import(pathToFileURL(join(dir, 'drawing/InkEngine/deviceProfile.mjs')));
+    const { DelegatedInk, opaqueInkColor } = await import(pathToFileURL(join(dir, 'drawing/InkEngine/delegatedInk.mjs')));
+    const { interpolate } = await import(pathToFileURL(join(dir, 'drawing/goodnotes/InkEngine.mjs')));
+    const board = { screenWidth: 3840, maxTouchPoints: 20 }, tablet = { screenWidth: 1366, maxTouchPoints: 5 };
+    assert.equal(detectInputProfile({ pointerType: 'touch', pressure: 0 }, 'auto', tablet), 'board', 'touch ink uses the board profile');
+    assert.equal(detectInputProfile({ pointerType: 'pen', pressure: .5 }, 'auto', board), 'board', 'binary-pressure pen on a board');
+    assert.equal(detectInputProfile({ pointerType: 'pen', pressure: .37, tiltX: 20 }, 'auto', board), 'stylus');
+    assert.equal(detectInputProfile({ pointerType: 'pen', pressure: .5 }, 'auto', tablet), 'stylus', 'tablet midpoint pressure stays stylus');
+    assert.equal(detectInputProfile({ pointerType: 'touch', pressure: 0 }, 'off', board), 'stylus');
+    assert.equal(detectInputProfile({ pointerType: 'mouse', pressure: .5 }, 'on', tablet), 'board');
+    assert.ok(INK_PROFILES.board.palmContactPx > INK_PROFILES.stylus.palmContactPx);
+
+    // Deterministic IR-like jitter: slow horizontal writing at 90 Hz with ±2 px noise.
+    let seed = 7;
+    const noise = () => { seed = (seed * 16807) % 2147483647; return (seed / 2147483647 - .5) * 4; };
+    const touch = (t, x, y) => ({ pointerId: 2, pointerType: 'touch', timeStamp: t, clientX: x, clientY: y, pressure: 0, tiltX: 0, tiltY: 0, twist: 0 });
+    const jitterRms = (profile, smoothing = 1) => {
+        const input = new InkInput(smoothing, false, profile, 1);
+        seed = 7;
+        let sum = 0, n = 0;
+        for (let i = 0; i < 180; i++) {
+            const t = i * 11, x = 100 + i * .45, y = 200 + noise();
+            const p = input.sample(touch(t, x, y), { x, y });
+            if (p && i > 20) { sum += (p.y - 200) ** 2; n++; }
+            assert.ok(!input.corner || profile !== 'board', 'slow board jitter never forms corners');
+        }
+        return Math.sqrt(sum / n);
+    };
+    const stylusRms = jitterRms('stylus'), boardRms = jitterRms('board'), strongRms = jitterRms('board', 1.35);
+    assert.ok(boardRms < stylusRms * .65, `board profile removes jitter (${boardRms.toFixed(2)} vs ${stylusRms.toFixed(2)})`);
+    assert.ok(strongRms <= boardRms, 'stronger stabilisation is steadier');
+    {
+        // Fast strokes must not lag: One Euro raises the cutoff with speed.
+        const input = new InkInput(1, false, 'board', 1);
+        let last;
+        for (let i = 0; i < 40; i++) last = input.sample(touch(i * 11, i * 16, 0), { x: i * 16, y: 0 });
+        assert.ok(39 * 16 - last.x < 10, `fast board lag is bounded (${(39 * 16 - last.x).toFixed(1)} px)`);
+        // Filtering runs in screen space: the same hand motion at 2× zoom keeps the same screen lag.
+        const zoomed = new InkInput(1, false, 'board', 2);
+        let z;
+        for (let i = 0; i < 40; i++) z = zoomed.sample(touch(i * 11, i * 16, 0), { x: i * 8, y: 0 });
+        assert.ok(Math.abs((39 * 8 - z.x) * 2 - (39 * 16 - last.x)) < .5, 'zoom-independent filtering');
+        // A real, fast direction change still bypasses the filter.
+        const sharp = new InkInput(1, false, 'board', 1);
+        for (let i = 0; i < 10; i++) sharp.sample(touch(i * 11, i * 10, 0), { x: i * 10, y: 0 });
+        sharp.sample(touch(110, 90, 10), { x: 90, y: 10 });
+        assert.ok(sharp.corner, 'fast reversal is a corner');
+        assert.equal(sharp.fork().profile, 'board', 'forked prediction state keeps the profile');
+    }
+    const predictEvent = { ...event(100, 0), getPredictedEvents: () => [event(110), event(118), event(130)] };
+    assert.deepEqual(predictedSamples(predictEvent, 20).map(p => p.timeStamp), [110, 118], 'board prediction horizon');
+
+    // Fast hairpin (letter turnaround) with uneven spacing: uniform Catmull–Rom hooks past the tip.
+    const uneven = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 102, y: 1 }, { x: 100, y: 2 }, { x: 0, y: 2 }].map((p, i) => ({ ...p, p: .5, timestamp: i * 10 }));
+    const tip = line => Math.max(...line.map(p => p.x));
+    const centripetal = centripetalSpline(uneven);
+    assert.ok(tip(interpolate(uneven)) > 104, 'uniform spline overshoots the turn (reference)');
+    assert.ok(tip(centripetal) <= 102.5, `centripetal turn stays at the pen tip (${tip(centripetal).toFixed(2)})`);
+    for (const p of uneven) assert.ok(centripetal.some(q => q.x === p.x && q.y === p.y), 'spline passes through every sample');
+    assert.equal(centripetalSpline([{ x: 1, y: 1 }, { x: 1, y: 1 }, { x: 1, y: 1 }]).length, 1, 'repeated taps collapse to one point');
+
+    // Capsule union: finite, consistent winding, radii within the pen's bounds.
+    const record = () => { const calls = []; return { calls, moveTo: (x, y) => calls.push(['M', x, y]), lineTo: (x, y) => calls.push(['L', x, y]),
+        arc: (x, y, r, a, b, ccw) => calls.push(['A', x, y, r, a, b, ccw]), closePath: () => calls.push(['Z']) }; };
+    const loop = Array.from({ length: 60 }, (_, i) => { const a = i / 59 * Math.PI * 4; return { x: a * 3 - 5 * Math.sin(a), y: 5 * Math.cos(a), p: .3 + .6 * (i % 7) / 7, velocity: 300, timestamp: i * 8 }; });
+    for (const pen of ['fountain', 'brush']) {
+        const sink = record();
+        traceCapsules(sink, loop, { pen, width: 3, sharpness: .5, sensitivity: .65, complete: true });
+        assert.ok(sink.calls.length > 50 && sink.calls.every(c => c.slice(1).every(v => typeof v === 'boolean' || Number.isFinite(v))), `${pen}: finite capsules`);
+        assert.ok(sink.calls.filter(c => c[0] === 'A').every(c => c[6] === true), `${pen}: every arc shares one winding (no nonzero holes)`);
+        const radii = inkRadii(centripetalSpline(loop), { pen, width: 3, sharpness: .5, sensitivity: .65, complete: true });
+        assert.ok(radii.every(r => r >= 3 * .06 - 1e-9 && r <= 3 * 1.4 + 1e-9), `${pen}: radii stay within bounds`);
+    }
+    {
+        const dot = record();
+        traceCapsules(dot, [{ x: 5, y: 5, p: .5 }], { pen: 'fountain', width: 3, sharpness: .5, sensitivity: .65, complete: true });
+        assert.deepEqual(dot.calls.map(c => c[0]), ['M', 'A', 'Z'], 'single tap is a dot');
+        const line = record();
+        traceCentreline(line, loop);
+        assert.ok(line.calls[0][0] === 'M' && line.calls.slice(1).every(c => c[0] === 'L'), 'ballpoint centreline is a single open polyline');
+    }
+    globalThis.Path2D = class { moveTo() {} lineTo() {} arc() {} quadraticCurveTo() {} closePath() {} };
+    const { inkLineWidth } = await import(pathToFileURL(join(dir, 'drawing/penEngine.mjs')));
+    const v5 = { tool: 'pencil', color: '#000', width: 3, penType: 'ballpoint', inkVersion: 5, points: loop };
+    assert.equal(inkLineWidth(v5, 3), 3, 'v5 ballpoint renders as a stroked line');
+    assert.equal(inkLineWidth({ ...v5, penType: 'fountain' }, 3), null, 'v5 fountain renders as a filled union');
+    assert.equal(inkLineWidth({ ...v5, inkVersion: 4 }, 3), null, 'older strokes keep their renderer');
+    assert.ok(getInkPath(v5, 3) && getInkPath(v5, 3) === getInkPath(v5, 3), 'v5 paths use the geometry cache');
+    delete globalThis.Path2D;
+    assert.deepEqual(decodePages(encodePages([{ strokes: [v5], boxes: [] }]))[0].strokes[0].inkVersion, 5, 'v5 survives save/load');
+
+    assert.ok(opaqueInkColor('#1a2b3c') && opaqueInkColor('#abc') && !opaqueInkColor('#1a2b3c80') && !opaqueInkColor('rgba(0,0,0,.5)'));
+    const trail = new DelegatedInk();
+    trail.update({ isTrusted: false, type: 'pointermove' }, '#000000', 3);
+    assert.equal(trail.active, false, 'no presenter without the Ink API');
 
     const start = performance.now();
     for (let stroke = 0; stroke < 1000; stroke++) {

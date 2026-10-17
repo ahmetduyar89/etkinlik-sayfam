@@ -6,6 +6,7 @@ import { widthFactor, nibFactor } from './InkEngine/physics';
 import { ribbonOutline, outlinePath } from './goodnotes/InkEngine';
 import { isGoodnotesPen } from './goodnotes/types';
 import { renderGraphite } from './InkEngine/graphite';
+import { isConstantWidth, traceCapsules, traceCentreline } from './InkEngine/geometry';
 
 export interface PenProfile {
     id: PenType;
@@ -458,6 +459,15 @@ export function getInkPath(stroke: Stroke, baseWidth: number): Path2D | null {
         cached.width === baseWidth && cached.pen === stroke.penType && cached.version === stroke.inkVersion &&
         cached.sensitivity === stroke.pressureSensitivity && cached.sharpness === stroke.tipSharpness &&
         cached.response === stroke.pressureResponse && cached.complete === stroke.inkComplete && cached.tail === tail) return cached.path;
+    if (stroke.inkVersion === 5 && isGoodnotesPen(stroke.penType)) {
+        const path = new Path2D();
+        if (isConstantWidth(stroke.penType)) traceCentreline(path, stroke.points);
+        else traceCapsules(path, stroke.points, { pen: stroke.penType, width: baseWidth, sharpness: stroke.tipSharpness ?? .5,
+            sensitivity: stroke.pressureResponse ?? .65, complete: stroke.inkComplete ?? false });
+        inkPaths.set(stroke, { points: stroke.points, count: stroke.points.length, width: baseWidth,
+            pen: stroke.penType, version: stroke.inkVersion, sensitivity: stroke.pressureSensitivity, sharpness: stroke.tipSharpness, response: stroke.pressureResponse, complete: stroke.inkComplete, tail, path });
+        return path;
+    }
     const modern = (stroke.inkVersion === 3 || stroke.inkVersion === 4) && isGoodnotesPen(stroke.penType);
     const outline = modern ? ribbonOutline(stroke.points, {pen: isGoodnotesPen(stroke.penType) ? stroke.penType : 'ballpoint',
         width: baseWidth, sharpness: stroke.tipSharpness ?? .5, sensitivity: stroke.pressureResponse ?? .65,
@@ -480,9 +490,23 @@ export function getInkPath(stroke: Stroke, baseWidth: number): Path2D | null {
     return path;
 }
 
+/** v5 constant-width ink is a stroked centreline; returns null for filled outlines. */
+export function inkLineWidth(stroke: Stroke, baseWidth: number): number | null {
+    return stroke.inkVersion === 5 && stroke.penType === 'ballpoint' ? baseWidth : null;
+}
+
 export function renderFreehandStroke(ctx: CanvasRenderingContext2D, stroke: Stroke, baseWidth: number): void {
     const path = getInkPath(stroke, baseWidth);
     if (!path) return;
+    const lineWidth = inkLineWidth(stroke, baseWidth);
+    if (lineWidth !== null) {
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = ctx.fillStyle;
+        ctx.stroke(path);
+        return;
+    }
     if (stroke.penType === 'graphite' && stroke.inkVersion === 2) renderGraphite(ctx, stroke, baseWidth, path);
     else ctx.fill(path);
 }
