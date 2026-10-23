@@ -64,10 +64,14 @@ async function loadFirebase() {
   try {
     // Kalıcı önbellek: bekleyen yazımlar sayfa kapansa da cihazda kalır.
     // Okul ağları akış bağlantısını sık keser; uzun yoklamaya kendiliğinden geçer.
+    // Tek sekme yöneticisi: çok sekmeli yöneticide sunucuya yalnız "birincil"
+    // sekme bağlanır; Safari'de bu seçim takılınca sekme hiç sunucu görüntüsü
+    // almıyor, yazımlar sonsuza dek bekliyordu. Önbellek başka sekmedeyse SDK
+    // bu sekmeyi kendiliğinden bellek önbelleğiyle doğrudan bağlar.
     db = storeSdk.initializeFirestore(app, {
       ignoreUndefinedProperties: true,
       ...(forceLongPolling() ? { experimentalForceLongPolling: true } : { experimentalAutoDetectLongPolling: true }),
-      localCache: storeSdk.persistentLocalCache({ tabManager: storeSdk.persistentMultipleTabManager() })
+      localCache: storeSdk.persistentLocalCache({ tabManager: storeSdk.persistentSingleTabManager({}) })
     });
   } catch {
     db = storeSdk.getFirestore(app);
