@@ -20,6 +20,46 @@ import { RESULT_POINTS, tally, rankRows, pairRound } from "./SwissPairing.js";
 const KEY = "satranc-okulu-siniflar";
 const VERSION = 1;
 
+/**
+ * Oyunun kazananını belirleme kuralı. Mat, pes etme ve anlaşmalı beraberlik
+ * her kuralda geçerlidir; kurallar yalnızca oyun böyle bitmediğinde kimin
+ * kazanacağını söyler.
+ *
+ *   • sure      — Gerçek satranç: süresi biten kaybeder.
+ *   • sure-puan — Süre bitince tahtada taş puanı fazla olan kazanır; puanlar
+ *                 eşitse süresi biten kaybeder. Öğretmen oyunu istediği an
+ *                 puanla da bitirebilir.
+ *   • puan      — Saat yok: öğretmen oyunu bitirince taş puanı fazla olan
+ *                 kazanır, eşitse berabere.
+ *
+ * Bu alan eklenmeden önce oluşturulan turnuvalar "sure" sayılır.
+ */
+export const WIN_RULES = [
+  {
+    id: "sure",
+    label: "Sadece süre",
+    icon: "⏱",
+    detail: "Gerçek satranç kuralı: mat eden ya da rakibinin süresi biten kazanır."
+  },
+  {
+    id: "sure-puan",
+    label: "Süre + puan",
+    icon: "⏱⚖",
+    detail: "Süre bitince taş puanı fazla olan kazanır; puanlar eşitse süresi biten kaybeder."
+  },
+  {
+    id: "puan",
+    label: "Sadece puan",
+    icon: "⚖",
+    detail: "Saat kullanılmaz. Oyun bitirildiğinde taş puanı fazla olan kazanır; eşitse berabere."
+  }
+];
+
+/** Kayıttaki kuralı döndürür; bilinmeyen ya da eski kayıt "sure" sayılır. */
+export function winRuleOf(id) {
+  return WIN_RULES.find((rule) => rule.id === id) || WIN_RULES[0];
+}
+
 /** Kısa, çakışması pratikte imkânsız kimlik. */
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
@@ -307,7 +347,7 @@ export class ClassroomService {
     return this.state.tournaments.find((t) => t.id === id) || null;
   }
 
-  createTournament({ classId, name, rounds, playerIds, showMoveHints = true, requireTouchMove = false }) {
+  createTournament({ classId, name, rounds, playerIds, showMoveHints = true, requireTouchMove = false, winRule = "sure" }) {
     if (!this.getClass(classId) || playerIds.length < 2) return null;
     // Başlangıç sırası (seed) kurada belirlenir: öğrencilerin reytingi yok ve
     // alfabetik sıra hep aynı çocukları ilk turda karşılaştırırdı.
@@ -320,6 +360,7 @@ export class ClassroomService {
       plannedRounds: Math.max(1, Math.min(20, Number(rounds) || 1)),
       showMoveHints: showMoveHints !== false,
       requireTouchMove: requireTouchMove === true,
+      winRule: winRuleOf(winRule).id,
       playerIds: seeded,
       withdrawn: [],
       rounds: [],

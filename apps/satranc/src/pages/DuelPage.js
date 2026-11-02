@@ -34,7 +34,7 @@ import { pieceHTML } from "../components/PieceGlyph.js";
 import { burst } from "../animations/effects.js";
 import { pageShell, focusToggle } from "./pageUtils.js";
 import { navigate, routeParam } from "../utils/router.js";
-import { classroom } from "../services/ClassroomService.js";
+import { classroom, WIN_RULES, winRuleOf } from "../services/ClassroomService.js";
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const RANKS = [8, 7, 6, 5, 4, 3, 2, 1];
@@ -142,6 +142,8 @@ export function DuelPage({ sound }) {
   // oyunda öğretmen bu iki yardımı kurulum panelinden değiştirebilir.
   let showMoveHints = !tourBoard || tourBoard.tournament.showMoveHints !== false;
   let touchMoveRequired = tourBoard?.tournament.requireTouchMove === true;
+  // Kazananı belirleme kuralı da turnuvadan gelir; serbest oyunda seçilir.
+  let winRule = winRuleOf(tourBoard?.tournament.winRule).id;
 
   let savedMatch = null; // bu oyunun kaydı; oyun geri alınırsa silinir
   let tourRecorded = false; // turnuva masasına bir kez yazılır
@@ -449,6 +451,20 @@ export function DuelPage({ sound }) {
     timeoutLoser = color;
 
     const rival = color === "w" ? "b" : "w";
+
+    // Puanlı kurallarda süre bitince önce tahtadaki taş puanına bakılır.
+    if (winRule !== "sure") {
+      const leader = pointsLeader();
+      if (leader || winRule === "puan") {
+        endGame({
+          winner: leader,
+          reason: `Süre bitti! ${pointsLine()} — ${leader ? `${names[leader]} puanla kazandı.` : "puanlar eşit, beraberlik."}`
+        });
+        return;
+      }
+      // Süre + puan: puanlar eşitse karar yine saatindir.
+    }
+
     // FIDE kuralı: süre biter ama rakipte mat edecek taş yoksa oyun BERABERE
     // biter. Kimsenin kazanamayacağı bir konumda saat de kazandırmaz.
     const canMate = hasMatingMaterial(rival);
@@ -459,7 +475,7 @@ export function DuelPage({ sound }) {
       // "Beyaz Oyuncu" olduğu için "… oyuncunun" demek "Oyuncu oyuncunun"
       // gibi tuhaf bir cümle üretiyordu.
       reason: canMate
-        ? `Süre bitti! ${names[color]} için zaman kalmadı.`
+        ? `Süre bitti! ${names[color]} için zaman kalmadı.${winRule === "sure" ? "" : " (Taş puanları eşitti.)"}`
         : `Süre bitti ama ${names[rival]} mat edecek taşı olmadığı için kazanamaz — beraberlik.`
     });
   }
@@ -531,12 +547,30 @@ export function DuelPage({ sound }) {
    * Kalan taşları saymak her kuruluşta doğru cevabı verir.
    */
   function materialLead() {
-    let balance = 0;
+    const material = boardPoints();
+    return material.w - material.b;
+  }
+
+  /** Her tarafın tahtada KALAN taşlarının puan toplamı (şah sayılmaz). */
+  function boardPoints() {
+    const total = { w: 0, b: 0 };
     for (const piece of Object.values(chess.pieceMap())) {
       if (piece.type === "k") continue;
-      balance += (piece.color === "w" ? 1 : -1) * SIMPLE_VALUES[piece.type];
+      total[piece.color] += SIMPLE_VALUES[piece.type];
     }
-    return balance;
+    return total;
+  }
+
+  /** Taş puanı fazla olan taraf; eşitse null. */
+  function pointsLeader() {
+    const lead = materialLead();
+    return lead > 0 ? "w" : lead < 0 ? "b" : null;
+  }
+
+  /** "Taş puanı: Ali 31 – 27 Ayşe" — sonuç kartında hesabın görünmesi için. */
+  function pointsLine() {
+    const material = boardPoints();
+    return `Taş puanı: ${names.w} ${material.w} – ${material.b} ${names.b}`;
   }
 
   /** Biten oyunun maç puanını yazar (kazanan 1, beraberlik ½). */
@@ -878,6 +912,18 @@ export function DuelPage({ sound }) {
     endGame({ winner: null, reason: "Oyuncular beraberlikte anlaştı." });
   }
 
+  /** Puanlı kurallarda öğretmen oyunu bitirir; taş puanı fazla olan kazanır. */
+  function endByPoints() {
+    if (phase !== "play" || finished || winRule === "sure") return;
+    const leader = pointsLeader();
+    const verdict = leader ? `${names[leader]} kazanacak` : "puanlar eşit, beraberlik olacak";
+    if (!window.confirm(`Oyun taş puanıyla bitirilsin mi?\n${pointsLine()} — ${verdict}.`)) return;
+    endGame({
+      winner: leader,
+      reason: `Oyun puanla bitirildi. ${pointsLine()} — ${leader ? `${names[leader]} kazandı.` : "beraberlik."}`
+    });
+  }
+
   /** Hamle listesine yeni satır ekler. */
   function appendMove(move) {
     moveList.append(
@@ -1142,11 +1188,17 @@ export function DuelPage({ sound }) {
 
   /** Seçili temponun ne anlama geldiğini çocuk diliyle anlatır. */
   function timeHint() {
-    if (!timed()) return "Saat kapalı: iki oyuncu da istediği kadar düşünebilir.";
+    if (!timed()) {
+      return winRule === "sure"
+        ? "Saat kapalı: iki oyuncu da istediği kadar düşünebilir."
+        : "Saat kapalı: oyun “Puanla Bitir” ile bitirilince taş puanı fazla olan kazanır.";
+    }
     const mins = Math.floor(timeControl.base / 60);
     const secs = timeControl.base % 60;
     const baseStr = secs > 0 ? `${mins} dk ${secs} sn` : `${mins} dakika`;
-    const base = `Her oyuncuya ${baseStr}. Süresi biten oyunu kaybeder.`;
+    const base = `Her oyuncuya ${baseStr}. ` + (winRule === "sure"
+      ? "Süresi biten oyunu kaybeder."
+      : "Süre bitince taş puanı fazla olan kazanır; eşitse süresi biten kaybeder.");
     return timeControl.increment > 0
       ? `${base} Her hamleden sonra saatine ${timeControl.increment} saniye eklenir.`
       : base;
@@ -1377,6 +1429,53 @@ export function DuelPage({ sound }) {
 
   timeNote.textContent = timeHint();
 
+  /* --- Kurulum: kazananı belirleme kuralı --- */
+
+  const timeSection = el("div", { className: "duel-time-section" }, [
+    el("label", { className: "panel-label", text: "Satranç saati" }),
+    timeButtonsContainer,
+    customTimeBox,
+    timeNote
+  ]);
+  const ruleNote = el("p", { className: "duel-time-note" });
+
+  /** Kural değişince saat bölümünü ve açıklamaları uyarlar. */
+  function applyWinRule() {
+    const rule = winRuleOf(winRule);
+    for (const button of ruleButtons) button.classList.toggle("active", button.dataset.rule === winRule);
+    ruleNote.textContent = rule.detail + (tourBoard ? " Bu kural turnuva oluşturulurken belirlendi." : "");
+    // Sadece puan: saat kullanılmaz. Seçili bir tempo kalmışsa kapatılır.
+    timeSection.hidden = winRule === "puan";
+    if (winRule === "puan" && timed()) {
+      timeControl = TIME_CONTROLS[0];
+      customTimeBox.hidden = true;
+      for (const button of timeButtonsContainer.children) {
+        button.classList.toggle("active", button.dataset.time === timeControl.id);
+      }
+      resetClocks();
+    }
+    timeNote.textContent = timeHint();
+    pointsEndButton.hidden = winRule === "sure";
+  }
+
+  const ruleButtons = WIN_RULES.map((rule) =>
+    el("button", {
+      className: "seg-button",
+      type: "button",
+      "data-rule": rule.id,
+      title: rule.detail,
+      disabled: tourBoard ? "" : null,
+      onClick: () => {
+        winRule = rule.id;
+        sound.play("click");
+        applyWinRule();
+      }
+    }, [
+      el("strong", { text: rule.icon }),
+      el("small", { text: rule.label })
+    ])
+  );
+
   /** Oyuncu adı kutusu — sınıfta "Ali vs Ayşe" yazması oyunu ciddileştirir. */
   function nameInput(color) {
     return el("input", {
@@ -1541,10 +1640,10 @@ export function DuelPage({ sound }) {
     ]),
     el("label", { className: "panel-label", text: "Kim başlıyor?" }),
     el("div", { className: "segmented" }, turnButtons),
-    el("label", { className: "panel-label", text: "Satranç saati" }),
-    timeButtonsContainer,
-    customTimeBox,
-    timeNote,
+    el("label", { className: "panel-label", text: "Kazanan nasıl belirlensin?" }),
+    el("div", { className: "segmented duel-rule-picker" }, ruleButtons),
+    ruleNote,
+    timeSection,
     el("label", { className: "panel-label", text: "Yardım ve kurallar" }),
     assistanceOptions,
     el("label", { className: "panel-label", text: tourBoard ? "Turnuva masası" : "Oyuncular" }),
@@ -1582,6 +1681,14 @@ export function DuelPage({ sound }) {
   }
 
   const pauseButton = toolButton("pause", "Saati duraklat", () => togglePause());
+
+  const pointsEndButton = el("button", {
+    className: "ghost small",
+    type: "button",
+    text: "⚖️ Puanla Bitir",
+    title: "Oyunu şimdi bitir: tahtada taş puanı fazla olan kazanır",
+    onClick: () => endByPoints()
+  });
 
   const flipButton = toolButton("board", "Tahtayı çevir", () => {
     sound.play("click");
@@ -1633,7 +1740,8 @@ export function DuelPage({ sound }) {
     el("div", { className: "duel-end-row" }, [
       el("button", { className: "ghost small", type: "button", text: "🏳 Beyaz pes etti", onClick: () => resign("w") }),
       el("button", { className: "ghost small", type: "button", text: "🤝 Beraberlik", onClick: () => agreeDraw() }),
-      el("button", { className: "ghost small", type: "button", text: "🏳 Siyah pes etti", onClick: () => resign("b") })
+      el("button", { className: "ghost small", type: "button", text: "🏳 Siyah pes etti", onClick: () => resign("b") }),
+      pointsEndButton
     ]),
     moveList,
     resultHost
@@ -1664,6 +1772,7 @@ export function DuelPage({ sound }) {
   buildBoards();
   openSetup(null);
   updateRecordNote();
+  applyWinRule();
   // Turnuva maçı standart dizilişle başlar; çocuklar yine de düzenleyebilir.
   if (tourBoard) {
     setup = standardSetup();

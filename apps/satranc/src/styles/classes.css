@@ -354,6 +354,11 @@
   accent-color: var(--primary);
 }
 
+.tour-rules { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
+.tour-rules .tour-option { grid-column: auto; }
+.tour-rule:has(input:checked) { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent); }
+.tour-rule-note { font-weight: 600; color: var(--muted); line-height: 1.35; }
+
 .tour-option-copy { display: grid; gap: 0.15rem; }
 .tour-option-copy strong { font-size: 0.88rem; }
 .tour-option-copy small { color: var(--muted); line-height: 1.35; }
@@ -534,6 +539,7 @@
 @media (max-width: 560px) {
   .class-picker-select { max-width: 6.5rem; }
   .tour-form { grid-template-columns: 1fr; }
+  .tour-rules { grid-template-columns: 1fr; }
   .tour-board { grid-template-columns: 1fr; justify-items: stretch; }
   .tour-side.black { justify-content: flex-start; flex-direction: row-reverse; text-align: left; }
   .tour-results { justify-self: center; }

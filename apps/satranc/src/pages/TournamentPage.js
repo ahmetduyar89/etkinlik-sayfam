@@ -10,13 +10,16 @@
  *   3. Turun bütün sonuçları girilince sonraki tur eşleştirilir.
  *   4. Puan tablosu puan → Buchholz → galibiyet sırasıyla dizilir.
  *
+ * Tahtada oynanan oyunun kazananı turnuvada seçilen kurala göre belirlenir:
+ * sadece süre, süre + taş puanı ya da sadece taş puanı (bkz. WIN_RULES).
+ *
  * Bütün maçlar öğrencinin kişisel geçmişine de yazılır (bkz. Sınıflarım).
  */
 
 import { el } from "../utils/dom.js";
 import { navigate, routeParam } from "../utils/router.js";
 import { icon } from "../components/Icon.js";
-import { classroom } from "../services/ClassroomService.js";
+import { classroom, WIN_RULES, winRuleOf } from "../services/ClassroomService.js";
 import { suggestedRounds } from "../services/SwissPairing.js";
 import { pageShell } from "./pageUtils.js";
 import { pointsText, dateText } from "./ClassesPage.js";
@@ -90,6 +93,25 @@ export function TournamentPage({ sound }) {
       type: "checkbox",
       "aria-describedby": "tour-touch-move-note"
     });
+    let winRule = WIN_RULES[0].id;
+    const ruleOptions = WIN_RULES.map((rule) =>
+      el("label", { className: "tour-option tour-rule" }, [
+        el("input", {
+          type: "radio",
+          name: "tour-win-rule",
+          value: rule.id,
+          checked: rule.id === winRule ? "" : null,
+          onChange: () => {
+            winRule = rule.id;
+            sound.play("click");
+          }
+        }),
+        el("span", { className: "tour-option-copy" }, [
+          el("strong", { text: `${rule.icon} ${rule.label}` }),
+          el("small", { text: rule.detail })
+        ])
+      ])
+    );
     const countNote = el("span", { className: "class-hint" });
     const updateCount = () => {
       countNote.textContent = `${chosen.size} oyuncu · önerilen ${suggestedRounds(chosen.size)} tur` +
@@ -133,6 +155,14 @@ export function TournamentPage({ sound }) {
           : el("div", { className: "tour-form" }, [
               el("label", { className: "tour-field" }, [el("span", { text: "Turnuva adı" }), nameInput]),
               el("label", { className: "tour-field short" }, [el("span", { text: "Tur sayısı" }), roundsInput]),
+              el("div", { className: "tour-field wide", role: "radiogroup", "aria-label": "Kazanan nasıl belirlensin?" }, [
+                el("span", { text: "Kazanan nasıl belirlensin?" }),
+                el("div", { className: "tour-rules" }, ruleOptions),
+                el("small", {
+                  className: "tour-rule-note",
+                  text: "Her kuralda mat eden, rakibi pes eden kazanır; anlaşmalı beraberlik geçerlidir. Taş puanı: piyon 1, at ve fil 3, kale 5, vezir 9."
+                })
+              ]),
               el("label", { className: "tour-option wide" }, [
                 moveHintsInput,
                 el("span", { className: "tour-option-copy" }, [
@@ -178,6 +208,7 @@ export function TournamentPage({ sound }) {
                     rounds: roundsInput.value,
                     showMoveHints: moveHintsInput.checked,
                     requireTouchMove: touchMoveInput.checked,
+                    winRule,
                     playerIds: students.filter((student) => chosen.has(student.id)).map((student) => student.id)
                   });
                   classroom.pairNextRound(t.id);
@@ -260,7 +291,9 @@ export function TournamentPage({ sound }) {
         }),
         el("div", { className: "tour-head-title" }, [
           el("h2", { text: t.name }),
-          el("small", { text: `${dateText(t.createdAt)} · ${t.playerIds.length} oyuncu · Tur ${roundCount}/${t.plannedRounds} · İsviçre sistemi` })
+          el("small", {
+            text: `${dateText(t.createdAt)} · ${t.playerIds.length} oyuncu · Tur ${roundCount}/${t.plannedRounds} · İsviçre sistemi · Kazanan: ${winRuleOf(t.winRule).label.toLocaleLowerCase("tr")}`
+          })
         ]),
         el("div", { className: "class-row-buttons" }, [
           canPair
