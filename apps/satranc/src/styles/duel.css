@@ -633,3 +633,7 @@ body.focus-mode .duel-panel { padding: 0.7rem; }
 @media (min-width: 1500px) {
   .duel-layout { grid-template-columns: minmax(0, 1fr) 19rem; }
 }
+
+/* Turnuva masası: süre turnuvada belirlendi, değiştirilemez. */
+.duel-time-section.locked .time-btn:not(.active) { opacity: 0.45; }
+.duel-time-section.locked .time-btn { cursor: not-allowed; transform: none; }

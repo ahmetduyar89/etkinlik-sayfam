@@ -34,7 +34,7 @@ import { pieceHTML } from "../components/PieceGlyph.js";
 import { burst } from "../animations/effects.js";
 import { pageShell, focusToggle } from "./pageUtils.js";
 import { navigate, routeParam } from "../utils/router.js";
-import { classroom, WIN_RULES, winRuleOf } from "../services/ClassroomService.js";
+import { classroom, WIN_RULES, winRuleOf, normalizeTimeControl } from "../services/ClassroomService.js";
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const RANKS = [8, 7, 6, 5, 4, 3, 2, 1];
@@ -144,6 +144,8 @@ export function DuelPage({ sound }) {
   let touchMoveRequired = tourBoard?.tournament.requireTouchMove === true;
   // Kazananı belirleme kuralı da turnuvadan gelir; serbest oyunda seçilir.
   let winRule = winRuleOf(tourBoard?.tournament.winRule).id;
+  // Oyun süresi de turnuvada belirlenir (eski turnuvalarda yoktur → serbest).
+  const tourTime = tourBoard ? normalizeTimeControl(tourBoard.tournament.timeControl) : null;
 
   let savedMatch = null; // bu oyunun kaydı; oyun geri alınırsa silinir
   let tourRecorded = false; // turnuva masasına bir kez yazılır
@@ -1189,9 +1191,10 @@ export function DuelPage({ sound }) {
   /** Seçili temponun ne anlama geldiğini çocuk diliyle anlatır. */
   function timeHint() {
     if (!timed()) {
-      return winRule === "sure"
+      const text = winRule === "sure"
         ? "Saat kapalı: iki oyuncu da istediği kadar düşünebilir."
         : "Saat kapalı: oyun “Puanla Bitir” ile bitirilince taş puanı fazla olan kazanır.";
+      return tourTime ? `${text} Bu turnuvada süre kullanılmıyor.` : text;
     }
     const mins = Math.floor(timeControl.base / 60);
     const secs = timeControl.base % 60;
@@ -1199,9 +1202,10 @@ export function DuelPage({ sound }) {
     const base = `Her oyuncuya ${baseStr}. ` + (winRule === "sure"
       ? "Süresi biten oyunu kaybeder."
       : "Süre bitince taş puanı fazla olan kazanır; eşitse süresi biten kaybeder.");
-    return timeControl.increment > 0
+    const text = timeControl.increment > 0
       ? `${base} Her hamleden sonra saatine ${timeControl.increment} saniye eklenir.`
       : base;
+    return tourTime ? `${text} Bu süre turnuva oluşturulurken belirlendi.` : text;
   }
 
   const minutesInput = el("input", {
@@ -1475,6 +1479,30 @@ export function DuelPage({ sound }) {
       el("small", { text: rule.label })
     ])
   );
+
+  /**
+   * Turnuva masasında süre, turnuva oluşturulurken seçilen süreye ayarlanır
+   * ve kilitlenir: aynı turdaki bütün masalar aynı süreyle oynar.
+   */
+  function lockTournamentTime(tc) {
+    const preset = TIME_CONTROLS.find((option) => option.id !== "ozel" && option.base === tc.base && option.increment === tc.increment);
+    if (preset) {
+      timeControl = preset;
+      customTimeBox.hidden = true;
+      for (const button of timeButtonsContainer.children) {
+        button.classList.toggle("active", button.dataset.time === preset.id);
+      }
+      resetClocks();
+    } else {
+      customMinutes = Math.max(1, Math.round(tc.base / 60));
+      customIncrement = tc.increment;
+      applyCustomTime();
+      customTimeBox.hidden = true; // ayar kutusu kilitliyken açık kalmasın
+    }
+    for (const control of timeSection.querySelectorAll("button, input")) control.disabled = true;
+    timeSection.classList.add("locked");
+    timeNote.textContent = timeHint();
+  }
 
   /** Oyuncu adı kutusu — sınıfta "Ali vs Ayşe" yazması oyunu ciddileştirir. */
   function nameInput(color) {
@@ -1773,6 +1801,7 @@ export function DuelPage({ sound }) {
   openSetup(null);
   updateRecordNote();
   applyWinRule();
+  if (tourTime) lockTournamentTime(tourTime);
   // Turnuva maçı standart dizilişle başlar; çocuklar yine de düzenleyebilir.
   if (tourBoard) {
     setup = standardSetup();

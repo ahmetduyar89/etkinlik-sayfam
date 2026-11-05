@@ -12,6 +12,8 @@
  *
  * Tahtada oynanan oyunun kazananı turnuvada seçilen kurala göre belirlenir:
  * sadece süre, süre + taş puanı ya da sadece taş puanı (bkz. WIN_RULES).
+ * Oyunların süresi (ana süre + hamle başına ekleme) de burada belirlenir ve
+ * turnuva masasında değiştirilemez.
  *
  * Bütün maçlar öğrencinin kişisel geçmişine de yazılır (bkz. Sınıflarım).
  */
@@ -19,7 +21,7 @@
 import { el } from "../utils/dom.js";
 import { navigate, routeParam } from "../utils/router.js";
 import { icon } from "../components/Icon.js";
-import { classroom, WIN_RULES, winRuleOf } from "../services/ClassroomService.js";
+import { classroom, WIN_RULES, winRuleOf, timeControlText } from "../services/ClassroomService.js";
 import { suggestedRounds } from "../services/SwissPairing.js";
 import { pageShell } from "./pageUtils.js";
 import { pointsText, dateText } from "./ClassesPage.js";
@@ -104,6 +106,7 @@ export function TournamentPage({ sound }) {
           onChange: () => {
             winRule = rule.id;
             sound.play("click");
+            updateTimeField();
           }
         }),
         el("span", { className: "tour-option-copy" }, [
@@ -112,6 +115,87 @@ export function TournamentPage({ sound }) {
         ])
       ])
     );
+
+    /* --- Oyun süresi --- */
+    const TIME_PRESETS = [
+      { id: "yok", label: "Süresiz", detail: "Saat yok", base: 0, increment: 0 },
+      { id: "5", label: "5 dk", detail: "Yıldırım", base: 300, increment: 0 },
+      { id: "10", label: "10 dk", detail: "Hızlı", base: 600, increment: 0 },
+      { id: "15+10", label: "15 + 10", detail: "Turnuva", base: 900, increment: 10 },
+      { id: "ozel", label: "Özel", detail: "Kendin belirle", base: null, increment: null }
+    ];
+    let timePreset = "10";
+    const customMinutesInput = el("input", {
+      className: "class-input tour-time-input",
+      type: "number",
+      min: "1",
+      max: "180",
+      value: "10",
+      "aria-label": "Ana süre (dakika)",
+      onInput: () => updateTimeField()
+    });
+    const customIncrementInput = el("input", {
+      className: "class-input tour-time-input",
+      type: "number",
+      min: "0",
+      max: "60",
+      value: "0",
+      "aria-label": "Hamle başına ekleme (saniye)",
+      onInput: () => updateTimeField()
+    });
+    const customTimeRow = el("div", { className: "tour-time-custom", hidden: "" }, [
+      el("label", {}, [el("span", { text: "Ana süre (dk)" }), customMinutesInput]),
+      el("label", {}, [el("span", { text: "Hamle başına ekleme (sn)" }), customIncrementInput])
+    ]);
+    const timeOptions = TIME_PRESETS.map((preset) =>
+      el("label", { className: "tour-option tour-rule tour-time" }, [
+        el("input", {
+          type: "radio",
+          name: "tour-time",
+          value: preset.id,
+          checked: preset.id === timePreset ? "" : null,
+          onChange: () => {
+            timePreset = preset.id;
+            sound.play("click");
+            updateTimeField();
+          }
+        }),
+        el("span", { className: "tour-option-copy" }, [
+          el("strong", { text: preset.label }),
+          el("small", { text: preset.detail })
+        ])
+      ])
+    );
+    const timeNote = el("small", { className: "tour-rule-note" });
+    const timeField = el("div", { className: "tour-field wide", role: "radiogroup", "aria-label": "Oyun süresi" }, [
+      el("span", { text: "Oyun süresi (her oyuncuya)" }),
+      el("div", { className: "tour-times" }, timeOptions),
+      customTimeRow,
+      timeNote
+    ]);
+    /** Seçili süreyi { base, increment } (saniye) olarak verir. */
+    function chosenTimeControl() {
+      if (timePreset === "ozel") {
+        const mins = Math.min(180, Math.max(1, parseInt(customMinutesInput.value, 10) || 1));
+        const inc = Math.min(60, Math.max(0, parseInt(customIncrementInput.value, 10) || 0));
+        return { base: mins * 60, increment: inc };
+      }
+      const preset = TIME_PRESETS.find((p) => p.id === timePreset);
+      return { base: preset.base, increment: preset.increment };
+    }
+    function updateTimeField() {
+      // Sadece puan kuralında saat kullanılmaz.
+      timeField.hidden = winRule === "puan";
+      customTimeRow.hidden = timePreset !== "ozel";
+      const tc = chosenTimeControl();
+      timeNote.textContent = tc.base === 0
+        ? "Saat kullanılmaz; oyuncular istediği kadar düşünebilir."
+        : `Her oyuncunun ${timeControlText(tc)} süresi olur` +
+          (tc.increment > 0 ? ` (her hamleden sonra saatine ${tc.increment} saniye eklenir).` : ".") +
+          " Süre turnuva masasında değiştirilemez.";
+    }
+    updateTimeField();
+
     const countNote = el("span", { className: "class-hint" });
     const updateCount = () => {
       countNote.textContent = `${chosen.size} oyuncu · önerilen ${suggestedRounds(chosen.size)} tur` +
@@ -163,6 +247,7 @@ export function TournamentPage({ sound }) {
                   text: "Her kuralda mat eden, rakibi pes eden kazanır; anlaşmalı beraberlik geçerlidir. Taş puanı: piyon 1, at ve fil 3, kale 5, vezir 9."
                 })
               ]),
+              timeField,
               el("label", { className: "tour-option wide" }, [
                 moveHintsInput,
                 el("span", { className: "tour-option-copy" }, [
@@ -209,6 +294,7 @@ export function TournamentPage({ sound }) {
                     showMoveHints: moveHintsInput.checked,
                     requireTouchMove: touchMoveInput.checked,
                     winRule,
+                    timeControl: chosenTimeControl(),
                     playerIds: students.filter((student) => chosen.has(student.id)).map((student) => student.id)
                   });
                   classroom.pairNextRound(t.id);
@@ -292,7 +378,8 @@ export function TournamentPage({ sound }) {
         el("div", { className: "tour-head-title" }, [
           el("h2", { text: t.name }),
           el("small", {
-            text: `${dateText(t.createdAt)} · ${t.playerIds.length} oyuncu · Tur ${roundCount}/${t.plannedRounds} · İsviçre sistemi · Kazanan: ${winRuleOf(t.winRule).label.toLocaleLowerCase("tr")}`
+            text: `${dateText(t.createdAt)} · ${t.playerIds.length} oyuncu · Tur ${roundCount}/${t.plannedRounds} · İsviçre sistemi · Kazanan: ${winRuleOf(t.winRule).label.toLocaleLowerCase("tr")}` +
+              (t.timeControl ? ` · Süre: ${timeControlText(t.timeControl).toLocaleLowerCase("tr")}` : "")
           })
         ]),
         el("div", { className: "class-row-buttons" }, [
