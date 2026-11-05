@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Geri Dönüşüm Kahramanı: Atıkları Ayır! | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'sans-serif'],
+            display: ['Baloo 2', 'cursive'],
+          },
+          colors: {
+            bgMain: '#fffbeb',
+            ink: '#0f172a',
+            ecoGreen: '#16a34a',
+          },
+          borderWidth: { '3': '3px' },
+          boxShadow: {
+            'hard': '4px 4px 0px #0f172a',
+            'hard-sm': '2px 2px 0px #0f172a',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky {
+      border: 3.5px solid #0f172a;
+      border-radius: 1.25rem;
+      box-shadow: 4px 4px 0px #0f172a;
+    }
+    .pushable {
+      border: 3px solid #0f172a;
+      border-radius: 0.85rem;
+      box-shadow: 3px 3px 0px #0f172a;
+      transition: all 0.12s ease;
+      cursor: pointer;
+    }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .active-tab {
+      background-color: #facc15 !important;
+      color: #0f172a !important;
+      border-color: #0f172a !important;
+    }
+
+    /* Konveyör bant */
+    @keyframes beltMove {
+      from { background-position: 0 0; }
+      to { background-position: 40px 0; }
+    }
+    .belt {
+      background-color: #334155;
+      background-image: repeating-linear-gradient(90deg, #475569 0 18px, #334155 18px 40px);
+      animation: beltMove 0.8s linear infinite;
+      animation-play-state: paused;
+    }
+    .belt.running { animation-play-state: running; }
+
+    .waste-item {
+      position: absolute;
+      left: 0; top: 0;
+      width: 72px;
+      touch-action: none;
+      cursor: grab;
+      z-index: 10;
+    }
+    .waste-item.dragging { cursor: grabbing; z-index: 40; }
+    .waste-item .tile {
+      background: #ffffff;
+      border: 3px solid #0f172a;
+      border-radius: 1rem;
+      box-shadow: 3px 3px 0 #0f172a;
+      height: 60px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 34px;
+      transition: box-shadow 0.1s, transform 0.1s;
+    }
+    .waste-item.selected .tile {
+      background: #fef08a;
+      box-shadow: 0 0 0 4px #facc15, 3px 3px 0 #0f172a;
+      transform: scale(1.08);
+    }
+    .waste-item .name {
+      margin-top: 3px;
+      font-size: 10px; font-weight: 900; line-height: 1.1;
+      text-align: center;
+      background: rgba(255,255,255,0.95);
+      border: 2px solid #0f172a;
+      border-radius: 8px;
+      padding: 1px 3px;
+    }
+    .bin {
+      border: 3px solid #0f172a;
+      border-radius: 0.5rem 0.5rem 1rem 1rem;
+      box-shadow: 3px 3px 0 #0f172a;
+      cursor: pointer;
+      transition: transform 0.12s;
+    }
+    .bin.hot { transform: translateY(-6px) scale(1.05); }
+    .bin-lid {
+      border: 3px solid #0f172a;
+      border-radius: 0.6rem;
+      transform-origin: 10% 100%;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <!-- Üst Başlık -->
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-ink text-sm font-black flex items-center gap-1">
+        <span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span>
+      </a>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">♻️</span>
+          <h1 class="display text-lg sm:text-2xl font-black text-ink tracking-wide">
+            Geri Dönüşüm Kahramanı
+          </h1>
+        </div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">
+          Banttan gelen atıkları doğru kutulara ayır, doğayı koru! 🌍💚
+        </p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab flex items-center gap-1">
+          <span>🎯</span> <span>1. Ayırma Bandı</span>
+        </button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white text-ink flex items-center gap-1">
+          <span>🏭</span> <span>2. Dönüşüm Fabrikası</span>
+        </button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black flex items-center gap-1" title="Sesi Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <!-- SOL PANEL -->
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3 relative">
+
+        <!-- Seviye Çubuğu -->
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black text-ink shadow-sm">SEVİYE 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black text-ink">Kâğıt mı, Plastik mi?</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <!-- OYUN SAHNESİ -->
+        <div id="stage" class="relative w-full rounded-2xl border-3 border-ink overflow-hidden select-none shadow-inner" style="height: 400px; background: linear-gradient(#bae6fd 0%, #e0f2fe 45%, #dcfce7 45%, #bbf7d0 100%);">
+
+          <!-- Üst HUD -->
+          <div class="absolute top-2 left-2 right-2 flex items-center justify-between gap-2 z-30 pointer-events-none">
+            <div class="bg-white/95 px-2.5 py-1 rounded-xl border-2 border-ink text-xs font-black shadow-sm flex items-center gap-1">
+              <span id="hearts">❤️❤️❤️</span>
+            </div>
+            <div class="bg-white/95 px-2.5 py-1 rounded-xl border-2 border-ink text-xs font-black shadow-sm flex items-center gap-2">
+              <span>📦 <span id="progressText">0/8</span></span>
+              <span id="comboText" class="text-orange-600"></span>
+            </div>
+          </div>
+
+          <!-- Fabrika süsü -->
+          <div class="absolute left-3 top-12 text-4xl pointer-events-none">🏭</div>
+          <div class="absolute right-4 top-12 text-3xl pointer-events-none">🌳</div>
+
+          <!-- Konveyör Bant -->
+          <div class="absolute left-0 right-0" style="top: 150px;">
+            <div id="belt" class="belt h-5 border-y-3 border-ink"></div>
+            <div class="flex justify-between px-3 -mt-2.5">
+              <span class="w-5 h-5 rounded-full bg-slate-400 border-2 border-ink"></span>
+              <span class="w-5 h-5 rounded-full bg-slate-400 border-2 border-ink"></span>
+              <span class="w-5 h-5 rounded-full bg-slate-400 border-2 border-ink"></span>
+              <span class="w-5 h-5 rounded-full bg-slate-400 border-2 border-ink"></span>
+              <span class="w-5 h-5 rounded-full bg-slate-400 border-2 border-ink"></span>
+            </div>
+          </div>
+          <!-- Bant sonu: çöp yığını -->
+          <div class="absolute right-1 text-2xl pointer-events-none" style="top: 172px;">🗑️</div>
+
+          <!-- Ayırma Kutuları -->
+          <div id="bins" class="absolute left-2 right-2 bottom-2 flex items-end justify-center gap-1.5 sm:gap-2 z-20"></div>
+
+          <!-- Geri bildirim balonu -->
+          <div id="toast" class="absolute left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-xl border-3 border-ink bg-white text-xs sm:text-sm font-black shadow-hard-sm text-center hidden" style="top: 44px; max-width: 90%;"></div>
+
+          <!-- Başlat katmanı -->
+          <div id="startOverlay" class="absolute inset-0 z-50 bg-ink/50 flex items-center justify-center p-4">
+            <div class="chunky bg-white p-5 max-w-sm w-full text-center">
+              <div class="text-4xl mb-1">♻️</div>
+              <h3 id="startTitle" class="display text-xl font-black text-ink">Seviye 1</h3>
+              <p id="startText" class="text-xs font-bold text-gray-700 mt-1 mb-3"></p>
+              <div id="startBins" class="flex justify-center gap-1.5 flex-wrap mb-3"></div>
+              <p class="text-[11px] font-bold text-gray-500 mb-3">👆 Atığı sürükleyip kutuya bırak <b>ya da</b> önce atığa, sonra kutuya dokun.</p>
+              <button id="btnStart" class="pushable w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white display text-base font-black">▶️ Bandı Çalıştır</button>
+            </div>
+          </div>
+
+          <!-- DÖNÜŞÜM FABRİKASI (Test Masası) -->
+          <div id="factory" class="absolute inset-0 z-50 bg-white hidden flex-col p-3 sm:p-4" style="min-height: 400px;">
+            <p class="text-xs font-black text-gray-700 mb-2">🏭 Bir atık türü seç, fabrikada neye dönüştüğünü izle:</p>
+            <div id="factoryPicker" class="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-3"></div>
+            <div id="factoryView" class="flex-1 rounded-xl border-3 border-ink bg-emerald-50 p-3 flex flex-col gap-3">
+              <p class="text-sm font-black text-gray-500 text-center my-auto">👆 Yukarıdan bir atık türü seç!</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- AKSİYON BUTONLARI -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <div class="flex items-center gap-2">
+            <button id="btnPause" class="pushable px-3.5 py-2 bg-amber-100 hover:bg-amber-200 text-ink text-xs font-black flex items-center gap-1">
+              <span>⏸️</span> <span id="pauseText">Duraklat</span>
+            </button>
+            <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-ink text-xs font-black flex items-center gap-1">
+              <span>🔄</span> <span>Baştan Başla</span>
+            </button>
+          </div>
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black flex items-center gap-1">
+            <span>💡</span> <span>İpucu</span>
+          </button>
+        </div>
+
+        <!-- BİLİM NOTU -->
+        <div class="p-3 bg-gradient-to-r from-emerald-50 to-lime-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shadow-sm shrink-0">🌱</span>
+          <div class="text-xs">
+            <p class="font-black text-ink">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">
+              Atıkları türlerine göre ayırırsak fabrikalar onları eritip, ezip yeni ürünlere dönüştürebilir. Böylece daha az ağaç kesilir, daha az maden çıkarılır ve daha az çöp birikir!
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- SAĞ PANEL -->
+    <div class="lg:col-span-5 flex flex-col gap-3">
+
+      <!-- GÖREVLER -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🎯</span>
+            <h3 class="display text-base font-black text-ink">Çevre Kahramanı Görevleri</h3>
+          </div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <!-- GÖSTERGELER -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">📊</span>
+            <h3 class="display text-base font-black text-ink">Ayırma Tablosu</h3>
+          </div>
+          <span class="text-xs font-bold text-gray-500" id="accuracyText">İsabet: -</span>
+        </div>
+        <div id="statBars" class="space-y-1.5"></div>
+      </div>
+
+      <!-- FEN BİLGİSİ REHBERİ -->
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <span class="text-xl">📚</span>
+          <h3 class="display text-base font-black text-ink">Fen Bilgisi Rehberi</h3>
+        </div>
+        <div class="space-y-2 text-xs font-bold">
+          <div class="p-2 bg-emerald-50 rounded-lg border border-emerald-300">
+            <p class="text-emerald-900 font-extrabold">🌍 Önce Azalt, Sonra Dönüştür</p>
+            <p class="text-[11px] text-emerald-800 font-semibold mt-0.5"><b>1. Azalt:</b> İhtiyacın kadarını al. <b>2. Yeniden kullan:</b> Kavanozu kalemlik yap. <b>3. Geri dönüştür:</b> Atığı doğru kutuya at.</p>
+          </div>
+          <div class="p-2 bg-sky-50 rounded-lg border border-sky-300">
+            <p class="text-sky-900 font-extrabold">🎨 Sıfır Atık Kutu Renkleri</p>
+            <p class="text-[11px] text-sky-800 font-semibold mt-0.5"><b class="text-blue-600">Mavi</b>: kâğıt · <b class="text-yellow-600">Sarı</b>: plastik · <b class="text-green-600">Yeşil</b>: cam · <b class="text-slate-500">Gri</b>: metal · <b class="text-amber-800">Kahverengi</b>: organik atık</p>
+          </div>
+          <div class="p-2 bg-rose-50 rounded-lg border border-rose-300">
+            <p class="text-rose-900 font-extrabold">🔋 Piller Asla Çöpe Atılmaz!</p>
+            <p class="text-[11px] text-rose-800 font-semibold mt-0.5">Kullanılmış pillerin içindeki zararlı maddeler toprağa ve suya karışabilir. Pilleri okullardaki ve marketlerdeki <b>atık pil kutularına</b> at.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- SONUÇ PENCERESİ -->
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black text-ink">Bant Temizlendi!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-emerald-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-emerald-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-ink text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() {
+      if (!audioCtx) audioCtx = new AudioCtx();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(f1, t);
+        osc.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        gain.gain.setValueAtTime(vol, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(t); osc.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      pick() { tone('triangle', 500, 700, 0.06, 0.15); },
+      correct(combo) { const b = 600 + Math.min(combo, 8) * 60; tone('triangle', b, b * 1.5, 0.12, 0.22); },
+      wrong() { tone('sawtooth', 220, 110, 0.3, 0.18); },
+      miss() { tone('sine', 400, 150, 0.35, 0.18); },
+      machine() { tone('square', 90, 140, 0.25, 0.06); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); },
+      lose() { [392, 330, 262].forEach((f, i) => tone('triangle', f, f * 0.98, 0.25, 0.2, i * 0.18)); }
+    };
+
+    // --- 2. VERİLER ---
+    const BINS = {
+      kagit: { name: 'KÂĞIT', icon: '📄', color: '#3b82f6', light: '#dbeafe' },
+      plastik: { name: 'PLASTİK', icon: '🧴', color: '#facc15', light: '#fef9c3' },
+      cam: { name: 'CAM', icon: '🍾', color: '#22c55e', light: '#dcfce7' },
+      metal: { name: 'METAL', icon: '🥫', color: '#94a3b8', light: '#f1f5f9' },
+      organik: { name: 'ORGANİK', icon: '🍂', color: '#a16207', light: '#fef3c7' },
+      pil: { name: 'ATIK PİL', icon: '🔋', color: '#ef4444', light: '#fee2e2' }
+    };
+
+    const ITEMS = [
+      { e: '📰', n: 'Gazete', c: 'kagit' },
+      { e: '📦', n: 'Karton Kutu', c: 'kagit' },
+      { e: '📒', n: 'Eski Defter', c: 'kagit' },
+      { e: '✉️', n: 'Zarf', c: 'kagit' },
+      { e: '🧴', n: 'Şampuan Şişesi', c: 'plastik' },
+      { e: '🛍️', n: 'Plastik Poşet', c: 'plastik' },
+      { e: '🥤', n: 'Plastik Bardak', c: 'plastik' },
+      { e: '🪣', n: 'Plastik Kova', c: 'plastik' },
+      { e: '🍾', n: 'Cam Şişe', c: 'cam' },
+      { e: '🫙', n: 'Reçel Kavanozu', c: 'cam' },
+      { e: '🥫', n: 'Konserve Kutusu', c: 'metal' },
+      { e: '🔩', n: 'Eski Cıvata', c: 'metal' },
+      { e: '📎', n: 'Ataş', c: 'metal' },
+      { e: '🗝️', n: 'Eski Anahtar', c: 'metal' },
+      { e: '🍌', n: 'Muz Kabuğu', c: 'organik' },
+      { e: '🍎', n: 'Elma Koçanı', c: 'organik' },
+      { e: '🥚', n: 'Yumurta Kabuğu', c: 'organik' },
+      { e: '🍂', n: 'Kuru Yaprak', c: 'organik' },
+      { e: '🔋', n: 'Kullanılmış Pil', c: 'pil' },
+      { e: '🪫', n: 'Bitmiş Pil', c: 'pil' }
+    ];
+
+    const LEVELS = [
+      {
+        title: 'Kâğıt mı, Plastik mi?', bins: ['kagit', 'plastik'], count: 8, travel: 12, gap: 3.2,
+        intro: 'İlk görevin kolay: Kâğıt atıkları mavi kutuya, plastikleri sarı kutuya at!',
+        fact: 'Geri dönüştürülen kâğıtlar suyla karıştırılıp hamur yapılır. Bu hamurdan yeni defterler ve kartonlar üretilir. Böylece daha az ağaç kesilir.'
+      },
+      {
+        title: 'Cam Kutusu Geldi', bins: ['kagit', 'plastik', 'cam'], count: 10, travel: 11, gap: 2.9,
+        intro: 'Yeşil cam kutusu eklendi! Şişe ve kavanozlar kırılmadan yeşil kutuya gitmeli.',
+        fact: 'Cam, kalitesi bozulmadan tekrar tekrar geri dönüştürülebilir. Eski bir kavanoz eritilip yepyeni bir şişe olabilir!'
+      },
+      {
+        title: 'Metal Avcısı', bins: ['kagit', 'plastik', 'cam', 'metal'], count: 12, travel: 10, gap: 2.6,
+        intro: 'Gri metal kutusu da geldi. Konserve kutuları, ataşlar ve cıvatalar metal kutusuna!',
+        fact: 'Geri dönüşüm tesislerinde demir içeren atıklar dev <b>mıknatıslarla</b> diğer atıklardan ayrılır. Mıknatıs deneyini hatırladın mı?'
+      },
+      {
+        title: 'Kompost Bahçesi', bins: ['kagit', 'plastik', 'cam', 'metal', 'organik'], count: 14, travel: 9, gap: 2.3,
+        intro: 'Meyve ve sebze kabukları çöp değildir! Kahverengi organik kutusunda toprağa dönüşürler.',
+        fact: 'Organik atıklar kompost kutusunda solucanlar ve gözle göremediğimiz minik canlılar tarafından parçalanır. Birkaç ay içinde bitkiler için harika bir gübreye dönüşür.'
+      },
+      {
+        title: 'Süper Kahraman Bandı', bins: ['kagit', 'plastik', 'cam', 'metal', 'organik', 'pil'], count: 16, travel: 8, gap: 2.0,
+        intro: 'Son görev! Kırmızı atık pil kutusu da geldi. Bant hızlandı, dikkatli ol!',
+        fact: 'Kullanılmış piller özel tesislerde işlenir ve içlerindeki metaller güvenle geri kazanılır. Pilleri çöpe atmamak toprağı ve suyu korur.'
+      }
+    ];
+
+    const FACTORY = {
+      kagit: {
+        steps: [['🚛', 'Toplanır'], ['💧', 'Suyla karıştırılıp hamur olur'], ['🗜️', 'Preslenir ve kurutulur'], ['📓', 'Yeni defter ve karton olur']],
+        nature: 'Doğada birkaç hafta ile birkaç ay arasında yok olur.',
+        tip: 'Yağlı pizza kutusu gibi kirli kâğıtlar geri dönüştürülemez. Kâğıdı temiz ve kuru tut!'
+      },
+      plastik: {
+        steps: [['🚛', 'Toplanır'], ['🧼', 'Yıkanıp küçük parçalara kırpılır'], ['🔥', 'Eritilip tanecik yapılır'], ['🧥', 'Yeni kova, lif ve kumaş olur']],
+        nature: 'Doğada yüzlerce yıl kaybolmadan kalabilir!',
+        tip: 'Plastik şişeleri atmadan önce içini boşalt ve ez. Böylece kutuda daha az yer kaplar.'
+      },
+      cam: {
+        steps: [['🚛', 'Toplanır'], ['🎨', 'Rengine göre ayrılıp kırılır'], ['🔥', 'Çok yüksek sıcaklıkta eritilir'], ['🍾', 'Yeni şişe ve kavanoz olur']],
+        nature: 'Doğada binlerce yıl bozulmadan kalabilir.',
+        tip: 'Cam, tekrar tekrar geri dönüştürülebilen harika bir maddedir. Kavanozları yıkayıp kalemlik olarak yeniden de kullanabilirsin!'
+      },
+      metal: {
+        steps: [['🚛', 'Toplanır'], ['🧲', 'Mıknatısla demirler ayrılır'], ['🔥', 'Eritilip kalıplara dökülür'], ['🚲', 'Yeni kutu ve bisiklet parçası olur']],
+        nature: 'Doğada paslanarak onlarca, hatta yüzlerce yılda yok olur.',
+        tip: 'Metaller tekrar tekrar eritilip kullanılabilir. Maden çıkarmaya gerek kalmaz!'
+      },
+      organik: {
+        steps: [['🧺', 'Kompost kutusuna konur'], ['🪱', 'Solucanlar ve minik canlılar parçalar'], ['🟫', 'Birkaç ayda toprağa dönüşür'], ['🌻', 'Bitkiler için gübre olur']],
+        nature: 'Doğada birkaç hafta ile birkaç ay arasında toprağa karışır.',
+        tip: 'Pişmiş yemek ve et artıkları kompost kutusuna konmaz. Meyve ve sebze kabukları, yumurta kabuğu ve kuru yapraklar konur.'
+      },
+      pil: {
+        steps: [['📦', 'Atık pil kutusunda biriktirilir'], ['🚛', 'Özel tesise taşınır'], ['⚗️', 'İçindeki metaller güvenle ayrılır'], ['♻️', 'Metaller yeniden kullanılır']],
+        nature: 'Çöpe atılırsa zararlı maddeleri toprağa ve suya karışabilir!',
+        tip: 'Evde bir kavanozda bitmiş pilleri biriktir. Dolunca okulundaki atık pil kutusuna götür.'
+      }
+    };
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: Hatasız Başlangıç', text: '1. seviyeyi hiç can kaybetmeden bitir.' },
+      { id: 'm2', title: '2. Görev: Seri Ayırıcı', text: 'Art arda 6 atığı doğru kutuya at.' },
+      { id: 'm3', title: '3. Görev: Fabrika Müfettişi', text: 'Dönüşüm Fabrikasında 6 atık türünün hepsini incele.', progress: true },
+      { id: 'm4', title: '4. Görev: Geri Dönüşüm Kahramanı', text: '5 seviyenin hepsini tamamla.' }
+    ];
+
+    // --- 3. DURUM ---
+    const stageEl = document.getElementById('stage');
+    const binsEl = document.getElementById('bins');
+    let mode = 'levels';
+    let levelIndex = 0;
+    let running = false;
+    let paused = false;
+    let items = [];
+    let queue = [];
+    let spawnTimer = 0;
+    let hearts = 3;
+    let resolved = 0;
+    let mistakes = 0;
+    let combo = 0;
+    let score = 0;
+    let selected = null;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    const factorySeen = new Set();
+    const stats = {};
+    Object.keys(BINS).forEach(k => stats[k] = { ok: 0, bad: 0 });
+
+    // --- 4. KUTULAR ---
+    function renderBins(keys) {
+      binsEl.innerHTML = keys.map(k => {
+        const b = BINS[k];
+        return `<div class="bin-wrap flex-1 max-w-[92px] flex flex-col items-center" data-bin="${k}">
+          <div class="bin-lid w-[92%] h-3.5 -mb-0.5 relative z-10" style="background:${b.color}"></div>
+          <div class="bin w-full h-[88px] sm:h-[96px] flex flex-col items-center justify-center gap-0.5" style="background:${b.color}">
+            <span class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white border-2 border-ink flex items-center justify-center text-xl sm:text-2xl">${b.icon}</span>
+            <span class="text-[9px] sm:text-[10px] font-black text-ink bg-white/90 px-1 rounded border border-ink leading-tight text-center">${b.name}</span>
+            <span class="text-[10px]">♻️</span>
+          </div>
+        </div>`;
+      }).join('');
+      binsEl.querySelectorAll('.bin-wrap').forEach(w => {
+        w.addEventListener('click', () => {
+          if (selected && running && !paused) sortItem(selected, w.dataset.bin);
+        });
+      });
+    }
+
+    function binAt(clientX, clientY) {
+      let found = null;
+      binsEl.querySelectorAll('.bin-wrap').forEach(w => {
+        const r = w.getBoundingClientRect();
+        if (clientX >= r.left - 6 && clientX <= r.right + 6 && clientY >= r.top - 20 && clientY <= r.bottom + 6) found = w.dataset.bin;
+      });
+      return found;
+    }
+
+    function highlightBin(key) {
+      binsEl.querySelectorAll('.bin-wrap').forEach(w => {
+        w.querySelector('.bin').classList.toggle('hot', w.dataset.bin === key);
+      });
+    }
+
+    function binEl(key) { return binsEl.querySelector(`[data-bin="${key}"]`); }
+
+    // --- 5. ATIKLAR ---
+    const BELT_Y = 94;
+
+    function buildQueue(L) {
+      const pool = ITEMS.filter(it => L.bins.includes(it.c));
+      const q = [];
+      // Her kutudan en az bir atık gelsin
+      L.bins.forEach(b => {
+        const opts = pool.filter(p => p.c === b);
+        q.push(opts[Math.floor(Math.random() * opts.length)]);
+      });
+      while (q.length < L.count) q.push(pool[Math.floor(Math.random() * pool.length)]);
+      for (let i = q.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [q[i], q[j]] = [q[j], q[i]];
+      }
+      return q;
+    }
+
+    function spawnItem(data) {
+      const el = document.createElement('div');
+      el.className = 'waste-item';
+      el.innerHTML = `<div class="tile">${data.e}</div><div class="name">${data.n}</div>`;
+      stageEl.appendChild(el);
+      const it = { data, el, x: -80, y: BELT_Y, dragging: false, done: false };
+      setPos(it);
+      attachDrag(it);
+      items.push(it);
+      if (typeof gsap !== 'undefined') gsap.from(el.firstElementChild, { scale: 0.3, duration: 0.3, ease: 'back.out(2)' });
+    }
+
+    function setPos(it) {
+      it.el.style.transform = `translate(${it.x}px, ${it.y}px)`;
+    }
+
+    function attachDrag(it) {
+      let startX = 0, startY = 0, moved = false, offX = 0, offY = 0;
+      it.el.addEventListener('pointerdown', e => {
+        if (!running || paused || it.done) return;
+        e.preventDefault();
+        initAudio();
+        it.el.setPointerCapture(e.pointerId);
+        const sr = stageEl.getBoundingClientRect();
+        startX = e.clientX; startY = e.clientY; moved = false;
+        offX = e.clientX - sr.left - it.x;
+        offY = e.clientY - sr.top - it.y;
+        it.dragging = true;
+        it.el.classList.add('dragging');
+      });
+      it.el.addEventListener('pointermove', e => {
+        if (!it.dragging) return;
+        if (Math.hypot(e.clientX - startX, e.clientY - startY) > 6) moved = true;
+        if (!moved) return;
+        const sr = stageEl.getBoundingClientRect();
+        it.x = e.clientX - sr.left - offX;
+        it.y = e.clientY - sr.top - offY;
+        setPos(it);
+        highlightBin(binAt(e.clientX, e.clientY));
+      });
+      const end = e => {
+        if (!it.dragging) return;
+        it.dragging = false;
+        it.el.classList.remove('dragging');
+        highlightBin(null);
+        if (!moved) {
+          // Dokun-seç modu
+          if (selected === it) { selectItem(null); }
+          else { selectItem(it); Sound.pick(); }
+          return;
+        }
+        const bin = binAt(e.clientX, e.clientY);
+        if (bin) sortItem(it, bin);
+        else returnToBelt(it);
+      };
+      it.el.addEventListener('pointerup', end);
+      it.el.addEventListener('pointercancel', end);
+    }
+
+    function selectItem(it) {
+      items.forEach(i => i.el.classList.remove('selected'));
+      selected = it;
+      if (it) it.el.classList.add('selected');
+    }
+
+    function returnToBelt(it) {
+      if (typeof gsap !== 'undefined') {
+        it.busy = true;
+        gsap.to(it, { y: BELT_Y, duration: 0.25, ease: 'power2.out', onUpdate: () => setPos(it), onComplete: () => { it.busy = false; } });
+      } else {
+        it.y = BELT_Y; setPos(it);
+      }
+    }
+
+    function sortItem(it, binKey) {
+      if (it.done) return;
+      it.done = true;
+      if (selected === it) selectItem(null);
+      const correct = it.data.c === binKey;
+      const target = binEl(correct ? binKey : it.data.c) || binEl(binKey);
+      const sr = stageEl.getBoundingClientRect();
+      const br = target.getBoundingClientRect();
+      const tx = br.left - sr.left + br.width / 2 - 36;
+      const ty = br.top - sr.top - 10;
+
+      if (correct) {
+        combo++;
+        const gained = 10 * (1 + Math.floor(combo / 3));
+        score += gained;
+        stats[binKey].ok++;
+        Sound.correct(combo);
+        floatText(`+${gained}`, tx + 36, ty - 10, '#16a34a');
+        if (combo >= 6) completeMission('m2');
+      } else {
+        combo = 0;
+        hearts--;
+        mistakes++;
+        stats[it.data.c].bad++;
+        Sound.wrong();
+        const w = binEl(binKey).querySelector('.bin');
+        if (typeof gsap !== 'undefined') gsap.fromTo(w, { x: -6 }, { x: 0, duration: 0.4, ease: 'elastic.out(4, 0.2)' });
+        showToast(`${it.data.e} <b>${it.data.n}</b> ${BINS[binKey].name} değil! <span style="color:${BINS[it.data.c].color === '#facc15' ? '#a16207' : BINS[it.data.c].color}">${BINS[it.data.c].name}</span> kutusuna gider.`, '#fee2e2');
+      }
+
+      const lid = target.querySelector('.bin-lid');
+      if (typeof gsap !== 'undefined') {
+        gsap.to(lid, { rotate: -35, duration: 0.15, yoyo: true, repeat: 1 });
+        gsap.to(it, {
+          x: tx, y: ty, duration: correct ? 0.3 : 0.6, ease: 'power2.in',
+          onUpdate: () => setPos(it),
+          onComplete: () => {
+            gsap.to(it.el, { scale: 0.2, opacity: 0, duration: 0.2, onComplete: () => removeItem(it) });
+          }
+        });
+      } else {
+        removeItem(it);
+      }
+      resolved++;
+      updateHud();
+      if (hearts <= 0) gameOver();
+    }
+
+    function removeItem(it) {
+      it.el.remove();
+      items = items.filter(i => i !== it);
+      checkLevelEnd();
+    }
+
+    function missItem(it) {
+      it.done = true;
+      if (selected === it) selectItem(null);
+      combo = 0;
+      hearts--;
+      mistakes++;
+      stats[it.data.c].bad++;
+      resolved++;
+      Sound.miss();
+      showToast(`Kaçırdın! ${it.data.e} <b>${it.data.n}</b> çöpe gitti. ${BINS[it.data.c].name} kutusuna atılmalıydı.`, '#ffedd5');
+      if (typeof gsap !== 'undefined') {
+        gsap.to(it, { y: it.y + 40, duration: 0.3, onUpdate: () => setPos(it) });
+        gsap.to(it.el, { opacity: 0, rotate: 40, duration: 0.3, onComplete: () => removeItem(it) });
+      } else removeItem(it);
+      updateHud();
+      if (hearts <= 0) gameOver();
+    }
+
+    function floatText(txt, x, y, color) {
+      const d = document.createElement('div');
+      d.className = 'absolute z-40 display font-black text-xl pointer-events-none';
+      d.style.left = `${x}px`; d.style.top = `${y}px`; d.style.color = color;
+      d.style.textShadow = '2px 2px 0 #0f172a';
+      d.textContent = txt;
+      stageEl.appendChild(d);
+      if (typeof gsap !== 'undefined') gsap.to(d, { y: -40, opacity: 0, duration: 0.9, onComplete: () => d.remove() });
+      else setTimeout(() => d.remove(), 900);
+    }
+
+    let toastTimer = null;
+    function showToast(html, bg) {
+      const t = document.getElementById('toast');
+      t.innerHTML = html;
+      t.style.background = bg;
+      t.classList.remove('hidden');
+      if (typeof gsap !== 'undefined') gsap.fromTo(t, { scale: 0.8 }, { scale: 1, duration: 0.25, ease: 'back.out(2)' });
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.add('hidden'), 2600);
+    }
+
+    // --- 6. OYUN DÖNGÜSÜ ---
+    let last = performance.now();
+    function loop(now) {
+      const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+      last = now;
+      if (running && !paused) {
+        const L = LEVELS[levelIndex];
+        const W = stageEl.clientWidth;
+        const speed = (W + 80) / L.travel;
+        spawnTimer -= dt;
+        if (queue.length && (spawnTimer <= 0 || items.length === 0)) {
+          spawnItem(queue.shift());
+          spawnTimer = L.gap;
+          updateHud();
+        }
+        items.forEach(it => {
+          if (it.dragging || it.done || it.busy) return;
+          it.x += speed * dt;
+          setPos(it);
+          if (it.x > W - 40) missItem(it);
+        });
+      }
+      requestAnimationFrame(loop);
+    }
+
+    function checkLevelEnd() {
+      if (!running) return;
+      if (queue.length === 0 && items.length === 0 && hearts > 0) {
+        running = false;
+        document.getElementById('belt').classList.remove('running');
+        winLevel();
+      }
+    }
+
+    function updateHud() {
+      const L = LEVELS[levelIndex];
+      document.getElementById('hearts').textContent = '❤️'.repeat(Math.max(0, hearts)) + '🤍'.repeat(3 - Math.max(0, hearts));
+      document.getElementById('progressText').textContent = `${resolved}/${L.count}`;
+      document.getElementById('comboText').textContent = combo >= 3 ? `🔥 x${1 + Math.floor(combo / 3)} SERİ` : '';
+      document.getElementById('scoreBadge').textContent = `${score} Puan`;
+      renderStats();
+    }
+
+    function renderStats() {
+      let ok = 0, bad = 0;
+      document.getElementById('statBars').innerHTML = Object.entries(BINS).map(([k, b]) => {
+        const s = stats[k];
+        ok += s.ok; bad += s.bad;
+        const total = s.ok + s.bad;
+        const pct = total ? Math.round(s.ok / total * 100) : 0;
+        return `<div class="flex items-center gap-2 text-[11px] font-black">
+          <span class="w-20 truncate">${b.icon} ${b.name}</span>
+          <div class="flex-1 h-3.5 bg-gray-100 rounded-full border-2 border-ink overflow-hidden"><div class="h-full" style="width:${pct}%;background:${b.color}"></div></div>
+          <span class="w-12 text-right">✅${s.ok} ❌${s.bad}</span>
+        </div>`;
+      }).join('');
+      document.getElementById('accuracyText').textContent = ok + bad ? `İsabet: %${Math.round(ok / (ok + bad) * 100)}` : 'İsabet: -';
+    }
+
+    // --- 7. SEVİYE AKIŞI ---
+    function clearItems() {
+      items.forEach(it => it.el.remove());
+      items = [];
+      selectItem(null);
+    }
+
+    function loadLevel(i) {
+      mode = 'levels';
+      levelIndex = i;
+      const L = LEVELS[i];
+      clearItems();
+      clearTimeout(toastTimer);
+      document.getElementById('toast').classList.add('hidden');
+      running = false; paused = false;
+      document.getElementById('pauseText').textContent = 'Duraklat';
+      document.getElementById('belt').classList.remove('running');
+      hearts = 3; resolved = 0; mistakes = 0; combo = 0;
+      queue = buildQueue(L);
+      spawnTimer = 0;
+      document.getElementById('levelBadge').textContent = `SEVİYE ${i + 1}`;
+      document.getElementById('levelTitle').textContent = L.title;
+      renderBins(L.bins);
+      renderLevelDots();
+      updateHud();
+
+      document.getElementById('startTitle').textContent = `Seviye ${i + 1}: ${L.title}`;
+      document.getElementById('startText').textContent = L.intro;
+      document.getElementById('startBins').innerHTML = L.bins.map(k =>
+        `<span class="px-2 py-0.5 rounded-lg border-2 border-ink text-[11px] font-black" style="background:${BINS[k].light}">${BINS[k].icon} ${BINS[k].name}</span>`
+      ).join('');
+      const ov = document.getElementById('startOverlay');
+      ov.classList.remove('hidden'); ov.classList.add('flex');
+    }
+
+    function startLevel() {
+      initAudio();
+      Sound.machine();
+      const ov = document.getElementById('startOverlay');
+      ov.classList.add('hidden'); ov.classList.remove('flex');
+      running = true;
+      document.getElementById('belt').classList.add('running');
+    }
+
+    function winLevel() {
+      const L = LEVELS[levelIndex];
+      const s = mistakes === 0 ? 3 : mistakes === 1 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20;
+      if (levelIndex === 0 && mistakes === 0) completeMission('m1');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      updateHud();
+      renderLevelDots();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 100, spread: 75, origin: { y: 0.6 }, colors: ['#22c55e', '#3b82f6', '#facc15', '#a16207'] });
+      showModal({
+        emoji: '🏆', title: levelIndex === LEVELS.length - 1 ? 'Sen Bir Çevre Kahramanısın!' : 'Bant Temizlendi!',
+        stars: '⭐'.repeat(s) + '☆'.repeat(3 - s),
+        info: `${L.count} atıktan ${L.count - mistakes} tanesini doğru ayırdın.`,
+        fact: L.fact,
+        next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Fabrikaya Git 🏭'
+      });
+    }
+
+    function gameOver() {
+      if (!running) return;
+      running = false;
+      document.getElementById('belt').classList.remove('running');
+      setTimeout(clearItems, 700);
+      Sound.lose();
+      showModal({
+        emoji: '🌧️', title: 'Canların Bitti!',
+        stars: '☆☆☆',
+        info: 'Hiç sorun değil, kahramanlar da pratik yapar. Kutuların renklerini hatırlayarak tekrar dene!',
+        fact: 'Yanlış kutuya atılan bir atık, o kutudaki diğer atıkların geri dönüşümünü zorlaştırabilir. Bu yüzden doğru ayırmak çok önemli!',
+        next: null
+      });
+    }
+
+    function showModal(o) {
+      document.getElementById('resultEmoji').textContent = o.emoji;
+      document.getElementById('resultTitle').textContent = o.title;
+      document.getElementById('resultStars').textContent = o.stars;
+      document.getElementById('resultInfo').textContent = o.info;
+      document.getElementById('resultFact').innerHTML = o.fact;
+      const next = document.getElementById('btnModalNext');
+      next.classList.toggle('hidden', !o.next);
+      if (o.next) next.textContent = o.next;
+      setTimeout(() => {
+        const m = document.getElementById('resultModal');
+        m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 700);
+    }
+
+    function closeModal() {
+      const m = document.getElementById('resultModal');
+      m.classList.add('hidden'); m.classList.remove('flex');
+    }
+
+    // --- 8. GÖREVLER ---
+    function renderMissions() {
+      document.getElementById('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        const extra = m.progress && !done ? ` <b class="text-sky-700">(${factorySeen.size}/6)</b>` : '';
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5">
+          <span class="text-lg">${done ? '✅' : '⬜'}</span>
+          <div class="flex-1 text-xs">
+            <p class="font-extrabold text-ink">${m.title}</p>
+            <p class="text-gray-600 font-semibold text-[11px]">${m.text}${extra}</p>
+          </div>
+        </li>`;
+      }).join('');
+    }
+
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true;
+      score += 50;
+      document.getElementById('scoreBadge').textContent = `${score} Puan`;
+      renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+
+    function renderLevelDots() {
+      const wrap = document.getElementById('levelDots');
+      wrap.innerHTML = '<span class="text-xs font-bold text-gray-500">Seviyeler:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      wrap.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    // --- 9. DÖNÜŞÜM FABRİKASI ---
+    function renderFactoryPicker(active) {
+      document.getElementById('factoryPicker').innerHTML = Object.entries(BINS).map(([k, b]) =>
+        `<button data-f="${k}" class="f-btn pushable py-2 text-[11px] font-black flex flex-col items-center gap-0.5 ${k === active ? 'active-tab' : ''}" style="${k === active ? '' : `background:${b.light}`}">
+          <span class="text-2xl">${b.icon}</span><span>${b.name}</span>${factorySeen.has(k) ? '<span class="text-[9px]">✅</span>' : ''}
+        </button>`
+      ).join('');
+      document.querySelectorAll('.f-btn').forEach(btn => btn.addEventListener('click', () => showFactory(btn.dataset.f)));
+    }
+
+    function showFactory(key) {
+      Sound.machine();
+      factorySeen.add(key);
+      renderMissions();
+      if (factorySeen.size === 6) completeMission('m3');
+      renderFactoryPicker(key);
+      const f = FACTORY[key], b = BINS[key];
+      const view = document.getElementById('factoryView');
+      view.style.background = b.light;
+      view.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span class="text-3xl">${b.icon}</span>
+          <h4 class="display text-lg font-black text-ink">${b.name} atığının yolculuğu</h4>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          ${f.steps.map((s, i) => `
+            <div class="f-step relative p-2 bg-white rounded-xl border-2 border-ink text-center shadow-hard-sm">
+              <span class="absolute -top-2 -left-2 w-5 h-5 rounded-full bg-yellow-400 border-2 border-ink text-[10px] font-black flex items-center justify-center">${i + 1}</span>
+              <div class="text-3xl">${s[0]}</div>
+              <p class="text-[11px] font-black text-ink leading-tight mt-1">${s[1]}</p>
+            </div>`).join('')}
+        </div>
+        <div class="p-2 bg-white rounded-xl border-2 border-ink text-xs f-step">
+          <p class="font-black text-ink">⏳ Doğaya atılırsa?</p>
+          <p class="font-semibold text-gray-700">${f.nature}</p>
+        </div>
+        <div class="p-2 bg-white rounded-xl border-2 border-ink text-xs f-step">
+          <p class="font-black text-ink">💡 Kahraman İpucu</p>
+          <p class="font-semibold text-gray-700">${f.tip}</p>
+        </div>`;
+      if (typeof gsap !== 'undefined') gsap.from(view.querySelectorAll('.f-step'), { y: 20, opacity: 0, stagger: 0.18, duration: 0.35, ease: 'back.out(1.6)' });
+    }
+
+    function switchMode(m) {
+      const isF = m === 'factory';
+      const lt = document.getElementById('tabLevels'), st = document.getElementById('tabSandbox');
+      lt.classList.toggle('active-tab', !isF); lt.classList.toggle('bg-white', isF);
+      st.classList.toggle('active-tab', isF); st.classList.toggle('bg-white', !isF);
+      const fac = document.getElementById('factory');
+      fac.classList.toggle('hidden', !isF); fac.classList.toggle('flex', isF);
+      fac.classList.toggle('absolute', !isF); fac.classList.toggle('inset-0', !isF);
+      fac.classList.toggle('relative', isF);
+      stageEl.style.height = isF ? 'auto' : '400px';
+      document.getElementById('levelDots').classList.toggle('hidden', isF);
+      document.getElementById('btnPause').classList.toggle('invisible', isF);
+      if (isF) {
+        mode = 'factory';
+        paused = true;
+        document.getElementById('levelBadge').textContent = 'FABRİKA';
+        document.getElementById('levelTitle').textContent = 'Atıklar Neye Dönüşüyor?';
+        renderFactoryPicker(null);
+      } else {
+        loadLevel(levelIndex);
+      }
+    }
+
+    // --- 10. BUTONLAR ---
+    document.getElementById('btnStart').addEventListener('click', startLevel);
+    document.getElementById('btnPause').addEventListener('click', () => {
+      if (!running) return;
+      paused = !paused;
+      Sound.click();
+      document.getElementById('pauseText').textContent = paused ? 'Devam Et' : 'Duraklat';
+      document.getElementById('belt').classList.toggle('running', !paused);
+    });
+    document.getElementById('btnReset').addEventListener('click', () => { Sound.click(); if (mode === 'levels') loadLevel(levelIndex); else switchMode('levels'); });
+    document.getElementById('btnHint').addEventListener('click', () => {
+      Sound.click();
+      const note = document.getElementById('scienceNote');
+      if (mode === 'factory') {
+        note.innerHTML = '<b>İpucu:</b> Her atık türüne dokun ve yolculuğunu izle. Hangi atık doğada en uzun süre kalıyor?';
+      } else {
+        const L = LEVELS[levelIndex];
+        note.innerHTML = '<b>İpucu:</b> ' + L.bins.map(k => `${BINS[k].icon} <b>${BINS[k].name}</b>: ${ITEMS.filter(i => i.c === k).map(i => i.n).join(', ')}`).join(' · ');
+      }
+    });
+    document.getElementById('btnModalRetry').addEventListener('click', () => { closeModal(); loadLevel(levelIndex); });
+    document.getElementById('btnModalNext').addEventListener('click', () => {
+      closeModal();
+      if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('factory');
+    });
+    document.getElementById('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    document.getElementById('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('factory'); });
+    document.getElementById('soundToggle').addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+      Sound.click();
+    });
+
+    // Sahnenin boş yerine dokununca seçimi kaldır
+    stageEl.addEventListener('click', e => {
+      if (e.target === stageEl) selectItem(null);
+    });
+
+    // --- 11. BAŞLAT ---
+    renderMissions();
+    loadLevel(0);
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

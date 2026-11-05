@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Karışım Ayırma Laboratuvarı | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .pushable:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+    .beaker-card { cursor: pointer; transition: transform 0.12s; }
+    .beaker-card.sel { outline: 4px solid #facc15; outline-offset: 2px; }
+    .beaker-card.pure { background: #dcfce7; }
+    .comp-on { background: #facc15 !important; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-sm font-black flex items-center gap-1"><span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span></a>
+      <div>
+        <div class="flex items-center gap-2"><span class="text-2xl sm:text-3xl">⚗️</span><h1 class="display text-lg sm:text-2xl font-black tracking-wide">Karışım Ayırma Laboratuvarı</h1></div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Mıknatıs, elek, süzgeç ya da ısı! Doğru aracı seç ve karışımdaki maddeleri tek tek ayır. 🧲🕸️🔥</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab">🧪 1. Deneyler</button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white">🔬 2. Karışım Yap</button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">DENEY 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">Demir Tozu ve Kum</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5 flex-wrap"></div>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 p-2.5 bg-violet-50 rounded-xl border-2 border-ink">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">🎯</span>
+            <p id="taskText" class="text-xs sm:text-sm font-black">Karışımdaki her maddeyi ayrı bir kaba ayır!</p>
+          </div>
+          <div class="text-right shrink-0">
+            <p class="text-[10px] font-black text-gray-500">ADIM</p>
+            <p id="stepText" class="display text-2xl font-black leading-none">0</p>
+          </div>
+        </div>
+
+        <!-- Karışım Seçici (Test modu) -->
+        <div id="mixBuilder" class="hidden p-2.5 bg-amber-50 rounded-xl border-2 border-ink">
+          <p class="text-xs font-black mb-2">🧺 Karışıma eklenecek maddeleri seç (2–4 madde):</p>
+          <div id="compGrid" class="grid grid-cols-3 sm:grid-cols-6 gap-1.5"></div>
+          <button id="btnMix" class="pushable mt-2 px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white text-xs font-black">🥣 Karıştır!</button>
+        </div>
+
+        <!-- Laboratuvar tezgâhı -->
+        <div class="relative rounded-2xl border-3 border-ink bg-gradient-to-b from-slate-100 to-slate-300 p-3 min-h-[230px]">
+          <p class="text-[11px] font-black text-slate-600 mb-2">👆 Bir kaba dokun, sonra aşağıdan bir araç seç.</p>
+          <div id="bench" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
+          <div id="toolFx" class="absolute inset-0 pointer-events-none flex items-center justify-center text-6xl opacity-0"></div>
+        </div>
+
+        <div>
+          <p class="text-xs font-black text-gray-700 mb-2">🧰 Araç Dolabı</p>
+          <div id="tools" class="grid grid-cols-3 sm:grid-cols-5 gap-2"></div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-xs font-black">🔄 Baştan Başla</button>
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black">💡 İpucu</button>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-violet-50 to-fuchsia-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">Karışımdaki maddeler özelliklerini <b>kaybetmez</b>. Bu yüzden maddelerin farklı özelliklerinden (mıknatısa çekilme, tane büyüklüğü, suda çözünme) yararlanarak onları birbirinden ayırabiliriz!</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">Kimyager Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📋</span><h3 class="display text-base font-black">Deney Raporu</h3></div>
+        <ol id="report" class="text-[11px] font-bold space-y-1 max-h-48 overflow-y-auto list-decimal list-inside"></ol>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Fen Bilgisi Rehberi</h3></div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="p-2 bg-slate-50 rounded-lg border border-slate-300"><p class="font-extrabold">🧲 Mıknatısla Ayırma</p><p class="text-[11px] text-gray-700 font-semibold">Demir gibi mıknatısa çekilen maddeleri ayırır.</p></div>
+          <div class="p-2 bg-amber-50 rounded-lg border border-amber-300"><p class="font-extrabold text-amber-900">🕸️ Eleme</p><p class="text-[11px] text-amber-800 font-semibold">Tane büyüklükleri farklı katıları ayırır.</p></div>
+          <div class="p-2 bg-sky-50 rounded-lg border border-sky-300"><p class="font-extrabold text-sky-900">☕ Süzme</p><p class="text-[11px] text-sky-800 font-semibold">Sıvıda çözünmeyen katıları sıvıdan ayırır.</p></div>
+          <div class="p-2 bg-orange-50 rounded-lg border border-orange-300"><p class="font-extrabold text-orange-900">🔥 Buharlaştırma</p><p class="text-[11px] text-orange-800 font-semibold">Suda çözünmüş katıyı geri kazandırır.</p></div>
+        </div>
+        <div class="p-2 mt-2 bg-rose-50 rounded-lg border border-rose-300 text-xs"><p class="font-extrabold text-rose-900">🛡️ Güvenlik</p><p class="text-[11px] text-rose-800 font-semibold">Isıtma deneylerini evde yalnız başına yapma. Mutlaka bir yetişkinle çalış!</p></div>
+      </div>
+    </div>
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Karışım Ayrıldı!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-violet-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-violet-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      magnet() { tone('sine', 200, 900, 0.3, 0.15); },
+      sieve() { for (let i = 0; i < 5; i++) tone('square', 300, 250, 0.04, 0.05, i * 0.07); },
+      filter() { for (let i = 0; i < 4; i++) tone('sine', 1000, 600, 0.06, 0.08, i * 0.12); },
+      heat() { tone('sawtooth', 100, 180, 0.6, 0.08); },
+      pour() { tone('triangle', 600, 300, 0.3, 0.12); },
+      wrong() { tone('sawtooth', 220, 110, 0.3, 0.15); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. MADDELER VE ARAÇLAR ---
+    const COMP = {
+      demir: { n: 'Demir Tozu', c: '#334155', mag: true, big: false },
+      kum: { n: 'Kum', c: '#eab308', big: false },
+      cakil: { n: 'Çakıl Taşı', c: '#78716c', big: true },
+      tuz: { n: 'Tuz', c: '#f8fafc', dis: true, big: false },
+      seker: { n: 'Şeker', c: '#fde68a', dis: true, big: false },
+      atas: { n: 'Ataş', c: '#94a3b8', mag: true, big: true },
+      pirinc: { n: 'Pirinç', c: '#fffbeb', big: true },
+      un: { n: 'Un', c: '#fafaf9', big: false },
+      cay: { n: 'Çay Yaprağı', c: '#14532d', big: true },
+      su: { n: 'Su', c: '#38bdf8', liquid: true }
+    };
+
+    const TOOLS = [
+      { id: 'miknatis', e: '🧲', n: 'Mıknatıs' },
+      { id: 'elek', e: '🕸️', n: 'Elek' },
+      { id: 'suzme', e: '☕', n: 'Süzgeç Kâğıdı' },
+      { id: 'isi', e: '🔥', n: 'Buharlaştır' },
+      { id: 'suekle', e: '💧', n: 'Su Ekle' }
+    ];
+
+    const hasLiquid = g => g.includes('su');
+    const solids = g => g.filter(x => x !== 'su');
+    const isPure = g => g.length === 1;
+
+    // Araç uygula: { ok, groups (yeni kaplar), msg }
+    function applyTool(tool, g) {
+      const s = solids(g);
+      switch (tool) {
+        case 'miknatis': {
+          const mag = s.filter(x => COMP[x].mag);
+          if (mag.length === 0) return { ok: false, msg: `Mıknatıs ${s.map(x => COMP[x].n.toLowerCase()).join(' ve ')} maddelerini çekmez. Mıknatıs yalnızca <b>demir, nikel ve kobalt</b> içeren maddeleri çeker.` };
+          if (mag.length === g.length) return { ok: false, msg: 'Kaptaki her şey zaten mıknatısa çekiliyor. Ayıracak başka madde yok!' };
+          return { ok: true, groups: [mag, g.filter(x => !COMP[x].mag)], msg: `🧲 Mıknatıs <b>${mag.map(x => COMP[x].n).join(', ')}</b> maddesini çekip ayırdı!` };
+        }
+        case 'elek': {
+          if (hasLiquid(g)) return { ok: false, msg: 'Islak karışım elekten akıp gider! <b>Eleme</b>, kuru katı karışımlar için kullanılır.' };
+          const big = s.filter(x => COMP[x].big), small = s.filter(x => !COMP[x].big);
+          if (!big.length || !small.length) return { ok: false, msg: 'Karışımdaki tanelerin büyüklükleri birbirine çok yakın. Elek onları ayıramaz.' };
+          return { ok: true, groups: [big, small], msg: `🕸️ Küçük taneler (<b>${small.map(x => COMP[x].n).join(', ')}</b>) elekten geçti, büyük taneler (<b>${big.map(x => COMP[x].n).join(', ')}</b>) elekte kaldı.` };
+        }
+        case 'suzme': {
+          if (!hasLiquid(g)) return { ok: false, msg: '<b>Süzme</b> için karışımda sıvı olmalı. Kuru karışımı süzgeçten geçiremeyiz.' };
+          const undis = s.filter(x => !COMP[x].dis);
+          if (!undis.length) {
+            if (s.length) return { ok: false, msg: `${s.map(x => COMP[x].n).join(', ')} suda <b>çözündü</b>! Çözünen maddeler süzgeç kâğıdından suyla birlikte geçer.` };
+            return { ok: false, msg: 'Kapta sadece su var. Süzecek bir şey yok.' };
+          }
+          return { ok: true, groups: [undis, g.filter(x => !undis.includes(x))], msg: `☕ Çözünmeyen <b>${undis.map(x => COMP[x].n).join(', ')}</b> süzgeç kâğıdında kaldı, sıvı aşağıdaki kaba geçti.` };
+        }
+        case 'isi': {
+          if (!hasLiquid(g)) return { ok: false, msg: 'Kapta buharlaşacak sıvı yok!' };
+          if (!s.length) return { ok: false, msg: 'Sadece su buharlaşıp gider, geriye bir şey kalmaz. Bunu yapmaya gerek yok!' };
+          const undis = s.filter(x => !COMP[x].dis);
+          const msg = undis.length
+            ? `🔥 Su buharlaştı ama kapta <b>${s.map(x => COMP[x].n).join(' ve ')}</b> birlikte kaldı. Önce çözünmeyen maddeleri süzmek daha iyi olurdu!`
+            : `🔥 Su ısıyla buharlaşıp gitti. Kabın dibinde çözünmüş olan <b>${s.map(x => COMP[x].n).join(', ')}</b> kristalleri kaldı!`;
+          return { ok: true, groups: [s], msg, partial: undis.length > 0 };
+        }
+        case 'suekle': {
+          if (hasLiquid(g)) return { ok: false, msg: 'Kapta zaten su var.' };
+          if (!s.some(x => COMP[x].dis)) return { ok: false, msg: 'Bu maddelerin hiçbiri suda çözünmez. Su eklemek ayırmaya yardım etmez.' };
+          return { ok: true, groups: [[...g, 'su']], msg: `💧 Su ekleyip karıştırdık. <b>${s.filter(x => COMP[x].dis).map(x => COMP[x].n).join(', ')}</b> suda çözündü!` };
+        }
+      }
+    }
+
+    // --- 3. DENEYLER ---
+    const LEVELS = [
+      { title: 'Demir Tozu ve Kum', mix: ['demir', 'kum'], par: 1, hint: 'Demir tozunun hangi özelliği kumda yok? Mıknatısa çekilmek!', fact: 'Hurdalıklarda dev <b>elektromıknatıslar</b> demir parçalarını diğer atıklardan ayırır.' },
+      { title: 'Çakıl ve Kum', mix: ['cakil', 'kum'], par: 1, hint: 'Çakıl taşları büyük, kum taneleri küçük. Delikli bir araç işe yarar!', fact: 'İnşaat ustaları sıvaya kullanacakları ince kumu kalın çakıllardan <b>elek</b> ile ayırır.' },
+      { title: 'Çamurlu Su', mix: ['kum', 'su'], par: 1, hint: 'Kum suda çözünmez. Süzgeç kâğıdı suyu geçirir ama kumu tutar.', fact: 'Çay demlerken çay yapraklarını <b>süzgeçle</b> ayırırız. Su arıtma tesislerinde de süzme kullanılır.' },
+      { title: 'Tuzlu Su', mix: ['tuz', 'su'], par: 1, hint: 'Tuz suda çözündüğü için süzgeçten geçer. Suyu yok etmenin bir yolu var: ısı!', fact: 'Tuz göllerinde ve deniz kenarındaki <b>tuzlalarda</b> deniz suyu Güneş ısısıyla buharlaştırılarak tuz elde edilir.' },
+      { title: 'Mutfak Karmaşası', mix: ['atas', 'pirinc', 'un'], par: 2, hint: 'Önce ataşı mıknatısla al. Kalan pirinç ve unun tane büyüklüğü çok farklı!', fact: 'Birden fazla maddeden oluşan karışımları <b>birkaç yöntemi art arda</b> kullanarak ayırırız.' },
+      { title: 'Şekerli Çay', mix: ['cay', 'seker', 'su'], par: 2, hint: 'Önce çözünmeyen çay yapraklarını ayır, sonra çözünmüş şekeri geri kazan.', fact: 'Şeker de tuz gibi suda çözünür. Suyu buharlaştırınca şeker kristalleri geri kalır.' },
+      { title: 'Üçlü Kuru Karışım', mix: ['demir', 'kum', 'tuz'], par: 4, hint: 'Mıknatıs ➔ kalan kum ve tuza su ekle ➔ süz ➔ buharlaştır.', fact: 'Bilim insanları karışımları ayırırken önce maddelerin <b>özelliklerini</b> listeler, sonra her özelliğe uygun bir yöntem seçer. Sen de tam bunu yaptın!' },
+      { title: 'Büyük Final', mix: ['cakil', 'kum', 'tuz', 'su'], par: 3, hint: 'Islak karışım elenmez. Önce süz, sonra suyu buharlaştır ve en sonda kuru katıları ele!', fact: 'Tebrikler kimyager! Doğru sırayı bulmak da en az doğru aleti bulmak kadar önemlidir.' }
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: İlk Ayırma', text: 'İlk deneyi tamamla.' },
+      { id: 'm2', title: '2. Görev: Tüm Aletler', text: 'Mıknatıs, elek, süzgeç ve buharlaştırmanın hepsini doğru kullan.', progress: true },
+      { id: 'm3', title: '3. Görev: Mucit Kimyager', text: 'Karışım Yap modunda 3 maddelik bir karışımı tamamen ayır.' },
+      { id: 'm4', title: '4. Görev: Laboratuvar Şefi', text: '8 deneyin hepsini tamamla.' }
+    ];
+
+    // --- 4. DURUM ---
+    const $ = id => document.getElementById(id);
+    let mode = 'levels';
+    let levelIndex = 0;
+    let groups = [];
+    let sel = 0;
+    let steps = 0;
+    let wrong = 0;
+    let finished = false;
+    let score = 0;
+    let startMix = [];
+    let pickMix = new Set(['demir', 'kum', 'tuz']);
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    const usedTools = new Set();
+    let modalTimer = null;
+
+    // --- 5. ÇİZİM ---
+    function seeded(i) { const x = Math.sin(i * 12.9898) * 43758.5453; return x - Math.floor(x); }
+
+    function beakerSvg(g) {
+      const liquid = hasLiquid(g);
+      const s = solids(g);
+      let h = `<svg viewBox="0 0 100 110" class="w-full h-24">`;
+      h += `<path d="M18 10 L22 96 Q23 104 32 104 L68 104 Q77 104 78 96 L82 10" fill="#f8fafc" stroke="#0f172a" stroke-width="3" />`;
+      if (liquid) {
+        const tint = s.some(x => COMP[x].dis) ? '#7dd3fc' : '#38bdf8';
+        h += `<path d="M21 46 L24 96 Q25 101 32 101 L68 101 Q75 101 76 96 L79 46 Z" fill="${tint}" opacity="0.8" />`;
+      }
+      let n = 0;
+      s.forEach((id, ci) => {
+        const c = COMP[id];
+        if (liquid && c.dis) {
+          for (let i = 0; i < 8; i++) { n++; h += `<circle cx="${28 + seeded(n + ci * 50) * 44}" cy="${52 + seeded(n + 7) * 44}" r="1.3" fill="#ffffff" opacity="0.9" />`; }
+          return;
+        }
+        const count = c.big ? 7 : 26;
+        for (let i = 0; i < count; i++) {
+          n++;
+          const x = 28 + seeded(n * 3 + ci) * 44;
+          const y = 98 - seeded(n * 7 + ci) * (c.big ? 26 : 22) - ci * 5;
+          if (c.big) {
+            if (id === 'atas') h += `<path d="M${x - 5} ${y} h9 a2 2 0 0 0 0 -4 h-8 a1.5 1.5 0 0 0 0 3 h6" fill="none" stroke="#475569" stroke-width="1.5" />`;
+            else if (id === 'cay') h += `<ellipse cx="${x}" cy="${y}" rx="4" ry="2" fill="${c.c}" transform="rotate(${seeded(n) * 180} ${x} ${y})" />`;
+            else h += `<ellipse cx="${x}" cy="${y}" rx="${id === 'pirinc' ? 3.5 : 5}" ry="${id === 'pirinc' ? 1.8 : 4}" fill="${c.c}" stroke="#0f172a" stroke-width="1" />`;
+          } else {
+            h += `<circle cx="${x}" cy="${y}" r="1.8" fill="${c.c}" stroke="${c.c === '#f8fafc' || c.c === '#fafaf9' ? '#94a3b8' : 'none'}" stroke-width="0.6" />`;
+          }
+        }
+      });
+      h += `<line x1="26" y1="30" x2="28" y2="80" stroke="#ffffff" stroke-width="3" opacity="0.8" />`;
+      h += `</svg>`;
+      return h;
+    }
+
+    function renderBench() {
+      $('bench').innerHTML = groups.map((g, i) => {
+        const pure = isPure(g);
+        const label = g.map(x => COMP[x].n + (hasLiquid(g) && COMP[x].dis ? ' (çözünmüş)' : '')).join(' + ');
+        return `<div data-i="${i}" class="beaker-card rounded-xl border-3 border-ink bg-white p-1.5 ${i === sel ? 'sel' : ''} ${pure ? 'pure' : ''}">
+          ${beakerSvg(g)}
+          <p class="text-[10px] font-black text-center leading-tight min-h-[26px]">${pure ? '✅ ' : ''}${label}</p></div>`;
+      }).join('');
+      $('bench').querySelectorAll('.beaker-card').forEach(c => c.addEventListener('click', () => { sel = +c.dataset.i; Sound.click(); renderBench(); }));
+      $('stepText').textContent = steps;
+    }
+
+    function renderTools() {
+      $('tools').innerHTML = TOOLS.map(t => `<button data-t="${t.id}" class="tool pushable py-2 bg-white hover:bg-violet-50 flex flex-col items-center"><span class="text-2xl">${t.e}</span><span class="text-[10px] font-black">${t.n}</span></button>`).join('');
+      $('tools').querySelectorAll('.tool').forEach(b => b.addEventListener('click', () => useTool(b.dataset.t)));
+    }
+
+    function addReport(html, ok) {
+      const li = document.createElement('li');
+      li.className = ok ? 'text-emerald-800' : 'text-rose-700';
+      li.innerHTML = html;
+      $('report').appendChild(li);
+      li.scrollIntoView({ block: 'nearest' });
+    }
+
+    // --- 6. ARAÇ KULLANIMI ---
+    function useTool(tool) {
+      if (finished || !groups[sel]) return;
+      initAudio();
+      const g = groups[sel];
+      const t = TOOLS.find(x => x.id === tool);
+      if (isPure(g)) { note(`Bu kapta sadece <b>${COMP[g[0]].n}</b> var. Başka bir kabı seç!`); Sound.wrong(); return; }
+      const r = applyTool(tool, g);
+      fx(t.e);
+      if (!r.ok) {
+        wrong++;
+        Sound.wrong();
+        note('❌ ' + r.msg);
+        addReport(`${t.e} ${t.n}: işe yaramadı`, false);
+        const card = $('bench').children[sel];
+        if (card && typeof gsap !== 'undefined') gsap.fromTo(card, { x: -8 }, { x: 0, duration: 0.45, ease: 'elastic.out(4,0.2)' });
+        return;
+      }
+      steps++;
+      if (tool !== 'suekle' && !r.partial) usedTools.add(tool);
+      renderMissions();
+      if (['miknatis', 'elek', 'suzme', 'isi'].every(x => usedTools.has(x))) completeMission('m2');
+      ({ miknatis: Sound.magnet, elek: Sound.sieve, suzme: Sound.filter, isi: Sound.heat, suekle: Sound.pour })[tool]();
+      if (r.partial) wrong++;
+      note(r.msg);
+      addReport(`${t.e} ${t.n}: ${r.groups.map(x => x.map(y => COMP[y].n).join('+')).join(' | ')}`, true);
+      groups.splice(sel, 1, ...r.groups.filter(x => x.length));
+      sel = groups.findIndex(x => !isPure(x));
+      if (sel < 0) sel = 0;
+      renderBench();
+      if (typeof gsap !== 'undefined') gsap.from('#bench .beaker-card', { scale: 0.85, duration: 0.3, ease: 'back.out(2)', stagger: 0.05 });
+      if (groups.every(isPure)) winLevel();
+    }
+
+    function fx(emoji) {
+      const el = $('toolFx');
+      el.textContent = emoji;
+      if (typeof gsap !== 'undefined') gsap.fromTo(el, { opacity: 1, scale: 0.5, rotate: -20 }, { opacity: 0, scale: 1.6, rotate: 10, duration: 0.7 });
+    }
+    function note(html) { $('scienceNote').innerHTML = html; }
+
+    function winLevel() {
+      finished = true;
+      if (mode === 'sandbox') {
+        Sound.win();
+        if (startMix.length >= 3) completeMission('m3');
+        if (typeof confetti !== 'undefined') confetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
+        note(`🎉 Karışımı ${steps} adımda tamamen ayırdın! Yeni bir karışım dene.`);
+        return;
+      }
+      const L = LEVELS[levelIndex];
+      const s = wrong === 0 && steps <= L.par ? 3 : wrong <= 1 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20;
+      if (levelIndex === 0) completeMission('m1');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      updateScore(); renderLevelDots();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+      showModal({ emoji: '⚗️', title: 'Karışım Ayrıldı!', stars: '⭐'.repeat(s) + '☆'.repeat(3 - s), info: `${steps} adım, ${wrong} hatalı deneme. (En az: ${L.par} adım)`, fact: L.fact, next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Karışım Yap 🔬' });
+    }
+
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info; $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next); if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 900);
+    }
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    // --- 7. AKIŞ ---
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        const extra = m.progress && !done ? ` <b class="text-sky-700">(${[...usedTools].filter(x => x !== 'suekle').length}/4)</b>` : '';
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5"><span class="text-lg">${done ? '✅' : '⬜'}</span><div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}${extra}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Deneyler:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function startWith(mix) {
+      startMix = [...mix];
+      groups = [[...mix]]; sel = 0; steps = 0; wrong = 0; finished = false;
+      $('report').innerHTML = `<li class="text-gray-700">🥣 Başlangıç: ${mix.map(x => COMP[x].n).join(' + ')}</li>`;
+      renderBench();
+    }
+
+    function loadLevel(i) {
+      closeModal();
+      mode = 'levels'; levelIndex = i;
+      const L = LEVELS[i];
+      $('levelBadge').textContent = `DENEY ${i + 1}`;
+      $('levelTitle').textContent = L.title;
+      $('taskText').textContent = 'Karışımdaki her maddeyi ayrı bir kaba ayır!';
+      renderLevelDots();
+      startWith(L.mix);
+    }
+
+    function renderCompGrid() {
+      $('compGrid').innerHTML = Object.entries(COMP).map(([k, c]) => `<button data-k="${k}" class="comp pushable px-1 py-1.5 bg-white text-[10px] font-black ${pickMix.has(k) ? 'comp-on' : ''}">${c.n}</button>`).join('');
+      $('compGrid').querySelectorAll('.comp').forEach(b => b.addEventListener('click', () => {
+        const k = b.dataset.k;
+        if (pickMix.has(k)) pickMix.delete(k); else if (pickMix.size < 4) pickMix.add(k);
+        Sound.click(); renderCompGrid();
+      }));
+    }
+
+    function switchMode(m) {
+      const isS = m === 'sandbox';
+      $('tabLevels').classList.toggle('active-tab', !isS); $('tabLevels').classList.toggle('bg-white', isS);
+      $('tabSandbox').classList.toggle('active-tab', isS); $('tabSandbox').classList.toggle('bg-white', !isS);
+      $('levelDots').classList.toggle('hidden', isS);
+      $('mixBuilder').classList.toggle('hidden', !isS);
+      if (isS) {
+        closeModal();
+        mode = 'sandbox';
+        $('levelBadge').textContent = 'SERBEST';
+        $('levelTitle').textContent = 'Kendi Karışımını Yap';
+        $('taskText').textContent = 'Maddeleri seç, karıştır ve ayırmayı dene!';
+        renderCompGrid();
+        startWith([...pickMix]);
+      } else loadLevel(levelIndex);
+    }
+
+    $('btnMix').addEventListener('click', () => {
+      if (pickMix.size < 2) { note('En az 2 madde seçmelisin.'); Sound.wrong(); return; }
+      Sound.pour(); startWith([...pickMix]);
+    });
+    $('btnReset').addEventListener('click', () => { Sound.click(); if (mode === 'levels') loadLevel(levelIndex); else startWith(startMix); });
+    $('btnHint').addEventListener('click', () => {
+      Sound.click();
+      note(mode === 'levels' ? `<b>İpucu:</b> ${LEVELS[levelIndex].hint}` : '<b>Deney fikri:</b> Unla şekeri karıştır. Elek işe yarıyor mu? Su ekleyince ne oluyor? Un suda çözünmez, şeker çözünür!');
+    });
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('sandbox'); });
+    $('btnModalRetry').addEventListener('click', () => loadLevel(levelIndex));
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('sandbox'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; Sound.click(); });
+
+    renderTools(); renderMissions(); updateScore(); loadLevel(0);
+  </script>
+</body>
+</html>

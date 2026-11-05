@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+const dir = await mkdtemp(join(tmpdir(), 'device-session-'));
+try {
+  const outfile = join(dir, 'session.mjs');
+  await build({ entryPoints: ['src/components/drawing/InkEngine/deviceSession.ts'], bundle: true, platform: 'node', format: 'esm', outfile });
+  const { DeviceSession, sampleAge } = await import(pathToFileURL(outfile));
+  const s = new DeviceSession();
+  const begin = (trusted, legacy = false) => s.record({stage:'begin', id:'1',pointerType:'pen',trusted,legacy});
+  const sample = (timestamp, pressure=.5) => s.record({stage:'sample',timestamp,pressure,raw:{x:3,y:4},filtered:{x:0,y:0},scale:2});
+  begin(false); sample(1); assert.equal(s.report().samples,0);
+  begin(true,true); sample(2); assert.equal(s.report().strokes,0);
+  begin(true); sample(10,.2); sample(18,.8); sample(218);
+  s.record({stage:'frame',renderMs:2,queueMs:8,sampleAgeMs:null});
+  assert.deepEqual(s.report().pressureRange,[.2,.8]);
+  assert.equal(s.report().sampleIntervalMs.observed,1);
+  assert.equal(s.report().sampleIntervalMs.p50,8);
+  assert.equal(s.report().filterOffsetScreenPx.p95,10);
+  assert.equal(s.report().sampleToCanvasCompletionMs.observed,0);
+  begin(true); sample(1000,NaN);
+  for(let i=0;i<5000;i++) s.record({stage:'process',durationMs:i});
+  s.record({stage:'process',durationMs:NaN});
+  assert.equal(s.report().processingMs.retained,4096);
+  assert.equal(s.report().processingMs.observed,5000);
+  assert.equal(s.report().processingMs.max,4999);
+  assert.equal(s.report().syntheticStrokesExcluded,1);
+  assert.deepEqual(s.report().pointerTypes,['pen']);
+  const invalid = new DeviceSession(); invalid.record({stage:'begin',id:'1',pointerType:'pen',trusted:true,legacy:false});
+  invalid.record({stage:'sample',timestamp:1,pressure:NaN,raw:{x:0,y:0},filtered:{x:0,y:0},scale:1});
+  assert.equal(invalid.report().pressureRange,null);
+  assert.equal(sampleAge(100,92),8); assert.equal(sampleAge(10,20),null);
+  assert.equal(sampleAge(100,Date.now()),null); assert.equal(sampleAge(NaN,1),null);
+  console.log('Device session tests passed (trusted input, modes, bounded distributions, clocks).');
+} finally { await rm(dir,{recursive:true,force:true}); }

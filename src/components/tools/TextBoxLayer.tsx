@@ -2,16 +2,17 @@ import React from 'react';
 import { motion, useDragControls } from 'framer-motion';
 import { GripHorizontal, X } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import type { TextBoxData } from '../../types';
+import type { TextBoxData, Viewport } from '../../types';
 import { TEXTBOX_COLORS, getTextBoxTextColor } from '../../constants/drawing';
 
 interface TextBoxItemProps {
     box: TextBoxData;
+    view: Viewport;
     onUpdate: (next: TextBoxData) => void;
     onDelete: () => void;
 }
 
-function TextBoxItem({ box, onUpdate, onDelete }: TextBoxItemProps) {
+function TextBoxItem({ box, view, onUpdate, onDelete }: TextBoxItemProps) {
     const [editing, setEditing] = React.useState(box.text === '');
     const textRef = React.useRef<HTMLTextAreaElement>(null);
     const dragControls = useDragControls();
@@ -29,10 +30,22 @@ function TextBoxItem({ box, onUpdate, onDelete }: TextBoxItemProps) {
             dragListener={false}
             dragMomentum={false}
             dragElastic={0}
+            onDragEnd={(_, info) => {
+                // Konumu dünya koordinatında sakla; ölçek geri alınır.
+                onUpdate({
+                    ...box,
+                    x: box.x + info.offset.x / view.scale,
+                    y: box.y + info.offset.y / view.scale,
+                });
+            }}
             className="absolute group pointer-events-auto"
             style={{
-                left: box.x,
-                top: box.y,
+                // Notlar da çizimlerle aynı dünya koordinatında durur;
+                // yakınlaştırma ölçek, kaydırma ise konum olarak uygulanır.
+                left: box.x * view.scale + view.tx,
+                top: box.y * view.scale + view.ty,
+                transform: `scale(${view.scale})`,
+                transformOrigin: '0 0',
                 zIndex: 4800,
                 minWidth: 120,
                 maxWidth: 320,
@@ -131,16 +144,38 @@ interface TextBoxLayerProps {
     onDelete: (id: string) => void;
     onAdd: (box: TextBoxData) => void;
     enabled: boolean;
+    /** Çalışma alanının yakınlaştırma/kaydırma durumu. */
+    view?: Viewport;
+    /** Tanımlıysa notlar ve yeni not girişleri bu sayfanın içinde kalır. */
+    pageBox?: { w: number; h: number } | null;
 }
 
-export function TextBoxLayer({ boxes, onUpdate, onDelete, onAdd, enabled }: TextBoxLayerProps) {
+const IDENTITY_VIEW: Viewport = { scale: 1, tx: 0, ty: 0 };
+
+export function TextBoxLayer({
+    boxes,
+    onUpdate,
+    onDelete,
+    onAdd,
+    enabled,
+    view = IDENTITY_VIEW,
+    pageBox,
+}: TextBoxLayerProps) {
     const handleClick = (e: React.MouseEvent) => {
         if (!enabled) return;
         const rect = e.currentTarget.getBoundingClientRect();
+        const worldX = (e.clientX - rect.left - view.tx) / view.scale;
+        const worldY = (e.clientY - rect.top - view.ty) / view.scale;
+        if (
+            pageBox &&
+            (worldX < 0 || worldX > pageBox.w || worldY < 0 || worldY > pageBox.h)
+        ) {
+            return;
+        }
         onAdd({
             id: Date.now().toString(),
-            x: e.clientX - rect.left - 60,
-            y: e.clientY - rect.top - 20,
+            x: worldX - 60,
+            y: worldY - 20,
             text: '',
             color: '#fff9c4',
             fontSize: 15,
@@ -154,11 +189,19 @@ export function TextBoxLayer({ boxes, onUpdate, onDelete, onAdd, enabled }: Text
                 enabled ? 'pointer-events-auto cursor-text' : 'pointer-events-none'
             )}
             onClick={handleClick}
+            style={
+                pageBox
+                    ? {
+                          clipPath: `polygon(${view.tx}px ${view.ty}px, ${view.tx + pageBox.w * view.scale}px ${view.ty}px, ${view.tx + pageBox.w * view.scale}px ${view.ty + pageBox.h * view.scale}px, ${view.tx}px ${view.ty + pageBox.h * view.scale}px)`,
+                      }
+                    : undefined
+            }
         >
             {boxes.map((b) => (
                 <TextBoxItem
                     key={b.id}
                     box={b}
+                    view={view}
                     onUpdate={(upd) => onUpdate(b.id, upd)}
                     onDelete={() => onDelete(b.id)}
                 />

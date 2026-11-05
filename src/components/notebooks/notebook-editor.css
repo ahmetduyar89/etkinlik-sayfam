@@ -1,0 +1,42 @@
+.notebook-document-header{position:relative;z-index:6000;display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:48px;padding:5px 16px;background:#fff;color:#46556b;border-bottom:1px solid #e5eaf1;flex-shrink:0;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif}
+.nb-document-identity,.nb-page-navigation,.nb-document-actions{display:flex;align-items:center;gap:5px;min-width:0}.nb-document-identity{flex:1}.nb-document-actions{flex:1;justify-content:flex-end}.nb-page-navigation{flex-shrink:0;background:#f5f7fa;border:1px solid #edf0f5;border-radius:9px;padding:0 3px}
+.nb-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:7px;flex-shrink:0;color:#64748b;cursor:pointer}.nb-icon:hover{background:#f0f4fa;color:#2873d7}.nb-icon.is-active{background:#e8f0fc;color:#2873d7}.nb-icon:disabled{opacity:.3;cursor:default}.nb-title{width:190px;max-width:100%;min-width:50px;padding:6px 5px;font-size:13px;font-weight:600;color:#26354b;background:transparent;border:1px solid transparent;border-radius:6px;outline:none}.nb-title:hover{background:#f5f7fa}.nb-title:focus{border-color:#bcd2f3;background:#f5f9ff}.nb-save-state{display:flex;align-items:center;gap:5px;color:#94a0b1;white-space:nowrap}.nb-save-state>span{width:5px;height:5px;background:#4ea782;border-radius:50%}.nb-save-state small{font-size:10px}.nb-save-warning{display:flex;align-items:center;gap:5px;color:#b42335;font-size:11px;white-space:nowrap}.nb-collab{color:#38a17f}.nb-separator{width:1px;height:15px;background:#e0e5ed;margin:0 2px}.nb-page-count{min-width:44px;padding:0 5px;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;color:#35445a}.nb-page-count span{color:#9ba6b7;font-weight:400}.nb-save-button{color:#2873d7}.nb-menu-anchor{position:relative}.nb-menu-panel{position:absolute;right:0;top:calc(100% + 10px);width:265px;padding:13px;background:#fff;color:#46556b;border:1px solid #e1e7ef;border-radius:12px;box-shadow:0 12px 40px #253b5820;z-index:6100}.nb-menu-panel>b{display:block;font-size:12px;font-weight:600;margin:3px 5px 12px}.nb-menu-panel p{font-size:10px;color:#97a2b2;margin:12px 5px 8px}.nb-menu-panel hr{border:0;border-top:1px solid #edf0f4;margin:10px 0}.nb-menu-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 7px;border-radius:7px;text-align:left;font-size:11px;cursor:pointer}.nb-menu-item:hover{background:#f1f5fa}.nb-danger{color:#c45b65}.nb-file-actions{display:flex;gap:5px}.nb-file-actions>div>button{color:#42536b;background:#f1f4f9;border:1px solid #e6ebf3;min-height:32px}.nb-file-actions>div>button span{display:inline!important}.nb-paper-colors{display:flex;gap:7px;padding:4px}.nb-paper-colors button{width:20px;height:20px;border:1px solid #d9e0e9;border-radius:50%;cursor:pointer}.nb-paper-colors button.is-selected{outline:2px solid #2873d7;outline-offset:2px}.nb-lesson-panel{width:310px}.nb-lesson-panel>div{justify-content:space-between}.nb-lesson-panel button{flex-direction:column;font-size:10px;gap:7px}.nb-lesson-panel button span{display:inline!important}.nb-mobile-paper{display:none}
+.notebook-document-header button:focus-visible{outline:2px solid #2873d7;outline-offset:2px}
+@media(max-width:1050px){.nb-save-state small{display:none}.nb-title{width:150px}.notebook-document-header{gap:10px;padding:5px 10px}.nb-paper-control>div>button span{max-width:135px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+@media(max-width:700px){.nb-paper-control{display:none}.nb-mobile-paper{display:block;margin-top:10px}.nb-title{width:120px}.notebook-document-header{gap:4px;padding:5px 7px}.nb-save-state{display:none}.nb-page-navigation{gap:0}.nb-page-navigation .nb-icon{width:27px}.nb-document-actions{flex:0}}
+@media(max-width:450px){.nb-title{width:85px;font-size:12px}.nb-document-identity>.nb-icon{width:25px}.nb-document-actions{gap:0}.nb-document-actions>.nb-icon{display:none}.nb-save-warning{font-size:0}.nb-document-identity{gap:0}.nb-separator{display:none}.nb-page-count{min-width:35px}}
+.nb-file-actions>div>button svg,.nb-file-actions>div>button span{color:#52647b}
+.nb-back{width:auto!important;min-width:36px;padding:0 8px;display:flex;gap:5px;color:#334155}
+.nb-back span{font-size:12px;font-weight:600}
+@media(pointer:coarse){.notebook-document-header{min-height:54px}.nb-icon{min-height:42px;min-width:36px}.nb-back{min-width:66px}.nb-page-navigation .nb-icon{min-width:30px}}
+@media(max-width:450px){.nb-back span{display:none}}
+
+/* One persistent row, including document identity and drawing controls. */
+.notebook-editor .notebook-document-header{gap:8px;min-height:60px;padding:3px 10px;background:linear-gradient(105deg,#f8faff,#fff 55%,#fcf9ff)}
+.notebook-editor .nb-document-identity{flex:0 1 180px;gap:3px}
+.notebook-editor .nb-title{width:125px;min-width:0;padding:6px 3px}
+.notebook-editor .nb-back{width:44px!important;min-width:44px;height:44px;padding:0;justify-content:center}
+.notebook-editor .nb-back span,.notebook-editor .nb-save-state small{display:none}
+.notebook-editor .nb-document-actions{flex:0 0 auto;gap:3px}
+.notebook-editor .nb-document-actions>.nb-icon,.notebook-editor .nb-menu-anchor>.nb-icon{width:44px;height:44px;min-width:44px}
+.notebook-editor .nb-page-shortcut{min-width:52px;min-height:44px;font-size:11px;font-weight:600;white-space:nowrap;border-radius:8px}
+.notebook-editor .nb-page-shortcut:hover{background:#edf2ff}
+.notebook-editor .nb-save-warning{font-size:0;min-height:44px;min-width:24px;justify-content:center}
+.notebook-editor .nb-save-warning svg{flex-shrink:0}
+.notebook-editor .nb-menu-paper{display:block;margin:12px 0}
+.notebook-editor .nb-menu-panel{max-width:calc(100vw - 24px);max-height:calc(100dvh - 84px);overflow-y:auto;overscroll-behavior:contain}
+.notebook-editor .nb-menu-item{min-height:44px;font-size:12px}
+.notebook-editor .nb-menu-panel .nb-page-navigation{justify-content:space-between}
+.notebook-editor .nb-page-navigation .nb-icon{min-width:36px;min-height:44px}
+.notebook-editor .nb-page-count{min-height:44px}
+.nb-focus-controls{position:absolute;left:calc(var(--app-safe-left,0px) + 10px);top:calc(var(--app-safe-top,0px) + 10px);z-index:6500;display:flex;align-items:center;gap:2px;padding:2px;background:#fffffff5;border:1px solid #e1e7f2;border-radius:12px;box-shadow:0 3px 16px #253b5818}
+.nb-focus-controls .nb-icon{width:44px;height:44px}
+.nb-focus-pages{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(var(--app-safe-bottom,0px) + 12px);z-index:6500}
+.nb-focus-pages .nb-page-navigation{padding:3px;background:#fffffff5;box-shadow:0 3px 16px #253b5818;border-radius:12px}
+.nb-focus-pages .nb-icon{width:44px;height:44px}
+@media(max-width:1100px){.notebook-editor .nb-document-identity{flex-basis:120px}.notebook-editor .nb-title{width:74px}}
+@media(max-width:700px){.notebook-editor .notebook-document-header{gap:3px;padding:3px 5px}.notebook-editor .nb-document-identity{flex-basis:44px;flex-shrink:0}.notebook-editor .nb-title,.notebook-editor .nb-collab,.notebook-editor .nb-save-state,.notebook-editor .nb-page-shortcut{display:none}.notebook-editor .nb-document-actions>.nb-icon{display:grid}.notebook-editor .gn-notebook .gn-notebook-main{gap:0}.notebook-editor .nb-menu-panel{position:fixed;top:calc(var(--app-safe-top,0px) + 66px);right:8px}.notebook-editor .nb-focus-pages{left:10px;transform:none}}
+
+.nb-menu-title{display:flex;flex-direction:column;gap:6px;font-size:11px;color:#64748b;margin-bottom:10px}.nb-menu-title input{min-width:0;min-height:44px;padding:8px;border:1px solid #dce4fa;border-radius:8px;background:#f8faff;color:#26354b;font-size:13px}.nb-menu-lesson{margin:8px 0}.nb-menu-lesson>div{flex-wrap:wrap}.nb-menu-lesson button{min-height:44px}.notebook-editor .nb-menu-panel .responsive-popover{position:relative!important;inset:auto!important;transform:none!important;width:100%!important;margin-top:8px;max-height:50dvh}.notebook-editor .nb-menu-panel .nb-file-actions:has(.responsive-popover){flex-direction:column}.notebook-editor .nb-menu-paper>div>button span{display:inline}
+
+.nb-inline-pages{display:flex;align-items:center;gap:0}.nb-inline-pages .nb-icon{width:36px;height:44px}@media(max-width:1100px){.notebook-editor .nb-document-identity{flex-basis:100px}.notebook-editor .nb-title{width:54px}}@media(max-width:700px){.notebook-editor .nb-document-identity{flex-basis:44px}.nb-inline-pages{display:none}}

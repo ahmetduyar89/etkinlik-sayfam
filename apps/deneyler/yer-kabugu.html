@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yer Kabuğu Asansörü | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .pushable:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+    .pick-on { background: #bbf7d0 !important; }
+    input[type=range] { accent-color: #ea580c; }
+    @keyframes quake { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(-6px, 3px); } 40% { transform: translate(5px, -4px); } 60% { transform: translate(-4px, -2px); } 80% { transform: translate(4px, 3px); } }
+    .quake { animation: quake 0.18s linear infinite; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-sm font-black flex items-center gap-1"><span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span></a>
+      <div>
+        <div class="flex items-center gap-2"><span class="text-2xl sm:text-3xl">🌋</span><h1 class="display text-lg sm:text-2xl font-black tracking-wide">Yer Kabuğu Asansörü</h1></div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Dünya'nın merkezine yolculuk! Katmanları keşfet, soruları çöz ve depreme hazırlıklı ol. 🛗🌍</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab">🛗 1. Görevler</button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white">🔬 2. Kesit Laboratuvarı</button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">GÖREV 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">Katmanları Sırala</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 p-2.5 bg-orange-50 rounded-xl border-2 border-ink">
+          <p id="taskText" class="text-xs sm:text-sm font-black">🎯 Görev</p>
+          <div class="text-right shrink-0">
+            <p class="text-[10px] font-black text-gray-500">İLERLEME</p>
+            <p id="progText" class="display text-xl font-black leading-none">0/4</p>
+          </div>
+        </div>
+
+        <div id="sceneWrap" class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+          <div class="rounded-2xl border-3 border-ink bg-slate-900 p-1">
+            <svg id="earth" viewBox="0 0 300 300" class="w-full h-auto"></svg>
+          </div>
+          <div id="panel" class="flex flex-col gap-2"></div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-xs font-black">🔄 Baştan</button>
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black">💡 İpucu</button>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-orange-50 to-red-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">Dünya bir soğan gibi katmanlardan oluşur. Üzerinde yaşadığımız <b>yer kabuğu</b>, Dünya'nın büyüklüğüne göre bir elmanın kabuğu kadar incedir!</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">Kâşif Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Fen Bilgisi Rehberi</h3></div>
+        <div class="space-y-2 text-xs">
+          <div class="p-2 bg-amber-50 rounded-lg border border-amber-300"><p class="font-extrabold text-amber-900">🪨 Yer Kabuğu</p><p class="text-[11px] text-amber-800 font-semibold mt-0.5">En dış ve en ince katman. Kara ve denizlerin altında kayaçlardan oluşur. Toprak, madenler, fosiller ve yeraltı suları buradadır.</p></div>
+          <div class="p-2 bg-orange-50 rounded-lg border border-orange-300"><p class="font-extrabold text-orange-900">🔥 Manto</p><p class="text-[11px] text-orange-800 font-semibold mt-0.5">En kalın katman. Çok sıcak kayaçlar çok yavaş hareket eder. Volkanlardan çıkan <b>magma</b> mantonun üst kısmından gelir.</p></div>
+          <div class="p-2 bg-red-50 rounded-lg border border-red-300"><p class="font-extrabold text-red-900">⚙️ Çekirdek</p><p class="text-[11px] text-red-800 font-semibold mt-0.5">Demir ve nikelden oluşur. <b>Dış çekirdek sıvı</b>, <b>iç çekirdek katıdır</b>. İç çekirdek Güneş'in yüzeyi kadar sıcaktır!</p></div>
+          <div class="p-2 bg-sky-50 rounded-lg border border-sky-300"><p class="font-extrabold text-sky-900">🛡️ Depremde: Çök – Kapan – Tutun</p><p class="text-[11px] text-sky-800 font-semibold mt-0.5">Sağlam bir eşyanın yanına <b>çök</b>, başını ve enseni kollarınla <b>kapat</b>, sallantı bitene kadar <b>tutun</b>.</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Görev Tamam!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-orange-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-orange-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      correct() { tone('triangle', 660, 990, 0.12, 0.2); tone('triangle', 990, 1320, 0.15, 0.18, 0.08); },
+      wrong() { tone('sawtooth', 220, 110, 0.3, 0.15); },
+      elevator() { tone('sine', 400, 200, 0.8, 0.1); tone('sine', 1200, 1200, 0.15, 0.12, 0.85); },
+      rumble() { tone('sawtooth', 60, 40, 1.2, 0.25); tone('square', 45, 35, 1.2, 0.1); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. KATMANLAR ---
+    const LAYERS = [
+      { id: 'kabuk', n: 'Yer Kabuğu', c: '#a16207', d0: 0, d1: 35, r0: 270, r1: 256, state: 'Katı kayaçlar', temp: 'Yüzeyde yaşadığımız sıcaklıklardan derinde birkaç yüz °C\'ye kadar' },
+      { id: 'manto', n: 'Manto', c: '#ea580c', d0: 35, d1: 2900, r0: 256, r1: 140, state: 'Çok sıcak, yavaşça akabilen kayaçlar', temp: 'Yaklaşık 1000 °C ile 3700 °C arası' },
+      { id: 'dis', n: 'Dış Çekirdek', c: '#dc2626', d0: 2900, d1: 5150, r0: 140, r1: 60, state: 'Sıvı demir ve nikel', temp: 'Yaklaşık 4000 °C ile 5000 °C arası' },
+      { id: 'ic', n: 'İç Çekirdek', c: '#facc15', d0: 5150, d1: 6371, r0: 60, r1: 0, state: 'Katı demir ve nikel', temp: 'Yaklaşık 5000 °C\'nin üzerinde' }
+    ];
+    const CX = 20, CY = 280; // Çeyrek kesitin merkezi (sol alt)
+
+    function depthToR(d) {
+      const l = LAYERS.find(x => d >= x.d0 && d <= x.d1) || LAYERS[3];
+      return l.r0 + (l.r1 - l.r0) * (d - l.d0) / (l.d1 - l.d0);
+    }
+    function layerAt(d) { return LAYERS.find(x => d >= x.d0 && d < x.d1) || LAYERS[3]; }
+    function tempAt(d) {
+      const pts = [[0, 15], [35, 600], [2900, 3700], [5150, 5000], [6371, 5700]];
+      for (let i = 1; i < pts.length; i++) if (d <= pts[i][0]) { const [a, ta] = pts[i - 1], [b, tb] = pts[i]; return ta + (tb - ta) * (d - a) / (b - a); }
+      return 5700;
+    }
+
+    function earthSvg(opts = {}) {
+      const filled = opts.filled || LAYERS.map(l => l.id);
+      let h = '<g opacity="0.7"><circle cx="270" cy="30" r="1.5" fill="#fff" /><circle cx="200" cy="15" r="1" fill="#fff" /><circle cx="290" cy="120" r="1.2" fill="#fff" /></g>';
+      LAYERS.forEach(l => {
+        const on = filled.includes(l.id);
+        const r = l.r0;
+        h += `<path d="M${CX} ${CY} L${CX + r} ${CY} A${r} ${r} 0 0 0 ${CX} ${CY - r} Z" fill="${on ? l.c : '#334155'}" stroke="#0f172a" stroke-width="2.5" />`;
+      });
+      // Okyanus ve kıta yüzeyi
+      h += `<path d="M${CX} ${CY - 270} A270 270 0 0 1 ${CX + 150} ${CY - 224}" fill="none" stroke="#22c55e" stroke-width="5" /><path d="M${CX + 150} ${CY - 224} A270 270 0 0 1 ${CX + 270} ${CY}" fill="none" stroke="#38bdf8" stroke-width="5" />`;
+      if (opts.labels !== false) {
+        LAYERS.forEach(l => {
+          if (!filled.includes(l.id)) return;
+          const rm = l.id === 'kabuk' ? 282 : (l.r0 + l.r1) / 2;
+          const a = l.id === 'kabuk' ? 32 : l.id === 'ic' ? 45 : 50;
+          let x = CX + rm * Math.cos(a * Math.PI / 180), y = CY - rm * Math.sin(a * Math.PI / 180);
+          if (l.id === 'ic') { x = CX + 8; y = CY - 20; }
+          h += `<text x="${x}" y="${y}" font-size="${l.id === 'ic' ? 8 : 11}" font-weight="900" fill="${l.id === 'ic' ? '#0f172a' : '#fff'}" text-anchor="${l.id === 'ic' ? 'start' : 'middle'}" stroke="${l.id === 'ic' ? 'none' : '#0f172a'}" stroke-width="0.6">${l.n}</text>`;
+        });
+      }
+      if (opts.depth !== undefined) {
+        const r = depthToR(opts.depth);
+        h += `<line x1="${CX + 8}" y1="${CY - 275}" x2="${CX + 8}" y2="${CY}" stroke="#e2e8f0" stroke-width="2" stroke-dasharray="4 4" />`;
+        h += `<g transform="translate(${CX + 8},${CY - r})"><rect x="-10" y="-12" width="20" height="24" rx="4" fill="#e2e8f0" stroke="#0f172a" stroke-width="2.5" /><text y="5" font-size="12" text-anchor="middle">🧒</text></g>`;
+      }
+      return h;
+    }
+
+    // --- 3. GÖREVLER ---
+    const QUESTIONS = {
+      kabuk: [
+        { q: 'Üzerinde yaşadığımız katman hangisidir?', o: ['Yer kabuğu', 'Manto', 'İç çekirdek'], a: 0 },
+        { q: 'Madenler, fosiller ve yeraltı suları hangi katmanda bulunur?', o: ['Dış çekirdekte', 'Yer kabuğunda', 'Mantoda'], a: 1 }
+      ],
+      manto: [
+        { q: 'Dünya\'nın en kalın katmanı hangisidir?', o: ['Yer kabuğu', 'İç çekirdek', 'Manto'], a: 2 },
+        { q: 'Volkanlardan çıkan magma nereden gelir?', o: ['Mantonun üst kısmından', 'Bulutlardan', 'Denizlerden'], a: 0 }
+      ],
+      dis: [
+        { q: 'Dış çekirdek hangi hâldedir?', o: ['Katı', 'Sıvı', 'Gaz'], a: 1 },
+        { q: 'Çekirdek çoğunlukla hangi maddelerden oluşur?', o: ['Su ve tuz', 'Kum ve kil', 'Demir ve nikel'], a: 2 }
+      ],
+      ic: [
+        { q: 'Çok sıcak olmasına rağmen iç çekirdek neden katıdır?', o: ['Üstündeki katmanların çok büyük basıncı yüzünden', 'Çok soğuk olduğu için', 'İçinde buz olduğu için'], a: 0 },
+        { q: 'Dünya\'nın en sıcak katmanı hangisidir?', o: ['Yer kabuğu', 'İç çekirdek', 'Manto'], a: 1 }
+      ]
+    };
+
+    const CRUST_ITEMS = [
+      { e: '🟫', n: 'Toprak', yes: true, why: 'Toprak yer kabuğunun en üst kısmındadır.' },
+      { e: '🪨', n: 'Kayaçlar', yes: true, why: 'Yer kabuğu kayaçlardan oluşur.' },
+      { e: '⛏️', n: 'Madenler', yes: true, why: 'Bakır, demir gibi madenler yer kabuğundaki kayaçlardan çıkarılır.' },
+      { e: '🦴', n: 'Fosiller', yes: true, why: 'Fosiller yer kabuğundaki tortul kayaçlarda bulunur.' },
+      { e: '💧', n: 'Yeraltı Suyu', yes: true, why: 'Yeraltı suları yer kabuğundaki boşluklarda birikir.' },
+      { e: '🛢️', n: 'Petrol', yes: true, why: 'Petrol yer kabuğunun derinliklerindeki kayaç katmanlarında bulunur.' },
+      { e: '🔥', n: 'Sıvı Demir-Nikel', yes: false, why: 'Sıvı demir ve nikel dış çekirdekte bulunur.' },
+      { e: '☁️', n: 'Bulutlar', yes: false, why: 'Bulutlar yer kabuğunda değil, atmosferde bulunur.' },
+      { e: '🟡', n: 'Katı Sıcak Çekirdek', yes: false, why: 'Katı demir-nikel küresi iç çekirdektir.' }
+    ];
+
+    const QUAKE = [
+      { s: '🏫 Derste deprem başladı! Ne yaparsın?', o: ['Sıramın yanına çöker, başımı kollarımla kapatır ve tutunurum', 'Hemen merdivenlerden aşağı koşarım', 'Pencerenin yanına gidip dışarı bakarım'], a: 0, why: '<b>Çök – Kapan – Tutun!</b> Sallantı sırasında koşmak düşmeye ve yaralanmaya yol açar. Camlar kırılabileceği için pencerelerden uzak dur.' },
+      { s: '🧱 Sallantı bitti. Binadan nasıl çıkarsın?', o: ['Asansörle hızlıca inerim', 'Öğretmenimi takip ederek merdivenden sakin çıkarım', 'Eşyalarımı toplamak için sınıfta beklerim'], a: 1, why: 'Depremden sonra <b>asansör kullanılmaz</b>. Elektrik kesilebilir. Öğretmeni takip ederek toplanma alanına gidilir.' },
+      { s: '🌳 Deprem sırasında bahçedesin. Ne yaparsın?', o: ['Binanın duvarına yaslanırım', 'Elektrik direğinin altına geçerim', 'Binalardan, direklerden ve ağaçlardan uzak açık alanda çökerim'], a: 2, why: 'Dışarıdaysan üstüne bir şey düşmeyecek <b>açık bir alana</b> geç ve çök.' },
+      { s: '🛏️ Odanı depreme hazırlıyorsun. En doğru hazırlık hangisi?', o: ['Ağır eşyaları dolabın en üstüne koyarım', 'Kitaplığı ve dolabı duvara sabitletirim', 'Yatağımı pencerenin önüne taşırım'], a: 1, why: 'Devrilebilecek eşyaları <b>duvara sabitlemek</b> ve ağır eşyaları alt raflara koymak hayat kurtarır.' },
+      { s: '🎒 Deprem çantasına ne koymalıyız?', multi: true, o: ['💧 Su', '🔦 El feneri', '📯 Düdük', '🩹 İlk yardım çantası', '📻 Pilli radyo', '🎮 Oyun konsolu', '🏺 Cam vazo', '🍫 Uzun süre bozulmayan yiyecek'], correct: [0, 1, 2, 3, 4, 7], why: 'Deprem çantasında <b>su, dayanıklı yiyecek, el feneri, düdük, ilk yardım malzemesi ve pilli radyo</b> bulunmalıdır. Düdükle yerimizi bildirebiliriz!' }
+    ];
+
+    const LEVELS = [
+      { title: 'Katmanları Sırala', type: 'order', task: '🎯 Dünya\'nın katmanlarını DIŞTAN İÇE doğru sırayla seç!', hint: 'En dışta üzerinde yaşadığımız katman var. En içte ise çekirdeğin katı kısmı.', fact: 'Dünya\'nın yarıçapı yaklaşık <b>6371 km</b>\'dir. Merkezine kadar inmek, Ankara\'dan Pekin\'e gitmek kadar uzun bir yolculuk olurdu!' },
+      { title: 'Asansörle İniş', type: 'elevator', task: '🎯 Her durakta soruları doğru cevapla, asansör bir sonraki katmana insin!', hint: 'Sağdaki Fen Bilgisi Rehberini oku: kabuk ince ve katı, manto en kalın, dış çekirdek sıvı, iç çekirdek katı ve en sıcak.', fact: 'Bilim insanları Dünya\'nın merkezine hiç gitmedi! Katmanları <b>deprem dalgalarının</b> Dünya\'nın içinden nasıl geçtiğini inceleyerek keşfettiler.' },
+      { title: 'Kabukta Neler Var?', type: 'crust', task: '🎯 Her kartın yer kabuğunda bulunup bulunmadığını söyle!', hint: 'İnsanların kazarak ulaşabildiği her şey yer kabuğundadır. Sıvı metal ve çok sıcak katı çekirdek çok daha derindedir.', fact: 'İnsanların kazdığı en derin kuyu bile yaklaşık 12 km derinliktedir. Bu, yer kabuğunu bile tam geçemez!' },
+      { title: 'Deprem Kahramanı', type: 'quake', task: '🎯 Deprem durumlarında en güvenli davranışı seç!', hint: 'Deprem sırasında koşma, çök-kapan-tutun. Depremden sonra asansör kullanma, açık alanda toplan.', fact: 'Türkiye deprem kuşağında yer alır. Deprem anında doğru davranmak ve önceden hazırlıklı olmak <b>hayat kurtarır</b>. Ailenle bir deprem planı yapın!' }
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: Katman Uzmanı', text: 'Katmanları doğru sırala.' },
+      { id: 'm2', title: '2. Görev: Merkeze Yolculuk', text: 'Asansörle iç çekirdeğe kadar in.' },
+      { id: 'm3', title: '3. Görev: Derin Dalgıç', text: 'Kesit Laboratuvarında Dünya\'nın merkezine (6371 km) ulaş.' },
+      { id: 'm4', title: '4. Görev: Deprem Kahramanı', text: 'Deprem Kahramanı görevini hatasız bitir.' }
+    ];
+
+    // --- 4. DURUM ---
+    const $ = id => document.getElementById(id);
+    let mode = 'levels';
+    let levelIndex = 0;
+    let step = 0;
+    let mistakes = 0;
+    let finished = false;
+    let busy = false;
+    let queue = [];
+    let depth = 0;
+    let multiSel = new Set();
+    let score = 0;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    let modalTimer = null;
+
+    function L() { return LEVELS[levelIndex]; }
+    function note(html) { $('scienceNote').innerHTML = html; }
+
+    // --- 5. GÖREV MANTIĞI ---
+    function render() {
+      const lv = L();
+      const panel = $('panel');
+      if (lv.type === 'order') {
+        const filled = LAYERS.slice(0, step).map(l => l.id);
+        $('earth').innerHTML = earthSvg({ filled });
+        $('progText').textContent = `${step}/4`;
+        panel.innerHTML = `<p class="text-xs font-black">${step < 4 ? `${step + 1}. katman (dıştan içe):` : '✅ Tamamlandı!'}</p>` + queue.map(l => `<button data-id="${l.id}" ${filled.includes(l.id) ? 'disabled' : ''} class="lay pushable py-2.5 text-sm font-black text-white" style="background:${l.c}">${l.n}</button>`).join('');
+        panel.querySelectorAll('.lay').forEach(b => b.addEventListener('click', () => answerOrder(b.dataset.id, b)));
+      } else if (lv.type === 'elevator') {
+        const layer = LAYERS[Math.min(3, Math.floor(step / 2))];
+        const q = QUESTIONS[layer.id][step % 2];
+        $('earth').innerHTML = earthSvg({ depth });
+        $('progText').textContent = `${step}/8`;
+        panel.innerHTML = `<div class="p-2 rounded-xl border-2 border-ink text-white" style="background:${layer.c}"><p class="text-[10px] font-black">🛗 DURAK: ${layer.n.toUpperCase()}</p><p class="text-xs font-bold">Derinlik: ${Math.round(depth).toLocaleString('tr-TR')} km</p></div>
+          <p class="display text-base font-black leading-tight">${q.q}</p>` + q.o.map((o, i) => `<button data-i="${i}" class="qa pushable py-2 px-2 bg-white text-xs font-black text-left">${o}</button>`).join('');
+        panel.querySelectorAll('.qa').forEach(b => b.addEventListener('click', () => answerElevator(+b.dataset.i, b, q)));
+      } else if (lv.type === 'crust') {
+        const it = queue[step];
+        $('earth').innerHTML = earthSvg({});
+        $('progText').textContent = `${step}/${queue.length}`;
+        panel.innerHTML = `<div class="p-4 bg-amber-50 rounded-2xl border-3 border-ink text-center"><p class="text-5xl">${it.e}</p><p class="display text-xl font-black">${it.n}</p></div>
+          <p class="text-xs font-black text-center">Yer kabuğunda bulunur mu?</p>
+          <div class="grid grid-cols-2 gap-2"><button data-a="1" class="ca pushable py-3 bg-emerald-300 text-sm font-black">✅ Bulunur</button><button data-a="0" class="ca pushable py-3 bg-rose-300 text-sm font-black">❌ Bulunmaz</button></div>`;
+        panel.querySelectorAll('.ca').forEach(b => b.addEventListener('click', () => answerCrust(b.dataset.a === '1')));
+      } else if (lv.type === 'quake') {
+        const sc = QUAKE[step];
+        $('earth').innerHTML = earthSvg({ labels: false }) + `<text x="150" y="160" font-size="70" text-anchor="middle">🏫</text>`;
+        $('progText').textContent = `${step}/${QUAKE.length}`;
+        if (sc.multi) {
+          panel.innerHTML = `<p class="display text-base font-black leading-tight">${sc.s}</p><p class="text-[11px] font-bold text-gray-500">Gerekli olanların hepsini seç, sonra onayla.</p>
+            <div class="grid grid-cols-2 gap-1.5">${sc.o.map((o, i) => `<button data-i="${i}" class="mq pushable py-1.5 px-1 bg-white text-[11px] font-black ${multiSel.has(i) ? 'pick-on' : ''}">${o}</button>`).join('')}</div>
+            <button id="btnPack" class="pushable py-2 bg-emerald-500 text-white text-sm font-black">🎒 Çantayı Kontrol Et</button>`;
+          panel.querySelectorAll('.mq').forEach(b => b.addEventListener('click', () => { const i = +b.dataset.i; multiSel.has(i) ? multiSel.delete(i) : multiSel.add(i); Sound.click(); render(); }));
+          $('btnPack').addEventListener('click', checkPack);
+        } else {
+          panel.innerHTML = `<p class="display text-base font-black leading-tight">${sc.s}</p>` + sc.o.map((o, i) => `<button data-i="${i}" class="qq pushable py-2 px-2 bg-white text-xs font-black text-left">${o}</button>`).join('');
+          panel.querySelectorAll('.qq').forEach(b => b.addEventListener('click', () => answerQuake(+b.dataset.i, b)));
+        }
+      }
+    }
+
+    function answerOrder(id, btn) {
+      if (finished) return;
+      initAudio();
+      if (id === LAYERS[step].id) {
+        Sound.correct();
+        note(`✅ <b>${LAYERS[step].n}</b>: ${LAYERS[step].state}.`);
+        step++;
+        render();
+        if (step === 4) winLevel();
+      } else {
+        mistakes++; Sound.wrong();
+        if (typeof gsap !== 'undefined') gsap.fromTo(btn, { x: -6 }, { x: 0, duration: 0.4, ease: 'elastic.out(4,0.2)' });
+        note('❌ Dıştan içe doğru düşün. Önce en dıştaki katmanı seç!');
+      }
+    }
+
+    function answerElevator(i, btn, q) {
+      if (finished || busy) return;
+      initAudio();
+      if (i !== q.a) { mistakes++; Sound.wrong(); btn.disabled = true; btn.classList.add('bg-rose-200'); note('❌ Tekrar düşün! Rehberdeki bilgiler yardımcı olabilir.'); return; }
+      Sound.correct();
+      note(`✅ Doğru: <b>${q.o[q.a]}</b>`);
+      step++;
+      if (step >= 8) { winLevel(); return; }
+      if (step % 2 === 0) {
+        const next = LAYERS[step / 2];
+        const target = (next.d0 + next.d1) / 2;
+        busy = true;
+        Sound.elevator();
+        if (typeof gsap !== 'undefined') {
+          const o = { d: depth };
+          gsap.to(o, { d: target, duration: 1.2, ease: 'power2.inOut', onUpdate: () => { depth = o.d; $('earth').innerHTML = earthSvg({ depth }); }, onComplete: () => { busy = false; render(); } });
+        } else { depth = target; busy = false; render(); }
+      } else render();
+    }
+
+    function answerCrust(yes) {
+      if (finished) return;
+      initAudio();
+      const it = queue[step];
+      if (yes === it.yes) { Sound.correct(); note(`✅ ${it.why}`); }
+      else { mistakes++; Sound.wrong(); note(`❌ ${it.why}`); }
+      step++;
+      if (step >= queue.length) { winLevel(); return; }
+      render();
+    }
+
+    function answerQuake(i, btn) {
+      if (finished) return;
+      initAudio();
+      const sc = QUAKE[step];
+      if (i === sc.a) {
+        Sound.correct(); note(`✅ ${sc.why}`); step++; render();
+      } else {
+        mistakes++; Sound.rumble(); btn.disabled = true; btn.classList.add('bg-rose-200');
+        note(`❌ Bu güvenli değil! ${sc.why}`);
+        $('sceneWrap').classList.add('quake'); setTimeout(() => $('sceneWrap').classList.remove('quake'), 900);
+      }
+    }
+
+    function checkPack() {
+      const sc = QUAKE[step];
+      const ok = sc.correct.length === multiSel.size && sc.correct.every(i => multiSel.has(i));
+      initAudio();
+      if (ok) { Sound.correct(); note(`✅ ${sc.why}`); step++; winLevel(); }
+      else {
+        mistakes++; Sound.wrong();
+        const missing = sc.correct.filter(i => !multiSel.has(i)).length;
+        const extra = [...multiSel].filter(i => !sc.correct.includes(i)).length;
+        note(`❌ ${missing ? `${missing} gerekli malzeme eksik. ` : ''}${extra ? `${extra} gereksiz malzeme var. ` : ''}Tekrar kontrol et!`);
+      }
+    }
+
+    function winLevel() {
+      finished = true;
+      const s = mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20;
+      if (levelIndex === 0) completeMission('m1');
+      if (L().type === 'elevator') completeMission('m2');
+      if (L().type === 'quake' && mistakes === 0) completeMission('m4');
+      updateScore(); renderLevelDots();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 }, colors: ['#a16207', '#ea580c', '#dc2626', '#facc15'] });
+      showModal({ emoji: L().type === 'quake' ? '🦸' : '🌍', title: 'Görev Tamam!', stars: '⭐'.repeat(s) + '☆'.repeat(3 - s), info: mistakes === 0 ? 'Hiç hata yapmadın!' : `${mistakes} hata yaptın.`, fact: L().fact, next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Kesit Laboratuvarı 🔬' });
+    }
+
+    // --- 6. KESİT LABORATUVARI ---
+    function buildLab() {
+      $('panel').innerHTML = `
+        <div id="labLayer" class="p-3 rounded-2xl border-3 border-ink"><p class="text-[10px] font-black">BULUNDUĞUN KATMAN</p><p id="labLayerName" class="display text-2xl font-black"></p></div>
+        <div class="flex items-center gap-2"><span class="text-xs font-black">⬇️ Derinlik</span><input id="depthSlider" type="range" min="0" max="6371" step="1" value="0" class="flex-1"></div>
+        <div class="grid grid-cols-2 gap-2 text-center">
+          <div class="p-2 bg-white rounded-xl border-2 border-ink"><p class="text-[10px] font-black text-gray-500">DERİNLİK</p><p id="labDepth" class="display text-lg font-black"></p></div>
+          <div class="p-2 bg-white rounded-xl border-2 border-ink"><p class="text-[10px] font-black text-gray-500">SICAKLIK (yaklaşık)</p><p id="labTemp" class="display text-lg font-black text-red-600"></p></div>
+        </div>
+        <p class="text-xs font-bold"><b>Hâli:</b> <span id="labState"></span></p>
+        <p id="labCompare" class="text-[11px] font-semibold text-gray-600"></p>
+        <button id="btnQuake" class="pushable py-2 bg-rose-300 text-xs font-black">🌋 Deprem Simülasyonu</button>`;
+      $('depthSlider').addEventListener('input', e => { depth = +e.target.value; if (depth >= 6371) completeMission('m3'); updateLab(); });
+      $('btnQuake').addEventListener('click', () => {
+        initAudio(); Sound.rumble();
+        $('sceneWrap').classList.add('quake'); setTimeout(() => $('sceneWrap').classList.remove('quake'), 1300);
+        note('🌋 Depremler çoğunlukla <b>yer kabuğundaki</b> büyük kaya parçalarının (levhaların) hareket etmesi ve kırılmasıyla oluşur. Hatırla: <b>Çök – Kapan – Tutun!</b>');
+      });
+      updateLab();
+    }
+
+    function updateLab() {
+      const l = layerAt(depth);
+      const km = Math.round(depth);
+      $('earth').innerHTML = earthSvg({ depth });
+      $('progText').textContent = `${Math.round(depth / 6371 * 100)}%`;
+      $('depthSlider').value = km;
+      $('labLayer').style.background = l.c;
+      $('labLayer').style.color = l.id === 'ic' ? '#0f172a' : '#ffffff';
+      $('labLayerName').textContent = l.n;
+      $('labDepth').textContent = `${km.toLocaleString('tr-TR')} km`;
+      $('labTemp').textContent = `${Math.round(tempAt(depth) / 50) * 50} °C`;
+      $('labState').textContent = l.state;
+      $('labCompare').textContent = '📏 ' + (km < 36 ? 'Uçakların uçtuğu yüksekliğin yaklaşık 3 katı kadar derin' : km < 500 ? 'İstanbul–Ankara arası yaklaşık 350 km' : km < 2000 ? 'Edirne–Kars arası yaklaşık 1500 km' : km < 5000 ? 'Türkiye\'nin batısından doğusuna üç kez gitmek gibi' : 'Dünya\'nın merkezine yaklaşıyorsun!');
+    }
+
+    // --- 7. AKIŞ ---
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info; $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next); if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 800);
+    }
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5"><span class="text-lg">${done ? '✅' : '⬜'}</span><div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Görevler:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function loadLevel(i) {
+      closeModal();
+      mode = 'levels'; levelIndex = i; step = 0; mistakes = 0; finished = false; busy = false; multiSel = new Set();
+      $('levelBadge').textContent = `GÖREV ${i + 1}`;
+      $('levelTitle').textContent = L().title;
+      $('taskText').textContent = L().task;
+      if (L().type === 'order') queue = [...LAYERS].sort(() => Math.random() - 0.5);
+      if (L().type === 'crust') queue = [...CRUST_ITEMS].sort(() => Math.random() - 0.5);
+      if (L().type === 'elevator') depth = 17;
+      renderLevelDots(); render();
+    }
+
+    function switchMode(m) {
+      const isS = m === 'lab';
+      $('tabLevels').classList.toggle('active-tab', !isS); $('tabLevels').classList.toggle('bg-white', isS);
+      $('tabSandbox').classList.toggle('active-tab', isS); $('tabSandbox').classList.toggle('bg-white', !isS);
+      $('levelDots').classList.toggle('hidden', isS);
+      if (isS) {
+        closeModal();
+        mode = 'lab'; depth = 0;
+        $('levelBadge').textContent = 'LABORATUVAR';
+        $('levelTitle').textContent = 'Dünya\'nın Kesiti';
+        $('taskText').textContent = '🎯 Kaydırıcıyla derinlere in. Katman, sıcaklık ve hâl nasıl değişiyor?';
+        buildLab();
+      } else loadLevel(levelIndex);
+    }
+
+    $('btnReset').addEventListener('click', () => { Sound.click(); if (mode === 'levels') loadLevel(levelIndex); else { depth = 0; updateLab(); } });
+    $('btnHint').addEventListener('click', () => { Sound.click(); note(mode === 'levels' ? `<b>İpucu:</b> ${L().hint}` : '<b>Keşif:</b> Derine indikçe sıcaklık hep artıyor mu? Dış çekirdek sıvıyken iç çekirdek neden katı? (İpucu: basınç!)'); });
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('lab'); });
+    $('btnModalRetry').addEventListener('click', () => loadLevel(levelIndex));
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('lab'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; Sound.click(); });
+
+    renderMissions(); updateScore(); loadLevel(0);
+  </script>
+</body>
+</html>

@@ -1,0 +1,1772 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Soğan Zarında Hücre Keşfi - Küçük Mucitler</title>
+
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- GSAP Animation Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            paper: '#fffdfa',
+            ink: '#182b4d',
+            sun: '#facc15',
+            sky: '#38bdf8',
+            amberBio: '#d97706',
+            amberDark: '#92400e',
+            emeraldBio: '#059669',
+            onionSkin: '#ca8a04',
+            cellStain: '#b45309'
+          },
+          fontFamily: {
+            display: ['"Baloo 2"', 'cursive'],
+            body: ['Nunito', 'sans-serif']
+          },
+          borderWidth: {
+            '3': '3px'
+          },
+          boxShadow: {
+            card: '0 8px 0 #182b4d',
+            'card-sm': '0 4px 0 #182b4d',
+            'card-lg': '0 12px 0 #182b4d',
+            'card-pressed': '0 2px 0 #182b4d'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fefce8;
+      color: #182b4d;
+    }
+    .display {
+      font-family: 'Baloo 2', cursive;
+    }
+    .pushable {
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+      border: 3px solid #182b4d;
+      border-radius: 1rem;
+      box-shadow: 0 4px 0 #182b4d;
+    }
+    .pushable:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #182b4d;
+    }
+    .pushable-sm {
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+      border: 2px solid #182b4d;
+      border-radius: 0.75rem;
+      box-shadow: 0 3px 0 #182b4d;
+    }
+    .pushable-sm:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 #182b4d;
+    }
+    .chunky {
+      border: 3px solid #182b4d;
+      border-radius: 1.25rem;
+      box-shadow: 0 6px 0 #182b4d;
+    }
+    /* Mikroskop Oküler Maskelemesi */
+    .microscope-lens {
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.7), 0 0 0 16px #1e293b, 0 0 0 20px #0f172a, 0 10px 25px rgba(0,0,0,0.5);
+    }
+    /* Özel Kaydırıcı Stili */
+    input[type=range] {
+      accent-color: #d97706;
+    }
+    /* SVG Güvenli Hover Efekti (Konumu Bozmayan Sabit Işıma) */
+    #onionObject {
+      cursor: pointer;
+    }
+    #onionObject:hover path {
+      filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.75));
+    }
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 0.95; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.02); }
+    }
+    .pulse-subtle {
+      animation: pulse-subtle 2.5s infinite ease-in-out;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col p-3 sm:p-5 antialiased selection:bg-amber-200">
+
+  <!-- ÜST NAVİGASYON VE LOGO BARI -->
+  <header class="max-w-6xl w-full mx-auto mb-4 flex items-center justify-between gap-3 bg-white px-4 py-3 chunky">
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="pushable-sm px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-ink font-black text-xs sm:text-sm flex items-center gap-1.5" title="Ana Sayfaya Dön">
+        <span>⬅</span> <span class="hidden sm:inline">Deneyler</span>
+      </a>
+      <div class="flex items-center gap-2">
+        <span class="text-2xl sm:text-3xl">🔬</span>
+        <div>
+          <span class="text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">18. Deney • 4-5. Sınıf Fen</span>
+          <h1 class="display text-base sm:text-xl font-extrabold leading-none text-ink">Soğan Zarında Hücre Keşfi</h1>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sağ Üst: Ses & Yardım Kontrolü -->
+    <div class="flex items-center gap-2">
+      <button id="soundToggle" class="pushable-sm px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-ink font-bold text-xs flex items-center gap-1">
+        <span id="soundIcon">🔊</span>
+        <span class="hidden sm:inline">Ses</span>
+      </button>
+      <button id="btnResetAll" class="pushable-sm px-2.5 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-900 font-bold text-xs flex items-center gap-1" title="Deneyi Sıfırla">
+        <span>🔄</span> <span class="hidden sm:inline">Sıfırla</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ANA İÇERİK DÜZENİ (2 KOLONLU) -->
+  <main class="max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
+    
+    <!-- SOL KOLON: İNTERAKTİF MİKROSKOP OKÜLERİ VE PREPARAT ALANI (7 Kolon) -->
+    <div class="lg:col-span-7 flex flex-col gap-3">
+
+      <!-- MOD SEÇİM SEKMELERİ (Preparat Hazırlama vs Mikroskop İnceleme) -->
+      <div class="grid grid-cols-2 gap-2 bg-amber-100 p-1.5 rounded-2xl border-3 border-ink">
+        <button id="tabPrep" class="tab-btn py-2 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all bg-white border-2 border-ink shadow-sm text-ink">
+          <span>🧫</span> <span>1. Preparat Hazırla</span>
+        </button>
+        <button id="tabScope" class="tab-btn py-2 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all text-gray-700 hover:bg-white/60">
+          <span>🔬</span> <span>2. Mikroskop İnceleme</span>
+        </button>
+      </div>
+
+      <!-- GÖRÜNÜM A: 1. AŞAMA - PREPARAT HAZIRLAMA MASASI -->
+      <section id="viewPrep" class="bg-white p-4 chunky flex flex-col justify-between flex-1 min-h-[460px]">
+        <div>
+          <!-- Başlık ve Yönerge -->
+          <div class="flex items-center justify-between border-b-2 border-dashed border-gray-300 pb-3 mb-3">
+            <div>
+              <span class="text-xs font-black uppercase text-amber-600 tracking-wider">Laboratuvar Atölyesi</span>
+              <h2 class="display text-lg sm:text-xl font-black text-ink">Lam-Lamel Üzerinde Soğan Zarı Hazırlığı</h2>
+            </div>
+            <span id="prepStepBadge" class="px-2.5 py-1 bg-amber-400 text-ink border-2 border-ink rounded-full text-xs font-black">
+              Adım 1 / 5
+            </span>
+          </div>
+
+          <!-- Yönerge Kutucuğu -->
+          <div class="bg-amber-50 p-3 rounded-xl border-2 border-amber-300 mb-4 flex items-start gap-2.5">
+            <span id="prepInstructionIcon" class="text-2xl flex-shrink-0">🧅</span>
+            <div>
+              <h3 id="prepInstructionTitle" class="font-extrabold text-sm text-amber-900">Soğanın Şeffaf Zarını Soy</h3>
+              <p id="prepInstructionDesc" class="text-xs text-amber-800 font-medium">
+                Cımbızı kullanarak soğanın etli katının iç yüzeyindeki incecik, saydam zarı (epidermis) tek hamlede nazikçe çekip çıkar!
+              </p>
+            </div>
+          </div>
+
+          <!-- İnteraktif Laboratuvar Tablası (SVG) -->
+          <div class="relative w-full aspect-[400/230] bg-gradient-to-b from-sky-50 to-amber-50 rounded-2xl border-3 border-ink overflow-hidden flex items-center justify-center shadow-inner">
+            
+            <!-- Masa Ahşap Çizgisi -->
+            <div class="absolute bottom-0 left-0 right-0 h-8 bg-amber-200 border-t-2 border-ink/40"></div>
+
+            <svg id="prepSvg" viewBox="0 0 400 230" class="w-full h-full overflow-visible select-none cursor-pointer">
+              <defs>
+                <linearGradient id="glassSlideGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.8"/>
+                  <stop offset="50%" stop-color="#e0f2fe" stop-opacity="0.4"/>
+                  <stop offset="100%" stop-color="#ffffff" stop-opacity="0.7"/>
+                </linearGradient>
+                <linearGradient id="iodineDropGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#f59e0b"/>
+                  <stop offset="100%" stop-color="#b45309"/>
+                </linearGradient>
+              </defs>
+
+              <!-- 1. SOĞAN KATMANI (Sol tarafta duran soğan parçası) -->
+              <g id="onionObject" transform="translate(75, 140)">
+                <!-- Soğan Dış Kabuk -->
+                <path d="M -40 30 C -40 -20, 40 -20, 40 30 Z" fill="#fef08a" stroke="#182b4d" stroke-width="3" />
+                <!-- Soğan Etli Katman Çizgileri -->
+                <path d="M -30 30 C -30 -10, 30 -10, 30 30" fill="none" stroke="#eab308" stroke-width="2.5" />
+                <path d="M -18 30 C -18 0, 18 0, 18 30" fill="none" stroke="#ca8a04" stroke-width="2" />
+                <!-- Zar Soyulma Hattı (Kırmızı kesikli hat) -->
+                <path id="peelHighlight" d="M -12 26 C -12 6, 12 6, 12 26" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 2" opacity="0.9" />
+                <text x="0" y="44" text-anchor="middle" font-size="10" font-weight="900" fill="#182b4d" font-family="'Baloo 2'">🧅 Taze Soğan</text>
+              </g>
+
+              <!-- CIMBIZ (Zar Çekme Aleti) -->
+              <g id="tweezerObject" transform="translate(80, 85)">
+                <path d="M 0 0 L 15 -45 L 20 -45 L 6 0 Z" fill="#94a3b8" stroke="#182b4d" stroke-width="2" />
+                <path d="M 3 0 L 22 -45 L 25 -45 L 8 0 Z" fill="#cbd5e1" stroke="#182b4d" stroke-width="1.8" />
+                <!-- Cımbızın Ucundaki Zar Parçası -->
+                <path id="tweezerMembrane" d="M 1 0 Q 8 8 14 2 Q 8 -4 1 0" fill="#fef08a" stroke="#ca8a04" stroke-width="1.5" opacity="0" />
+              </g>
+
+              <!-- 2. CAM LAM (Merkezdeki Dikdörtgen Cam Plaka) -->
+              <g id="slideGroup" transform="translate(240, 140)">
+                <!-- Lam Gölgesi -->
+                <rect x="-85" y="-18" width="170" height="38" rx="4" fill="#94a3b8" opacity="0.3" transform="translate(4, 6)" />
+                <!-- Lam Cam Gövdesi -->
+                <rect x="-85" y="-18" width="170" height="38" rx="4" fill="url(#glassSlideGrad)" stroke="#182b4d" stroke-width="2.5" />
+                <rect x="-83" y="-16" width="166" height="34" rx="2" fill="#f8fafc" opacity="0.3" />
+                <!-- Lam Parlama Çizgisi -->
+                <line x1="-80" y1="-14" x2="80" y2="-14" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.8" />
+                <text x="0" y="32" text-anchor="middle" font-size="10" font-weight="900" fill="#64748b" font-family="'Baloo 2'">🔬 Cam Lam</text>
+
+                <!-- Lam Üzerine Serilen Soğan Zarı -->
+                <path id="membraneOnSlide" d="M -25 -10 Q 0 -14 25 -9 Q 28 6 22 10 Q -5 12 -25 8 Z" 
+                      fill="#fef08a" stroke="#ca8a04" stroke-width="1.8" opacity="0" />
+                <!-- Zar Üstündeki Hücre Doku Çizgileri -->
+                <g id="membraneCellPattern" opacity="0">
+                  <line x1="-15" y1="-8" x2="-15" y2="8" stroke="#ca8a04" stroke-width="1" stroke-dasharray="2 2" />
+                  <line x1="-5" y1="-10" x2="-5" y2="9" stroke="#ca8a04" stroke-width="1" stroke-dasharray="2 2" />
+                  <line x1="5" y1="-11" x2="5" y2="10" stroke="#ca8a04" stroke-width="1" stroke-dasharray="2 2" />
+                  <line x1="15" y1="-9" x2="15" y2="8" stroke="#ca8a04" stroke-width="1" stroke-dasharray="2 2" />
+                </g>
+
+                <!-- İyot Çözeltisi Damlası / Leke -->
+                <ellipse id="iodineStainOnSlide" cx="0" cy="0" rx="18" ry="9" fill="url(#iodineDropGrad)" opacity="0" />
+
+                <!-- LAMEL (Küçük Kare Cam Kapak) -->
+                <g id="coverSlipObject" opacity="0">
+                  <!-- 45 Derece Kapanma Animasyonu İçin Lamel -->
+                  <polygon id="coverSlipShape" points="-22,-15 22,-15 22,15 -22,15" fill="#e0f2fe" stroke="#0284c7" stroke-width="2" opacity="0.8" />
+                  <line x1="-20" y1="-13" x2="20" y2="13" stroke="#ffffff" stroke-width="1.5" opacity="0.7" />
+                </g>
+              </g>
+
+              <!-- 3. İYOT DAMLALIĞI (Pipet) -->
+              <g id="dropperObject" transform="translate(240, 45)" opacity="0">
+                <!-- Damlalık Cam Ucu -->
+                <path d="M -4 20 L -2 40 L 2 40 L 4 20 Z" fill="#e2e8f0" stroke="#182b4d" stroke-width="1.5" />
+                <!-- Damlalık Cam Gövdesi -->
+                <rect x="-6" y="-15" width="12" height="35" rx="2" fill="#f8fafc" stroke="#182b4d" stroke-width="2" opacity="0.9" />
+                <!-- İçindeki İyot Çözeltisi -->
+                <rect x="-4" y="0" width="8" height="20" rx="1" fill="#d97706" />
+                <!-- Damlalık Kauçuk Başlığı -->
+                <path d="M -8 -15 C -8 -26, 8 -26, 8 -15 Z" fill="#b91c1c" stroke="#182b4d" stroke-width="2" />
+                <!-- Asılı Kalan İyot Damlası -->
+                <path id="hangingDrop" d="M 0 42 C -3 42, -4 47, 0 50 C 4 47, 3 42, 0 42 Z" fill="#d97706" stroke="#182b4d" stroke-width="1" />
+              </g>
+
+              <!-- 4. BAŞARI ROZETİ VE OKLAR -->
+              <g id="prepSuccessBadge" opacity="0" transform="translate(200, 100)">
+                <rect x="-100" y="-20" width="200" height="40" rx="12" fill="#22c55e" stroke="#182b4d" stroke-width="3" />
+                <text x="0" y="6" text-anchor="middle" font-size="14" font-weight="900" fill="#ffffff" font-family="'Baloo 2'">🎉 Preparat Hazırlandı!</text>
+              </g>
+
+            </svg>
+          </div>
+        </div>
+
+        <!-- Alt Aksiyon Kontrol Butonları -->
+        <div class="mt-4 pt-3 border-t-2 border-dashed border-gray-300 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-gray-500">Hazırlık Süreci:</span>
+            <div class="flex gap-1.5" id="prepStepDots">
+              <span class="w-3 h-3 rounded-full bg-amber-500 border border-ink"></span>
+              <span class="w-3 h-3 rounded-full bg-gray-200 border border-ink"></span>
+              <span class="w-3 h-3 rounded-full bg-gray-200 border border-ink"></span>
+              <span class="w-3 h-3 rounded-full bg-gray-200 border border-ink"></span>
+              <span class="w-3 h-3 rounded-full bg-gray-200 border border-ink"></span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button id="btnPrepAction" class="pushable py-2.5 px-5 bg-amber-400 hover:bg-amber-500 text-ink font-black text-sm flex items-center gap-2">
+              <span id="btnPrepIcon">🧅</span>
+              <span id="btnPrepText">Soğan Zarını Soy (Adım 1)</span>
+            </button>
+            <button id="btnGoToScope" class="hidden pushable py-2.5 px-5 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm items-center gap-2 animate-bounce">
+              <span>🔬</span> <span>Mikroskoba Geç ➔</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- GÖRÜNÜM B: 2. AŞAMA - MİKROSKOP OKÜLER İNCELEME LABORATUVARI -->
+      <section id="viewScope" class="hidden bg-white p-4 chunky flex flex-col justify-between flex-1 min-h-[460px]">
+        <div>
+          <!-- Mikroskop Başlık ve Kontrol Durumları -->
+          <div class="flex items-center justify-between border-b-2 border-dashed border-gray-300 pb-2 mb-2">
+            <div>
+              <span class="text-xs font-black uppercase text-emerald-600 tracking-wider">Işık Mikroskobu</span>
+              <h2 class="display text-lg sm:text-xl font-black text-ink">Okülerden Soğan Zarı Hücreleri</h2>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="magBadge" class="px-2.5 py-0.5 bg-emerald-100 text-emerald-900 border-2 border-ink rounded-full text-xs font-black">
+                100x Büyütme
+              </span>
+              <span id="focusBadge" class="px-2.5 py-0.5 bg-rose-100 text-rose-900 border-2 border-ink rounded-full text-xs font-black">
+                Bulanık 🔍
+              </span>
+            </div>
+          </div>
+
+          <!-- MİKROSKOP DAİRESEL OKÜLER MERCEĞİ (SVG & İNTERAKTİF HÜCRELER) -->
+          <div class="relative w-full max-w-[420px] aspect-square mx-auto rounded-full bg-slate-900 microscope-lens overflow-hidden border-4 border-ink flex items-center justify-center">
+            
+            <!-- Mikroskop Aydınlatma Çemberi (Kondansatör Işığı) -->
+            <div id="lensBackdrop" class="absolute inset-2 rounded-full bg-gradient-to-br from-amber-50 via-yellow-100 to-amber-200 transition-colors duration-500"></div>
+
+            <!-- Cam Yansıması Efekti -->
+            <div class="absolute inset-0 rounded-full bg-gradient-to-tr from-transparent via-white/10 to-white/40 pointer-events-none z-20"></div>
+            
+            <!-- Vinyet Karartması (Optik Kenar Gölgelenmesi) -->
+            <div class="absolute inset-0 rounded-full shadow-[inset_0_0_40px_rgba(0,0,0,0.6)] pointer-events-none z-20"></div>
+
+            <!-- Mikrometre Ölçek Cetveli (Mikron Ölçümü) -->
+            <div class="absolute bottom-6 right-8 bg-black/60 text-white px-2 py-0.5 rounded border border-white/40 text-[10px] font-mono z-20 pointer-events-none flex items-center gap-1">
+              <span class="w-8 h-1 bg-white inline-block"></span>
+              <span id="scaleLabel">100 µm</span>
+            </div>
+
+            <!-- HÜCRE KOLONİSİ SVG ÇİZİM ALANI -->
+            <svg id="scopeSvg" viewBox="0 0 400 400" class="w-full h-full relative z-10 select-none">
+              
+              <defs>
+                <!-- Bulanıklık Filtresi (Netlik/Fokus için) -->
+                <filter id="focusFilter">
+                  <feGaussianBlur id="blurNode" stdDeviation="5" />
+                </filter>
+
+                <!-- Hücre Çeperi Deseni / Çift Hat Degradesi -->
+                <linearGradient id="wallGradStained" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#b45309"/>
+                  <stop offset="100%" stop-color="#78350f"/>
+                </linearGradient>
+
+                <linearGradient id="wallGradNatural" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#94a3b8"/>
+                  <stop offset="100%" stop-color="#64748b"/>
+                </linearGradient>
+
+                <!-- Sitoplazma Degradesi -->
+                <radialGradient id="cytoStained" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#fef3c7" stop-opacity="0.85"/>
+                  <stop offset="85%" stop-color="#fde68a" stop-opacity="0.95"/>
+                  <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.6"/>
+                </radialGradient>
+
+                <radialGradient id="cytoNatural" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#f8fafc" stop-opacity="0.7"/>
+                  <stop offset="85%" stop-color="#f1f5f9" stop-opacity="0.85"/>
+                  <stop offset="100%" stop-color="#cbd5e1" stop-opacity="0.5"/>
+                </radialGradient>
+
+                <!-- Çekirdek Degradesi -->
+                <radialGradient id="nucleusStained" cx="40%" cy="40%" r="60%">
+                  <stop offset="0%" stop-color="#b45309"/>
+                  <stop offset="60%" stop-color="#78350f"/>
+                  <stop offset="100%" stop-color="#451a03"/>
+                </radialGradient>
+
+                <radialGradient id="nucleusNatural" cx="40%" cy="40%" r="60%">
+                  <stop offset="0%" stop-color="#94a3b8"/>
+                  <stop offset="70%" stop-color="#64748b"/>
+                  <stop offset="100%" stop-color="#475569"/>
+                </radialGradient>
+              </defs>
+
+              <!-- ANA HÜCRE GRUBU (Tüm hücreler burada çizilir ve odaklanır) -->
+              <g id="cellColonyGroup" filter="url(#focusFilter)">
+                
+                <!-- BÜYÜTME 40x / 100x / 400x İÇİN SOĞAN ZARI TUĞLA DOKUSU (DİNAMİK RENDER) -->
+                <g id="cellsContainer">
+                  <!-- JavaScript dinamik olarak gerçekçi hücreleri buraya ekler -->
+                </g>
+
+              </g>
+
+              <!-- SEÇİLEN ORGANELE ODAK HALKASI -->
+              <circle id="inspectRing" cx="-100" cy="-100" r="16" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="4 3" opacity="0" pointer-events="none" />
+
+            </svg>
+          </div>
+
+          <!-- MİKROSKOP AYAR KONTROL PANELİ -->
+          <div class="mt-3 bg-amber-50 p-2.5 rounded-xl border-2 border-ink space-y-2">
+            
+            <!-- 1. Büyütme Çarkı (Revolver) Butonları -->
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-black text-ink flex items-center gap-1">
+                <span>🔄</span> <span>Objektif:</span>
+              </span>
+              <div class="grid grid-cols-3 gap-1.5 flex-1 max-w-[280px]">
+                <button id="btnMag40" class="mag-btn py-1 px-2 rounded-lg font-black text-xs border-2 border-ink bg-white text-ink transition-all">
+                  40x (Tarama)
+                </button>
+                <button id="btnMag100" class="mag-btn py-1 px-2 rounded-lg font-black text-xs border-2 border-ink bg-emerald-400 text-ink shadow-sm transition-all">
+                  100x (Doku)
+                </button>
+                <button id="btnMag400" class="mag-btn py-1 px-2 rounded-lg font-black text-xs border-2 border-ink bg-white text-ink transition-all">
+                  400x (Hücre)
+                </button>
+              </div>
+            </div>
+
+            <!-- 2. Netlik (Fokus) Kaydırıcısı -->
+            <div class="flex items-center justify-between gap-2 pt-1 border-t border-amber-200">
+              <label for="focusSlider" class="text-xs font-black text-ink flex items-center gap-1">
+                <span>🎚️</span> <span>Netlik (Mikrometre):</span>
+              </label>
+              <div class="flex items-center gap-2 flex-1 max-w-[280px]">
+                <span class="text-[10px] text-gray-500 font-bold">Bulanık</span>
+                <input id="focusSlider" type="range" min="0" max="100" value="25" class="w-full h-2 bg-amber-200 rounded-lg cursor-pointer border border-ink" />
+                <span class="text-[10px] text-gray-500 font-bold">Net</span>
+              </div>
+            </div>
+
+            <!-- 3. İyot Boyası ve Etiket Aç/Kapa Anahtarları -->
+            <div class="flex items-center justify-between gap-2 pt-1 border-t border-amber-200 text-xs">
+              <div class="flex items-center gap-2">
+                <button id="btnToggleStain" class="pushable-sm px-2.5 py-1 bg-amber-200 hover:bg-amber-300 font-extrabold text-ink flex items-center gap-1 text-[11px]">
+                  <span>🧪</span> <span id="stainBtnText">İyot Boyalı (Aktif)</span>
+                </button>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="btnToggleLabels" class="pushable-sm px-2.5 py-1 bg-sky-100 hover:bg-sky-200 font-extrabold text-ink flex items-center gap-1 text-[11px]">
+                  <span>🏷️</span> <span id="labelsBtnText">Etiketleri Göster</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Alt İpucu ve Seçilen Organel Bilgisi -->
+        <div id="organelleCard" class="mt-2 p-2.5 bg-yellow-50 rounded-xl border-2 border-ink text-xs flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span id="organelleIcon" class="text-2xl">🧱</span>
+            <div>
+              <div class="flex items-center gap-1.5">
+                <h4 id="organelleName" class="font-black text-ink">Soğan Zarı Hücreleri</h4>
+                <span id="organelleBadge" class="px-1.5 py-0.2 bg-amber-200 text-[10px] font-black rounded border border-ink">Tuğla Dizilimi</span>
+              </div>
+              <p id="organelleDesc" class="text-[11px] text-gray-700 font-medium">
+                Mercekteki herhangi bir hücreye, çepere veya çekirdeğe tıkla ve organelleri keşfet!
+              </p>
+            </div>
+          </div>
+          <span class="text-[10px] bg-white px-2 py-1 rounded border border-ink font-bold text-gray-500 whitespace-nowrap">
+            Tıkla & Öğren 👆
+          </span>
+        </div>
+      </section>
+
+    </div>
+
+
+    <!-- SAĞ KOLON: BİLİM REHBERİ, BİTKİ VS HAYVAN KIYASI & GÖREVLER (5 Kolon) -->
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      
+      <!-- REHBER VE TEST SEKMELERİ -->
+      <div class="grid grid-cols-3 gap-1 bg-amber-100 p-1.5 rounded-2xl border-3 border-ink text-xs font-black">
+        <button id="subTabGuide" class="sub-tab-btn py-1.5 rounded-xl bg-white border-2 border-ink shadow-sm text-ink">
+          📖 Hücre Yapısı
+        </button>
+        <button id="subTabCompare" class="sub-tab-btn py-1.5 rounded-xl text-gray-700 hover:bg-white/60">
+          🌱 vs 🐾 Hücre
+        </button>
+        <button id="subTabQuiz" class="sub-tab-btn py-1.5 rounded-xl text-gray-700 hover:bg-white/60">
+          ⭐ Bilgi Sınavı
+        </button>
+      </div>
+
+      <!-- SEÇENEK 1: HÜCRE REHBERİ VE DEDEKTİF GÖREVLERİ -->
+      <div id="subViewGuide" class="space-y-3 flex-1 flex flex-col">
+        
+        <!-- Biyolog Görev Listesi -->
+        <div class="bg-white p-3.5 chunky">
+          <div class="flex items-center justify-between border-b-2 border-gray-100 pb-2 mb-2">
+            <h3 class="display text-sm sm:text-base font-black text-ink flex items-center gap-1.5">
+              <span>🎯</span> <span>Küçük Biyolog Görevleri</span>
+            </h3>
+            <span id="missionProgressText" class="px-2 py-0.5 bg-amber-100 border border-ink rounded-full text-[10px] font-black text-amber-900">
+              0 / 3 Görev
+            </span>
+          </div>
+
+          <ul class="space-y-2 text-xs font-bold text-gray-700">
+            <li id="mission1" class="flex items-start gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50 transition-colors">
+              <span class="mission-check text-base">⭕</span>
+              <div>
+                <span class="text-ink font-black block">1. Görev: Preparat Hazırla</span>
+                <span class="text-[11px] text-gray-600 font-medium">Zarı soy, lam üzerine koy, iyot damlat ve lameli kapat!</span>
+              </div>
+            </li>
+            <li id="mission2" class="flex items-start gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50 transition-colors">
+              <span class="mission-check text-base">⭕</span>
+              <div>
+                <span class="text-ink font-black block">2. Görev: Mikroskopta Netlik Yakala</span>
+                <span class="text-[11px] text-gray-600 font-medium">Mikrometre kaydırıcısını çevirerek hücreleri kristal netliğe ulaştır!</span>
+              </div>
+            </li>
+            <li id="mission3" class="flex items-start gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50 transition-colors">
+              <span class="mission-check text-base">⭕</span>
+              <div>
+                <span class="text-ink font-black block">3. Görev: 400x Büyütmeyle Çekirdeği İncele</span>
+                <span class="text-[11px] text-gray-600 font-medium">400x objektife geç ve hücrenin çekirdeğine tıklayarak bilgi al!</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Soğan Zarı Hücresi Temel Kısımları -->
+        <div class="bg-white p-3.5 chunky flex-1">
+          <h3 class="display text-sm sm:text-base font-black text-ink flex items-center gap-1.5 mb-2">
+            <span>🧅</span> <span>Soğan Hücresinin 4 Temel Harikası</span>
+          </h3>
+
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="bg-amber-50 p-2.5 rounded-xl border-2 border-amber-200">
+              <div class="flex items-center gap-1 text-amber-900 font-black mb-1">
+                <span>🧱</span> <span>Hücre Çeperi</span>
+              </div>
+              <p class="text-[11px] text-amber-800 leading-snug">
+                Sadece bitkilerde bulunur! Selülozdan yapılmış sert kalkan hücreye tuğla gibi sağlam köşeli şekil verir.
+              </p>
+            </div>
+
+            <div class="bg-orange-50 p-2.5 rounded-xl border-2 border-orange-200">
+              <div class="flex items-center gap-1 text-orange-900 font-black mb-1">
+                <span>🎯</span> <span>Çekirdek (Nükleus)</span>
+              </div>
+              <p class="text-[11px] text-orange-800 leading-snug">
+                Hücrenin yönetim ve DNA merkezidir. İyot boyasıyla kehribar sarısına boyanarak koyu küre halinde parlar!
+              </p>
+            </div>
+
+            <div class="bg-yellow-50 p-2.5 rounded-xl border-2 border-yellow-200">
+              <div class="flex items-center gap-1 text-yellow-900 font-black mb-1">
+                <span>💧</span> <span>Sitoplazma</span>
+              </div>
+              <p class="text-[11px] text-yellow-800 leading-snug">
+                Çeper ile çekirdek arasını dolduran yarı akışkan, canlı jelimsi yaşam sıvısıdır.
+              </p>
+            </div>
+
+            <div class="bg-sky-50 p-2.5 rounded-xl border-2 border-sky-200">
+              <div class="flex items-center gap-1 text-sky-900 font-black mb-1">
+                <span>🫧</span> <span>Merkezi Koful</span>
+              </div>
+              <p class="text-[11px] text-sky-800 leading-snug">
+                Bitki hücresinin ortasındaki dev su deposudur! O kadar büyüktür ki çekirdeği kenara doğru iter.
+              </p>
+            </div>
+          </div>
+
+          <!-- Neden İyot Kullanırız? Kutusu -->
+          <div class="mt-3 bg-emerald-50 p-2.5 rounded-xl border-2 border-emerald-300 flex items-start gap-2">
+            <span class="text-xl">💡</span>
+            <div>
+              <span class="text-xs font-black text-emerald-900 block">Neden İyot (Lugol) Damlatırız?</span>
+              <p class="text-[11px] text-emerald-800 font-medium leading-tight">
+                Soğan zarı hücreleri renksiz ve saydamdır. İyot çözeltisi hücre çeperini ve çekirdeği koyu renge boyayarak mikroskopta kolayca görünür kılar!
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- SEÇENEK 2: BİTKİ VS HAYVAN HÜCRESİ KARŞILAŞTIRMASI -->
+      <div id="subViewCompare" class="hidden space-y-3 flex-1">
+        <div class="bg-white p-4 chunky">
+          <div class="flex items-center justify-between mb-3 border-b-2 border-gray-100 pb-2">
+            <h3 class="display text-base font-black text-ink flex items-center gap-1.5">
+              <span>🌱</span> <span>Bitki vs Hayvan Hücresi</span>
+            </h3>
+            <span class="px-2 py-0.5 bg-purple-100 border border-ink text-purple-900 rounded-full text-[10px] font-black">
+              MEB Müfredat Karşılaştırması
+            </span>
+          </div>
+
+          <div class="space-y-2.5 text-xs">
+            <div class="grid grid-cols-2 gap-2">
+              <!-- Soğan Zarı (Bitki) -->
+              <div class="bg-amber-50 p-3 rounded-xl border-2 border-amber-300">
+                <div class="flex items-center gap-1 text-amber-900 font-black mb-1.5">
+                  <span class="text-lg">🧅</span> <span>Soğan Zarı (Bitki)</span>
+                </div>
+                <ul class="space-y-1 text-[11px] text-amber-900 font-semibold">
+                  <li>✅ <b>Şekil:</b> Köşeli ve tuğla gibi düzgün.</li>
+                  <li>✅ <b>Hücre Çeperi:</b> VAR (Sert koruyucu).</li>
+                  <li>✅ <b>Kofullar:</b> BÜYÜK ve AZ sayıda.</li>
+                  <li>✅ <b>Çekirdek:</b> Koful nedeniyle kenarda.</li>
+                </ul>
+              </div>
+
+              <!-- Ağız İçi Epiteli (Hayvan) -->
+              <div class="bg-rose-50 p-3 rounded-xl border-2 border-rose-300">
+                <div class="flex items-center gap-1 text-rose-900 font-black mb-1.5">
+                  <span class="text-lg">👅</span> <span>Ağız Epiteli (Hayvan)</span>
+                </div>
+                <ul class="space-y-1 text-[11px] text-rose-900 font-semibold">
+                  <li>❌ <b>Şekil:</b> Yuvarlak ve esnek.</li>
+                  <li>❌ <b>Hücre Çeperi:</b> YOK (Sadece zar).</li>
+                  <li>❌ <b>Kofullar:</b> KÜÇÜK ve ÇOK sayıda.</li>
+                  <li>❌ <b>Çekirdek:</b> Genelde hücre merkezinde.</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Bilimsel Çıkarım -->
+            <div class="bg-sky-50 p-3 rounded-xl border-2 border-sky-300">
+              <span class="font-black text-sky-900 text-xs block mb-1">🔬 Temel Bilimsel Çıkarım:</span>
+              <p class="text-[11px] text-sky-800 leading-relaxed">
+                Tüm canlılar (bitkiler, hayvanlar, insanlar) mikroskobik yapı taşları olan <b>hücrelerden</b> oluşur. Hücre, canlının canlılık özelliği gösteren en küçük temel birimidir!
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- SEÇENEK 3: BİLGİ SINAVI (QUIZ) -->
+      <div id="subViewQuiz" class="hidden space-y-3 flex-1">
+        <div class="bg-white p-4 chunky">
+          <div class="flex items-center justify-between mb-3 border-b-2 border-gray-100 pb-2">
+            <h3 class="display text-base font-black text-ink flex items-center gap-1.5">
+              <span>⭐</span> <span>Hücre Bilgi Sınavı</span>
+            </h3>
+            <span id="quizScoreText" class="px-2 py-0.5 bg-yellow-300 text-ink border border-ink rounded-full text-[10px] font-black">
+              Soru 1 / 5
+            </span>
+          </div>
+
+          <div id="quizContainer" class="space-y-3">
+            <div class="bg-amber-50 p-3 rounded-xl border-2 border-amber-300">
+              <span id="quizQuestion" class="font-extrabold text-xs text-ink block leading-relaxed">
+                1. Soğan zarını mikroskop altında incelediğimizde hücrelerin birbirine tuğla gibi kenetli ve köşeli görünmesini sağlayan yapı nedir?
+              </span>
+            </div>
+
+            <div id="quizOptions" class="space-y-2">
+              <!-- Seçenekler dinamik olarak yüklenir -->
+            </div>
+
+            <!-- Açıklama ve Sonraki Butonu -->
+            <div id="quizFeedback" class="hidden p-2.5 rounded-xl border-2 text-xs font-bold leading-tight"></div>
+            
+            <button id="btnNextQuestion" class="hidden w-full pushable py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs items-center justify-center gap-1">
+              <span>Sıradaki Soru ➔</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ALT BİLGİ (FOOTER) -->
+  <footer class="max-w-6xl w-full mx-auto mt-4 py-2 px-4 bg-white/70 rounded-xl border border-ink/30 text-center text-xs text-gray-600 font-bold flex flex-wrap items-center justify-between gap-2">
+    <span>Küçük Mucitler Laboratuvarı • Soğan Zarında Hücre Keşfi</span>
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="text-amber-800 hover:underline">Tüm Deneyler</a>
+      <span>•</span>
+      <a href="kalbimiz-kani-pompaliyor.html" class="text-amber-800 hover:underline">Önceki: Kalp Pompası</a>
+    </div>
+  </footer>
+
+
+  <!-- JAVASCRIPT KODLARI: SESLER, PREPARAT MOTORU, MİKROSKOP OKÜLERİ VE ETKİLEŞİM -->
+  <script>
+    // --- 1. WEB AUDIO API SES MOTORU ---
+    let audioCtx = null;
+    let isSoundEnabled = true;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    const Sound = {
+      // Cımbız tıkırtısı
+      snap() {
+        if (!isSoundEnabled) return;
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(520, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.08);
+      },
+
+      // İyot damlama sesi (plop / drip)
+      drip() {
+        if (!isSoundEnabled) return;
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(950, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.35, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.12);
+      },
+
+      // Lamel kapanma sesi (clack)
+      clack() {
+        if (!isSoundEnabled) return;
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(320, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.06);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.06);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.06);
+      },
+
+      // Mikroskop objektif revolver çevirme tıkırtısı (revolver click)
+      revolver() {
+        if (!isSoundEnabled) return;
+        const ctx = getAudioContext();
+        [280, 480].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          const t = ctx.currentTime + (i * 0.05);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.25, t);
+          gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.05);
+        });
+      },
+
+      // Netlik ayarlama sürtünme sesi
+      focusClick() {
+        if (!isSoundEnabled) return;
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, ctx.currentTime);
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.005, ctx.currentTime + 0.04);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.04);
+      },
+
+      // Başarı melodisi
+      success() {
+        if (!isSoundEnabled) return;
+        const ctx = getAudioContext();
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          const t = ctx.currentTime + (idx * 0.09);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.2, t);
+          gain.gain.exponentialRampToValueAtTime(0.01, t + 0.22);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.22);
+        });
+      }
+    };
+
+    // Ses Aç/Kapat Butonu
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    soundToggle.addEventListener('click', () => {
+      isSoundEnabled = !isSoundEnabled;
+      soundIcon.textContent = isSoundEnabled ? '🔊' : '🔇';
+      if (isSoundEnabled) Sound.snap();
+    });
+
+
+    // --- 2. DENEY DURUMU VE GLOBAL STATE ---
+    const State = {
+      prepStep: 1, // 1: Zar Soy, 2: Lama Koy, 3: İyot Damlat, 4: Lamel Kapat, 5: Mikroskoba Yerleştir
+      isPrepComplete: false,
+      magnification: 100, // 40, 100, 400
+      focusValue: 25, // 0 - 100 arası (optimum netlik: 70-80 arası)
+      isFocused: false,
+      isStainedWithIodine: true,
+      showLabels: false,
+      currentTab: 'prep',
+      missions: {
+        prep: false,
+        focus: false,
+        examine400: false
+      }
+    };
+
+
+    // --- 3. AŞAMA 1: İNTERAKTİF PREPARAT HAZIRLAMA ATÖLYESİ ---
+    const prepStepBadge = document.getElementById('prepStepBadge');
+    const prepInstructionIcon = document.getElementById('prepInstructionIcon');
+    const prepInstructionTitle = document.getElementById('prepInstructionTitle');
+    const prepInstructionDesc = document.getElementById('prepInstructionDesc');
+    const btnPrepAction = document.getElementById('btnPrepAction');
+    const btnPrepIcon = document.getElementById('btnPrepIcon');
+    const btnPrepText = document.getElementById('btnPrepText');
+    const btnGoToScope = document.getElementById('btnGoToScope');
+    const prepStepDots = document.getElementById('prepStepDots').children;
+
+    // SVG Elementleri
+    const tweezerObject = document.getElementById('tweezerObject');
+    const tweezerMembrane = document.getElementById('tweezerMembrane');
+    const membraneOnSlide = document.getElementById('membraneOnSlide');
+    const membraneCellPattern = document.getElementById('membraneCellPattern');
+    const dropperObject = document.getElementById('dropperObject');
+    const hangingDrop = document.getElementById('hangingDrop');
+    const iodineStainOnSlide = document.getElementById('iodineStainOnSlide');
+    const coverSlipObject = document.getElementById('coverSlipObject');
+    const coverSlipShape = document.getElementById('coverSlipShape');
+    const prepSuccessBadge = document.getElementById('prepSuccessBadge');
+
+    const prepInstructions = [
+      {
+        step: 1,
+        title: "1. Soğanın Şeffaf Zarını Soy",
+        desc: "Cımbızı kullanarak soğanın etli katının iç yüzeyindeki incecik, saydam zarı (epidermis) tek hamlede nazikçe çekip çıkar!",
+        btnText: "Zarı Cımbızla Soy",
+        icon: "🧅"
+      },
+      {
+        step: 2,
+        title: "2. Zarı Cam Lam Üzerine Yerleştir",
+        desc: "Soyduğun incecik soğan zarını temiz lamın tam ortasına düzgünce, kırışmayacak şekilde ser!",
+        btnText: "Zarı Lama Yerleştir",
+        icon: "🔬"
+      },
+      {
+        step: 3,
+        title: "3. Damlalıkla İyot Çözeltisi Damlat",
+        desc: "Zarın üzerine damlalıkla 1 damla iyot çözeltisi (Lugol) ekle. İyot hücre çekirdeğini ve çeperini boyayarak belirginleştirecek!",
+        btnText: "İyot Damlat",
+        icon: "🧪"
+      },
+      {
+        step: 4,
+        title: "4. Lameli 45° Açıyla Kapat",
+        desc: "Küçük kare lamel camını zarın kenarına 45 derece eğimle daya ve hava kabarcığı kalmayacak şekilde yavaşça kapat!",
+        btnText: "Lameli Kapat",
+        icon: "🧫"
+      },
+      {
+        step: 5,
+        title: "5. Preparat Hazır! Mikroskoba Yerleştir",
+        desc: "Tebrikler! Hava kabarcıksız, boyanmış mükemmel bir soğan zarı preparatı hazırladın. Şimdi mikroskop tablasına sürebilirsin!",
+        btnText: "Mikroskoba Yerleştir",
+        icon: "🎉"
+      }
+    ];
+
+    function updatePrepUI() {
+      const info = prepInstructions[State.prepStep - 1];
+      prepStepBadge.textContent = `Adım ${State.prepStep} / 5`;
+      prepInstructionIcon.textContent = info.icon;
+      prepInstructionTitle.textContent = info.title;
+      prepInstructionDesc.textContent = info.desc;
+      btnPrepIcon.textContent = info.icon;
+      btnPrepText.textContent = `${info.btnText} (Adım ${State.prepStep})`;
+
+      // Noktaları güncelle
+      for (let i = 0; i < 5; i++) {
+        if (i < State.prepStep) {
+          prepStepDots[i].className = "w-3 h-3 rounded-full bg-amber-500 border border-ink";
+        } else {
+          prepStepDots[i].className = "w-3 h-3 rounded-full bg-gray-200 border border-ink";
+        }
+      }
+    }
+
+    let isPrepAnimating = false;
+
+    function advancePrepStep() {
+      if (isPrepAnimating) return;
+
+      if (State.prepStep === 1) {
+        // Cımbız soğana yaklaşır ve zarı koparır
+        isPrepAnimating = true;
+        Sound.snap();
+        gsap.to(tweezerObject, {
+          x: 75,
+          y: 135,
+          duration: 0.45,
+          ease: "power2.inOut",
+          onComplete: () => {
+            tweezerMembrane.setAttribute('opacity', '1');
+            Sound.snap();
+            gsap.to(tweezerObject, {
+              x: 90,
+              y: 75,
+              duration: 0.45,
+              ease: "power2.out",
+              onComplete: () => {
+                State.prepStep = 2;
+                updatePrepUI();
+                isPrepAnimating = false;
+              }
+            });
+          }
+        });
+      } else if (State.prepStep === 2) {
+        // Cımbız zarı lama taşır
+        isPrepAnimating = true;
+        Sound.snap();
+        gsap.to(tweezerObject, {
+          x: 240,
+          y: 140,
+          duration: 0.6,
+          ease: "power2.inOut",
+          onComplete: () => {
+            tweezerMembrane.setAttribute('opacity', '0');
+            membraneOnSlide.setAttribute('opacity', '0.9');
+            membraneCellPattern.setAttribute('opacity', '0.7');
+            Sound.clack();
+            gsap.to(tweezerObject, {
+              x: 325,
+              y: 60,
+              opacity: 0.25,
+              duration: 0.4,
+              ease: "power2.out",
+              onComplete: () => {
+                State.prepStep = 3;
+                updatePrepUI();
+                isPrepAnimating = false;
+              }
+            });
+          }
+        });
+      } else if (State.prepStep === 3) {
+        // Damlalık belirir ve iyot damlatır
+        isPrepAnimating = true;
+        dropperObject.setAttribute('opacity', '1');
+        hangingDrop.setAttribute('opacity', '1');
+        gsap.set(hangingDrop, { y: 0, opacity: 1 });
+        gsap.fromTo(dropperObject, { y: 20, opacity: 0 }, {
+          y: 70,
+          opacity: 1,
+          duration: 0.4,
+          ease: "power2.out",
+          onComplete: () => {
+            // Damla düşer
+            Sound.drip();
+            gsap.to(hangingDrop, {
+              y: 60,
+              opacity: 0,
+              duration: 0.25,
+              onComplete: () => {
+                iodineStainOnSlide.setAttribute('opacity', '0.75');
+                membraneOnSlide.setAttribute('fill', '#f59e0b');
+                membraneOnSlide.setAttribute('stroke', '#b45309');
+                gsap.to(dropperObject, {
+                  y: 10,
+                  opacity: 0,
+                  duration: 0.35,
+                  onComplete: () => {
+                    State.prepStep = 4;
+                    updatePrepUI();
+                    isPrepAnimating = false;
+                  }
+                });
+              }
+            });
+          }
+        });
+      } else if (State.prepStep === 4) {
+        // Lamel 45 derece eğimle kapanır
+        isPrepAnimating = true;
+        coverSlipObject.setAttribute('opacity', '1');
+        gsap.fromTo(coverSlipObject, 
+          { x: 20, y: -25, rotation: -40, transformOrigin: "left bottom" },
+          {
+            x: 0,
+            y: 0,
+            rotation: 0,
+            duration: 0.5,
+            ease: "power2.out",
+            onComplete: () => {
+              Sound.clack();
+              State.prepStep = 5;
+              State.isPrepComplete = true;
+              updatePrepUI();
+              btnPrepAction.classList.add('hidden');
+              btnGoToScope.classList.remove('hidden');
+              btnGoToScope.classList.add('flex');
+              
+              // Başarı rozeti
+              prepSuccessBadge.setAttribute('opacity', '1');
+              gsap.fromTo(prepSuccessBadge, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, ease: "back.out(1.7)" });
+              Sound.success();
+
+              // 1. Görevi tamamla
+              completeMission('prep');
+              isPrepAnimating = false;
+            }
+          }
+        );
+      }
+    }
+
+    btnPrepAction.addEventListener('click', advancePrepStep);
+    document.getElementById('prepSvg').addEventListener('click', () => {
+      if (State.prepStep <= 4) advancePrepStep();
+    });
+
+
+    // --- 4. AŞAMA 2: GERÇEKÇİ MİKROSKOP OKÜLERİ VE HÜCRE MOTORU ---
+    const cellsContainer = document.getElementById('cellsContainer');
+    const blurNode = document.getElementById('blurNode');
+    const focusSlider = document.getElementById('focusSlider');
+    const focusBadge = document.getElementById('focusBadge');
+    const magBadge = document.getElementById('magBadge');
+    const scaleLabel = document.getElementById('scaleLabel');
+    const btnMag40 = document.getElementById('btnMag40');
+    const btnMag100 = document.getElementById('btnMag100');
+    const btnMag400 = document.getElementById('btnMag400');
+    const btnToggleStain = document.getElementById('btnToggleStain');
+    const stainBtnText = document.getElementById('stainBtnText');
+    const btnToggleLabels = document.getElementById('btnToggleLabels');
+    const labelsBtnText = document.getElementById('labelsBtnText');
+    const lensBackdrop = document.getElementById('lensBackdrop');
+
+    // Organel Bilgi Kartı
+    const inspectRing = document.getElementById('inspectRing');
+    const organelleIcon = document.getElementById('organelleIcon');
+    const organelleName = document.getElementById('organelleName');
+    const organelleBadge = document.getElementById('organelleBadge');
+    const organelleDesc = document.getElementById('organelleDesc');
+
+    // Hücre Verileri (Bilimsel koordinatlar ve tuğla dizilimi)
+    // Farklı satırlarda tuğla gibi kaydırılmış bitki hücreleri
+    const CellData = {
+      // 100x için standart tuğla hücreleri
+      rows: [
+        { y: 60, h: 58, cells: [
+          { x: -20, w: 120, nucX: 40, nucY: 75 },
+          { x: 105, w: 110, nucX: 185, nucY: 80 },
+          { x: 220, w: 115, nucX: 300, nucY: 72 },
+          { x: 340, w: 90,  nucX: 385, nucY: 78 }
+        ]},
+        { y: 124, h: 62, cells: [
+          { x: -50, w: 105, nucX: 10,  nucY: 140 },
+          { x: 60,  w: 125, nucX: 155, nucY: 150 },
+          { x: 190, w: 120, nucX: 280, nucY: 145 },
+          { x: 315, w: 120, nucX: 370, nucY: 140 }
+        ]},
+        { y: 192, h: 60, cells: [
+          { x: -10, w: 115, nucX: 70,  nucY: 210 },
+          { x: 110, w: 125, nucX: 200, nucY: 215 },
+          { x: 240, w: 115, nucX: 320, nucY: 205 },
+          { x: 360, w: 80,  nucX: 395, nucY: 212 }
+        ]},
+        { y: 258, h: 64, cells: [
+          { x: -40, w: 120, nucX: 30,  nucY: 280 },
+          { x: 85,  w: 120, nucX: 170, nucY: 275 },
+          { x: 210, w: 125, nucX: 305, nucY: 285 },
+          { x: 340, w: 95,  nucX: 380, nucY: 280 }
+        ]},
+        { y: 328, h: 56, cells: [
+          { x: 0,   w: 110, nucX: 65,  nucY: 345 },
+          { x: 115, w: 120, nucX: 195, nucY: 350 },
+          { x: 240, w: 110, nucX: 315, nucY: 345 }
+        ]}
+      ]
+    };
+
+    // Hücreleri SVG Olarak Çiz
+    function renderCells() {
+      cellsContainer.innerHTML = '';
+
+      const isStained = State.isStainedWithIodine;
+      const mag = State.magnification;
+
+      // 400x Büyütme: Tek bir soğan hücresinin devasa organel yapısı
+      if (mag === 400) {
+        renderHighMagnification(isStained);
+        return;
+      }
+
+      // 40x veya 100x Büyütme: Tuğla Doku Dizilimi
+      const scale = mag === 40 ? 0.55 : 1.0;
+      const originX = mag === 40 ? 80 : 0;
+      const originY = mag === 40 ? 80 : 0;
+
+      const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      group.setAttribute("transform", `translate(${originX}, ${originY}) scale(${scale})`);
+
+      CellData.rows.forEach((row, rIdx) => {
+        row.cells.forEach((c, cIdx) => {
+          // Hücre Dış Sınırı (Hücre Çeperi - Selüloz Duvar)
+          const cellGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          cellGroup.setAttribute("class", "cell-unit cursor-pointer");
+          cellGroup.setAttribute("data-type", "cell");
+          cellGroup.setAttribute("data-info", `Soğan Hücresi #${rIdx + 1}-${cIdx + 1}`);
+
+          // 1. Hücre Duvarı Dış Çerçevesi (Kalın tuğla çeperi)
+          const wallOuter = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          wallOuter.setAttribute("x", c.x);
+          wallOuter.setAttribute("y", row.y);
+          wallOuter.setAttribute("width", c.w);
+          wallOuter.setAttribute("height", row.h);
+          wallOuter.setAttribute("rx", "3");
+          wallOuter.setAttribute("fill", isStained ? "url(#cytoStained)" : "url(#cytoNatural)");
+          wallOuter.setAttribute("stroke", isStained ? "#92400e" : "#64748b");
+          wallOuter.setAttribute("stroke-width", "4");
+          wallOuter.setAttribute("stroke-linejoin", "round");
+          cellGroup.appendChild(wallOuter);
+
+          // 2. Hücre Çeperi İç Çizgisi (Çift katmanlı selüloz izlenimi)
+          const wallInner = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          wallInner.setAttribute("x", c.x + 3);
+          wallInner.setAttribute("y", row.y + 3);
+          wallInner.setAttribute("width", c.w - 6);
+          wallInner.setAttribute("height", row.h - 6);
+          wallInner.setAttribute("rx", "2");
+          wallInner.setAttribute("fill", "none");
+          wallInner.setAttribute("stroke", isStained ? "#d97706" : "#cbd5e1");
+          wallInner.setAttribute("stroke-width", "1.5");
+          wallInner.setAttribute("opacity", "0.7");
+          cellGroup.appendChild(wallInner);
+
+          // 3. Merkezi Koful (Vakuol - Su Dolu Geniş Alan)
+          const vacuole = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          vacuole.setAttribute("x", c.x + 8);
+          vacuole.setAttribute("y", row.y + 7);
+          vacuole.setAttribute("width", c.w - 16);
+          vacuole.setAttribute("height", row.h - 14);
+          vacuole.setAttribute("rx", "8");
+          vacuole.setAttribute("fill", isStained ? "#fef3c7" : "#f8fafc");
+          vacuole.setAttribute("opacity", "0.6");
+          vacuole.setAttribute("stroke", isStained ? "#fde68a" : "#e2e8f0");
+          vacuole.setAttribute("stroke-width", "1");
+          cellGroup.appendChild(vacuole);
+
+          // 4. Çekirdek (Nükleus - Kenara İtilmiş Koyu Küre)
+          const nucleusGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          nucleusGroup.setAttribute("class", "nucleus-unit cursor-pointer");
+          nucleusGroup.setAttribute("data-type", "nucleus");
+
+          const nucCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          nucCircle.setAttribute("cx", c.nucX);
+          nucCircle.setAttribute("cy", c.nucY);
+          nucCircle.setAttribute("r", isStained ? "7.5" : "6.5");
+          nucCircle.setAttribute("fill", isStained ? "url(#nucleusStained)" : "url(#nucleusNatural)");
+          nucCircle.setAttribute("stroke", isStained ? "#451a03" : "#334155");
+          nucCircle.setAttribute("stroke-width", "1.5");
+          nucleusGroup.appendChild(nucCircle);
+
+          // Çekirdekçik (Nükleolus)
+          const nucleolus = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          nucleolus.setAttribute("cx", c.nucX - 1.5);
+          nucleolus.setAttribute("cy", c.nucY - 1.5);
+          nucleolus.setAttribute("r", "2");
+          nucleolus.setAttribute("fill", isStained ? "#fef08a" : "#f1f5f9");
+          nucleolus.setAttribute("opacity", "0.8");
+          nucleusGroup.appendChild(nucleolus);
+
+          cellGroup.appendChild(nucleusGroup);
+
+          // Etiketler Gösteriliyorsa
+          if (State.showLabels && rIdx === 1 && cIdx === 1) {
+            const labelGroup = createLabelGroup(c.nucX, c.nucY, "Çekirdek", -35, -20);
+            cellGroup.appendChild(labelGroup);
+            const wallLabel = createLabelGroup(c.x + 20, row.y, "Hücre Çeperi", -40, -18);
+            cellGroup.appendChild(wallLabel);
+          }
+
+          group.appendChild(cellGroup);
+        });
+      });
+
+      cellsContainer.appendChild(group);
+      attachOrganelleListeners();
+    }
+
+    // 400x Yüksek Büyütme: Tek Bir Hücrenin Detaylı Anatomisi
+    function renderHighMagnification(isStained) {
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      g.setAttribute("transform", "translate(30, 40)");
+
+      // 1. Hücre Çeperi (Kalın, Çift Katmanlı Selüloz Lifleri)
+      const outerWall = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      outerWall.setAttribute("x", "0");
+      outerWall.setAttribute("y", "20");
+      outerWall.setAttribute("width", "340");
+      outerWall.setAttribute("height", "280");
+      outerWall.setAttribute("rx", "16");
+      outerWall.setAttribute("fill", isStained ? "url(#cytoStained)" : "url(#cytoNatural)");
+      outerWall.setAttribute("stroke", isStained ? "#78350f" : "#475569");
+      outerWall.setAttribute("stroke-width", "10");
+      outerWall.setAttribute("class", "cursor-pointer");
+      outerWall.setAttribute("data-type", "cellwall");
+      g.appendChild(outerWall);
+
+      // Hücre Zarı (Plazma Membranı - İçteki İnce Çizgi)
+      const plasmaMembrane = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      plasmaMembrane.setAttribute("x", "12");
+      plasmaMembrane.setAttribute("y", "32");
+      plasmaMembrane.setAttribute("width", "316");
+      plasmaMembrane.setAttribute("height", "256");
+      plasmaMembrane.setAttribute("rx", "12");
+      plasmaMembrane.setAttribute("fill", "none");
+      plasmaMembrane.setAttribute("stroke", isStained ? "#b45309" : "#94a3b8");
+      plasmaMembrane.setAttribute("stroke-width", "2");
+      plasmaMembrane.setAttribute("stroke-dasharray", "6 3");
+      plasmaMembrane.setAttribute("class", "cursor-pointer");
+      plasmaMembrane.setAttribute("data-type", "membrane");
+      g.appendChild(plasmaMembrane);
+
+      // 2. Dev Merkezi Koful (Vakuol)
+      const centralVacuole = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      centralVacuole.setAttribute("x", "30");
+      centralVacuole.setAttribute("y", "50");
+      centralVacuole.setAttribute("width", "280");
+      centralVacuole.setAttribute("height", "220");
+      centralVacuole.setAttribute("rx", "24");
+      centralVacuole.setAttribute("fill", isStained ? "#fffbeb" : "#ffffff");
+      centralVacuole.setAttribute("opacity", "0.75");
+      centralVacuole.setAttribute("stroke", isStained ? "#fde68a" : "#cbd5e1");
+      centralVacuole.setAttribute("stroke-width", "2");
+      centralVacuole.setAttribute("class", "cursor-pointer");
+      centralVacuole.setAttribute("data-type", "vacuole");
+      g.appendChild(centralVacuole);
+
+      // Koful İçi Su Dalgalanması & Moleküller
+      for (let i = 0; i < 5; i++) {
+        const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        dot.setAttribute("cx", 60 + (i * 50));
+        dot.setAttribute("cy", 120 + ((i % 2) * 40));
+        dot.setAttribute("r", "3");
+        dot.setAttribute("fill", isStained ? "#d97706" : "#94a3b8");
+        dot.setAttribute("opacity", "0.4");
+        g.appendChild(dot);
+      }
+
+      // 3. Sitoplazma Akıntıları (Kenarlarda Sıkışmış Jelimsi Yapı)
+      const cytoText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      cytoText.setAttribute("x", "50");
+      cytoText.setAttribute("y", "44");
+      cytoText.setAttribute("font-size", "10");
+      cytoText.setAttribute("font-weight", "900");
+      cytoText.setAttribute("fill", isStained ? "#92400e" : "#64748b");
+      cytoText.setAttribute("font-family", "'Baloo 2'");
+      cytoText.setAttribute("class", "cursor-pointer");
+      cytoText.setAttribute("data-type", "cytoplasm");
+      cytoText.textContent = "Sitoplazma Akıntısı";
+      g.appendChild(cytoText);
+
+      // 4. BÜYÜK ÇEKİRDEK (NÜKLEUS - Koful Tarafından Kenara İtilmiş)
+      const nucGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      nucGroup.setAttribute("class", "cursor-pointer");
+      nucGroup.setAttribute("data-type", "nucleus");
+
+      // Çekirdek Gövdesi
+      const nucBody = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      nucBody.setAttribute("cx", "250");
+      nucBody.setAttribute("cy", "160");
+      nucBody.setAttribute("r", "32");
+      nucBody.setAttribute("fill", isStained ? "url(#nucleusStained)" : "url(#nucleusNatural)");
+      nucBody.setAttribute("stroke", isStained ? "#451a03" : "#1e293b");
+      nucBody.setAttribute("stroke-width", "3");
+      nucGroup.appendChild(nucBody);
+
+      // Çekirdek Zarı Gözenekleri (Nükleer Porlar)
+      const nucPore = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      nucPore.setAttribute("cx", "250");
+      nucPore.setAttribute("cy", "160");
+      nucPore.setAttribute("r", "29");
+      nucPore.setAttribute("fill", "none");
+      nucPore.setAttribute("stroke", isStained ? "#f59e0b" : "#e2e8f0");
+      nucPore.setAttribute("stroke-width", "1.5");
+      nucPore.setAttribute("stroke-dasharray", "4 4");
+      nucGroup.appendChild(nucPore);
+
+      // Çekirdekçik (Nükleolus)
+      const nucCore = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      nucCore.setAttribute("cx", "242");
+      nucCore.setAttribute("cy", "152");
+      nucCore.setAttribute("r", "9");
+      nucCore.setAttribute("fill", isStained ? "#fbbf24" : "#ffffff");
+      nucCore.setAttribute("opacity", "0.9");
+      nucGroup.appendChild(nucCore);
+
+      g.appendChild(nucGroup);
+
+      // Etiketler
+      if (State.showLabels) {
+        g.appendChild(createLabelGroup(250, 160, "Çekirdek (DNA)", 45, -35));
+        g.appendChild(createLabelGroup(170, 20, "Hücre Çeperi", -40, -18));
+        g.appendChild(createLabelGroup(170, 160, "Merkezi Koful", -40, -15));
+      }
+
+      cellsContainer.appendChild(g);
+      attachOrganelleListeners();
+    }
+
+    // Yardımcı SVG Etiket Baloncuğu
+    function createLabelGroup(x, y, text, dx, dy) {
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", x);
+      line.setAttribute("y1", y);
+      line.setAttribute("x2", x + dx);
+      line.setAttribute("y2", y + dy);
+      line.setAttribute("stroke", "#182b4d");
+      line.setAttribute("stroke-width", "1.5");
+      line.setAttribute("stroke-dasharray", "2 2");
+      g.appendChild(line);
+
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("x", x + dx - 35);
+      rect.setAttribute("y", y + dy - 12);
+      rect.setAttribute("width", "70");
+      rect.setAttribute("height", "16");
+      rect.setAttribute("rx", "4");
+      rect.setAttribute("fill", "#ffffff");
+      rect.setAttribute("stroke", "#182b4d");
+      rect.setAttribute("stroke-width", "1.2");
+      g.appendChild(rect);
+
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      t.setAttribute("x", x + dx);
+      t.setAttribute("y", y + dy - 1);
+      t.setAttribute("text-anchor", "middle");
+      t.setAttribute("font-size", "8.5");
+      t.setAttribute("font-weight", "900");
+      t.setAttribute("fill", "#182b4d");
+      t.setAttribute("font-family", "'Baloo 2'");
+      t.textContent = text;
+      g.appendChild(t);
+
+      return g;
+    }
+
+    // Netlik / Fokus Güncellemesi
+    function updateFocus(val) {
+      State.focusValue = parseInt(val);
+      // İdeal netlik noktası: 75
+      const diff = Math.abs(State.focusValue - 75);
+      const blurAmount = (diff / 75) * 6; // 0px ile 6px arası bulanıklık
+
+      blurNode.setAttribute("stdDeviation", blurAmount.toFixed(1));
+
+      if (blurAmount < 1.0) {
+        State.isFocused = true;
+        focusBadge.textContent = "Kristal Net ✨";
+        focusBadge.className = "px-2.5 py-0.5 bg-emerald-400 text-ink border-2 border-ink rounded-full text-xs font-black shadow-sm";
+        completeMission('focus');
+      } else if (blurAmount < 2.5) {
+        State.isFocused = false;
+        focusBadge.textContent = "Az Bulanık 🔎";
+        focusBadge.className = "px-2.5 py-0.5 bg-amber-200 text-ink border-2 border-ink rounded-full text-xs font-black";
+      } else {
+        State.isFocused = false;
+        focusBadge.textContent = "Bulanık 🔍";
+        focusBadge.className = "px-2.5 py-0.5 bg-rose-100 text-rose-900 border-2 border-ink rounded-full text-xs font-black";
+      }
+    }
+
+    focusSlider.addEventListener('input', (e) => {
+      Sound.focusClick();
+      updateFocus(e.target.value);
+    });
+
+    // Büyütme Objektifi Değiştirme
+    function setMagnification(mag) {
+      Sound.revolver();
+      State.magnification = mag;
+
+      [btnMag40, btnMag100, btnMag400].forEach(btn => {
+        btn.className = "mag-btn py-1 px-2 rounded-lg font-black text-xs border-2 border-ink bg-white text-ink transition-all";
+      });
+
+      if (mag === 40) {
+        btnMag40.className = "mag-btn py-1 px-2 rounded-lg font-black text-xs border-2 border-ink bg-emerald-400 text-ink shadow-sm transition-all";
+        magBadge.textContent = "40x Büyütme";
+        scaleLabel.textContent = "250 µm";
+      } else if (mag === 100) {
+        btnMag100.className = "mag-btn py-1 px-2 rounded-lg font-black text-xs border-2 border-ink bg-emerald-400 text-ink shadow-sm transition-all";
+        magBadge.textContent = "100x Büyütme";
+        scaleLabel.textContent = "100 µm";
+      } else if (mag === 400) {
+        btnMag400.className = "mag-btn py-1 px-2 rounded-lg font-black text-xs border-2 border-ink bg-emerald-400 text-ink shadow-sm transition-all";
+        magBadge.textContent = "400x Büyütme";
+        scaleLabel.textContent = "25 µm";
+        completeMission('examine400');
+      }
+
+      // Mercek animasyonu
+      gsap.fromTo("#cellsContainer", { scale: 0.85, opacity: 0.5 }, { scale: 1, opacity: 1, duration: 0.35, ease: "power2.out" });
+      renderCells();
+    }
+
+    btnMag40.addEventListener('click', () => setMagnification(40));
+    btnMag100.addEventListener('click', () => setMagnification(100));
+    btnMag400.addEventListener('click', () => setMagnification(400));
+
+    // İyot Boyama Aç / Kapa
+    btnToggleStain.addEventListener('click', () => {
+      Sound.snap();
+      State.isStainedWithIodine = !State.isStainedWithIodine;
+      if (State.isStainedWithIodine) {
+        btnToggleStain.className = "pushable-sm px-2.5 py-1 bg-amber-200 hover:bg-amber-300 font-extrabold text-ink flex items-center gap-1 text-[11px]";
+        stainBtnText.textContent = "İyot Boyalı (Aktif)";
+        lensBackdrop.className = "absolute inset-2 rounded-full bg-gradient-to-br from-amber-50 via-yellow-100 to-amber-200 transition-colors duration-500";
+      } else {
+        btnToggleStain.className = "pushable-sm px-2.5 py-1 bg-gray-200 hover:bg-gray-300 font-extrabold text-ink flex items-center gap-1 text-[11px]";
+        stainBtnText.textContent = "Boyasız (Suyla)";
+        lensBackdrop.className = "absolute inset-2 rounded-full bg-gradient-to-br from-slate-100 via-sky-50 to-slate-200 transition-colors duration-500";
+      }
+      renderCells();
+    });
+
+    // Etiketleri Aç / Kapa
+    btnToggleLabels.addEventListener('click', () => {
+      Sound.snap();
+      State.showLabels = !State.showLabels;
+      labelsBtnText.textContent = State.showLabels ? "Etiketleri Gizle" : "Etiketleri Göster";
+      renderCells();
+    });
+
+
+    // --- 5. TIKLA & ÖĞREN ORGANELLER DÜNYASI ---
+    const organelleInfoMap = {
+      nucleus: {
+        name: "Çekirdek (Nükleus)",
+        badge: "Yönetim Merkezi",
+        icon: "🎯",
+        desc: "Hücrenin beynidir! Kalıtsal bilgiyi (DNA) taşır ve hücrenin tüm yaşamsal faaliyetlerini yönetir. İyot boyasıyla kehribar renginde parlar."
+      },
+      cellwall: {
+        name: "Hücre Çeperi (Duvarı)",
+        badge: "Selüloz Kalkan",
+        icon: "🧱",
+        desc: "Yalnızca bitki hücrelerinde bulunur! Sert ve dayanıklı yapısıyla hücreye tuğla gibi köşeli şekil verir ve dış darbelerden korur."
+      },
+      membrane: {
+        name: "Hücre Zarı",
+        badge: "Seçici Geçirgen",
+        icon: "🛡️",
+        desc: "Hücre çeperinin hemen altındaki canlı, esnek zardır. Hücreye neyin girip neyin çıkacağını bir kapı nöbetçisi gibi kontrol eder."
+      },
+      vacuole: {
+        name: "Merkezi Koful (Vakuol)",
+        badge: "Su ve Besin Deposu",
+        icon: "🫧",
+        desc: "Bitki hücresinin ortasındaki dev su ve mineral deposudur. Fazla suyu depolayarak hücrenin dik ve diri durmasını sağlar."
+      },
+      cytoplasm: {
+        name: "Sitoplazma",
+        badge: "Jelimsi Yaşam Sıvısı",
+        icon: "💧",
+        desc: "Hücre zarı ile çekirdek arasını dolduran şeffaf, akışkan sıvıdır. Hücrenin beslenmesini ve metabolik reaksiyonlarını barındırır."
+      },
+      cell: {
+        name: "Soğan Zarı Hücresi",
+        badge: "Bitki Hücresi",
+        icon: "🧅",
+        desc: "Birbirine sıkıca kenetlenmiş tuğla dizilimli bitki hücresi. Kloroplast içermez çünkü toprak altında ışık görmeden büyür!"
+      }
+    };
+
+    function attachOrganelleListeners() {
+      const interactives = cellsContainer.querySelectorAll('[data-type]');
+      interactives.forEach(el => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const type = el.getAttribute('data-type');
+          const data = organelleInfoMap[type] || organelleInfoMap.cell;
+
+          Sound.snap();
+          organelleIcon.textContent = data.icon;
+          organelleName.textContent = data.name;
+          organelleBadge.textContent = data.badge;
+          organelleDesc.textContent = data.desc;
+
+          // Vurgu efekti
+          gsap.fromTo("#organelleCard", { scale: 0.96 }, { scale: 1, duration: 0.2, ease: "back.out(2)" });
+        });
+      });
+    }
+
+
+    // --- 6. GÖREV VE DEDEKTİF SİSTEMİ ---
+    function completeMission(missionKey) {
+      if (State.missions[missionKey]) return;
+      State.missions[missionKey] = true;
+
+      const missionEl = document.getElementById(`mission${missionKey === 'prep' ? 1 : missionKey === 'focus' ? 2 : 3}`);
+      if (missionEl) {
+        missionEl.className = "flex items-start gap-2 p-2 rounded-xl border border-emerald-300 bg-emerald-50 transition-colors";
+        missionEl.querySelector('.mission-check').textContent = "✅";
+      }
+
+      // İlerleme sayacı
+      const completedCount = Object.values(State.missions).filter(Boolean).length;
+      document.getElementById('missionProgressText').textContent = `${completedCount} / 3 Görev`;
+
+      if (completedCount === 3) {
+        Sound.success();
+        if (window.confetti) {
+          confetti({ particleCount: 70, spread: 70, origin: { y: 0.6 } });
+        }
+      }
+    }
+
+
+    // --- 7. SEKME YÖNETİMİ (PREPARAT VS MİKROSKOP VS REHBER) ---
+    const tabPrep = document.getElementById('tabPrep');
+    const tabScope = document.getElementById('tabScope');
+    const viewPrep = document.getElementById('viewPrep');
+    const viewScope = document.getElementById('viewScope');
+
+    function switchMainTab(tab) {
+      Sound.snap();
+      State.currentTab = tab;
+      if (tab === 'prep') {
+        tabPrep.className = "tab-btn py-2 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all bg-white border-2 border-ink shadow-sm text-ink";
+        tabScope.className = "tab-btn py-2 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all text-gray-700 hover:bg-white/60";
+        viewPrep.classList.remove('hidden');
+        viewScope.classList.add('hidden');
+      } else {
+        tabScope.className = "tab-btn py-2 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all bg-white border-2 border-ink shadow-sm text-ink";
+        tabPrep.className = "tab-btn py-2 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all text-gray-700 hover:bg-white/60";
+        viewScope.classList.remove('hidden');
+        viewPrep.classList.add('hidden');
+        renderCells();
+        updateFocus(State.focusValue);
+      }
+    }
+
+    tabPrep.addEventListener('click', () => switchMainTab('prep'));
+    tabScope.addEventListener('click', () => switchMainTab('scope'));
+    btnGoToScope.addEventListener('click', () => switchMainTab('scope'));
+
+    // Sağ Panel Alt Sekmeleri (Hücre Rehberi vs Karşılaştırma vs Sınav)
+    const subTabGuide = document.getElementById('subTabGuide');
+    const subTabCompare = document.getElementById('subTabCompare');
+    const subTabQuiz = document.getElementById('subTabQuiz');
+    const subViewGuide = document.getElementById('subViewGuide');
+    const subViewCompare = document.getElementById('subViewCompare');
+    const subViewQuiz = document.getElementById('subViewQuiz');
+
+    function switchSubTab(sub) {
+      Sound.snap();
+      [subTabGuide, subTabCompare, subTabQuiz].forEach(b => {
+        b.className = "sub-tab-btn py-1.5 rounded-xl text-gray-700 hover:bg-white/60";
+      });
+      [subViewGuide, subViewCompare, subViewQuiz].forEach(v => v.classList.add('hidden'));
+
+      if (sub === 'guide') {
+        subTabGuide.className = "sub-tab-btn py-1.5 rounded-xl bg-white border-2 border-ink shadow-sm text-ink";
+        subViewGuide.classList.remove('hidden');
+      } else if (sub === 'compare') {
+        subTabCompare.className = "sub-tab-btn py-1.5 rounded-xl bg-white border-2 border-ink shadow-sm text-ink";
+        subViewCompare.classList.remove('hidden');
+      } else if (sub === 'quiz') {
+        subTabQuiz.className = "sub-tab-btn py-1.5 rounded-xl bg-white border-2 border-ink shadow-sm text-ink";
+        subViewQuiz.classList.remove('hidden');
+      }
+    }
+
+    subTabGuide.addEventListener('click', () => switchSubTab('guide'));
+    subTabCompare.addEventListener('click', () => switchSubTab('compare'));
+    subTabQuiz.addEventListener('click', () => switchSubTab('quiz'));
+
+
+    // --- 8. MEB FEN BİLGİSİ BİLGİ SINAVI (QUIZ) ---
+    const QuizData = [
+      {
+        q: "1. Soğan zarını mikroskop altında incelediğimizde hücrelerin birbirine tuğla gibi kenetli ve köşeli görünmesini sağlayan yapı nedir?",
+        opts: ["Hücre zarı", "Hücre çeperi (duvarı)", "Sitoplazma", "Mitokondri"],
+        correct: 1,
+        exp: "Tuğla gibi sert ve köşeli şekli selülozdan yapılmış sert 'Hücre Çeperi' sağlar. Hayvan hücrelerinde çeper olmadığı için şekilleri yuvarlaktır."
+      },
+      {
+        q: "2. Preparat hazırlarken soğan zarının üzerine damlattığımız iyot çözeltisinin (Lugol) temel amacı nedir?",
+        opts: ["Hücreleri öldürüp kokutmak", "Hücre çekirdeğini ve çeperini boyayarak belirginleştirmek", "Zarı mikroskoba yapıştırmak", "Hücrelerin büyümesini sağlamak"],
+        correct: 1,
+        exp: "Saydam soğan zarı hücreleri boyasızken zor görünür; iyot çözeltisi çekirdeği koyu kehribar rengine boyayarak rahatça seçilmesini sağlar."
+      },
+      {
+        q: "3. Soğan hücresinde çekirdeğin tam merkezde değil de kenara doğru itilmiş olmasının sebebi nedir?",
+        opts: ["Çekirdeğin çok ağır olması", "Hücrenin ortasını kaplayan dev merkezi koful", "Hücre çeperinin çekirdeği çekmesi", "Damlattığımız iyotun etkisi"],
+        correct: 1,
+        exp: "Bitki hücrelerinde koful tek ve çok büyüktür. Ortadaki dev koful, sitoplazmayı ve çekirdeği çepere doğru iter."
+      },
+      {
+        q: "4. Soğan bir bitki olmasına rağmen soğan zarı hücrelerinde neden yeşil renkli kloroplast bulunmaz?",
+        opts: ["Soğan zarı yaprak değil, toprak altındaki depo gövdesidir ve ışık görmez", "Kloroplastlar mikroskopta görünmeyecek kadar küçüktür", "İyot damlattığımız için kaybolmuştur", "Soğan bir mantar türüdür"],
+        correct: 0,
+        exp: "Kloroplast fotosentez için ışığa ihtiyaç duyar; soğan toprak altında yetiştiği için zarlarında kloroplasta ihtiyaç yoktur."
+      },
+      {
+        q: "5. Mikroskopta incelediğimiz soğan zarı preparatı bize canlılarla ilgili hangi büyük gerçeği kanıtlar?",
+        opts: ["Bütün canlıların yalnızca sudan oluştuğunu", "Canlıların mikroskobik yapı birimleri olan hücrelerden oluştuğunu", "Soğanın cansız bir madde olduğunu", "Mikroskobun cisimleri küçülttüğünü"],
+        correct: 1,
+        exp: "Tüm canlılar (bitkiler, hayvanlar, insanlar) hücre adı verilen temel mikroskobik yapı taşlarından meydana gelir."
+      }
+    ];
+
+    let currentQuestionIdx = 0;
+    let quizScore = 0;
+
+    const quizScoreText = document.getElementById('quizScoreText');
+    const quizQuestion = document.getElementById('quizQuestion');
+    const quizOptions = document.getElementById('quizOptions');
+    const quizFeedback = document.getElementById('quizFeedback');
+    const btnNextQuestion = document.getElementById('btnNextQuestion');
+
+    function loadQuizQuestion(idx) {
+      const q = QuizData[idx];
+      quizScoreText.textContent = `Soru ${idx + 1} / ${QuizData.length}`;
+      quizQuestion.textContent = q.q;
+      quizOptions.innerHTML = '';
+      quizFeedback.className = "hidden";
+      btnNextQuestion.classList.add('hidden');
+
+      q.opts.forEach((opt, oIdx) => {
+        const btn = document.createElement('button');
+        btn.className = "w-full text-left p-2.5 rounded-xl border-2 border-ink bg-white hover:bg-amber-50 font-bold text-xs flex items-center gap-2 transition-all";
+        btn.innerHTML = `<span class="w-5 h-5 rounded-full bg-amber-100 border border-ink flex items-center justify-center text-[10px] font-black">${String.fromCharCode(65 + oIdx)}</span> <span>${opt}</span>`;
+        btn.addEventListener('click', () => handleQuizAnswer(oIdx, btn));
+        quizOptions.appendChild(btn);
+      });
+    }
+
+    function handleQuizAnswer(selectedIdx, btnEl) {
+      const q = QuizData[currentQuestionIdx];
+      const buttons = quizOptions.querySelectorAll('button');
+      buttons.forEach(b => b.disabled = true);
+
+      if (selectedIdx === q.correct) {
+        Sound.success();
+        quizScore++;
+        btnEl.className = "w-full text-left p-2.5 rounded-xl border-2 border-ink bg-emerald-100 font-bold text-xs flex items-center gap-2 text-emerald-900";
+        quizFeedback.className = "p-2.5 rounded-xl border-2 border-emerald-300 bg-emerald-50 text-emerald-900 text-xs font-bold leading-tight block";
+        quizFeedback.innerHTML = `<span>🎉 Harika Doğru!</span> <br><span class="text-[11px] font-medium text-emerald-800">${q.exp}</span>`;
+      } else {
+        Sound.snap();
+        btnEl.className = "w-full text-left p-2.5 rounded-xl border-2 border-ink bg-rose-100 font-bold text-xs flex items-center gap-2 text-rose-900";
+        buttons[q.correct].className = "w-full text-left p-2.5 rounded-xl border-2 border-ink bg-emerald-100 font-bold text-xs flex items-center gap-2 text-emerald-900";
+        quizFeedback.className = "p-2.5 rounded-xl border-2 border-rose-300 bg-rose-50 text-rose-900 text-xs font-bold leading-tight block";
+        quizFeedback.innerHTML = `<span>❌ Yanlış Cevap.</span> <br><span class="text-[11px] font-medium text-rose-800">${q.exp}</span>`;
+      }
+
+      btnNextQuestion.classList.remove('hidden');
+      btnNextQuestion.classList.add('flex');
+    }
+
+    btnNextQuestion.addEventListener('click', () => {
+      Sound.snap();
+      currentQuestionIdx++;
+      if (currentQuestionIdx < QuizData.length) {
+        loadQuizQuestion(currentQuestionIdx);
+      } else {
+        // Test Bitti
+        quizQuestion.textContent = `Tebrikler! Sınavı Tamamladın! 🏆 Skorun: ${quizScore} / ${QuizData.length}`;
+        quizOptions.innerHTML = `
+          <div class="bg-amber-100 p-4 rounded-xl border-2 border-ink text-center">
+            <span class="text-4xl block mb-2">🎉</span>
+            <p class="text-xs font-bold text-ink mb-3">Hücrenin mikroskobik dünyasını başarıyla keşfettin ve harika bir biyolog oldun!</p>
+            <button onclick="restartQuiz()" class="pushable py-2 px-4 bg-amber-400 font-black text-xs">Tekrar Çöz</button>
+          </div>
+        `;
+        quizFeedback.className = "hidden";
+        btnNextQuestion.classList.add('hidden');
+        if (window.confetti && quizScore >= 3) {
+          confetti({ particleCount: 80, spread: 80, origin: { y: 0.5 } });
+        }
+      }
+    });
+
+    function restartQuiz() {
+      currentQuestionIdx = 0;
+      quizScore = 0;
+      loadQuizQuestion(0);
+    }
+    loadQuizQuestion(0);
+
+
+    // --- 9. SIFIRLAMA BUTONU ---
+    document.getElementById('btnResetAll').addEventListener('click', () => {
+      Sound.snap();
+      isPrepAnimating = false;
+      State.prepStep = 1;
+      State.isPrepComplete = false;
+      gsap.killTweensOf([tweezerObject, dropperObject, hangingDrop, coverSlipObject, prepSuccessBadge]);
+      gsap.set(tweezerObject, { clearProps: "all" });
+      gsap.set(dropperObject, { clearProps: "all" });
+      gsap.set(hangingDrop, { clearProps: "all" });
+      gsap.set(coverSlipObject, { clearProps: "all" });
+      gsap.set(prepSuccessBadge, { clearProps: "all" });
+      tweezerObject.setAttribute('transform', 'translate(80, 85)');
+      tweezerObject.style.opacity = '1';
+      tweezerMembrane.setAttribute('opacity', '0');
+      membraneOnSlide.setAttribute('opacity', '0');
+      membraneOnSlide.setAttribute('fill', '#fef08a');
+      membraneOnSlide.setAttribute('stroke', '#ca8a04');
+      membraneCellPattern.setAttribute('opacity', '0');
+      iodineStainOnSlide.setAttribute('opacity', '0');
+      coverSlipObject.setAttribute('opacity', '0');
+      dropperObject.setAttribute('opacity', '0');
+      hangingDrop.setAttribute('opacity', '1');
+      prepSuccessBadge.setAttribute('opacity', '0');
+      btnPrepAction.classList.remove('hidden');
+      btnGoToScope.classList.add('hidden');
+      btnGoToScope.classList.remove('flex');
+      updatePrepUI();
+      switchMainTab('prep');
+    });
+
+    // Başlangıç Yüklemesi
+    updatePrepUI();
+    updateFocus(25);
+  </script>
+</body>
+</html>

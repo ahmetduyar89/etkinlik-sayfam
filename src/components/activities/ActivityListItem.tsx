@@ -71,6 +71,11 @@ function ActivityListItemBase({
                     )}>
                         {act.subject || 'Ders yok'}
                     </span>
+                    {act.unit && (
+                        <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[9px] font-bold rounded-md uppercase tracking-wider border border-emerald-500/20">
+                            {act.unit}
+                        </span>
+                    )}
                 </div>
                 <p className="text-sm text-slate-400 line-clamp-1">
                     {act.description || 'Açıklama girilmedi.'}
