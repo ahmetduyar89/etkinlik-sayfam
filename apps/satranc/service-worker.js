@@ -6,7 +6,7 @@
  * önbellekten servis eder. Böylece sınıfta internet olmasa da platform açılır.
  */
 
-const CACHE_NAME = "satranc-okulu-online-v39";
+const CACHE_NAME = "satranc-okulu-online-v40";
 
 /** Uygulamanın açılması için gereken çekirdek dosyalar. */
 const APP_SHELL = [
@@ -41,6 +41,7 @@ const APP_SHELL = [
   "./src/services/GameService.js",
   "./src/services/ClassroomService.js",
   "./src/services/SwissPairing.js",
+  "./src/services/MatingMaterial.js",
   "./src/services/RosterCrypto.js",
   "./src/services/CloudSyncService.js",
   "./src/services/CloudRecords.js",

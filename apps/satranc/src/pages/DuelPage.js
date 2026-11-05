@@ -34,6 +34,7 @@ import { pieceHTML } from "../components/PieceGlyph.js";
 import { burst } from "../animations/effects.js";
 import { pageShell, focusToggle } from "./pageUtils.js";
 import { navigate, routeParam } from "../utils/router.js";
+import { canPossiblyMate } from "../services/MatingMaterial.js";
 import { classroom, WIN_RULES, winRuleOf, normalizeTimeControl } from "../services/ClassroomService.js";
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
@@ -467,8 +468,8 @@ export function DuelPage({ sound }) {
       // Süre + puan: puanlar eşitse karar yine saatindir.
     }
 
-    // FIDE kuralı: süre biter ama rakipte mat edecek taş yoksa oyun BERABERE
-    // biter. Kimsenin kazanamayacağı bir konumda saat de kazandırmaz.
+    // FIDE 6.9: süre biter ama rakip hiçbir şekilde mat edemiyorsa oyun
+    // BERABERE biter. Kimsenin kazanamayacağı bir konumda saat de kazandırmaz.
     const canMate = hasMatingMaterial(rival);
 
     endGame({
@@ -478,19 +479,16 @@ export function DuelPage({ sound }) {
       // gibi tuhaf bir cümle üretiyordu.
       reason: canMate
         ? `Süre bitti! ${names[color]} için zaman kalmadı.${winRule === "sure" ? "" : " (Taş puanları eşitti.)"}`
-        : `Süre bitti ama ${names[rival]} mat edecek taşı olmadığı için kazanamaz — beraberlik.`
+        : `Süre bitti ama ${names[rival]} mat etme imkânı kalmadığı için kazanamaz — beraberlik.`
     });
   }
 
-  /** Bir tarafın mat edebilecek taşı var mı? (Şah + tek hafif taş mat edemez.) */
+  /**
+   * FIDE 6.9: rakip, hiçbir yasal hamle dizisiyle mat edemiyorsa süre bitişi
+   * beraberliktir. Karşı tarafın taşları da hesaba girer (bkz. MatingMaterial).
+   */
   function hasMatingMaterial(color) {
-    let minors = 0;
-    for (const piece of Object.values(chess.pieceMap())) {
-      if (piece.color !== color) continue;
-      if (piece.type === "p" || piece.type === "r" || piece.type === "q") return true;
-      if (piece.type === "n" || piece.type === "b") minors += 1;
-    }
-    return minors >= 2;
+    return canPossiblyMate(chess.pieceMap(), color);
   }
 
   /** Saati duraklatır ya da devam ettirir. */

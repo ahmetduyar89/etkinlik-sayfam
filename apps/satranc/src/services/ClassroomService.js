@@ -37,9 +37,9 @@ const VERSION = 1;
 export const WIN_RULES = [
   {
     id: "sure",
-    label: "Sadece süre",
+    label: "Sadece süre (FIDE)",
     icon: "⏱",
-    detail: "Gerçek satranç kuralı: mat eden ya da rakibinin süresi biten kazanır."
+    detail: "Resmî (FIDE) satranç kuralı: mat eden ya da rakibinin süresi biten kazanır; rakip hiçbir şekilde mat edemiyorsa beraberlik."
   },
   {
     id: "sure-puan",
