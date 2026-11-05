@@ -7,17 +7,19 @@
 // (…/?view=student&id=… ve …/?view=notebook&id=…). Bu yüzden React
 // uygulaması kökte kalır; bölüm adı yalnızca yol olarak eklenir.
 // ─────────────────────────────────────────────────────────────────────
-import { PORTAL_MODULES } from '../constants/portal';
+import { PORTAL_FOLDERS, PORTAL_MODULES } from '../constants/portal';
 
 /** Ana sayfa (kart ekranı) ya da içerideki bir bölümün kimliği. */
 export type Section = 'portal' | string;
 
 /** Bu React uygulamasının içinde açılabilen bölümler. */
-const INTERNAL_IDS = PORTAL_MODULES.filter((m) => m.kind === 'internal').map((m) => m.id);
+const INTERNAL_IDS = [...PORTAL_MODULES.filter((m) => m.kind === 'internal'), ...PORTAL_FOLDERS].map((m) => m.id);
 
 /** Adres çubuğundaki yoldan aktif bölümü çıkarır. */
 export function sectionFromLocation(): Section {
     const path = window.location.pathname.replace(/^\/+|\/+$/g, '');
+    // Eski ayrı Satranç Yönetimi bağlantıları artık birleşik Sınıflar merkezine gider.
+    if (path === 'satranc-yonetim') return 'siniflar';
     if (INTERNAL_IDS.includes(path)) return path;
     // Eski bağlantılarla uyum: /?app=etkinlikler
     const app = new URLSearchParams(window.location.search).get('app');

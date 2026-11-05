@@ -887,12 +887,12 @@ export function MoleculeBuilderTool({ onClose, onInsertImage }: MoleculeBuilderT
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
-                style={{ touchAction: 'none' }}
+                style={{ touchAction: 'pan-y' }}
                 className={cn(
-                    'pointer-events-auto flex flex-col bg-[#0f111a]/95 backdrop-blur-xl border border-indigo-500/30 rounded-2xl shadow-2xl overflow-hidden select-none',
+                    'responsive-tool pointer-events-auto flex flex-col bg-[#0f111a]/95 backdrop-blur-xl border border-indigo-500/30 rounded-2xl shadow-2xl overflow-hidden select-none',
                     isMaximized
                         ? 'w-full h-full'
-                        : 'w-[min(96vw,880px)] h-[min(88vh,640px)]'
+                        : 'w-[min(96vw,880px)] h-[min(88dvh,640px)]'
                 )}
             >
                 <canvas ref={canvasHiddenRef} className="hidden" />

@@ -46,7 +46,7 @@ export function ProfilePage({ progress, sound }) {
       hint ? el("small", { text: hint }) : null
     ]);
 
-  return pageShell("Profil", "İlerlemeni, seviyeni ve rozetlerini buradan takip et.", [
+  return pageShell(`${progress.activeProfileName} Profili`, "İlerlemeni, seviyeni ve rozetlerini buradan takip et.", [
     // --- Seviye kartı ---
     el("section", { className: "profile-hero" }, [
       el("div", { className: "level-badge" }, [
@@ -70,7 +70,8 @@ export function ProfilePage({ progress, sound }) {
       statBox("Rozet", `${earnedBadges.length}/${badges.length}`),
       statBox("Tamamlanan Ders", `${overall.done}/${overall.total}`),
       statBox("Çözülen Bulmaca", `${state.solvedPuzzles.length}`, `${puzzles.length} bulmacadan`),
-      statBox("Kazanma Oranı", `%${winRate}`, `${totalGames} oyun`)
+      statBox("Kazanma Oranı", `%${winRate}`, `${totalGames} oyun`),
+      statBox("Bugünkü Çalışma", `${Math.min(5, progress.dailyCount())}/5`, "kişisel bulmaca seti")
     ]),
 
     // --- Bölüm bölüm ilerleme ---
@@ -104,6 +105,12 @@ export function ProfilePage({ progress, sound }) {
       statBox("Berabere", games.drawn),
       statBox("Kaybedilen", games.lost)
     ]),
+    el("button", {
+      className: "ghost profile-archive-link",
+      type: "button",
+      text: `Oyun arşivini aç (${state.gamesArchive?.length || 0})`,
+      onClick: () => { sound.play("click"); navigate("games"); }
+    }),
 
     // --- Mini oyun rekorları ---
     el("h2", { className: "section-heading", text: "Mini oyun rekorların" }),

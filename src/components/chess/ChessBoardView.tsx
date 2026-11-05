@@ -202,9 +202,10 @@ export function ChessBoardView({
     const lastTo = lastMove ? lastMove.slice(2, 4) : null;
 
     return (
-        <div className="relative w-full">
+        <div className="relative w-full min-w-0 select-none">
             <div
                 onPointerUp={handlePointerUp}
+                onPointerCancel={() => { press.current = null; handledByPointer.current = false; setDragging(null); }}
                 // Satırlar da sütunlar kadar eşit bölünmeli: aksi hâlde taşı olan
                 // satırlar içeriğe göre uzar, boş satırlar ezilir ve kareler
                 // dikdörtgene döner.
@@ -229,7 +230,7 @@ export function ChessBoardView({
                                 onClick={() => handleClick(square)}
                                 onPointerDown={handlePointerDown(square)}
                                 className={cn(
-                                    'relative flex items-center justify-center',
+                                    'relative flex min-h-0 min-w-0 items-center justify-center',
                                     light ? 'bg-[#f2e6cf]' : 'bg-[#b58561]',
                                     (square === lastFrom || square === lastTo) &&
                                         'after:absolute after:inset-0 after:bg-amber-300/35',
@@ -294,11 +295,11 @@ export function ChessBoardView({
 
             {promotion && (
                 <div className="absolute inset-0 z-40 flex items-center justify-center rounded-2xl bg-on-surface/45 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-xs rounded-2xl bg-surface p-4 shadow-xl">
+                    <div className="w-full max-w-xs rounded-2xl bg-surface p-3 sm:p-4 shadow-xl">
                         <p className="mb-3 text-center text-sm font-semibold text-on-surface">
                             Piyonun hangi taşa dönüşsün?
                         </p>
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-4 gap-1 sm:gap-2">
                             {PROMOTION_CHOICES.map((choice) => (
                                 <button
                                     key={choice.type}
@@ -308,7 +309,7 @@ export function ChessBoardView({
                                         setPromotion(null);
                                         onMove(`${from}${to}${choice.type}`);
                                     }}
-                                    className="flex flex-col items-center gap-1 rounded-xl border border-outline-variant bg-surface-container-low p-2 transition hover:border-primary hover:bg-primary-container"
+                                    className="flex flex-col items-center min-h-14 min-w-0 gap-1 rounded-xl border border-outline-variant bg-surface-container-low p-1 sm:p-2 transition hover:border-primary hover:bg-primary-container"
                                 >
                                     <ChessPiece
                                         type={choice.type}

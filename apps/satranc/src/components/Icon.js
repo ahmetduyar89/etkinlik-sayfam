@@ -30,7 +30,9 @@ const paths = {
   play: "M8 5l11 7-11 7z",
   // Sınıf (okul binası) ve turnuva kupası
   school: "M3 21h18M5 21V10l7-5 7 5v11M10 21v-5h4v5M12 9.5h.01",
-  trophy: "M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 21h8M9.5 17h5"
+  trophy: "M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 21h8M9.5 17h5",
+  chart: "M4 20V10h4v10M10 20V4h4v16M16 20v-7h4v7M3 20h18",
+  archive: "M4 5h16v4H4zM5 9h14v11H5zM9 13h6"
 };
 
 export function icon(name, className = "icon") {
