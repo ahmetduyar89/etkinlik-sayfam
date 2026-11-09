@@ -727,6 +727,58 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
         }
     }, [applyRemote, confirm, save]);
 
+    /**
+     * Elle kayıt: otomatik kaydı beklemeden hemen yazar ve sonucu her zaman
+     * kullanıcıya söyler. Otomatik kayıt hata uyarısını bir kez gösterip
+     * sessizce yeniden dener; burada hata metni her basışta yeniden gösterilir.
+     */
+    const [manualSaving, setManualSaving] = React.useState(false);
+    const manualSave = React.useCallback(async () => {
+        if (manualSaving) return;
+        if (saveBlockRef.current === 'load') {
+            toast.error('Defter içeriği yüklenemediği için kayıt kapalı. Sayfayı yenileyip tekrar açın.');
+            return;
+        }
+        if (saveBlockRef.current === 'conflict') {
+            await resolveConflict();
+            return;
+        }
+        if (!canvasRef.current) return;
+        if (saveTimerRef.current) {
+            window.clearTimeout(saveTimerRef.current);
+            saveTimerRef.current = null;
+        }
+        if (retryTimerRef.current) {
+            window.clearTimeout(retryTimerRef.current);
+            retryTimerRef.current = null;
+        }
+        retryCountRef.current = 0;
+        errorWarnedRef.current = false;
+        fullWarnedRef.current = false;
+        dirtyRef.current = true;
+        setManualSaving(true);
+        try {
+            await save();
+        } finally {
+            setManualSaving(false);
+        }
+        if (!dirtyRef.current) toast.success('Defter kaydedildi.');
+    }, [manualSaving, resolveConflict, save, toast]);
+    const manualSaveRef = React.useRef(manualSave);
+    manualSaveRef.current = manualSave;
+
+    // Ctrl/Cmd+S tarayıcının "sayfayı farklı kaydet" penceresi yerine defteri kaydeder.
+    React.useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                void manualSaveRef.current();
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
+
     /*
      * Editör ekrandan kalkarken (üst bileşen kapattı, başka sayfaya gidildi)
      * bekleyen değişiklik atılmasın. Düzen efektinin temizliği, tuval
@@ -1700,6 +1752,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     : <span className="nb-save-state" title={saveState === 'saving' ? 'Kaydediliyor' : saveState === 'error' ? 'Kaydedilemedi; otomatik yeniden deneniyor' : 'Buluta otomatik kaydedilir'}>
                         {saveState === 'saving' ? <Loader2 size={12} className="animate-spin"/> : saveState === 'error' ? <AlertTriangle size={12} color="#b42335"/> : <span/>}<small>{saveState === 'saving' ? 'Kaydediliyor' : saveState === 'error' ? 'Yeniden deniyor' : 'Kayıtlı'}</small>
                     </span>}
+                <button type="button" className="nb-icon nb-save-button" onClick={() => void manualSave()} disabled={manualSaving || isLoading} title="Şimdi kaydet (Ctrl+S)" aria-label="Defteri şimdi kaydet">{manualSaving ? <Loader2 size={17} className="animate-spin"/> : <Save size={17}/>}</button>
             </div>
             {renderDrawingToolbar()}
             <div className="nb-document-actions">
@@ -1715,7 +1768,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         <b>Belge işlemleri</b>
                         <label className="nb-menu-title">Defter adı<input value={title} onChange={e => setTitle(e.target.value)} onBlur={handleTitleCommit} onKeyDown={e => {if(e.key === 'Enter') (e.target as HTMLInputElement).blur();}} aria-label="Menüde defter adı"/></label>
                         {renderPageNavigation()}
-                        <button type="button" className="nb-menu-item" onClick={() => void save()}><Save size={16}/> Kaydet</button>
+                        <button type="button" className="nb-menu-item" onClick={() => {setEditorMenu(null);void manualSave();}}><Save size={16}/> Şimdi kaydet</button>
                         <div className="nb-file-actions">{renderPdfDropdown(true)}{renderExportDropdown(true)}</div>
                         <div className="nb-menu-paper">{renderPaperDropdown(false)}</div>
                         <p>Kağıt rengi</p><div className="nb-paper-colors">{BG_COLORS.map(b => <button type="button" key={b.color} style={{background:b.color}} aria-label={`Zemin rengi: ${b.label}`} title={b.label} className={bgColor === b.color ? 'is-selected' : ''} onClick={() => changeBg(b.color)}/>)}</div>
@@ -1744,6 +1797,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     <button type="button" className="nb-icon" onClick={handleClose} aria-label="Defterlerime dön"><ArrowLeft size={20}/></button>
                     <button type="button" className="nb-icon" onClick={() => setHideHeader(false)} title="Odak modundan çık" aria-label="Odak modundan çık"><Minimize2 size={20}/></button>
                     <button type="button" className="nb-icon" onClick={changeDockSide} title="Araçları diğer yana taşı" aria-label="Araçları diğer yana taşı"><ArrowLeftRight size={20}/></button>
+                    <button type="button" className="nb-icon nb-save-button" onClick={() => void manualSave()} disabled={manualSaving} title="Şimdi kaydet (Ctrl+S)" aria-label="Defteri şimdi kaydet">{manualSaving ? <Loader2 size={20} className="animate-spin"/> : <Save size={20}/>}</button>
                     {saveBlock && <button type="button" className="nb-icon nb-save-warning" title="Otomatik kayıt durdu" aria-label="Kayıt sorununu göster" onClick={() => {setHideHeader(false);if(saveBlock === 'conflict') void resolveConflict();}}><AlertTriangle size={20}/></button>}
                 </div>
                 {renderDrawingToolbar()}

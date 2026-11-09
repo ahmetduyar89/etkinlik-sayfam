@@ -201,7 +201,7 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
             {button('Silgi (E)', Eraser, () => config.tool === 'eraser' ? toggle('eraser') : select('eraser'), config.tool === 'eraser')}
             {button('Kement (L)', Lasso, () => config.tool === 'lasso' ? toggle('lasso') : select('lasso'), config.tool === 'lasso')}
             {!props.dockSide && button('Metin (T)', Type, () => select('text'), config.tool === 'text')}
-            {props.dockSide && button('Sayfayı taşı', Hand, () => select('pan'), config.tool === 'pan')}
+            {button('Sayfayı taşı', Hand, () => select('pan'), config.tool === 'pan')}
             <span className="gn-main-divider"/>
             <div className="gn-quick-colors" role="group" aria-label="Hızlı renkler">
                 {prefs.colors.map((c,i) => ({c,i})).filter(({c}) => c.toLowerCase() !== '#ffffff').slice(0,4).map(({c,i}) => <button type="button" key={i} className={`gn-color ${config.color.toLowerCase() === c.toLowerCase() ? 'is-selected' : ''}`} style={{'--ink':c} as React.CSSProperties} aria-label={`Renk ${i+1}: ${c}`} aria-pressed={config.color.toLowerCase() === c.toLowerCase()} onClick={() => { if(config.color.toLowerCase() === c.toLowerCase()) {setSlot(i);setHex(c);toggle('color');} else patch({color:c}); }}><span/></button>)}
@@ -277,7 +277,6 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
                 {props.onInsertElement && <button type="button" onClick={() => setPanel('elements')}><Sticker/>Öğeler</button>}
                 {props.onInsertImages && <button type="button" disabled={props.isInsertingImage} onClick={() => {file.current?.click();setPanel(null);}}><ImagePlus/>Görsel ekle</button>}
                 <button type="button" onClick={() => setPanel('shapes')}><Shapes/>Şekiller</button>
-                <button type="button" onClick={() => select('pan')}><Hand/>Sayfayı taşı</button>
                 <button type="button" onClick={() => {if(onOpenLibrary) {onOpenLibrary();setPanel(null);} else setPanel('library');}}><BookOpen/>Kütüphane</button>
                 {props.onSelectTool && <button type="button" onClick={() => setPanel('lab')}><FlaskConical/>Dinamik Laboratuvar</button>}
                 <button type="button" onClick={() => setPanel('page')}><Grid2X2/>Sayfa ve yazma</button>
