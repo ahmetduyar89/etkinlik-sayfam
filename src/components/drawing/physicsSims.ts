@@ -1,0 +1,2609 @@
+// src/components/drawing/physicsSims.ts
+// Fizik simülasyonları: ışığın kırılması ve hareket grafikleri.
+
+import type { MathObject } from '../../types';
+import {
+    arrow,
+    clamp,
+    fillShape,
+    clampInt,
+    fitText,
+    fmtNum,
+    isIconSize,
+    label,
+    line,
+    panel,
+    path,
+    roundRect,
+    simValue,
+    withAlpha,
+    type Ctx,
+    type MathCatalogItem,
+    type Rect,
+    type Renderer,
+    type SimControl,
+    type SimSpec,
+} from './objectDrawing';
+
+// ── Işığın kırılması (Işığın Madde ile Etkileşimi) ───────────────────
+//
+// Kilit fikir: ışık yoğun ortama geçerken normale yaklaşır, az yoğun
+// ortama geçerken normalden uzaklaşır. Az yoğun ortama geçişte belli bir
+// açıdan sonra ışık hiç çıkamaz — tam yansıma.
+
+interface MediumPair {
+    top: string;
+    bottom: string;
+    n1: number;
+    n2: number;
+}
+
+const REFRACTION_PAIRS: ReadonlyArray<MediumPair> = [
+    { top: 'Hava', bottom: 'Su', n1: 1, n2: 1.33 },
+    { top: 'Hava', bottom: 'Cam', n1: 1, n2: 1.5 },
+    { top: 'Su', bottom: 'Hava', n1: 1.33, n2: 1 },
+    { top: 'Cam', bottom: 'Hava', n1: 1.5, n2: 1 },
+];
+
+const refractionState = (o: MathObject) => {
+    const pair = REFRACTION_PAIRS[clampInt(simValue(o, 'pair', 0), 0, REFRACTION_PAIRS.length - 1, 0)];
+    const angle = clamp(simValue(o, 'angle', 40), 1, 88);
+    const ratio = (pair.n1 * Math.sin((angle * Math.PI) / 180)) / pair.n2;
+    // |sin θ₂| > 1 ise kırılan ışın yoktur: tam yansıma.
+    const total = Math.abs(ratio) > 1;
+    return {
+        pair,
+        angle,
+        total,
+        refracted: total ? 0 : (Math.asin(ratio) * 180) / Math.PI,
+        critical: pair.n1 > pair.n2 ? (Math.asin(pair.n2 / pair.n1) * 180) / Math.PI : null,
+    };
+};
+
+function refractionGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    return {
+        fs,
+        ox: r.x + r.w / 2,
+        oy: r.y + r.h * 0.5,
+        len: Math.min(r.w * 0.38, r.h * 0.4),
+    };
+}
+
+export const refractionRender: Renderer = (k) => {
+    const r = k.r;
+    const s = refractionState(k.o);
+    const g = refractionGeom(r);
+    const icon = isIconSize(r);
+    const rad = (deg: number) => (deg * Math.PI) / 180;
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    // Ortam sınırı ve alttaki ortamın gölgesi
+    line(k, r.x + r.w * 0.06, g.oy, r.x + r.w * 0.94, g.oy, Math.max(1.6, k.lw));
+    k.c.save();
+    k.c.globalAlpha = 0.08;
+    k.c.fillRect(r.x + r.w * 0.06, g.oy, r.w * 0.88, r.y + r.h - g.oy - 2);
+    k.c.restore();
+
+    // Normal
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.5);
+    k.c.setLineDash([6, 4]);
+    line(k, g.ox, g.oy - g.len * 1.05, g.ox, g.oy + g.len * 1.05, 1);
+    k.c.restore();
+
+    // Gelen ışın (sol üstten) ve yansıyan ışın (sağ üste)
+    const inX = g.ox - g.len * Math.sin(rad(s.angle));
+    const inY = g.oy - g.len * Math.cos(rad(s.angle));
+    arrow(k, inX, inY, g.ox, g.oy, g.fs * 0.5, Math.max(1.6, k.lw));
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, s.total ? 1 : 0.45);
+    arrow(
+        k,
+        g.ox,
+        g.oy,
+        g.ox + g.len * 0.8 * Math.sin(rad(s.angle)),
+        g.oy - g.len * 0.8 * Math.cos(rad(s.angle)),
+        g.fs * 0.45,
+        s.total ? Math.max(1.6, k.lw) : 1.2,
+    );
+    k.c.restore();
+
+    // Kırılan ışın
+    if (!s.total) {
+        arrow(
+            k,
+            g.ox,
+            g.oy,
+            g.ox + g.len * Math.sin(rad(s.refracted)),
+            g.oy + g.len * Math.cos(rad(s.refracted)),
+            g.fs * 0.5,
+            Math.max(1.6, k.lw),
+        );
+    }
+
+    if (icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Açı yayları
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.6);
+    k.c.beginPath();
+    k.c.lineWidth = 1.2;
+    k.c.arc(g.ox, g.oy, g.len * 0.3, -Math.PI / 2 - rad(s.angle), -Math.PI / 2);
+    k.c.stroke();
+    if (!s.total) {
+        k.c.beginPath();
+        k.c.arc(g.ox, g.oy, g.len * 0.3, Math.PI / 2 - rad(s.refracted), Math.PI / 2);
+        k.c.stroke();
+    }
+    k.c.restore();
+
+    label(
+        k,
+        `${fmtNum(s.angle, 0)}°`,
+        g.ox - g.len * 0.42 * Math.sin(rad(s.angle / 2)) - g.fs * 0.5,
+        g.oy - g.len * 0.42 * Math.cos(rad(s.angle / 2)),
+        'center',
+        'middle',
+        0.72,
+    );
+    if (!s.total) {
+        label(
+            k,
+            `${fmtNum(s.refracted, 0)}°`,
+            g.ox + g.len * 0.42 * Math.sin(rad(s.refracted / 2)) + g.fs * 0.6,
+            g.oy + g.len * 0.42 * Math.cos(rad(s.refracted / 2)),
+            'center',
+            'middle',
+            0.72,
+        );
+    }
+
+    label(k, `${s.pair.top} (n = ${fmtNum(s.pair.n1, 2)})`, r.x + 4, g.oy - g.fs * 0.4, 'left', 'bottom', 0.7);
+    label(k, `${s.pair.bottom} (n = ${fmtNum(s.pair.n2, 2)})`, r.x + 4, g.oy + g.fs * 0.4, 'left', 'top', 0.7);
+    label(k, 'normal', g.ox + g.fs * 0.3, r.y + g.fs * 1.9, 'left', 'top', 0.62);
+
+    const note = s.total
+        ? 'Tam yansıma — ışık alt ortama geçemez'
+        : s.pair.n2 > s.pair.n1
+          ? 'Yoğun ortama geçiş: ışın normale yaklaşır'
+          : 'Az yoğun ortama geçiş: ışın normalden uzaklaşır';
+    label(k, fitText(k, [note], r.w - g.fs * 4, 0.82), r.x + 4, r.y + 1, 'left', 'top', 0.82);
+    label(
+        k,
+        s.critical !== null
+            ? `Sınır açı ${fmtNum(s.critical, 0)}° · gelme açısı ${fmtNum(s.angle, 0)}°`
+            : `Gelme açısı ${fmtNum(s.angle, 0)}° · kırılma açısı ${fmtNum(s.refracted, 0)}°`,
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.78,
+    );
+    k.c.restore();
+};
+
+export const refractionSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = refractionState(o);
+        const g = refractionGeom(r);
+        const rad = (s.angle * Math.PI) / 180;
+        return [
+            {
+                id: 'ray',
+                x: g.ox - g.len * Math.sin(rad),
+                y: g.oy - g.len * Math.cos(rad),
+                type: 'drag',
+                label: 'Gelen ışını sürükle',
+            },
+            {
+                id: 'pair',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: `Ortamları değiştir (şimdi: ${s.pair.top} → ${s.pair.bottom})`,
+                on: true,
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const s = refractionState(o);
+        if (id === 'pair') {
+            const i = REFRACTION_PAIRS.indexOf(s.pair);
+            return { pair: (i + 1) % REFRACTION_PAIRS.length };
+        }
+        const g = refractionGeom(r);
+        // Açı normalden ölçülür; ışın hep sol üstten gelir.
+        const deg = (Math.atan2(g.ox - p.x, g.oy - p.y) * 180) / Math.PI;
+        return { angle: clamp(deg, 1, 88) };
+    },
+    params: [
+        { key: 'angle', label: 'Gelme açısı', min: 1, max: 88, step: 1, unit: '°' },
+        { key: 'pair', label: 'Ortam çifti (0-3)', min: 0, max: 3, step: 1 },
+    ],
+};
+
+// ── Hareket grafikleri (Kuvvet ve Hareket) ───────────────────────────
+//
+// Kilit fikir: konum-zaman grafiğinin EĞİMİ hızı, hız-zaman grafiğinin
+// ALTINDAKİ ALAN yolu verir. Aynı hareket üç yerde birden izlenir:
+// yolda araba, iki grafikte hareketli işaret.
+
+const MOTION_MAX_T = 10;
+
+const motionState = (o: MathObject, t: number) => {
+    const v0 = clamp(simValue(o, 'v0', 4), 0, 20);
+    const a = clamp(simValue(o, 'a', 0), -2, 4);
+    const playing = simValue(o, 'play', 0) > 0.5;
+    const stored = clamp(simValue(o, 'time', 4), 0, MOTION_MAX_T);
+    const time = playing ? (t * 1.2) % MOTION_MAX_T : stored;
+    return {
+        v0,
+        a,
+        playing,
+        time,
+        pos: (tt: number) => v0 * tt + (a * tt * tt) / 2,
+        vel: (tt: number) => v0 + a * tt,
+    };
+};
+
+function motionGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const roadY = r.y + fs * 3.4;
+    const top = roadY + fs * 1.6;
+    const gap = r.w * 0.06;
+    const w = (r.w - gap * 3) / 2;
+    return {
+        fs,
+        roadY,
+        roadX0: r.x + fs,
+        roadX1: r.x + r.w - fs,
+        charts: [
+            { x: r.x + gap, y: top, w, h: r.y + r.h - top - fs * 1.6 },
+            { x: r.x + gap * 2 + w, y: top, w, h: r.y + r.h - top - fs * 1.6 },
+        ],
+    };
+}
+
+export const motionRender: Renderer = (k) => {
+    const r = k.r;
+    const s = motionState(k.o, k.t);
+    const g = motionGeom(r);
+    const icon = isIconSize(r);
+
+    // Ölçekler tüm hareketi kapsar: işaret grafikten taşmasın.
+    const maxPos = Math.max(1, ...Array.from({ length: 21 }, (_, i) => s.pos((i * MOTION_MAX_T) / 20)));
+    const minVel = Math.min(0, s.vel(MOTION_MAX_T), s.v0);
+    const maxVel = Math.max(1, s.v0, s.vel(MOTION_MAX_T));
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    if (icon) {
+        // Simge ölçeğinde yol ve grafikler okunmaz; konum eğrisi tek başına
+        // hareketi anlatır.
+        const bx = r.x + r.w * 0.12;
+        const by = r.y + r.h * 0.12;
+        const bw = r.w * 0.76;
+        const bh = r.h * 0.76;
+        line(k, bx, by, bx, by + bh);
+        line(k, bx, by + bh, bx + bw, by + bh);
+        const pts: Array<[number, number]> = [];
+        for (let j = 0; j <= 24; j++) {
+            const tt = (j * MOTION_MAX_T) / 24;
+            pts.push([bx + (bw * tt) / MOTION_MAX_T, by + bh - (bh * s.pos(tt)) / maxPos]);
+        }
+        k.c.lineWidth = Math.max(1.6, k.lw);
+        path(k, pts, false);
+        k.c.restore();
+        return;
+    }
+
+    // Yol ve araba
+    line(k, g.roadX0, g.roadY, g.roadX1, g.roadY);
+    const carX = g.roadX0 + ((g.roadX1 - g.roadX0) * clamp(s.pos(s.time), 0, maxPos)) / maxPos;
+    const carW = Math.min(g.fs * 2.2, (g.roadX1 - g.roadX0) * 0.12);
+    const carH = carW * 0.45;
+    k.c.strokeRect(carX - carW / 2, g.roadY - carH - 2, carW, carH);
+    for (const dx of [-0.28, 0.28]) {
+        k.c.beginPath();
+        k.c.arc(carX + carW * dx, g.roadY - 2, carH * 0.22, 0, Math.PI * 2);
+        k.c.stroke();
+    }
+
+    // İki grafik: konum-zaman ve hız-zaman
+    const charts: Array<{
+        title: string;
+        value: (tt: number) => number;
+        min: number;
+        max: number;
+    }> = [
+        { title: 'konum – zaman', value: s.pos, min: 0, max: maxPos },
+        { title: 'hız – zaman', value: s.vel, min: minVel, max: maxVel },
+    ];
+
+    charts.forEach((chart, i) => {
+        const box = g.charts[i];
+        const px = (tt: number) => box.x + (box.w * tt) / MOTION_MAX_T;
+        const py = (v: number) =>
+            box.y + box.h - (box.h * (v - chart.min)) / Math.max(0.001, chart.max - chart.min);
+        line(k, box.x, box.y, box.x, box.y + box.h);
+        line(k, box.x, box.y + box.h, box.x + box.w, box.y + box.h);
+        // Sıfır çizgisi (hız negatif olabilir)
+        if (chart.min < 0) {
+            k.c.save();
+            k.c.strokeStyle = withAlpha(k.color, 0.35);
+            k.c.setLineDash([4, 3]);
+            line(k, box.x, py(0), box.x + box.w, py(0), 1);
+            k.c.restore();
+        }
+        const pts: Array<[number, number]> = [];
+        for (let j = 0; j <= 40; j++) {
+            const tt = (j * MOTION_MAX_T) / 40;
+            pts.push([px(tt), py(chart.value(tt))]);
+        }
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.3);
+        path(k, pts, false);
+        k.c.restore();
+        const walked = pts.filter((_, j) => (j * MOTION_MAX_T) / 40 <= s.time);
+        walked.push([px(s.time), py(chart.value(s.time))]);
+        k.c.lineWidth = Math.max(1.8, k.lw);
+        path(k, walked, false);
+        k.c.beginPath();
+        k.c.arc(px(s.time), py(chart.value(s.time)), Math.max(2.5, g.fs * 0.22), 0, Math.PI * 2);
+        k.c.fill();
+        if (k.o.labels !== false) {
+            label(k, chart.title, box.x + box.w / 2, box.y + box.h + g.fs * 0.3, 'center', 'top', 0.66);
+            // Eksen uçlarındaki değerler: grafiğin ölçeği okunabilsin.
+            label(k, fmtNum(chart.max, 0), box.x - g.fs * 0.25, box.y, 'right', 'middle', 0.58);
+            label(k, `${MOTION_MAX_T} s`, box.x + box.w, box.y + box.h + g.fs * 0.3, 'right', 'top', 0.58);
+        }
+    });
+
+    if (k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                `${s.a === 0 ? 'Sabit hızlı hareket' : s.a > 0 ? 'Hızlanan hareket' : 'Yavaşlayan hareket'} · v₀ = ${fmtNum(s.v0, 1)} m/s · a = ${fmtNum(s.a, 1)} m/s²`,
+                `v₀ = ${fmtNum(s.v0, 1)} m/s · a = ${fmtNum(s.a, 1)} m/s²`,
+            ],
+            r.w - g.fs * 4,
+            0.82,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.82,
+    );
+    label(
+        k,
+        `t = ${fmtNum(s.time, 1)} s · x = ${fmtNum(s.pos(s.time), 1)} m · v = ${fmtNum(s.vel(s.time), 1)} m/s`,
+        r.x + r.w / 2,
+        r.y + g.fs * 1.6,
+        'center',
+        'middle',
+        0.78,
+    );
+    k.c.restore();
+};
+
+export const motionSpec: SimSpec = {
+    animated: (o) => simValue(o, 'play', 0) > 0.5,
+    controls: (r, o): SimControl[] => {
+        const s = motionState(o, 0);
+        const g = motionGeom(r);
+        const play: SimControl = {
+            id: 'play',
+            x: r.x + r.w - 14,
+            y: r.y + 14,
+            type: 'toggle',
+            label: s.playing ? 'Hareketi duraklat' : 'Hareketi başlat',
+            on: s.playing,
+        };
+        if (s.playing) return [play];
+        // Tutamak eğrinin üzerindeki işaretin yerinde durur; eksen yazılarının
+        // üstünde durduğunda etiketleri kapatıyordu.
+        const box = g.charts[0];
+        const maxPos = Math.max(1, ...Array.from({ length: 21 }, (_, i) => s.pos((i * MOTION_MAX_T) / 20)));
+        return [
+            {
+                id: 'time',
+                x: box.x + (box.w * s.time) / MOTION_MAX_T,
+                y: box.y + box.h - (box.h * s.pos(s.time)) / maxPos,
+                type: 'drag',
+                label: 'Zamanı sürükle',
+            },
+            play,
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (id === 'play') return { play: simValue(o, 'play', 0) > 0.5 ? 0 : 1 };
+        const box = motionGeom(r).charts[0];
+        return { time: clamp(((p.x - box.x) / box.w) * MOTION_MAX_T, 0, MOTION_MAX_T) };
+    },
+    params: [
+        { key: 'v0', label: 'İlk hız', min: 0, max: 20, step: 1, unit: 'm/s' },
+        { key: 'a', label: 'İvme', min: -2, max: 4, step: 0.5, unit: 'm/s²' },
+        { key: 'time', label: 'Zaman', min: 0, max: MOTION_MAX_T, step: 0.5, unit: 's' },
+        { key: 'play', label: 'Oynat (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
+// ── Bileşke kuvvet (Kuvvet ve Hareket) ───────────────────────────────
+//
+// Kilit fikir: kuvvetler sayı gibi değil, ok gibi toplanır. Aynı yöndeyse
+// büyür, zıt yöndeyse birbirini götürür; açılıysa paralelkenar kuralıyla
+// bulunur. Bileşke sıfırsa cisim dengededir.
+
+const FORCE_MAX = 50;
+
+const forceState = (o: MathObject) => {
+    const f1 = clamp(simValue(o, 'f1', 30), 0, FORCE_MAX);
+    const a1 = clamp(simValue(o, 'a1', 0), 0, 359);
+    const f2 = clamp(simValue(o, 'f2', 20), 0, FORCE_MAX);
+    const a2 = clamp(simValue(o, 'a2', 90), 0, 359);
+    const rad = (deg: number) => (deg * Math.PI) / 180;
+    // Ekranda y aşağı arttığı için bileşen hesabında y ters işaretlidir.
+    const x = f1 * Math.cos(rad(a1)) + f2 * Math.cos(rad(a2));
+    const y = f1 * Math.sin(rad(a1)) + f2 * Math.sin(rad(a2));
+    const mag = Math.hypot(x, y);
+    return {
+        f1,
+        a1,
+        f2,
+        a2,
+        x,
+        y,
+        mag,
+        angle: ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360,
+        balanced: mag < 0.5,
+    };
+};
+
+/**
+ * Ölçek 40 N'a göre kurulur: tipik değerlerde oklar kutuyu doldurur, en
+ * büyük değer (50 N) kenara yaklaşır. Simge ölçeğinde ise oklar kutuya
+ * sığacak şekilde o anki en büyük kuvvete göre küçültülür.
+ */
+function forceGeom(r: Rect, s: { f1: number; f2: number; mag: number }) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const reference = icon ? Math.max(s.f1, s.f2, s.mag, 1) : 40;
+    return {
+        fs,
+        cx: r.x + r.w * (icon ? 0.5 : 0.44),
+        cy: r.y + r.h * 0.5,
+        scale: Math.min(r.w * (icon ? 0.45 : 0.38), r.h * (icon ? 0.45 : 0.4)) / reference,
+    };
+}
+
+/** Kuvvet vektörünün uç noktası (ekran koordinatı). */
+const forceTip = (g: { cx: number; cy: number; scale: number }, mag: number, deg: number) => ({
+    x: g.cx + mag * g.scale * Math.cos((deg * Math.PI) / 180),
+    y: g.cy - mag * g.scale * Math.sin((deg * Math.PI) / 180),
+});
+
+export const netForceRender: Renderer = (k) => {
+    const r = k.r;
+    const s = forceState(k.o);
+    const g = forceGeom(r, s);
+    const icon = isIconSize(r);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    if (icon) {
+        // Simge ölçeğinde cisim kutusu ve paralelkenar leke oluşturuyor;
+        // yalnızca üç ok çizilir.
+        const t1i = forceTip(g, s.f1, s.a1);
+        const t2i = forceTip(g, s.f2, s.a2);
+        const tri = forceTip(g, s.mag, s.angle);
+        arrow(k, g.cx, g.cy, t1i.x, t1i.y, Math.min(r.w, r.h) * 0.12, 1.4);
+        arrow(k, g.cx, g.cy, t2i.x, t2i.y, Math.min(r.w, r.h) * 0.12, 1.4);
+        if (!s.balanced) {
+            arrow(k, g.cx, g.cy, tri.x, tri.y, Math.min(r.w, r.h) * 0.16, 2.6);
+        }
+        k.c.restore();
+        return;
+    }
+
+    // Cisim
+    const box = Math.min(g.fs * 2.2, Math.min(r.w, r.h) * 0.12);
+    k.c.strokeRect(g.cx - box / 2, g.cy - box / 2, box, box);
+    k.c.save();
+    k.c.globalAlpha = 0.12;
+    k.c.fillRect(g.cx - box / 2, g.cy - box / 2, box, box);
+    k.c.restore();
+
+    const t1 = forceTip(g, s.f1, s.a1);
+    const t2 = forceTip(g, s.f2, s.a2);
+    const tr = forceTip(g, s.mag, s.angle);
+
+    // Paralelkenar kuralı: uçlardan bileşkenin ucuna kesikli tamamlama
+    if (!icon && !s.balanced && s.f1 > 0 && s.f2 > 0) {
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.35);
+        k.c.setLineDash([5, 4]);
+        line(k, t1.x, t1.y, tr.x, tr.y, 1);
+        line(k, t2.x, t2.y, tr.x, tr.y, 1);
+        k.c.restore();
+    }
+
+    if (s.f1 > 0) arrow(k, g.cx, g.cy, t1.x, t1.y, g.fs * 0.5, Math.max(1.5, k.lw));
+    if (s.f2 > 0) arrow(k, g.cx, g.cy, t2.x, t2.y, g.fs * 0.5, Math.max(1.5, k.lw));
+    if (!s.balanced) {
+        k.c.save();
+        k.c.lineWidth = Math.max(2.4, k.lw * 1.8);
+        arrow(k, g.cx, g.cy, tr.x, tr.y, g.fs * 0.7, Math.max(2.4, k.lw * 1.8));
+        k.c.restore();
+    }
+
+    if (icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Etiketler okun UCUNDAN dışarı doğru kaydırılır; merkezde üst üste
+    // binmesinler.
+    const outward = (tip: { x: number; y: number }, deg: number, d: number) => ({
+        x: tip.x + d * Math.cos((deg * Math.PI) / 180),
+        y: tip.y - d * Math.sin((deg * Math.PI) / 180),
+    });
+    if (s.f1 > 0) {
+        const p1 = outward(t1, s.a1, g.fs * 1.4);
+        label(k, `F₁ ${fmtNum(s.f1, 0)} N`, p1.x, p1.y, 'center', 'middle', 0.7);
+    }
+    if (s.f2 > 0) {
+        const p2 = outward(t2, s.a2, g.fs * 1.4);
+        label(k, `F₂ ${fmtNum(s.f2, 0)} N`, p2.x, p2.y, 'center', 'middle', 0.7);
+    }
+    if (!s.balanced) {
+        const pr = outward(tr, s.angle, g.fs * 1.6);
+        label(k, `R ${fmtNum(s.mag, 1)} N`, pr.x, pr.y, 'center', 'middle', 0.8);
+    }
+
+    label(
+        k,
+        fitText(
+            k,
+            ['Kuvvetler ok gibi toplanır — uçları sürükle', 'Kuvvet oklarını sürükle'],
+            r.w - g.fs * 3,
+            0.8,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8,
+    );
+    const verdict = s.balanced
+        ? 'Bileşke sıfır · kuvvetler dengelenmiş, cisim hareket etmez'
+        : `Bileşke ${fmtNum(s.mag, 1)} N · ${fmtNum(s.angle, 0)}° yönünde · dengelenmemiş`;
+    label(k, fitText(k, [verdict, `R = ${fmtNum(s.mag, 1)} N`], r.w - 8, 0.8), r.x + r.w / 2, r.y + r.h, 'center', 'bottom', 0.8);
+    k.c.restore();
+};
+
+export const netForceSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = forceState(o);
+        const g = forceGeom(r, s);
+        const t1 = forceTip(g, s.f1, s.a1);
+        const t2 = forceTip(g, s.f2, s.a2);
+        return [
+            { id: 'f1', x: t1.x, y: t1.y, type: 'drag', label: 'Birinci kuvveti sürükle' },
+            { id: 'f2', x: t2.x, y: t2.y, type: 'drag', label: 'İkinci kuvveti sürükle' },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const g = forceGeom(r, forceState(o));
+        const dx = p.x - g.cx;
+        const dy = g.cy - p.y;
+        const mag = clamp(Math.hypot(dx, dy) / g.scale, 0, FORCE_MAX);
+        const deg = ((Math.atan2(dy, dx) * 180) / Math.PI + 360) % 360;
+        // Değerler tam sayıya yuvarlanır; okuma ve hesap kolay kalsın.
+        return id === 'f1'
+            ? { f1: Math.round(mag), a1: Math.round(deg) }
+            : { f2: Math.round(mag), a2: Math.round(deg) };
+    },
+    params: [
+        { key: 'f1', label: '1. kuvvet', min: 0, max: FORCE_MAX, step: 1, unit: 'N' },
+        { key: 'a1', label: '1. kuvvetin açısı', min: 0, max: 359, step: 5, unit: '°' },
+        { key: 'f2', label: '2. kuvvet', min: 0, max: FORCE_MAX, step: 1, unit: 'N' },
+        { key: 'a2', label: '2. kuvvetin açısı', min: 0, max: 359, step: 5, unit: '°' },
+    ],
+};
+
+// ── Enerji dönüşümü (Enerji Dönüşümleri) ─────────────────────────────
+//
+// Kilit fikir: sarkaç yükseldikçe potansiyel, alçaldıkça kinetik enerji
+// artar; toplam sabittir. Sürtünme açıkken toplam azalmaz — enerjinin bir
+// kısmı ısıya dönüşür, yani kaybolmaz, biçim değiştirir.
+
+/** Sarkaç: 1 kg kütle, 1 m ip, g = 10 N/kg. */
+const PEND_M = 1;
+const PEND_L = 1;
+const PEND_G = 10;
+/** Sürtünme açıkken sönüm katsayısı. */
+const PEND_DAMP = 0.08;
+/** Sönümlü gösterim bu sürede bir başa döner. */
+const PEND_CYCLE = 24;
+
+function energyState(o: MathObject, t: number) {
+    const amp = (clamp(simValue(o, 'amp', 40), 5, 70) * Math.PI) / 180;
+    const playing = simValue(o, 'play', 0) > 0.5;
+    const damped = simValue(o, 'damp', 0) > 0.5;
+    const w = Math.sqrt(PEND_G / PEND_L);
+    const elapsed = playing ? t % PEND_CYCLE : 0;
+    // Sönüm genliği azaltır; duraklatılmışken sarkaç en uçta bekler.
+    const current = damped && playing ? amp * Math.exp(-PEND_DAMP * elapsed) : amp;
+    const theta = playing ? current * Math.cos(w * elapsed) : amp;
+    const height = (a: number) => PEND_L * (1 - Math.cos(a));
+    const total0 = PEND_M * PEND_G * height(amp);
+    const total = PEND_M * PEND_G * height(current);
+    const pe = PEND_M * PEND_G * height(Math.abs(theta));
+    return {
+        amp,
+        theta,
+        playing,
+        damped,
+        pe,
+        ke: Math.max(0, total - pe),
+        total,
+        lost: Math.max(0, total0 - total),
+        max: total0,
+    };
+}
+
+function energyGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const pivotX = r.x + r.w * (icon ? 0.5 : 0.34);
+    const pivotY = r.y + (icon ? r.h * 0.12 : fs * 2.6);
+    const len = Math.min(r.w * (icon ? 0.34 : 0.26), r.h * (icon ? 0.6 : 0.52));
+    return { fs, icon, pivotX, pivotY, len, bobR: Math.max(5, len * 0.13) };
+}
+
+export const energyRender: Renderer = (k) => {
+    const r = k.r;
+    const s = energyState(k.o, k.t);
+    const g = energyGeom(r);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    // Askı ve yörünge yayı
+    line(k, g.pivotX - g.fs, g.pivotY, g.pivotX + g.fs, g.pivotY);
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.3);
+    k.c.setLineDash([5, 4]);
+    k.c.beginPath();
+    k.c.lineWidth = 1;
+    k.c.arc(g.pivotX, g.pivotY, g.len, Math.PI / 2 - s.amp, Math.PI / 2 + s.amp);
+    k.c.stroke();
+    k.c.restore();
+
+    // İp ve top
+    const bx = g.pivotX + g.len * Math.sin(s.theta);
+    const by = g.pivotY + g.len * Math.cos(s.theta);
+    line(k, g.pivotX, g.pivotY, bx, by, Math.max(1.4, k.lw));
+    k.c.beginPath();
+    k.c.arc(bx, by, g.bobR, 0, Math.PI * 2);
+    k.c.stroke();
+    k.c.save();
+    k.c.globalAlpha = 0.25;
+    k.c.fill();
+    k.c.restore();
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // En alçak nokta: potansiyel enerjinin sıfır kabul edildiği yer
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.35);
+    k.c.setLineDash([4, 4]);
+    line(k, g.pivotX - g.len, g.pivotY + g.len, g.pivotX + g.len, g.pivotY + g.len, 1);
+    k.c.restore();
+    label(k, 'referans (Ep = 0)', g.pivotX - g.len, g.pivotY + g.len + g.fs * 0.3, 'left', 'top', 0.6);
+
+    // Enerji çubukları
+    const barsX = r.x + r.w * 0.68;
+    const barW = r.w * 0.075;
+    const barTop = r.y + g.fs * 3;
+    const barH = r.h - g.fs * 6;
+    const bars: Array<[string, number]> = [
+        ['Ek', s.ke],
+        ['Ep', s.pe],
+        ['ısı', s.lost],
+    ];
+    bars.forEach(([name, value], i) => {
+        const x = barsX + i * barW * 1.6;
+        const h = s.max > 0 ? (value / s.max) * barH : 0;
+        k.c.lineWidth = k.lw;
+        k.c.strokeRect(x, barTop, barW, barH);
+        k.c.save();
+        k.c.globalAlpha = 0.26;
+        k.c.fillRect(x, barTop + barH - h, barW, h);
+        k.c.restore();
+        label(k, name, x + barW / 2, barTop + barH + g.fs * 0.3, 'center', 'top', 0.66);
+        // Birim her sayının yanında yazılır; ayrı bir "joule" etiketi
+        // çubukların üstüne biniyordu.
+        label(k, `${fmtNum(value, 1)} J`, x + barW / 2, barTop - g.fs * 0.3, 'center', 'bottom', 0.62);
+    });
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                s.damped
+                    ? 'Sürtünmeli: toplam enerji azalmaz, bir kısmı ısıya dönüşür'
+                    : 'Sürtünmesiz: Ek + Ep toplamı sabit kalır',
+                s.damped ? 'Sürtünmeli sarkaç' : 'Sürtünmesiz sarkaç',
+            ],
+            r.w - g.fs * 5,
+            0.8,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8,
+    );
+    label(
+        k,
+        `Ek ${fmtNum(s.ke, 1)} J + Ep ${fmtNum(s.pe, 1)} J = ${fmtNum(s.ke + s.pe, 1)} J`,
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.8,
+    );
+    k.c.restore();
+};
+
+export const energySpec: SimSpec = {
+    animated: (o) => simValue(o, 'play', 0) > 0.5,
+    controls: (r, o): SimControl[] => {
+        const s = energyState(o, 0);
+        const g = energyGeom(r);
+        const play: SimControl = {
+            id: 'play',
+            x: r.x + r.w - 14,
+            y: r.y + 14,
+            type: 'toggle',
+            label: s.playing ? 'Sarkacı durdur' : 'Sarkacı bırak',
+            on: s.playing,
+        };
+        const damp: SimControl = {
+            id: 'damp',
+            x: r.x + r.w - 40,
+            y: r.y + 14,
+            type: 'toggle',
+            label: s.damped ? 'Sürtünmeyi kaldır' : 'Sürtünme ekle',
+            on: s.damped,
+        };
+        if (s.playing) return [play, damp];
+        return [
+            {
+                id: 'bob',
+                x: g.pivotX + g.len * Math.sin(s.amp),
+                y: g.pivotY + g.len * Math.cos(s.amp),
+                type: 'drag',
+                label: 'Topu kaldır (genliği belirler)',
+            },
+            play,
+            damp,
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (id === 'play') return { play: simValue(o, 'play', 0) > 0.5 ? 0 : 1 };
+        if (id === 'damp') return { damp: simValue(o, 'damp', 0) > 0.5 ? 0 : 1 };
+        const g = energyGeom(r);
+        const deg = (Math.atan2(p.x - g.pivotX, Math.max(1, p.y - g.pivotY)) * 180) / Math.PI;
+        return { amp: clamp(Math.abs(deg), 5, 70) };
+    },
+    params: [
+        { key: 'amp', label: 'Bırakma açısı', min: 5, max: 70, step: 5, unit: '°' },
+        { key: 'play', label: 'Salla (0/1)', min: 0, max: 1, step: 1 },
+        { key: 'damp', label: 'Sürtünme (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
+// ── Ohm yasası (Elektrik Akımı) ──────────────────────────────────────
+//
+// Kilit fikir: aynı direnç için gerilim ile akım DOĞRU orantılıdır;
+// gerilim-akım grafiği orijinden geçen bir doğrudur ve o doğrunun EĞİMİ
+// direncin kendisidir.
+
+const OHM_MAX_V = 12;
+const OHM_MAX_I = 6;
+
+const ohmState = (o: MathObject) => {
+    const res = clamp(simValue(o, 'r', 3), 1, 12);
+    const volt = clamp(simValue(o, 'v', 6), 0, OHM_MAX_V);
+    return { res, volt, current: volt / res };
+};
+
+function ohmGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    return {
+        fs,
+        icon,
+        circuit: {
+            x: r.x + r.w * (icon ? 0.12 : 0.06),
+            y: r.y + (icon ? r.h * 0.16 : fs * 3),
+            w: r.w * (icon ? 0.76 : 0.34),
+            h: r.h - (icon ? r.h * 0.32 : fs * 5),
+        },
+        chart: {
+            x: r.x + r.w * 0.52,
+            y: r.y + fs * 3,
+            w: r.w * 0.4,
+            h: r.h - fs * 5.4,
+        },
+    };
+}
+
+export const ohmRender: Renderer = (k) => {
+    const r = k.r;
+    const s = ohmState(k.o);
+    const g = ohmGeom(r);
+    const c = g.circuit;
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    // Devre: üstte direnç, solda pil, sağda ampermetre
+    line(k, c.x, c.y, c.x + c.w * 0.3, c.y);
+    line(k, c.x + c.w * 0.7, c.y, c.x + c.w, c.y);
+    line(k, c.x, c.y, c.x, c.y + c.h);
+    line(k, c.x + c.w, c.y, c.x + c.w, c.y + c.h * 0.34);
+    line(k, c.x + c.w, c.y + c.h * 0.66, c.x + c.w, c.y + c.h);
+    line(k, c.x, c.y + c.h, c.x + c.w * 0.34, c.y + c.h);
+    line(k, c.x + c.w * 0.66, c.y + c.h, c.x + c.w, c.y + c.h);
+
+    // Direnç (dikdörtgen sembol)
+    k.c.strokeRect(c.x + c.w * 0.3, c.y - c.h * 0.06, c.w * 0.4, c.h * 0.12);
+    // Pil
+    const bx = c.x + c.w * 0.5;
+    line(k, bx - c.w * 0.05, c.y + c.h - c.h * 0.09, bx - c.w * 0.05, c.y + c.h + c.h * 0.09);
+    line(k, bx + c.w * 0.05, c.y + c.h - c.h * 0.05, bx + c.w * 0.05, c.y + c.h + c.h * 0.05);
+    // Ampermetre
+    const ax = c.x + c.w;
+    const ay = c.y + c.h * 0.5;
+    const arad = Math.min(c.w * 0.13, c.h * 0.13);
+    k.c.beginPath();
+    k.c.arc(ax, ay, arad, 0, Math.PI * 2);
+    k.c.stroke();
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+    label(k, 'A', ax, ay, 'center', 'middle', 0.75);
+    label(k, `${fmtNum(s.res, 0)} Ω`, c.x + c.w * 0.5, c.y - c.h * 0.1, 'center', 'bottom', 0.72);
+    // Pil ve ampermetre okumaları devrenin İÇİNE yazılır; dışarıda alt
+    // satırdaki özetle ve tellerle çakışıyordu.
+    label(k, `${fmtNum(s.volt, 1)} V`, bx + c.w * 0.1, c.y + c.h, 'left', 'middle', 0.72);
+    label(k, `${fmtNum(s.current, 2)} A`, ax - arad - g.fs * 0.35, ay, 'right', 'middle', 0.7);
+
+    // Gerilim–akım grafiği: eğim direnci verir
+    const ch = g.chart;
+    const px = (i: number) => ch.x + (ch.w * i) / OHM_MAX_I;
+    const py = (v: number) => ch.y + ch.h - (ch.h * v) / OHM_MAX_V;
+    line(k, ch.x, ch.y, ch.x, ch.y + ch.h);
+    line(k, ch.x, ch.y + ch.h, ch.x + ch.w, ch.y + ch.h);
+    // Doğrunun kutu içinde kalan ucu
+    const iEnd = Math.min(OHM_MAX_I, OHM_MAX_V / s.res);
+    line(k, px(0), py(0), px(iEnd), py(iEnd * s.res), Math.max(1.6, k.lw));
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.45);
+    k.c.setLineDash([4, 3]);
+    line(k, px(s.current), py(s.volt), px(s.current), py(0), 1);
+    line(k, ch.x, py(s.volt), px(s.current), py(s.volt), 1);
+    k.c.restore();
+    k.c.beginPath();
+    k.c.arc(px(s.current), py(s.volt), Math.max(3, g.fs * 0.26), 0, Math.PI * 2);
+    k.c.fill();
+    label(k, 'V', ch.x - g.fs * 0.3, ch.y, 'right', 'middle', 0.62);
+    label(k, `${OHM_MAX_I} A`, ch.x + ch.w, ch.y + ch.h + g.fs * 0.3, 'right', 'top', 0.6);
+    label(k, '0', ch.x - g.fs * 0.3, ch.y + ch.h, 'right', 'middle', 0.6);
+    label(k, `${OHM_MAX_V}`, ch.x - g.fs * 0.3, ch.y + g.fs * 0.6, 'right', 'middle', 0.6);
+
+    label(
+        k,
+        fitText(
+            k,
+            ['Gerilim–akım grafiğinin eğimi direnci verir', 'Ohm yasası'],
+            r.w - g.fs * 4,
+            0.82,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.82,
+    );
+    label(
+        k,
+        `V = ${fmtNum(s.volt, 1)} V · I = ${fmtNum(s.current, 2)} A · R = V / I = ${fmtNum(s.res, 0)} Ω`,
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.82,
+    );
+    k.c.restore();
+};
+
+export const ohmSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = ohmState(o);
+        const g = ohmGeom(r);
+        const ch = g.chart;
+        return [
+            {
+                id: 'point',
+                x: ch.x + (ch.w * s.current) / OHM_MAX_I,
+                y: ch.y + ch.h - (ch.h * s.volt) / OHM_MAX_V,
+                type: 'drag',
+                label: 'Gerilimi değiştir',
+            },
+            {
+                id: 'res',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: `Direnci değiştir (şimdi: ${fmtNum(s.res, 0)} Ω)`,
+                on: s.res > 1,
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const s = ohmState(o);
+        // Direnç okunması kolay değerler arasında döner.
+        if (id === 'res') {
+            const steps = [1, 2, 3, 4, 6, 12];
+            const i = steps.indexOf(Math.round(s.res));
+            return { r: steps[(i + 1) % steps.length] };
+        }
+        const g = ohmGeom(r);
+        const volt = clamp(((g.chart.y + g.chart.h - p.y) / g.chart.h) * OHM_MAX_V, 0, OHM_MAX_V);
+        return { v: Math.round(volt * 2) / 2 };
+    },
+    params: [
+        { key: 'v', label: 'Gerilim', min: 0, max: OHM_MAX_V, step: 0.5, unit: 'V' },
+        { key: 'r', label: 'Direnç', min: 1, max: 12, step: 1, unit: 'Ω' },
+    ],
+};
+
+// ── Ses dalgası (Ses ve Özellikleri) ─────────────────────────────────
+//
+// Kilit fikir: sesin İNCELİĞİNİ frekans, ŞİDDETİNİ genlik belirler.
+// Dalga çizimi enine görünse de ses aslında boyuna bir dalgadır; bu
+// yüzden altta sıkışma-seyrelme modeli de çizilir.
+
+const soundState = (o: MathObject) => ({
+    freq: clamp(simValue(o, 'freq', 3), 1, 8),
+    amp: clamp(simValue(o, 'amp', 60), 10, 100),
+    playing: simValue(o, 'play', 0) > 0.5,
+});
+
+export const soundRender: Renderer = (k) => {
+    const r = k.r;
+    const s = soundState(k.o);
+    const icon = isIconSize(r);
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const x0 = r.x + (icon ? r.w * 0.06 : fs * 4);
+    const x1 = r.x + r.w - (icon ? r.w * 0.06 : fs);
+    const waveY = r.y + (icon ? r.h * 0.32 : fs * 4.6);
+    const waveH = (icon ? r.h * 0.22 : fs * 3.4) * (s.amp / 100);
+    const phase = s.playing ? k.t * 2.2 : 0;
+    const waves = s.freq;
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = k.lw;
+
+    // Ses kaynağı: hoparlör
+    if (!icon) {
+        const sx = r.x + fs * 1.2;
+        path(k, [
+            [sx, waveY - fs * 0.8],
+            [sx, waveY + fs * 0.8],
+            [sx + fs * 1.2, waveY + fs * 1.6],
+            [sx + fs * 1.2, waveY - fs * 1.6],
+        ], true);
+    }
+
+    // Enine dalga çizimi
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.3);
+    line(k, x0, waveY, x1, waveY, 1);
+    k.c.restore();
+    const pts: Array<[number, number]> = [];
+    for (let i = 0; i <= 120; i++) {
+        const t = i / 120;
+        pts.push([x0 + (x1 - x0) * t, waveY - Math.sin(t * waves * Math.PI * 2 - phase) * waveH]);
+    }
+    k.c.lineWidth = Math.max(1.8, k.lw);
+    path(k, pts, false);
+
+    // Boyuna model: sıkışma ve seyrelmeler
+    const partY = r.y + (icon ? r.h * 0.78 : r.h - fs * 3.4);
+    const count = 90;
+    for (let i = 0; i < count; i++) {
+        const t = i / count;
+        const shift = Math.sin(t * waves * Math.PI * 2 - phase) * ((x1 - x0) / count) * 2.4;
+        k.c.beginPath();
+        k.c.arc(x0 + (x1 - x0) * t + shift, partY, Math.max(1.2, fs * 0.1), 0, Math.PI * 2);
+        k.c.fill();
+    }
+
+    if (icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Dalga boyu ve genlik ölçüleri
+    const lambda = (x1 - x0) / waves;
+    const lx = x0 + lambda * 0.25;
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.6);
+    arrow(k, lx, waveY - waveH - fs * 0.9, lx + lambda, waveY - waveH - fs * 0.9, fs * 0.4, 1.2);
+    arrow(k, lx + lambda, waveY - waveH - fs * 0.9, lx, waveY - waveH - fs * 0.9, fs * 0.4, 1.2);
+    k.c.restore();
+    label(k, 'dalga boyu', lx + lambda / 2, waveY - waveH - fs * 1.2, 'center', 'bottom', 0.6);
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.6);
+    arrow(k, x0 + lambda * 0.25, waveY, x0 + lambda * 0.25, waveY - waveH, fs * 0.4, 1.2);
+    k.c.restore();
+    label(k, 'genlik', x0 + lambda * 0.25 + fs * 0.3, waveY - waveH / 2, 'left', 'middle', 0.6);
+    label(k, 'sıkışma – seyrelme', (x0 + x1) / 2, partY + fs * 0.9, 'center', 'top', 0.62);
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                `Frekans ${fmtNum(s.freq, 0)} birim → ${s.freq >= 5 ? 'ince (tiz)' : s.freq <= 2 ? 'kalın (pes)' : 'orta'} ses`,
+                `Frekans ${fmtNum(s.freq, 0)}`,
+            ],
+            r.w - fs * 4,
+            0.82,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.82,
+    );
+    label(
+        k,
+        fitText(
+            k,
+            [
+                `Genlik ${fmtNum(s.amp, 0)} → ${s.amp >= 70 ? 'şiddetli' : s.amp <= 30 ? 'zayıf' : 'orta şiddette'} ses · frekans inceliği, genlik şiddeti belirler`,
+                `Genlik ${fmtNum(s.amp, 0)} → ${s.amp >= 70 ? 'şiddetli' : s.amp <= 30 ? 'zayıf' : 'orta şiddette'} ses`,
+            ],
+            r.w - 8,
+            0.7,
+        ),
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.7,
+    );
+    k.c.restore();
+};
+
+export const soundSpec: SimSpec = {
+    animated: (o) => simValue(o, 'play', 0) > 0.5,
+    controls: (r, o): SimControl[] => [
+        {
+            id: 'play',
+            x: r.x + r.w - 14,
+            y: r.y + 14,
+            type: 'toggle',
+            label: soundState(o).playing ? 'Dalgayı durdur' : 'Dalgayı hareket ettir',
+            on: soundState(o).playing,
+        },
+    ],
+    onControl: (_r, o, id): Record<string, number> =>
+        id === 'play' ? { play: soundState(o).playing ? 0 : 1 } : {},
+    params: [
+        { key: 'freq', label: 'Frekans', min: 1, max: 8, step: 1 },
+        { key: 'amp', label: 'Genlik', min: 10, max: 100, step: 5 },
+        { key: 'play', label: 'Oynat (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
+// ── Gaz basıncı (Basınç) ─────────────────────────────────────────────
+//
+// Kilit fikir: kapalı kapta gaz taneciklerinin sayısı değişmez. Hacim
+// küçülünce tanecikler duvara daha sık çarpar, basınç artar: P · V sabit.
+
+/** Sabit sıcaklıkta P · V çarpımı (birim). */
+const GAS_CONST = 600;
+
+const gasState = (o: MathObject) => {
+    const v = clamp(simValue(o, 'v', 60), 20, 100);
+    return { v, p: GAS_CONST / v };
+};
+
+function gasGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const tube = {
+        x: r.x + (icon ? r.w * 0.06 : fs),
+        y: r.y + (icon ? r.h * 0.24 : fs * 3.6),
+        w: r.w * (icon ? 0.88 : 0.62),
+        h: r.h - (icon ? r.h * 0.48 : fs * 6.4),
+    };
+    return { fs, icon, tube };
+}
+
+export const gasRender: Renderer = (k) => {
+    const r = k.r;
+    const s = gasState(k.o);
+    const g = gasGeom(r);
+    const t = g.tube;
+    const gasW = t.w * (s.v / 100);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = Math.max(1.6, k.lw);
+
+    // Silindir: sağ ucu açık, pistonla kapanır
+    line(k, t.x, t.y, t.x + t.w, t.y);
+    line(k, t.x, t.y + t.h, t.x + t.w, t.y + t.h);
+    line(k, t.x, t.y, t.x, t.y + t.h);
+
+    // Gaz tanecikleri: sayı sabit, hacim küçülünce sıklaşır
+    const count = 26;
+    const scatter = (n: number) => Math.abs(Math.sin(n * 127.1) * 43758.5453) % 1;
+    for (let i = 0; i < count; i++) {
+        const px = t.x + gasW * (0.04 + scatter(i + 1) * 0.92);
+        const py = t.y + t.h * (0.08 + scatter(i + 51) * 0.84);
+        k.c.beginPath();
+        k.c.arc(px, py, Math.max(1.6, g.fs * 0.16), 0, Math.PI * 2);
+        k.c.fill();
+    }
+
+    // Piston
+    const px = t.x + gasW;
+    k.c.save();
+    k.c.globalAlpha = 0.18;
+    k.c.fillRect(px, t.y, g.fs * 0.7, t.h);
+    k.c.restore();
+    k.c.strokeRect(px, t.y, g.fs * 0.7, t.h);
+    // Piston kolu silindirin ucunda biter; göstergenin üstüne binmesin.
+    line(k, px + g.fs * 0.7, t.y + t.h / 2, t.x + t.w, t.y + t.h / 2);
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    // Basınç göstergesi
+    const gx = t.x + t.w + r.w * 0.1;
+    const gy = t.y + t.h * 0.5;
+    const grad = Math.min(r.w * 0.11, t.h * 0.42);
+    k.c.beginPath();
+    k.c.arc(gx, gy, grad, Math.PI, Math.PI * 2);
+    k.c.stroke();
+    line(k, gx - grad, gy, gx + grad, gy, 1);
+    // İbre: basınç 6–30 aralığında
+    const frac = clamp((s.p - 6) / 24, 0, 1);
+    const ang = Math.PI + frac * Math.PI;
+    line(k, gx, gy, gx + grad * 0.85 * Math.cos(ang), gy + grad * 0.85 * Math.sin(ang), Math.max(1.6, k.lw));
+    label(k, `${fmtNum(s.p, 1)}`, gx, gy + g.fs * 0.8, 'center', 'top', 0.8);
+    label(k, 'basınç', gx, gy + g.fs * 2, 'center', 'top', 0.62);
+
+    label(
+        k,
+        fitText(
+            k,
+            ['Pistonu it: hacim küçülünce çarpışma sıklaşır', 'Pistonu sürükle'],
+            r.w - g.fs * 4,
+            0.82,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.82,
+    );
+    label(
+        k,
+        `Hacim ${fmtNum(s.v, 0)} birim · basınç ${fmtNum(s.p, 1)} birim · P · V = ${fmtNum(s.p * s.v, 0)} (sabit)`,
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.78,
+    );
+    k.c.restore();
+};
+
+export const gasSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = gasState(o);
+        const g = gasGeom(r);
+        return [
+            {
+                id: 'piston',
+                x: g.tube.x + g.tube.w * (s.v / 100) + g.fs * 0.35,
+                y: g.tube.y + g.tube.h / 2,
+                type: 'drag',
+                label: 'Pistonu sürükle',
+            },
+        ];
+    },
+    onControl: (r, o, _id, p): Record<string, number> => {
+        const g = gasGeom(r);
+        return { v: clamp(((p.x - g.tube.x) / g.tube.w) * 100, 20, 100) };
+    },
+    params: [{ key: 'v', label: 'Hacim', min: 20, max: 100, step: 5, unit: 'birim' }],
+};
+
+// ── Yay ve Hooke yasası (Kuvvet ve Hareket) ──────────────────────────
+//
+// Kilit fikir: yaya asılan kuvvet arttıkça uzama orantılı artar. Kuvvet-
+// uzama grafiği orijinden geçen bir doğrudur ve eğimi yay sabitidir;
+// sert yay (büyük k) aynı kuvvette daha az uzar.
+
+const springState = (o: MathObject) => {
+    const mass = clamp(simValue(o, 'mass', 200), 0, 500);
+    const k = clamp(simValue(o, 'k', 20), 10, 50);
+    const force = (mass / 1000) * 10;
+    return { mass, k, force, stretch: (force / k) * 100 };
+};
+
+function springGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    return {
+        fs,
+        icon,
+        topY: r.y + (icon ? r.h * 0.1 : fs * 3),
+        springX: r.x + r.w * (icon ? 0.5 : 0.22),
+        maxLen: r.h - (icon ? r.h * 0.3 : fs * 6.4),
+        chart: {
+            x: r.x + r.w * 0.5,
+            y: r.y + fs * 3.2,
+            w: r.w * 0.42,
+            h: r.h - fs * 5.6,
+        },
+    };
+}
+
+/** Yay çizimi: verilen uzunlukta zikzak. */
+function springCoil(k: Ctx, cx: number, top: number, len: number, coils: number, w: number) {
+    k.c.beginPath();
+    k.c.moveTo(cx, top);
+    for (let i = 0; i <= coils * 2; i++) {
+        const t = (i + 0.5) / (coils * 2 + 1);
+        k.c.lineTo(cx + (i % 2 === 0 ? w : -w), top + len * t);
+    }
+    k.c.lineTo(cx, top + len);
+    k.c.stroke();
+}
+
+export const springRender: Renderer = (k) => {
+    const r = k.r;
+    const s = springState(k.o);
+    const g = springGeom(r);
+    // Doğal boy ve uzama piksele çevrilir; en fazla kutuya sığdığı kadar.
+    const natural = g.maxLen * 0.34;
+    const stretchPx = Math.min(g.maxLen * 0.5, s.stretch * (g.maxLen * 0.5) / 50);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = Math.max(1.5, k.lw);
+
+    // Tavan
+    line(k, g.springX - g.fs * 1.6, g.topY, g.springX + g.fs * 1.6, g.topY);
+    for (let i = -3; i <= 3; i++) {
+        line(k, g.springX + i * g.fs * 0.5, g.topY, g.springX + i * g.fs * 0.5 - g.fs * 0.3, g.topY - g.fs * 0.4, 1);
+    }
+
+    springCoil(k, g.springX, g.topY, natural + stretchPx, 8, g.fs * 0.7);
+
+    // Asılı kütle
+    const boxTop = g.topY + natural + stretchPx;
+    const boxW = g.fs * 2.4;
+    const boxH = g.fs * 1.8;
+    k.c.strokeRect(g.springX - boxW / 2, boxTop, boxW, boxH);
+    k.c.save();
+    k.c.globalAlpha = 0.14;
+    k.c.fillRect(g.springX - boxW / 2, boxTop, boxW, boxH);
+    k.c.restore();
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    label(k, `${fmtNum(s.mass, 0)} g`, g.springX, boxTop + boxH / 2, 'center', 'middle', 0.68);
+
+    // Uzama ölçüsü
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.55);
+    k.c.setLineDash([4, 3]);
+    line(k, g.springX + g.fs * 1.8, g.topY + natural, g.springX + g.fs * 3.4, g.topY + natural, 1);
+    line(k, g.springX + g.fs * 1.8, boxTop, g.springX + g.fs * 3.4, boxTop, 1);
+    k.c.restore();
+    arrow(k, g.springX + g.fs * 2.8, g.topY + natural, g.springX + g.fs * 2.8, boxTop, g.fs * 0.4, 1.2);
+    label(k, `${fmtNum(s.stretch, 1)} cm`, g.springX + g.fs * 3.1, (g.topY + natural + boxTop) / 2, 'left', 'middle', 0.66);
+
+    // Kuvvet–uzama grafiği
+    const ch = g.chart;
+    const maxX = 50;
+    const maxF = 5;
+    const cpx = (x: number) => ch.x + (ch.w * x) / maxX;
+    const cpy = (f: number) => ch.y + ch.h - (ch.h * f) / maxF;
+    line(k, ch.x, ch.y, ch.x, ch.y + ch.h);
+    line(k, ch.x, ch.y + ch.h, ch.x + ch.w, ch.y + ch.h);
+    const endX = Math.min(maxX, (maxF / s.k) * 100);
+    line(k, cpx(0), cpy(0), cpx(endX), cpy((endX / 100) * s.k), Math.max(1.6, k.lw));
+    k.c.beginPath();
+    k.c.arc(cpx(Math.min(s.stretch, maxX)), cpy(Math.min(s.force, maxF)), Math.max(3, g.fs * 0.24), 0, Math.PI * 2);
+    k.c.fill();
+    label(k, 'kuvvet (N)', ch.x - g.fs * 0.3, ch.y, 'right', 'middle', 0.58);
+    label(k, 'uzama (cm)', ch.x + ch.w, ch.y + ch.h + g.fs * 0.3, 'right', 'top', 0.58);
+
+    label(
+        k,
+        fitText(
+            k,
+            ['Kütleyi sürükle: uzama kuvvetle orantılı artar', 'Yay ve Hooke yasası'],
+            r.w - g.fs * 4,
+            0.82,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.82,
+    );
+    label(
+        k,
+        `F = ${fmtNum(s.force, 1)} N · uzama ${fmtNum(s.stretch, 1)} cm · yay sabiti ${fmtNum(s.k, 0)} N/m`,
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.78,
+    );
+    k.c.restore();
+};
+
+export const springSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = springState(o);
+        const g = springGeom(r);
+        const natural = g.maxLen * 0.34;
+        const stretchPx = Math.min(g.maxLen * 0.5, (s.stretch * (g.maxLen * 0.5)) / 50);
+        return [
+            {
+                id: 'mass',
+                x: g.springX,
+                y: g.topY + natural + stretchPx + g.fs * 0.9,
+                type: 'drag',
+                label: 'Kütleyi aşağı-yukarı sürükle',
+            },
+        ];
+    },
+    onControl: (r, o, _id, p): Record<string, number> => {
+        const s = springState(o);
+        const g = springGeom(r);
+        const natural = g.topY + g.maxLen * 0.34;
+        // Tutamak kutunun biraz altında durur; aynı kaydırma burada da
+        // düşülmezse sürüklemeye başlar başlamaz değer sıçrar.
+        const stretchPx = clamp(p.y - g.fs * 0.9 - natural, 0, g.maxLen * 0.5);
+        const stretchCm = (stretchPx / (g.maxLen * 0.5)) * 50;
+        const mass = ((stretchCm / 100) * s.k * 1000) / 10;
+        return { mass: clamp(Math.round(mass / 50) * 50, 0, 500) };
+    },
+    params: [
+        { key: 'mass', label: 'Asılan kütle', min: 0, max: 500, step: 50, unit: 'g' },
+        { key: 'k', label: 'Yay sabiti', min: 10, max: 50, step: 5, unit: 'N/m' },
+    ],
+};
+
+// ── Elektromıknatıs (Elektrik Enerjisinin Dönüşümü) ──────────────────
+//
+// Kilit fikir: elektromıknatısın çekim gücü sarım sayısına ve akıma
+// bağlıdır; demir çekirdek gücü belirgin biçimde artırır. Akım kesilince
+// mıknatıslık kaybolur.
+
+const magnetState = (o: MathObject) => {
+    const turns = clamp(simValue(o, 'turns', 20), 5, 40);
+    const cells = clamp(simValue(o, 'cells', 1), 1, 3);
+    const core = simValue(o, 'core', 1) > 0.5;
+    const on = simValue(o, 'on', 1) > 0.5;
+    const strength = on ? (turns / 40) * (cells / 3) * (core ? 1 : 0.4) : 0;
+    return { turns, cells, core, on, strength, clips: Math.round(strength * 12) };
+};
+
+function magnetGeom(r: Rect) {
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    return {
+        fs,
+        icon,
+        nail: {
+            x: r.x + r.w * (icon ? 0.2 : 0.3),
+            y: r.y + r.h * (icon ? 0.34 : 0.36),
+            w: r.w * (icon ? 0.6 : 0.42),
+            h: Math.min(r.h * 0.12, fs * 2),
+        },
+    };
+}
+
+export const electromagnetRender: Renderer = (k) => {
+    const r = k.r;
+    const s = magnetState(k.o);
+    const g = magnetGeom(r);
+    const n = g.nail;
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineWidth = Math.max(1.5, k.lw);
+
+    // Çivi (demir çekirdek) — çekirdeksiz durumda yalnız hava
+    if (s.core) {
+        k.c.strokeRect(n.x, n.y, n.w, n.h);
+        k.c.save();
+        k.c.globalAlpha = 0.12;
+        k.c.fillRect(n.x, n.y, n.w, n.h);
+        k.c.restore();
+    } else {
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.3);
+        k.c.setLineDash([5, 4]);
+        k.c.strokeRect(n.x, n.y, n.w, n.h);
+        k.c.restore();
+    }
+
+    // Sarımlar: görsel halka sayısı sarım sayısıyla artar
+    const loops = Math.max(3, Math.round(s.turns / 4));
+    for (let i = 0; i < loops; i++) {
+        const x = n.x + (n.w * (i + 0.5)) / loops;
+        k.c.beginPath();
+        k.c.ellipse(x, n.y + n.h / 2, n.w / loops / 2.6, n.h * 0.85, 0, 0, Math.PI * 2);
+        k.c.stroke();
+    }
+
+    // Piller ve kablolar
+    // Alt tel, asılı ataç zincirinin altından geçmeli.
+    const by = n.y + n.h + r.h * 0.3;
+    const bx = r.x + r.w * 0.3;
+    for (let i = 0; i < s.cells; i++) {
+        const cx = bx + i * g.fs * 1.6;
+        line(k, cx, by - g.fs * 0.7, cx, by + g.fs * 0.7, Math.max(1.6, k.lw));
+        line(k, cx + g.fs * 0.5, by - g.fs * 0.4, cx + g.fs * 0.5, by + g.fs * 0.4);
+    }
+    line(k, n.x, n.y + n.h / 2, n.x - g.fs, n.y + n.h / 2);
+    line(k, n.x - g.fs, n.y + n.h / 2, n.x - g.fs, by);
+    line(k, n.x - g.fs, by, bx, by);
+    line(k, bx + (s.cells - 1) * g.fs * 1.6 + g.fs * 0.5, by, n.x + n.w + g.fs, by);
+    line(k, n.x + n.w + g.fs, by, n.x + n.w + g.fs, n.y + n.h / 2);
+    line(k, n.x + n.w + g.fs, n.y + n.h / 2, n.x + n.w, n.y + n.h / 2);
+
+    // Ataçlar: uçta zincir hâlinde asılı
+    for (let i = 0; i < s.clips; i++) {
+        const cx = n.x + n.w - g.fs * 0.4 - (i % 3) * g.fs * 0.9;
+        const cy = n.y + n.h + g.fs * (0.6 + Math.floor(i / 3) * 0.9);
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.85);
+        roundRect(k, cx - g.fs * 0.3, cy - g.fs * 0.18, g.fs * 0.6, g.fs * 0.36, g.fs * 0.18);
+        k.c.stroke();
+        k.c.restore();
+    }
+
+    if (g.icon || k.o.labels === false) {
+        k.c.restore();
+        return;
+    }
+
+    label(k, s.core ? 'demir çekirdek' : 'çekirdeksiz', n.x + n.w / 2, n.y - g.fs * 1.5, 'center', 'bottom', 0.62);
+    label(k, `${fmtNum(s.cells, 0)} pil`, bx + (s.cells - 1) * g.fs * 0.8, by + g.fs * 1.3, 'center', 'top', 0.62);
+    label(k, `${s.clips} ataç`, n.x + n.w + g.fs * 1.4, n.y + n.h + g.fs * 1.4, 'left', 'middle', 0.7);
+
+    label(
+        k,
+        fitText(
+            k,
+            [
+                `Sarım ${fmtNum(s.turns, 0)} · ${fmtNum(s.cells, 0)} pil · ${s.core ? 'demir çekirdekli' : 'çekirdeksiz'}`,
+                `Sarım ${fmtNum(s.turns, 0)} · ${fmtNum(s.cells, 0)} pil`,
+            ],
+            r.w - g.fs * 5,
+            0.82,
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.82,
+    );
+    label(
+        k,
+        s.on
+            ? `Çekim gücü %${fmtNum(s.strength * 100, 0)} · sarım ve akım arttıkça güç artar`
+            : 'Akım kesildi: mıknatıslık kayboldu, ataçlar düşer',
+        r.x + r.w / 2,
+        r.y + r.h,
+        'center',
+        'bottom',
+        0.75,
+    );
+    k.c.restore();
+};
+
+export const electromagnetSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = magnetState(o);
+        return [
+            {
+                id: 'on',
+                x: r.x + r.w - 14,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.on ? 'Akımı kes' : 'Akımı ver',
+                on: s.on,
+            },
+            {
+                id: 'core',
+                x: r.x + r.w - 40,
+                y: r.y + 14,
+                type: 'toggle',
+                label: s.core ? 'Demir çekirdeği çıkar' : 'Demir çekirdek tak',
+                on: s.core,
+            },
+        ];
+    },
+    onControl: (_r, o, id): Record<string, number> => {
+        const s = magnetState(o);
+        if (id === 'on') return { on: s.on ? 0 : 1 };
+        if (id === 'core') return { core: s.core ? 0 : 1 };
+        return {};
+    },
+    params: [
+        { key: 'turns', label: 'Sarım sayısı', min: 5, max: 40, step: 5 },
+        { key: 'cells', label: 'Pil sayısı', min: 1, max: 3, step: 1 },
+        { key: 'core', label: 'Demir çekirdek (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
+// ── Kayıt ────────────────────────────────────────────────────────────
+
+// ── Fiziksel iş (Kuvvet ve Enerjiyi Keşfedelim) ──────────────────────
+//
+// Kilit fikir: fizikte iş, KUVVET YÖNÜNDEKİ yer değiştirmeyle yapılır.
+//   W = F · x · cos θ
+// Kuvvet yer değiştirmeye dikse (θ = 90°) ya da cisim hiç yer
+// değiştirmiyorsa (x = 0) iş sıfırdır — ne kadar zorlanırsak zorlanalım.
+
+interface WorkState {
+    /** Uygulanan kuvvet (N). */
+    f: number;
+    /** Yer değiştirme (m). */
+    x: number;
+    /** Kuvvetin yatayla açısı (derece). */
+    ang: number;
+    w: number;
+}
+
+const workState = (o: MathObject): WorkState => {
+    const f = clamp(simValue(o, 'f', 40), 0, 100);
+    const x = clamp(simValue(o, 'x', 3), 0, 6);
+    const ang = clamp(simValue(o, 'ang', 30), 0, 90);
+    return { f, x, ang, w: f * x * Math.cos((ang * Math.PI) / 180) };
+};
+
+/** Sandığı (tahta kasa) verilen merkeze çizer. */
+function drawCrate(k: Ctx, cx: number, groundY: number, side: number, ghost: boolean) {
+    const x0 = cx - side / 2;
+    const y0 = groundY - side;
+    k.c.save();
+    if (ghost) {
+        k.c.setLineDash([5, 4]);
+        k.c.strokeStyle = withAlpha(k.color, 0.4);
+        k.c.strokeRect(x0, y0, side, side);
+        k.c.restore();
+        return;
+    }
+    fillShape(k, () => k.c.rect(x0, y0, side, side), 0.12);
+    k.c.lineWidth = Math.max(1.8, k.lw);
+    k.c.strokeRect(x0, y0, side, side);
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.35);
+    k.c.lineWidth = 1.2;
+    k.c.beginPath();
+    k.c.moveTo(x0, y0);
+    k.c.lineTo(x0 + side, y0 + side);
+    k.c.moveTo(x0 + side, y0);
+    k.c.lineTo(x0, y0 + side);
+    k.c.stroke();
+    k.c.restore();
+    k.c.restore();
+}
+
+export const workRender: Renderer = (k) => {
+    const r = k.r;
+    const s = workState(k.o);
+    const icon = isIconSize(r);
+    const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+    k.c.lineJoin = 'round';
+
+    const stage: Rect = icon
+        ? r
+        : { x: r.x + fs * 0.6, y: r.y + fs * 2.2, w: r.w * 0.62, h: r.h - fs * 3.2 };
+    const groundY = stage.y + stage.h * (icon ? 0.78 : 0.7);
+    const side = Math.min(stage.h * 0.24, stage.w * 0.16);
+    // 1 m = kaç piksel
+    const unit = (stage.w - side * 1.6) / 6.4;
+    const startX = stage.x + side * 0.9;
+    const crateX = startX + s.x * unit;
+
+    // Zemin
+    line(k, stage.x, groundY, stage.x + stage.w, groundY, Math.max(1.8, k.lw));
+    if (!icon) {
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.3);
+        for (let x = stage.x; x < stage.x + stage.w; x += fs * 0.8) {
+            line(k, x, groundY, x - fs * 0.4, groundY + fs * 0.45, 1);
+        }
+        k.c.restore();
+    }
+
+    if (!icon && s.x > 0.02) drawCrate(k, startX, groundY, side, true);
+    drawCrate(k, crateX, groundY, side, false);
+
+    // Kuvvet oku: sandığın üst köşesinden θ açısıyla
+    const a = (s.ang * Math.PI) / 180;
+    const ax = crateX + side / 2;
+    const ay = groundY - side * 0.75;
+    const len = fs * 1.7 + (s.f / 100) * Math.min(stage.w * 0.26, fs * 5.4);
+    const fx = ax + len * Math.cos(a);
+    const fy = ay - len * Math.sin(a);
+    k.c.save();
+    k.c.strokeStyle = k.color;
+    arrow(k, ax, ay, fx, fy, fs * 0.5, Math.max(2, k.lw * 1.3));
+    k.c.restore();
+    if (!icon) {
+        label(k, `F = ${fmtNum(s.f, 0)} N`, fx + fs * 0.2, fy - fs * 0.2, 'left', 'bottom', 0.6);
+        // Bileşenler
+        k.c.save();
+        k.c.setLineDash([4, 4]);
+        k.c.strokeStyle = withAlpha(k.color, 0.55);
+        line(k, ax, ay, ax + len * Math.cos(a), ay, 1.2);
+        line(k, ax + len * Math.cos(a), ay, fx, fy, 1.2);
+        k.c.restore();
+        if (s.ang < 86) {
+            label(k, 'F·cos θ', ax + len * Math.cos(a) * 0.5 + fs * 0.4, ay + fs * 0.28, 'center', 'top', 0.55);
+        }
+        // Açı yayı
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.6);
+        k.c.beginPath();
+        k.c.lineWidth = 1.2;
+        k.c.arc(ax, ay, fs * 0.95, -a, 0);
+        k.c.stroke();
+        k.c.restore();
+        if (s.ang >= 8) {
+            const bis = a / 2;
+            const rad = Math.min(fs * 1.5, len * 0.42);
+            label(k, 'θ', ax + rad * Math.cos(bis), ay - rad * Math.sin(bis), 'center', 'middle', 0.6);
+        }
+    }
+
+    // Yer değiştirme ölçüsü
+    if (!icon) {
+        const my = groundY + fs * 1.5;
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.7);
+        if (s.x > 0.02) {
+            arrow(k, startX, my, crateX, my, fs * 0.45, 1.4);
+            arrow(k, crateX, my, startX, my, fs * 0.45, 1.4);
+        }
+        line(k, startX, groundY + fs * 0.2, startX, my + fs * 0.4, 1);
+        line(k, crateX, groundY + fs * 0.2, crateX, my + fs * 0.4, 1);
+        k.c.restore();
+        label(k, `x = ${fmtNum(s.x, 1)} m`, (startX + crateX) / 2, my + fs * 0.55, 'center', 'top', 0.58);
+    }
+
+    if (icon) {
+        k.c.restore();
+        return;
+    }
+
+    if (k.o.labels !== false) {
+        const px = r.x + r.w * 0.63;
+        const pw = r.w - (px - r.x) - fs * 0.4;
+        const py = r.y + fs * 2.2;
+        const ph = fs * 8.2;
+        panel(k, px, py, pw, ph);
+        const cosv = Math.cos(a);
+        const rows: ReadonlyArray<[string, string]> = [
+            ['Kuvvet', `F = ${fmtNum(s.f, 0)} N`],
+            ['Yer değiştirme', `x = ${fmtNum(s.x, 1)} m`],
+            ['Açı', `θ = ${fmtNum(s.ang, 0)}°  ·  cos θ = ${fmtNum(cosv, 2)}`],
+        ];
+        rows.forEach(([t, v], i) => {
+            const y = py + fs * (1.1 + i * 1.5);
+            label(k, t, px + fs * 0.6, y, 'left', 'middle', 0.52);
+            label(k, v, px + fs * 0.6, y + fs * 0.72, 'left', 'middle', 0.6);
+        });
+        const wy = py + fs * 5.9;
+        label(k, 'W = F · x · cos θ', px + fs * 0.6, wy, 'left', 'middle', 0.6);
+        label(
+            k,
+            fitText(
+                k,
+                [
+                    `= ${fmtNum(s.f, 0)} · ${fmtNum(s.x, 1)} · ${fmtNum(cosv, 2)} = ${fmtNum(s.w, 1)} J`,
+                    `W = ${fmtNum(s.w, 1)} J`,
+                ],
+                pw - fs * 1.2,
+                0.66
+            ),
+            px + fs * 0.6,
+            wy + fs * 1.3,
+            'left',
+            'middle',
+            0.66
+        );
+
+        // Karar kutusu
+        const done = Math.abs(s.w) > 0.05;
+        const reason = done
+            ? 'Kuvvet yönünde yer değiştirme var'
+            : s.x <= 0.02
+              ? 'Cisim yer değiştirmedi (x = 0)'
+              : 'Kuvvet yer değiştirmeye dik (θ = 90°)';
+        const by = py + ph + fs * 0.5;
+        k.c.save();
+        k.c.strokeStyle = withAlpha(k.color, 0.5);
+        roundRect(k, px + fs * 0.4, by, pw - fs * 0.8, fs * 2.5, 5);
+        k.c.lineWidth = 1;
+        k.c.stroke();
+        k.c.restore();
+        label(k, done ? 'İŞ YAPILDI' : 'İŞ YAPILMADI', px + fs * 0.8, by + fs * 0.8, 'left', 'middle', 0.64);
+        label(k, fitText(k, [reason, done ? 'Yer değiştirme var' : 'İş sıfır'], pw - fs * 1.4, 0.52), px + fs * 0.8, by + fs * 1.8, 'left', 'middle', 0.52);
+    }
+
+    label(
+        k,
+        fitText(
+            k,
+            ['Fiziksel iş: kuvvet yönündeki yer değiştirme sayılır', 'Fiziksel iş: W = F · x · cos θ', 'Fiziksel iş'],
+            r.w - fs * 3,
+            0.8
+        ),
+        r.x + 4,
+        r.y + 1,
+        'left',
+        'top',
+        0.8
+    );
+    k.c.restore();
+};
+
+const workGeom = (r: Rect) => {
+    const fs = clamp(Math.min(r.w, r.h) / 14, 9, 20);
+    const stage: Rect = { x: r.x + fs * 0.6, y: r.y + fs * 2.2, w: r.w * 0.62, h: r.h - fs * 3.2 };
+    const groundY = stage.y + stage.h * 0.7;
+    const side = Math.min(stage.h * 0.24, stage.w * 0.16);
+    const unit = (stage.w - side * 1.6) / 6.4;
+    return { fs, stage, groundY, side, unit, startX: stage.x + side * 0.9 };
+};
+
+export const workSpec: SimSpec = {
+    controls: (r, o): SimControl[] => {
+        const s = workState(o);
+        const g = workGeom(r);
+        const crateX = g.startX + s.x * g.unit;
+        const a = (s.ang * Math.PI) / 180;
+        const len = g.fs * 1.7 + (s.f / 100) * Math.min(g.stage.w * 0.26, g.fs * 5.4);
+        return [
+            {
+                id: 'x',
+                x: crateX,
+                y: g.groundY + g.fs * 1.5,
+                type: 'drag',
+                label: 'Sandığı kaydır: yer değiştirme',
+            },
+            {
+                id: 'ang',
+                x: crateX + g.side / 2 + len * Math.cos(a),
+                y: g.groundY - g.side * 0.75 - len * Math.sin(a),
+                type: 'drag',
+                label: 'Kuvvetin açısını değiştir',
+            },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        if (!p) return {};
+        const g = workGeom(r);
+        if (id === 'x') return { x: clamp((p.x - g.startX) / g.unit, 0, 6) };
+        if (id === 'ang') {
+            const s = workState(o);
+            const crateX = g.startX + s.x * g.unit;
+            const ax = crateX + g.side / 2;
+            const ay = g.groundY - g.side * 0.75;
+            const deg = (Math.atan2(ay - p.y, Math.max(1, p.x - ax)) * 180) / Math.PI;
+            return { ang: clamp(deg, 0, 90) };
+        }
+        return {};
+    },
+    params: [
+        { key: 'f', label: 'Kuvvet F (N)', min: 0, max: 100, step: 5 },
+        { key: 'x', label: 'Yer değiştirme x (m)', min: 0, max: 6, step: 0.5 },
+        { key: 'ang', label: 'Açı θ (°)', min: 0, max: 90, step: 5 },
+    ],
+};
+
+// ── Eğik ve Yatay Atış Laboratuvarı ─────────────────────────────────
+interface ProjectileState {
+    angle: number;
+    v0: number;
+    playing: boolean;
+    t: number;
+    tTotal: number;
+    tPeak: number;
+    hMax: number;
+    range: number;
+    targetX: number;
+    hitTarget: boolean;
+}
+
+function projectileState(o: MathObject, animTime = 0): ProjectileState {
+    const angle = clamp(simValue(o, 'angle', 45), 10, 85);
+    const v0 = clamp(simValue(o, 'v0', 25), 10, 42);
+    const targetX = clamp(simValue(o, 'targetX', 55), 15, 120);
+    const g = 9.8;
+    const rad = (angle * Math.PI) / 180;
+    const v0x = v0 * Math.cos(rad);
+    const v0y = v0 * Math.sin(rad);
+    const tPeak = v0y / g;
+    const hMax = (v0y * v0y) / (2 * g);
+    const tTotal = (2 * v0y) / g;
+    const range = v0x * tTotal;
+
+    const playing = simValue(o, 'play', 0) === 1;
+    let t = simValue(o, 't', 0);
+    if (playing) {
+        t = animTime % (tTotal + 1.5);
+        if (t > tTotal) t = tTotal;
+    }
+
+    const currentX = v0x * t;
+    const hitTarget = Math.abs(currentX - targetX) < 4 && t >= tTotal * 0.95;
+
+    return {
+        angle,
+        v0,
+        playing,
+        t,
+        tTotal,
+        tPeak,
+        hMax,
+        range,
+        targetX,
+        hitTarget,
+    };
+}
+
+export const projectileRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = projectileState(k.o, k.t);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const gy = r.y + r.h - (icon ? fs * 1.5 : fs * 2.8);
+    const x0 = r.x + (icon ? fs * 1.5 : fs * 3.5);
+
+    const maxWorldX = 120;
+    const maxWorldY = 55;
+    const scaleX = (r.w - (x0 - r.x) - fs * 2) / maxWorldX;
+    const scaleY = (gy - r.y - fs * 4) / maxWorldY;
+    const scale = Math.min(scaleX, scaleY);
+
+    const toScrX = (wx: number) => x0 + wx * scale;
+    const toScrY = (wy: number) => gy - wy * scale;
+
+    line(k, r.x, gy, r.x + r.w, gy, 1.8);
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.08);
+    k.c.fillRect(r.x, gy, r.w, r.y + r.h - gy);
+    k.c.restore();
+
+    if (!icon) {
+        for (let m = 20; m <= 110; m += 20) {
+            const tx = toScrX(m);
+            if (tx < r.x + r.w - fs * 1.5) {
+                line(k, tx, gy, tx, gy + fs * 0.4, 1);
+                label(k, `${m}m`, tx, gy + fs * 0.9, 'center', 'top', 0.52);
+            }
+        }
+    }
+
+    const rad = (s.angle * Math.PI) / 180;
+    const v0x = s.v0 * Math.cos(rad);
+    const v0y = s.v0 * Math.sin(rad);
+    const g = 9.8;
+
+    k.c.save();
+    k.c.strokeStyle = withAlpha(k.color, 0.45);
+    k.c.lineWidth = icon ? 1.5 : 2;
+    k.c.setLineDash([4, 4]);
+    k.c.beginPath();
+    const steps = 40;
+    for (let i = 0; i <= steps; i++) {
+        const ti = (i / steps) * s.tTotal;
+        const wx = v0x * ti;
+        const wy = Math.max(0, v0y * ti - 0.5 * g * ti * ti);
+        const px = toScrX(wx);
+        const py = toScrY(wy);
+        if (i === 0) k.c.moveTo(px, py);
+        else k.c.lineTo(px, py);
+    }
+    k.c.stroke();
+    k.c.restore();
+
+    if (!icon) {
+        const peakX = toScrX(v0x * s.tPeak);
+        const peakY = toScrY(s.hMax);
+        line(k, peakX, gy, peakX, peakY, 1);
+        k.c.save();
+        k.c.fillStyle = withAlpha(k.color, 0.15);
+        k.c.beginPath();
+        k.c.arc(peakX, peakY, fs * 0.35, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+        label(k, `h_max: ${fmtNum(s.hMax, 1)}m`, peakX, peakY - fs * 0.7, 'center', 'bottom', 0.65);
+
+        const rangeX = toScrX(s.range);
+        label(k, `X_menzil: ${fmtNum(s.range, 1)}m`, rangeX, gy + fs * 1.2, 'center', 'top', 0.65);
+    }
+
+    const targetScrX = toScrX(s.targetX);
+    line(k, targetScrX, gy, targetScrX, gy - fs * 2.2, 2);
+    k.c.save();
+    k.c.fillStyle = '#ef4444';
+    k.c.beginPath();
+    k.c.moveTo(targetScrX, gy - fs * 2.2);
+    k.c.lineTo(targetScrX + fs * 1.3, gy - fs * 1.6);
+    k.c.lineTo(targetScrX, gy - fs * 1.0);
+    k.c.closePath();
+    k.c.fill();
+    k.c.restore();
+    if (!icon) {
+        label(k, `Hedef (${fmtNum(s.targetX, 0)}m)`, targetScrX, gy - fs * 2.5, 'center', 'bottom', 0.58);
+    }
+
+    const barrelLen = fs * 2.4;
+    const muzzleX = x0 + Math.cos(rad) * barrelLen;
+    const muzzleY = gy - Math.sin(rad) * barrelLen;
+
+    k.c.save();
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = fs * 0.65;
+    k.c.lineCap = 'round';
+    line(k, x0, gy, muzzleX, muzzleY, fs * 0.65);
+    k.c.restore();
+
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.3);
+    k.c.beginPath();
+    k.c.arc(x0, gy, fs * 0.7, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.lineWidth = 1.5;
+    k.c.stroke();
+    k.c.restore();
+
+    const curWx = v0x * s.t;
+    const curWy = Math.max(0, v0y * s.t - 0.5 * g * s.t * s.t);
+    const curPx = toScrX(curWx);
+    const curPy = toScrY(curWy);
+
+    k.c.save();
+    k.c.fillStyle = withAlpha(k.color, 0.2);
+    k.c.beginPath();
+    k.c.ellipse(curPx, gy, fs * 0.4, fs * 0.15, 0, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.restore();
+
+    k.c.save();
+    k.c.fillStyle = '#f59e0b';
+    k.c.strokeStyle = k.color;
+    k.c.lineWidth = 1.5;
+    k.c.beginPath();
+    k.c.arc(curPx, curPy, fs * 0.42, 0, Math.PI * 2);
+    k.c.fill();
+    k.c.stroke();
+    k.c.restore();
+
+    if (!icon && s.playing && s.t > 0 && s.t < s.tTotal) {
+        const curVy = v0y - g * s.t;
+        const vLen = fs * 1.5;
+        const vxLen = (v0x / s.v0) * vLen;
+        const vyLen = -(curVy / s.v0) * vLen;
+        arrow(k, curPx, curPy, curPx + vxLen, curPy, 1.2);
+        arrow(k, curPx, curPy, curPx, curPy + vyLen, 1.2);
+        arrow(k, curPx, curPy, curPx + vxLen, curPy + vyLen, 1.8);
+    }
+
+    if (s.hitTarget) {
+        k.c.save();
+        k.c.fillStyle = '#10b981';
+        roundRect(k, targetScrX - fs * 3.5, gy - fs * 4.2, fs * 7, fs * 1.5, 6);
+        k.c.fill();
+        k.c.restore();
+        k.c.save();
+        k.c.fillStyle = '#ffffff';
+        label(k, '🎯 HEDEF VURULDU!', targetScrX, gy - fs * 3.45, 'center', 'middle', 0.65);
+        k.c.restore();
+    }
+
+    if (!icon && k.o.labels !== false) {
+        const pw = fs * 11.5;
+        const ph = fs * 5.8;
+        const px = r.x + r.w - pw - fs * 0.8;
+        const py = r.y + fs * 0.8;
+        panel(k, px, py, pw, ph);
+
+        label(k, 'Eğik Atış Parametreleri', px + fs * 0.5, py + fs * 0.7, 'left', 'middle', 0.65);
+        label(k, `Açı (θ): ${fmtNum(s.angle, 0)}°`, px + fs * 0.5, py + fs * 1.6, 'left', 'middle', 0.55);
+        label(k, `İlk Hız (v₀): ${fmtNum(s.v0, 0)} m/s`, px + fs * 0.5, py + fs * 2.4, 'left', 'middle', 0.55);
+        label(k, `v₀x = ${fmtNum(v0x, 1)} m/s | v₀y = ${fmtNum(v0y, 1)} m/s`, px + fs * 0.5, py + fs * 3.2, 'left', 'middle', 0.52);
+        label(k, `Uçuş Süresi (t): ${fmtNum(s.tTotal, 2)} s`, px + fs * 0.5, py + fs * 4.0, 'left', 'middle', 0.55);
+        label(k, `Maks Yükseklik: ${fmtNum(s.hMax, 1)} m`, px + fs * 0.5, py + fs * 4.8, 'left', 'middle', 0.55);
+    }
+
+    if (!icon) {
+        const btnW = fs * 4.4;
+        const btnH = fs * 1.4;
+        const bx1 = r.x + fs * 1.2;
+        const by1 = r.y + fs * 1.0;
+
+        k.c.save();
+        k.c.fillStyle = s.playing ? '#ef4444' : '#6366f1';
+        roundRect(k, bx1, by1, btnW, btnH, 6);
+        k.c.fill();
+        k.c.restore();
+        k.c.save();
+        k.c.fillStyle = '#ffffff';
+        label(k, s.playing ? '⏹ Durdur' : '🚀 Ateş Et', bx1 + btnW / 2, by1 + btnH / 2, 'center', 'middle', 0.62);
+        k.c.restore();
+
+        const bx2 = bx1 + btnW + fs * 0.6;
+        k.c.save();
+        k.c.fillStyle = withAlpha(k.color, 0.15);
+        roundRect(k, bx2, by1, fs * 3.2, btnH, 6);
+        k.c.fill();
+        k.c.stroke();
+        k.c.restore();
+        label(k, '↺ Sıfırla', bx2 + fs * 1.6, by1 + btnH / 2, 'center', 'middle', 0.58);
+    }
+
+    k.c.restore();
+};
+
+export const projectileSpec: SimSpec = {
+    animated: (o) => simValue(o, 'play', 0) === 1,
+    controls: (r, o) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        const s = projectileState(o);
+        const gy = r.y + r.h - fs * 2.8;
+        const x0 = r.x + fs * 3.5;
+        const rad = (s.angle * Math.PI) / 180;
+        const barrelLen = fs * 2.4;
+        const muzzleX = x0 + Math.cos(rad) * barrelLen;
+        const muzzleY = gy - Math.sin(rad) * barrelLen;
+
+        const maxWorldX = 120;
+        const scaleX = (r.w - (x0 - r.x) - fs * 2) / maxWorldX;
+        const targetScrX = x0 + s.targetX * scaleX;
+
+        return [
+            { id: 'barrel', x: muzzleX, y: muzzleY, type: 'drag', label: 'Namlu açısını ve hızını ayarla' },
+            { id: 'target', x: targetScrX, y: gy - fs * 1.2, type: 'drag', label: 'Hedef mesafesini ayarla' },
+            { id: 'btn_fire', x: r.x + fs * 3.4, y: r.y + fs * 1.7, type: 'toggle', label: 'Ateşle / Durdur', on: s.playing },
+            { id: 'btn_reset', x: r.x + fs * 7.5, y: r.y + fs * 1.7, type: 'toggle', label: 'Sıfırla' },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        const gy = r.y + r.h - fs * 2.8;
+        const x0 = r.x + fs * 3.5;
+
+        if (id === 'barrel' && p) {
+            const dx = p.x - x0;
+            const dy = gy - p.y;
+            const angRad = Math.atan2(Math.max(1, dy), Math.max(1, dx));
+            const angle = Math.round((angRad * 180) / Math.PI);
+            const dist = Math.hypot(dx, dy);
+            const v0 = Math.round(clamp(dist * 0.8, 12, 42));
+            return { angle: clamp(angle, 15, 82), v0 };
+        }
+        if (id === 'target' && p) {
+            const maxWorldX = 120;
+            const scaleX = (r.w - (x0 - r.x) - fs * 2) / maxWorldX;
+            const targetX = Math.round(clamp((p.x - x0) / scaleX, 15, 115));
+            return { targetX };
+        }
+        if (id === 'btn_fire') {
+            const cur = simValue(o, 'play', 0) === 1;
+            return { play: cur ? 0 : 1, t: 0 };
+        }
+        if (id === 'btn_reset') {
+            return { play: 0, t: 0 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'angle', label: 'Atış Açısı θ', min: 15, max: 80, step: 1, unit: '°' },
+        { key: 'v0', label: 'İlk Hız v₀', min: 10, max: 45, step: 1, unit: 'm/s' },
+        { key: 'targetX', label: 'Hedef Mesafesi', min: 15, max: 110, step: 5, unit: 'm' },
+        { key: 'play', label: 'Uçuş Hareketi (0/1)', min: 0, max: 1, step: 1 },
+    ],
+};
+
+// ── Geometrik Optik: Mercekler ve Aynalar (Ray Tracing) ──────────────
+const OPTIC_MODES = [
+    { id: 0, name: 'Çukur Ayna', type: 'mirror', conv: true },
+    { id: 1, name: 'Tümsek Ayna', type: 'mirror', conv: false },
+    { id: 2, name: 'İnce Mercek', type: 'lens', conv: true },
+    { id: 3, name: 'Kalın Mercek', type: 'lens', conv: false },
+];
+
+interface LensMirrorState {
+    mode: number;
+    opt: typeof OPTIC_MODES[0];
+    f: number;
+    doVal: number;
+    hoVal: number;
+    diVal: number | null;
+    hiVal: number;
+    m: number;
+    isReal: boolean;
+    isUpright: boolean;
+}
+
+function lensMirrorState(o: MathObject): LensMirrorState {
+    const mode = clampInt(simValue(o, 'mode', 0), 0, 3, 0);
+    const opt = OPTIC_MODES[mode];
+    const fMag = clamp(simValue(o, 'f', 3.5), 2.0, 5.5);
+    const f = opt.conv ? fMag : -fMag;
+    const doVal = clamp(simValue(o, 'do', 6.5), 1.0, 12.0);
+    const hoVal = clamp(simValue(o, 'ho', 2.4), 0.8, 4.0);
+
+    const denom = 1 / f - 1 / doVal;
+    const diVal = Math.abs(denom) < 1e-3 ? null : 1 / denom;
+    const m = diVal === null ? 0 : -diVal / doVal;
+    const hiVal = m * hoVal;
+    const isReal = diVal !== null && diVal > 0;
+    const isUpright = m > 0;
+
+    return {
+        mode,
+        opt,
+        f: fMag,
+        doVal,
+        hoVal,
+        diVal,
+        hiVal,
+        m,
+        isReal,
+        isUpright,
+    };
+}
+
+export const lensMirrorRender: Renderer = (k) => {
+    const r = k.r;
+    const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+    const icon = isIconSize(r);
+    const s = lensMirrorState(k.o);
+
+    k.c.save();
+    k.c.beginPath();
+    k.c.rect(r.x, r.y, r.w, r.h);
+    k.c.clip();
+
+    const cx = r.x + r.w * 0.48;
+    const cy = r.y + r.h * 0.52;
+    const unit = Math.min(r.w / 24, r.h / 14);
+
+    line(k, r.x, cy, r.x + r.w, cy, 1.2);
+    if (!icon) {
+        label(k, 'Asal Eksen', r.x + fs * 0.5, cy - fs * 0.4, 'left', 'bottom', 0.5);
+    }
+
+    const elemH = unit * 7;
+    k.c.save();
+    k.c.lineWidth = 3;
+    k.c.strokeStyle = k.color;
+
+    if (s.opt.type === 'lens') {
+        if (s.opt.conv) {
+            k.c.beginPath();
+            k.c.moveTo(cx, cy - elemH / 2);
+            k.c.quadraticCurveTo(cx + unit * 0.6, cy, cx, cy + elemH / 2);
+            k.c.quadraticCurveTo(cx - unit * 0.6, cy, cx, cy - elemH / 2);
+            k.c.fillStyle = withAlpha('#38bdf8', 0.2);
+            k.c.fill();
+            k.c.stroke();
+        } else {
+            k.c.beginPath();
+            k.c.moveTo(cx - unit * 0.4, cy - elemH / 2);
+            k.c.lineTo(cx + unit * 0.4, cy - elemH / 2);
+            k.c.quadraticCurveTo(cx, cy, cx + unit * 0.4, cy + elemH / 2);
+            k.c.lineTo(cx - unit * 0.4, cy + elemH / 2);
+            k.c.quadraticCurveTo(cx, cy, cx - unit * 0.4, cy - elemH / 2);
+            k.c.fillStyle = withAlpha('#38bdf8', 0.2);
+            k.c.fill();
+            k.c.stroke();
+        }
+    } else {
+        k.c.beginPath();
+        if (s.opt.conv) {
+            k.c.arc(cx + unit * 5, cy, unit * 5, Math.PI - 0.7, Math.PI + 0.7);
+        } else {
+            k.c.arc(cx - unit * 5, cy, unit * 5, -0.7, 0.7);
+        }
+        k.c.stroke();
+        for (let i = -6; i <= 6; i++) {
+            const my = cy + (i * elemH) / 14;
+            line(k, cx, my, cx + unit * 0.35, my - unit * 0.25, 1);
+        }
+    }
+    k.c.restore();
+
+    const fPix = s.f * unit;
+    const fLeftX = cx - fPix;
+    const mLeftX = cx - 2 * fPix;
+    const fRightX = cx + fPix;
+    const mRightX = cx + 2 * fPix;
+
+    const drawPoint = (px: number, txt: string) => {
+        k.c.save();
+        k.c.fillStyle = '#f59e0b';
+        k.c.beginPath();
+        k.c.arc(px, cy, 3.5, 0, Math.PI * 2);
+        k.c.fill();
+        k.c.restore();
+        label(k, txt, px, cy + fs * 0.4, 'center', 'top', 0.55);
+    };
+
+    drawPoint(fLeftX, 'F');
+    drawPoint(mLeftX, '2F (M)');
+    if (s.opt.type === 'lens') {
+        drawPoint(fRightX, "F'");
+        drawPoint(mRightX, "2F'");
+    }
+
+    const objX = cx - s.doVal * unit;
+    const objTopY = cy - s.hoVal * unit;
+    arrow(k, objX, cy, objX, objTopY, 2.5);
+    label(k, 'Cisim', objX, objTopY - fs * 0.4, 'center', 'bottom', 0.58);
+
+    if (!icon) {
+        k.c.save();
+        k.c.strokeStyle = '#38bdf8';
+        k.c.lineWidth = 1.6;
+        line(k, objX, objTopY, cx, objTopY, 1.6);
+
+        if (s.opt.type === 'lens') {
+            if (s.opt.conv) {
+                line(k, cx, objTopY, cx + (r.w - cx), objTopY + ((cy - objTopY) / fPix) * (r.w - cx), 1.6);
+            } else {
+                line(k, cx, objTopY, r.x + r.w, objTopY - ((objTopY - cy) / fPix) * (r.w - cx), 1.6);
+                k.c.setLineDash([3, 3]);
+                line(k, cx, objTopY, fLeftX, cy, 1.2);
+            }
+        } else {
+            if (s.opt.conv) {
+                line(k, cx, objTopY, r.x, cy + ((cy - objTopY) / fPix) * (cx - r.x), 1.6);
+            } else {
+                line(k, cx, objTopY, r.x, objTopY - ((cy - objTopY) / fPix) * (cx - r.x), 1.6);
+                k.c.setLineDash([3, 3]);
+                line(k, cx, objTopY, fRightX, cy, 1.2);
+            }
+        }
+        k.c.restore();
+
+        k.c.save();
+        k.c.strokeStyle = '#c084fc';
+        k.c.lineWidth = 1.6;
+        if (s.opt.type === 'lens') {
+            line(k, objX, objTopY, r.x + r.w, cy + ((cy - objTopY) / (cx - objX)) * (r.x + r.w - cx), 1.6);
+        } else {
+            line(k, objX, objTopY, cx, cy, 1.6);
+            line(k, cx, cy, r.x, cy + (cy - objTopY) * ((cx - r.x) / (cx - objX)), 1.6);
+        }
+        k.c.restore();
+    }
+
+    if (s.diVal !== null && Math.abs(s.diVal) < 25) {
+        let imgX = cx;
+        if (s.opt.type === 'lens') {
+            imgX = cx + s.diVal * unit;
+        } else {
+            imgX = cx - s.diVal * unit;
+        }
+        const imgTopY = cy - s.hiVal * unit;
+
+        k.c.save();
+        if (s.isReal) {
+            k.c.strokeStyle = '#ef4444';
+            arrow(k, imgX, cy, imgX, imgTopY, 2.5);
+            label(k, 'Gerçek Görüntü', imgX, s.isUpright ? imgTopY - fs * 0.4 : imgTopY + fs * 0.4, 'center', s.isUpright ? 'bottom' : 'top', 0.58);
+        } else {
+            k.c.strokeStyle = '#a855f7';
+            k.c.setLineDash([4, 4]);
+            arrow(k, imgX, cy, imgX, imgTopY, 2.5);
+            label(k, 'Sanal Görüntü', imgX, s.isUpright ? imgTopY - fs * 0.4 : imgTopY + fs * 0.4, 'center', s.isUpright ? 'bottom' : 'top', 0.58);
+        }
+        k.c.restore();
+    }
+
+    if (!icon) {
+        const btnW = fs * 7.5;
+        const btnH = fs * 1.5;
+        const bx = r.x + fs * 1.0;
+        const by = r.y + fs * 1.0;
+        k.c.save();
+        k.c.fillStyle = '#4f46e5';
+        roundRect(k, bx, by, btnW, btnH, 6);
+        k.c.fill();
+        k.c.restore();
+        k.c.save();
+        k.c.fillStyle = '#ffffff';
+        label(k, `Optik: ${s.opt.name} ↻`, bx + btnW / 2, by + btnH / 2, 'center', 'middle', 0.62);
+        k.c.restore();
+
+        if (k.o.labels !== false) {
+            const pw = fs * 11.2;
+            const ph = fs * 5.2;
+            const px = r.x + r.w - pw - fs * 0.8;
+            const py = r.y + fs * 0.8;
+            panel(k, px, py, pw, ph);
+
+            label(k, 'Görüntü Özellikleri', px + fs * 0.5, py + fs * 0.7, 'left', 'middle', 0.65);
+            label(k, `Cisim Mesafesi (do): ${fmtNum(s.doVal, 1)} br`, px + fs * 0.5, py + fs * 1.6, 'left', 'middle', 0.55);
+            label(k, `Odak Uzaklığı (f): ${fmtNum(s.f, 1)} br`, px + fs * 0.5, py + fs * 2.4, 'left', 'middle', 0.55);
+            if (s.diVal !== null) {
+                label(k, `Görüntü Mesafesi (di): ${fmtNum(Math.abs(s.diVal), 1)} br`, px + fs * 0.5, py + fs * 3.2, 'left', 'middle', 0.55);
+                label(k, `Büyütme (m): ${fmtNum(s.m, 2)} kat`, px + fs * 0.5, py + fs * 4.0, 'left', 'middle', 0.55);
+                const desc = `${s.isReal ? 'Gerçek' : 'Sanal'}, ${s.isUpright ? 'Düz' : 'Ters'}, ${Math.abs(s.m) > 1.05 ? 'Büyütülmüş' : Math.abs(s.m) < 0.95 ? 'Küçültülmüş' : 'Eşit Boyda'}`;
+                label(k, desc, px + fs * 0.5, py + fs * 4.7, 'left', 'middle', 0.58);
+            } else {
+                label(k, 'Görüntü sonsuzdadır', px + fs * 0.5, py + fs * 3.4, 'left', 'middle', 0.6);
+            }
+        }
+    }
+
+    k.c.restore();
+};
+
+export const lensMirrorSpec: SimSpec = {
+    controls: (r, o) => {
+        const fs = Math.max(9, Math.min(20, Math.min(r.w, r.h) / 13));
+        const s = lensMirrorState(o);
+        const cx = r.x + r.w * 0.48;
+        const cy = r.y + r.h * 0.52;
+        const unit = Math.min(r.w / 24, r.h / 14);
+
+        const objX = cx - s.doVal * unit;
+        const objTopY = cy - s.hoVal * unit;
+        const fLeftX = cx - s.f * unit;
+
+        return [
+            { id: 'btn_mode', x: r.x + fs * 4.5, y: r.y + fs * 1.7, type: 'toggle', label: 'Optik elemanı değiştir' },
+            { id: 'obj_dist', x: objX, y: cy, type: 'drag', label: 'Cisim mesafesini değiştir (do)' },
+            { id: 'obj_height', x: objX, y: objTopY, type: 'drag', label: 'Cisim boyunu ayarla (ho)' },
+            { id: 'focal', x: fLeftX, y: cy, type: 'drag', label: 'Odak noktasını ayarla (F)' },
+        ];
+    },
+    onControl: (r, o, id, p): Record<string, number> => {
+        const cx = r.x + r.w * 0.48;
+        const cy = r.y + r.h * 0.52;
+        const unit = Math.min(r.w / 24, r.h / 14);
+
+        if (id === 'obj_dist' && p) {
+            const doVal = clamp((cx - p.x) / unit, 1.2, 11.5);
+            return { do: Math.round(doVal * 10) / 10 };
+        }
+        if (id === 'obj_height' && p) {
+            const hoVal = clamp((cy - p.y) / unit, 0.8, 3.8);
+            return { ho: Math.round(hoVal * 10) / 10 };
+        }
+        if (id === 'focal' && p) {
+            const fVal = clamp((cx - p.x) / unit, 2.0, 5.0);
+            return { f: Math.round(fVal * 10) / 10 };
+        }
+        if (id === 'btn_mode') {
+            const cur = simValue(o, 'mode', 0);
+            return { mode: (cur + 1) % 4 };
+        }
+        return {};
+    },
+    params: [
+        { key: 'mode', label: 'Optik Mod (0-3)', min: 0, max: 3, step: 1 },
+        { key: 'f', label: 'Odak Uzaklığı f', min: 2, max: 5.5, step: 0.5, unit: 'br' },
+        { key: 'do', label: 'Cisim Mesafesi do', min: 1.5, max: 11, step: 0.5, unit: 'br' },
+        { key: 'ho', label: 'Cisim Boyu ho', min: 1, max: 3.5, step: 0.2, unit: 'br' },
+    ],
+};
+
+export const PHYSICS_SIM_RENDERERS: Record<string, Renderer> = {
+    refraction_sim: refractionRender,
+    motion_graph_sim: motionRender,
+    net_force_sim: netForceRender,
+    energy_sim: energyRender,
+    ohm_sim: ohmRender,
+    sound_wave_sim: soundRender,
+    gas_pressure_sim: gasRender,
+    spring_sim: springRender,
+    electromagnet_sim: electromagnetRender,
+    work_sim: workRender,
+    projectile_sim: projectileRender,
+    lens_mirror_sim: lensMirrorRender,
+};
+
+export const PHYSICS_SIM_SPECS: Record<string, SimSpec> = {
+    refraction_sim: refractionSpec,
+    motion_graph_sim: motionSpec,
+    net_force_sim: netForceSpec,
+    energy_sim: energySpec,
+    ohm_sim: ohmSpec,
+    sound_wave_sim: soundSpec,
+    gas_pressure_sim: gasSpec,
+    spring_sim: springSpec,
+    electromagnet_sim: electromagnetSpec,
+    work_sim: workSpec,
+    projectile_sim: projectileSpec,
+    lens_mirror_sim: lensMirrorSpec,
+};
+
+export const PHYSICS_SIM_ITEMS: ReadonlyArray<MathCatalogItem> = [
+    {
+        kind: 'projectile_sim',
+        label: 'Eğik & Yatay Atış',
+        hint: 'Namlu açısını ve ilk hızı sürükle; menzil, tepe noktası ve yörüngeyi canlı gör',
+        size: { w: 620, h: 400 },
+        defaults: { labels: true, sim: { angle: 45, v0: 28, play: 0, t: 0, targetX: 65 } },
+    },
+    {
+        kind: 'lens_mirror_sim',
+        label: 'Mercekler & Aynalar',
+        hint: 'Cismi ve odağı kaydır; asal eksende özel ışınları ve canlı görüntüyü izle',
+        size: { w: 640, h: 380 },
+        defaults: { labels: true, sim: { mode: 0, f: 3.5, do: 6.5, ho: 2.4 } },
+    },
+    {
+        kind: 'refraction_sim',
+        label: 'Işığın Kırılması',
+        hint: 'Gelme açısını sürükle; kırılmayı ve tam yansımayı gör',
+        size: { w: 500, h: 340 },
+        defaults: { labels: true, sim: { angle: 40, pair: 0 } },
+    },
+    {
+        kind: 'motion_graph_sim',
+        label: 'Hareket Grafikleri',
+        hint: 'Aracı izle; konum-zaman ve hız-zaman grafiği eşzamanlı çizilsin',
+        size: { w: 540, h: 360 },
+        defaults: { labels: true, sim: { v0: 4, a: 0, time: 4, play: 0 } },
+    },
+    {
+        kind: 'net_force_sim',
+        label: 'Bileşke Kuvvet',
+        hint: 'Kuvvet oklarını sürükle; bileşkeyi ve dengeyi gör',
+        size: { w: 500, h: 340 },
+        defaults: { labels: true, sim: { f1: 30, a1: 0, f2: 20, a2: 90 } },
+    },
+    {
+        kind: 'energy_sim',
+        label: 'Enerji Dönüşümü',
+        hint: 'Sarkacı bırak; kinetik ve potansiyel enerji çubuklarını izle',
+        size: { w: 520, h: 340 },
+        defaults: { labels: true, sim: { amp: 40, play: 0, damp: 0 } },
+    },
+    {
+        kind: 'ohm_sim',
+        label: 'Ohm Yasası',
+        hint: 'Gerilimi değiştir; akım ve grafiğin eğimi ilişkisini gör',
+        size: { w: 540, h: 340 },
+        defaults: { labels: true, sim: { v: 6, r: 3 } },
+    },
+    {
+        kind: 'sound_wave_sim',
+        label: 'Ses Dalgası',
+        hint: 'Frekans ve genliği değiştir; incelik ile şiddeti ayır',
+        size: { w: 540, h: 320 },
+        defaults: { labels: true, sim: { freq: 3, amp: 60, play: 0 } },
+    },
+    {
+        kind: 'gas_pressure_sim',
+        label: 'Gaz Basıncı',
+        hint: 'Pistonu it; hacim küçülünce basınç artsın (P · V sabit)',
+        size: { w: 540, h: 320 },
+        defaults: { labels: true, sim: { v: 60 } },
+    },
+    {
+        kind: 'spring_sim',
+        label: 'Yay ve Hooke Yasası',
+        hint: 'Kütleyi as; uzama ile kuvvetin orantısını grafikte gör',
+        size: { w: 540, h: 360 },
+        defaults: { labels: true, sim: { mass: 200, k: 20 } },
+    },
+    {
+        kind: 'electromagnet_sim',
+        label: 'Elektromıknatıs',
+        hint: 'Sarım, pil ve demir çekirdek: kaç ataç çekiliyor',
+        size: { w: 520, h: 340 },
+        defaults: { labels: true, sim: { turns: 20, cells: 1, core: 1, on: 1 } },
+    },
+    {
+        kind: 'work_sim',
+        label: 'Fiziksel İş',
+        hint: 'F, x ve açıyı değiştir: iş yapıldı mı, yapılmadı mı?',
+        size: { w: 580, h: 360 },
+        defaults: { labels: true, sim: { f: 40, x: 3, ang: 30 } },
+    },
+];

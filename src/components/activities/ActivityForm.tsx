@@ -4,7 +4,7 @@ import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../lib/firebase';
 import { cn } from '../../utils/cn';
 import { GRADE_LEVELS, SUBJECTS, formatGradeLevel } from '../../constants/education';
-import type { Activity } from '../../types';
+import type { Activity, Unit } from '../../types';
 
 export type ActivityFormValues = Omit<Activity, 'id' | 'created_at'>;
 
@@ -13,7 +13,9 @@ interface ActivityFormProps {
     isSubmitting: boolean;
     onSubmit: (values: ActivityFormValues) => void;
     onCancel: () => void;
+    units: Unit[];
 }
+
 
 const inputClasses =
     'w-full bg-white border border-outline-variant rounded-lg px-4 py-3 text-[14px] text-on-surface font-medium focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all placeholder:text-on-surface-variant';
@@ -39,11 +41,57 @@ export function ActivityForm({
     isSubmitting,
     onSubmit,
     onCancel,
+    units,
 }: ActivityFormProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
     const [uploadError, setUploadError] = React.useState<string | null>(null);
     const [isProcessing, setIsProcessing] = React.useState(false);
     const [storageLoadFailed, setStorageLoadFailed] = React.useState(false);
+
+    const [gradeLevel, setGradeLevel] = React.useState(editItem?.grade_level || '');
+    const [subject, setSubject] = React.useState(editItem?.subject || '');
+    const [unitVal, setUnitVal] = React.useState(editItem?.unit || '');
+    const [isNewUnit, setIsNewUnit] = React.useState(false);
+    const [newUnitName, setNewUnitName] = React.useState('');
+
+    const handleGradeLevelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const val = e.target.value;
+        setGradeLevel(val);
+        setUnitVal('');
+        setIsNewUnit(false);
+        setNewUnitName('');
+    };
+
+    const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const val = e.target.value;
+        setSubject(val);
+        setUnitVal('');
+        setIsNewUnit(false);
+        setNewUnitName('');
+    };
+
+    const filteredUnits = React.useMemo(() => {
+        if (!gradeLevel || !subject) return [];
+        return units.filter(
+            (u) => u.grade_level === gradeLevel && u.subject === subject
+        );
+    }, [units, gradeLevel, subject]);
+
+    const uniqueUnits = React.useMemo(() => {
+        const list = [...filteredUnits];
+        if (editItem?.unit && editItem.grade_level === gradeLevel && editItem.subject === subject) {
+            if (!list.some(u => u.name.toLowerCase().trim() === editItem.unit!.toLowerCase().trim())) {
+                list.push({
+                    id: 'edit-item-unit',
+                    name: editItem.unit,
+                    grade_level: gradeLevel,
+                    subject: subject
+                });
+            }
+        }
+        return list;
+    }, [filteredUnits, editItem, gradeLevel, subject]);
+
 
     React.useEffect(() => {
         let ignore = false;
@@ -155,12 +203,16 @@ export function ActivityForm({
             }
         }
 
+        let finalUnit = isNewUnit ? newUnitName.trim() : unitVal;
+        if (finalUnit === '') finalUnit = undefined as any;
+
         onSubmit({
             title,
             image_url: String(formData.get('image_url') || '').trim() || undefined,
             category: String(formData.get('category') || '').trim() || undefined,
-            grade_level: String(formData.get('grade_level') || '').trim() || undefined,
-            subject: String(formData.get('subject') || '').trim() || undefined,
+            grade_level: gradeLevel || undefined,
+            subject: subject || undefined,
+            unit: finalUnit || undefined,
             description: String(formData.get('description') || '').trim() || undefined,
             tags: String(formData.get('tags') || '').trim() || undefined,
             html_code: shouldUseStorage ? '' : html_code,
@@ -198,7 +250,8 @@ export function ActivityForm({
                     <select
                         id="activity-grade-level"
                         name="grade_level"
-                        defaultValue={editItem?.grade_level || ''}
+                        value={gradeLevel}
+                        onChange={handleGradeLevelChange}
                         className={inputClasses}
                     >
                         <option value="" className="text-slate-900">Sınıf seçin</option>
@@ -212,7 +265,8 @@ export function ActivityForm({
                     <select
                         id="activity-subject"
                         name="subject"
-                        defaultValue={editItem?.subject || ''}
+                        value={subject}
+                        onChange={handleSubjectChange}
                         className={inputClasses}
                     >
                         <option value="" className="text-slate-900">Ders seçin</option>
@@ -222,6 +276,56 @@ export function ActivityForm({
                     </select>
                 </div>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <label htmlFor="activity-unit" className={labelClasses}>Ünite</label>
+                    <select
+                        id="activity-unit"
+                        name="unit"
+                        value={isNewUnit ? '__new__' : unitVal}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '__new__') {
+                                setIsNewUnit(true);
+                                setUnitVal('');
+                            } else {
+                                setIsNewUnit(false);
+                                setUnitVal(val);
+                            }
+                        }}
+                        disabled={!gradeLevel || !subject}
+                        className={inputClasses}
+                    >
+                        {!gradeLevel || !subject ? (
+                            <option value="" className="text-slate-900">Önce sınıf ve ders seçin</option>
+                        ) : (
+                            <>
+                                <option value="" className="text-slate-900">Ünite seçin (İsteğe bağlı)</option>
+                                {uniqueUnits.map((u) => (
+                                    <option key={u.id} value={u.name} className="text-slate-900">{u.name}</option>
+                                ))}
+                                <option value="__new__" className="text-slate-900 font-semibold text-primary-container">+ Yeni Ünite Ekle...</option>
+                            </>
+                        )}
+                    </select>
+                </div>
+                {isNewUnit && (
+                    <div>
+                        <label htmlFor="activity-new-unit" className={labelClasses}>Yeni Ünite Adı</label>
+                        <input
+                            id="activity-new-unit"
+                            type="text"
+                            value={newUnitName}
+                            onChange={(e) => setNewUnitName(e.target.value)}
+                            placeholder="Ünite adını yazın"
+                            className={inputClasses}
+                            required
+                        />
+                    </div>
+                )}
+            </div>
+
 
             <div>
                 <label htmlFor="activity-description" className={labelClasses}>Açıklama</label>

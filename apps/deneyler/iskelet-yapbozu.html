@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>İskelet Yapbozu Acil Servisi | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .pushable:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+    .piece-btn.sel { background: #fef08a !important; box-shadow: 0 0 0 4px #facc15, 3px 3px 0 #0f172a; }
+    .slot-hit { cursor: pointer; }
+    input[type=range] { accent-color: #ef4444; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-sm font-black flex items-center gap-1"><span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span></a>
+      <div>
+        <div class="flex items-center gap-2"><span class="text-2xl sm:text-3xl">🦴</span><h1 class="display text-lg sm:text-2xl font-black tracking-wide">İskelet Yapbozu Acil Servisi</h1></div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Kemikleri yerine yerleştir, görevlerini öğren ve röntgendeki kırığı bul! 🏥🩻</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab">🏥 1. Acil Servis</button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white">💪 2. Kas Laboratuvarı</button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">VAKA 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">İskeleti Kur</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 p-2.5 bg-rose-50 rounded-xl border-2 border-ink">
+          <p id="taskText" class="text-xs sm:text-sm font-black">🎯 Tepsiden bir kemik seç ve iskelette doğru yerine dokun!</p>
+          <div class="text-right shrink-0">
+            <p id="counterLabel" class="text-[10px] font-black text-gray-500">KEMİK</p>
+            <p id="counterText" class="display text-xl font-black leading-none">0/12</p>
+          </div>
+        </div>
+
+        <!-- İSKELET MODU -->
+        <div id="skelMode" class="grid grid-cols-1 sm:grid-cols-5 gap-3">
+          <div id="skelBox" class="sm:col-span-2 rounded-2xl border-3 border-ink bg-sky-50 p-2 flex items-center justify-center">
+            <svg id="skel" viewBox="0 0 300 470" class="w-full h-auto max-h-[440px]"></svg>
+          </div>
+          <div class="sm:col-span-3 flex flex-col gap-2">
+            <div id="trayWrap">
+              <p class="text-xs font-black mb-1.5">🧺 Kemik Tepsisi</p>
+              <div id="tray" class="grid grid-cols-3 gap-2"></div>
+            </div>
+            <div id="questionBox" class="hidden p-3 bg-yellow-50 rounded-xl border-3 border-ink"></div>
+          </div>
+        </div>
+
+        <!-- KAS MODU -->
+        <div id="muscleMode" class="hidden flex-col gap-3">
+          <div class="rounded-2xl border-3 border-ink bg-orange-50 p-2">
+            <svg id="arm" viewBox="0 0 400 300" class="w-full h-auto"></svg>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-black">💪 Dirseği Bük:</span>
+            <input id="elbow" type="range" min="0" max="140" value="0" class="flex-1">
+            <span id="elbowText" class="display font-black w-14 text-right">0°</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-center">
+            <div class="p-2 bg-red-50 rounded-xl border-2 border-ink"><p class="text-[10px] font-black text-gray-500">ÖN KOL KASI (Pazı)</p><p id="bicepsState" class="text-sm font-black text-red-700">Gevşek</p></div>
+            <div class="p-2 bg-blue-50 rounded-xl border-2 border-ink"><p class="text-[10px] font-black text-gray-500">ARKA KOL KASI</p><p id="tricepsState" class="text-sm font-black text-blue-700">Kasılı</p></div>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-xs font-black">🔄 Baştan</button>
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black">💡 İpucu</button>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-rose-50 to-orange-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">İskeletimiz vücudumuza <b>şekil verir</b>, bizi <b>dik tutar</b> ve beyin, kalp gibi <b>organlarımızı korur</b>. Kaslarla birlikte hareket etmemizi sağlar!</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">Doktor Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Fen Bilgisi Rehberi</h3></div>
+        <div class="space-y-2 text-xs">
+          <div class="p-2 bg-slate-50 rounded-lg border border-slate-300"><p class="font-extrabold">💀 Kafatası</p><p class="text-[11px] text-gray-700 font-semibold mt-0.5">Beyni korur. Yüzümüze şekil verir.</p></div>
+          <div class="p-2 bg-rose-50 rounded-lg border border-rose-300"><p class="font-extrabold text-rose-900">🫁 Göğüs Kafesi</p><p class="text-[11px] text-rose-800 font-semibold mt-0.5">Kaburgalar ve göğüs kemiğinden oluşur. Kalbi ve akciğerleri korur.</p></div>
+          <div class="p-2 bg-amber-50 rounded-lg border border-amber-300"><p class="font-extrabold text-amber-900">🧍 Omurga</p><p class="text-[11px] text-amber-800 font-semibold mt-0.5">Üst üste dizilmiş küçük omurlardan oluşur. Vücudu dik tutar, içinden geçen omuriliği korur.</p></div>
+          <div class="p-2 bg-sky-50 rounded-lg border border-sky-300"><p class="font-extrabold text-sky-900">🦵 Kol ve Bacak Kemikleri</p><p class="text-[11px] text-sky-800 font-semibold mt-0.5">Hareket etmemizi sağlar. Uyluk kemiği vücudumuzun en uzun kemiğidir.</p></div>
+          <div class="p-2 bg-emerald-50 rounded-lg border border-emerald-300"><p class="font-extrabold text-emerald-900">🥛 Güçlü Kemikler İçin</p><p class="text-[11px] text-emerald-800 font-semibold mt-0.5">Süt ürünleri tüket, güneş ışığından (D vitamini) faydalan, spor yap ve dik otur!</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Hasta Taburcu!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-rose-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-rose-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      snap() { tone('square', 900, 400, 0.06, 0.12); tone('triangle', 500, 700, 0.1, 0.15, 0.04); },
+      correct() { tone('triangle', 660, 990, 0.12, 0.2); tone('triangle', 990, 1320, 0.15, 0.18, 0.08); },
+      wrong() { tone('sawtooth', 220, 110, 0.3, 0.15); },
+      beep() { tone('sine', 1000, 1000, 0.08, 0.1); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. KEMİK ÇİZİMLERİ ---
+    const BONE = '#f8fafc';
+    function longBone(len, w = 12) {
+      const h = len / 2;
+      return `<rect x="${-w / 2}" y="${-h + 4}" width="${w}" height="${len - 8}" rx="${w / 2}" fill="${BONE}" stroke="#0f172a" stroke-width="2.5" />
+        <circle cx="${-w * 0.45}" cy="${-h + 4}" r="${w * 0.6}" fill="${BONE}" stroke="#0f172a" stroke-width="2.5" /><circle cx="${w * 0.45}" cy="${-h + 4}" r="${w * 0.6}" fill="${BONE}" stroke="#0f172a" stroke-width="2.5" />
+        <circle cx="${-w * 0.45}" cy="${h - 4}" r="${w * 0.6}" fill="${BONE}" stroke="#0f172a" stroke-width="2.5" /><circle cx="${w * 0.45}" cy="${h - 4}" r="${w * 0.6}" fill="${BONE}" stroke="#0f172a" stroke-width="2.5" />
+        <rect x="${-w / 2 + 2.5}" y="${-h + 4}" width="${w - 5}" height="${len - 8}" fill="${BONE}" />`;
+    }
+    function twoBones(len, extra) {
+      return `<g transform="translate(-5,0)">${longBone(len, 7)}</g><g transform="translate(5,0)">${longBone(len, 7)}</g>${extra || ''}`;
+    }
+    const hand = y => `<g transform="translate(0,${y})"><ellipse cx="0" cy="8" rx="11" ry="10" fill="${BONE}" stroke="#0f172a" stroke-width="2.5" />${[-8, -3, 2, 7].map(x => `<rect x="${x - 1.8}" y="14" width="3.6" height="14" rx="1.8" fill="${BONE}" stroke="#0f172a" stroke-width="1.8" />`).join('')}</g>`;
+    const foot = (y, dir) => `<g transform="translate(0,${y})"><path d="M-8 0 L8 0 L${dir * 26} 12 L${dir * 26} 18 L-10 18 Z" fill="${BONE}" stroke="#0f172a" stroke-width="2.5" stroke-linejoin="round" /></g>`;
+
+    const DRAW = {
+      kafatasi: () => `<path d="M-30 5 Q-34 -38 0 -40 Q34 -38 30 5 Q30 18 20 22 L20 34 Q0 42 -20 34 L-20 22 Q-30 18 -30 5 Z" fill="${BONE}" stroke="#0f172a" stroke-width="3" />
+        <ellipse cx="-11" cy="0" rx="8" ry="9" fill="#0f172a" /><ellipse cx="11" cy="0" rx="8" ry="9" fill="#0f172a" />
+        <path d="M0 10 L-4 18 L4 18 Z" fill="#0f172a" /><path d="M-12 28 h24 M-8 24 v8 M0 24 v8 M8 24 v8" stroke="#0f172a" stroke-width="2" />`,
+      omurga: () => Array.from({ length: 11 }, (_, i) => `<rect x="-8" y="${-75 + i * 14}" width="16" height="11" rx="4" fill="${BONE}" stroke="#0f172a" stroke-width="2" />`).join(''),
+      gogus: () => `<rect x="-6" y="-38" width="12" height="62" rx="5" fill="${BONE}" stroke="#0f172a" stroke-width="2.5" />` +
+        [0, 1, 2, 3, 4, 5].map(i => {
+          const y = -32 + i * 12, w = 40 + i * 3;
+          return `<path d="M-6 ${y} Q${-w} ${y - 4} ${-w + 4} ${y + 18} " fill="none" stroke="#0f172a" stroke-width="7" stroke-linecap="round" /><path d="M-6 ${y} Q${-w} ${y - 4} ${-w + 4} ${y + 18} " fill="none" stroke="${BONE}" stroke-width="3.5" stroke-linecap="round" />
+                  <path d="M6 ${y} Q${w} ${y - 4} ${w - 4} ${y + 18} " fill="none" stroke="#0f172a" stroke-width="7" stroke-linecap="round" /><path d="M6 ${y} Q${w} ${y - 4} ${w - 4} ${y + 18} " fill="none" stroke="${BONE}" stroke-width="3.5" stroke-linecap="round" />`;
+        }).join(''),
+      legen: () => `<path d="M-42 -16 Q-46 12 -18 22 L-8 12 L8 12 L18 22 Q46 12 42 -16 Q24 -6 10 -12 L-10 -12 Q-24 -6 -42 -16 Z" fill="${BONE}" stroke="#0f172a" stroke-width="3" stroke-linejoin="round" /><circle cx="-18" cy="8" r="6" fill="#0f172a" opacity="0.8" /><circle cx="18" cy="8" r="6" fill="#0f172a" opacity="0.8" />`,
+      ustKol: () => longBone(78, 12),
+      onKol: () => twoBones(64, hand(30)),
+      uyluk: () => longBone(92, 14),
+      bacakL: () => twoBones(80, foot(40, -1)),
+      bacakR: () => twoBones(80, foot(40, 1))
+    };
+
+    // Tür bilgileri
+    const KINDS = {
+      kafatasi: { n: 'Kafatası', role: 'Beyni korur.' },
+      omurga: { n: 'Omurga', role: 'Vücudu dik tutar, omuriliği korur.' },
+      gogus: { n: 'Göğüs Kafesi', role: 'Kalbi ve akciğerleri korur.' },
+      legen: { n: 'Leğen Kemiği', role: 'Oturunca ağırlığımızı taşır, bacakları gövdeye bağlar.' },
+      ustKol: { n: 'Üst Kol Kemiği', role: 'Omuz ile dirsek arasındadır.' },
+      onKol: { n: 'Ön Kol Kemikleri', role: 'Dirsek ile el arasındaki iki kemiktir.' },
+      uyluk: { n: 'Uyluk Kemiği', role: 'Vücudun en uzun ve en sağlam kemiğidir.' },
+      bacak: { n: 'Baldır Kemikleri', role: 'Diz ile ayak arasındaki iki kemiktir.' }
+    };
+
+    // Yuvalar: kind, çizim, konum, açı, tıklama alanı
+    const SLOTS = [
+      { id: 'kafatasi', kind: 'kafatasi', draw: 'kafatasi', x: 150, y: 48, r: 0, hx: 150, hy: 45, hr: 34 },
+      { id: 'omurga', kind: 'omurga', draw: 'omurga', x: 150, y: 175, r: 0, hx: 150, hy: 228, hr: 20 },
+      { id: 'gogus', kind: 'gogus', draw: 'gogus', x: 150, y: 140, r: 0, hx: 150, hy: 140, hr: 34 },
+      { id: 'legen', kind: 'legen', draw: 'legen', x: 150, y: 268, r: 0, hx: 150, hy: 270, hr: 24 },
+      { id: 'ustKolL', kind: 'ustKol', draw: 'ustKol', x: 96, y: 150, r: 14, hx: 94, hy: 150, hr: 22 },
+      { id: 'ustKolR', kind: 'ustKol', draw: 'ustKol', x: 204, y: 150, r: -14, hx: 206, hy: 150, hr: 22 },
+      { id: 'onKolL', kind: 'onKol', draw: 'onKol', x: 78, y: 222, r: 6, hx: 76, hy: 232, hr: 24 },
+      { id: 'onKolR', kind: 'onKol', draw: 'onKol', x: 222, y: 222, r: -6, hx: 224, hy: 232, hr: 24 },
+      { id: 'uylukL', kind: 'uyluk', draw: 'uyluk', x: 132, y: 330, r: 5, hx: 130, hy: 330, hr: 22 },
+      { id: 'uylukR', kind: 'uyluk', draw: 'uyluk', x: 168, y: 330, r: -5, hx: 170, hy: 330, hr: 22 },
+      { id: 'bacakL', kind: 'bacak', draw: 'bacakL', x: 126, y: 418, r: 2, hx: 124, hy: 412, hr: 24 },
+      { id: 'bacakR', kind: 'bacak', draw: 'bacakR', x: 174, y: 418, r: -2, hx: 176, hy: 412, hr: 24 }
+    ];
+    // Tepsideki parçalar (her yuva için bir parça)
+    const PIECES = SLOTS.map(s => ({ id: s.id, kind: s.kind, draw: s.draw }));
+
+    const QUESTIONS = [
+      { q: 'Beynimizi koruyan kemik hangisi?', a: 'kafatasi' },
+      { q: 'Kalbimizi ve akciğerlerimizi koruyan kemikler hangileri?', a: 'gogus' },
+      { q: 'Sırtımızda üst üste dizilmiş, bizi dik tutan kemik hangisi?', a: 'omurga' },
+      { q: 'Vücudumuzun en uzun kemiği hangisi?', a: 'uyluk' },
+      { q: 'Otururken ağırlığımızı taşıyan kalça kemiği hangisi?', a: 'legen' },
+      { q: 'Omzumuz ile dirseğimiz arasındaki kemik hangisi?', a: 'ustKol' },
+      { q: 'Topa vururken dizimizin altında kalan kemikler hangileri?', a: 'bacak' },
+      { q: 'Dirseğimiz ile elimiz arasındaki iki kemik hangileri?', a: 'onKol' }
+    ];
+
+    const LEVELS = [
+      { title: 'İskeleti Kur', type: 'build', task: '🎯 Tepsiden bir kemik seç ve iskelette doğru yerine dokun!', hint: 'Önce kafatası, göğüs kafesi, omurga ve leğen gibi ortadaki kemikleri yerleştir. Sonra kolları ve bacakları ekle.', fact: 'Bir yetişkinin iskeletinde yaklaşık <b>206 kemik</b> vardır. Bebekler daha fazla kemikle doğar, bazı kemikler büyüdükçe birleşir!' },
+      { title: 'Kemik Görevleri', type: 'quiz', task: '🎯 Soruyu oku ve iskelette doğru kemiğe dokun!', hint: 'Kemiğin nerede olduğunu düşün: Korunan organ nerede? Hareket eden eklem nerede?', fact: 'Kemikler canlıdır! İçlerinde kan damarları vardır ve kırılınca kendilerini onarabilirler.' },
+      { title: 'Acil Durum!', type: 'timed', time: 60, task: '⏱️ Ambulans geliyor! İskeleti 60 saniyede kur. Yanlış yer 3 saniye kaybettirir.', hint: 'Sol ve sağ kemikler aynıdır, hangisine koyduğun fark etmez. Hızlı ol!', fact: 'Acil serviste doktorlar kırık kemikleri <b>alçı</b> ile sabitler. Kemik birkaç haftada kendini onarır.' },
+      { title: 'Röntgen Odası', type: 'xray', rounds: 6, task: '🩻 Röntgen filmine bak. Kırık kemik hangisi?', hint: 'Kırmızı zikzak çizgiyi bul ve o kemiğin adını seç.', fact: '<b>Röntgen</b> ışınları vücudumuzdan geçer ama kemiklerden geçemez. Bu yüzden filmde kemikler beyaz görünür.' }
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: İlk İskelet', text: 'İskeleti eksiksiz kur.' },
+      { id: 'm2', title: '2. Görev: Kemik Profesörü', text: 'Kemik Görevleri sorularının hepsini hatasız bil.' },
+      { id: 'm3', title: '3. Görev: Kas Ustası', text: 'Kas Laboratuvarında kolu tamamen bük ve sonra tamamen düzelt.' },
+      { id: 'm4', title: '4. Görev: Baş Hekim', text: '4 vakanın hepsini tamamla.' }
+    ];
+
+    // --- 3. DURUM ---
+    const $ = id => document.getElementById(id);
+    let mode = 'levels';
+    let levelIndex = 0;
+    let placed = {};
+    let tray = [];
+    let selPiece = null;
+    let mistakes = 0;
+    let finished = false;
+    let qIndex = 0;
+    let qQueue = [];
+    let timeLeft = 0;
+    let timer = null;
+    let xrayKind = null;
+    let score = 0;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    let modalTimer = null;
+    let bentFull = false;
+
+    // --- 4. İSKELET ÇİZİMİ ---
+    function renderSkeleton() {
+      const L = LEVELS[levelIndex];
+      const xray = mode === 'levels' && L.type === 'xray';
+      let h = xray ? '<rect width="300" height="470" fill="#0f172a" />' : '';
+      // Taban silüet
+      h += `<g opacity="${xray ? 0.25 : 0.12}"><circle cx="150" cy="45" r="38" fill="${xray ? '#38bdf8' : '#0f172a'}" /><rect x="100" y="90" width="100" height="195" rx="30" fill="${xray ? '#38bdf8' : '#0f172a'}" /></g>`;
+      const order = ['omurga', 'gogus', 'legen', 'kafatasi', 'ustKolL', 'ustKolR', 'onKolL', 'onKolR', 'uylukL', 'uylukR', 'bacakL', 'bacakR'];
+      order.forEach(id => {
+        const s = SLOTS.find(x => x.id === id);
+        const p = placed[id];
+        const g = `<g transform="translate(${s.x},${s.y}) rotate(${s.r})">${DRAW[s.draw]()}</g>`;
+        if (p) h += xray ? `<g style="filter: invert(0) " opacity="0.95">${g.replaceAll(BONE, '#e0f2fe').replaceAll('#0f172a', '#7dd3fc')}</g>` : g;
+        else h += `<g opacity="0.3" style="filter: grayscale(1)">${g.replaceAll(BONE, 'transparent').replace(/stroke-width="[\d.]+"/g, 'stroke-width="1.5" stroke-dasharray="4 3"')}</g>`;
+      });
+      if (xray && xrayKind) {
+        const s = SLOTS.find(x => x.kind === xrayKind && (x.id.endsWith('L') || !/[LR]$/.test(x.id)));
+        h += `<g transform="translate(${s.hx},${s.hy})"><path d="M-12 -6 L-4 4 L2 -4 L9 6 L14 -2" fill="none" stroke="#ef4444" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" /><circle r="20" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 3" opacity="0.8" /></g>`;
+      }
+      // Tıklama alanları
+      SLOTS.forEach(s => { h += `<circle class="slot-hit" data-slot="${s.id}" cx="${s.hx}" cy="${s.hy}" r="${s.hr}" fill="transparent" />`; });
+      $('skel').innerHTML = h;
+      $('skel').querySelectorAll('.slot-hit').forEach(c => c.addEventListener('click', () => onSlot(c.dataset.slot)));
+    }
+
+    function pieceSvg(p) {
+      const vb = { kafatasi: '-40 -45 80 90', omurga: '-20 -80 40 160', gogus: '-60 -45 120 90', legen: '-50 -25 100 50', ustKol: '-15 -45 30 90', onKol: '-20 -40 40 105', uyluk: '-15 -50 30 100', bacakL: '-35 -45 60 110', bacakR: '-25 -45 60 110' }[p.draw];
+      return `<svg viewBox="${vb}" class="w-full h-14">${DRAW[p.draw]()}</svg>`;
+    }
+
+    function renderTray() {
+      $('tray').innerHTML = tray.map(p => `<button data-p="${p.id}" class="piece-btn pushable bg-white p-1 flex flex-col items-center ${selPiece === p.id ? 'sel' : ''}">${pieceSvg(p)}<span class="text-[10px] font-black leading-tight">${KINDS[p.kind].n}</span></button>`).join('')
+        || '<p class="col-span-3 text-center text-sm font-black text-emerald-700 py-6">✅ Tepsi boş, bütün kemikler yerinde!</p>';
+      $('tray').querySelectorAll('.piece-btn').forEach(b => b.addEventListener('click', () => { if (finished) return; selPiece = selPiece === b.dataset.p ? null : b.dataset.p; Sound.click(); renderTray(); }));
+      $('counterText').textContent = `${Object.keys(placed).length}/12`;
+    }
+
+    // --- 5. ETKİLEŞİM ---
+    function onSlot(slotId) {
+      if (finished || mode !== 'levels') return;
+      initAudio();
+      const L = LEVELS[levelIndex];
+      const slot = SLOTS.find(s => s.id === slotId);
+      if (L.type === 'quiz') { answerQuiz(slot.kind); return; }
+      if (L.type !== 'build' && L.type !== 'timed') return;
+      if (!selPiece) { note('👆 Önce tepsiden bir kemik seç!'); return; }
+      if (placed[slotId]) { note('Bu yerde zaten bir kemik var.'); return; }
+      const piece = PIECES.find(p => p.id === selPiece);
+      if (piece.kind !== slot.kind) {
+        mistakes++;
+        Sound.wrong();
+        if (L.type === 'timed') { timeLeft = Math.max(0, timeLeft - 3); updateTimer(); }
+        note(`❌ <b>${KINDS[piece.kind].n}</b> buraya ait değil. İpucu: ${KINDS[piece.kind].role}`);
+        if (typeof gsap !== 'undefined') gsap.fromTo('#skelBox', { x: -6 }, { x: 0, duration: 0.4, ease: 'elastic.out(4,0.2)' });
+        return;
+      }
+      // Sol/sağ bacak için ayağın yönü yuvaya göre çizilir
+      placed[slotId] = piece.id;
+      tray = tray.filter(p => p.id !== piece.id);
+      selPiece = null;
+      Sound.snap();
+      note(`✅ <b>${KINDS[slot.kind].n}</b> yerleşti! ${KINDS[slot.kind].role}`);
+      renderSkeleton(); renderTray();
+      if (Object.keys(placed).length === 12) winLevel();
+    }
+
+    function note(html) { $('scienceNote').innerHTML = html; }
+
+    function renderQuestion() {
+      const box = $('questionBox');
+      const L = LEVELS[levelIndex];
+      if (L.type === 'quiz') {
+        const q = qQueue[qIndex];
+        box.innerHTML = `<p class="text-[10px] font-black text-amber-700 uppercase">Soru ${qIndex + 1}/${qQueue.length}</p><p class="display text-lg font-black">${q.q}</p><p class="text-[11px] font-bold text-gray-500">👈 İskelette doğru kemiğe dokun.</p>`;
+        $('counterText').textContent = `${qIndex}/${qQueue.length}`;
+      } else if (L.type === 'xray') {
+        const kinds = Object.keys(KINDS);
+        const opts = [xrayKind, ...kinds.filter(k => k !== xrayKind).sort(() => Math.random() - 0.5).slice(0, 3)].sort(() => Math.random() - 0.5);
+        box.innerHTML = `<p class="text-[10px] font-black text-sky-700 uppercase">Film ${qIndex + 1}/${L.rounds}</p><p class="display text-lg font-black mb-2">Kırık hangi kemikte?</p>
+          <div class="grid grid-cols-2 gap-2">${opts.map(k => `<button data-k="${k}" class="xopt pushable bg-white py-2 text-xs font-black">${KINDS[k].n}</button>`).join('')}</div>`;
+        box.querySelectorAll('.xopt').forEach(b => b.addEventListener('click', () => answerXray(b.dataset.k, b)));
+        $('counterText').textContent = `${qIndex}/${L.rounds}`;
+      }
+    }
+
+    function answerQuiz(kind) {
+      const q = qQueue[qIndex];
+      if (kind === q.a) {
+        Sound.correct();
+        note(`✅ Doğru: <b>${KINDS[kind].n}</b>. ${KINDS[kind].role}`);
+        qIndex++;
+        if (qIndex >= qQueue.length) { if (mistakes === 0) completeMission('m2'); winLevel(); return; }
+        renderQuestion();
+      } else {
+        mistakes++;
+        Sound.wrong();
+        note(`❌ Bu <b>${KINDS[kind].n}</b>: ${KINDS[kind].role} Tekrar dene!`);
+      }
+    }
+
+    function nextXray() {
+      const kinds = Object.keys(KINDS);
+      let k;
+      do { k = kinds[Math.floor(Math.random() * kinds.length)]; } while (k === xrayKind);
+      xrayKind = k;
+      renderSkeleton(); renderQuestion();
+    }
+
+    function answerXray(k, btn) {
+      if (k === xrayKind) {
+        Sound.correct();
+        note(`✅ Kırık <b>${KINDS[k].n}</b> üzerinde. Doktor alçıya alacak! 🩹`);
+        qIndex++;
+        if (qIndex >= LEVELS[levelIndex].rounds) { xrayKind = null; winLevel(); return; }
+        nextXray();
+      } else {
+        mistakes++;
+        Sound.wrong();
+        btn.disabled = true; btn.classList.add('bg-rose-200');
+        note('❌ Kırmızı zikzak çizgiye daha dikkatli bak!');
+      }
+    }
+
+    function updateTimer() {
+      $('counterLabel').textContent = 'SÜRE';
+      $('counterText').textContent = `${timeLeft} sn`;
+      $('counterText').classList.toggle('text-red-600', timeLeft <= 10);
+    }
+
+    function startTimer() {
+      clearInterval(timer);
+      timer = setInterval(() => {
+        if (finished) { clearInterval(timer); return; }
+        timeLeft--;
+        updateTimer();
+        if (timeLeft <= 10 && timeLeft > 0) Sound.beep();
+        if (timeLeft <= 0) { clearInterval(timer); failTimed(); }
+      }, 1000);
+    }
+
+    function failTimed() {
+      finished = true;
+      Sound.wrong();
+      showModal({ emoji: '🚑', title: 'Süre Doldu!', stars: '☆☆☆', info: `${Object.keys(placed).length}/12 kemik yerleştirildi.`, fact: 'Tekrar dene! Önce ortadaki büyük kemikleri, sonra kol ve bacakları yerleştirmek zaman kazandırır.', next: null });
+    }
+
+    function winLevel() {
+      finished = true;
+      clearInterval(timer);
+      const L = LEVELS[levelIndex];
+      let s = mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1;
+      if (L.type === 'timed') s = timeLeft >= 25 && mistakes <= 1 ? 3 : timeLeft >= 10 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20;
+      if (L.type === 'build') completeMission('m1');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      updateScore(); renderLevelDots(); renderSkeleton();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+      showModal({ emoji: '🦴', title: 'Hasta Taburcu!', stars: '⭐'.repeat(s) + '☆'.repeat(3 - s), info: L.type === 'timed' ? `${timeLeft} saniye kala bitirdin! ${mistakes} hata.` : `${mistakes} hata yaptın.`, fact: L.fact, next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Kas Laboratuvarı 💪' });
+    }
+
+    // --- 6. KAS LABORATUVARI ---
+    function renderArm(angle) {
+      const sx = 120, sy = 70;           // omuz
+      const ex = 120, ey = 190;          // dirsek
+      const a = (angle) * Math.PI / 180;
+      const len = 120;
+      // Ön kol dirsekten aşağı sarkar, büküldükçe öne (sağa) ve yukarı döner
+      const hx = ex + len * Math.sin(a), hy = ey + len * Math.cos(a);
+      const t = angle / 140;
+      const bicepsW = 16 + t * 20, tricepsW = 26 - t * 12;
+      let h = `<rect width="400" height="300" fill="#fff7ed" />`;
+      // Gövde silüeti
+      h += `<rect x="20" y="40" width="80" height="220" rx="30" fill="#fde68a" stroke="#0f172a" stroke-width="3" opacity="0.6" />`;
+      // Üst kol kemiği
+      h += `<line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" stroke="#0f172a" stroke-width="16" stroke-linecap="round" /><line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" stroke="${BONE}" stroke-width="10" stroke-linecap="round" />`;
+      // Ön kol kemiği
+      h += `<line x1="${ex}" y1="${ey}" x2="${hx}" y2="${hy}" stroke="#0f172a" stroke-width="14" stroke-linecap="round" /><line x1="${ex}" y1="${ey}" x2="${hx}" y2="${hy}" stroke="${BONE}" stroke-width="8" stroke-linecap="round" />`;
+      // Pazı kası (önde): omuzdan ön kolun üst kısmına
+      const bx2 = ex + 26 * Math.sin(a), by2 = ey + 26 * Math.cos(a);
+      const midX = (sx + 14 + bx2) / 2 + bicepsW * 0.9, midY = (sy + 20 + by2) / 2;
+      h += `<path d="M${sx + 8} ${sy + 18} Q${midX} ${midY} ${bx2 + 6} ${by2}" fill="none" stroke="#0f172a" stroke-width="${bicepsW + 6}" stroke-linecap="round" /><path d="M${sx + 8} ${sy + 18} Q${midX} ${midY} ${bx2 + 6} ${by2}" fill="none" stroke="#ef4444" stroke-width="${bicepsW}" stroke-linecap="round" />`;
+      // Arka kol kası
+      h += `<path d="M${sx - 8} ${sy + 18} Q${sx - 10 - tricepsW * 0.5} ${(sy + ey) / 2} ${ex - 8} ${ey + 4}" fill="none" stroke="#0f172a" stroke-width="${tricepsW + 6}" stroke-linecap="round" /><path d="M${sx - 8} ${sy + 18} Q${sx - 10 - tricepsW * 0.5} ${(sy + ey) / 2} ${ex - 8} ${ey + 4}" fill="none" stroke="#3b82f6" stroke-width="${tricepsW}" stroke-linecap="round" />`;
+      // El
+      h += `<circle cx="${hx}" cy="${hy}" r="14" fill="#fcd34d" stroke="#0f172a" stroke-width="3" />`;
+      h += `<circle cx="${ex}" cy="${ey}" r="8" fill="#94a3b8" stroke="#0f172a" stroke-width="2.5" />`;
+      // Etiketler
+      h += `<g font-size="12" font-weight="900"><text x="250" y="60" fill="#b91c1c">🔴 Pazı: ${angle > 20 ? 'KASILIYOR ⬆️' : 'gevşek'}</text><text x="250" y="84" fill="#1d4ed8">🔵 Arka kol kası: ${angle > 20 ? 'gevşiyor' : 'KASILI'}</text><text x="${ex + 14}" y="${ey + 4}" fill="#0f172a">Dirsek eklemi</text></g>`;
+      $('arm').innerHTML = h;
+      $('elbowText').textContent = `${angle}°`;
+      $('bicepsState').textContent = angle > 20 ? 'Kasılıyor, kısalıp kalınlaşıyor' : 'Gevşek';
+      $('tricepsState').textContent = angle > 20 ? 'Gevşiyor, uzuyor' : 'Kasılı';
+    }
+
+    $('elbow').addEventListener('input', e => {
+      const v = +e.target.value;
+      renderArm(v);
+      if (v >= 130) bentFull = true;
+      if (bentFull && v <= 5) completeMission('m3');
+    });
+
+    // --- 7. AKIŞ ---
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info; $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next); if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 700);
+    }
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5"><span class="text-lg">${done ? '✅' : '⬜'}</span><div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Vakalar:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function loadLevel(i) {
+      closeModal();
+      clearInterval(timer);
+      mode = 'levels'; levelIndex = i; mistakes = 0; finished = false; selPiece = null; qIndex = 0; xrayKind = null;
+      const L = LEVELS[i];
+      $('levelBadge').textContent = `VAKA ${i + 1}`;
+      $('levelTitle').textContent = L.title;
+      $('taskText').textContent = L.task;
+      $('counterLabel').textContent = L.type === 'quiz' ? 'SORU' : L.type === 'xray' ? 'FİLM' : 'KEMİK';
+      $('counterText').classList.remove('text-red-600');
+      const building = L.type === 'build' || L.type === 'timed';
+      $('trayWrap').classList.toggle('hidden', !building);
+      $('questionBox').classList.toggle('hidden', building);
+      if (building) {
+        placed = {};
+        tray = [...PIECES].sort(() => Math.random() - 0.5);
+        renderTray();
+      } else {
+        placed = Object.fromEntries(SLOTS.map(s => [s.id, s.id]));
+      }
+      if (L.type === 'quiz') { qQueue = [...QUESTIONS].sort(() => Math.random() - 0.5); renderQuestion(); }
+      if (L.type === 'xray') nextXray();
+      if (L.type === 'timed') { timeLeft = L.time; updateTimer(); startTimer(); }
+      renderLevelDots(); renderSkeleton();
+    }
+
+    function switchMode(m) {
+      const isM = m === 'muscle';
+      $('tabLevels').classList.toggle('active-tab', !isM); $('tabLevels').classList.toggle('bg-white', isM);
+      $('tabSandbox').classList.toggle('active-tab', isM); $('tabSandbox').classList.toggle('bg-white', !isM);
+      $('levelDots').classList.toggle('hidden', isM);
+      $('skelMode').classList.toggle('hidden', isM);
+      $('muscleMode').classList.toggle('hidden', !isM); $('muscleMode').classList.toggle('flex', isM);
+      if (isM) {
+        closeModal(); clearInterval(timer);
+        mode = 'muscle';
+        $('levelBadge').textContent = 'LABORATUVAR';
+        $('levelTitle').textContent = 'Kaslar Nasıl Çalışır?';
+        $('taskText').textContent = '🎯 Kaydırıcıyla dirseği bük ve kasların nasıl değiştiğini izle!';
+        $('counterLabel').textContent = 'AÇI'; $('counterText').textContent = '💪';
+        $('elbow').value = 0; renderArm(0);
+        note('Kaslar sadece <b>çekerek</b> çalışır, itemezler. Bu yüzden kolumuzda <b>çift çalışan</b> kaslar vardır: Biri kasılınca diğeri gevşer.');
+      } else loadLevel(levelIndex);
+    }
+
+    $('btnReset').addEventListener('click', () => { Sound.click(); if (mode === 'levels') loadLevel(levelIndex); else { $('elbow').value = 0; renderArm(0); bentFull = false; } });
+    $('btnHint').addEventListener('click', () => {
+      Sound.click();
+      note(mode === 'levels' ? `<b>İpucu:</b> ${LEVELS[levelIndex].hint}` : '<b>Dene:</b> Kendi kolunu bük ve diğer elinle pazı kasını tut. Kasın sertleşip kalınlaştığını hissedeceksin!');
+    });
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('muscle'); });
+    $('btnModalRetry').addEventListener('click', () => loadLevel(levelIndex));
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('muscle'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; Sound.click(); });
+
+    renderMissions(); updateScore(); loadLevel(0);
+  </script>
+</body>
+</html>

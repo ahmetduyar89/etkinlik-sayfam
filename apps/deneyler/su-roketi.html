@@ -1,0 +1,1845 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Basınçlı Su Roketi: Hedefe İniş! | Küçük Mucitler Bilim Oyunları</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'sans-serif'],
+            display: ['Baloo 2', 'cursive'],
+          },
+          colors: {
+            bgMain: '#f0f9ff',
+            ink: '#0f172a',
+            skyBlue: '#0284c7',
+            sunYellow: '#facc15',
+            rocketCoral: '#ef4444',
+            seaNavy: '#0c4a6e',
+            mintGreen: '#10b981',
+            purpleGrape: '#8b5cf6',
+          },
+          borderWidth: {
+            '3': '3px',
+            '3.5': '3.5px',
+          },
+          boxShadow: {
+            'hard': '4px 4px 0px #0f172a',
+            'hard-lg': '6px 6px 0px #0f172a',
+            'hard-sm': '2px 2px 0px #0f172a',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #f0f9ff;
+      color: #0f172a;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display {
+      font-family: 'Baloo 2', cursive;
+    }
+    .chunky {
+      border: 3.5px solid #0f172a;
+      border-radius: 1.25rem;
+      box-shadow: 4px 4px 0px #0f172a;
+    }
+    .pushable {
+      border: 3px solid #0f172a;
+      border-radius: 0.85rem;
+      box-shadow: 3px 3px 0px #0f172a;
+      transition: all 0.12s ease;
+      cursor: pointer;
+    }
+    .pushable:hover {
+      transform: translate(-1.5px, -1.5px);
+      box-shadow: 4.5px 4.5px 0px #0f172a;
+    }
+    .pushable:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #0f172a;
+    }
+    .sticker {
+      filter: drop-shadow(2px 2px 0px #0f172a);
+    }
+    /* Özel kaydırıcı stilleri */
+    input[type=range] {
+      accent-color: #0284c7;
+      cursor: pointer;
+    }
+    /* Nabız gibi atan paraşüt butonu */
+    @keyframes chutePulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      50% { transform: scale(1.05); box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
+    }
+    .pulse-chute {
+      animation: chutePulse 1.2s infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <!-- Üst Başlık & Navigasyon Çubuğu -->
+  <header class="max-w-7xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-ink text-xs sm:text-sm font-black flex items-center gap-1">
+        <span>⬅️</span> <span>Oyunlara Dön</span>
+      </a>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">🚀</span>
+          <h1 class="display text-lg sm:text-2xl font-black text-ink tracking-wide">
+            Basınçlı Su Roketi: Hedefe İniş!
+          </h1>
+          <span class="hidden md:inline px-2 py-0.5 bg-sky-100 text-sky-800 text-xs font-extrabold rounded-lg border border-ink">
+            Gerçek 60 FPS Fizik Simülasyonu
+          </span>
+        </div>
+        <p class="text-xs text-gray-500 font-bold hidden sm:block">
+          Newton 3. Yasası (Etki-Tepki) · Sıvı & Gaz Basıncı · Balistik ve Paraşüt Sürüklenmesi
+        </p>
+      </div>
+    </div>
+
+    <!-- Puan, Görev Bilgisi ve Ses Aç/Kapa -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <div class="bg-amber-100 px-3 py-1.5 rounded-xl border-2 border-ink text-xs font-black text-ink flex items-center gap-1.5">
+        <span>🏆</span> <span>Puan:</span> <span id="lblScore" class="text-sm font-black text-coral">0</span>
+      </div>
+      <button id="btnToggleSound" class="pushable p-2 bg-purple-100 hover:bg-purple-200 text-ink font-bold text-xs" title="Ses Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+      <button id="btnScienceGuide" class="pushable px-3 py-1.5 bg-yellow-300 hover:bg-yellow-400 text-ink text-xs font-extrabold flex items-center gap-1">
+        <span>💡</span> <span class="hidden sm:inline">Nasıl Çalışır?</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Seviye Seçim Barı -->
+  <div class="max-w-7xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center gap-2 overflow-x-auto pb-1">
+      <button onclick="setLevel(1)" id="lvlBtn1" class="pushable px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-black bg-emerald-400 text-white flex items-center gap-1.5 shadow-sm">
+        <span>🏝️ Seviye 1:</span> Sakin Ada (60m)
+      </button>
+      <button onclick="setLevel(2)" id="lvlBtn2" class="pushable px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-black bg-white text-ink hover:bg-gray-100 flex items-center gap-1.5 shadow-sm">
+        <span>💨 Seviye 2:</span> Rüzgarlı Fener (110m)
+      </button>
+      <button onclick="setLevel(3)" id="lvlBtn3" class="pushable px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-black bg-white text-ink hover:bg-gray-100 flex items-center gap-1.5 shadow-sm">
+        <span>🚢 Seviye 3:</span> Kurtarma Gemisi (150m)
+      </button>
+      <button onclick="setLevel(4)" id="lvlBtn4" class="pushable px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-black bg-white text-ink hover:bg-gray-100 flex items-center gap-1.5 shadow-sm">
+        <span>🧪 Laboratuvar:</span> Serbest Mod
+      </button>
+    </div>
+
+    <!-- Aktif Seviye Görev İpucu -->
+    <div id="levelTargetBadge" class="bg-white px-3 py-1.5 rounded-xl border-2 border-ink text-xs font-bold text-gray-700 flex items-center gap-2 shadow-sm">
+      <span>🎯</span> <span id="levelTargetText">Hedef Platform: <b>60 metre</b> uzakta. Rüzgar: <b>0 km/s</b></span>
+    </div>
+  </div>
+
+  <!-- Ana Oyun Alanı: İki Kolonlu Neubrutalist Düzen -->
+  <main class="max-w-7xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+    
+    <!-- SOL KOLON: Kontrol Paneli, Rampa & Basınç Pompalama (4 Kolon) -->
+    <section class="lg:col-span-4 flex flex-col gap-3.5">
+      
+      <!-- Kontrol Kutusu -->
+      <div class="chunky bg-white p-4 sm:p-5 flex flex-col gap-4">
+        
+        <div class="flex items-center justify-between border-b-2 border-dashed border-gray-300 pb-2">
+          <h2 class="display text-lg font-black text-ink flex items-center gap-2">
+            <span>🛠️</span> Roket Fırlatma Ayarları
+          </h2>
+          <span id="launchStateTag" class="px-2.5 py-0.5 bg-amber-100 text-amber-900 border border-ink text-[11px] font-black rounded-lg">
+            Rampada Hazır
+          </span>
+        </div>
+
+        <!-- 1. Su Hacmi Ayarı (ml) -->
+        <div class="bg-sky-50 p-3 rounded-xl border-2 border-ink/40 flex flex-col gap-1.5">
+          <div class="flex items-center justify-between text-xs font-black text-ink">
+            <span class="flex items-center gap-1.5">
+              <span>💧</span> Su Miktarı:
+            </span>
+            <span id="lblWaterVal" class="text-sky-700 font-extrabold text-sm">400 ml (%27)</span>
+          </div>
+          <input type="range" id="sliderWater" min="0" max="1200" step="50" value="400" class="w-full h-2.5 bg-sky-200 rounded-lg appearance-none cursor-pointer">
+          <div class="flex justify-between text-[10px] font-bold text-gray-500">
+            <span>0 ml (Boş Hava)</span>
+            <span class="text-emerald-600 font-black">★ İdeal (~400-500ml)</span>
+            <span>1200 ml (Aşırı Dolu)</span>
+          </div>
+          <p id="waterHint" class="text-[11px] text-gray-600 font-semibold leading-tight mt-0.5">
+            💡 <i>Su tükenirken devasa kütlesel itki sağlar. Fazla su roketi ağırlaştırır, sıfır su ise kütlesiz kalır!</i>
+          </p>
+        </div>
+
+        <!-- 2. Rampa Fırlatma Açısı (Derece) -->
+        <div class="bg-amber-50 p-3 rounded-xl border-2 border-ink/40 flex flex-col gap-1.5">
+          <div class="flex items-center justify-between text-xs font-black text-ink">
+            <span class="flex items-center gap-1.5">
+              <span>📐</span> Rampa Fırlatma Açısı:
+            </span>
+            <span id="lblAngleVal" class="text-amber-800 font-extrabold text-sm">45°</span>
+          </div>
+          <input type="range" id="sliderAngle" min="20" max="85" step="1" value="45" class="w-full h-2.5 bg-amber-200 rounded-lg appearance-none cursor-pointer">
+          <div class="flex justify-between text-[10px] font-bold text-gray-500">
+            <span>20° (Yatay Hızlı)</span>
+            <span class="font-bold text-amber-700">45° (Maksimum Menzil)</span>
+            <span>85° (Dikey Yüksek)</span>
+          </div>
+        </div>
+
+        <!-- 3. İniş Alanı Konumu / Mesafesi (Metre) -->
+        <div class="bg-purple-50 p-3 rounded-xl border-2 border-ink/40 flex flex-col gap-1.5">
+          <div class="flex items-center justify-between text-xs font-black text-ink">
+            <span class="flex items-center gap-1.5">
+              <span>🎯</span> İniş Alanı Mesafesi:
+            </span>
+            <span id="lblTargetDistVal" class="text-purple-900 font-black text-sm">60 metre</span>
+          </div>
+          <input type="range" id="sliderTargetDist" min="30" max="180" step="5" value="60" class="w-full h-2.5 bg-purple-200 rounded-lg appearance-none cursor-pointer">
+          <div class="flex justify-between text-[10px] font-bold text-gray-500">
+            <span>30m (Yakın)</span>
+            <span class="font-bold text-purple-700">100m (Orta)</span>
+            <span>180m (Uzak)</span>
+          </div>
+          <!-- Hızlı Seçim Butonları -->
+          <div class="grid grid-cols-4 gap-1 pt-1">
+            <button type="button" onclick="setTargetDistance(40)" class="pushable px-1 py-1 bg-white hover:bg-purple-100 text-[10px] font-black text-purple-900">
+              40m
+            </button>
+            <button type="button" onclick="setTargetDistance(70)" class="pushable px-1 py-1 bg-white hover:bg-purple-100 text-[10px] font-black text-purple-900">
+              70m
+            </button>
+            <button type="button" onclick="setTargetDistance(110)" class="pushable px-1 py-1 bg-white hover:bg-purple-100 text-[10px] font-black text-purple-900">
+              110m
+            </button>
+            <button type="button" onclick="setTargetDistance(150)" class="pushable px-1 py-1 bg-white hover:bg-purple-100 text-[10px] font-black text-purple-900">
+              150m
+            </button>
+          </div>
+          <p class="text-[10px] text-gray-500 font-semibold leading-tight mt-0.5 flex items-center gap-1">
+            <span>💡</span> <span>İniş adasını ekranda fareyle tutup sürükleyerek de taşıyabilirsin!</span>
+          </p>
+        </div>
+
+        <!-- 4. Hava Pompası & Basınç Manometresi (Bar) -->
+        <div class="bg-emerald-50 p-3.5 rounded-xl border-2 border-ink/50 flex flex-col gap-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black text-ink flex items-center gap-1.5">
+              <span>💨</span> Manometre Basıncı:
+            </span>
+            <span id="lblPressureVal" class="text-base font-black text-emerald-700">0.0 Bar</span>
+          </div>
+
+          <!-- Basınç İlerleme Çubuğu -->
+          <div class="w-full h-4 bg-gray-200 border-2 border-ink rounded-full overflow-hidden relative shadow-inner">
+            <div id="pressureBar" class="h-full bg-gradient-to-r from-emerald-400 via-yellow-400 to-red-500 w-0 transition-all duration-150"></div>
+          </div>
+
+          <!-- Pompa Butonu -->
+          <button id="btnPump" onclick="pumpAir()" class="pushable w-full py-3 bg-emerald-400 hover:bg-emerald-300 text-ink font-black text-sm flex items-center justify-center gap-2 shadow-sm active:scale-95">
+            <span class="text-xl">🫸</span>
+            <span>HAVA BAS! (+0.8 Bar)</span>
+          </button>
+          
+          <div class="flex items-center justify-between text-[10px] font-bold text-gray-500">
+            <span>Min: 2.0 Bar</span>
+            <span class="text-emerald-700 font-bold">Önerilen: 5.0 - 7.0 Bar</span>
+            <span class="text-red-600 font-bold">Maks: 8.0 Bar</span>
+          </div>
+        </div>
+
+        <!-- Serbest Mod Özel Ayarları (Varsayılan Gizli) -->
+        <div id="sandboxSettings" class="hidden bg-purple-50 p-3 rounded-xl border-2 border-ink/40 flex flex-col gap-2">
+          <span class="text-xs font-black text-purple-900 flex items-center gap-1">
+            <span>🪐</span> Ortam Yerçekimi & Rüzgar:
+          </span>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button onclick="setGravity(9.8, 'Dünya (9.8 m/s²)')" id="btnGravEarth" class="pushable px-2 py-1 bg-purple-600 text-white font-bold text-[11px]">
+              Dünya
+            </button>
+            <button onclick="setGravity(1.62, 'Ay (1.62 m/s²)')" id="btnGravMoon" class="pushable px-2 py-1 bg-white text-ink hover:bg-gray-100 font-bold text-[11px]">
+              Ay 🌕
+            </button>
+            <button onclick="setGravity(3.72, 'Mars (3.72 m/s²)')" id="btnGravMars" class="pushable px-2 py-1 bg-white text-ink hover:bg-gray-100 font-bold text-[11px]">
+              Mars 🔴
+            </button>
+          </div>
+          <div class="flex items-center justify-between text-[11px] font-bold mt-1 text-gray-700">
+            <span>Rüzgar:</span>
+            <input type="range" id="sliderWind" min="-6" max="6" step="0.5" value="0" class="w-32">
+            <span id="lblCustomWind">0 m/s</span>
+          </div>
+        </div>
+
+        <!-- BÜYÜK ATEŞLEME & YENİDEN BAŞLATMA BUTONLARI -->
+        <div class="flex flex-col gap-2 pt-1">
+          <button id="btnLaunch" onclick="launchRocket()" class="pushable w-full py-3.5 bg-rocketCoral hover:bg-red-600 text-white display font-black text-lg flex items-center justify-center gap-2 shadow-md">
+            <span>🚀</span> <span>ROKETİ FIRLAT!</span>
+          </button>
+
+          <button id="btnReset" onclick="resetRocket()" class="pushable w-full py-2 bg-gray-100 hover:bg-gray-200 text-ink font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95" title="Roketi rampaya geri getirir ve basıncı sıfırlar">
+            <span>🔄</span> <span>Rampaya Sıfırla (Basıncı Boşalt)</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Bilim Kazanımı Notu -->
+      <div class="bg-amber-100/70 p-3 rounded-2xl border-2 border-ink text-xs font-bold text-gray-700">
+        <span class="text-ink font-black block mb-0.5">🧠 Fen İpucu:</span>
+        <span id="tipText">Havadayken tepe noktasına (apogee) ulaştığında paraşütü açmayı unutma! Erken açarsan rüzgar savurur, geç açarsan sert çakılırsın!</span>
+      </div>
+
+    </section>
+
+    <!-- SAĞ KOLON: 60 FPS HTML5 Canvas Oyun Sahnesi & Canlı Telemetri HUD (8 Kolon) -->
+    <section class="lg:col-span-8 flex flex-col gap-3">
+      
+      <!-- Telemetri Bilgi Şeridi (HUD) -->
+      <div class="chunky bg-white p-3 grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs">
+        <div class="bg-sky-50 p-2 rounded-xl border border-ink/30">
+          <span class="text-[10px] font-bold text-gray-500 uppercase block">İrtifa (Yükseklik)</span>
+          <span id="hudAltitude" class="display text-base font-black text-sky-700">0.0 m</span>
+        </div>
+        <div class="bg-emerald-50 p-2 rounded-xl border border-ink/30">
+          <span class="text-[10px] font-bold text-gray-500 uppercase block">Yatay Mesafe</span>
+          <span id="hudDistance" class="display text-base font-black text-emerald-700">0.0 m</span>
+        </div>
+        <div class="bg-amber-50 p-2 rounded-xl border border-ink/30">
+          <span class="text-[10px] font-bold text-gray-500 uppercase block">Anlık Hız</span>
+          <span id="hudSpeed" class="display text-base font-black text-amber-700">0 km/s</span>
+        </div>
+        <div class="bg-purple-50 p-2 rounded-xl border border-ink/30">
+          <span class="text-[10px] font-bold text-gray-500 uppercase block">İniş Hızı (Vy)</span>
+          <span id="hudVy" class="display text-base font-black text-purple-700">0.0 m/s</span>
+        </div>
+        <div class="bg-gray-100 p-2 rounded-xl border border-ink/30 col-span-2 sm:col-span-1">
+          <span class="text-[10px] font-bold text-gray-500 uppercase block">Rüzgar Hızı</span>
+          <span id="hudWind" class="display text-base font-black text-ink">0 km/s ➔</span>
+        </div>
+      </div>
+
+      <!-- CANVASI BARINDIRAN OYUN ALANI -->
+      <div class="relative chunky bg-sky-200 overflow-hidden shadow-2xl flex flex-col justify-end" style="height: 520px;">
+        
+        <!-- Oyun Canvası -->
+        <canvas id="gameCanvas" width="900" height="520" class="w-full h-full block cursor-crosshair"></canvas>
+
+        <!-- Uçuş Sırasında Görünen Devasa Paraşüt Butonu -->
+        <div id="parachuteControlOverlay" class="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 hidden">
+          <button id="btnDeployChute" class="pushable pulse-chute px-6 sm:px-10 py-3.5 bg-rocketCoral text-white display font-black text-base sm:text-xl flex items-center gap-2 sm:gap-3 shadow-2xl rounded-2xl border-3 border-ink">
+            <span class="text-2xl sm:text-3xl">🪂</span>
+            <span>PARAŞÜTÜ AÇ!</span>
+            <span class="hidden sm:inline text-xs bg-white text-ink px-2 py-0.5 rounded-md font-extrabold border border-ink">BOŞLUK</span>
+          </button>
+        </div>
+
+        <!-- Mini Radar / Panorama Harita (Sağ Üst Köşe) -->
+        <div class="absolute top-3 right-3 bg-white/90 backdrop-blur-sm p-2 rounded-xl border-2 border-ink shadow-md pointer-events-auto hidden sm:block">
+          <div class="flex items-center justify-between text-[10px] font-black text-gray-600 mb-1">
+            <span>🛰️ Mini Radar</span>
+            <span id="radarDistanceTag">0m / 200m</span>
+          </div>
+          <canvas id="radarCanvas" width="160" height="40" class="bg-sky-100 rounded border border-ink/30 cursor-pointer" title="Hedefi konumlandırmak için tıkla"></canvas>
+          <div class="text-[9px] text-gray-500 text-center font-bold mt-0.5 select-none">Tıklayarak hedefi taşı</div>
+        </div>
+
+        <!-- Uçuş Durum Rozeti (Sol Üst) -->
+        <div class="absolute top-3 left-3 flex flex-col gap-1.5 pointer-events-none">
+          <div id="badgePhase" class="bg-white/95 px-3 py-1 rounded-full border-2 border-ink text-xs font-black text-ink shadow-sm flex items-center gap-1.5">
+            <span>🏁</span> <span>Rampada Fırlatılmayı Bekliyor</span>
+          </div>
+        </div>
+
+        <!-- Sonuç & İniş Değerlendirme Modalı (Canvas Üzerine Binen) -->
+        <div id="resultModal" class="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-30 hidden">
+          <div class="chunky bg-white p-6 max-w-md w-full text-center flex flex-col gap-4 shadow-2xl animate-bounce-short">
+            <div id="resultIcon" class="text-5xl">🎯</div>
+            <div>
+              <h3 id="resultTitle" class="display text-2xl font-black text-ink">Harika İniş!</h3>
+              <p id="resultDesc" class="text-xs sm:text-sm font-bold text-gray-600 mt-1">
+                Hedef platformun tam merkezine iniş yaptın!
+              </p>
+            </div>
+
+            <!-- İstatistik Kartı -->
+            <div class="grid grid-cols-3 gap-2 bg-amber-50 p-3 rounded-xl border-2 border-ink text-xs font-black">
+              <div>
+                <span class="text-[10px] text-gray-500 block">Mesafe</span>
+                <span id="resDist" class="text-ink text-sm">62.4 m</span>
+              </div>
+              <div>
+                <span class="text-[10px] text-gray-500 block">İniş Hızı</span>
+                <span id="resLandingSpeed" class="text-emerald-700 text-sm">2.8 m/s</span>
+              </div>
+              <div>
+                <span class="text-[10px] text-gray-500 block">Kazanılan</span>
+                <span id="resPoints" class="text-coral text-sm">+100 Puan</span>
+              </div>
+            </div>
+
+            <!-- Aksiyon Butonları -->
+            <div class="flex items-center gap-2 pt-2">
+              <button onclick="retryLevel()" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-ink font-extrabold text-xs">
+                🔄 Tekrar Dene
+              </button>
+              <button id="btnNextLevel" onclick="nextLevel()" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center gap-1">
+                <span>Sonraki Seviye</span> <span>➔</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- "NASIL ÇALIŞIR?" BİLİM & KAZANIM MODALI -->
+  <div id="scienceModal" class="fixed inset-0 bg-black/70 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="chunky bg-white max-w-xl w-full p-6 flex flex-col gap-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+      
+      <div class="flex items-center justify-between border-b-2 border-dashed border-gray-300 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-3xl">🚀</span>
+          <h2 class="display text-xl sm:text-2xl font-black text-ink">Basınçlı Su Roketinin Fiziği</h2>
+        </div>
+        <button onclick="closeScienceModal()" class="pushable px-2.5 py-1 bg-coral text-white font-black text-sm">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs sm:text-sm font-semibold text-gray-700 leading-relaxed">
+        <div class="bg-sky-50 p-3.5 rounded-xl border-2 border-ink">
+          <h3 class="display text-base font-black text-sky-900 mb-1">1. Newton'un 3. Hareket Yasası (Etki–Tepki)</h3>
+          <p>
+            Şişeye doldurulan basınçlı hava sıkıştıkça dev bir potansiyel enerji depolar. Nozülden aşağı doğru saatte yüzlerce kilometre hızla fışkıran su kütlesi (etki), roketi tam tersi yönde gökyüzüne fırlatır (tepki)!
+          </p>
+        </div>
+
+        <div class="bg-amber-50 p-3.5 rounded-xl border-2 border-ink">
+          <h3 class="display text-base font-black text-amber-900 mb-1">2. Neden Sadece Hava Yetmez?</h3>
+          <p>
+            Havanın kütlesi suya göre yaklaşık 800 kat daha hafiftir! Havanın momentumu (<span class="font-mono font-bold">p = m · v</span>) düşük olduğu için tek başına roketi uzağa itemez. Su ise ağır bir kütle sağlayarak fırlatıcı motor yakıtı görevi görür.
+          </p>
+        </div>
+
+        <div class="bg-emerald-50 p-3.5 rounded-xl border-2 border-ink">
+          <h3 class="display text-base font-black text-emerald-900 mb-1">3. Şişeyi Tamamen Doldurursak Ne Olur?</h3>
+          <p>
+            Sıvılar (su) sıkıştırılamaz! Şişeyi ağzına kadar su doldurursanız içeri hava pompalanamaz, dolayısıyla basınç birikmez. En ideal oran şişenin <b>üçte birini (~%30 - %40)</b> suyla doldurmaktır.
+          </p>
+        </div>
+
+        <div class="bg-purple-50 p-3.5 rounded-xl border-2 border-ink">
+          <h3 class="display text-base font-black text-purple-900 mb-1">4. Paraşüt ve Terminal Hız</h3>
+          <p>
+            Roket yukarı çıkıp hızının sıfırlandığı tepe noktasında (apogee) paraşüt açılırsa yüzey alanı devasa şekilde artar. Hava sürtünmesi yerçekimi kuvvetini dengeler ve roket saatte 100 km yerine sakin bir hızla (~3 m/s) güvenle adaya iner.
+          </p>
+        </div>
+      </div>
+
+      <button onclick="closeScienceModal()" class="pushable w-full py-2.5 bg-emerald-400 hover:bg-emerald-300 text-ink font-black text-sm">
+        Harika, Anladım! Oyuna Dön ➔
+      </button>
+
+    </div>
+  </div>
+
+  <!-- SİSTEM SCRİPTİ: 60 FPS HTML5 CANVAS FİZİK MOTORU & WEB AUDIO SENTEZLEYİCİ -->
+  <script>
+    // ==========================================
+    // 1. WEB AUDIO API SES SENTEZLEYİCİ
+    // ==========================================
+    let audioCtx = null;
+    let isSoundEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    const soundEffects = {
+      pump() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(160, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(380, audioCtx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.12);
+      },
+      launch() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        // Beyaz gürültü + derin bas patlaması (Rocket Roar)
+        const bufferSize = audioCtx.sampleRate * 0.6;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(800, audioCtx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.6);
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        noise.start();
+      },
+      parachute() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        // Paraşüt açılma "Poof" sesi
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(320, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+      },
+      success() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        // Başarı Zafer Fanfarı (Do - Mi - Sol - Do)
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = freq;
+          const startTime = audioCtx.currentTime + idx * 0.1;
+          gain.gain.setValueAtTime(0.2, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.25);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(startTime);
+          osc.stop(startTime + 0.25);
+        });
+      },
+      crash() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.4);
+        gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.4);
+      },
+      vent() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        // Basınç tahliye tıslama sesi
+        try {
+          const bufferSize = audioCtx.sampleRate * 0.25;
+          const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+          const noise = audioCtx.createBufferSource();
+          noise.buffer = buffer;
+          const filter = audioCtx.createBiquadFilter();
+          filter.type = 'highpass';
+          filter.frequency.setValueAtTime(1000, audioCtx.currentTime);
+          const gain = audioCtx.createGain();
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(audioCtx.destination);
+          noise.start();
+        } catch(e) {}
+      }
+    };
+
+    // Ses Aç/Kapa
+    document.getElementById('btnToggleSound').addEventListener('click', () => {
+      isSoundEnabled = !isSoundEnabled;
+      document.getElementById('soundIcon').textContent = isSoundEnabled ? '🔊' : '🔇';
+    });
+
+    // ==========================================
+    // 2. OYUN & FİZİK MOTORU DEĞİŞKENLERİ
+    // ==========================================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const radarCanvas = document.getElementById('radarCanvas');
+    const radarCtx = radarCanvas.getContext('2d');
+
+    // Seviye Tanımları
+    const LEVELS = {
+      1: {
+        name: "Sakin Ada",
+        targetX: 60, // metre
+        targetWidth: 24, // metre
+        wind: 0, // m/s
+        gravity: 9.8,
+        description: "Hedef Platform: 60 metre uzakta. Rüzgarsız, mükemmel bir fırlatma günü!"
+      },
+      2: {
+        name: "Rüzgarlı Fener",
+        targetX: 110,
+        targetWidth: 20,
+        wind: -3.5, // 13 km/s sola doğru yan rüzgar
+        gravity: 9.8,
+        description: "Hedef Platform: 110 metre uzakta. Rüzgar: 13 km/s Karşıdan Esiyor!"
+      },
+      3: {
+        name: "Kurtarma Gemisi",
+        targetX: 150,
+        targetWidth: 18,
+        wind: 2.2, // Hafif arkadan rüzgar
+        isMovingShip: true,
+        gravity: 9.8,
+        description: "Hedef Gemi: 150 metre uzakta. Dalgalarla yavaşça hareket ediyor!"
+      },
+      4: {
+        name: "Serbest Laboratuvar",
+        targetX: 100,
+        targetWidth: 30,
+        wind: 0,
+        gravity: 9.8,
+        description: "Laboratuvar Modu: İstediğin yerçekimi ve rüzgarla dene!"
+      }
+    };
+
+    let currentLevel = 1;
+    let score = 0;
+
+    // Roket Fiziksel Durumu
+    const rocket = {
+      // Başlangıç Rampa Konumu (Dünya Koordinatlarında Metre Cinsinden)
+      x: 0,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: 45, // Derece
+      // Kütle ve İtki
+      dryMass: 0.15, // kg (Boş 1.5L PET şişe + burun konisi + kanatlar)
+      waterVol: 400, // ml
+      waterMass: 0.40, // kg
+      pressure: 0.0, // Bar
+      initialPressure: 0.0,
+      thrustDuration: 0,
+      thrustTimer: 0,
+      // Uçuş Durumu: 'idle' | 'thrust' | 'coast' | 'parachute' | 'landed' | 'crashed'
+      state: 'idle',
+      hasParachute: false,
+      parachuteDeployed: false,
+      trajectory: [],
+      particles: [],
+      // Gemi dalga fazı
+      shipPhase: 0
+    };
+
+    // Ölçek: 1 metre = 4.5 piksel (Dinamik kamera takibi ile)
+    const LAUNCH_PAD_X = 140; // Fırlatma rampasının sol kenardan uzaklığı (Tam görünürlük için)
+    const METER_TO_PIXEL = 4.5;
+    const GROUND_Y_PIXEL = 440; // Canvas zemin yüksekliği
+    const LAUNCH_RAIL_HEIGHT = 28; // Rampa sehpasının yüksekliği
+
+    // Kamera
+    const camera = {
+      x: 0,
+      y: 0,
+      zoom: 1
+    };
+
+    // ==========================================
+    // 3. SEVİYE AYARLARI & GEÇİŞLER
+    // ==========================================
+    window.setTargetDistance = function(dist, updateSlider = true) {
+      dist = Math.max(30, Math.min(185, Math.round(dist)));
+      LEVELS[currentLevel].targetX = dist;
+
+      const sliderTargetDist = document.getElementById('sliderTargetDist');
+      const lblTargetDistVal = document.getElementById('lblTargetDistVal');
+      if (sliderTargetDist && updateSlider) sliderTargetDist.value = dist;
+      if (lblTargetDistVal) lblTargetDistVal.textContent = `${dist} metre`;
+
+      // Seviye ipucu rozetini güncelle
+      const env = LEVELS[currentLevel];
+      const badge = document.getElementById('levelTargetBadge');
+      if (badge) {
+        const windDir = env.wind < 0 ? '⬅️ Karşı' : (env.wind > 0 ? 'Arkadan ➔' : 'Durgun');
+        badge.innerHTML = `<span>🎯</span> <span>Hedef Platform: <b>${dist}m</b>. Rüzgar: <b>${Math.abs(Math.round(env.wind * 3.6))} km/s ${windDir}</b></span>`;
+      }
+    };
+
+    function setLevel(lvl) {
+      currentLevel = lvl;
+      for (let i = 1; i <= 4; i++) {
+        const btn = document.getElementById(`lvlBtn${i}`);
+        if (i === lvl) {
+          btn.className = 'pushable px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-black bg-emerald-400 text-white flex items-center gap-1.5 shadow-sm';
+        } else {
+          btn.className = 'pushable px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-black bg-white text-ink hover:bg-gray-100 flex items-center gap-1.5 shadow-sm';
+        }
+      }
+
+      const l = LEVELS[lvl];
+      window.setTargetDistance(l.targetX, true);
+      
+      const sbSettings = document.getElementById('sandboxSettings');
+      if (lvl === 4) {
+        sbSettings.classList.remove('hidden');
+      } else {
+        sbSettings.classList.add('hidden');
+      }
+
+      updateHudWind();
+      resetRocket();
+    }
+
+    function setGravity(g, label) {
+      LEVELS[4].gravity = g;
+      ['btnGravEarth', 'btnGravMoon', 'btnGravMars'].forEach(id => {
+        document.getElementById(id).className = 'pushable px-2 py-1 bg-white text-ink hover:bg-gray-100 font-bold text-[11px]';
+      });
+      if (g === 9.8) document.getElementById('btnGravEarth').className = 'pushable px-2 py-1 bg-purple-600 text-white font-bold text-[11px]';
+      if (g === 1.62) document.getElementById('btnGravMoon').className = 'pushable px-2 py-1 bg-purple-600 text-white font-bold text-[11px]';
+      if (g === 3.72) document.getElementById('btnGravMars').className = 'pushable px-2 py-1 bg-purple-600 text-white font-bold text-[11px]';
+    }
+
+    document.getElementById('sliderWind').addEventListener('input', (e) => {
+      LEVELS[4].wind = parseFloat(e.target.value);
+      document.getElementById('lblCustomWind').textContent = `${e.target.value} m/s`;
+      updateHudWind();
+    });
+
+    function updateHudWind() {
+      const w = LEVELS[currentLevel].wind;
+      const kmh = Math.abs(Math.round(w * 3.6));
+      let dir = 'Durgun';
+      if (w < 0) dir = `⬅️ ${kmh} km/s`;
+      if (w > 0) dir = `${kmh} km/s ➔`;
+      document.getElementById('hudWind').textContent = dir;
+    }
+
+    // ==========================================
+    // 4. KULLANICI GİRDİLERİ & POMPA
+    // ==========================================
+    const sliderWater = document.getElementById('sliderWater');
+    const lblWaterVal = document.getElementById('lblWaterVal');
+    const sliderAngle = document.getElementById('sliderAngle');
+    const lblAngleVal = document.getElementById('lblAngleVal');
+    const btnPump = document.getElementById('btnPump');
+    const lblPressureVal = document.getElementById('lblPressureVal');
+    const pressureBar = document.getElementById('pressureBar');
+    const btnLaunch = document.getElementById('btnLaunch');
+    const btnReset = document.getElementById('btnReset');
+    const parachuteOverlay = document.getElementById('parachuteControlOverlay');
+    const btnDeployChute = document.getElementById('btnDeployChute');
+
+    // Su Miktarı
+    sliderWater.addEventListener('input', (e) => {
+      if (rocket.state !== 'idle') return;
+      rocket.waterVol = parseInt(e.target.value);
+      rocket.waterMass = rocket.waterVol / 1000;
+      const pct = Math.round((rocket.waterVol / 1500) * 100);
+      lblWaterVal.textContent = `${rocket.waterVol} ml (%${pct})`;
+    });
+
+    // Rampa Açısı
+    sliderAngle.addEventListener('input', (e) => {
+      if (rocket.state !== 'idle') return;
+      rocket.angle = parseInt(e.target.value);
+      lblAngleVal.textContent = `${rocket.angle}°`;
+    });
+
+    // İniş Alanı Mesafesi Slider'ı
+    const sliderTargetDist = document.getElementById('sliderTargetDist');
+    if (sliderTargetDist) {
+      sliderTargetDist.addEventListener('input', (e) => {
+        window.setTargetDistance(parseInt(e.target.value), false);
+      });
+    }
+
+    // ==========================================
+    // İNİŞ ALANI SÜRÜKLEME & ETKİLEŞİMİ (CANVAS & RADAR)
+    // ==========================================
+    let isTargetDragging = false;
+    let isTargetHovered = false;
+
+    function getCanvasCoords(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleCanvasX = canvas.width / rect.width;
+      const scaleCanvasY = canvas.height / rect.height;
+      const canvasX = (clientX - rect.left) * scaleCanvasX;
+      const canvasY = (clientY - rect.top) * scaleCanvasY;
+      const worldX = canvasX + camera.x;
+      const worldY = canvasY - camera.y;
+      return { canvasX, canvasY, worldX, worldY };
+    }
+
+    function isPointNearTarget(worldX, worldY) {
+      const env = LEVELS[currentLevel];
+      let targetPixelX = LAUNCH_PAD_X + (env.targetX * METER_TO_PIXEL);
+      if (env.isMovingShip) {
+        targetPixelX += Math.sin(rocket.shipPhase) * 15 * METER_TO_PIXEL;
+      }
+      const halfW = Math.max(50, (env.targetWidth * METER_TO_PIXEL) / 2 + 25);
+      const hitX = Math.abs(worldX - targetPixelX) <= halfW;
+      const hitY = worldY >= (GROUND_Y_PIXEL - 95) && worldY <= (GROUND_Y_PIXEL + 55);
+      return hitX && hitY;
+    }
+
+    // Canvas Fare Olayları
+    canvas.addEventListener('mousedown', (e) => {
+      const coords = getCanvasCoords(e.clientX, e.clientY);
+      if (isPointNearTarget(coords.worldX, coords.worldY)) {
+        isTargetDragging = true;
+        canvas.style.cursor = 'grabbing';
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      const coords = getCanvasCoords(e.clientX, e.clientY);
+      if (isTargetDragging) {
+        const meters = Math.round((coords.worldX - LAUNCH_PAD_X) / METER_TO_PIXEL);
+        window.setTargetDistance(meters, true);
+        canvas.style.cursor = 'grabbing';
+      } else {
+        const hovered = isPointNearTarget(coords.worldX, coords.worldY);
+        if (hovered !== isTargetHovered) {
+          isTargetHovered = hovered;
+          canvas.style.cursor = hovered ? 'grab' : 'crosshair';
+        }
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isTargetDragging) {
+        isTargetDragging = false;
+        canvas.style.cursor = isTargetHovered ? 'grab' : 'crosshair';
+      }
+    });
+
+    // Canvas Mobil Dokunmatik Olayları
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const coords = getCanvasCoords(touch.clientX, touch.clientY);
+        if (isPointNearTarget(coords.worldX, coords.worldY)) {
+          isTargetDragging = true;
+          isTargetHovered = true;
+          e.preventDefault();
+        }
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (isTargetDragging && e.touches.length === 1) {
+        const touch = e.touches[0];
+        const coords = getCanvasCoords(touch.clientX, touch.clientY);
+        const meters = Math.round((coords.worldX - LAUNCH_PAD_X) / METER_TO_PIXEL);
+        window.setTargetDistance(meters, true);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', () => {
+      isTargetDragging = false;
+      isTargetHovered = false;
+    });
+
+    // Mini Radar Tıklama & Sürükleme Olayları
+    function handleRadarPointer(clientX) {
+      const rect = radarCanvas.getBoundingClientRect();
+      const scale = radarCanvas.width / rect.width;
+      const clickX = (clientX - rect.left) * scale;
+      const padMargin = 12;
+      const usableWidth = radarCanvas.width - padMargin * 2;
+      const maxMeters = 200;
+      const scaleX = usableWidth / maxMeters;
+      const meters = Math.round((clickX - padMargin) / scaleX);
+      window.setTargetDistance(meters, true);
+    }
+
+    let isRadarDragging = false;
+    radarCanvas.addEventListener('mousedown', (e) => {
+      isRadarDragging = true;
+      handleRadarPointer(e.clientX);
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (isRadarDragging) {
+        handleRadarPointer(e.clientX);
+      }
+    });
+    window.addEventListener('mouseup', () => {
+      isRadarDragging = false;
+    });
+
+    radarCanvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length > 0) {
+        isRadarDragging = true;
+        handleRadarPointer(e.touches[0].clientX);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    radarCanvas.addEventListener('touchmove', (e) => {
+      if (isRadarDragging && e.touches.length > 0) {
+        handleRadarPointer(e.touches[0].clientX);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    radarCanvas.addEventListener('touchend', () => {
+      isRadarDragging = false;
+    });
+
+    // Ritmik Pompa Fonksiyonu
+    window.pumpAir = function() {
+      if (rocket.state !== 'idle') return;
+      if (rocket.pressure < 8.0) {
+        rocket.pressure = Math.min(8.0, +(rocket.pressure + 0.8).toFixed(1));
+        soundEffects.pump();
+        updatePressureUI();
+
+        // GSAP ile buton sıkışma animasyonu
+        if (window.gsap && btnPump) {
+          gsap.fromTo(btnPump, { scale: 0.93 }, { scale: 1, duration: 0.15, ease: 'back.out(2)' });
+        }
+      }
+    };
+    btnPump.addEventListener('click', window.pumpAir);
+
+    window.updatePressureUI = function() {
+      if (!lblPressureVal || !pressureBar) return;
+      lblPressureVal.textContent = `${rocket.pressure.toFixed(1)} Bar`;
+      const pct = (rocket.pressure / 8.0) * 100;
+      pressureBar.style.width = `${pct}%`;
+      if (rocket.pressure >= 6.5) {
+        pressureBar.className = 'h-full bg-red-500 w-0 transition-all duration-150';
+      } else if (rocket.pressure >= 4.0) {
+        pressureBar.className = 'h-full bg-yellow-400 w-0 transition-all duration-150';
+      } else {
+        pressureBar.className = 'h-full bg-emerald-400 w-0 transition-all duration-150';
+      }
+    };
+
+    // Fırlat Butonu
+    window.launchRocket = function() {
+      if (rocket.state !== 'idle') return;
+      if (rocket.pressure < 1.0) {
+        alert("⚠️ Basınç çok düşük! Lütfen 'HAVA BAS' butonuna birkaç kez basarak en az 2 Bar basınç topla.");
+        return;
+      }
+
+      rocket.state = 'thrust';
+      rocket.initialPressure = rocket.pressure;
+      rocket.hasParachute = true;
+      rocket.parachuteDeployed = false;
+      rocket.trajectory = [{ x: 0, y: 0 }];
+
+      // Newton Etki-Tepki Hesaplaması:
+      // Çıkış hızı Torricelli/Bernoulli formülü: ve = sqrt(2 * P / rho_water)
+      // P in Pascal: Bar * 100,000
+      const pressurePascal = rocket.pressure * 100000;
+      const waterDensity = 1000; // kg/m^3
+      const exhaustVelocity = Math.sqrt((2 * pressurePascal) / waterDensity) * 0.45; // Nozul kayıp faktörü
+
+      // Su kütle akış süresi: su çoksa daha uzun süre itiş yapar
+      // Optimum itiş: ~0.3 - 0.7 saniye
+      rocket.thrustDuration = Math.max(0.2, (rocket.waterMass / 0.5) * 0.6);
+      rocket.thrustTimer = 0;
+
+      // Başlangıç İtki Kuvveti Vektörü
+      const rad = (rocket.angle * Math.PI) / 180;
+      // Kütlesel itki: F = m_dot * v_e
+      // Su yoksa (0 ml) itme kuvveti havanın hafifliğinden ötürü 1/20'ye düşer
+      const massMultiplier = rocket.waterMass > 0 ? (rocket.waterMass / 0.4) : 0.05;
+      const initialThrustSpeed = exhaustVelocity * massMultiplier;
+
+      rocket.vx = Math.cos(rad) * initialThrustSpeed;
+      rocket.vy = Math.sin(rad) * initialThrustSpeed;
+
+      soundEffects.launch();
+      if (parachuteOverlay) parachuteOverlay.classList.remove('hidden');
+      const launchStateTag = document.getElementById('launchStateTag');
+      if (launchStateTag) {
+        launchStateTag.textContent = '🚀 Uçuşta!';
+        launchStateTag.className = 'px-2.5 py-0.5 bg-emerald-500 text-white border border-ink text-[11px] font-black rounded-lg animate-pulse';
+      }
+    };
+    btnLaunch.addEventListener('click', window.launchRocket);
+
+    // Sıfırla Butonu
+    window.resetRocket = function() {
+      // 1. Roket pozisyon ve uçuş durumunu sıfırla
+      rocket.x = 0;
+      rocket.y = 0;
+      rocket.vx = 0;
+      rocket.vy = 0;
+      rocket.state = 'idle';
+      rocket.parachuteDeployed = false;
+      rocket.trajectory = [];
+      rocket.particles = [];
+      rocket.thrustTimer = 0;
+
+      // 2. Basıncı boşalt ve manometreyi sıfırla (Böylece kullanıcı tekrar hava basabilir!)
+      rocket.pressure = 0.0;
+      window.updatePressureUI();
+
+      // 3. Suyu sliderdaki mevcut değere geri yükle
+      if (sliderWater) {
+        rocket.waterVol = parseInt(sliderWater.value);
+        rocket.waterMass = rocket.waterVol / 1000;
+      }
+
+      // 4. Arayüz elemanlarını başlangıç haline getir
+      if (parachuteOverlay) parachuteOverlay.classList.add('hidden');
+      const resultModal = document.getElementById('resultModal');
+      if (resultModal) resultModal.classList.add('hidden');
+      
+      const launchStateTag = document.getElementById('launchStateTag');
+      if (launchStateTag) {
+        launchStateTag.textContent = 'Rampada Hazır';
+        launchStateTag.className = 'px-2.5 py-0.5 bg-amber-100 text-amber-900 border border-ink text-[11px] font-black rounded-lg';
+      }
+
+      const badgePhase = document.getElementById('badgePhase');
+      if (badgePhase) {
+        badgePhase.innerHTML = `<span>🏁</span> <span>Rampada Fırlatılmayı Bekliyor</span>`;
+      }
+      
+      // 5. Kamera ve HUD telemetrisini başlangıca al
+      camera.x = 0;
+      camera.y = 0;
+      updateHUD(0, 0, 0, 0);
+
+      // 6. Basınç tahliye tıslama sesi ve buton geri bildirimi
+      soundEffects.vent();
+      const btnResetEl = document.getElementById('btnReset');
+      if (btnResetEl && window.gsap) {
+        gsap.fromTo(btnResetEl, { scale: 0.95 }, { scale: 1, duration: 0.2, ease: 'back.out(2)' });
+      }
+    };
+    btnReset.addEventListener('click', window.resetRocket);
+
+    // Paraşüt Butonu
+    window.deployParachute = function() {
+      if (rocket.parachuteDeployed || (rocket.state !== 'thrust' && rocket.state !== 'coast')) return;
+      rocket.parachuteDeployed = true;
+      rocket.state = 'parachute';
+      soundEffects.parachute();
+
+      // Paraşüt anlık olarak dikey hızı çok sert frenler
+      rocket.vy = Math.max(-3.0, rocket.vy * 0.25);
+      rocket.vx = rocket.vx * 0.4;
+
+      if (parachuteOverlay) parachuteOverlay.classList.add('hidden');
+      const badgePhase = document.getElementById('badgePhase');
+      if (badgePhase) {
+        badgePhase.innerHTML = `<span>🪂</span> <span>Paraşüt Açıldı! Güvenle Süzülüyor</span>`;
+      }
+    };
+    btnDeployChute.addEventListener('click', window.deployParachute);
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && (rocket.state === 'thrust' || rocket.state === 'coast')) {
+        e.preventDefault();
+        window.deployParachute();
+      }
+    });
+
+    // Ana Fizik Güncelleme Adımı
+    const dt = 1 / 60; // 60 FPS delta zamanı
+    function updatePhysics() {
+      if (rocket.state === 'idle' || rocket.state === 'landed' || rocket.state === 'crashed') {
+        // Gemiyi hafifçe dalgalandır
+        rocket.shipPhase += 0.03;
+        return;
+      }
+
+      const env = LEVELS[currentLevel];
+      const g = env.gravity;
+      const wind = env.wind;
+
+      // 1. İtki Aşaması (Thrust Phase)
+      if (rocket.state === 'thrust') {
+        rocket.thrustTimer += dt;
+        // Su püskürtme parçacıkları üret
+        for (let i = 0; i < 4; i++) {
+          createThrustParticle();
+        }
+
+        if (rocket.thrustTimer >= rocket.thrustDuration) {
+          rocket.state = 'coast';
+          document.getElementById('badgePhase').innerHTML = `<span>⚡</span> <span>Balistik Süzülme (Paraşütü Açabilirsin!)</span>`;
+        }
+      }
+
+      // 2. Hava Direnci (Drag) & Rüzgar Kuvveti
+      let dragCoeff = 0.0018; // Düşük aerodinamik roket direnci
+      if (rocket.state === 'parachute') {
+        dragCoeff = 0.085; // Paraşütle devasa hava tutunması
+      }
+
+      const relVx = rocket.vx - wind; // Rüzgara göre bağıl hız
+      const relVy = rocket.vy;
+      const speed = Math.sqrt(relVx * relVx + relVy * relVy);
+
+      const dragX = -0.5 * dragCoeff * speed * relVx;
+      const dragY = -0.5 * dragCoeff * speed * relVy;
+
+      // İvme hesapları: a = F_net / m
+      let ax = dragX;
+      let ay = -g + dragY;
+
+      // Paraşütte terminal hız kontrolü: roket saniyede en fazla ~2.8 - 3.2 m/s hızla düşer
+      if (rocket.state === 'parachute') {
+        ax += (wind - rocket.vx) * 0.15; // Rüzgarla aynı hızda sürüklenme eğilimi
+        if (rocket.vy < -3.2) {
+          rocket.vy += ( -3.2 - rocket.vy ) * 0.1;
+          ay = 0;
+        }
+      }
+
+      // Hız ve Konum Güncellemesi (Euler Integrator)
+      rocket.vx += ax * dt;
+      rocket.vy += ay * dt;
+
+      rocket.x += rocket.vx * dt;
+      rocket.y += rocket.vy * dt;
+
+      // Yörünge kaydetme
+      if (rocket.trajectory.length === 0 || Math.hypot(rocket.x - rocket.trajectory[rocket.trajectory.length-1].x, rocket.y - rocket.trajectory[rocket.trajectory.length-1].y) > 0.8) {
+        rocket.trajectory.push({ x: rocket.x, y: rocket.y });
+      }
+
+      // 3. Yere İniş veya Çakılma Kontrolü
+      if (rocket.y <= 0 && rocket.x > 1) {
+        rocket.y = 0;
+        evaluateLanding();
+      }
+
+      // Telemetri HUD Güncelle
+      const totalSpeedKmh = Math.round(Math.sqrt(rocket.vx * rocket.vx + rocket.vy * rocket.vy) * 3.6);
+      updateHUD(rocket.y, rocket.x, totalSpeedKmh, rocket.vy);
+
+      // Kamera Takibi
+      smoothCamera();
+    }
+
+    function createThrustParticle() {
+      const rad = (rocket.angle * Math.PI) / 180;
+      // Roketin arkasından çıkan su
+      const backX = rocket.x - Math.cos(rad) * 0.4;
+      const backY = rocket.y - Math.sin(rad) * 0.4;
+      rocket.particles.push({
+        x: backX,
+        y: backY,
+        vx: -Math.cos(rad) * (15 + Math.random() * 20) + (Math.random() - 0.5) * 5,
+        vy: -Math.sin(rad) * (15 + Math.random() * 20) + (Math.random() - 0.5) * 5,
+        life: 0.25 + Math.random() * 0.2,
+        maxLife: 0.4,
+        size: 3 + Math.random() * 4,
+        color: Math.random() > 0.3 ? '#38bdf8' : '#e0f2fe'
+      });
+    }
+
+    function updateParticles() {
+      for (let i = rocket.particles.length - 1; i >= 0; i--) {
+        const p = rocket.particles[i];
+        p.life -= dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        if (p.life <= 0) {
+          rocket.particles.splice(i, 1);
+        }
+      }
+    }
+
+    function smoothCamera() {
+      // Roket ilerledikçe kamerayı sağa ve yukarı kaydır
+      const targetCamX = Math.max(0, (LAUNCH_PAD_X + rocket.x * METER_TO_PIXEL) - 280);
+      const targetCamY = Math.max(0, rocket.y * METER_TO_PIXEL - 160);
+      camera.x += (targetCamX - camera.x) * 0.1;
+      camera.y += (targetCamY - camera.y) * 0.1;
+    }
+
+    function updateHUD(alt, dist, spd, vy) {
+      document.getElementById('hudAltitude').textContent = `${Math.max(0, alt).toFixed(1)} m`;
+      document.getElementById('hudDistance').textContent = `${Math.max(0, dist).toFixed(1)} m`;
+      document.getElementById('hudSpeed').textContent = `${Math.max(0, spd)} km/s`;
+      document.getElementById('hudVy').textContent = `${vy.toFixed(1)} m/s`;
+    }
+
+    // ==========================================
+    // 6. İNİŞ DEĞERLENDİRME & PUANLAMA
+    // ==========================================
+    function evaluateLanding() {
+      const env = LEVELS[currentLevel];
+      let targetX = env.targetX;
+      if (env.isMovingShip) {
+        targetX += Math.sin(rocket.shipPhase) * 15;
+      }
+      const halfWidth = env.targetWidth / 2;
+      const landingDist = rocket.x;
+      const distToCenter = Math.abs(landingDist - targetX);
+      const landingSpeed = Math.abs(rocket.vy);
+
+      parachuteOverlay.classList.add('hidden');
+
+      const modal = document.getElementById('resultModal');
+      const icon = document.getElementById('resultIcon');
+      const title = document.getElementById('resultTitle');
+      const desc = document.getElementById('resultDesc');
+      const resDist = document.getElementById('resDist');
+      const resSpeed = document.getElementById('resLandingSpeed');
+      const resPoints = document.getElementById('resPoints');
+
+      resDist.textContent = `${landingDist.toFixed(1)} m`;
+      resSpeed.textContent = `${landingSpeed.toFixed(1)} m/s`;
+
+      if (distToCenter <= halfWidth && landingSpeed <= 4.2) {
+        // TAM İSABET & YUMUŞAK İNİŞ!
+        rocket.state = 'landed';
+        soundEffects.success();
+        icon.textContent = '🌟';
+        title.textContent = 'Mükemmel İniş!';
+        title.className = 'display text-2xl font-black text-emerald-600';
+        desc.textContent = `Tebrikler! Hedef platformun tam üzerine (${distToCenter < 3 ? 'Tam Merkez!' : 'Güvenli Bölge'}) yumuşak bir iniş yaptın.`;
+        const pts = distToCenter < 3 ? 150 : 100;
+        score += pts;
+        resPoints.textContent = `+${pts} Puan`;
+
+        if (window.confetti) {
+          confetti({ particleCount: 150, spread: 80, origin: { y: 0.5 } });
+        }
+      } else if (distToCenter <= halfWidth && landingSpeed > 4.2) {
+        // HEDEFE İNDİ AMA PARAŞÜT AÇMADI / SERT ÇAKILDI
+        rocket.state = 'crashed';
+        soundEffects.crash();
+        icon.textContent = '💥';
+        title.textContent = 'Sert Çakılma!';
+        title.className = 'display text-2xl font-black text-amber-600';
+        desc.textContent = `Hedefi tutturdun fakat paraşütü zamanında açmadığın için roket çok sert indi (${landingSpeed.toFixed(1)} m/s)!`;
+        const pts = 30;
+        score += pts;
+        resPoints.textContent = `+${pts} Puan`;
+      } else {
+        // HEDEFİ ISKALADI (DENİZE DÜŞTÜ)
+        rocket.state = 'crashed';
+        soundEffects.crash();
+        icon.textContent = '🌊';
+        title.textContent = 'Hedef Kaçırıldı!';
+        title.className = 'display text-2xl font-black text-sky-700';
+        desc.textContent = `Roket denize düştü (${distToCenter.toFixed(1)} metre farkla). Basınç, su miktarı veya fırlatma açısını yeniden ayarlamalısın!`;
+        resPoints.textContent = '0 Puan';
+      }
+
+      document.getElementById('lblScore').textContent = score;
+      modal.classList.remove('hidden');
+    }
+
+    function retryLevel() {
+      resetRocket();
+    }
+
+    function nextLevel() {
+      if (currentLevel < 3) {
+        setLevel(currentLevel + 1);
+      } else {
+        setLevel(1);
+      }
+      resetRocket();
+    }
+
+    // ==========================================
+    // 7. ÇİZİM DÖNGÜSÜ (RENDER LOOP)
+    // ==========================================
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      // Kamera dönüşümü
+      ctx.translate(-camera.x, camera.y);
+
+      // Gökyüzü ve Arka Plan Elementleri
+      drawSkyAndBackground();
+
+      // Deniz ve Hedef Adalar / Platformlar
+      drawWorldGroundAndTargets();
+
+      // Roket Yörünge İzi
+      drawTrajectory();
+
+      // Parçacıklar
+      drawParticles();
+
+      // Fırlatma Rampası & Roket
+      drawRocketAndPad();
+
+      ctx.restore();
+
+      // Mini Radar Güncellemesi
+      drawMiniRadar();
+
+      // Fizik Güncellemesi & Sonraki Kare
+      updatePhysics();
+      updateParticles();
+      requestAnimationFrame(render);
+    }
+
+    function drawSkyAndBackground() {
+      // Gökyüzü Degradesi
+      const grad = ctx.createLinearGradient(0, -1000, 0, GROUND_Y_PIXEL);
+      grad.addColorStop(0, '#bae6fd'); // Açık mavi üst
+      grad.addColorStop(1, '#f0f9ff'); // Ufuk çizgisi
+      ctx.fillStyle = grad;
+      ctx.fillRect(camera.x - 200, -1000, canvas.width + 500, 1000 + GROUND_Y_PIXEL);
+
+      // Bulutlar (Paralaks)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+      for (let i = 0; i < 15; i++) {
+        const cx = (i * 280) - (camera.x * 0.2);
+        const cy = 120 + Math.sin(i * 45) * 60 - (camera.y * 0.15);
+        ctx.beginPath();
+        ctx.arc(cx, cy, 32, 0, Math.PI * 2);
+        ctx.arc(cx + 28, cy - 8, 38, 0, Math.PI * 2);
+        ctx.arc(cx + 60, cy, 30, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Rüzgar Çizgileri (Eğer rüzgar varsa)
+      const wind = LEVELS[currentLevel].wind;
+      if (Math.abs(wind) > 0.5) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([12, 18]);
+        for (let j = 0; j < 6; j++) {
+          const wy = 60 + j * 50;
+          const wx = ((Date.now() * 0.08 * wind) % 600) + camera.x - 200;
+          ctx.beginPath();
+          ctx.moveTo(wx, wy);
+          ctx.lineTo(wx + 800, wy);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+    }
+
+    function drawWorldGroundAndTargets() {
+      // Deniz Suyu
+      const waterGrad = ctx.createLinearGradient(0, GROUND_Y_PIXEL, 0, GROUND_Y_PIXEL + 150);
+      waterGrad.addColorStop(0, '#0284c7');
+      waterGrad.addColorStop(1, '#0c4a6e');
+      ctx.fillStyle = waterGrad;
+      ctx.fillRect(-200, GROUND_Y_PIXEL, 2500, 200);
+
+      // Fırlatma Platformu Adası (Sol Taraf)
+      ctx.fillStyle = '#86efac'; // Çimen yeşili
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.roundRect(-100, GROUND_Y_PIXEL - 10, LAUNCH_PAD_X + 110, 100, [0, 24, 0, 0]);
+      ctx.fill();
+      ctx.stroke();
+
+      // Seviye Hedef Bölgesi
+      const env = LEVELS[currentLevel];
+      let targetPixelX = LAUNCH_PAD_X + (env.targetX * METER_TO_PIXEL);
+      let targetPixelWidth = env.targetWidth * METER_TO_PIXEL;
+
+      if (env.isMovingShip) {
+        // Hareketli Gemi (Seviye 3)
+        targetPixelX += Math.sin(rocket.shipPhase) * 15 * METER_TO_PIXEL;
+
+        ctx.save();
+        ctx.translate(targetPixelX, GROUND_Y_PIXEL - 14);
+
+        // Gemi Gövdesi
+        ctx.fillStyle = '#ef4444';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-targetPixelWidth / 2 - 12, 0);
+        ctx.lineTo(targetPixelWidth / 2 + 12, 0);
+        ctx.lineTo(targetPixelWidth / 2 - 4, 25);
+        ctx.lineTo(-targetPixelWidth / 2 + 4, 25);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Gemi Güvertesi & İniş Pisti (Helipad)
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(-targetPixelWidth / 2, -6, targetPixelWidth, 6);
+        ctx.strokeRect(-targetPixelWidth / 2, -6, targetPixelWidth, 6);
+
+        // Hedef 'H' Harfi & Çember
+        ctx.strokeStyle = '#facc15';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(0, -3, 14, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🎯 HEDEF', 0, -18);
+
+        // Etkileşimli Sürükleme Rozeti (Gemi)
+        const isHoverOrDragShip = isTargetHovered || isTargetDragging;
+        ctx.save();
+        ctx.translate(0, -36);
+        ctx.fillStyle = isHoverOrDragShip ? '#f59e0b' : '#3b82f6';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(-46, -10, 92, 20, [10]);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(isHoverOrDragShip ? `↔ ${Math.round(env.targetX)}m ✥` : `↔ ${Math.round(env.targetX)}m`, 0, 0);
+        ctx.restore();
+
+        ctx.restore();
+
+      } else {
+        // Sabit Hedef Ada (Seviye 1 & 2)
+        ctx.save();
+        ctx.translate(targetPixelX, GROUND_Y_PIXEL);
+
+        // Ada Toprağı & Kumu
+        ctx.fillStyle = '#fef08a'; // Kumsal
+        ctx.beginPath();
+        ctx.ellipse(0, 15, targetPixelWidth / 2 + 25, 30, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Ada Çimenliği
+        ctx.fillStyle = '#4ade80';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, targetPixelWidth / 2, 14, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Hedef İniş Halkaları
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, targetPixelWidth * 0.35, 8, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 8, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Bayrak veya Deniz Feneri (Seviye 2 ise)
+        if (currentLevel === 2) {
+          // Deniz Feneri
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(targetPixelWidth / 2 - 10, -55, 12, 55);
+          ctx.strokeRect(targetPixelWidth / 2 - 10, -55, 12, 55);
+          ctx.fillStyle = '#facc15';
+          ctx.beginPath();
+          ctx.arc(targetPixelWidth / 2 - 4, -60, 8, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Kırmızı Hedef Bayrağı
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(0, -38);
+          ctx.stroke();
+
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.moveTo(0, -38);
+          ctx.lineTo(24, -28);
+          ctx.lineTo(0, -18);
+          ctx.fill();
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 12px Nunito';
+        ctx.textAlign = 'center';
+        ctx.fillText(`İniş Alanı (${env.targetX}m)`, 0, 24);
+
+        // Etkileşimli Sürükleme Rozeti (Ada)
+        const isHoverOrDragIsland = isTargetHovered || isTargetDragging;
+        ctx.save();
+        ctx.translate(0, currentLevel === 2 ? -74 : -56);
+        ctx.fillStyle = isHoverOrDragIsland ? '#f59e0b' : '#3b82f6';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(-46, -10, 92, 20, [10]);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(isHoverOrDragIsland ? `↔ ${Math.round(env.targetX)}m ✥` : `↔ ${Math.round(env.targetX)}m`, 0, 0);
+        ctx.restore();
+
+        ctx.restore();
+      }
+    }
+
+    function drawTrajectory() {
+      if (rocket.trajectory.length < 2) return;
+      const angleRad = (rocket.angle * Math.PI) / 180;
+      const originX = LAUNCH_PAD_X + Math.cos(angleRad) * 32;
+      const originY = GROUND_Y_PIXEL - LAUNCH_RAIL_HEIGHT - Math.sin(angleRad) * 32;
+
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.55)';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      for (let i = 0; i < rocket.trajectory.length; i++) {
+        const pt = rocket.trajectory[i];
+        const px = originX + (pt.x * METER_TO_PIXEL);
+        const py = originY - (pt.y * METER_TO_PIXEL);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function drawParticles() {
+      const angleRad = (rocket.angle * Math.PI) / 180;
+      const originX = LAUNCH_PAD_X + Math.cos(angleRad) * 32;
+      const originY = GROUND_Y_PIXEL - LAUNCH_RAIL_HEIGHT - Math.sin(angleRad) * 32;
+
+      for (let p of rocket.particles) {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life / p.maxLife;
+        ctx.beginPath();
+        const px = originX + (p.x * METER_TO_PIXEL);
+        const py = originY - (p.y * METER_TO_PIXEL);
+        ctx.arc(px, py, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1.0;
+    }
+
+    function drawRocketAndPad() {
+      // 1. Fırlatma Rampası Çizimi (x = LAUNCH_PAD_X)
+      ctx.save();
+      ctx.translate(LAUNCH_PAD_X, GROUND_Y_PIXEL);
+
+      // Zemin Plakası
+      ctx.fillStyle = '#475569';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(-35, -6, 70, 8, 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Rampa Üçgen Ayakları
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(-25, -6);
+      ctx.lineTo(0, -LAUNCH_RAIL_HEIGHT);
+      ctx.lineTo(25, -6);
+      ctx.stroke();
+
+      // Döner Açı Kadranı (Göbek halkası)
+      ctx.fillStyle = '#facc15';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, -LAUNCH_RAIL_HEIGHT, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Eğimli Fırlatma Kılavuz Çubuğu (Metal ray)
+      const angleRad = (rocket.angle * Math.PI) / 180;
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(0, -LAUNCH_RAIL_HEIGHT);
+      ctx.lineTo(Math.cos(angleRad) * 65, -LAUNCH_RAIL_HEIGHT - Math.sin(angleRad) * 65);
+      ctx.stroke();
+
+      // Kılavuz çubuğu durdurma pimi
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(Math.cos(angleRad) * 65, -LAUNCH_RAIL_HEIGHT - Math.sin(angleRad) * 65, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Basınç Hortumu (Sarı kıvrımlı boru)
+      ctx.strokeStyle = '#eab308';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(0, -LAUNCH_RAIL_HEIGHT);
+      ctx.bezierCurveTo(-25, -15, -45, -5, -65, -3);
+      ctx.stroke();
+
+      ctx.restore();
+
+      // 2. Roketin Çizimi
+      let rkPixelX, rkPixelY;
+      if (rocket.state === 'idle') {
+        rkPixelX = LAUNCH_PAD_X + Math.cos(angleRad) * 32;
+        rkPixelY = GROUND_Y_PIXEL - LAUNCH_RAIL_HEIGHT - Math.sin(angleRad) * 32;
+      } else {
+        const originX = LAUNCH_PAD_X + Math.cos(angleRad) * 32;
+        const originY = GROUND_Y_PIXEL - LAUNCH_RAIL_HEIGHT - Math.sin(angleRad) * 32;
+        rkPixelX = originX + (rocket.x * METER_TO_PIXEL);
+        rkPixelY = originY - (rocket.y * METER_TO_PIXEL);
+      }
+
+      ctx.save();
+      ctx.translate(rkPixelX, rkPixelY);
+
+      // Roketin Açısal Yönelimi
+      let flightAngle = rocket.angle;
+      if (rocket.state === 'thrust' || rocket.state === 'coast') {
+        flightAngle = (Math.atan2(rocket.vy, rocket.vx) * 180) / Math.PI;
+      } else if (rocket.state === 'parachute') {
+        flightAngle = 90; // Paraşütle asılıyken dik durur
+      } else if (rocket.state === 'landed') {
+        flightAngle = 80;
+      } else if (rocket.state === 'crashed') {
+        flightAngle = 170;
+      }
+
+      ctx.rotate(- (flightAngle * Math.PI) / 180);
+
+      // Paraşüt Açıldıysa: Kubbe ve İpler Çizilir
+      if (rocket.parachuteDeployed && rocket.state === 'parachute') {
+        ctx.save();
+        ctx.rotate((flightAngle * Math.PI) / 180); // Dünyaya göre yukarı bakacak şekilde çiz
+        ctx.translate(0, -55);
+
+        // İpler
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(0, 55);
+        ctx.lineTo(-38, 0);
+        ctx.moveTo(0, 55);
+        ctx.lineTo(-12, 0);
+        ctx.moveTo(0, 55);
+        ctx.lineTo(12, 0);
+        ctx.moveTo(0, 55);
+        ctx.lineTo(38, 0);
+        ctx.stroke();
+
+        // Paraşüt Kubbesi (Kırmızı & Sarı Dilimli)
+        ctx.fillStyle = '#ef4444';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2.8;
+        ctx.beginPath();
+        ctx.arc(0, 0, 42, Math.PI, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Orta Sarı Dilim
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, Math.PI, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      // ROKET GÖVDESİ (Daha Dolgun, Sevimli ve Belirgin)
+      // Kuyruk Kanatçıkları (Fins)
+      ctx.fillStyle = '#facc15';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2.5;
+
+      // Üst Kanatçık
+      ctx.beginPath();
+      ctx.moveTo(-24, -12);
+      ctx.lineTo(-34, -28);
+      ctx.lineTo(-12, -12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Alt Kanatçık
+      ctx.beginPath();
+      ctx.moveTo(-24, 12);
+      ctx.lineTo(-34, 28);
+      ctx.lineTo(-12, 12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Şeffaf PET Şişe Gövdesi
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(-26, -12, 44, 24, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      // Şişe İçindeki Kalan Su (Mavi Sıvı)
+      if (rocket.state === 'idle' || rocket.state === 'thrust') {
+        ctx.fillStyle = '#38bdf8';
+        const waterRatio = Math.min(1, rocket.waterVol / 1200);
+        const waterWidth = 38 * waterRatio;
+        ctx.beginPath();
+        ctx.roundRect(-24, -9.5, waterWidth, 19, [4, 0, 0, 4]);
+        ctx.fill();
+
+        // Su içindeki küçük kabarcıklar
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.beginPath();
+        ctx.arc(-16, -2, 2.5, 0, Math.PI * 2);
+        ctx.arc(-8, 3, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Şişe Boğazı & Nozul (Motor çıkışı)
+      ctx.fillStyle = '#334155';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2.5;
+      ctx.fillRect(-32, -6, 7, 12);
+      ctx.strokeRect(-32, -6, 7, 12);
+
+      // Kırmızı Aerodinamik Burun Konisi
+      ctx.fillStyle = '#ef4444';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(18, -12);
+      ctx.lineTo(44, 0);
+      ctx.lineTo(18, 12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Burun Konisi Işık Parıltısı
+      ctx.strokeStyle = '#fecaca';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(22, -6);
+      ctx.lineTo(36, -1);
+      ctx.stroke();
+
+      // Gövde Üzerinde Küçük Yıldız Logosu
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.arc(4, 0, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawMiniRadar() {
+      radarCtx.clearRect(0, 0, radarCanvas.width, radarCanvas.height);
+
+      const maxMeters = 200;
+      const padMargin = 12;
+      const usableWidth = radarCanvas.width - padMargin * 2;
+      const scaleX = usableWidth / maxMeters;
+
+      // Zemin / Deniz çizgisi
+      radarCtx.fillStyle = '#0284c7';
+      radarCtx.fillRect(0, radarCanvas.height - 6, radarCanvas.width, 6);
+
+      // Rampa işareti
+      radarCtx.fillStyle = '#10b981';
+      radarCtx.fillRect(padMargin - 3, radarCanvas.height - 12, 6, 6);
+
+      // Hedef İşareti
+      const env = LEVELS[currentLevel];
+      const targetRadarX = padMargin + (env.targetX * scaleX);
+      radarCtx.fillStyle = '#ef4444';
+      radarCtx.fillRect(targetRadarX - 4, radarCanvas.height - 16, 8, 10);
+
+      // Roket Noktası
+      const rocketRadarX = Math.min(radarCanvas.width - 6, padMargin + (rocket.x * scaleX));
+      const rocketRadarY = Math.max(4, radarCanvas.height - 10 - (rocket.y * (radarCanvas.height / 80)));
+
+      radarCtx.fillStyle = '#facc15';
+      radarCtx.strokeStyle = '#0f172a';
+      radarCtx.lineWidth = 1.8;
+      radarCtx.beginPath();
+      radarCtx.arc(rocketRadarX, rocketRadarY, 4, 0, Math.PI * 2);
+      radarCtx.fill();
+      radarCtx.stroke();
+
+      document.getElementById('radarDistanceTag').textContent = `${Math.round(rocket.x)}m / ${maxMeters}m`;
+    }
+
+    // Modal Yardımcıları
+    function closeScienceModal() {
+      document.getElementById('scienceModal').classList.add('hidden');
+    }
+    document.getElementById('btnScienceGuide').addEventListener('click', () => {
+      document.getElementById('scienceModal').classList.remove('hidden');
+    });
+
+    // Sayfa Başlatma
+    window.addEventListener('DOMContentLoaded', () => {
+      setLevel(1);
+      requestAnimationFrame(render);
+    });
+  </script>
+</body>
+</html>

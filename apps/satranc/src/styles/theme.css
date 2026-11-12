@@ -1,0 +1,546 @@
+/* ==================================================================== *
+ * theme.css — Neşeli tema katmanı (EN SON yüklenir)
+ *
+ * base/layout/components dosyaları tasarım sistemini kurar. Bu dosya ise
+ * sayfaya özel bileşenleri (ders programı, rozetler, mini oyunlar, tahta
+ * ekranları) aynı dile taşır: kalın yuvarlak köşeler, canlı renkler,
+ * basılabilir düğmeler ve küçük neşeli hareketler.
+ *
+ * Ayrı bir dosyada durmasının nedeni, sayfa CSS'lerinin kendi yapısını
+ * bozmadan yalnızca GÖRÜNÜMÜ değiştirmesidir; düzenler olduğu gibi kalır.
+ * ==================================================================== */
+
+/* ------------------------------------------------------------------ *
+ * 1) Küçük düğmeler — hepsi aynı "basılabilir" his
+ * ------------------------------------------------------------------ */
+
+.stage-chip, .week-nav button, .intro-nav button, .back-button,
+.mini-end-actions button, .duel-result-actions button, .theme-chip,
+.level-chip, .focus-button, .quiz-option {
+  border-radius: 999px;
+  border: 2px solid var(--line-strong);
+  background: var(--panel);
+  color: var(--ink);
+  font-weight: 800;
+  box-shadow: 0 3px 0 rgba(38, 36, 80, 0.09);
+  transition: transform 120ms ease, box-shadow 120ms ease, background 160ms ease;
+}
+
+.stage-chip:hover, .week-nav button:hover, .intro-nav button:hover,
+.back-button:hover, .theme-chip:hover, .level-chip:hover,
+.focus-button:hover, .quiz-option:hover {
+  transform: translateY(-2px);
+  background: var(--sun-soft);
+  box-shadow: 0 5px 0 rgba(38, 36, 80, 0.12);
+}
+
+.stage-chip:active, .week-nav button:active, .intro-nav button:active,
+.back-button:active, .theme-chip:active, .level-chip:active,
+.quiz-option:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(38, 36, 80, 0.12);
+}
+
+.stage-chip.active, .theme-chip.active, .level-chip.active,
+.week-nav button.active, .intro-nav button.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--grape), var(--sky));
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 3px 0 var(--grape-dark);
+}
+
+/* Cevap seçenekleri: doğru yeşil zıplar, yanlış kırmızı sallanır. */
+.quiz-option.correct {
+  color: #fff;
+  background: linear-gradient(135deg, var(--lime), var(--primary));
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 3px 0 var(--lime-dark);
+}
+
+.quiz-option.wrong {
+  color: #fff;
+  background: linear-gradient(135deg, var(--coral), #e0392c);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 3px 0 var(--coral-dark);
+}
+
+.quiz-result.correct { color: var(--lime-dark); font-weight: 900; }
+.quiz-result.wrong { color: var(--coral-dark); font-weight: 900; }
+
+/* ------------------------------------------------------------------ *
+ * 2) Sıkışık başlık (oyun ekranları)
+ *
+ * Yerden kazanmak için başlık ince bir şeride iner; dekoratif at ve
+ * gökkuşağı şeridi orada yazının üstüne binmesin diye kaldırılır.
+ * ------------------------------------------------------------------ */
+
+.page-compact .page-hero {
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg, var(--grape-soft), var(--sky-soft));
+}
+
+.page-compact .page-hero::after { display: none; }
+
+.page-compact .page-hero::before {
+  inset: auto 0 0 0;
+  height: 0.35rem;
+}
+
+.page-compact .page-hero h1 {
+  font-size: 1.25rem;
+  color: var(--grape-dark);
+  -webkit-text-fill-color: currentColor;
+}
+
+/* ------------------------------------------------------------------ *
+ * 3) Ders programı
+ * ------------------------------------------------------------------ */
+
+.plan-progress {
+  border-radius: var(--r-lg);
+  border: 2px solid var(--line);
+  background: linear-gradient(135deg, #fff, var(--sky-soft));
+}
+
+.plan-progress-bar {
+  height: 1.1rem;
+  background: rgba(38, 36, 80, 0.09);
+  border: 2px solid rgba(38, 36, 80, 0.06);
+}
+
+.plan-progress-fill {
+  background: linear-gradient(90deg, var(--sky), var(--primary), var(--lime), var(--sun), var(--pink));
+}
+
+.unit-block {
+  border-radius: var(--r-xl);
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--unit) 14%, #fff),
+    color-mix(in srgb, var(--unit) 5%, #fff));
+  border-width: 3px;
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--unit) 16%, transparent), var(--shadow);
+}
+
+.unit-emoji { font-size: 2.4rem; }
+.unit-title h2 { font-size: 1.3rem; }
+.unit-title p { font-size: 0.86rem; font-weight: 600; }
+
+.unit-count {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.9rem;
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--unit) 60%, #000);
+}
+
+.week-card {
+  border-radius: var(--r-md);
+  border-width: 3px;
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--unit) 14%, transparent);
+}
+
+.week-number {
+  width: 2.3rem;
+  height: 2.3rem;
+  font-size: 1rem;
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--unit) 62%, #000);
+}
+
+.week-emoji { font-size: 1.8rem; }
+.week-title { font-size: 0.8rem; font-weight: 800; }
+
+.week-card:active { transform: translateY(-1px); }
+
+/* --- Ana sayfadaki "bu haftanın dersi" kartı --- */
+
+.next-week-card {
+  border-radius: var(--r-xl);
+  border-width: 3px;
+  padding: 1.2rem 1.4rem;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--unit) 26%, #fff),
+    color-mix(in srgb, var(--unit) 9%, #fff));
+  box-shadow: 0 6px 0 color-mix(in srgb, var(--unit) 22%, transparent),
+              0 18px 34px color-mix(in srgb, var(--unit) 18%, transparent);
+}
+
+.next-week-label {
+  justify-self: start;
+  padding: 0.22rem 0.7rem;
+  border-radius: 999px;
+  color: #fff;
+  background: color-mix(in srgb, var(--unit) 80%, #000);
+}
+
+.next-week-emoji { font-size: 3.1rem; }
+.next-week-main h2 { font-size: 1.45rem; }
+.next-week-objective { font-size: 0.92rem; font-weight: 600; color: var(--ink-soft); }
+
+.next-week-button {
+  border-radius: 999px;
+  font-size: 1.02rem;
+  font-weight: 900;
+  padding: 0.85rem 1.7rem;
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--unit) 55%, #000),
+              0 14px 24px color-mix(in srgb, var(--unit) 30%, transparent);
+}
+
+.next-week-button:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--unit) 55%, #000);
+}
+
+/* ------------------------------------------------------------------ *
+ * 4) Rozetler
+ *
+ * Kilitli rozet SİLİK değil, GÖLGE olmalıdır: çocuk neyi kazanacağını
+ * görebilmeli, ilerleme çubuğu okunabilmeli. Eski %60 saydamlık kartları
+ * neredeyse görünmez yapıyordu.
+ * ------------------------------------------------------------------ */
+
+.badge-card.locked {
+  filter: none;
+  opacity: 1;
+  background: var(--panel-2);
+  border-style: dashed;
+  border-color: var(--line-strong);
+}
+
+.badge-card.locked .badge-medal {
+  filter: none;
+  opacity: 1;
+  color: var(--muted);
+  background: linear-gradient(135deg, #eceaf5, #d8d5e6);
+  box-shadow: none;
+}
+
+.badge-card.locked h3 { color: var(--ink-soft); }
+
+.badge-summary {
+  border-radius: var(--r-lg);
+  border: 2px solid var(--line);
+  background: linear-gradient(135deg, #fff, var(--sun-soft));
+}
+
+.badge-summary-bar { height: 0.9rem; }
+
+.badge-card.unlocked {
+  border-width: 3px;
+  box-shadow: 0 5px 0 rgba(255, 176, 32, 0.28), var(--shadow);
+}
+
+/* ------------------------------------------------------------------ *
+ * 5) Ana sayfa imza kartı
+ * ------------------------------------------------------------------ */
+
+.home-credit {
+  border-radius: var(--r-lg);
+  border: 2px dashed var(--line-strong);
+  background: linear-gradient(135deg, #fff, var(--primary-soft));
+  box-shadow: none;
+}
+
+.home-credit p { font-size: 0.92rem; font-weight: 600; }
+.home-credit strong { color: var(--primary-dark); font-weight: 900; }
+.credit-piece { font-size: 2rem; }
+
+/* ------------------------------------------------------------------ *
+ * 6) Panolar: oyun, mini oyun, iki kişilik oyun, ders panelleri
+ * ------------------------------------------------------------------ */
+
+.play-panel, .lesson-panel, .game-panel, .duel-panel, .mini-panel,
+.plan-panel, .week-hero, .board-panel, .score-panel, .analysis-panel {
+  border-radius: var(--r-lg);
+  border: 2px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+/* Ders panelindeki kural listesi: her madde yeşil bir onay noktasıyla. */
+.rule-list {
+  list-style: none;
+  padding-left: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.rule-list li {
+  position: relative;
+  padding-left: 1.6rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.rule-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.35em;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--lime), var(--primary));
+  box-shadow: 0 2px 0 rgba(38, 36, 80, 0.12);
+}
+
+/* Etiket hapları */
+.pill.done {
+  color: #fff;
+  background: linear-gradient(135deg, var(--lime), var(--primary));
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 3px 0 var(--lime-dark);
+}
+
+/* ------------------------------------------------------------------ *
+ * 7) Ayarlar anahtarları ve ilerleme çubukları
+ * ------------------------------------------------------------------ */
+
+.level-bar, .section-progress-bar, .badge-progress-bar, .badge-summary-bar {
+  height: 0.8rem;
+  border-radius: 999px;
+  background: rgba(38, 36, 80, 0.13);
+  overflow: hidden;
+}
+
+.level-bar-fill, .section-progress-fill, .badge-progress-fill, .badge-summary-fill {
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--sky), var(--primary), var(--lime));
+}
+
+/* ------------------------------------------------------------------ *
+ * 7b) Mini oyun kartları — yedi oyun, yedi renk
+ *
+ * Hepsi aynı yeşil simgeyle duruyordu; çocuk kartları birbirinden
+ * ayırt edemiyordu. Artık her oyunun kendi rengi var, tıpkı ana
+ * menüdeki kutucuklar gibi.
+ * ------------------------------------------------------------------ */
+
+.mini-card {
+  --tone: var(--primary);
+  --tone-soft: var(--primary-soft);
+  --tone-dark: var(--primary-dark);
+  border-radius: var(--r-lg);
+  border: 2px solid var(--line);
+  box-shadow: 0 5px 0 var(--tone-soft), var(--shadow);
+}
+
+.mini-grid .mini-card:nth-child(6n + 2) { --tone: var(--grape); --tone-soft: var(--grape-soft); --tone-dark: var(--grape-dark); }
+.mini-grid .mini-card:nth-child(6n + 3) { --tone: var(--sky);   --tone-soft: var(--sky-soft);   --tone-dark: var(--sky-dark); }
+.mini-grid .mini-card:nth-child(6n + 4) { --tone: var(--sun);   --tone-soft: var(--sun-soft);   --tone-dark: var(--sun-dark); }
+.mini-grid .mini-card:nth-child(6n + 5) { --tone: var(--pink);  --tone-soft: var(--pink-soft);  --tone-dark: var(--pink-dark); }
+.mini-grid .mini-card:nth-child(6n + 6) { --tone: var(--lime);  --tone-soft: var(--lime-soft);  --tone-dark: var(--lime-dark); }
+
+.mini-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 11px 0 var(--tone-soft), var(--shadow-lift);
+}
+
+.mini-card-icon {
+  width: 3.1rem;
+  height: 3.1rem;
+  border-radius: 1.1rem;
+  background: linear-gradient(135deg, var(--tone), var(--tone-dark));
+  box-shadow: 0 4px 0 rgba(38, 36, 80, 0.12);
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mini-card-icon .icon { width: 1.7rem; height: 1.7rem; }
+.mini-card:hover .mini-card-icon { transform: rotate(-10deg) scale(1.08); }
+
+.mini-card-title { font-size: 1.08rem; font-weight: 900; }
+.mini-card-desc { font-size: 0.84rem; font-weight: 600; }
+
+.mini-card-meta {
+  padding: 0.25rem 0.7rem;
+  color: var(--tone-dark);
+  background: var(--tone-soft);
+  font-size: 0.76rem;
+}
+
+.mini-card-best { font-size: 0.76rem; }
+
+/* ------------------------------------------------------------------ *
+ * 8) Küçük neşe: sayfa açılışında kartlar sırayla belirir
+ * ------------------------------------------------------------------ */
+
+.menu-grid .menu-tile,
+.card-grid .info-card,
+.badge-grid .badge-card {
+  animation: tilePop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.menu-grid .menu-tile:nth-child(1)  { animation-delay: 20ms; }
+.menu-grid .menu-tile:nth-child(2)  { animation-delay: 50ms; }
+.menu-grid .menu-tile:nth-child(3)  { animation-delay: 80ms; }
+.menu-grid .menu-tile:nth-child(4)  { animation-delay: 110ms; }
+.menu-grid .menu-tile:nth-child(5)  { animation-delay: 140ms; }
+.menu-grid .menu-tile:nth-child(6)  { animation-delay: 170ms; }
+.menu-grid .menu-tile:nth-child(7)  { animation-delay: 200ms; }
+.menu-grid .menu-tile:nth-child(8)  { animation-delay: 230ms; }
+.menu-grid .menu-tile:nth-child(n + 9) { animation-delay: 260ms; }
+
+@keyframes tilePop {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ------------------------------------------------------------------ *
+ * 9) Yüksek kontrast: süslemeler kapanır, kenarlar netleşir
+ * ------------------------------------------------------------------ */
+
+.high-contrast .welcome-panel::after,
+.high-contrast .page-hero::after,
+.high-contrast .menu-tile::after { display: none; }
+
+.high-contrast .welcome-panel,
+.high-contrast .page-hero,
+.high-contrast .menu-tile,
+.high-contrast .quiz-box,
+.high-contrast .stat { background: #fff; }
+
+.high-contrast .hero-copy h1,
+.high-contrast .page-hero h1,
+.high-contrast .welcome-copy h1 {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------------------ *
+ * 10) Tahta: kareler, çerçeve ve vurgular
+ *
+ * Kareler daha canlı bir krem/turkuaz ikilisine geçti. İkisi de ORTA
+ * tonda kalır; çok koyu bir yeşil fildişi taşı, çok açık bir krem ise
+ * koyu taşı yutardı. Taşların dış çizgisi (bkz. components.css .pc)
+ * her iki karede de sınırı net tutar.
+ * ------------------------------------------------------------------ */
+
+/*
+ * Üstteki hafif ışık, sözde öge yerine ZEMİN KATMANI olarak verilir.
+ * `::before` mutlak konumlu olurdu ve konumsuz `.cb-piece`in ÜSTÜNE binip
+ * taşı soluklaştırırdı; iki katmanlı background'da böyle bir risk yoktur.
+ */
+.cb-square.light {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 58%), #ffeec4;
+}
+
+.cb-square.dark {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 58%), #38b6a1;
+}
+
+.cb-grid {
+  border-radius: var(--r-md);
+  border-color: #8a6238;
+  background: #8a6238;
+  box-shadow:
+    inset 0 0 0 0.12rem rgba(255, 235, 200, 0.45),
+    0 8px 0 rgba(90, 62, 32, 0.45),
+    0 20px 40px rgba(66, 60, 125, 0.22);
+}
+
+/* Taşın kendi konturu artık var; eski beyaz `text-shadow` sınırı bulanıklaştırır. */
+.cb-piece { text-shadow: none; }
+
+/* Koordinat harfleri yeni kare renklerinde okunur kalsın. */
+.cb-square.light .cb-rank, .cb-square.light .cb-file { color: #a06a2c; }
+.cb-square.dark .cb-rank, .cb-square.dark .cb-file { color: #eafff9; }
+
+/* Seçili kare ve hamle işaretleri daha kalın, daha neşeli. */
+.cb-square.selected { box-shadow: inset 0 0 0 0.3rem rgba(255, 190, 30, 0.98); }
+.cb-square.last-from { box-shadow: inset 0 0 0 100vmax rgba(255, 200, 40, 0.30); }
+.cb-square.last-to { box-shadow: inset 0 0 0 100vmax rgba(255, 200, 40, 0.46); }
+
+.cb-square.target .cb-hint::after {
+  width: 34%;
+  height: 34%;
+  background: rgba(20, 60, 52, 0.42);
+  box-shadow: 0 0 0 0.16rem rgba(255, 255, 255, 0.45);
+}
+
+.cb-square.target-capture .cb-hint::after {
+  border-color: rgba(255, 111, 97, 0.92);
+  box-shadow: 0 0 0 0.14rem rgba(255, 255, 255, 0.4);
+}
+
+.board3d, .board-grid {
+  border-radius: var(--r-md);
+}
+
+/* ------------------------------------------------------------------ *
+ * 11) Bulmaca ekranı: konu ve zorluk seçicileri
+ * ------------------------------------------------------------------ */
+
+.puzzle-themes .chip {
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  border: 2px solid var(--line-strong);
+  background: var(--panel);
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  box-shadow: 0 2px 0 rgba(38, 36, 80, 0.08);
+}
+
+.puzzle-themes .chip:hover { background: var(--sun-soft); }
+
+.puzzle-themes .chip.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--grape), var(--sky));
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 0 var(--grape-dark);
+}
+
+/* Seçili zorluk düğmesindeki "923 adet" yazısı beyaz gradyanda kayboluyordu. */
+.seg-button.active small,
+.segmented button.active small {
+  opacity: 1;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.seg-button strong { font-size: 0.95rem; }
+
+/* ------------------------------------------------------------------ *
+ * 12) Yüksek kontrastta tahta ve taşlar
+ *
+ * Canlı krem/turkuaz ikilisi normalde iyi okunur ama düşük görme
+ * durumunda iki kare birbirine yaklaşır. Bu modda kareler uçlara
+ * çekilir, taşlar saf beyaz/siyaha iner ve konturları kalınlaşır.
+ * ------------------------------------------------------------------ */
+
+.high-contrast .cb-square.light { background: #ffffff; }
+.high-contrast .cb-square.dark { background: #0d6a5c; }
+
+.high-contrast .pc-w {
+  color: #ffffff;
+  --pc-line: #000000;
+  --pc-detail: rgba(0, 0, 0, 0.8);
+}
+
+.high-contrast .pc-b {
+  color: #0b0b12;
+  --pc-line: #000000;
+  --pc-detail: rgba(255, 255, 255, 0.92);
+}
+
+/* Düşük görmede ince hat kaybolur; yalnızca bu modda kalınlaştırılır. */
+.high-contrast .piece-svg g { stroke-width: 2.1; }
+
+.high-contrast .cb-square.light .cb-rank,
+.high-contrast .cb-square.light .cb-file { color: #0a4a40; }
+
+/* ------------------------------------------------------------------ *
+ * 13) XP ve yıldız sayacının vurgusu
+ *
+ * Ders bitip XP kazanıldığında sayaç yerinde güncellenir (app.js) ve kısa
+ * bir zıplamayla dikkat çeker. İlkokul çağındaki bir çocuk için ödülün
+ * GÖRÜLMESİ, kaydedilmesi kadar önemlidir — sayı sessizce değişirse
+ * kazandığını fark etmez.
+ *
+ * Animasyon kapalıyken `.reduced-motion` kuralı bunu da durdurur.
+ * ------------------------------------------------------------------ */
+
+.top-stat.stat-bump {
+  animation: statBump 620ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes statBump {
+  30% { transform: scale(1.22) rotate(-3deg); }
+  55% { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}

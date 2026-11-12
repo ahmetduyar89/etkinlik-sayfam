@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hayvan İzleri Dedektifi | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .pushable:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-sm font-black flex items-center gap-1"><span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span></a>
+      <div>
+        <div class="flex items-center gap-2"><span class="text-2xl sm:text-3xl">🐾</span><h1 class="display text-lg sm:text-2xl font-black tracking-wide">Hayvan İzleri Dedektifi</h1></div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Karda ve çamurda kimin izleri var? İpuçlarını topla, hayvanı bul ve yaşadığı yeri eşleştir! 🔍❄️</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab">🔍 1. İz Sürme</button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white">📘 2. İz Atlası</button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">İZ 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">Karda İzler</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 p-2.5 bg-sky-50 rounded-xl border-2 border-ink">
+          <p id="taskText" class="text-xs sm:text-sm font-black">🎯 Görev</p>
+          <div class="text-right shrink-0">
+            <p class="text-[10px] font-black text-gray-500">İZ</p>
+            <p id="roundText" class="display text-xl font-black leading-none">1/5</p>
+          </div>
+        </div>
+
+        <div class="relative rounded-2xl border-3 border-ink overflow-hidden">
+          <svg id="trail" viewBox="0 0 560 260" class="w-full h-auto block"></svg>
+        </div>
+
+        <div id="clues" class="flex flex-col gap-1.5"></div>
+        <div id="answerBox" class="p-3 bg-slate-50 rounded-xl border-2 border-ink"></div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-xs font-black">🔄 Baştan</button>
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black">💡 İpucu</button>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-sky-50 to-emerald-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">Doğa bilimciler hayvanları görmeden de tanıyabilir! <b>Ayak izleri</b>, adım aralıkları ve izlerin şekli bize hayvanın nasıl hareket ettiğini ve nerede yaşadığını anlatır.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">İz Sürücü Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Fen Bilgisi Rehberi</h3></div>
+        <div class="space-y-2 text-xs">
+          <div class="p-2 bg-amber-50 rounded-lg border border-amber-300"><p class="font-extrabold text-amber-900">🐾 Pençe ve Parmak İzleri</p><p class="text-[11px] text-amber-800 font-semibold mt-0.5">Kediler yürürken tırnaklarını içeri çeker, köpekler çekemez. Bu yüzden köpek izlerinde tırnak izi görünür.</p></div>
+          <div class="p-2 bg-stone-50 rounded-lg border border-stone-300"><p class="font-extrabold">🐴 Toynaklar</p><p class="text-[11px] text-gray-700 font-semibold mt-0.5">Atların toynağı tek parçadır. Geyik, keçi ve inek gibi hayvanların toynağı ise iki parçalıdır.</p></div>
+          <div class="p-2 bg-sky-50 rounded-lg border border-sky-300"><p class="font-extrabold text-sky-900">🦆 Ağ Ayaklar</p><p class="text-[11px] text-sky-800 font-semibold mt-0.5">Ördek ve kazların parmakları arasında zar vardır. Bu zar yüzerken kürek gibi çalışır.</p></div>
+          <div class="p-2 bg-emerald-50 rounded-lg border border-emerald-300"><p class="font-extrabold text-emerald-900">🏡 Yaşam Alanı</p><p class="text-[11px] text-emerald-800 font-semibold mt-0.5">Her canlı yiyecek bulabildiği, barınabildiği ve vücut yapısına uygun bir yerde yaşar.</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Dosya Çözüldü!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-sky-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-sky-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      step() { tone('sine', 200, 120, 0.05, 0.06); },
+      correct() { tone('triangle', 660, 990, 0.12, 0.2); tone('triangle', 990, 1320, 0.15, 0.18, 0.08); },
+      wrong() { tone('sawtooth', 220, 110, 0.3, 0.15); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. İZ ÇİZİMLERİ (yukarı = ileri) ---
+    const INK = '#334155';
+    const PRINT = {
+      kedi: () => `<ellipse cx="0" cy="6" rx="8" ry="7" fill="${INK}" />${[[-9, -5], [-3, -11], [3, -11], [9, -5]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="3.2" ry="3.8" fill="${INK}" />`).join('')}`,
+      kopek: () => `<ellipse cx="0" cy="7" rx="8" ry="7.5" fill="${INK}" />${[[-8, -6], [-3, -13], [3, -13], [8, -6]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="3.2" ry="4.2" fill="${INK}" /><circle cx="${x * 1.1}" cy="${y - 7}" r="1.4" fill="${INK}" />`).join('')}`,
+      at: () => `<path d="M-10 10 C-15 -16 15 -16 10 10" fill="none" stroke="${INK}" stroke-width="6" stroke-linecap="round" /><path d="M-3 8 L0 -2 L3 8" fill="none" stroke="${INK}" stroke-width="2" />`,
+      geyik: () => `<path d="M-2 10 C-10 8 -9 -6 -3 -14 C-1 -6 -1 4 -2 10 Z" fill="${INK}" /><path d="M2 10 C10 8 9 -6 3 -14 C1 -6 1 4 2 10 Z" fill="${INK}" />`,
+      ayi: () => `<rect x="-12" y="-2" width="24" height="18" rx="9" fill="${INK}" />${[-10, -5, 0, 5, 10].map((x, i) => `<ellipse cx="${x}" cy="${-8 - (i === 0 || i === 4 ? 0 : 3)}" rx="2.6" ry="3.2" fill="${INK}" /><line x1="${x}" y1="${-12 - (i === 0 || i === 4 ? 0 : 3)}" x2="${x * 1.15}" y2="${-19 - (i === 0 || i === 4 ? 0 : 3)}" stroke="${INK}" stroke-width="1.5" />`).join('')}`,
+      tavuk: () => `<g stroke="${INK}" stroke-width="3" stroke-linecap="round"><line x1="0" y1="4" x2="-9" y2="-10" /><line x1="0" y1="4" x2="0" y2="-14" /><line x1="0" y1="4" x2="9" y2="-10" /><line x1="0" y1="4" x2="0" y2="12" /></g>`,
+      ordek: () => `<path d="M0 8 L-11 -9 Q0 -4 0 -13 Q0 -4 11 -9 Z" fill="${INK}" opacity="0.55" /><g stroke="${INK}" stroke-width="2.5" stroke-linecap="round"><line x1="0" y1="8" x2="-11" y2="-9" /><line x1="0" y1="8" x2="0" y2="-13" /><line x1="0" y1="8" x2="11" y2="-9" /></g>`,
+      tavsanArka: () => `<ellipse cx="0" cy="0" rx="4.5" ry="11" fill="${INK}" />`,
+      tavsanOn: () => `<ellipse cx="0" cy="0" rx="3.5" ry="4" fill="${INK}" />`,
+      insan: () => `<path d="M-6 12 C-9 4 -9 -8 -3 -14 C3 -18 8 -12 7 -4 C6 4 6 10 3 13 C0 15 -4 15 -6 12 Z" fill="${INK}" /><rect x="-7" y="4" width="14" height="2" fill="#f8fafc" />`
+    };
+
+    const ANIMALS = [
+      { id: 'kedi', n: 'Kedi', e: '🐈', gait: 'walk', sp: 34, sc: 0.8, sound: 'Miyav!', clue: 'Yuvarlak izler, 4 parmak, <b>tırnak izi yok</b>.', habitat: 'sehir', why: 'Kediler tırnaklarını içeri çekerek sessizce yürür. Bu yüzden izlerinde tırnak görünmez.' },
+      { id: 'kopek', n: 'Köpek', e: '🐕', gait: 'walk', sp: 42, sc: 0.9, sound: 'Hav hav!', clue: '4 parmak ve parmakların önünde <b>minik tırnak izleri</b>.', habitat: 'sehir', why: 'Köpekler tırnaklarını içeri çekemez. Tırnakları zemine sürtünerek hızlı koşmalarına yardım eder.' },
+      { id: 'at', n: 'At', e: '🐴', gait: 'walk', sp: 70, sc: 1.2, sound: 'Kişneme sesi!', clue: '<b>Tek parçalı</b>, U şeklinde toynak izi. Adımlar çok uzun.', habitat: 'ciftlik', why: 'Atların her ayağında tek parça sert bir toynak vardır. Bu toynak koşarken ayağı korur.' },
+      { id: 'geyik', n: 'Geyik', e: '🦌', gait: 'walk', sp: 58, sc: 1, sound: 'Ormandan yüksek bir böğürme!', clue: 'Kalp şeklinde, <b>iki parçalı</b> toynak izi.', habitat: 'orman', why: 'Geyiğin toynağı iki parçalıdır. Bu yapı yumuşak ve engebeli orman zemininde dengesini korumasına yardım eder.' },
+      { id: 'ayi', n: 'Ayı', e: '🐻', gait: 'walk', sp: 60, sc: 1.4, sound: 'Derin bir homurtu!', clue: '<b>Çok geniş</b> taban, 5 parmak ve <b>uzun tırnaklar</b>.', habitat: 'orman', why: 'Ayılar uzun tırnaklarıyla toprak kazar, ağaçlara tırmanır ve yiyecek arar.' },
+      { id: 'tavuk', n: 'Tavuk', e: '🐔', gait: 'walk', sp: 30, sc: 0.8, sound: 'Gıt gıdak!', clue: 'Öne bakan <b>3 ince parmak</b>, arkada 1 parmak. Parmaklar arasında zar yok.', habitat: 'ciftlik', why: 'Tavukların ince ve ayrık parmakları toprağı eşeleyip yem aramaya uygundur.' },
+      { id: 'ordek', n: 'Ördek', e: '🦆', gait: 'waddle', sp: 32, sc: 0.9, sound: 'Vak vak!', clue: '3 parmak ve parmaklar arasında <b>zar</b> (ağ ayak). İzler hafif içe dönük.', habitat: 'gol', why: 'Ördeğin ağ ayakları suda kürek gibi çalışır. Karada ise paytak paytak yürür.' },
+      { id: 'tavsan', n: 'Tavşan', e: '🐇', gait: 'hop', sp: 70, sc: 0.9, sound: 'Neredeyse hiç ses yok, sadece bir hışırtı.', clue: 'İzler <b>dörtlü gruplar</b> hâlinde: iki uzun iz önde, iki küçük iz arkada.', habitat: 'orman', why: 'Tavşan zıplarken uzun arka ayaklarını ön ayaklarının önüne koyar. Bu yüzden uzun izler öndedir!' },
+      { id: 'insan', n: 'İnsan', e: '🧒', gait: 'walk', sp: 52, sc: 1.1, sound: 'Bir çocuk ıslık çalıyor! 🎵', clue: 'Uzun, ayakkabı şeklinde iz ve topuk izi.', habitat: 'sehir', why: 'İnsanlar iki ayak üzerinde yürür. İzler sağ-sol diye düzenli sıralanır.' }
+    ];
+    const AN = Object.fromEntries(ANIMALS.map(a => [a.id, a]));
+    const HABITATS = { orman: '🌲 Orman', gol: '🏞️ Göl Kenarı', ciftlik: '🚜 Çiftlik', sehir: '🏘️ Şehir ve Evler' };
+
+    // --- 3. BÖLÜMLER ---
+    const LEVELS = [
+      { title: 'Karda İzler', ground: 'snow', animals: ['kedi', 'at', 'tavuk', 'insan', 'ordek'], confuse: false, habitat: false, task: '🎯 Karda bırakılan izlere bak ve bunun hangi hayvana ait olduğunu bul!', hint: 'İzin şekline bak: Parmak mı, toynak mı? Kaç parmak var? Parmaklar arasında zar var mı?', fact: 'Kar, izleri çok net gösterdiği için doğa bilimcilerin en sevdiği "iz defteri"dir!' },
+      { title: 'Benzer İzler', ground: 'mud', animals: ['kopek', 'geyik', 'tavsan', 'ayi', 'kedi', 'tavuk'], confuse: true, habitat: false, task: '🎯 Bu izler birbirine çok benziyor! Büyüteçle detaylara bak ve doğru hayvanı bul.', hint: 'Kedi ve köpek: tırnak izi var mı? At ve geyik: toynak tek parça mı, iki parça mı? Tavuk ve ördek: parmaklar arasında zar var mı?', fact: 'Benzer görünen izleri ayırt etmek için bilim insanları küçük detaylara bakar: tırnak, parmak sayısı, toynak şekli ve adım aralığı.' },
+      { title: 'Yaşam Alanı', ground: 'mud', animals: ['geyik', 'ordek', 'at', 'kopek', 'ayi', 'tavsan'], confuse: false, habitat: true, task: '🎯 Önce izin sahibini bul, sonra bu hayvanın nerede yaşadığını seç!', hint: 'Ağ ayaklı hayvanlar suya yakın yaşar. Toynaklı evcil hayvanlar çiftliklerde, yabani olanlar ormanda bulunur.', fact: 'Hayvanların vücut yapısı yaşadıkları yere uygundur. Buna <b>uyum</b> denir: Ördeğin ağ ayağı suya, ayının kalın kürkü soğuk ormana uygundur.' }
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: Çırak İz Sürücü', text: 'Karda İzler bölümünü tamamla.' },
+      { id: 'm2', title: '2. Görev: Keskin Göz', text: 'Benzer İzler bölümünü büyüteç kullanmadan hatasız bitir.' },
+      { id: 'm3', title: '3. Görev: Atlas Uzmanı', text: 'İz Atlasında 9 hayvanın hepsini incele.', progress: true },
+      { id: 'm4', title: '4. Görev: Usta İz Sürücü', text: '3 bölümün hepsini tamamla.' }
+    ];
+
+    // --- 4. DURUM ---
+    const $ = id => document.getElementById(id);
+    let mode = 'levels';
+    let levelIndex = 0;
+    let queue = [];
+    let round = 0;
+    let mistakes = 0;
+    let magnifierUsed = false;
+    let stage = 'animal';
+    let finished = false;
+    let busy = false;
+    let score = 0;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    const atlasSeen = new Set();
+    let modalTimer = null;
+
+    function L() { return LEVELS[levelIndex]; }
+    function note(html) { $('scienceNote').innerHTML = html; }
+
+    // --- 5. İZ YOLU ---
+    function trailSvg(a, ground, reveal) {
+      const snow = ground === 'snow';
+      let h = snow
+        ? '<rect width="560" height="260" fill="#f1f5f9" /><g opacity="0.5"><ellipse cx="120" cy="60" rx="80" ry="10" fill="#e2e8f0" /><ellipse cx="420" cy="210" rx="110" ry="12" fill="#e2e8f0" /></g>'
+        : '<rect width="560" height="260" fill="#a16207" /><g opacity="0.35"><ellipse cx="140" cy="50" rx="90" ry="12" fill="#78350f" /><ellipse cx="400" cy="220" rx="120" ry="14" fill="#78350f" /><circle cx="300" cy="90" r="6" fill="#78350f" /></g>';
+      h += `<text x="20" y="240" font-size="30">${snow ? '🌲' : '🌿'}</text>`;
+      // Çalı (hayvanın saklandığı yer)
+      h += `<g transform="translate(505,120)"><circle cx="-14" cy="6" r="22" fill="#15803d" stroke="#0f172a" stroke-width="2.5" /><circle cx="12" cy="-6" r="26" fill="#16a34a" stroke="#0f172a" stroke-width="2.5" /><circle cx="18" cy="16" r="20" fill="#15803d" stroke="#0f172a" stroke-width="2.5" /></g>`;
+      if (reveal) h += `<text id="peek" x="505" y="100" font-size="44" text-anchor="middle">${a.e}</text>`;
+      const y0 = 140, rot = 90;
+      const g = (fn, x, y, extraRot = 0, s = a.sc * 1.7) => `<g transform="translate(${x},${y}) rotate(${rot + extraRot}) scale(${s})">${PRINT[fn]()}</g>`;
+      let x = 40, i = 0;
+      while (x < 450) {
+        if (a.gait === 'walk') {
+          h += `<g class="print">${g(a.id, x, y0 + (i % 2 ? 22 : -22))}</g>`;
+          x += a.sp * 1.4; i++;
+        } else if (a.gait === 'waddle') {
+          h += `<g class="print">${g(a.id, x, y0 + (i % 2 ? 20 : -20), i % 2 ? -15 : 15)}</g>`;
+          x += a.sp * 1.5; i++;
+        } else if (a.gait === 'hop') {
+          h += `<g class="print">${g('tavsanOn', x, y0 - 6)}${g('tavsanOn', x + 26, y0 + 6)}${g('tavsanArka', x + 64, y0 - 20)}${g('tavsanArka', x + 64, y0 + 20)}</g>`;
+          x += a.sp + 70; i++;
+        }
+      }
+      return h;
+    }
+
+    function drawTrail(a, reveal) {
+      $('trail').innerHTML = trailSvg(a, mode === 'levels' ? L().ground : 'snow', reveal);
+      if (typeof gsap !== 'undefined' && !reveal) gsap.from('#trail .print', { opacity: 0, scale: 0.4, transformOrigin: 'center', stagger: 0.08, duration: 0.25 });
+      if (reveal && typeof gsap !== 'undefined') gsap.from('#peek', { y: 40, opacity: 0, duration: 0.5, ease: 'back.out(2)' });
+    }
+
+    // --- 6. OYUN ---
+    function current() { return AN[queue[round]]; }
+
+    function startRound() {
+      stage = 'animal'; busy = false;
+      const a = current();
+      drawTrail(a, false);
+      $('clues').innerHTML = '';
+      $('roundText').textContent = `${round + 1}/${queue.length}`;
+      renderAnswers();
+    }
+
+    function optionsFor(a) {
+      const pairs = { kedi: 'kopek', kopek: 'kedi', at: 'geyik', geyik: 'at', tavuk: 'ordek', ordek: 'tavuk', ayi: 'insan', insan: 'ayi', tavsan: 'kedi' };
+      const set = new Set([a.id]);
+      if (L().confuse && pairs[a.id]) set.add(pairs[a.id]);
+      while (set.size < 4) set.add(ANIMALS[Math.floor(Math.random() * ANIMALS.length)].id);
+      return [...set].sort(() => Math.random() - 0.5);
+    }
+
+    function renderAnswers() {
+      const a = current();
+      const box = $('answerBox');
+      if (stage === 'animal') {
+        box.innerHTML = `<div class="flex items-center justify-between mb-2"><p class="text-xs font-black">🐾 Bu izler kimin?</p>${L().confuse ? '<button id="btnMag" class="pushable px-2 py-1 bg-amber-200 text-[11px] font-black">🔍 Büyüteç</button>' : ''}</div>
+          <div class="grid grid-cols-2 gap-2">${optionsFor(a).map(id => `<button data-a="${id}" class="ans pushable bg-white py-2 flex items-center justify-center gap-2 text-sm font-black"><span class="text-2xl">${AN[id].e}</span>${AN[id].n}</button>`).join('')}</div>`;
+        box.querySelectorAll('.ans').forEach(b => b.addEventListener('click', () => answerAnimal(b.dataset.a, b)));
+        const mag = $('btnMag');
+        if (mag) mag.addEventListener('click', () => { magnifierUsed = true; mag.disabled = true; Sound.click(); addClue('🔍', a.clue); });
+      } else {
+        box.innerHTML = `<p class="text-xs font-black mb-2">🏡 ${a.e} ${a.n} nerede yaşar?</p><div class="grid grid-cols-2 gap-2">${Object.entries(HABITATS).map(([k, n]) => `<button data-h="${k}" class="hab pushable bg-white py-2 text-sm font-black">${n}</button>`).join('')}</div>`;
+        box.querySelectorAll('.hab').forEach(b => b.addEventListener('click', () => answerHabitat(b.dataset.h, b)));
+      }
+    }
+
+    function addClue(icon, html) {
+      const d = document.createElement('div');
+      d.className = 'p-2 bg-yellow-50 rounded-lg border-2 border-ink text-xs font-semibold flex gap-2';
+      d.innerHTML = `<span class="text-lg leading-none">${icon}</span><span>${html}</span>`;
+      $('clues').appendChild(d);
+      if (typeof gsap !== 'undefined') gsap.from(d, { x: 30, opacity: 0, duration: 0.3 });
+    }
+
+    function answerAnimal(id, btn) {
+      if (busy || finished) return;
+      initAudio();
+      const a = current();
+      if (id === a.id) {
+        Sound.correct();
+        note(`✅ Bunlar <b>${a.n}</b> izleri! ${a.why}`);
+        busy = true;
+        drawTrail(a, true);
+        if (L().habitat) { setTimeout(() => { stage = 'habitat'; busy = false; renderAnswers(); }, 900); }
+        else setTimeout(nextRound, 1500);
+      } else {
+        mistakes++;
+        Sound.wrong();
+        btn.disabled = true; btn.classList.add('bg-rose-200');
+        const shown = $('clues').children.length;
+        if (shown === 0) addClue('👂', `Çalının arkasından bir ses geliyor: <b>"${a.sound}"</b>`);
+        else if (!magnifierUsed || shown < 2) addClue('🔍', a.clue);
+        note(`❌ ${AN[id].n} izleri böyle değil. İpuçlarını oku ve izlere tekrar bak!`);
+      }
+    }
+
+    function answerHabitat(h, btn) {
+      if (busy || finished) return;
+      const a = current();
+      initAudio();
+      if (h === a.habitat) {
+        Sound.correct();
+        const where = { orman: 'ormanlarda', gol: 'göl ve dere kenarlarında', ciftlik: 'çiftliklerde', sehir: 'şehirlerde ve evlerde' }[h];
+        note(`✅ ${a.e} ${a.n} genellikle <b>${where}</b> yaşar.`);
+        busy = true;
+        setTimeout(nextRound, 1200);
+      } else {
+        mistakes++; Sound.wrong();
+        btn.disabled = true; btn.classList.add('bg-rose-200');
+        note('❌ Bu hayvanın vücut yapısını ve beslenmesini düşün. Nerede yiyecek bulur, nerede barınır?');
+      }
+    }
+
+    function nextRound() {
+      round++;
+      if (round >= queue.length) { winLevel(); return; }
+      startRound();
+    }
+
+    function winLevel() {
+      finished = true;
+      const s = mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20;
+      if (levelIndex === 0) completeMission('m1');
+      if (levelIndex === 1 && mistakes === 0 && !magnifierUsed) completeMission('m2');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      updateScore(); renderLevelDots();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+      showModal({ emoji: '🐾', title: 'Dosya Çözüldü!', stars: '⭐'.repeat(s) + '☆'.repeat(3 - s), info: mistakes === 0 ? 'Hiç hata yapmadın, keskin gözlü dedektif!' : `${mistakes} hata yaptın.`, fact: L().fact, next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'İz Atlası 📘' });
+    }
+
+    // --- 7. ATLAS ---
+    function renderAtlas(sel) {
+      const a = sel ? AN[sel] : ANIMALS[0];
+      drawTrail(a, true);
+      $('clues').innerHTML = sel ? `<div class="p-3 bg-white rounded-xl border-2 border-ink text-xs">
+        <div class="flex items-center gap-3"><svg viewBox="-25 -25 50 50" class="w-16 h-16 bg-slate-100 rounded-lg border-2 border-ink">${a.id === 'tavsan' ? `<g transform="translate(-8,0)">${PRINT.tavsanArka()}</g><g transform="translate(8,6)">${PRINT.tavsanOn()}</g>` : PRINT[a.id]()}</svg>
+        <div><p class="display text-lg font-black">${a.e} ${a.n}</p><p class="font-bold">${a.clue}</p><p class="font-bold text-gray-500">🏡 ${HABITATS[a.habitat]} · 🔊 ${a.sound}</p></div></div>
+        <p class="font-semibold text-gray-700 mt-2">💡 <b>Neden böyle?</b> ${a.why}</p></div>` : '<p class="text-sm font-black text-center">👇 İncelemek istediğin hayvana dokun!</p>';
+      $('answerBox').innerHTML = `<div class="grid grid-cols-3 sm:grid-cols-9 gap-1.5">${ANIMALS.map(x => `<button data-id="${x.id}" class="atl pushable bg-white py-1.5 text-2xl ${atlasSeen.has(x.id) ? 'ring-2 ring-emerald-400' : ''}">${x.e}</button>`).join('')}</div>`;
+      $('answerBox').querySelectorAll('.atl').forEach(b => b.addEventListener('click', () => {
+        atlasSeen.add(b.dataset.id); Sound.click();
+        renderMissions();
+        if (atlasSeen.size >= ANIMALS.length) completeMission('m3');
+        renderAtlas(b.dataset.id);
+      }));
+    }
+
+    // --- 8. AKIŞ ---
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info; $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next); if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 600);
+    }
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        const extra = m.progress && !done ? ` <b class="text-sky-700">(${atlasSeen.size}/9)</b>` : '';
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5"><span class="text-lg">${done ? '✅' : '⬜'}</span><div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}${extra}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Bölümler:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function loadLevel(i) {
+      closeModal();
+      mode = 'levels'; levelIndex = i; round = 0; mistakes = 0; magnifierUsed = false; finished = false;
+      queue = [...L().animals].sort(() => Math.random() - 0.5);
+      $('levelBadge').textContent = `BÖLÜM ${i + 1}`;
+      $('levelTitle').textContent = L().title;
+      $('taskText').textContent = L().task;
+      renderLevelDots();
+      startRound();
+    }
+
+    function switchMode(m) {
+      const isA = m === 'atlas';
+      $('tabLevels').classList.toggle('active-tab', !isA); $('tabLevels').classList.toggle('bg-white', isA);
+      $('tabSandbox').classList.toggle('active-tab', isA); $('tabSandbox').classList.toggle('bg-white', !isA);
+      $('levelDots').classList.toggle('hidden', isA);
+      if (isA) {
+        closeModal();
+        mode = 'atlas';
+        $('levelBadge').textContent = 'ATLAS';
+        $('levelTitle').textContent = 'İz Atlası';
+        $('taskText').textContent = '🎯 Hayvanlara dokun, izlerini ve bu izlerin nedenini keşfet!';
+        $('roundText').textContent = '9';
+        renderAtlas(null);
+      } else loadLevel(levelIndex);
+    }
+
+    $('btnReset').addEventListener('click', () => { Sound.click(); if (mode === 'levels') loadLevel(levelIndex); else renderAtlas(null); });
+    $('btnHint').addEventListener('click', () => { Sound.click(); note(mode === 'levels' ? `<b>İpucu:</b> ${L().hint}` : '<b>Keşif fikri:</b> Kedi ile köpeğin, at ile geyiğin izlerini art arda aç ve farkları bul!'); });
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('atlas'); });
+    $('btnModalRetry').addEventListener('click', () => loadLevel(levelIndex));
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('atlas'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; Sound.click(); });
+
+    renderMissions(); updateScore(); loadLevel(0);
+  </script>
+</body>
+</html>

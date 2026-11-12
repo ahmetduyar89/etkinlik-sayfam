@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Duyu Dedektifi: Gizemli Kutu | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .pushable:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+    .organ-spot { cursor: pointer; }
+    .organ-spot:hover circle { fill-opacity: 0.6; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-sm font-black flex items-center gap-1"><span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span></a>
+      <div>
+        <div class="flex items-center gap-2"><span class="text-2xl sm:text-3xl">👃</span><h1 class="display text-lg sm:text-2xl font-black tracking-wide">Duyu Dedektifi: Gizemli Kutu</h1></div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Kutunun içini göremiyorsun! Duyu organlarını kullanarak içindekini tahmin et. 👁️👂👃👅✋</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab">📦 1. Gizemli Kutu</button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white">🧍 2. Duyu Haritası</button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">DOSYA 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">Isınma Turu</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 p-2.5 bg-pink-50 rounded-xl border-2 border-ink">
+          <p id="taskText" class="text-xs sm:text-sm font-black">🎯 Duyularını kullan, kutudaki nesneyi bul! Ne kadar az duyu, o kadar çok puan.</p>
+          <div class="text-right shrink-0">
+            <p class="text-[10px] font-black text-gray-500">KUTU</p>
+            <p id="roundText" class="display text-xl font-black leading-none">1/5</p>
+          </div>
+        </div>
+
+        <!-- KUTU MODU -->
+        <div id="boxMode" class="flex flex-col gap-3">
+          <div class="rounded-2xl border-3 border-ink bg-gradient-to-b from-violet-200 to-pink-100 p-3 flex flex-col sm:flex-row gap-3 items-center">
+            <div id="boxWrap" class="relative w-40 h-40 shrink-0">
+              <svg viewBox="0 0 160 160" class="w-full h-full">
+                <polygon points="20,50 80,20 140,50 80,80" fill="#fcd34d" stroke="#0f172a" stroke-width="3" />
+                <polygon points="20,50 80,80 80,150 20,120" fill="#f59e0b" stroke="#0f172a" stroke-width="3" />
+                <polygon points="140,50 80,80 80,150 140,120" fill="#d97706" stroke="#0f172a" stroke-width="3" />
+                <ellipse cx="110" cy="100" rx="14" ry="18" fill="#0f172a" />
+                <text x="50" y="112" font-size="36" font-weight="900" text-anchor="middle" fill="#0f172a">?</text>
+              </svg>
+              <div id="revealItem" class="absolute inset-0 flex items-center justify-center text-7xl opacity-0 pointer-events-none">🍋</div>
+            </div>
+            <div class="flex-1 w-full">
+              <p class="text-[11px] font-black text-violet-800 mb-1">🗂️ İPUCU DEFTERİ</p>
+              <ul id="clues" class="space-y-1.5 min-h-[90px]"></ul>
+            </div>
+          </div>
+          <div>
+            <p class="text-xs font-black mb-2">🧠 Hangi duyunu kullanacaksın?</p>
+            <div id="senses" class="grid grid-cols-5 gap-2"></div>
+          </div>
+          <div id="safetyBox" class="hidden p-3 bg-rose-50 rounded-xl border-3 border-ink"></div>
+          <div>
+            <p class="text-xs font-black mb-2">🕵️ Tahminin ne?</p>
+            <div id="guesses" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+          </div>
+        </div>
+
+        <!-- HARİTA MODU -->
+        <div id="mapMode" class="hidden flex-col sm:flex-row gap-3">
+          <div class="rounded-2xl border-3 border-ink bg-sky-50 p-2 sm:w-1/2">
+            <svg id="bodySvg" viewBox="0 0 220 300" class="w-full h-auto max-h-72 mx-auto">
+              <!-- Çocuk -->
+              <rect x="70" y="120" width="80" height="100" rx="18" fill="#60a5fa" stroke="#0f172a" stroke-width="3" />
+              <rect x="42" y="128" width="26" height="80" rx="12" fill="#fcd34d" stroke="#0f172a" stroke-width="3" transform="rotate(12 55 128)" />
+              <rect x="152" y="128" width="26" height="80" rx="12" fill="#fcd34d" stroke="#0f172a" stroke-width="3" transform="rotate(-12 165 128)" />
+              <rect x="78" y="215" width="26" height="70" rx="10" fill="#1e3a8a" stroke="#0f172a" stroke-width="3" />
+              <rect x="116" y="215" width="26" height="70" rx="10" fill="#1e3a8a" stroke="#0f172a" stroke-width="3" />
+              <circle cx="110" cy="72" r="48" fill="#fcd34d" stroke="#0f172a" stroke-width="3" />
+              <path d="M66 58 Q110 10 154 58 Q140 36 110 34 Q80 36 66 58 Z" fill="#92400e" stroke="#0f172a" stroke-width="2.5" />
+              <ellipse cx="62" cy="76" rx="8" ry="12" fill="#fcd34d" stroke="#0f172a" stroke-width="2.5" />
+              <ellipse cx="158" cy="76" rx="8" ry="12" fill="#fcd34d" stroke="#0f172a" stroke-width="2.5" />
+              <circle cx="92" cy="66" r="6" fill="#fff" stroke="#0f172a" stroke-width="2" /><circle cx="93" cy="67" r="3" fill="#0f172a" />
+              <circle cx="128" cy="66" r="6" fill="#fff" stroke="#0f172a" stroke-width="2" /><circle cx="129" cy="67" r="3" fill="#0f172a" />
+              <path d="M110 72 q-5 12 2 14" fill="none" stroke="#0f172a" stroke-width="2.5" />
+              <path d="M96 96 q14 12 28 0 q-14 4 -28 0 Z" fill="#ef4444" stroke="#0f172a" stroke-width="2" />
+              <g id="organSpots"></g>
+            </svg>
+          </div>
+          <div class="sm:w-1/2 flex flex-col gap-2">
+            <div id="activityCard" class="p-3 bg-yellow-50 rounded-xl border-3 border-ink text-center"></div>
+            <div id="organInfo" class="p-3 bg-white rounded-xl border-2 border-ink text-xs"></div>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-xs font-black">🔄 Baştan</button>
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black">💡 İpucu</button>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-pink-50 to-violet-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">Çevremizi <b>beş duyu organımızla</b> algılarız: göz, kulak, burun, dil ve deri. Duyu organlarımızdan gelen bilgileri beynimiz yorumlar!</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">Dedektif Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Duyu Organlarımız</h3></div>
+        <div class="space-y-1.5 text-xs">
+          <div class="p-2 bg-sky-50 rounded-lg border border-sky-300"><p class="font-extrabold">👁️ Göz: Görme</p><p class="text-[11px] font-semibold text-gray-700">Renkleri, şekilleri ve hareketi algılar. Güneşe asla doğrudan bakma!</p></div>
+          <div class="p-2 bg-amber-50 rounded-lg border border-amber-300"><p class="font-extrabold">👂 Kulak: İşitme</p><p class="text-[11px] font-semibold text-gray-700">Sesleri duyar. Çok yüksek sesler kulağa zarar verir.</p></div>
+          <div class="p-2 bg-lime-50 rounded-lg border border-lime-300"><p class="font-extrabold">👃 Burun: Koklama</p><p class="text-[11px] font-semibold text-gray-700">Kokuları algılar. Tanımadığın bir şişeyi doğrudan koklama!</p></div>
+          <div class="p-2 bg-rose-50 rounded-lg border border-rose-300"><p class="font-extrabold">👅 Dil: Tatma</p><p class="text-[11px] font-semibold text-gray-700">Tatlı, tuzlu, ekşi ve acı tatları algılar. Ne olduğunu bilmediğin hiçbir şeyi tatma!</p></div>
+          <div class="p-2 bg-orange-50 rounded-lg border border-orange-300"><p class="font-extrabold">✋ Deri: Dokunma</p><p class="text-[11px] font-semibold text-gray-700">Sıcak, soğuk, yumuşak, sert, pürüzlü ve kaygan gibi özellikleri hisseder.</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Dosya Kapandı!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-pink-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-pink-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    function noise(dur, vol, delay = 0, freq = 2000, q = 1) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const len = Math.floor(audioCtx.sampleRate * dur);
+        const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+        const src = audioCtx.createBufferSource(); src.buffer = buf;
+        const f = audioCtx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
+        const g = audioCtx.createGain(); g.gain.value = vol;
+        src.connect(f); f.connect(g); g.connect(audioCtx.destination); src.start(t);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      correct() { tone('triangle', 660, 990, 0.12, 0.2); tone('triangle', 990, 1320, 0.15, 0.18, 0.08); },
+      wrong() { tone('sawtooth', 220, 110, 0.3, 0.15); },
+      alarm() { tone('square', 880, 660, 0.2, 0.12); tone('square', 880, 660, 0.2, 0.12, 0.25); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+    // Nesne sesleri
+    const ITEM_SOUNDS = {
+      bell() { [880, 1320, 1760].forEach((f, i) => tone('sine', f, f * 0.999, 1.4 - i * 0.3, 0.15 / (i + 1))); },
+      clock() { for (let i = 0; i < 6; i++) tone('square', i % 2 ? 1200 : 1500, 900, 0.03, 0.08, i * 0.45); },
+      paper() { for (let i = 0; i < 6; i++) noise(0.08, 0.5, i * 0.09 + Math.random() * 0.04, 3500, 0.8); },
+      ice() { for (let i = 0; i < 5; i++) tone('sine', 2400 + Math.random() * 800, 1800, 0.04, 0.12, i * 0.13); },
+      ball() { [0, 0.45, 0.8, 1.05].forEach((t, i) => tone('sine', 160, 55, 0.18, 0.4 / (i + 1), t)); },
+      drum() { [0, 0.3, 0.6].forEach(t => { tone('sine', 120, 50, 0.3, 0.45, t); noise(0.08, 0.3, t, 800, 0.7); }); },
+      shaker() { for (let i = 0; i < 8; i++) noise(0.06, 0.4, i * 0.12, 6000, 1.2); },
+      scratch() { for (let i = 0; i < 4; i++) noise(0.22, 0.5, i * 0.28, 1200, 0.6); }
+    };
+
+    // --- 2. NESNELER ---
+    const SENSES = [
+      { id: 'goz', e: '👁️', n: 'Görme' },
+      { id: 'kulak', e: '👂', n: 'İşitme' },
+      { id: 'burun', e: '👃', n: 'Koklama' },
+      { id: 'dil', e: '👅', n: 'Tatma' },
+      { id: 'deri', e: '✋', n: 'Dokunma' }
+    ];
+
+    const ITEMS = [
+      { id: 'limon', e: '🍋', n: 'Limon', goz: 'Karanlıkta sadece rengi seçiliyor: <b>sarı</b> ve küçük.', kulak: null, burun: '<b>Ekşi ve ferah</b> bir koku!', deri: '<b>Yuvarlak</b>, kabuğu hafif <b>pürüzlü</b> ve sert.' },
+      { id: 'zil', e: '🔔', n: 'Zil', goz: 'Parlak, <b>sarı metal</b> bir şey.', kulak: 'bell', kulakT: '<b>Çın çın!</b> Tiz ve uzun bir ses.', burun: null, deri: '<b>Soğuk</b>, <b>pürüzsüz</b> ve sert. Sallayınca titriyor!' },
+      { id: 'gul', e: '🌹', n: 'Gül', goz: '<b>Kırmızı</b> ve ince uzun bir şey.', kulak: null, burun: '<b>Tatlı bir çiçek</b> kokusu!', deri: 'Bir tarafı <b>kadife gibi yumuşak</b>, sapında <b>dikenler</b> var. Dikkat!' },
+      { id: 'cikolata', e: '🍫', n: 'Çikolata', goz: '<b>Kahverengi</b>, dikdörtgen bir şey.', kulak: 'paper', kulakT: 'Kâğıt gibi <b>hışır hışır</b> bir ses.', burun: '<b>Tatlı kakao</b> kokusu!', deri: '<b>Sert</b> ama avucunda tutunca <b>eriyip yapışıyor</b>.' },
+      { id: 'ayi', e: '🧸', n: 'Oyuncak Ayı', goz: '<b>Kahverengi</b> ve tombul bir şey.', kulak: null, burun: null, deri: '<b>Çok yumuşak</b> ve <b>tüylü</b>. Minik kulakları var!' },
+      { id: 'buz', e: '🧊', n: 'Buz Küpü', goz: '<b>Şeffaf</b>, küçük bir küp.', kulak: 'ice', kulakT: 'Birbirine çarpınca <b>tıkır tıkır</b> sesi.', burun: null, deri: '<b>Çok soğuk</b>, <b>ıslak</b> ve <b>kaygan</b>! Yavaş yavaş eriyor.' },
+      { id: 'sabun', e: '🧼', n: 'Sabun', goz: '<b>Pembe</b>, yumuşak köşeli bir kalıp.', kulak: null, burun: '<b>Temiz, çiçeksi</b> bir koku.', deri: '<b>Pürüzsüz</b> ve ıslanınca çok <b>kaygan</b>.' },
+      { id: 'top', e: '⚽', n: 'Top', goz: '<b>Siyah beyaz desenli</b>, yuvarlak.', kulak: 'ball', kulakT: 'Yere düşünce <b>güm güm</b> zıplıyor!', burun: 'Hafif <b>lastik</b> kokusu.', deri: '<b>Yuvarlak</b> ve <b>esnek</b>. Bastırınca geri çıkıyor.' },
+      { id: 'saat', e: '⏰', n: 'Çalar Saat', goz: '<b>Kırmızı</b>, üstünde iki çan var.', kulak: 'clock', kulakT: '<b>Tik tak tik tak...</b> Düzenli bir ses.', burun: null, deri: '<b>Sert</b>, soğuk metal. İçinde bir şey titriyor.' },
+      { id: 'portakal', e: '🍊', n: 'Portakal', goz: '<b>Turuncu</b> ve yuvarlak.', kulak: null, burun: '<b>Tatlı ve ferah</b> bir meyve kokusu!', deri: '<b>Yuvarlak</b>, kabuğu <b>minik çukurlu</b>, avuç dolusu büyüklükte.' },
+      { id: 'kaktus', e: '🌵', n: 'Kaktüs', goz: '<b>Yeşil</b> bir şey, küçük bir saksıda.', kulak: null, burun: null, deri: '<b>AH! Diken batıyor!</b> Bilmediğin bir şeye dokunurken çok dikkatli olmalısın.' },
+      { id: 'davul', e: '🥁', n: 'Davul', goz: '<b>Kırmızı-beyaz</b> silindir şeklinde.', kulak: 'drum', kulakT: '<b>Bum bum!</b> Derin ve güçlü bir ses.', burun: null, deri: 'Üstü <b>gergin</b>, vurunca titriyor.' },
+      { id: 'tuzluk', e: '🧂', n: 'Tuzluk', goz: '<b>Beyaz</b>, küçük ve üstü delikli bir kap.', kulak: 'shaker', kulakT: 'Sallayınca <b>şıkır şıkır!</b> İçinde minik taneler var gibi.', burun: null, deri: 'Sert, küçük ve <b>içinde minik taneler kayıyor</b>.' },
+      { id: 'zimpara', e: '🟫', n: 'Zımpara Kâğıdı', goz: '<b>Kahverengi</b>, ince ve düz.', kulak: 'scratch', kulakT: 'Sürtünce <b>hırş hırş</b> bir ses.', burun: null, deri: '<b>Çok pürüzlü</b>! Kum taneleri yapıştırılmış gibi.' }
+    ];
+    const IT = Object.fromEntries(ITEMS.map(i => [i.id, i]));
+
+    const LEVELS = [
+      { title: 'Isınma Turu', items: ['limon', 'zil', 'ayi', 'top', 'gul'], maxSenses: 5, task: '🎯 Duyularını kullan, kutudaki nesneyi bul! Ne kadar az duyu, o kadar çok puan.', hint: 'En çok bilgi veren duyuyu seç. Ses çıkaran nesneler için kulak, kokulu nesneler için burun işe yarar.', fact: 'Tek bir duyu çoğu zaman yetmez. Beynimiz <b>birden fazla duyudan</b> gelen bilgileri birleştirerek nesneyi tanır.' },
+      { title: 'Tek Duyu', items: ['saat', 'portakal', 'buz', 'davul', 'sabun'], only: { saat: 'kulak', portakal: 'burun', buz: 'deri', davul: 'kulak', sabun: 'burun' }, maxSenses: 1, task: '🎯 Her kutuda sadece BİR duyunu kullanabilirsin! Hangi duyu açık, dikkat et.', hint: 'Sadece açık olan duyuyu kullanabilirsin. İpucunu dikkatlice oku!', fact: 'Görme engelli bireyler dokunma ve işitme duyularını çok iyi kullanır. <b>Braille alfabesi</b> parmak uçlarıyla okunur!' },
+      { title: 'Az İpucu Ustası', items: ['cikolata', 'kaktus', 'tuzluk', 'zimpara', 'limon', 'zil'], maxSenses: 2, task: '🎯 Her kutuda en fazla 2 duyu kullanabilirsin. Akıllıca seç!', hint: 'Önce en ayırt edici duyuyu seç. Sesli nesnede kulak, dokusu ilginç nesnede deri.', fact: 'Duyu organlarımızı korumalıyız: Gözlerimizi güneşten, kulaklarımızı yüksek sesten, derimizi yanıklardan koruruz.' }
+    ];
+
+    const ACTIVITIES = [
+      { t: 'Kuşların cıvıltısını duymak', o: 'kulak' },
+      { t: 'Gökkuşağının renklerini görmek', o: 'goz' },
+      { t: 'Taze ekmeğin kokusunu almak', o: 'burun' },
+      { t: 'Limonun ekşi olduğunu anlamak', o: 'dil' },
+      { t: 'Kedinin tüylerinin yumuşak olduğunu hissetmek', o: 'deri' },
+      { t: 'Çayın çok sıcak olduğunu fark etmek', o: 'deri' },
+      { t: 'Kitap okumak', o: 'goz' },
+      { t: 'Telefonun çaldığını duymak', o: 'kulak' },
+      { t: 'Yanık kokusunu fark edip tehlikeyi anlamak', o: 'burun' },
+      { t: 'Dondurmanın tatlı olduğunu anlamak', o: 'dil' },
+      { t: 'Kaygan zemini ayağınla hissetmek', o: 'deri' },
+      { t: 'Trafik ışığının kırmızı yandığını görmek', o: 'goz' }
+    ];
+
+    const ORGANS = {
+      goz: { x: 110, y: 66, e: '👁️', n: 'Göz', care: 'Ekrana çok uzun süre bakma, arada uzağa bak. Güneşe asla doğrudan bakma!' },
+      kulak: { x: 158, y: 76, e: '👂', n: 'Kulak', care: 'Kulağına çubuk ya da sivri bir şey sokma. Kulaklıkla çok yüksek sesle müzik dinleme.' },
+      burun: { x: 112, y: 82, e: '👃', n: 'Burun', care: 'Burnunu nazikçe temizle. Tanımadığın kimyasalları koklama!' },
+      dil: { x: 110, y: 104, e: '👅', n: 'Dil', care: 'Çok sıcak yiyecekleri beklet. Dişlerini fırçalarken dilini de temizle.' },
+      deri: { x: 55, y: 180, e: '✋', n: 'Deri', care: 'Güneşte şapka ve güneş kremi kullan. Ellerini sık sık yıka.' }
+    };
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: Çaylak Dedektif', text: 'İlk dosyayı tamamla.' },
+      { id: 'm2', title: '2. Görev: Güvenlik Kahramanı', text: 'Tatma sorusunda 3 kez güvenli seçimi yap.', progress: 'safe' },
+      { id: 'm3', title: '3. Görev: Duyu Haritacısı', text: 'Duyu Haritasında 10 etkinliği doğru organla eşleştir.', progress: 'map' },
+      { id: 'm4', title: '4. Görev: Baş Dedektif', text: '3 dosyanın hepsini kapat.' }
+    ];
+
+    // --- 3. DURUM ---
+    const $ = id => document.getElementById(id);
+    let mode = 'levels';
+    let levelIndex = 0;
+    let queue = [];
+    let round = 0;
+    let used = [];
+    let roundScore = 0;
+    let levelPoints = 0;
+    let mistakes = 0;
+    let finished = false;
+    let busy = false;
+    let score = 0;
+    let safeChoices = 0;
+    let mapCorrect = 0;
+    let activityIdx = 0;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    let modalTimer = null;
+
+    // --- 4. KUTU OYUNU ---
+    function item() { return IT[queue[round]]; }
+
+    function renderSenses() {
+      const L = LEVELS[levelIndex];
+      const only = L.only ? L.only[queue[round]] : null;
+      const limitReached = used.filter(s => s !== 'dil').length >= L.maxSenses;
+      $('senses').innerHTML = SENSES.map(s => {
+        const off = busy || used.includes(s.id) || (only && s.id !== only && s.id !== 'dil') || (limitReached && s.id !== 'dil');
+        return `<button data-s="${s.id}" ${off ? 'disabled' : ''} class="sense pushable bg-white py-2 flex flex-col items-center ${only === s.id ? 'ring-4 ring-yellow-300' : ''}"><span class="text-2xl">${s.e}</span><span class="text-[10px] font-black">${s.n}</span></button>`;
+      }).join('');
+      $('senses').querySelectorAll('.sense').forEach(b => b.addEventListener('click', () => useSense(b.dataset.s)));
+    }
+
+    function renderGuesses() {
+      const it = item();
+      const others = ITEMS.filter(x => x.id !== it.id).sort(() => Math.random() - 0.5).slice(0, 3);
+      const opts = [it, ...others].sort(() => Math.random() - 0.5);
+      const canGuess = used.some(s => s !== 'dil');
+      $('guesses').innerHTML = opts.map(o => `<button data-g="${o.id}" ${canGuess && !busy ? '' : 'disabled'} class="guess pushable bg-white py-2 text-sm font-black">${o.n}</button>`).join('');
+      $('guesses').querySelectorAll('.guess').forEach(b => b.addEventListener('click', () => guess(b.dataset.g, b)));
+    }
+
+    function addClue(sense, html) {
+      const s = SENSES.find(x => x.id === sense);
+      const li = document.createElement('li');
+      li.className = 'p-2 bg-white rounded-lg border-2 border-ink text-xs font-semibold flex gap-2 items-start';
+      li.innerHTML = `<span class="text-lg leading-none">${s.e}</span><span>${html}</span>`;
+      $('clues').appendChild(li);
+      if (typeof gsap !== 'undefined') gsap.from(li, { x: 30, opacity: 0, duration: 0.3 });
+    }
+
+    function useSense(sense) {
+      if (busy || finished) return;
+      initAudio();
+      const it = item();
+      if (sense === 'dil') { askSafety(); return; }
+      used.push(sense);
+      Sound.click();
+      if (sense === 'kulak') {
+        if (it.kulak) { ITEM_SOUNDS[it.kulak](); addClue('kulak', `${it.kulakT} <button class="replay underline font-black text-violet-700">🔁 tekrar dinle</button>`); }
+        else addClue('kulak', 'Kutuyu salladın ama <b>hiç ses gelmiyor</b>...');
+        const rp = $('clues').querySelector('li:last-child .replay');
+        if (rp) rp.addEventListener('click', () => ITEM_SOUNDS[it.kulak]());
+      } else {
+        const txt = it[sense];
+        addClue(sense, txt || (sense === 'burun' ? '<b>Hiçbir koku</b> alamadın.' : 'Pek bir şey anlaşılmıyor.'));
+        if (it.id === 'kaktus' && sense === 'deri') { Sound.alarm(); if (typeof gsap !== 'undefined') gsap.fromTo('#boxWrap', { x: -6 }, { x: 0, duration: 0.5, ease: 'elastic.out(5,0.2)' }); }
+      }
+      renderSenses(); renderGuessesState();
+    }
+
+    function renderGuessesState() {
+      const canGuess = used.some(s => s !== 'dil');
+      $('guesses').querySelectorAll('.guess').forEach(b => { if (!b.classList.contains('bg-rose-200')) b.disabled = !canGuess || busy; });
+    }
+
+    function askSafety() {
+      busy = true;
+      renderSenses(); renderGuessesState();
+      const box = $('safetyBox');
+      box.classList.remove('hidden');
+      box.innerHTML = `<p class="text-sm font-black mb-2">🛑 Dur ve düşün! Kutudaki şeyin ne olduğunu <b>bilmiyorsun</b>. Onu tatmak güvenli mi?</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button data-c="yes" class="safe pushable py-2 bg-white text-xs font-black">😋 Evet, tadıp bakarım</button>
+          <button data-c="no" class="safe pushable py-2 bg-emerald-300 text-xs font-black">🙅 Hayır, bilmediğim şeyi tatmam</button>
+        </div>`;
+      box.querySelectorAll('.safe').forEach(b => b.addEventListener('click', () => {
+        box.classList.add('hidden');
+        busy = false;
+        used.push('dil');
+        if (b.dataset.c === 'no') {
+          safeChoices++; Sound.correct();
+          roundScore += 10;
+          $('scienceNote').innerHTML = '✅ <b>Çok akıllıca!</b> Ne olduğunu bilmediğimiz şeyleri asla ağzımıza almayız. Zehirli ya da tehlikeli olabilir! (+10 puan)';
+          if (safeChoices >= 3) completeMission('m2');
+        } else {
+          mistakes++; roundScore -= 30; Sound.alarm();
+          $('scienceNote').innerHTML = '❌ <b>Tehlikeli!</b> Kutudaki şey sabun, boya ya da zehirli bir bitki olabilirdi. Bilmediğin şeyleri <b>asla tatma</b>. (-30 puan)';
+        }
+        renderMissions(); renderSenses(); renderGuessesState();
+      }));
+    }
+
+    function guess(id, btn) {
+      if (busy || finished) return;
+      const it = item();
+      initAudio();
+      if (id === it.id) {
+        busy = true;
+        Sound.correct();
+        const sensesUsed = used.filter(s => s !== 'dil').length;
+        const pts = Math.max(10, 100 - (sensesUsed - 1) * 20 + roundScore);
+        levelPoints += pts;
+        score += pts; updateScore();
+        $('revealItem').textContent = it.e;
+        if (typeof gsap !== 'undefined') gsap.fromTo('#revealItem', { opacity: 0, scale: 0.3, y: 20 }, { opacity: 1, scale: 1, y: -10, duration: 0.5, ease: 'back.out(2)' });
+        else $('revealItem').style.opacity = 1;
+        $('scienceNote').innerHTML = `✅ Kutudaki <b>${it.n}</b>! ${sensesUsed} duyu kullanarak buldun. (+${pts} puan)`;
+        setTimeout(() => { busy = false; nextRound(); }, 1400);
+      } else {
+        mistakes++;
+        Sound.wrong();
+        btn.disabled = true; btn.classList.add('bg-rose-200');
+        roundScore -= 15;
+        $('scienceNote').innerHTML = `❌ ${IT[id].n} değil! İpuçlarını tekrar oku ya da başka bir duyunu kullan.`;
+      }
+    }
+
+    function startRound() {
+      used = []; roundScore = 0; busy = false;
+      $('clues').innerHTML = '';
+      $('safetyBox').classList.add('hidden');
+      $('revealItem').style.opacity = 0;
+      if (typeof gsap !== 'undefined') gsap.set('#revealItem', { opacity: 0 });
+      const L = LEVELS[levelIndex];
+      $('roundText').textContent = `${round + 1}/${queue.length}`;
+      const only = L.only ? L.only[queue[round]] : null;
+      if (only) $('scienceNote').innerHTML = `Bu kutuda sadece <b>${SENSES.find(s => s.id === only).e} ${SENSES.find(s => s.id === only).n}</b> duyunu kullanabilirsin.`;
+      renderSenses(); renderGuesses();
+      if (typeof gsap !== 'undefined') gsap.fromTo('#boxWrap', { rotate: -6 }, { rotate: 0, duration: 0.6, ease: 'elastic.out(3,0.3)' });
+    }
+
+    function nextRound() {
+      round++;
+      if (round >= queue.length) { winLevel(); return; }
+      startRound();
+    }
+
+    function winLevel() {
+      finished = true;
+      const L = LEVELS[levelIndex];
+      const avg = levelPoints / queue.length;
+      const s = mistakes === 0 && avg >= 70 ? 3 : mistakes <= 2 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += gained * 20;
+      if (levelIndex === 0) completeMission('m1');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      updateScore(); renderLevelDots();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+      showModal({ emoji: '🕵️', title: 'Dosya Kapandı!', stars: '⭐'.repeat(s) + '☆'.repeat(3 - s), info: `${queue.length} kutudan ${levelPoints} puan topladın. ${mistakes} hata.`, fact: L.fact, next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Duyu Haritası 🧍' });
+    }
+
+    // --- 5. DUYU HARİTASI ---
+    function renderMap(selected) {
+      $('organSpots').innerHTML = Object.entries(ORGANS).map(([k, o]) => `
+        <g class="organ-spot" data-o="${k}">
+          <circle cx="${o.x}" cy="${o.y}" r="15" fill="#facc15" fill-opacity="${selected === k ? 0.7 : 0.25}" stroke="#0f172a" stroke-width="2" stroke-dasharray="4 3" />
+          <text x="${o.x + (k === 'deri' ? -26 : k === 'kulak' ? 24 : k === 'goz' ? -34 : 24)}" y="${o.y + 4}" font-size="15" text-anchor="middle">${o.e}</text>
+        </g>`).join('');
+      $('organSpots').querySelectorAll('.organ-spot').forEach(g => g.addEventListener('click', () => answerMap(g.dataset.o)));
+      const a = ACTIVITIES[activityIdx % ACTIVITIES.length];
+      $('activityCard').innerHTML = `<p class="text-[10px] font-black text-amber-700 uppercase">Hangi duyu organını kullanırız?</p><p class="display text-lg font-black">"${a.t}"</p><p class="text-[11px] font-bold text-gray-500">Çocuğun üzerindeki doğru organa dokun · ${mapCorrect}/10</p>`;
+    }
+
+    function answerMap(o) {
+      if (mode !== 'map') return;
+      initAudio();
+      const a = ACTIVITIES[activityIdx % ACTIVITIES.length];
+      const org = ORGANS[o];
+      $('organInfo').innerHTML = `<p class="font-black text-sm">${org.e} ${org.n}</p><p class="font-semibold text-gray-700 mt-1">🛡️ <b>Nasıl korurum?</b> ${org.care}</p>`;
+      if (o === a.o) {
+        Sound.correct();
+        mapCorrect++;
+        activityIdx++;
+        renderMissions();
+        if (mapCorrect >= 10) completeMission('m3');
+        $('scienceNote').innerHTML = `✅ "${a.t}" için <b>${org.n}</b> kullanırız.`;
+        renderMap(o);
+        if (typeof gsap !== 'undefined') gsap.from('#activityCard', { scale: 0.85, duration: 0.3, ease: 'back.out(2)' });
+      } else {
+        Sound.wrong();
+        $('scienceNote').innerHTML = `❌ ${org.n} ile bunu yapamayız. Tekrar dene!`;
+        renderMap(o);
+      }
+    }
+
+    // --- 6. AKIŞ ---
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info; $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next); if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 700);
+    }
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        let extra = '';
+        if (!done && m.progress === 'safe') extra = ` <b class="text-sky-700">(${Math.min(3, safeChoices)}/3)</b>`;
+        if (!done && m.progress === 'map') extra = ` <b class="text-sky-700">(${Math.min(10, mapCorrect)}/10)</b>`;
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5"><span class="text-lg">${done ? '✅' : '⬜'}</span><div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}${extra}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Dosyalar:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function loadLevel(i) {
+      closeModal();
+      mode = 'levels'; levelIndex = i; round = 0; mistakes = 0; levelPoints = 0; finished = false;
+      const L = LEVELS[i];
+      queue = [...L.items].sort(() => Math.random() - 0.5);
+      $('levelBadge').textContent = `DOSYA ${i + 1}`;
+      $('levelTitle').textContent = L.title;
+      $('taskText').textContent = L.task;
+      renderLevelDots();
+      startRound();
+    }
+
+    function switchMode(m) {
+      const isM = m === 'map';
+      $('tabLevels').classList.toggle('active-tab', !isM); $('tabLevels').classList.toggle('bg-white', isM);
+      $('tabSandbox').classList.toggle('active-tab', isM); $('tabSandbox').classList.toggle('bg-white', !isM);
+      $('levelDots').classList.toggle('hidden', isM);
+      $('boxMode').classList.toggle('hidden', isM);
+      $('mapMode').classList.toggle('hidden', !isM); $('mapMode').classList.toggle('flex', isM);
+      if (isM) {
+        closeModal();
+        mode = 'map';
+        $('levelBadge').textContent = 'HARİTA';
+        $('levelTitle').textContent = 'Duyu Haritası';
+        $('taskText').textContent = '🎯 Etkinliği oku ve hangi duyu organıyla yaptığımızı çocuğun üzerinde göster!';
+        $('roundText').textContent = '🧍';
+        $('organInfo').innerHTML = '<p class="font-semibold text-gray-600">Bir organa dokununca onu nasıl koruyacağını burada göreceksin.</p>';
+        renderMap(null);
+      } else loadLevel(levelIndex);
+    }
+
+    $('btnReset').addEventListener('click', () => { Sound.click(); if (mode === 'levels') loadLevel(levelIndex); else { mapCorrect = 0; activityIdx = 0; renderMap(null); renderMissions(); } });
+    $('btnHint').addEventListener('click', () => {
+      Sound.click();
+      $('scienceNote').innerHTML = mode === 'levels' ? `<b>İpucu:</b> ${LEVELS[levelIndex].hint}` : '<b>İpucu:</b> Sıcak ve soğuğu hissetmek de dokunma duyusudur. Deri bu yüzden en büyük duyu organımızdır!';
+    });
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('map'); });
+    $('btnModalRetry').addEventListener('click', () => loadLevel(levelIndex));
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('map'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; Sound.click(); });
+
+    renderMissions(); updateScore(); loadLevel(0);
+  </script>
+</body>
+</html>

@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enerji Dedektifi: Evdeki Sızıntılar | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .pushable:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+    .hotspot { cursor: pointer; }
+    @keyframes ringPulse { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+    .hint-ring { animation: ringPulse 0.8s ease-in-out infinite; }
+    input[type=range] { accent-color: #f59e0b; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-sm font-black flex items-center gap-1"><span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span></a>
+      <div>
+        <div class="flex items-center gap-2"><span class="text-2xl sm:text-3xl">🔌</span><h1 class="display text-lg sm:text-2xl font-black tracking-wide">Enerji Dedektifi: Evdeki Sızıntılar</h1></div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Evde boşa harcanan enerjiyi ve suyu bul, tehlikeleri fark et! Fatura düşsün, doğa kazansın. 🕵️💡💧</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab">🏠 1. Ev Turu</button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white">🧮 2. Tasarruf Hesaplayıcı</button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">ODA 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">Oturma Odası</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <!-- EV MODU -->
+        <div id="houseMode" class="flex flex-col gap-3">
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="p-1.5 bg-amber-50 rounded-xl border-2 border-ink"><p class="text-[10px] font-black text-gray-500">BULUNAN</p><p id="foundText" class="display text-lg font-black leading-none">0/4</p></div>
+            <div class="p-1.5 bg-rose-50 rounded-xl border-2 border-ink"><p class="text-[10px] font-black text-gray-500">SÜRE</p><p id="timeText" class="display text-lg font-black leading-none">60</p></div>
+            <div class="p-1.5 bg-emerald-50 rounded-xl border-2 border-ink"><p class="text-[10px] font-black text-gray-500">İSRAF METRESİ</p>
+              <div class="h-3.5 mt-1 bg-white rounded-full border-2 border-ink overflow-hidden"><div id="wasteBar" class="h-full bg-gradient-to-r from-yellow-400 to-red-500 transition-all duration-300" style="width:100%"></div></div>
+            </div>
+          </div>
+          <div class="relative rounded-2xl border-3 border-ink overflow-hidden">
+            <svg id="room" viewBox="0 0 560 340" class="w-full h-auto block"></svg>
+            <div id="startOverlay" class="absolute inset-0 bg-ink/50 flex items-center justify-center p-4">
+              <div class="chunky bg-white p-4 max-w-xs w-full text-center">
+                <p class="text-4xl">🕵️</p>
+                <p id="startTitle" class="display text-xl font-black">Oturma Odası</p>
+                <p id="startText" class="text-xs font-bold text-gray-700 my-2"></p>
+                <button id="btnStart" class="pushable w-full py-2.5 bg-emerald-500 text-white text-sm font-black">🔍 Aramaya Başla</button>
+              </div>
+            </div>
+          </div>
+          <div id="foundList" class="flex flex-wrap gap-1.5"></div>
+        </div>
+
+        <!-- HESAPLAYICI -->
+        <div id="calcMode" class="hidden flex-col gap-2">
+          <div id="calcRows" class="flex flex-col gap-2"></div>
+          <div class="p-3 bg-amber-50 rounded-xl border-3 border-ink">
+            <div class="flex items-center justify-between"><p class="display font-black">⚡ Günlük Tüketim</p><p id="dailyText" class="display text-xl font-black">0 kWh</p></div>
+            <div class="h-5 mt-1 bg-white rounded-full border-2 border-ink overflow-hidden"><div id="dailyBar" class="h-full bg-gradient-to-r from-lime-400 via-yellow-400 to-red-500 transition-all duration-300"></div></div>
+            <p id="monthText" class="text-xs font-bold text-gray-700 mt-1"></p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-xs font-black">🔄 Baştan</button>
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black">💡 İpucu (1 yıldız)</button>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-yellow-50 to-lime-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">Evlerimizde kullandığımız elektriğin bir kısmı fosil yakıtlar yakılarak üretilir. Enerjiyi <b>tasarruflu</b> kullanmak hem faturayı düşürür hem de doğayı korur!</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">Dedektif Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Fen Bilgisi Rehberi</h3></div>
+        <div class="space-y-2 text-xs">
+          <div class="p-2 bg-yellow-50 rounded-lg border border-yellow-300"><p class="font-extrabold text-yellow-900">💡 Aydınlatma</p><p class="text-[11px] text-yellow-800 font-semibold mt-0.5"><b>LED ampuller</b> eski tip (akkor) ampullere göre aynı ışığı çok daha az elektrikle verir. Gün ışığından yararlan!</p></div>
+          <div class="p-2 bg-sky-50 rounded-lg border border-sky-300"><p class="font-extrabold text-sky-900">💧 Su Tasarrufu</p><p class="text-[11px] text-sky-800 font-semibold mt-0.5">Dişini fırçalarken musluğu kapat, damlayan muslukları tamir ettir, kısa duş al.</p></div>
+          <div class="p-2 bg-rose-50 rounded-lg border border-rose-300"><p class="font-extrabold text-rose-900">⚡ Elektrik Güvenliği</p><p class="text-[11px] text-rose-800 font-semibold mt-0.5">Prizlere ve fişlere <b>ıslak elle</b> dokunma. Hasarlı kabloları kullanma. Bir prize çok fazla cihaz bağlama!</p></div>
+          <div class="p-2 bg-lime-50 rounded-lg border border-lime-300"><p class="font-extrabold text-lime-900">🔋 Bekleme Modu</p><p class="text-[11px] text-lime-800 font-semibold mt-0.5">Kapalı gibi görünen ama fişi takılı cihazlar da az miktarda elektrik harcamaya devam eder.</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Oda Temiz!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-lime-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-lime-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      fix() { tone('triangle', 700, 1100, 0.12, 0.2); tone('sine', 1400, 1400, 0.1, 0.1, 0.08); },
+      nope() { tone('sine', 300, 250, 0.15, 0.1); },
+      alarm() { tone('square', 880, 660, 0.15, 0.1); tone('square', 880, 660, 0.15, 0.1, 0.2); },
+      tick() { tone('sine', 1000, 1000, 0.05, 0.06); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. ODALAR ---
+    // kind: leak (israf), hazard (tehlike), ok (doğru kullanım)
+    const ROOMS = {
+      salon: {
+        wall: '#fde68a', floor: '#d6a36b',
+        decor: `<rect x="40" y="40" width="130" height="100" rx="6" fill="#bae6fd" stroke="#0f172a" stroke-width="4" /><line x1="105" y1="40" x2="105" y2="140" stroke="#0f172a" stroke-width="3" /><circle cx="140" cy="70" r="16" fill="#facc15" />
+          <rect x="220" y="200" width="200" height="60" rx="16" fill="#f472b6" stroke="#0f172a" stroke-width="3" /><rect x="210" y="180" width="30" height="80" rx="10" fill="#ec4899" stroke="#0f172a" stroke-width="3" /><rect x="400" y="180" width="30" height="80" rx="10" fill="#ec4899" stroke="#0f172a" stroke-width="3" />
+          <rect x="440" y="120" width="100" height="70" rx="4" fill="#78350f" stroke="#0f172a" stroke-width="3" />`
+      },
+      mutfak: {
+        wall: '#bbf7d0', floor: '#e5e7eb',
+        decor: `<rect x="30" y="80" width="90" height="190" rx="8" fill="#f8fafc" stroke="#0f172a" stroke-width="4" /><line x1="30" y1="150" x2="120" y2="150" stroke="#0f172a" stroke-width="3" />
+          <rect x="150" y="190" width="380" height="80" fill="#a16207" stroke="#0f172a" stroke-width="4" /><rect x="150" y="180" width="380" height="14" fill="#e7e5e4" stroke="#0f172a" stroke-width="3" />
+          <rect x="250" y="40" width="120" height="80" rx="6" fill="#bae6fd" stroke="#0f172a" stroke-width="4" /><circle cx="300" cy="70" r="14" fill="#facc15" />`
+      },
+      banyo: {
+        wall: '#bfdbfe', floor: '#cbd5e1',
+        decor: `<rect x="20" y="150" width="120" height="120" rx="10" fill="#f8fafc" stroke="#0f172a" stroke-width="4" /><rect x="40" y="40" width="80" height="90" rx="8" fill="#e0f2fe" stroke="#0f172a" stroke-width="4" />
+          <line x1="280" y1="0" x2="280" y2="340" stroke="#0f172a" stroke-width="4" /><rect x="280" y="0" width="280" height="340" fill="#fde68a" />
+          <rect x="300" y="190" width="160" height="80" rx="10" fill="#93c5fd" stroke="#0f172a" stroke-width="4" /><rect x="480" y="150" width="60" height="120" fill="#a16207" stroke="#0f172a" stroke-width="3" />
+          <rect x="380" y="40" width="110" height="80" rx="6" fill="#bae6fd" stroke="#0f172a" stroke-width="4" /><circle cx="460" cy="65" r="13" fill="#facc15" />`
+      }
+    };
+
+    const H = (x, y, kind, e, fixed, label, msg) => ({ x, y, kind, e, fixed, label, msg });
+
+    const LEVELS = [
+      {
+        title: 'Oturma Odası', room: 'salon', time: 50,
+        intro: 'Güneşli bir öğleden sonra. Odada kimse yok ama bir şeyler boşuna enerji harcıyor. 4 israfı bul!',
+        spots: [
+          H(300, 110, 'leak', '💡', '🌑', 'Açık lamba', 'Gün ışığı varken ve odada kimse yokken lambayı kapattık!'),
+          H(490, 150, 'leak', '📺', '⬛', 'Kimsenin izlemediği TV', 'İzlenmeyen televizyonu kapattık. Bekleme modunda bırakmak yerine tamamen kapatmak daha iyidir.'),
+          H(185, 290, 'leak', '🔌', '✅', 'Boşta takılı şarj aleti', 'Telefon takılı değilken prizde bırakılan şarj aleti boşuna elektrik harcar. Fişten çıkardık!'),
+          H(70, 160, 'leak', '🔥', '🧯', 'Pencere açıkken çalışan ısıtıcı', 'Pencere açıkken ısıtıcı çalışırsa sıcak hava dışarı kaçar. Isıtıcıyı kapattık!'),
+          H(320, 185, 'ok', '🐈', null, 'Uyuyan kedi', 'Bu sadece uyuyan bir kedi, enerji harcamıyor. 😺'),
+          H(530, 280, 'ok', '🪴', null, 'Saksı', 'Bitkiler enerji harcamaz, havayı temizler!'),
+          H(420, 100, 'ok', '📚', null, 'Kitaplık', 'Kitap okumak hiç elektrik harcamaz. Harika bir tercih!')
+        ],
+        fact: 'Bir odadan çıkarken ışığı kapatmak gibi küçük alışkanlıklar, bütün bir yıl boyunca çok büyük tasarruf sağlar.'
+      },
+      {
+        title: 'Mutfak', room: 'mutfak', time: 55,
+        intro: 'Mutfakta hem elektrik hem su boşa gidiyor! 5 israfı bul.',
+        spots: [
+          H(75, 120, 'leak', '🧊', '🚪', 'Kapısı açık buzdolabı', 'Buzdolabının kapısı açık kalınca içeri sıcak hava girer ve buzdolabı çok daha fazla çalışır. Kapıyı kapattık!'),
+          H(430, 150, 'leak', '🚰', '✅', 'Damlayan musluk', 'Damlayan bir musluk günde litrelerce suyu boşa harcayabilir. Sıkıca kapattık!'),
+          H(220, 160, 'leak', '🍲', '🫕', 'Kapaksız tencere', 'Tencerenin kapağını kapatınca yemek daha çabuk pişer ve daha az enerji harcanır.'),
+          H(340, 240, 'leak', '🍽️', '⏸️', 'Yarı boş çalışan bulaşık makinesi', 'Bulaşık makinesini tam dolunca çalıştırmak su ve elektrik tasarrufu sağlar.'),
+          H(310, 70, 'leak', '💡', '🌑', 'Gündüz yanan lamba', 'Pencereden güneş girerken lambaya gerek yok!'),
+          H(510, 150, 'ok', '🍎', null, 'Meyve tabağı', 'Meyveler enerji harcamaz, enerji verir! 🍎'),
+          H(160, 60, 'ok', '🕰️', null, 'Duvar saati', 'Pilli saat çok az enerji harcar ve bu normaldir.')
+        ],
+        fact: 'Buzdolabı evde en çok elektrik harcayan cihazlardan biridir çünkü hiç durmadan çalışır. Kapısını kısa süre açık tutmak önemlidir.'
+      },
+      {
+        title: 'Banyo ve Yatak Odası', room: 'banyo', time: 55,
+        intro: 'Sabah telaşı! Banyo ve yatak odasında 5 israf var.',
+        spots: [
+          H(80, 170, 'leak', '🚰', '✅', 'Diş fırçalarken açık musluk', 'Dişlerimizi fırçalarken musluğu kapatırsak dakikada birkaç litre su kurtarırız!'),
+          H(200, 90, 'leak', '🚿', '⏱️', 'Uzun süre açık kalan duş', 'Kısa duş almak hem suyu hem de suyu ısıtmak için harcanan enerjiyi korur.'),
+          H(330, 60, 'leak', '💡', '✨', 'Eski tip akkor ampul', 'Akkor ampulü LED ampulle değiştirdik. Aynı ışık için çok daha az elektrik harcar!'),
+          H(420, 220, 'leak', '💻', '💤', 'Kimsenin kullanmadığı açık bilgisayar', 'Kullanılmayan bilgisayarı kapattık.'),
+          H(510, 110, 'leak', '❄️', '🪟', 'Pencere açıkken çalışan klima', 'Klima çalışırken pencere açık olursa soğuk hava dışarı kaçar!'),
+          H(230, 250, 'ok', '🧴', null, 'Şampuan', 'Şampuan elektrik ya da su harcamaz.'),
+          H(360, 280, 'ok', '🧸', null, 'Oyuncak ayı', 'Oyuncak ayı sadece sarılmak için. 🧸')
+        ],
+        fact: 'Suyu ısıtmak çok enerji gerektirir. Bu yüzden sıcak su tasarrufu aynı zamanda <b>enerji tasarrufudur</b>.'
+      },
+      {
+        title: 'Güvenlik Turu', room: 'salon', time: 50,
+        intro: 'Bu sefer israf değil, TEHLİKE arıyorsun! Elektrik kazalarına yol açabilecek 5 durumu bul.',
+        spots: [
+          H(300, 280, 'hazard', '🔌', '✅', 'Çok fazla cihaz bağlı priz', 'Bir prize çok fazla cihaz bağlamak kabloları ısıtır ve yangına yol açabilir. Fazla fişleri çıkardık!'),
+          H(120, 285, 'hazard', '⚡', '🧰', 'Kabloları soyulmuş uzatma', 'Hasarlı kablolar elektrik çarpmasına yol açabilir. Bir yetişkine haber verip kabloyu kullanmıyoruz.'),
+          H(450, 290, 'hazard', '💧', '🧽', 'Kablonun yanındaki su birikintisi', 'Su elektriği iletir! Kabloların yakınındaki suyu hemen bir yetişkine haber vererek temizlettik.'),
+          H(490, 150, 'hazard', '🍹', '🚫', 'Televizyonun üstündeki içecek', 'Elektrikli cihazların üzerine sıvı konmaz. Devrilirse kısa devre olabilir!'),
+          H(70, 100, 'hazard', '🪁', '🌳', 'Elektrik tellerine yakın uçurtma', 'Uçurtmayı elektrik tellerinden uzakta, açık alanda uçurmalıyız!'),
+          H(320, 185, 'ok', '🐈', null, 'Uyuyan kedi', 'Kedi güvende, uyuyor. 😺'),
+          H(420, 100, 'ok', '📚', null, 'Kitaplık', 'Kitaplık güvenli.')
+        ],
+        fact: 'Elektrikle ilgili bir tehlike gördüğünde <b>kendin müdahale etme</b>, hemen bir yetişkine haber ver!'
+      },
+      {
+        title: 'Bütün Ev Taraması', room: 'mutfak', time: 45,
+        intro: 'Son görev! Karışık: israfları ve tehlikeleri birlikte bul. Süre az, dikkatli ol!',
+        spots: [
+          H(75, 120, 'leak', '🧊', '🚪', 'Kapısı açık buzdolabı', 'Buzdolabının kapısını kapattık.'),
+          H(430, 150, 'leak', '🚰', '✅', 'Açık bırakılmış musluk', 'Musluğu kapattık.'),
+          H(310, 70, 'leak', '💡', '🌑', 'Gündüz yanan lamba', 'Lambayı kapattık.'),
+          H(200, 250, 'hazard', '🔌', '✅', 'Islak tezgâhtaki fişli tost makinesi', 'Islak yerdeki elektrikli cihazın fişini bir yetişkin çekti. Su ve elektrik bir araya gelmemeli!'),
+          H(500, 250, 'hazard', '⚡', '🧰', 'Hasarlı kablo', 'Hasarlı kabloyu kullanmıyoruz.'),
+          H(220, 160, 'leak', '🍲', '🫕', 'Kapaksız tencere', 'Tencerenin kapağını kapattık.'),
+          H(510, 150, 'ok', '🍎', null, 'Meyve tabağı', 'Meyveler sorun değil!'),
+          H(160, 60, 'ok', '🕰️', null, 'Duvar saati', 'Saat normal çalışıyor.')
+        ],
+        fact: 'Tebrikler dedektif! Enerji tasarrufu ve elektrik güvenliği kurallarını ailenle paylaşarak evini daha güvenli ve tasarruflu yapabilirsin.'
+      }
+    ];
+
+    // --- 3. HESAPLAYICI ---
+    const DEVICES = [
+      { id: 'ampul', n: 'Salon Aydınlatması', e: '💡', w: 60, w2: 9, alt: 'LED ampul kullan', h: 6 },
+      { id: 'tv', n: 'Televizyon', e: '📺', w: 100, h: 5 },
+      { id: 'pc', n: 'Bilgisayar', e: '💻', w: 60, h: 4 },
+      { id: 'kurutma', n: 'Saç Kurutma Makinesi', e: '💨', w: 1500, h: 0.5 },
+      { id: 'isitici', n: 'Elektrikli Isıtıcı', e: '🔥', w: 2000, h: 2 }
+    ];
+    let calc = {};
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: İlk Tur', text: 'Oturma odasındaki israfları bul.' },
+      { id: 'm2', title: '2. Görev: Güvenlik Uzmanı', text: 'Güvenlik Turunu hiç yanlış tıklamadan bitir.' },
+      { id: 'm3', title: '3. Görev: Tasarruf Ustası', text: 'Hesaplayıcıda günlük tüketimi başlangıca göre yarıdan fazla azalt.' },
+      { id: 'm4', title: '4. Görev: Baş Dedektif', text: '5 turun hepsini tamamla.' }
+    ];
+
+    // --- 4. DURUM ---
+    const $ = id => document.getElementById(id);
+    let mode = 'levels';
+    let levelIndex = 0;
+    let spots = [];
+    let found = 0;
+    let wrong = 0;
+    let hintUsed = false;
+    let timeLeft = 0;
+    let timer = null;
+    let running = false;
+    let finished = false;
+    let score = 0;
+    let hintSpot = null;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    let modalTimer = null;
+
+    function L() { return LEVELS[levelIndex]; }
+    function note(html) { $('scienceNote').innerHTML = html; }
+
+    // --- 5. ODA ÇİZİMİ ---
+    function renderRoom() {
+      const lv = L(), r = ROOMS[lv.room];
+      let h = `<rect width="560" height="340" fill="${r.wall}" /><rect y="270" width="560" height="70" fill="${r.floor}" /><line x1="0" y1="270" x2="560" y2="270" stroke="#0f172a" stroke-width="3" />${r.decor}`;
+      spots.forEach((s, i) => {
+        const done = s.done;
+        const isProblem = s.kind !== 'ok';
+        h += `<g class="hotspot" data-i="${i}">`;
+        if (hintSpot === i && !done) h += `<circle class="hint-ring" cx="${s.x}" cy="${s.y}" r="30" fill="none" stroke="#dc2626" stroke-width="4" stroke-dasharray="6 4" />`;
+        if (done && isProblem) h += `<circle cx="${s.x}" cy="${s.y}" r="26" fill="#bbf7d0" stroke="#16a34a" stroke-width="3" />`;
+        h += `<text x="${s.x}" y="${s.y + 16}" font-size="46" text-anchor="middle">${done && s.fixed ? s.fixed : s.e}</text>`;
+        if (!done && isProblem && s.e === '💡') h += `<circle cx="${s.x}" cy="${s.y - 4}" r="30" fill="#fde047" opacity="0.25" />`;
+        h += `<circle cx="${s.x}" cy="${s.y}" r="30" fill="transparent" /></g>`;
+      });
+      $('room').innerHTML = h;
+      $('room').querySelectorAll('.hotspot').forEach(g => g.addEventListener('click', () => onSpot(+g.dataset.i)));
+      const total = spots.filter(s => s.kind !== 'ok').length;
+      $('foundText').textContent = `${found}/${total}`;
+      $('wasteBar').style.width = `${Math.round((1 - found / total) * 100)}%`;
+      $('foundList').innerHTML = spots.filter(s => s.done && s.kind !== 'ok').map(s => `<span class="px-2 py-0.5 rounded-lg border-2 border-ink text-[10px] font-black ${s.kind === 'hazard' ? 'bg-rose-100' : 'bg-lime-100'}">${s.kind === 'hazard' ? '⚠️' : '♻️'} ${s.label}</span>`).join('');
+    }
+
+    function onSpot(i) {
+      if (!running || finished) return;
+      initAudio();
+      const s = spots[i];
+      if (s.done) return;
+      if (s.kind === 'ok') {
+        wrong++;
+        timeLeft = Math.max(0, timeLeft - 3);
+        Sound.nope();
+        note(`🤔 ${s.msg} (-3 sn)`);
+        updateTime();
+        return;
+      }
+      s.done = true;
+      found++;
+      if (hintSpot === i) hintSpot = null;
+      if (s.kind === 'hazard') Sound.alarm(); else Sound.fix();
+      note(`${s.kind === 'hazard' ? '⚠️' : '✅'} <b>${s.label}</b>: ${s.msg}`);
+      renderRoom();
+      const g = $('room').querySelector(`.hotspot[data-i="${i}"]`);
+      if (g && typeof gsap !== 'undefined') gsap.from(g, { scale: 1.6, transformOrigin: `${s.x}px ${s.y}px`, duration: 0.4, ease: 'back.out(2)' });
+      if (found === spots.filter(x => x.kind !== 'ok').length) winLevel();
+    }
+
+    function updateTime() {
+      $('timeText').textContent = timeLeft;
+      $('timeText').classList.toggle('text-red-600', timeLeft <= 10);
+    }
+
+    function startTimer() {
+      clearInterval(timer);
+      timer = setInterval(() => {
+        if (!running || finished) return;
+        timeLeft--;
+        updateTime();
+        if (timeLeft <= 10 && timeLeft > 0) Sound.tick();
+        if (timeLeft <= 0) failLevel();
+      }, 1000);
+    }
+
+    function winLevel() {
+      finished = true; running = false; clearInterval(timer);
+      const s = hintUsed ? Math.min(2, wrong === 0 ? 2 : 1) : wrong === 0 && timeLeft >= L().time * 0.3 ? 3 : wrong <= 2 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20 + timeLeft;
+      if (levelIndex === 0) completeMission('m1');
+      if (levelIndex === 3 && wrong === 0) completeMission('m2');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      updateScore(); renderLevelDots();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 }, colors: ['#84cc16', '#facc15', '#38bdf8'] });
+      showModal({ emoji: '🕵️', title: 'Oda Temiz!', stars: '⭐'.repeat(s) + '☆'.repeat(3 - s), info: `${timeLeft} saniye kala bitirdin. ${wrong} yanlış tıklama.${hintUsed ? ' (İpucu kullanıldı)' : ''}`, fact: L().fact, next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Hesaplayıcı 🧮' });
+    }
+
+    function failLevel() {
+      finished = true; running = false; clearInterval(timer);
+      Sound.nope();
+      const missed = spots.filter(s => s.kind !== 'ok' && !s.done).map(s => s.label);
+      showModal({ emoji: '⏰', title: 'Süre Doldu!', stars: '☆☆☆', info: `Bulunamayanlar: ${missed.join(', ')}`, fact: 'Tekrar dene! Odayı soldan sağa sistemli bir şekilde taramak işini kolaylaştırır.', next: null });
+      spots.forEach((s, i) => { if (s.kind !== 'ok' && !s.done) hintSpot = i; });
+      renderRoom();
+    }
+
+    // --- 6. HESAPLAYICI ---
+    function dailyKwh(state) {
+      return DEVICES.reduce((a, d) => a + (state[d.id].alt && d.w2 ? d.w2 : d.w) * state[d.id].h / 1000, 0);
+    }
+    const BASE = Object.fromEntries(DEVICES.map(d => [d.id, { h: d.h, alt: false }]));
+    const BASE_KWH = dailyKwh(BASE);
+
+    function renderCalc() {
+      $('calcRows').innerHTML = DEVICES.map(d => {
+        const s = calc[d.id];
+        const w = s.alt && d.w2 ? d.w2 : d.w;
+        const kwh = w * s.h / 1000;
+        return `<div class="p-2.5 bg-white rounded-xl border-2 border-ink">
+          <div class="flex items-center justify-between gap-2"><p class="text-sm font-black">${d.e} ${d.n} <span class="text-[10px] font-bold text-gray-500">(yaklaşık ${w} W)</span></p><p id="kwh-${d.id}" class="text-xs font-black">${kwh.toFixed(2).replace('.', ',')} kWh</p></div>
+          <div class="flex items-center gap-2 mt-1"><span id="hrs-${d.id}" class="text-[11px] font-bold w-24">Günde ${String(s.h).replace('.', ',')} saat</span><input data-d="${d.id}" type="range" min="0" max="${d.id === 'kurutma' ? 2 : 10}" step="0.5" value="${s.h}" class="hrs flex-1">
+          ${d.w2 ? `<button data-d="${d.id}" class="alt pushable px-2 py-1 text-[10px] font-black ${s.alt ? 'bg-lime-300' : 'bg-white'}">${s.alt ? '✅ LED' : '🔁 ' + d.alt}</button>` : ''}</div></div>`;
+      }).join('');
+      $('calcRows').querySelectorAll('.hrs').forEach(inp => inp.addEventListener('input', e => {
+        const id = e.target.dataset.d, d = DEVICES.find(x => x.id === id), s = calc[id];
+        s.h = +e.target.value;
+        const w = s.alt && d.w2 ? d.w2 : d.w;
+        $(`hrs-${id}`).textContent = `Günde ${String(s.h).replace('.', ',')} saat`;
+        $(`kwh-${id}`).textContent = `${(w * s.h / 1000).toFixed(2).replace('.', ',')} kWh`;
+        updateCalcTotals();
+      }));
+      $('calcRows').querySelectorAll('.alt').forEach(b => b.addEventListener('click', () => { const s = calc[b.dataset.d]; s.alt = !s.alt; Sound.click(); renderCalc(); }));
+      updateCalcTotals();
+    }
+    function updateCalcTotals() {
+      const k = dailyKwh(calc);
+      $('dailyText').textContent = `${k.toFixed(2).replace('.', ',')} kWh`;
+      $('dailyBar').style.width = `${Math.min(100, k / 6 * 100)}%`;
+      const pct = Math.round((1 - k / BASE_KWH) * 100);
+      $('monthText').innerHTML = `Bir ayda (30 gün) yaklaşık <b>${Math.round(k * 30)} kWh</b>. ${pct > 0 ? `Başlangıca göre <b class="text-emerald-700">%${pct} tasarruf</b>! 🌱` : pct < 0 ? `Başlangıca göre <b class="text-rose-700">%${-pct} daha fazla</b> tüketim.` : 'Değerleri değiştirerek tasarruf etmeyi dene!'}`;
+      if (pct > 50) completeMission('m3');
+    }
+
+    // --- 7. AKIŞ ---
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info; $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next); if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 800);
+    }
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5"><span class="text-lg">${done ? '✅' : '⬜'}</span><div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Turlar:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function loadLevel(i) {
+      closeModal(); clearInterval(timer);
+      mode = 'levels'; levelIndex = i; found = 0; wrong = 0; hintUsed = false; hintSpot = null; running = false; finished = false;
+      spots = L().spots.map(s => ({ ...s, done: false }));
+      timeLeft = L().time; updateTime();
+      $('levelBadge').textContent = `TUR ${i + 1}`;
+      $('levelTitle').textContent = L().title;
+      $('startTitle').textContent = L().title;
+      $('startText').textContent = L().intro;
+      $('startOverlay').classList.remove('hidden');
+      renderLevelDots(); renderRoom();
+    }
+
+    $('btnStart').addEventListener('click', () => {
+      initAudio(); Sound.click();
+      $('startOverlay').classList.add('hidden');
+      running = true; startTimer();
+    });
+
+    function switchMode(m) {
+      const isC = m === 'calc';
+      $('tabLevels').classList.toggle('active-tab', !isC); $('tabLevels').classList.toggle('bg-white', isC);
+      $('tabSandbox').classList.toggle('active-tab', isC); $('tabSandbox').classList.toggle('bg-white', !isC);
+      $('levelDots').classList.toggle('hidden', isC);
+      $('houseMode').classList.toggle('hidden', isC);
+      $('calcMode').classList.toggle('hidden', !isC); $('calcMode').classList.toggle('flex', isC);
+      $('btnHint').textContent = isC ? '💡 İpucu' : '💡 İpucu (1 yıldız)';
+      if (isC) {
+        closeModal(); clearInterval(timer); running = false;
+        mode = 'calc';
+        $('levelBadge').textContent = 'HESAPLAYICI';
+        $('levelTitle').textContent = 'Evimiz Ne Kadar Elektrik Harcıyor?';
+        calc = JSON.parse(JSON.stringify(BASE));
+        renderCalc();
+        note('Bir cihazın harcadığı enerji, <b>gücüne (Watt)</b> ve <b>çalıştığı süreye</b> bağlıdır. 1000 Watt gücündeki bir cihaz 1 saat çalışırsa 1 kWh enerji harcar.');
+      } else loadLevel(levelIndex);
+    }
+
+    $('btnReset').addEventListener('click', () => { Sound.click(); if (mode === 'levels') loadLevel(levelIndex); else { calc = JSON.parse(JSON.stringify(BASE)); renderCalc(); } });
+    $('btnHint').addEventListener('click', () => {
+      Sound.click();
+      if (mode === 'calc') { note('<b>İpucu:</b> En yüksek güçteki cihazlar (ısıtıcı, saç kurutma makinesi) kısa sürede bile çok enerji harcar. Önce onların süresini azalt, sonra LED\'e geç!'); return; }
+      if (!running || finished) return;
+      const idx = spots.findIndex(s => s.kind !== 'ok' && !s.done);
+      if (idx >= 0) { hintUsed = true; hintSpot = idx; renderRoom(); note('🔍 Kırmızı halkanın olduğu yere bak!'); }
+    });
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('calc'); });
+    $('btnModalRetry').addEventListener('click', () => loadLevel(levelIndex));
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('calc'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; Sound.click(); });
+
+    renderMissions(); updateScore(); loadLevel(0);
+  </script>
+</body>
+</html>

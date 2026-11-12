@@ -1,0 +1,1906 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rube Goldberg Şeker Fabrikası: Basit Makineler Atölyesi | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'sans-serif'],
+            display: ['Baloo 2', 'cursive'],
+          },
+          colors: {
+            bgMain: '#fffdf5',
+            ink: '#0f172a',
+            candyPink: '#f43f5e',
+            candyYellow: '#fbbf24',
+            gearBrass: '#d97706',
+            factoryBlue: '#0284c7',
+            leverGreen: '#10b981',
+            chunkyShadow: '#0f172a',
+          },
+          borderWidth: {
+            '3': '3px',
+            '3.5': '3.5px',
+          },
+          boxShadow: {
+            'hard': '4px 4px 0px #0f172a',
+            'hard-lg': '6px 6px 0px #0f172a',
+            'hard-sm': '2px 2px 0px #0f172a',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffdf5;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky {
+      border: 3.5px solid #0f172a;
+      border-radius: 1.25rem;
+      box-shadow: 4px 4px 0px #0f172a;
+    }
+    .pushable {
+      border: 3px solid #0f172a;
+      border-radius: 0.85rem;
+      box-shadow: 3px 3px 0px #0f172a;
+      transition: all 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+      cursor: pointer;
+    }
+    .pushable:hover {
+      transform: translate(-1.5px, -1.5px);
+      box-shadow: 4.5px 4.5px 0px #0f172a;
+    }
+    .pushable:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #0f172a;
+    }
+    .sticker {
+      filter: drop-shadow(2px 2px 0px #0f172a);
+    }
+    .tool-item {
+      transition: all 0.15s ease;
+    }
+    .tool-item.selected {
+      background-color: #fef08a !important;
+      border-color: #0f172a !important;
+      box-shadow: 3px 3px 0px #0f172a !important;
+      transform: scale(1.04);
+    }
+    @keyframes gearSpinSlow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .gear-spin {
+      animation: gearSpinSlow 12s linear infinite;
+    }
+    /* Nabız parıltısı */
+    @keyframes goalGlow {
+      0%, 100% { filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.4)); }
+      50% { filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.9)); }
+    }
+    .goal-pulse {
+      animation: goalGlow 1.8s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <!-- Üst Başlık & Navigasyon Çubuğu -->
+  <header class="max-w-7xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-ink text-xs sm:text-sm font-black flex items-center gap-1">
+        <span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span>
+      </a>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">⚙️</span>
+          <h1 class="display text-lg sm:text-2xl font-black text-ink tracking-wide">
+            Rube Goldberg Şeker Fabrikası
+          </h1>
+          <span class="hidden md:inline px-2 py-0.5 bg-amber-100 text-amber-900 text-xs font-black rounded-lg border border-ink">
+            Basit Makineler Atölyesi
+          </span>
+        </div>
+        <p class="text-xs text-gray-600 font-bold hidden sm:block">
+          Dişliler, Kaldıraçlar, Makaralar, Eğik Düzlem & Yaylar ile Zincirleme Reaksiyon Kur! 🍭✨
+        </p>
+      </div>
+    </div>
+
+    <!-- Puan, Ses ve Bilimsel Rehber Butonları -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <div class="bg-amber-100 px-3 py-1.5 rounded-xl border-2 border-ink text-xs font-black text-ink flex items-center gap-1.5">
+        <span>⭐</span> <span>Yıldız:</span> <span id="lblStars" class="text-sm font-black text-amber-700">0 / 18</span>
+      </div>
+      <button id="btnVectors" onclick="toggleVectors()" class="pushable px-2.5 py-1.5 bg-sky-100 hover:bg-sky-200 text-ink text-xs font-extrabold flex items-center gap-1" title="Kuvvet ve Hız Vektörlerini Göster">
+        <span>↗️</span> <span class="hidden md:inline">Kuvvet Okları</span>
+      </button>
+      <button id="btnSoundToggle" onclick="toggleSound()" class="pushable p-2 bg-purple-100 hover:bg-purple-200 text-ink font-bold text-xs" title="Sesi Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+      <button onclick="openScienceModal()" class="pushable px-3 py-1.5 bg-yellow-300 hover:bg-yellow-400 text-ink text-xs font-black flex items-center gap-1 shadow-sm">
+        <span>💡</span> <span class="hidden sm:inline">Nasıl Çalışır?</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Seviye & Mod Seçim Çubuğu -->
+  <div class="max-w-7xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 max-w-full">
+      <button onclick="selectLevel(1)" id="lvlBtn1" class="pushable px-3 py-1.5 text-xs font-black bg-yellow-400 text-ink whitespace-nowrap">
+        <span>📐 1. Eğik Düzlem</span>
+      </button>
+      <button onclick="selectLevel(2)" id="lvlBtn2" class="pushable px-3 py-1.5 text-xs font-black bg-white text-ink hover:bg-gray-100 whitespace-nowrap">
+        <span>⚖️ 2. Kaldıraç Dengesi</span>
+      </button>
+      <button onclick="selectLevel(3)" id="lvlBtn3" class="pushable px-3 py-1.5 text-xs font-black bg-white text-ink hover:bg-gray-100 whitespace-nowrap">
+        <span>⚙️ 3. Dişli Çarklar</span>
+      </button>
+      <button onclick="selectLevel(4)" id="lvlBtn4" class="pushable px-3 py-1.5 text-xs font-black bg-white text-ink hover:bg-gray-100 whitespace-nowrap">
+        <span>🪢 4. Makara Asansörü</span>
+      </button>
+      <button onclick="selectLevel(5)" id="lvlBtn5" class="pushable px-3 py-1.5 text-xs font-black bg-white text-ink hover:bg-gray-100 whitespace-nowrap">
+        <span>🌀 5. Büyük Fabrika</span>
+      </button>
+      <button onclick="selectLevel(6)" id="lvlBtn6" class="pushable px-3 py-1.5 text-xs font-black bg-white text-ink hover:bg-gray-100 whitespace-nowrap">
+        <span>🏆 6. Mucit Usta</span>
+      </button>
+    </div>
+
+    <!-- Serbest Sandbox Butonu -->
+    <button onclick="selectSandbox()" id="btnSandbox" class="pushable px-3.5 py-1.5 text-xs font-black bg-purple-200 hover:bg-purple-300 text-purple-950 flex items-center gap-1.5 shrink-0">
+      <span>🛠️</span> <span>Serbest Deney Masası</span>
+    </button>
+  </div>
+
+  <!-- Ana Çalışma Alanı: Sol Sahne (Canvas) + Sağ Araç Kutusu (Sidebar) -->
+  <main class="max-w-7xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start mb-4">
+
+    <!-- SOL: 60 FPS Fizik Sahnesi (8 Sütun) -->
+    <div class="lg:col-span-8 flex flex-col gap-3">
+      
+      <!-- Görev & İpucu Bilgilendirme Kutusu -->
+      <div class="bg-amber-50/80 p-3 chunky flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-white border-2 border-ink flex items-center justify-center text-xl shrink-0">
+            <span id="lvlIcon">📐</span>
+          </div>
+          <div>
+            <h2 id="lvlTitle" class="display text-base sm:text-lg font-black text-ink leading-tight">
+              Seviye 1: Eğik Düzlemin Gücü
+            </h2>
+            <p id="lvlDesc" class="text-xs font-bold text-gray-600">
+              Rampayı doğru açı ve konuma yerleştir, şekeri Altın Kavanoz'a ulaştır!
+            </p>
+          </div>
+        </div>
+
+        <button onclick="showHint()" class="pushable px-2.5 py-1.5 bg-white hover:bg-amber-100 text-ink text-xs font-extrabold flex items-center gap-1 shrink-0" title="İpucu Al">
+          <span>💡</span> <span>İpucu</span>
+        </button>
+      </div>
+
+      <!-- Canvas Çerçevesi -->
+      <div class="relative chunky bg-white overflow-hidden flex flex-col items-center justify-center select-none shadow-hard-lg">
+        
+        <!-- Üst Kontrol & Durum Rozetleri -->
+        <div class="absolute top-3 left-3 flex items-center gap-2 z-10 pointer-events-none">
+          <span id="badgeStatus" class="px-2.5 py-1 bg-white/95 border-2 border-ink rounded-full text-xs font-black text-ink shadow-sm flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="statusText">Fabrika Hazır</span>
+          </span>
+          <span id="badgeTimer" class="px-2.5 py-1 bg-amber-200/95 border-2 border-ink rounded-full text-xs font-black text-ink shadow-sm hidden">
+            ⏱️ 00:00
+          </span>
+        </div>
+
+        <!-- Canlı Canvas -->
+        <canvas id="gameCanvas" width="900" height="560" class="w-full h-auto max-h-[560px] bg-[#f8fafc] cursor-crosshair block touch-none"></canvas>
+
+        <!-- Canlı Seçili Eleman Kontrol Barı (Floating Toolbar) -->
+        <div id="selectionToolbar" class="absolute bottom-3 left-1/2 -translate-x-1/2 bg-white/95 border-2 border-ink rounded-2xl p-2 shadow-hard flex items-center gap-2 z-10 transition-all duration-150 hidden">
+          <span class="text-xs font-black text-ink px-1" id="selectedItemName">Eleman</span>
+          <button onclick="rotateSelectedItem(-15)" class="pushable p-1.5 bg-gray-100 hover:bg-gray-200 text-xs font-black" title="Sola Döndür (-15°)">
+            <span>↺</span>
+          </button>
+          <button onclick="rotateSelectedItem(15)" class="pushable p-1.5 bg-gray-100 hover:bg-gray-200 text-xs font-black" title="Sağa Döndür (+15°)">
+            <span>↻</span>
+          </button>
+          <!-- Destek Noktası Kaydırıcı (Yalnızca Kaldıraç için) -->
+          <div id="leverFulcrumControl" class="hidden items-center gap-1 px-1">
+            <span class="text-[10px] font-black">Destek:</span>
+            <input type="range" id="leverFulcrumRange" min="20" max="80" value="50" oninput="updateFulcrum(this.value)" class="w-16 accent-amber-500 cursor-pointer">
+          </div>
+          <button onclick="deleteSelectedItem()" class="pushable p-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-black" title="Sil">
+            <span>🗑️</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Alt Ana Çalıştırma / Sıfırlama Çubuğu -->
+      <div class="chunky bg-white p-3 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <button id="btnRun" onclick="toggleSimulation()" class="pushable px-6 py-3 bg-emerald-400 hover:bg-emerald-300 text-ink display font-black text-base flex items-center gap-2 shadow-sm">
+            <span id="runIcon">▶️</span> <span id="runText">FABRİKAYI ÇALIŞTIR!</span>
+          </button>
+          <button onclick="resetSimulation()" class="pushable px-4 py-3 bg-amber-100 hover:bg-amber-200 text-ink font-extrabold text-sm flex items-center gap-1.5">
+            <span>🔄</span> <span>Sıfırla</span>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="clearAllPlayerItems()" class="pushable px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold flex items-center gap-1" title="Koyduğun tüm parçaları kaldır">
+            <span>🧹</span> <span>Masayı Temizle</span>
+          </button>
+          <div class="text-right hidden sm:block">
+            <span class="text-[11px] font-bold text-gray-500 block">Kalan Parça:</span>
+            <span id="lblPartsLeft" class="text-xs font-black text-ink">3 / 3</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- SAĞ: Araç Kutusu & Bilim Kazanımları (4 Sütun) -->
+    <aside class="lg:col-span-4 flex flex-col gap-3">
+      
+      <!-- Araç Kutusu (Toolbox) -->
+      <div class="chunky bg-white p-4 flex flex-col gap-3">
+        <div class="flex items-center justify-between border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🧰</span>
+            <h3 class="display text-base font-black text-ink">Mucit Alet Çantası</h3>
+          </div>
+          <span class="text-[11px] font-bold text-gray-500">Tıkla veya Sürükle</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5" id="toolboxContainer">
+          <!-- Dinamik olarak JS tarafından üretilecek -->
+        </div>
+
+        <p class="text-[11px] font-bold text-gray-500 mt-1 text-center">
+          💡 İpucu: Tuvale parçayı bırakınca üzerine tıklayarak döndürebilir veya silebilirsin.
+        </p>
+      </div>
+
+      <!-- Bilim Kazanımları ve Formülsüz Kurallar Kartı -->
+      <div class="chunky bg-gradient-to-br from-amber-50 to-orange-50 p-4 flex flex-col gap-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🔬</span>
+          <h3 class="display text-base font-black text-ink">Fabrika Bilim Kuralları</h3>
+        </div>
+
+        <div class="space-y-2 text-xs font-bold text-gray-700">
+          <div class="bg-white/80 p-2.5 rounded-xl border border-ink/20 flex items-start gap-2">
+            <span class="text-base shrink-0">📐</span>
+            <div>
+              <span class="text-ink font-black block">Eğik Düzlem (Rampa):</span>
+              Yükseklik arttıkça bilye daha çok ivmelenir; boy uzadıkça eğim yumuşar ve hız dengelenir!
+            </div>
+          </div>
+
+          <div class="bg-white/80 p-2.5 rounded-xl border border-ink/20 flex items-start gap-2">
+            <span class="text-base shrink-0">⚖️</span>
+            <div>
+              <span class="text-ink font-black block">Kaldıraç & Tork:</span>
+              Ağır bilyeyi uzun kola düşürürsen, kısa koldaki şeker gökyüzüne fırlar! ($F \times d$ dengesi).
+            </div>
+          </div>
+
+          <div class="bg-white/80 p-2.5 rounded-xl border border-ink/20 flex items-start gap-2">
+            <span class="text-base shrink-0">⚙️</span>
+            <div>
+              <span class="text-ink font-black block">Dişli Çarklar:</span>
+              Birbirine değen iki dişli zıt yönde döner! Küçük dişli daha hızlı tur atar.
+            </div>
+          </div>
+
+          <div class="bg-white/80 p-2.5 rounded-xl border border-ink/20 flex items-start gap-2">
+            <span class="text-base shrink-0">🪢</span>
+            <div>
+              <span class="text-ink font-black block">Makaralar:</span>
+              Sabit makara kuvvetin yönünü değiştirir; aşağı düşen ağırlık şeker kapağını yukarı çeker!
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-2 border-t-2 border-dashed border-amber-300 flex items-center justify-between">
+          <span class="text-[11px] font-black text-amber-900">MEB 5-8. Sınıf & STEM</span>
+          <button onclick="openScienceModal()" class="text-xs font-black text-amber-700 hover:underline flex items-center gap-1">
+            <span>Daha Fazla Keşfet ➔</span>
+          </button>
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- ==================== BİLİMSEL REHBER MODALI ==================== -->
+  <div id="scienceModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden opacity-0 transition-opacity duration-200">
+    <div class="bg-white chunky max-w-2xl w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 relative">
+      <button onclick="closeScienceModal()" class="pushable absolute top-4 right-4 w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 text-red-700 font-black flex items-center justify-center text-sm">
+        ✕
+      </button>
+
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-12 h-12 rounded-2xl bg-amber-300 border-3 border-ink flex items-center justify-center text-2xl shadow-hard-sm">
+          ⚙️
+        </div>
+        <div>
+          <h2 class="display text-xl sm:text-2xl font-black text-ink">Basit Makineler Nasıl Çalışır?</h2>
+          <p class="text-xs font-bold text-gray-500">Küçük Mucitler İçin Formülsüz Fen Rehberi</p>
+        </div>
+      </div>
+
+      <div class="space-y-4 text-xs sm:text-sm text-gray-800 font-semibold leading-relaxed">
+        
+        <!-- Altın Kural Uyarısı -->
+        <div class="bg-amber-100 p-3.5 rounded-2xl border-2 border-ink flex items-center gap-3">
+          <span class="text-3xl">⚠️</span>
+          <div>
+            <span class="font-black text-amber-900 block text-sm">Altın Fen Kuralı: İşten Kazanç Olmaz!</span>
+            Basit makineler enerjiden ya da işten kazanç SAĞLAMAZ. Sadece uyguladığın kuvveti küçülterek veya yönünü değiştirerek iş kolaylığı sağlar!
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          
+          <div class="bg-sky-50 p-3 rounded-2xl border-2 border-ink/40">
+            <h4 class="display font-black text-sky-900 text-sm flex items-center gap-1.5 mb-1">
+              <span>📐</span> Eğik Düzlem (Rampa)
+            </h4>
+            <p class="text-xs text-gray-700 leading-normal">
+              Bir cismi doğrudan yukarı kaldırmak zordur. Ama bir rampa üzerinde itersen daha küçük kuvvet uygularsın. Yol uzar, ama kuvvet küçülür!
+            </p>
+          </div>
+
+          <div class="bg-emerald-50 p-3 rounded-2xl border-2 border-ink/40">
+            <h4 class="display font-black text-emerald-900 text-sm flex items-center gap-1.5 mb-1">
+              <span>⚖️</span> Kaldıraç Prensibi
+            </h4>
+            <p class="text-xs text-gray-700 leading-normal">
+              Destek noktasına uzak olan kol daha az kuvvetle daha ağır cisimleri kaldırabilir. Tıpkı tahterevallide olduğu gibi!
+            </p>
+          </div>
+
+          <div class="bg-amber-50 p-3 rounded-2xl border-2 border-ink/40">
+            <h4 class="display font-black text-amber-900 text-sm flex items-center gap-1.5 mb-1">
+              <span>⚙️</span> Dişli Çarklar & Tork
+            </h4>
+            <p class="text-xs text-gray-700 leading-normal">
+              Büyük dişlinin 20 dişi, küçük dişlinin 10 dişi varsa; büyük 1 tur atarken küçük 2 tam tur atar! Ayrıca birbirine temas eden dişliler daima ters yönde döner.
+            </p>
+          </div>
+
+          <div class="bg-purple-50 p-3 rounded-2xl border-2 border-ink/40">
+            <h4 class="display font-black text-purple-900 text-sm flex items-center gap-1.5 mb-1">
+              <span>🪢</span> Makaralar
+            </h4>
+            <p class="text-xs text-gray-700 leading-normal">
+              Sabit makara bayrak direklerinde kullanılır, kuvvetin yönünü değiştirir. Hareketli makara ise yükü taşımak için gereken kuvveti yarı yarıya indirir!
+            </p>
+          </div>
+
+        </div>
+
+        <!-- Rube Goldberg Nedir? -->
+        <div class="bg-pink-50 p-3.5 rounded-2xl border-2 border-ink/40">
+          <h4 class="display font-black text-pink-900 text-sm flex items-center gap-1.5 mb-1">
+            <span>🎩</span> Rube Goldberg Makinesi Nedir?
+          </h4>
+          <p class="text-xs text-gray-700 leading-normal">
+            Çok basit bir işi (örneğin bir şekeri kavanoza atmayı) birbirini tetikleyen en az 3-4 farklı mekanik parçanın zincirleme reaksiyonuyla en eğlenceli ve dolambaçlı yoldan yapan çılgın düzeneklerdir!
+          </p>
+        </div>
+
+      </div>
+
+      <div class="mt-5 pt-3 border-t-2 border-dashed border-gray-300 flex justify-end">
+        <button onclick="closeScienceModal()" class="pushable px-5 py-2 bg-amber-400 hover:bg-amber-300 text-ink font-black text-sm">
+          Harika, Anladım! 🚀
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SEVİYE TAMAMLANDI ZAFER MODALI ==================== -->
+  <div id="victoryModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden opacity-0 transition-opacity duration-200">
+    <div class="bg-white chunky max-w-md w-full p-6 text-center relative overflow-hidden">
+      <div class="text-5xl mb-2 animate-bounce">🎉</div>
+      <h2 class="display text-2xl sm:text-3xl font-black text-ink mb-1">
+        Şeker Kavanozda!
+      </h2>
+      <p class="text-xs sm:text-sm font-bold text-gray-600 mb-4">
+        Tüm basit makineler kusursuz bir zincirleme reaksiyonla çalıştı!
+      </p>
+
+      <!-- 3 Yıldız Gösterimi -->
+      <div class="flex items-center justify-center gap-2 mb-4 text-3xl" id="victoryStars">
+        <span>⭐</span><span>⭐</span><span>⭐</span>
+      </div>
+
+      <!-- Bilimsel Başarı Kartı -->
+      <div class="bg-amber-50 p-3 rounded-2xl border-2 border-ink/30 mb-5 text-left text-xs font-bold text-gray-800">
+        <span class="text-amber-900 font-black block mb-0.5">🏆 Bu Seviyede Keşfettiğin Bilim:</span>
+        <p id="victoryScienceFact">
+          Kuvvet ve tork dengesi sayesinde şeker hedefine ulaştı!
+        </p>
+      </div>
+
+      <div class="flex items-center justify-center gap-3">
+        <button onclick="retryCurrentLevel()" class="pushable px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-ink font-bold text-xs flex items-center gap-1">
+          <span>🔄</span> <span>Tekrar Oyna</span>
+        </button>
+        <button id="btnNextLevel" onclick="nextLevel()" class="pushable px-5 py-2.5 bg-emerald-400 hover:bg-emerald-300 text-ink display font-black text-sm flex items-center gap-1.5 shadow-sm">
+          <span>Sıradaki Seviye</span> <span>➔</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== JAVASCRIPT OYUN & FİZİK MOTORU ==================== -->
+  <script>
+    /* ==========================================================
+       1. SES MOTORU (Web Audio API - Prosedürel Sıfır Gecikme)
+       ========================================================== */
+    let audioCtx = null;
+    let isSoundEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function toggleSound() {
+      isSoundEnabled = !isSoundEnabled;
+      document.getElementById('soundIcon').textContent = isSoundEnabled ? '🔊' : '🔇';
+      if (isSoundEnabled) initAudio();
+    }
+
+    const sound = {
+      click() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.05);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.05);
+      },
+      gearTick() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(320, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(140, audioCtx.currentTime + 0.04);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.04);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.04);
+      },
+      ballHit() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(240, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(70, audioCtx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.08);
+      },
+      leverThud() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(110, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(45, audioCtx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.12);
+      },
+      springBoing() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(650, audioCtx.currentTime + 0.22);
+        gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.22);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.22);
+      },
+      bellJar() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        // Kristal kavanoz çınlaması
+        const freqs = [880, 1174.66, 1760];
+        freqs.forEach((f, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(f, audioCtx.currentTime + i * 0.06);
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime + i * 0.06);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.06 + 0.8);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime + i * 0.06);
+          osc.stop(audioCtx.currentTime + i * 0.06 + 0.8);
+        });
+      },
+      victory() {
+        if (!isSoundEnabled) return;
+        initAudio();
+        const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+        notes.forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.1);
+          gain.gain.setValueAtTime(0.25, audioCtx.currentTime + idx * 0.1);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + idx * 0.1 + 0.35);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime + idx * 0.1);
+          osc.stop(audioCtx.currentTime + idx * 0.1 + 0.35);
+        });
+      }
+    };
+
+    /* ==========================================================
+       2. TEMEL FİZİK VE OYUN VERİ YAPILARI
+       ========================================================== */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let showForceVectors = false;
+    let isRunning = false;
+    let isSandboxMode = false;
+    let currentLevel = 1;
+    let selectedToolType = null;
+    let selectedItem = null;
+    let isDraggingNew = false;
+    let dragItem = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    // Seviye Yıldız Veritabanı
+    let userStars = JSON.parse(localStorage.getItem('mucit_seker_stars') || '{"1":0,"2":0,"3":0,"4":0,"5":0,"6":0}');
+
+    // Fizik Sabitleri
+    const GRAVITY = 0.42;
+    const AIR_RESISTANCE = 0.996;
+    const CANVAS_WIDTH = 900;
+    const CANVAS_HEIGHT = 560;
+
+    // Seviye Tanımları
+    const LEVELS = {
+      1: {
+        title: "Seviye 1: Eğik Düzlemin Gücü",
+        icon: "📐",
+        desc: "Rampayı doğru açı ve konuma yerleştir, şekeri Altın Kavanoz'a ulaştır!",
+        scienceFact: "Eğik düzlem açısı arttıkça kütleçekim kuvvetinin eğim yönündeki bileşeni ($g \\sin \\theta$) artar ve şeker daha çok hızlanır!",
+        hint: "Alet çantasından Eğik Düzlem (Rampa) seç, dispensirin altına koy ve kavanoza doğru hafifçe eğ.",
+        toolsAllowed: { ramp: 2, spring: 0, lever: 0, gear: 0, domino: 0 },
+        dispenser: { x: 120, y: 100 },
+        goal: { x: 760, y: 480, width: 80, height: 65 },
+        staticObstacles: [
+          { type: 'wall', x: 420, y: 380, width: 40, height: 180, color: '#334155' }
+        ],
+        preplacedBalls: [
+          { x: 120, y: 100, vx: 0, vy: 0, radius: 14, color: '#f43f5e', type: 'candy', label: '🍬' }
+        ]
+      },
+      2: {
+        title: "Seviye 2: Kaldıraç Dengesi & Mancınık",
+        icon: "⚖️",
+        desc: "Ağır demir bilyeyi kaldıracın uzun koluna düşür, hafif çilekli şekeri duvarın üstünden kavanoza fırlat!",
+        scienceFact: "Kaldıraçta tork dengesi: $F_1 \\times d_1 = F_2 \\times d_2$. Ağır top desteğe yakın düşerse daha az fırlatır; uzağa düşerse şekeri göklere uçurur!",
+        hint: "Kaldıracı ortaya yerleştir. Şeker kaldıracın sağ ucunda durmalı. Demir bilye sol ucuna düşmeli!",
+        toolsAllowed: { ramp: 1, lever: 1, spring: 0, gear: 0, domino: 0 },
+        dispenser: { x: 140, y: 90 },
+        goal: { x: 800, y: 470, width: 80, height: 65 },
+        staticObstacles: [
+          { type: 'wall', x: 550, y: 250, width: 35, height: 310, color: '#334155' } // Yüksek engel duvarı
+        ],
+        preplacedBalls: [
+          { x: 140, y: 90, vx: 0, vy: 0, radius: 18, color: '#64748b', type: 'ironBall', label: '⚪' }, // Ağır demir bilye
+          { x: 470, y: 440, vx: 0, vy: 0, radius: 13, color: '#f43f5e', type: 'candy', label: '🍓' }  // Kaldıraç üzerindeki şeker
+        ]
+      },
+      3: {
+        title: "Seviye 3: Dişli Çarklar & Yön Değişimi",
+        icon: "⚙️",
+        desc: "Motorlu sarı çarkın dönüşünü aradaki aktarma dişlileriyle birleştir, paletin şekeri yukarı fırlatmasını sağla!",
+        scienceFact: "İki dişli birbirine temas ettiğinde ters yönde döner. 3 dişliyi arka arkaya dizersen ilk ve son dişli aynı yönde döner!",
+        hint: "Ortaya dişli ekleyerek motorun gücünü sağdaki fırlatıcı palete ilet!",
+        toolsAllowed: { gear: 2, ramp: 1, lever: 0, spring: 1, domino: 0 },
+        dispenser: { x: 130, y: 120 },
+        goal: { x: 780, y: 200, width: 80, height: 65 }, // Yüksekteki kavanoz
+        staticObstacles: [
+          { type: 'wall', x: 350, y: 350, width: 200, height: 25, color: '#334155' },
+          { type: 'motorGear', x: 380, y: 420, radius: 36, teeth: 12, speed: 0.04, label: 'Motor' }
+        ],
+        preplacedBalls: [
+          { x: 130, y: 120, vx: 0, vy: 0, radius: 14, color: '#f43f5e', type: 'candy', label: '🍬' }
+        ]
+      },
+      4: {
+        title: "Seviye 4: Makara Asansörü & Gizli Kapı",
+        icon: "🪢",
+        desc: "Ağır bilye makara sepetine düştüğünde ip gerilir ve aşağıdaki şeker kapısını yukarı çeker!",
+        scienceFact: "Sabit makara kuvvetin yönünü değiştirir: Aşağıya doğru uygulanan yerçekimi kuvveti, ip sayesinde kapağı yukarı kaldırır!",
+        hint: "Rampa ile ağır bilyeyi sol makara sepetine yönlendir. Şekerin yolu açılsın!",
+        toolsAllowed: { ramp: 2, lever: 1, spring: 1, gear: 0, domino: 0 },
+        dispenser: { x: 110, y: 80 },
+        goal: { x: 800, y: 480, width: 80, height: 65 },
+        staticObstacles: [
+          { type: 'pulleySystem', x: 360, y: 140, basketA: { x: 280, y: 260 }, basketB: { x: 440, y: 460 }, ropeLen: 320 },
+          { type: 'wall', x: 430, y: 340, width: 25, height: 180, id: 'gate', color: '#dc2626' }
+        ],
+        preplacedBalls: [
+          { x: 110, y: 80, vx: 0, vy: 0, radius: 16, color: '#475569', type: 'ironBall', label: '⚫' },
+          { x: 340, y: 480, vx: 0, vy: 0, radius: 13, color: '#f43f5e', type: 'candy', label: '🍭' }
+        ]
+      },
+      5: {
+        title: "Seviye 5: Büyük Fabrika Reaksiyonu",
+        icon: "🌀",
+        desc: "Rampa -> Kaldıraç -> Domino -> Yay -> Kavanoz! 4 farklı basit makinenin kusursuz senkronizasyonu!",
+        scienceFact: "Rube Goldberg makinelerinde her adım bir sonraki makineye potansiyel veya kinetik enerji aktarımı yapar ($E_p \\leftrightarrow E_k$).",
+        hint: "Bilyeyi rampadan yuvarla, kaldıraca çarpsın, kaldıraç dominoları devirsin, son domino şekeri yaya fırlatsın!",
+        toolsAllowed: { ramp: 2, lever: 1, spring: 1, gear: 1, domino: 3 },
+        dispenser: { x: 100, y: 90 },
+        goal: { x: 810, y: 260, width: 80, height: 65 },
+        staticObstacles: [
+          { type: 'wall', x: 260, y: 280, width: 30, height: 280, color: '#334155' },
+          { type: 'wall', x: 560, y: 380, width: 30, height: 180, color: '#334155' }
+        ],
+        preplacedBalls: [
+          { x: 100, y: 90, vx: 0, vy: 0, radius: 15, color: '#f43f5e', type: 'candy', label: '🍬' }
+        ]
+      },
+      6: {
+        title: "Seviye 6: Çılgın Mucit Usta",
+        icon: "🏆",
+        desc: "Minimum malzemeyle maksimum yerçekimi ustalığı! Çok az parçan var, kusursuz hassasiyetle yerleştir!",
+        scienceFact: "Mühendislikte zarafet, en az parçayla en yüksek verimlilikte çalışabilen mekanizmalar tasarlamaktır!",
+        hint: "Yayın ve rampanın açısını milimetrik ayarla, çift sekme yaptır!",
+        toolsAllowed: { ramp: 1, spring: 1, lever: 1, gear: 0, domino: 0 },
+        dispenser: { x: 120, y: 90 },
+        goal: { x: 800, y: 150, width: 80, height: 65 },
+        staticObstacles: [
+          { type: 'wall', x: 300, y: 200, width: 35, height: 360, color: '#334155' },
+          { type: 'wall', x: 580, y: 0, width: 35, height: 380, color: '#334155' }
+        ],
+        preplacedBalls: [
+          { x: 120, y: 90, vx: 0, vy: 0, radius: 14, color: '#f43f5e', type: 'candy', label: '🍬' }
+        ]
+      }
+    };
+
+    // Sahnedeki Dinamik Parçalar
+    let placedItems = [];
+    let activeBalls = [];
+    let initialSetup = []; // Sıfırlama için kopya
+
+    /* ==========================================================
+       3. ARAÇ KUTUSU (TOOLBOX) TANIMLARI
+       ========================================================== */
+    const TOOL_DEFINITIONS = [
+      { type: 'ramp', name: 'Eğik Düzlem', icon: '📐', desc: 'Açısı ayarlanabilir ray', defaultW: 130, defaultH: 22, color: '#fbbf24' },
+      { type: 'lever', name: 'Kaldıraç', icon: '⚖️', desc: 'Denge & Mancınık', defaultW: 150, defaultH: 14, color: '#10b981' },
+      { type: 'gear', name: 'Dişli Çark', icon: '⚙️', desc: 'Hız ve Yön Aktarıcı', radius: 30, teeth: 10, color: '#d97706' },
+      { type: 'spring', name: 'Yaylı Piston', icon: '🌀', desc: 'Elastik İtici', defaultW: 46, defaultH: 34, color: '#ec4899' },
+      { type: 'domino', name: 'Domino Taşları', icon: '🧱', desc: 'Sıralı İvme Aktarımı', defaultW: 12, defaultH: 45, color: '#3b82f6' }
+    ];
+
+    function renderToolbox() {
+      const container = document.getElementById('toolboxContainer');
+      container.innerHTML = '';
+
+      const lvl = isSandboxMode ? null : LEVELS[currentLevel];
+
+      TOOL_DEFINITIONS.forEach(tool => {
+        let count = 99; // Sandbox'ta sınırsız
+        if (lvl && lvl.toolsAllowed) {
+          const used = placedItems.filter(i => i.toolType === tool.type).length;
+          const allowed = lvl.toolsAllowed[tool.type] || 0;
+          count = allowed - used;
+        }
+
+        const isAvailable = count > 0;
+        const btn = document.createElement('div');
+        btn.className = `tool-item pushable p-2.5 bg-white flex flex-col items-center justify-between text-center select-none ${isAvailable ? 'cursor-pointer' : 'opacity-40 pointer-events-none'}`;
+        if (selectedToolType === tool.type) btn.classList.add('selected');
+
+        btn.innerHTML = `
+          <span class="text-2xl mb-1">${tool.icon}</span>
+          <span class="text-xs font-black text-ink block leading-tight">${tool.name}</span>
+          <span class="text-[10px] font-extrabold px-2 py-0.5 mt-1 rounded-full ${isAvailable ? 'bg-amber-100 text-amber-900 border border-ink/40' : 'bg-gray-100 text-gray-500'}">
+            ${isSandboxMode ? '∞' : 'Kalan: ' + count}
+          </span>
+        `;
+
+        btn.onclick = () => {
+          if (!isAvailable) return;
+          sound.click();
+          if (selectedToolType === tool.type) {
+            selectedToolType = null;
+          } else {
+            selectedToolType = tool.type;
+          }
+          renderToolbox();
+        };
+
+        container.appendChild(btn);
+      });
+
+      // Kalan parça sayacı güncelle
+      if (!isSandboxMode && lvl) {
+        let totalAllowed = Object.values(lvl.toolsAllowed).reduce((a, b) => a + b, 0);
+        let totalUsed = placedItems.length;
+        document.getElementById('lblPartsLeft').textContent = `${totalAllowed - totalUsed} / ${totalAllowed}`;
+      } else {
+        document.getElementById('lblPartsLeft').textContent = `${placedItems.length} parça`;
+      }
+    }
+
+    /* ==========================================================
+       4. SEVİYE YÜKLEME VE KURULUM
+       ========================================================== */
+    function selectLevel(lvlNum) {
+      if (isRunning) toggleSimulation();
+      isSandboxMode = false;
+      currentLevel = lvlNum;
+
+      // Seviye buton stillerini güncelle
+      for (let i = 1; i <= 6; i++) {
+        const btn = document.getElementById(`lvlBtn${i}`);
+        if (btn) {
+          if (i === lvlNum) {
+            btn.className = "pushable px-3 py-1.5 text-xs font-black bg-yellow-400 text-ink whitespace-nowrap shadow-sm";
+          } else {
+            btn.className = "pushable px-3 py-1.5 text-xs font-black bg-white text-ink hover:bg-gray-100 whitespace-nowrap shadow-sm";
+          }
+        }
+      }
+      document.getElementById('btnSandbox').className = "pushable px-3.5 py-1.5 text-xs font-black bg-purple-200 hover:bg-purple-300 text-purple-950 flex items-center gap-1.5 shrink-0";
+
+      const lvl = LEVELS[lvlNum];
+      document.getElementById('lvlIcon').textContent = lvl.icon;
+      document.getElementById('lvlTitle').textContent = lvl.title;
+      document.getElementById('lvlDesc').textContent = lvl.desc;
+
+      placedItems = [];
+      selectedItem = null;
+      hideSelectionToolbar();
+      resetSimulation();
+      renderToolbox();
+      updateStarsDisplay();
+    }
+
+    function selectSandbox() {
+      if (isRunning) toggleSimulation();
+      isSandboxMode = true;
+
+      for (let i = 1; i <= 6; i++) {
+        const btn = document.getElementById(`lvlBtn${i}`);
+        if (btn) btn.className = "pushable px-3 py-1.5 text-xs font-black bg-white text-ink hover:bg-gray-100 whitespace-nowrap shadow-sm";
+      }
+      document.getElementById('btnSandbox').className = "pushable px-3.5 py-1.5 text-xs font-black bg-purple-400 text-purple-950 flex items-center gap-1.5 shrink-0 shadow-sm";
+
+      document.getElementById('lvlIcon').textContent = "🛠️";
+      document.getElementById('lvlTitle').textContent = "Serbest Deney Masası (Sandbox)";
+      document.getElementById('lvlDesc').textContent = "Sınırsız basit makine kullanarak kendi çılgın Rube Goldberg fabrikasını inşa et!";
+
+      placedItems = [];
+      selectedItem = null;
+      hideSelectionToolbar();
+      resetSimulation();
+      renderToolbox();
+    }
+
+    function resetSimulation() {
+      isRunning = false;
+      document.getElementById('runIcon').textContent = '▶️';
+      document.getElementById('runText').textContent = 'FABRİKAYI ÇALIŞTIR!';
+      document.getElementById('statusText').textContent = 'Fabrika Hazır';
+      document.getElementById('btnRun').className = "pushable px-6 py-3 bg-emerald-400 hover:bg-emerald-300 text-ink display font-black text-base flex items-center gap-2 shadow-sm";
+
+      // Topları başlangıç konumlarına döndür
+      const lvl = isSandboxMode ? null : LEVELS[currentLevel];
+      activeBalls = [];
+
+      if (lvl && lvl.preplacedBalls) {
+        lvl.preplacedBalls.forEach(b => {
+          activeBalls.push({
+            x: b.x,
+            y: b.y,
+            vx: 0,
+            vy: 0,
+            radius: b.radius,
+            color: b.color,
+            type: b.type,
+            label: b.label,
+            inGoal: false,
+            initialX: b.x,
+            initialY: b.y
+          });
+        });
+      } else if (isSandboxMode) {
+        // Sandbox varsayılan başlangıç topu
+        activeBalls.push({
+          x: 120,
+          y: 100,
+          vx: 0,
+          vy: 0,
+          radius: 14,
+          color: '#f43f5e',
+          type: 'candy',
+          label: '🍬',
+          inGoal: false,
+          initialX: 120,
+          initialY: 100
+        });
+      }
+
+      // Parçaların açı ve konumlarını ilk hallerine döndür
+      placedItems.forEach(item => {
+        if (item.initialAngle !== undefined) item.angle = item.initialAngle;
+        item.angularSpeed = 0;
+      });
+
+      draw();
+    }
+
+    function toggleSimulation() {
+      sound.click();
+      initAudio();
+
+      isRunning = !isRunning;
+      if (isRunning) {
+        document.getElementById('runIcon').textContent = '⏸️';
+        document.getElementById('runText').textContent = 'DURDUR';
+        document.getElementById('statusText').textContent = 'Simülasyon Çalışıyor...';
+        document.getElementById('btnRun').className = "pushable px-6 py-3 bg-amber-400 hover:bg-amber-300 text-ink display font-black text-base flex items-center gap-2 shadow-sm";
+        hideSelectionToolbar();
+      } else {
+        document.getElementById('runIcon').textContent = '▶️';
+        document.getElementById('runText').textContent = 'DEVAM ET';
+        document.getElementById('statusText').textContent = 'Duraklatıldı';
+        document.getElementById('btnRun').className = "pushable px-6 py-3 bg-emerald-400 hover:bg-emerald-300 text-ink display font-black text-base flex items-center gap-2 shadow-sm";
+      }
+    }
+
+    /* ==========================================================
+       5. 60 FPS FİZİK MOTORU VE ÇARPIŞMA SİSTEMİ
+       ========================================================== */
+    function physicsStep() {
+      if (!isRunning) return;
+
+      const lvl = isSandboxMode ? null : LEVELS[currentLevel];
+      const goal = lvl ? lvl.goal : { x: 780, y: 480, width: 80, height: 65 };
+
+      // Çok adımlı alt adım (Sub-stepping) ile duvar delinmelerini önle
+      const SUB_STEPS = 4;
+      const subDt = 1 / SUB_STEPS;
+
+      for (let step = 0; step < SUB_STEPS; step++) {
+        
+        // 1. Topları Güncelle
+        activeBalls.forEach(ball => {
+          if (ball.inGoal) return;
+
+          // Yerçekimi ve Hava Sürtünmesi
+          ball.vy += GRAVITY * subDt;
+          ball.vx *= Math.pow(AIR_RESISTANCE, subDt);
+          ball.vy *= Math.pow(AIR_RESISTANCE, subDt);
+
+          ball.x += ball.vx * subDt;
+          ball.y += ball.vy * subDt;
+
+          // Zemin ve Duvar Sınırları
+          if (ball.y + ball.radius > CANVAS_HEIGHT) {
+            ball.y = CANVAS_HEIGHT - ball.radius;
+            ball.vy = -ball.vy * 0.45;
+            ball.vx *= 0.85;
+            if (Math.abs(ball.vy) > 1) sound.ballHit();
+          }
+          if (ball.x - ball.radius < 0) {
+            ball.x = ball.radius;
+            ball.vx = -ball.vx * 0.6;
+          }
+          if (ball.x + ball.radius > CANVAS_WIDTH) {
+            ball.x = CANVAS_WIDTH - ball.radius;
+            ball.vx = -ball.vx * 0.6;
+          }
+
+          // Statik Engellerle Çarpışma
+          if (lvl && lvl.staticObstacles) {
+            lvl.staticObstacles.forEach(obs => {
+              if (obs.type === 'wall') {
+                checkBallRectCollision(ball, obs.x, obs.y, obs.width, obs.height);
+              }
+            });
+          }
+
+          // Oyuncunun Koyduğu Parçalarla Çarpışma
+          placedItems.forEach(item => {
+            if (item.toolType === 'ramp') {
+              checkBallRampCollision(ball, item);
+            } else if (item.toolType === 'lever') {
+              checkBallLeverCollision(ball, item);
+            } else if (item.toolType === 'spring') {
+              checkBallSpringCollision(ball, item);
+            } else if (item.toolType === 'gear') {
+              checkBallGearCollision(ball, item);
+            } else if (item.toolType === 'domino') {
+              checkBallDominoCollision(ball, item);
+            }
+          });
+
+          // Toplar Arası Elastik Çarpışma
+          for (let j = 0; j < activeBalls.length; j++) {
+            const other = activeBalls[j];
+            if (other === ball || other.inGoal) continue;
+            checkBallBallCollision(ball, other);
+          }
+
+          // Hedef Kavanoza Ulaşma Kontrolü
+          if (ball.type === 'candy') {
+            if (ball.x > goal.x && ball.x < goal.x + goal.width &&
+                ball.y > goal.y && ball.y < goal.y + goal.height) {
+              ball.inGoal = true;
+              ball.vx = 0;
+              ball.vy = 0;
+              onGoalReached();
+            }
+          }
+        });
+
+        // 2. Dişlilerin Dönüşünü Güncelle
+        placedItems.forEach(item => {
+          if (item.toolType === 'gear') {
+            item.angle += (item.angularSpeed || 0.02) * subDt;
+          }
+        });
+      }
+    }
+
+    // Top - Dikdörtgen Çarpışması
+    function checkBallRectCollision(ball, rx, ry, rw, rh) {
+      const nearestX = Math.max(rx, Math.min(ball.x, rx + rw));
+      const nearestY = Math.max(ry, Math.min(ball.y, ry + rh));
+      const dx = ball.x - nearestX;
+      const dy = ball.y - nearestY;
+      const distSq = dx * dx + dy * dy;
+
+      if (distSq < ball.radius * ball.radius) {
+        const dist = Math.sqrt(distSq) || 0.001;
+        const overlap = ball.radius - dist;
+        const nx = dx / dist;
+        const ny = dy / dist;
+
+        ball.x += nx * overlap;
+        ball.y += ny * overlap;
+
+        const dot = ball.vx * nx + ball.vy * ny;
+        if (dot < 0) {
+          ball.vx -= (1 + 0.5) * dot * nx;
+          ball.vy -= (1 + 0.5) * dot * ny;
+          if (Math.abs(dot) > 1.2) sound.ballHit();
+        }
+      }
+    }
+
+    // Top - Rampa Çarpışması (Döndürülmüş Çizgi Çarpışması)
+    function checkBallRampCollision(ball, ramp) {
+      const cos = Math.cos(ramp.angle);
+      const sin = Math.sin(ramp.angle);
+
+      // Topu rampanın yerel koordinat sistemine dönüştür
+      const rx = ball.x - ramp.x;
+      const ry = ball.y - ramp.y;
+      const localX = cos * rx + sin * ry;
+      const localY = -sin * rx + cos * ry;
+
+      const halfW = ramp.width / 2;
+      const halfH = ramp.height / 2;
+
+      // Kutu sınırlarına yakın mı?
+      if (localX >= -halfW - ball.radius && localX <= halfW + ball.radius &&
+          localY >= -halfH - ball.radius && localY <= halfH + ball.radius) {
+
+        const clampedX = Math.max(-halfW, Math.min(halfW, localX));
+        const clampedY = Math.max(-halfH, Math.min(halfH, localY));
+        const diffX = localX - clampedX;
+        const diffY = localY - clampedY;
+        const distSq = diffX * diffX + diffY * diffY;
+
+        if (distSq < ball.radius * ball.radius) {
+          const dist = Math.sqrt(distSq) || 0.001;
+          const overlap = ball.radius - dist;
+          const localNx = diffX / dist;
+          const localNy = diffY / dist;
+
+          // Küresel koordinata geri dönüştür
+          const worldNx = cos * localNx - sin * localNy;
+          const worldNy = sin * localNx + cos * localNy;
+
+          ball.x += worldNx * overlap;
+          ball.y += worldNy * overlap;
+
+          const dot = ball.vx * worldNx + ball.vy * worldNy;
+          if (dot < 0) {
+            // Sürtünme ve sekme katsayısı
+            ball.vx -= (1 + 0.4) * dot * worldNx;
+            ball.vy -= (1 + 0.4) * dot * worldNy;
+
+            // Rampa boyunca yuvarlanma torku/hızı
+            const tangentX = -worldNy;
+            const tangentY = worldNx;
+            const tangentVel = ball.vx * tangentX + ball.vy * tangentY;
+            ball.vx = tangentX * tangentVel * 0.98 + worldNx * 0.01;
+            ball.vy = tangentY * tangentVel * 0.98 + worldNy * 0.01;
+
+            if (Math.abs(dot) > 1.2) sound.ballHit();
+          }
+        }
+      }
+    }
+
+    // Top - Kaldıraç Çarpışması & Tork Etkisi
+    function checkBallLeverCollision(ball, lever) {
+      const cos = Math.cos(lever.angle);
+      const sin = Math.sin(lever.angle);
+
+      const rx = ball.x - lever.x;
+      const ry = ball.y - lever.y;
+      const localX = cos * rx + sin * ry;
+      const localY = -sin * rx + cos * ry;
+
+      const halfW = lever.width / 2;
+      const halfH = lever.height / 2;
+
+      if (localX >= -halfW - ball.radius && localX <= halfW + ball.radius &&
+          localY >= -halfH - ball.radius && localY <= halfH + ball.radius) {
+
+        const clampedX = Math.max(-halfW, Math.min(halfW, localX));
+        const clampedY = Math.max(-halfH, Math.min(halfH, localY));
+        const diffX = localX - clampedX;
+        const diffY = localY - clampedY;
+        const distSq = diffX * diffX + diffY * diffY;
+
+        if (distSq < ball.radius * ball.radius) {
+          const dist = Math.sqrt(distSq) || 0.001;
+          const overlap = ball.radius - dist;
+          const localNy = diffY / dist;
+
+          const worldNx = -sin * localNy;
+          const worldNy = cos * localNy;
+
+          ball.x += worldNx * overlap;
+          ball.y += worldNy * overlap;
+
+          // Kaldıracın dönme torku: Tork = Kuvvet x Kol (localX)
+          const torque = (ball.vy * 0.8 + 2.5) * (localX / halfW) * 0.06;
+          lever.angularSpeed = (lever.angularSpeed || 0) + torque;
+
+          // Açı sınırları (-28° ile +28° arası)
+          const maxAngle = 0.48;
+          if (lever.angle > maxAngle) { lever.angle = maxAngle; lever.angularSpeed = -lever.angularSpeed * 0.3; sound.leverThud(); }
+          if (lever.angle < -maxAngle) { lever.angle = -maxAngle; lever.angularSpeed = -lever.angularSpeed * 0.3; sound.leverThud(); }
+
+          // Karşı uçtaki nesneyi fırlatma etkisi
+          ball.vy = -ball.vy * 0.5 - lever.angularSpeed * localX * 0.35;
+          sound.leverThud();
+        }
+      }
+
+      // Kaldıracın açısını ve sönümlenmesini güncelle
+      lever.angle += (lever.angularSpeed || 0);
+      lever.angularSpeed = (lever.angularSpeed || 0) * 0.94;
+      const maxA = 0.48;
+      if (lever.angle > maxA) { lever.angle = maxA; lever.angularSpeed = 0; }
+      if (lever.angle < -maxA) { lever.angle = -maxA; lever.angularSpeed = 0; }
+    }
+
+    // Top - Yaylı Piston Çarpışması (Fırlatma)
+    function checkBallSpringCollision(ball, spring) {
+      const dx = ball.x - spring.x;
+      const dy = ball.y - spring.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < ball.radius + spring.width / 2) {
+        // Yayı sıkıştır ve fırlat
+        spring.compressed = true;
+        sound.springBoing();
+
+        // Yay açısı yönünde kuvvetli fırlatma
+        const launchSpeed = 16.5;
+        const angle = spring.angle - Math.PI / 2; // Yukarı doğru varsayılan
+        ball.vx = Math.cos(angle) * launchSpeed;
+        ball.vy = Math.sin(angle) * launchSpeed;
+
+        setTimeout(() => { spring.compressed = false; }, 220);
+      }
+    }
+
+    // Top - Dişli Çark Çarpışması
+    function checkBallGearCollision(ball, gear) {
+      const dx = ball.x - gear.x;
+      const dy = ball.y - gear.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < ball.radius + gear.radius) {
+        const overlap = (ball.radius + gear.radius) - dist;
+        const nx = dx / dist;
+        const ny = dy / dist;
+
+        ball.x += nx * overlap;
+        ball.y += ny * overlap;
+
+        // Dişlinin teğetsel hızı topa aktarılır
+        const tanX = -ny;
+        const tanY = nx;
+        const gearLinearSpeed = (gear.angularSpeed || 0.04) * gear.radius * 2.5;
+
+        ball.vx += tanX * gearLinearSpeed * 0.4;
+        ball.vy += tanY * gearLinearSpeed * 0.4;
+        sound.gearTick();
+      }
+    }
+
+    // Top - Domino Taşı Çarpışması
+    function checkBallDominoCollision(ball, domino) {
+      const nearestX = Math.max(domino.x - domino.width / 2, Math.min(ball.x, domino.x + domino.width / 2));
+      const nearestY = Math.max(domino.y - domino.height, Math.min(ball.y, domino.y));
+      const dx = ball.x - nearestX;
+      const dy = ball.y - nearestY;
+
+      if (dx * dx + dy * dy < ball.radius * ball.radius) {
+        if (!domino.fallen) {
+          domino.fallen = true;
+          sound.ballHit();
+          // Dominonun düşüş yönü topun geliş yönüne göre
+          domino.targetAngle = ball.vx > 0 ? 1.35 : -1.35;
+          ball.vx *= 0.5;
+        }
+      }
+
+      if (domino.fallen && Math.abs(domino.angle - domino.targetAngle) > 0.05) {
+        domino.angle += (domino.targetAngle - domino.angle) * 0.2;
+      }
+    }
+
+    // Top - Top Elastik Çarpışması
+    function checkBallBallCollision(b1, b2) {
+      const dx = b2.x - b1.x;
+      const dy = b2.y - b1.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < b1.radius + b2.radius) {
+        const overlap = (b1.radius + b2.radius) - dist;
+        const nx = dx / dist;
+        const ny = dy / dist;
+
+        b1.x -= nx * overlap * 0.5;
+        b1.y -= ny * overlap * 0.5;
+        b2.x += nx * overlap * 0.5;
+        b2.y += ny * overlap * 0.5;
+
+        // Kütleye göre momentum aktarımı
+        const m1 = b1.type === 'ironBall' ? 3.5 : 1;
+        const m2 = b2.type === 'ironBall' ? 3.5 : 1;
+
+        const kx = b1.vx - b2.vx;
+        const ky = b1.vy - b2.vy;
+        const p = 2 * (nx * kx + ny * ky) / (m1 + m2);
+
+        b1.vx -= p * m2 * nx;
+        b1.vy -= p * m2 * ny;
+        b2.vx += p * m1 * nx;
+        b2.vy += p * m1 * ny;
+
+        sound.ballHit();
+      }
+    }
+
+    /* ==========================================================
+       6. HEDEF KAVANOZA ULAŞMA VE ZAFER KUTLAMASI
+       ========================================================== */
+    function onGoalReached() {
+      isRunning = false;
+      sound.bellJar();
+      setTimeout(() => { sound.victory(); }, 350);
+
+      // Konfeti Yağmuru
+      if (window.confetti) {
+        confetti({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.6 }
+        });
+      }
+
+      // Yıldız ve Başarı Hesapla
+      if (!isSandboxMode) {
+        const starsEarned = 3;
+        userStars[currentLevel] = Math.max(userStars[currentLevel] || 0, starsEarned);
+        localStorage.setItem('mucit_seker_stars', JSON.stringify(userStars));
+        updateStarsDisplay();
+
+        const lvl = LEVELS[currentLevel];
+        document.getElementById('victoryScienceFact').innerHTML = lvl.scienceFact;
+        document.getElementById('victoryStars').innerHTML = '⭐'.repeat(starsEarned);
+
+        const modal = document.getElementById('victoryModal');
+        modal.classList.remove('hidden');
+        setTimeout(() => { modal.classList.remove('opacity-0'); }, 10);
+      }
+    }
+
+    function retryCurrentLevel() {
+      closeVictoryModal();
+      resetSimulation();
+    }
+
+    function nextLevel() {
+      closeVictoryModal();
+      if (currentLevel < 6) {
+        selectLevel(currentLevel + 1);
+      } else {
+        selectSandbox();
+      }
+    }
+
+    function closeVictoryModal() {
+      const modal = document.getElementById('victoryModal');
+      modal.classList.add('opacity-0');
+      setTimeout(() => { modal.classList.add('hidden'); }, 200);
+    }
+
+    function updateStarsDisplay() {
+      let total = 0;
+      for (let i = 1; i <= 6; i++) {
+        total += userStars[i] || 0;
+      }
+      document.getElementById('lblStars').textContent = `${total} / 18`;
+    }
+
+    /* ==========================================================
+       7. GRAFİK VE ÇİZİM DÖNGÜSÜ (Canvas 60 FPS Render)
+       ========================================================== */
+    function draw() {
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      const lvl = isSandboxMode ? null : LEVELS[currentLevel];
+      const goal = lvl ? lvl.goal : { x: 780, y: 480, width: 80, height: 65 };
+      const dispenser = lvl ? lvl.dispenser : { x: 120, y: 100 };
+
+      // 1. Izgara Noktaları (Mühendislik Çizim Defteri Hissi)
+      ctx.fillStyle = '#e2e8f0';
+      for (let x = 20; x < CANVAS_WIDTH; x += 25) {
+        for (let y = 20; y < CANVAS_HEIGHT; y += 25) {
+          ctx.fillRect(x, y, 2, 2);
+        }
+      }
+
+      // 2. Statik Engelleri ve Duvarları Çiz
+      if (lvl && lvl.staticObstacles) {
+        lvl.staticObstacles.forEach(obs => {
+          if (obs.type === 'wall') {
+            ctx.fillStyle = obs.color || '#334155';
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 3;
+            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+            ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
+
+            // Çapraz uyarı şeritleri
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(obs.x, obs.y, obs.width, obs.height);
+            ctx.clip();
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 2;
+            for (let i = -obs.height; i < obs.width + obs.height; i += 16) {
+              ctx.beginPath();
+              ctx.moveTo(obs.x + i, obs.y);
+              ctx.lineTo(obs.x + i + 16, obs.y + obs.height);
+              ctx.stroke();
+            }
+            ctx.restore();
+          } else if (obs.type === 'motorGear') {
+            drawGear(obs.x, obs.y, obs.radius, obs.teeth, obs.speed * Date.now() * 0.05, '#f59e0b', true);
+          }
+        });
+      }
+
+      // 3. Şeker Dispenseri (Çıkış Hunisi)
+      drawDispenser(dispenser.x, dispenser.y);
+
+      // 4. Altın Şeker Kavanozu (Hedef)
+      drawGoalJar(goal.x, goal.y, goal.width, goal.height);
+
+      // 5. Oyuncunun Koyduğu Basit Makineleri Çiz
+      placedItems.forEach(item => {
+        ctx.save();
+        ctx.translate(item.x, item.y);
+        ctx.rotate(item.angle || 0);
+
+        if (item.toolType === 'ramp') {
+          drawRamp(item);
+        } else if (item.toolType === 'lever') {
+          drawLever(item);
+        } else if (item.toolType === 'gear') {
+          drawGear(0, 0, item.radius, item.teeth, item.angle, item.color, false);
+        } else if (item.toolType === 'spring') {
+          drawSpring(item);
+        } else if (item.toolType === 'domino') {
+          drawDomino(item);
+        }
+
+        ctx.restore();
+
+        // Seçili İse Seçim Vurgusu ve Çerçevesi
+        if (selectedItem === item) {
+          ctx.save();
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 2.5;
+          ctx.setLineDash([5, 4]);
+          ctx.strokeRect(item.x - (item.width || 60) / 2 - 8, item.y - (item.height || 60) / 2 - 8, (item.width || 60) + 16, (item.height || 60) + 16);
+          ctx.restore();
+        }
+      });
+
+      // 6. Topları (Şeker ve Demir Bilyeler) Çiz
+      activeBalls.forEach(ball => {
+        drawBall(ball);
+      });
+
+      // 7. Kuvvet Okları (Vektör Modu Açık İse)
+      if (showForceVectors && isRunning) {
+        activeBalls.forEach(ball => {
+          if (!ball.inGoal) {
+            drawVectorArrow(ball.x, ball.y, ball.vx * 7, ball.vy * 7, '#0284c7');
+          }
+        });
+      }
+
+      // Döngüyü Sürdür
+      physicsStep();
+      requestAnimationFrame(draw);
+    }
+
+    /* ==========================================================
+       8. DETAYLI GRAFİK ÇİZİM YARDIMCILARI
+       ========================================================== */
+    function drawDispenser(x, y) {
+      ctx.save();
+      ctx.fillStyle = '#0284c7';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3;
+
+      // Huni Gövdesi
+      ctx.beginPath();
+      ctx.moveTo(x - 30, y - 45);
+      ctx.lineTo(x + 30, y - 45);
+      ctx.lineTo(x + 16, y - 10);
+      ctx.lineTo(x + 16, y + 5);
+      ctx.lineTo(x - 16, y + 5);
+      ctx.lineTo(x - 16, y - 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Üst Halka & İbre
+      ctx.fillStyle = '#facc15';
+      ctx.beginPath();
+      ctx.arc(x, y - 45, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px Nunito';
+      ctx.textAlign = 'center';
+      ctx.fillText('DISPENSER', x, y - 24);
+
+      ctx.restore();
+    }
+
+    function drawGoalJar(x, y, w, h) {
+      ctx.save();
+      // Kavanoz Gövdesi (Şeffaf Kristal Cam)
+      ctx.fillStyle = 'rgba(254, 243, 199, 0.7)';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3.5;
+
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, 14);
+      ctx.fill();
+      ctx.stroke();
+
+      // Kavanoz Kapağı (Altın Sarı)
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillRect(x - 4, y - 6, w + 8, 12);
+      ctx.strokeRect(x - 4, y - 6, w + 8, 12);
+
+      // Altın Yıldız ve İç Dolgu Şekerleri
+      ctx.font = '24px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('⭐', x + w / 2, y + h / 2 + 8);
+
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'black 11px Baloo 2';
+      ctx.fillText('KAVANOZ', x + w / 2, y + h - 8);
+
+      ctx.restore();
+    }
+
+    function drawBall(ball) {
+      ctx.save();
+      ctx.translate(ball.x, ball.y);
+
+      ctx.fillStyle = ball.color;
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2.5;
+
+      ctx.beginPath();
+      ctx.arc(0, 0, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Parlama / Işık Vurgusu
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.beginPath();
+      ctx.arc(-ball.radius * 0.35, -ball.radius * 0.35, ball.radius * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+
+      // İç Simge
+      ctx.font = `${ball.radius * 1.1}px Nunito`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(ball.label || '🍬', 0, 1);
+
+      ctx.restore();
+    }
+
+    function drawRamp(ramp) {
+      const w = ramp.width;
+      const h = ramp.height;
+
+      ctx.fillStyle = ramp.color || '#fbbf24';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3;
+
+      // Üstü Kaygan Rampa Bloğu
+      ctx.beginPath();
+      ctx.roundRect(-w / 2, -h / 2, w, h, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      // Kayma Yüzeyi Şeridi
+      ctx.fillStyle = '#fef08a';
+      ctx.fillRect(-w / 2 + 4, -h / 2 + 2, w - 8, 4);
+
+      // Yön Oku
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 12px Nunito';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('➔', 0, 2);
+    }
+
+    function drawLever(lever) {
+      const w = lever.width;
+      const h = lever.height;
+
+      // Kaldıraç Tahtası (Plank)
+      ctx.fillStyle = lever.color || '#10b981';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3;
+
+      ctx.beginPath();
+      ctx.roundRect(-w / 2, -h / 2, w, h, 5);
+      ctx.fill();
+      ctx.stroke();
+
+      // İki Uçtaki Yük Hazneleri
+      ctx.fillStyle = '#059669';
+      ctx.fillRect(-w / 2, -h / 2 - 4, 18, 5);
+      ctx.fillRect(w / 2 - 18, -h / 2 - 4, 18, 5);
+
+      // Destek Noktası Üçgeni (Fulcrum)
+      ctx.save();
+      ctx.rotate(-lever.angle); // Desteğin dik durması için ters açı
+      ctx.fillStyle = '#334155';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(0, h / 2);
+      ctx.lineTo(-14, h / 2 + 24);
+      ctx.lineTo(14, h / 2 + 24);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Pivot Mili
+      ctx.fillStyle = '#facc15';
+      ctx.beginPath();
+      ctx.arc(0, h / 2, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawGear(x, y, r, teeth, angle, color, isMotor) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      ctx.fillStyle = color || '#d97706';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3;
+
+      // Dişli Gövdesi
+      ctx.beginPath();
+      const step = (Math.PI * 2) / teeth;
+      for (let i = 0; i < teeth; i++) {
+        const a1 = i * step;
+        const a2 = a1 + step * 0.4;
+        const a3 = a1 + step * 0.6;
+        const a4 = a1 + step;
+
+        const rOuter = r + 8;
+        const rInner = r;
+
+        if (i === 0) ctx.moveTo(Math.cos(a1) * rInner, Math.sin(a1) * rInner);
+        ctx.lineTo(Math.cos(a1) * rInner, Math.sin(a1) * rInner);
+        ctx.lineTo(Math.cos(a2) * rOuter, Math.sin(a2) * rOuter);
+        ctx.lineTo(Math.cos(a3) * rOuter, Math.sin(a3) * rOuter);
+        ctx.lineTo(Math.cos(a4) * rInner, Math.sin(a4) * rInner);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // İç Göbek Deliği
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      if (isMotor) {
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 11px Nunito';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('M', 0, 1);
+      }
+
+      ctx.restore();
+    }
+
+    function drawSpring(spring) {
+      const w = spring.width;
+      const h = spring.compressed ? spring.height * 0.6 : spring.height;
+
+      ctx.fillStyle = '#ec4899';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3;
+
+      // Taban Plakası
+      ctx.fillRect(-w / 2, h / 2 - 6, w, 6);
+      ctx.strokeRect(-w / 2, h / 2 - 6, w, 6);
+
+      // Yay Helezonu
+      ctx.beginPath();
+      ctx.moveTo(-w / 3, h / 2 - 6);
+      ctx.lineTo(w / 3, h / 4);
+      ctx.lineTo(-w / 3, 0);
+      ctx.lineTo(w / 3, -h / 4);
+      ctx.lineTo(0, -h / 2);
+      ctx.stroke();
+
+      // Üst İtici Tabla
+      ctx.fillStyle = '#f43f5e';
+      ctx.fillRect(-w / 2, -h / 2, w, 8);
+      ctx.strokeRect(-w / 2, -h / 2, w, 8);
+    }
+
+    function drawDomino(domino) {
+      const w = domino.width;
+      const h = domino.height;
+
+      ctx.fillStyle = domino.color || '#3b82f6';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2.5;
+
+      ctx.beginPath();
+      ctx.roundRect(-w / 2, -h, w, h, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      // Domino Noktası
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, -h / 2, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawVectorArrow(fromX, fromY, vecX, vecY, color) {
+      const toX = fromX + vecX;
+      const toY = fromY + vecY;
+      const headLen = 8;
+      const angle = Math.atan2(vecY, vecX);
+
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 2.5;
+
+      ctx.beginPath();
+      ctx.moveTo(fromX, fromY);
+      ctx.lineTo(toX, toY);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(toX, toY);
+      ctx.lineTo(toX - headLen * Math.cos(angle - Math.PI / 6), toY - headLen * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(toX - headLen * Math.cos(angle + Math.PI / 6), toY - headLen * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    /* ==========================================================
+       9. ETKİLEŞİM VE SÜRÜKLE-BIRAK (MOUSE & TOUCH)
+       ========================================================== */
+    function getCanvasCoords(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+
+      let clientX = e.clientX;
+      let clientY = e.clientY;
+      if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      }
+
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+      };
+    }
+
+    canvas.addEventListener('mousedown', onPointerDown);
+    canvas.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onPointerDown(e); }, { passive: false });
+    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onPointerMove(e); }, { passive: false });
+    window.addEventListener('touchend', onPointerUp);
+
+    function onPointerDown(e) {
+      initAudio();
+      const pt = getCanvasCoords(e);
+
+      // Eğer araç kutusundan bir alet seçiliyse, tıklandığı yere yeni parça koy
+      if (selectedToolType) {
+        spawnToolAt(selectedToolType, pt.x, pt.y);
+        selectedToolType = null;
+        renderToolbox();
+        return;
+      }
+
+      // Var olan bir parçayı seçme veya sürükleme
+      let clickedItem = null;
+      for (let i = placedItems.length - 1; i >= 0; i--) {
+        const item = placedItems[i];
+        const w = item.width || item.radius * 2 || 40;
+        const h = item.height || item.radius * 2 || 40;
+        if (pt.x >= item.x - w / 2 && pt.x <= item.x + w / 2 &&
+            pt.y >= item.y - h / 2 && pt.y <= item.y + h / 2) {
+          clickedItem = item;
+          break;
+        }
+      }
+
+      if (clickedItem) {
+        sound.click();
+        selectedItem = clickedItem;
+        dragItem = clickedItem;
+        dragOffsetX = pt.x - clickedItem.x;
+        dragOffsetY = pt.y - clickedItem.y;
+        showSelectionToolbar(clickedItem);
+      } else {
+        selectedItem = null;
+        dragItem = null;
+        hideSelectionToolbar();
+      }
+    }
+
+    function onPointerMove(e) {
+      if (!dragItem) return;
+      const pt = getCanvasCoords(e);
+      dragItem.x = Math.max(30, Math.min(CANVAS_WIDTH - 30, pt.x - dragOffsetX));
+      dragItem.y = Math.max(30, Math.min(CANVAS_HEIGHT - 30, pt.y - dragOffsetY));
+    }
+
+    function onPointerUp() {
+      dragItem = null;
+    }
+
+    function spawnToolAt(type, x, y) {
+      const def = TOOL_DEFINITIONS.find(t => t.type === type);
+      if (!def) return;
+
+      const newItem = {
+        id: 'item_' + Date.now(),
+        toolType: type,
+        name: def.name,
+        x: x,
+        y: y,
+        angle: 0,
+        initialAngle: 0,
+        width: def.defaultW || 80,
+        height: def.defaultH || 20,
+        radius: def.radius || 24,
+        teeth: def.teeth || 10,
+        color: def.color,
+        angularSpeed: 0
+      };
+
+      placedItems.push(newItem);
+      selectedItem = newItem;
+      showSelectionToolbar(newItem);
+      sound.click();
+    }
+
+    function showSelectionToolbar(item) {
+      const bar = document.getElementById('selectionToolbar');
+      document.getElementById('selectedItemName').textContent = item.name;
+      bar.classList.remove('hidden');
+
+      const fulcrumCtrl = document.getElementById('leverFulcrumControl');
+      if (item.toolType === 'lever') {
+        fulcrumCtrl.classList.remove('hidden');
+        fulcrumCtrl.classList.add('flex');
+      } else {
+        fulcrumCtrl.classList.add('hidden');
+        fulcrumCtrl.classList.remove('flex');
+      }
+    }
+
+    function hideSelectionToolbar() {
+      document.getElementById('selectionToolbar').classList.add('hidden');
+    }
+
+    function rotateSelectedItem(deltaDeg) {
+      if (!selectedItem) return;
+      sound.click();
+      const rad = (deltaDeg * Math.PI) / 180;
+      selectedItem.angle = (selectedItem.angle || 0) + rad;
+      selectedItem.initialAngle = selectedItem.angle;
+    }
+
+    function updateFulcrum(val) {
+      if (!selectedItem || selectedItem.toolType !== 'lever') return;
+      selectedItem.fulcrumRatio = val / 100;
+    }
+
+    function deleteSelectedItem() {
+      if (!selectedItem) return;
+      sound.click();
+      placedItems = placedItems.filter(i => i !== selectedItem);
+      selectedItem = null;
+      hideSelectionToolbar();
+      renderToolbox();
+    }
+
+    function clearAllPlayerItems() {
+      if (placedItems.length === 0) return;
+      sound.click();
+      placedItems = [];
+      selectedItem = null;
+      hideSelectionToolbar();
+      resetSimulation();
+      renderToolbox();
+    }
+
+    function toggleVectors() {
+      showForceVectors = !showForceVectors;
+      document.getElementById('btnVectors').className = showForceVectors 
+        ? "pushable px-2.5 py-1.5 bg-amber-300 text-ink text-xs font-black flex items-center gap-1 shadow-sm"
+        : "pushable px-2.5 py-1.5 bg-sky-100 hover:bg-sky-200 text-ink text-xs font-extrabold flex items-center gap-1";
+    }
+
+    function showHint() {
+      sound.click();
+      const lvl = LEVELS[currentLevel];
+      alert("💡 Mucit İpucu:\n\n" + (lvl ? lvl.hint : "Sandbox modunda sınırsız parça koyabilirsin!"));
+    }
+
+    /* ==========================================================
+       10. BİLİMSEL REHBER MODALI AÇ / KAPA
+       ========================================================== */
+    function openScienceModal() {
+      sound.click();
+      const modal = document.getElementById('scienceModal');
+      modal.classList.remove('hidden');
+      setTimeout(() => { modal.classList.remove('opacity-0'); }, 10);
+    }
+
+    function closeScienceModal() {
+      sound.click();
+      const modal = document.getElementById('scienceModal');
+      modal.classList.add('opacity-0');
+      setTimeout(() => { modal.classList.add('hidden'); }, 200);
+    }
+
+    /* ==========================================================
+       11. SAYFA BAŞLANGICI VE ETKİNLİK DİNLEYİCİLERİ
+       ========================================================== */
+    window.addEventListener('DOMContentLoaded', () => {
+      selectLevel(1);
+      requestAnimationFrame(draw);
+    });
+  </script>
+</body>
+</html>
