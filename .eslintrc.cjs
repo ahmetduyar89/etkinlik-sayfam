@@ -6,7 +6,16 @@ module.exports = {
         'plugin:@typescript-eslint/recommended',
         'plugin:react-hooks/recommended',
     ],
-    ignorePatterns: ['dist', 'apps', 'public/legacy', '.eslintrc.cjs'],
+    ignorePatterns: [
+        'dist',
+        'apps',
+        'functions',
+        'public/legacy',
+        'backup_components',
+        'design_handoff_icerik_merkezi',
+        'design_handoff_icerik_merkezi 2',
+        '.eslintrc.cjs',
+    ],
     parser: '@typescript-eslint/parser',
     plugins: ['react-refresh'],
     rules: {

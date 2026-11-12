@@ -616,14 +616,14 @@ export function GeoGebraStudioTool({
                 }}
                 exit={{ opacity: 0, scale: 0.96 }}
                 className={cn(
-                    'pointer-events-auto flex flex-col bg-slate-900 border border-slate-700/80 shadow-2xl rounded-2xl overflow-hidden backdrop-blur-xl select-none',
+                    'responsive-tool pointer-events-auto flex flex-col bg-slate-900 border border-slate-700/80 shadow-2xl rounded-2xl overflow-hidden backdrop-blur-xl select-none',
                     viewMode === 'maximized'
                         ? 'w-full h-full'
                         : viewMode === 'docked'
-                        ? 'w-[min(92vw,480px)] h-[min(70vh,440px)] shadow-indigo-500/20'
-                        : 'w-[min(95vw,890px)] h-[min(85vh,640px)]'
+                        ? 'w-[min(92vw,480px)] h-[min(70dvh,440px)] shadow-indigo-500/20'
+                        : 'w-[min(95vw,890px)] h-[min(85dvh,640px)]'
                 )}
-                style={{ touchAction: 'none' }}
+                style={{ touchAction: 'pan-y' }}
             >
                 {/* ── İframe Fare Kalkanı (Sürükleme anında iframenin fareyi yutmasını önler) ── */}
                 {isDragging && (
@@ -638,7 +638,7 @@ export function GeoGebraStudioTool({
                         if (viewMode !== 'maximized') dragControls.start(e);
                     }}
                     className={cn(
-                        'px-4 py-2.5 bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border-b border-white/10 flex items-center justify-between select-none cursor-grab active:cursor-grabbing',
+                        'responsive-tool-header px-4 py-2.5 bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border-b border-white/10 flex items-center justify-between select-none cursor-grab active:cursor-grabbing',
                         viewMode === 'maximized' && 'cursor-default'
                     )}
                 >

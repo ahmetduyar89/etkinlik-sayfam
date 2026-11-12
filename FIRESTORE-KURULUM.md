@@ -37,13 +37,29 @@ Canlı Satranç (`…/?view=satranc`) tek bir koleksiyon kullanır:
 | `chess_rooms` | Masalar: `chess_rooms/{dörtHaneliKod}` — oyuncular, hamleler, saat |
 
 Her masa TEK bir dokümandır; iki cihaz da onu canlı dinler, biri hamle
-yazdığında diğerinin tahtası anında güncellenir. Masada kişisel veri tutulmaz —
-yalnızca oyuncunun kendi yazdığı ad ve oynanan hamleler. Terk edilen masalar
-salon açıldığında temizlenir.
+yazdığında diğerinin tahtası anında güncellenir. Oyuncu adı, doğrulanmış öğrenci
+kimliği, sınıf kimliği ve hamleler tutulur; öğrenci numarası masa belgesine
+yazılmaz. Terk edilen masalar salon açıldığında temizlenir.
 
 **`chess_rooms` yeni bir koleksiyondur: Canlı Satranç'ın çalışması için aşağıdaki
 kuralları yeniden yayınlamanız gerekir.** Yayınlanmazsa salon boş görünür ve masa
 kurulamaz; bilgisayara karşı oyun bundan etkilenmez, o ağa hiç bağlanmaz.
+
+## Online Satranç Sınıf Yönetimi
+
+Sınıf turnuvaları, maçlar ve öğrenci gelişimleri için dört kimlik doğrulamalı
+koleksiyon kullanılır:
+
+| Koleksiyon          | İçerik                                       |
+| ------------------- | -------------------------------------------- |
+| `chess_matches`     | Sınıf maçları ve turnuva masa sonuçları      |
+| `chess_tournaments` | Turnuvalar, turlar ve eşleşmeler             |
+| `chess_progress`    | Öğrenci/sınıf XP, ders ve bulmaca ilerlemesi |
+| `chess_sync`        | Sınıf cihazlarının son senkron bilgisi       |
+
+Bu koleksiyonlar `request.auth != null` ister. Öğretmen hesabının kurulumu ve
+eski cihaz verilerinin aktarımı için [`ONLINE-SATRANC-KURULUM.md`](./ONLINE-SATRANC-KURULUM.md)
+belgesini izleyin.
 
 ## Kuralları güncelleme
 
@@ -67,9 +83,9 @@ firebase deploy --only firestore:rules --project interaktif-etkinliklerim
 
 ## Güvenlik notu
 
-Uygulamada Firebase Authentication yok; giriş yalnızca tarayıcıda çalışan basit
-bir şifre kilidiyle sağlanıyor. Bu yüzden kurallar açık erişim verir: adresi ve
-proje anahtarını bilen biri bu koleksiyonları okuyup yazabilir. Bu, mevcut
-`activities` koleksiyonunun bugünkü durumuyla aynıdır. Gerçek koruma için
-Firebase Authentication eklenip kurallardaki `if true` koşulları
-`if request.auth != null` ile değiştirilmelidir.
+Sınıf, öğrenci ve satranç koleksiyonları Firebase Authentication rolleri ve
+`classId` sınırıyla korunur. Sınıf parolaları ile öğrenci numarası dizini istemciye
+kapalıdır. Ders paylaşım bağlantılarının çalışması için etkinlik ve defter
+içerikleri okunabilir kalır; bu alanlara yazma yetkisi öğretmen/sınıf rolüyle
+sınırlandırılmıştır. Geçiş sırası için [`SISTEM-MIMARISI.md`](./SISTEM-MIMARISI.md)
+belgesini izleyin.

@@ -300,10 +300,10 @@ export function PdfViewerTool({ onClose, onInsertImage }: PdfViewerToolProps) {
                     scale: 1,
                 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                style={{ touchAction: 'none' }}
+                style={{ touchAction: 'pan-y' }}
                 className={cn(
-                    'pointer-events-auto flex flex-col bg-[#13151f]/95 backdrop-blur-xl border border-sky-500/30 rounded-2xl shadow-2xl overflow-hidden select-none',
-                    isMaximized ? 'w-full h-full' : 'w-[min(96vw,880px)] h-[min(90vh,620px)]'
+                    'responsive-tool pointer-events-auto flex flex-col bg-[#13151f]/95 backdrop-blur-xl border border-sky-500/30 rounded-2xl shadow-2xl overflow-hidden select-none',
+                    isMaximized ? 'w-full h-full' : 'w-[min(96vw,880px)] h-[min(90dvh,620px)]'
                 )}
             >
                 {/* Üst Başlık Çubuğu */}
@@ -314,7 +314,7 @@ export function PdfViewerTool({ onClose, onInsertImage }: PdfViewerToolProps) {
                         if (!isMaximized) dragControls.start(e);
                     }}
                     className={cn(
-                        'flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-sky-950/80 via-[#181d29] to-[#13151f] border-b border-white/10 select-none cursor-grab active:cursor-grabbing',
+                        'responsive-tool-header flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-sky-950/80 via-[#181d29] to-[#13151f] border-b border-white/10 select-none cursor-grab active:cursor-grabbing',
                         isMaximized && 'cursor-default'
                     )}
                 >

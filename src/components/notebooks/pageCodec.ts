@@ -8,8 +8,18 @@
 // yuvarlamadan sonra üst üste düşen noktalar atılır. Ekranda fark edilmez,
 // veri dörtte birine iner.
 //
-// Okuma hem yeni dizi biçimini hem eski `{x, y, p}` biçimini kabul eder;
-// eski defterler olduğu gibi açılır.
+// Kalem/akıllı tahta girişi ayrıca zaman, hız, eğim ve dönüş bilgisi taşır;
+// dolma ve fırça kalem çizimi yeniden çizerken bunları kullanır. Bu noktalar
+// da alan adsız ve yuvarlanmış diziye yazılır:
+//   [x, y, p, t, pressure, velocity, tiltX, tiltY, twist]
+// `t` çizginin ilk noktasından geçen milisaniyedir. Eskiden bu noktalar tam
+// kayan noktalı nesne olarak yazılıyordu (nokta başına ~180 bayt); tahtada
+// yazılan birkaç sayfa defterin 5,6 MB'lık sınırını dolduruyor, kayıt
+// tamamen duruyordu.
+//
+// Okuma yeni dizi biçimlerini de eski `{x, y, p, ...}` biçimini de kabul
+// eder. Eski sürümdeki istemciler uzun dizinin ilk üç değerini (x, y, p)
+// okur; çizim onlarda da açılır.
 import type { NotebookPage, Point, Stroke, TextBoxData } from '../../types';
 
 /** Koordinat yuvarlaması: 0,1 piksel. */
@@ -17,8 +27,20 @@ const r1 = (n: number): number => Math.round(n * 10) / 10;
 /** Uç baskısı yuvarlaması: 0,01. */
 const r2 = (n: number): number => Math.round(n * 100) / 100;
 
-/** Kodlanmış nokta: `[x, y]` veya baskılı kalemlerde `[x, y, p]`. */
-type PackedPoint = [number, number] | [number, number, number];
+/**
+ * Kodlanmış nokta: `[x, y]`, baskılı kalemlerde `[x, y, p]`, kalem
+ * telemetrisi olan girişte 9 elemanlı dizi (eksik değer `null`).
+ */
+type PackedPoint = [number, number] | [number, number, number] | (number | null)[];
+const telemetryKeys = ['timestamp', 'pressure', 'velocity', 'tiltX', 'tiltY', 'twist'] as const;
+function telemetry(pt: Point): Partial<Point> {
+    const result: Partial<Point> = {};
+    for (const key of telemetryKeys) {
+        const value = pt[key];
+        if (typeof value === 'number' && Number.isFinite(value)) result[key] = value;
+    }
+    return result;
+}
 
 const isFinitePoint = (pt: Point | undefined): pt is Point =>
     !!pt && Number.isFinite(pt.x) && Number.isFinite(pt.y);
@@ -28,12 +50,30 @@ function encodePoints(points: Point[]): PackedPoint[] {
     const out: PackedPoint[] = [];
     // İki noktalı çizimler (şekiller, görseller) köşe tanımıdır; ayıklanmaz.
     const dedupe = points.length > 2;
+    const t0 = points.find((pt) => Number.isFinite(pt?.timestamp))?.timestamp ?? 0;
+    const num = (n: number | undefined, round: (n: number) => number): number | null =>
+        typeof n === 'number' && Number.isFinite(n) ? round(n) : null;
     for (const pt of points) {
         if (!isFinitePoint(pt)) continue;
         const x = r1(pt.x);
         const y = r1(pt.y);
+        // Zengin giriş, aynı konumda olsa bile zaman/baskı değişimini korur.
+        if (telemetryKeys.some(key => Number.isFinite(pt[key]))) {
+            out.push([
+                x,
+                y,
+                num(pt.p, r2),
+                num(pt.timestamp === undefined ? undefined : pt.timestamp - t0, Math.round),
+                num(pt.pressure, r2),
+                num(pt.velocity, Math.round),
+                num(pt.tiltX, Math.round),
+                num(pt.tiltY, Math.round),
+                num(pt.twist, Math.round),
+            ]);
+            continue;
+        }
         const prev = out[out.length - 1];
-        if (dedupe && prev && prev[0] === x && prev[1] === y) continue;
+        if (dedupe && Array.isArray(prev) && prev[0] === x && prev[1] === y && prev[2] === (Number.isFinite(pt.p) ? r2(pt.p!) : undefined)) continue;
         out.push(
             typeof pt.p === 'number' && Number.isFinite(pt.p) ? [x, y, r2(pt.p)] : [x, y]
         );
@@ -52,15 +92,22 @@ function decodePoints(raw: unknown): Point[] {
         if (Array.isArray(item)) {
             const [x, y, p] = item as number[];
             if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-            out.push(Number.isFinite(p) ? { x, y, p } : { x, y });
+            const pt: Point = Number.isFinite(p) ? { x, y, p } : { x, y };
+            if (item.length > 3) {
+                telemetryKeys.forEach((key, i) => {
+                    const value = item[3 + i];
+                    if (typeof value === 'number' && Number.isFinite(value)) pt[key] = value;
+                });
+            }
+            out.push(pt);
         } else if (item && typeof item === 'object') {
             // Eski biçim: {x, y, p}
             const pt = item as Point;
             if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y)) continue;
             out.push(
                 typeof pt.p === 'number' && Number.isFinite(pt.p)
-                    ? { x: pt.x, y: pt.y, p: pt.p }
-                    : { x: pt.x, y: pt.y }
+                    ? { x: pt.x, y: pt.y, p: pt.p, ...telemetry(pt) }
+                    : { x: pt.x, y: pt.y, ...telemetry(pt) }
             );
         }
     }

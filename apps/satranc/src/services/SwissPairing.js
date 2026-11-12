@@ -15,7 +15,7 @@
  */
 
 /** Sonuç kodu → beyazın aldığı puan. */
-export const RESULT_POINTS = { "1-0": 1, "0-1": 0, "½-½": 0.5 };
+export const RESULT_POINTS = { "1-0": 1, "0-1": 0, "½-½": 0.5, "1/2-1/2": 0.5 };
 
 /** Önerilen tur sayısı: kazananın netleşmesi için log2(n) + 1. */
 export function suggestedRounds(playerCount) {

@@ -4,7 +4,7 @@
 // tahtası anında güncellenir (bkz. src/lib/chess/rooms.ts).
 //
 // Ekran üç hâlde olabilir:
-//   bekliyor   → rakip bekleniyor; kod ve bağlantı paylaşılır, "Hazırım" denir
+//   bekliyor   → rakip bekleniyor; kod ve bağlantı paylaşılır, rakip katılınca oyun başlatılır
 //   oynaniyor  → tahta açık, saatler işliyor
 //   bitti      → sonuç ve "Yeniden oyna"
 //
@@ -34,7 +34,7 @@ import {
     requestRematch,
     resign,
     seatColor,
-    setReady,
+    startGame,
     watchRoom,
     type ChessRoom,
 } from '../../lib/chess/rooms';
@@ -42,11 +42,13 @@ import {
 interface ChessTableProps {
     code: string;
     playerId: string;
+    studentId: string;
     playerName: string;
+    classId: string;
     onExit: () => void;
 }
 
-export function ChessTable({ code, playerId, playerName, onExit }: ChessTableProps) {
+export function ChessTable({ code, playerId, studentId, playerName, classId, onExit }: ChessTableProps) {
     const [room, setRoom] = useState<ChessRoom | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export function ChessTable({ code, playerId, playerName, onExit }: ChessTablePro
     // Masaya katıl (koltuk boşsa otur), sonra canlı dinlemeye geç.
     useEffect(() => {
         let alive = true;
-        joinRoom(code, playerId, playerName)
+        joinRoom(code, playerId, studentId, playerName, classId)
             .then(() => alive && setLoading(false))
             .catch((e: Error) => {
                 if (!alive) return;
@@ -76,7 +78,7 @@ export function ChessTable({ code, playerId, playerName, onExit }: ChessTablePro
             alive = false;
             stop();
         };
-    }, [code, playerId, playerName]);
+    }, [code, playerId, studentId, playerName, classId]);
 
     const myColor: PieceColor | null = room ? seatColor(room, playerId) : null;
 
@@ -191,12 +193,12 @@ export function ChessTable({ code, playerId, playerName, onExit }: ChessTablePro
               : 'Kaybettin';
 
     return (
-        <div className="mx-auto w-full max-w-5xl px-4 py-5">
-            <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mx-auto w-full max-w-5xl px-3 py-3 sm:px-6 sm:py-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-4">
                 <button
                     type="button"
                     onClick={handleExit}
-                    className="flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:text-on-surface"
+                    className="flex min-h-11 items-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:text-on-surface"
                 >
                     <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                     Salon
@@ -214,8 +216,8 @@ export function ChessTable({ code, playerId, playerName, onExit }: ChessTablePro
                 </div>
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-                <div className="flex flex-col gap-2.5">
+            <div className="chess-game-layout grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+                <div className="chess-board-column mx-auto flex w-full min-w-0 max-w-[36rem] flex-col gap-2 lg:mx-0">
                     <PlayerBar
                         name={topSeat?.name ?? 'Rakip bekleniyor'}
                         color={opponentColor}
@@ -246,15 +248,20 @@ export function ChessTable({ code, playerId, playerName, onExit }: ChessTablePro
                     />
                 </div>
 
-                <aside className="flex flex-col gap-3">
+                <aside className="flex min-w-0 flex-col gap-3">
+                    <div className="rounded-2xl border border-outline-variant bg-surface p-4 text-xs text-on-surface-variant">
+                        <h2 className="mb-1 font-bold text-on-surface">Oyun kuralları</h2>
+                        <p>Standart satranç · {room.clock ? `${room.clock.initial_ms / 60_000} dakika + ${room.clock.increment_ms / 1_000} saniye/hamle` : 'Süresiz'}</p>
+                        <p className="mt-1">Beraberlik teklifi {room.allow_draw ? 'açık' : 'kapalı'} · {room.kind === 'acik' ? 'Herkese açık oyun' : 'Kodla katılım'}</p>
+                    </div>
                     {room.status === 'bekliyor' && (
                         <div className="rounded-2xl border border-outline-variant bg-surface p-4">
                             <p className="text-sm font-bold text-on-surface">
-                                {topSeat ? 'Başlamaya hazır mısın?' : 'Rakip bekleniyor'}
+                                {topSeat ? 'Oyuncular katıldı' : 'Rakip bekleniyor'}
                             </p>
                             <p className="mt-1 text-xs text-on-surface-variant">
                                 {topSeat
-                                    ? 'İki oyuncu da hazır olunca saat çalışmaya başlar.'
+                                    ? 'Oyunu başlat düğmesine basıldığında oyun ve saat başlar.'
                                     : 'Arkadaşına aşağıdaki kodu ya da bağlantıyı gönder.'}
                             </p>
 
@@ -277,13 +284,13 @@ export function ChessTable({ code, playerId, playerName, onExit }: ChessTablePro
                             </div>
 
                             {!iAmSpectator && (
-                                <ReadyButton room={room} myColor={myColor} code={code} />
+                                <StartButton room={room} myColor={myColor} code={code} />
                             )}
                         </div>
                     )}
 
                     {room.status === 'bitti' && room.result && (
-                        <div className="flex flex-col gap-3">
+                        <div className="flex min-w-0 flex-col gap-3">
                             <ResultBanner
                                 result={resultTitle}
                                 reason={room.result.reason}
@@ -304,7 +311,7 @@ export function ChessTable({ code, playerId, playerName, onExit }: ChessTablePro
                         </div>
                     )}
 
-                    {drawOfferToMe && (
+                    {room.allow_draw && drawOfferToMe && (
                         <div className="rounded-2xl border border-secondary/40 bg-secondary-container/60 p-3">
                             <p className="text-sm font-semibold text-on-secondary-container">
                                 Rakibin beraberlik teklif etti.
@@ -330,11 +337,11 @@ export function ChessTable({ code, playerId, playerName, onExit }: ChessTablePro
 
                     {playing && !iAmSpectator && (
                         <div className="flex gap-2">
-                            <button
+                            {room.allow_draw && <button
                                 type="button"
                                 onClick={() => void offerDraw(code, playerId, !iOfferedDraw)}
                                 className={cn(
-                                    'flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-bold transition',
+                                    'flex flex-1 items-center justify-center gap-1.5 rounded-xl border min-h-11 px-3 py-2.5 text-sm font-bold transition',
                                     iOfferedDraw
                                         ? 'border-secondary/40 bg-secondary-container text-on-secondary-container'
                                         : 'border-outline-variant bg-surface text-on-surface-variant hover:text-on-surface'
@@ -346,11 +353,11 @@ export function ChessTable({ code, playerId, playerName, onExit }: ChessTablePro
                                     <Handshake className="h-3.5 w-3.5" aria-hidden="true" />
                                 )}
                                 {iOfferedDraw ? 'Teklifi geri al' : 'Beraberlik'}
-                            </button>
+                            </button>}
                             <button
                                 type="button"
                                 onClick={() => void resign(code, playerId)}
-                                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-error/30 bg-error-container px-3 py-2.5 text-xs font-bold text-on-error-container transition hover:brightness-105"
+                                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-error/30 bg-error-container min-h-11 px-3 py-2.5 text-sm font-bold text-on-error-container transition hover:brightness-105"
                             >
                                 <Flag className="h-3.5 w-3.5" aria-hidden="true" />
                                 Pes et
@@ -377,46 +384,23 @@ export function ChessTable({ code, playerId, playerName, onExit }: ChessTablePro
     );
 }
 
-/** "Hazırım" düğmesi; iki taraf da bastığında oyun kendiliğinden başlar. */
-function ReadyButton({
-    room,
-    myColor,
-    code,
-}: {
-    room: ChessRoom;
-    myColor: PieceColor | null;
-    code: string;
-}) {
+/** Katılımcılardan biri, iki koltuk dolduğunda oyunu başlatabilir. */
+function StartButton({ room, myColor, code }: { room: ChessRoom; myColor: PieceColor | null; code: string }) {
     const [busy, setBusy] = useState(false);
+    const toast = useToast();
     if (!myColor) return null;
     const mine = myColor === 'w' ? room.white : room.black;
-    const other = myColor === 'w' ? room.black : room.white;
-    const ready = Boolean(mine?.ready);
-
+    const full = Boolean(room.white && room.black);
     return (
-        <button
-            type="button"
-            disabled={busy}
+        <button type="button" disabled={busy || !full}
             onClick={async () => {
                 setBusy(true);
-                try {
-                    await setReady(code, mine!.id, !ready);
-                } finally {
-                    setBusy(false);
-                }
+                try { await startGame(code, mine!.id); }
+                catch (e) { toast.error(e instanceof Error ? e.message : 'Oyun başlatılamadı.'); }
+                finally { setBusy(false); }
             }}
-            className={cn(
-                'mt-3 w-full rounded-xl px-4 py-3 text-sm font-bold transition',
-                ready
-                    ? 'bg-tertiary-container text-on-tertiary-container'
-                    : 'bg-primary text-on-primary hover:brightness-105'
-            )}
-        >
-            {ready
-                ? other?.ready
-                    ? 'Başlıyor…'
-                    : 'Hazırsın — rakip bekleniyor'
-                : 'Hazırım, başlayalım'}
+            className="mt-3 w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-on-primary transition hover:brightness-105 disabled:opacity-50">
+            {busy ? 'Başlatılıyor…' : full ? 'Oyunu başlat' : 'Rakip bekleniyor…'}
         </button>
     );
 }

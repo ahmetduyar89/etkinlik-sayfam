@@ -161,7 +161,11 @@ export async function saveNotebookPages(
 
     const written = await saveDocsTransaction({ collection: COLLECTION, id: notebookId }, (current) => {
         serverRev = (current?.rev as number) ?? 0;
-        if (!force && serverRev !== baseRev) return null;
+        // Bu sekmenin kendi yazdığı sürüm çakışma sayılmaz: kayıt sunucuya
+        // ulaşıp yanıt gelmeden bağlantı koptuysa yeniden deneme kendi
+        // yazımıyla karşılaşır.
+        const ownWrite = current?.writer === WRITER_ID;
+        if (!force && serverRev !== baseRev && !ownWrite) return null;
         rev = serverRev + 1;
 
         const writes: DocWrite[] = [

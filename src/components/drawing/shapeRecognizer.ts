@@ -94,7 +94,16 @@ export function recognizeShape(rawPoints: Point[]): RecognizedShape | null {
     if (len < 1e-6) return null;
 
     const gap = dist(start, end);
-    const closed = gap < Math.max(diag * 0.32, 26);
+    let minGap = gap;
+    const checkCountStart = Math.min(pts.length, Math.max(5, Math.floor(pts.length * 0.25)));
+    for (let i = 0; i < checkCountStart; i++) {
+        minGap = Math.min(minGap, dist(pts[i], end));
+    }
+    const checkCountEnd = Math.max(0, pts.length - checkCountStart);
+    for (let i = checkCountEnd; i < pts.length; i++) {
+        minGap = Math.min(minGap, dist(start, pts[i]));
+    }
+    const closed = minGap < Math.max(diag * 0.40, 36);
 
     // ── Açık şekiller: Düz çizgi veya Ok (Arrow) ──────────────────────
     if (!closed) {
@@ -157,7 +166,7 @@ export function recognizeShape(rawPoints: Point[]): RecognizedShape | null {
     const aspect = bb.w && bb.h ? Math.max(bb.w, bb.h) / Math.min(bb.w, bb.h) : 99;
 
     // Daire / Elips: merkeze uzaklık istikrarlı ve en-boy oranı dengeli.
-    if (rDev < 0.22 && aspect < 1.45) {
+    if (rDev < 0.30 && aspect < 1.55) {
         // En-boy oranı birbirine çok yakınsa kusursuz daire
         return {
             tool: 'circle',
@@ -168,12 +177,59 @@ export function recognizeShape(rawPoints: Point[]): RecognizedShape | null {
         };
     }
 
+    // Basık çember / Elips tespiti
+    if (aspect >= 1.25 && aspect <= 5.0) {
+        const rx = bb.w / 2;
+        const ry = bb.h / 2;
+        if (rx > 10 && ry > 10) {
+            const normDists = pts.map((p) => Math.hypot((p.x - cx) / rx, (p.y - cy) / ry));
+            const normMean = normDists.reduce((s, d) => s + d, 0) / normDists.length;
+            const normDev =
+                Math.sqrt(normDists.reduce((s, d) => s + (d - normMean) ** 2, 0) / normDists.length);
+            if (normDev < 0.32 && normMean > 0.65 && normMean < 1.35) {
+                return {
+                    tool: 'ellipse',
+                    points: [
+                        { x: bb.x1, y: bb.y1 },
+                        { x: bb.x2, y: bb.y2 },
+                    ],
+                };
+            }
+        }
+    }
+
     // Köşe sayısına bak (Ramer-Douglas-Peucker ile sadeleştirme)
     const corners = simplify(pts, Math.max(diag * 0.05, 5.5));
     const cornerCount = Math.max(0, corners.length - 1);
 
-    // Üçgen: 3 belirgin köşe
+    // Üçgen: 3 belirgin köşe (Dik Üçgen veya Normal Üçgen)
     if (cornerCount === 3) {
+        // 3 köşenin açılarını analiz et
+        const c0 = corners[0];
+        const c1 = corners[1];
+        const c2 = corners[2];
+        const angleAt = (prev: Point, at: Point, next: Point) => {
+            const v1 = { x: prev.x - at.x, y: prev.y - at.y };
+            const v2 = { x: next.x - at.x, y: next.y - at.y };
+            const dot = v1.x * v2.x + v1.y * v2.y;
+            const m = Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y);
+            return m > 0 ? (Math.acos(Math.max(-1, Math.min(1, dot / m))) * 180) / Math.PI : 0;
+        };
+        const a0 = angleAt(c2, c0, c1);
+        const a1 = angleAt(c0, c1, c2);
+        const a2 = angleAt(c1, c2, c0);
+        const hasRightAngle = [a0, a1, a2].some((ang) => Math.abs(ang - 90) <= 18);
+
+        if (hasRightAngle) {
+            return {
+                tool: 'right_triangle',
+                points: [
+                    { x: bb.x1, y: bb.y1 },
+                    { x: bb.x2, y: bb.y2 },
+                ],
+            };
+        }
+
         return {
             tool: 'triangle',
             points: [
@@ -183,8 +239,27 @@ export function recognizeShape(rawPoints: Point[]): RecognizedShape | null {
         };
     }
 
-    // Dikdörtgen / Kare: 4 veya 5 köşe
-    if (cornerCount === 4 || cornerCount === 5) {
+    // Baklava / Eşkenar Dörtgen (Diamond) veya Dikdörtgen / Kare: 4 ila 8 köşe
+    if (cornerCount >= 4 && cornerCount <= 8) {
+        // 4 köşenin konumlarına bak: Kenar ortalarına yakınsa baklava (diamond)
+        if (cornerCount <= 5) {
+            const cPts = corners.slice(0, 4);
+            const nearTopMid = cPts.some(c => Math.abs(c.y - bb.y1) < bb.h * 0.22 && Math.abs(c.x - cx) < bb.w * 0.28);
+            const nearBotMid = cPts.some(c => Math.abs(c.y - bb.y2) < bb.h * 0.22 && Math.abs(c.x - cx) < bb.w * 0.28);
+            const nearLeftMid = cPts.some(c => Math.abs(c.x - bb.x1) < bb.w * 0.22 && Math.abs(c.y - cy) < bb.h * 0.28);
+            const nearRightMid = cPts.some(c => Math.abs(c.x - bb.x2) < bb.w * 0.22 && Math.abs(c.y - cy) < bb.h * 0.28);
+
+            if (nearTopMid && nearBotMid && nearLeftMid && nearRightMid) {
+                return {
+                    tool: 'diamond',
+                    points: [
+                        { x: bb.x1, y: bb.y1 },
+                        { x: bb.x2, y: bb.y2 },
+                    ],
+                };
+            }
+        }
+
         // Eğer en ve boy birbirine çok yakınsa kareye kilitle
         if (Math.abs(bb.w - bb.h) / Math.max(bb.w, bb.h) < 0.18) {
             const side = (bb.w + bb.h) / 2;
@@ -205,6 +280,64 @@ export function recognizeShape(rawPoints: Point[]): RecognizedShape | null {
                 { x: bb.x2, y: bb.y2 },
             ],
         };
+    }
+
+    // Çok köşeli veya yuvarlatılmış köşeli serbest elle çizilmiş dikdörtgen/kutu kontrolü (örn. formül kutusu)
+    if (bb.w > 24 && bb.h > 18) {
+        const perim = 2 * (bb.w + bb.h);
+        const perimRatio = len / perim;
+        if (perimRatio >= 0.72 && perimRatio <= 1.38) {
+            const cornerTol = Math.max(diag * 0.36, 28);
+            const hasTL = pts.some((p) => dist(p, { x: bb.x1, y: bb.y1 }) < cornerTol);
+            const hasTR = pts.some((p) => dist(p, { x: bb.x2, y: bb.y1 }) < cornerTol);
+            const hasBR = pts.some((p) => dist(p, { x: bb.x2, y: bb.y2 }) < cornerTol);
+            const hasBL = pts.some((p) => dist(p, { x: bb.x1, y: bb.y2 }) < cornerTol);
+
+            if (hasTL && hasTR && hasBR && hasBL) {
+                if (Math.abs(bb.w - bb.h) / Math.max(bb.w, bb.h) < 0.18) {
+                    const side = (bb.w + bb.h) / 2;
+                    const hx = (bb.x1 + bb.x2) / 2;
+                    const hy = (bb.y1 + bb.y2) / 2;
+                    return {
+                        tool: 'rect',
+                        points: [
+                            { x: hx - side / 2, y: hy - side / 2 },
+                            { x: hx + side / 2, y: hy + side / 2 },
+                        ],
+                    };
+                }
+                return {
+                    tool: 'rect',
+                    points: [
+                        { x: bb.x1, y: bb.y1 },
+                        { x: bb.x2, y: bb.y2 },
+                    ],
+                };
+            }
+        }
+    }
+
+    // Yıldız tespiti: 5 uçlu yıldız (yaklaşık 8–12 köşe ve 5 belirgin yarıçap tepesi)
+    if (cornerCount >= 8 && cornerCount <= 12 && rDev > 0.3) {
+        let peaks = 0;
+        const n = pts.length;
+        for (let i = 0; i < n; i++) {
+            const prevR = radii[(i - 1 + n) % n];
+            const currR = radii[i];
+            const nextR = radii[(i + 1) % n];
+            if (currR > prevR && currR > nextR && currR > rMean * 1.1) {
+                peaks++;
+            }
+        }
+        if (peaks >= 4 && peaks <= 6) {
+            return {
+                tool: 'star',
+                points: [
+                    { x: bb.x1, y: bb.y1 },
+                    { x: bb.x2, y: bb.y2 },
+                ],
+            };
+        }
     }
 
     // Çok köşeli ama dairesel forma yakınsa çembere çevir
@@ -260,7 +393,10 @@ export function adjustSnappedShape(
         const r = Math.hypot(dx, dy);
         if (r > 15) {
             const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
-            const targets = [0, 45, 90, 135, 180, -45, -90, -135, -180];
+            const targets = [
+                0, 30, 45, 60, 90, 120, 135, 150, 180,
+                -30, -45, -60, -90, -120, -135, -150, -180,
+            ];
             for (const target of targets) {
                 if (Math.abs(deg - target) < 6) {
                     const rad = (target * Math.PI) / 180;
@@ -271,7 +407,12 @@ export function adjustSnappedShape(
         }
     }
 
-    if (shape.tool === 'line' || shape.tool === 'arrow') {
+    if (
+        shape.tool === 'line' ||
+        shape.tool === 'dashed' ||
+        shape.tool === 'arrow' ||
+        shape.tool === 'double_arrow'
+    ) {
         return {
             tool: shape.tool,
             points: [{ ...start }, end],
@@ -285,7 +426,14 @@ export function adjustSnappedShape(
         };
     }
 
-    if (shape.tool === 'rect' || shape.tool === 'triangle') {
+    if (
+        shape.tool === 'rect' ||
+        shape.tool === 'ellipse' ||
+        shape.tool === 'triangle' ||
+        shape.tool === 'right_triangle' ||
+        shape.tool === 'diamond' ||
+        shape.tool === 'star'
+    ) {
         return {
             tool: shape.tool,
             points: [{ ...start }, end],
