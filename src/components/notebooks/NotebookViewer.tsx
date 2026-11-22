@@ -15,6 +15,7 @@ import { loadNotebookPages } from './notebookContent';
 import { watchOps } from './notebookOps';
 import { paperBackground } from './paper';
 import { pageDims } from '../../constants/pageSizes';
+import { PdfPageBackground } from './PdfPageBackground';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
@@ -213,6 +214,13 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
     const pageBox = pdfBox ?? pageDims(notebook.page_size);
     const canGoPrev = pageInfo.current > 0;
     const canGoNext = pageInfo.current < pageInfo.total - 1;
+    const currentMappedPdfPage = notebook.pdf_id
+        ? Array.isArray(notebook.pdf_page_map) && notebook.pdf_page_map.length > 0
+            ? (notebook.pdf_page_map[pageInfo.current] ?? null)
+            : pageInfo.current < (notebook.pdf_total_pages || pageInfo.total)
+            ? pageInfo.current + 1
+            : null
+        : null;
 
     return (
         <div ref={stageRef} className="h-[100dvh] flex flex-col bg-background">
@@ -247,6 +255,18 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
                     <div
                         className="absolute inset-0"
                         style={paperBackground(paper, bgColor, view, canvasSize)}
+                    />
+                )}
+                {notebook.pdf_id && (
+                    <PdfPageBackground
+                        pdfId={notebook.pdf_id}
+                        pdfName={notebook.pdf_name}
+                        pdfUrl={notebook.pdf_url}
+                        rotation={notebook.pdf_rotations?.[pageInfo.current + 1] || 0}
+                        pageNumber={currentMappedPdfPage}
+                        view={view}
+                        canvasSize={canvasSize}
+                        box={pdfBox}
                     />
                 )}
                 <DrawingCanvas

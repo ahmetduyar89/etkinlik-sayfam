@@ -1,4 +1,4 @@
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { storage } from './firebase';
 
 const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
@@ -124,19 +124,47 @@ export function ensurePdfjsLoaded(): Promise<any> {
 export async function uploadPdfToCloud(
     id: string,
     name: string,
-    data: ArrayBuffer
-): Promise<{ url: string; path: string }> {
+    data: ArrayBuffer,
+    onProgress?: (ratio: number) => void
+): Promise<{ url: string; path: string; error?: string }> {
     try {
         const sanitizedName = name.replace(/[^a-zA-Z0-9._-]/g, '_') || 'document.pdf';
         const storagePath = `notebooks/pdfs/${id}/${sanitizedName}`;
         const storageRef = ref(storage, storagePath);
         const blob = new Blob([data], { type: 'application/pdf' });
-        await uploadBytes(storageRef, blob, { contentType: 'application/pdf' });
+
+        await new Promise<void>((resolve, reject) => {
+            const task = uploadBytesResumable(storageRef, blob, { contentType: 'application/pdf' });
+            task.on(
+                'state_changed',
+                (snapshot) => {
+                    if (onProgress && snapshot.totalBytes > 0) {
+                        onProgress(Math.min(1, snapshot.bytesTransferred / snapshot.totalBytes));
+                    }
+                },
+                (err) => reject(err),
+                () => resolve()
+            );
+        });
+
         const url = await getDownloadURL(storageRef);
         return { url, path: storagePath };
-    } catch (err) {
+    } catch (err: any) {
         console.warn('PDF Firebase Storage yükleme uyarısı:', err);
-        return { url: '', path: '' };
+        return { url: '', path: '', error: err?.message || 'Bulut yükleme hatası' };
+    }
+}
+
+/**
+ * Buluttaki (Firebase Storage) PDF dosyasını siler.
+ */
+export async function deletePdfFromCloud(storagePath?: string): Promise<void> {
+    if (!storagePath) return;
+    try {
+        const storageRef = ref(storage, storagePath);
+        await deleteObject(storageRef);
+    } catch (err) {
+        console.warn('PDF buluttan silinirken uyarı:', err);
     }
 }
 

@@ -1270,6 +1270,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     pagesRef.current.push([]);
                     switchPage(pagesRef.current.length - 1);
                 },
+                insertPageAfter: (index = currentPageRef.current) => {
+                    commitTextRef.current();
+                    pagesRef.current[currentPageRef.current] = [...strokesRef.current];
+                    const insertAt = Math.max(0, Math.min(pagesRef.current.length, index + 1));
+                    pagesRef.current.splice(insertAt, 0, []);
+                    switchPage(insertAt);
+                },
                 duplicatePage: () => {
                     commitTextRef.current();
                     pagesRef.current[currentPageRef.current] = [...strokesRef.current];

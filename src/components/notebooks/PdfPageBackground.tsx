@@ -15,7 +15,8 @@ interface PdfPageBackgroundProps {
     pdfName?: string;
     pdfUrl?: string;
     rotation?: number; // 0, 90, 180, 270
-    pageNumber: number; // 1-based index (1, 2, 3...)
+    /** 1-based PDF sayfa numarası (1, 2, 3...). `null` veya `<= 0` ise bu yaprakta PDF sayfası yoktur (boş çalışma sayfası). */
+    pageNumber: number | null;
     view: Viewport;
     canvasSize: { w: number; h: number };
     /**
@@ -187,14 +188,29 @@ export function PdfPageBackground({
 
     // Sayfa numarası, dönüş açısı veya doküman değiştiğinde çiz
     React.useEffect(() => {
+        if (!pageNumber || pageNumber <= 0) {
+            if (renderTaskRef.current) {
+                renderTaskRef.current.cancel();
+                renderTaskRef.current = null;
+            }
+            const canvas = canvasRef.current;
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx?.clearRect(0, 0, canvas.width, canvas.height);
+            }
+            onCanvasReady?.(null);
+            setRendering(false);
+            return;
+        }
+        onCanvasReady?.(canvasRef.current);
         if (!isLoading && pdfDocRef.current) {
             void renderPage(pageNumber);
         }
-    }, [isLoading, pageNumber, rotation, renderPage]);
+    }, [isLoading, pageNumber, rotation, renderPage, onCanvasReady]);
 
     // Yakınlaştırma (zoom) bittiğinde daha yüksek çözünürlük için debounced yeniden çizim
     React.useEffect(() => {
-        if (isLoading || !pdfDocRef.current) return;
+        if (isLoading || !pdfDocRef.current || !pageNumber || pageNumber <= 0) return;
         const timer = setTimeout(() => {
             if (lastRenderedPageRef.current === pageNumber) {
                 void renderPage(pageNumber);
@@ -216,7 +232,9 @@ export function PdfPageBackground({
             const doc = await getPdfDocument(pdfId, buffer);
             pdfDocRef.current = doc;
             setIsLoading(false);
-            void renderPage(pageNumber);
+            if (pageNumber && pageNumber > 0) {
+                void renderPage(pageNumber);
+            }
             toast.success('PDF bu cihaza bağlandı.');
             onRebindSuccess?.();
             onDocLoaded?.(doc);
@@ -300,6 +318,12 @@ export function PdfPageBackground({
                 {error}
             </div>
         );
+    }
+
+    // Bu defter sayfası araya eklenmiş boş bir çalışma yaprağı ise (PDF sayfası değilse),
+    // alttaki kareli/çizgili kağıt deseninin görünmesi için PDF tuvalini gizle.
+    if (!pageNumber || pageNumber <= 0 || (pdfDocRef.current && pageNumber > pdfDocRef.current.numPages)) {
+        return null;
     }
 
     // Sayfa konumu

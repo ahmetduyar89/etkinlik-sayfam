@@ -573,6 +573,8 @@ export interface DrawingCanvasHandle {
     nextPage: () => void;
     prevPage: () => void;
     addPage: () => void;
+    /** Belirtilen indeksin hemen arkasına (verilmezse geçerli sayfanın arkasına) boş sayfa ekler. */
+    insertPageAfter: (index?: number) => void;
     deletePage: () => void;
     /** Belirtilen sayfaya geçer. */
     goToPage: (index: number) => void;
@@ -729,6 +731,16 @@ export interface Notebook {
     pdf_rotations?: Record<number, number>;
     /** PDF yer imleri (1 tabanlı sayfa numaraları dizisi) */
     pdf_bookmarks?: number[];
+    /**
+     * GoodNotes sayfa eşlemesi: Defterin her bir sayfasının (0-tabanlı indeks)
+     * PDF'in hangi sayfasına (1-tabanlı sayfa numarası) karşılık geldiğini tutar.
+     * `0` veya `null` ise o sayfa PDF arkasına değil, araya eklenmiş boş bir
+     * çalışma yaprağına (kareli/çizgili/düz kağıt) karşılık gelir.
+     * Bu sayede PDF sayfalarının arasına boş sayfa eklenebilir, PDF sayfaları
+     * çoğaltılabilir, silinebilir ve sırası değiştirildiğinde çizimlerle PDF
+     * sayfası birlikte hareket eder.
+     */
+    pdf_page_map?: (number | null)[];
     /**
      * Sayfa içeriğinin sürüm numarası. Her kayıtta artar; editör ve
      * görüntüleyici bu küçük üst veri dokümanını dinleyerek içeriğin başka

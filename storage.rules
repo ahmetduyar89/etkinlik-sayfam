@@ -30,11 +30,24 @@ service firebase.storage {
     function pdf() {
       return request.resource.size <= 25 * 1024 * 1024 && request.resource.contentType == 'application/pdf';
     }
+    function notebookPdf() {
+      return request.resource.size <= 100 * 1024 * 1024 && request.resource.contentType == 'application/pdf';
+    }
+    function isNotebookOwner() {
+      return (request.auth != null && request.auth.token.role in ['teacher', 'class']) || admin();
+    }
     // Etkinlik uygulamasının öğretmen oturumu custom claim kullanır.
     // Mevcut admin erişimi ve diğer uygulamaların dosya izinleri korunur.
     match /activities/{file} {
       allow read: if true;
       allow write: if (request.auth != null && request.auth.token.role == 'teacher') || admin();
+    }
+    // Defterlerim (GoodNotes modu) PDF belgeleri: QR ile paylaşılan öğrenci ekranları
+    // dahil tüm cihazlarda okunabilir; yalnız öğretmen veya sınıf oturumu yükleyip silebilir.
+    match /notebooks/pdfs/{pdfId}/{fileName} {
+      allow read: if true;
+      allow create, update: if isNotebookOwner() && notebookPdf();
+      allow delete: if isNotebookOwner();
     }
     match /pdfs/{id} {
       allow read: if sharedRootPdf(id) || admin();

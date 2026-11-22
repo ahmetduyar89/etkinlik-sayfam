@@ -25,7 +25,14 @@ import {
     Loader2,
 } from 'lucide-react';
 import { useFirestore } from '../../lib/firebase';
-import { savePdfToDB, getPdfDocument, uploadPdfToCloud } from '../../lib/pdfStorage';
+import {
+    savePdfToDB,
+    getPdfDocument,
+    uploadPdfToCloud,
+    deletePdfFromDB,
+    deletePdfFromCloud,
+    clearPdfDocCache,
+} from '../../lib/pdfStorage';
 import { pdfBoxFromPoints } from '../../constants/pageSizes';
 import { cn } from '../../utils/cn';
 import { copyText } from '../../utils/clipboard';
@@ -282,29 +289,33 @@ export function NotebooksView() {
             const firstPage = await doc.getPage(1);
             const pt = firstPage.getViewport({ scale: 1 });
             const pdf_box = pdfBoxFromPoints(pt.width, pt.height);
+            const pdf_page_map = Array.from({ length: numPages }, (_, i) => i + 1);
 
             // GoodNotes tarzı defteri oluştur
             const ref = await notebooksHandler.add({
                 title: file.name.replace(/\.pdf$/i, ''),
                 kind: 'notebook',
                 parent_id: currentFolderId,
-                paper: 'blank',
-                bg_color: '#f8fafc',
+                paper: 'grid',
+                bg_color: '#ffffff',
                 page_count: numPages,
                 pdf_id: pdfId,
                 pdf_name: file.name,
                 pdf_total_pages: numPages,
                 pdf_box,
+                pdf_page_map,
                 updated_at: new Date().toISOString(),
             });
 
             // Buluta yükleme (Tüm cihazlarda otomatik görünür olması için)
-            uploadPdfToCloud(pdfId, file.name, buffer).then(({ url, path }) => {
+            uploadPdfToCloud(pdfId, file.name, buffer).then(({ url, path, error }) => {
                 if (url) {
                     notebooksHandler.update(ref.id, {
                         pdf_url: url,
                         pdf_storage_path: path,
                     });
+                } else if (error) {
+                    console.warn('PDF buluta yüklenemedi:', error);
                 }
             });
 
@@ -390,8 +401,16 @@ export function NotebooksView() {
         try {
             await Promise.all(
                 notebookIds.map(async (id) => {
+                    const nb = notebooks.find((item) => item.id === id);
                     await notebooksHandler.remove(id);
                     await deleteNotebookPages(id);
+                    if (nb?.pdf_id) {
+                        clearPdfDocCache(nb.pdf_id);
+                        await deletePdfFromDB(nb.pdf_id);
+                    }
+                    if (nb?.pdf_storage_path) {
+                        await deletePdfFromCloud(nb.pdf_storage_path);
+                    }
                 })
             );
             // Etkinlikler İçerikler sekmesinde kalmalı; yalnızca silinen
@@ -424,6 +443,13 @@ export function NotebooksView() {
         try {
             await notebooksHandler.remove(n.id);
             await deleteNotebookPages(n.id);
+            if (n.pdf_id) {
+                clearPdfDocCache(n.pdf_id);
+                await deletePdfFromDB(n.pdf_id);
+            }
+            if (n.pdf_storage_path) {
+                await deletePdfFromCloud(n.pdf_storage_path);
+            }
             toast.success('Defter silindi.');
         } catch {
             toast.error('Defter silinemedi.');

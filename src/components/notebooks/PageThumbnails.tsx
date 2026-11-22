@@ -34,7 +34,8 @@ interface PageThumbnailProps {
     canvasSize: { w: number; h: number };
     pdfId?: string;
     pdfUrl?: string;
-    pageIndex?: number;
+    /** 1-based PDF sayfa numarası. `null` veya `0` ise bu yaprak boş çalışma sayfasıdır. */
+    pdfPageNumber?: number | null;
     rotation?: number;
 }
 
@@ -44,7 +45,7 @@ function PageThumbnail({
     canvasSize,
     pdfId,
     pdfUrl,
-    pageIndex = 0,
+    pdfPageNumber,
     rotation = 0,
 }: PageThumbnailProps) {
     const ref = React.useRef<HTMLCanvasElement>(null);
@@ -69,13 +70,12 @@ function PageThumbnail({
         ctx.clearRect(0, 0, THUMB_WIDTH, h);
 
         (async () => {
-            if (pdfId) {
+            if (pdfId && pdfPageNumber && pdfPageNumber > 0) {
                 try {
                     const doc = await getPdfDocument(pdfId, undefined, pdfUrl);
                     if (isCancelled) return;
-                    const pageNum = pageIndex + 1;
-                    if (pageNum <= doc.numPages) {
-                        const page = await doc.getPage(pageNum);
+                    if (pdfPageNumber <= doc.numPages) {
+                        const page = await doc.getPage(pdfPageNumber);
                         if (isCancelled) return;
                         const origVp = page.getViewport({ scale: 1 });
                         const targetRot = ((origVp.rotation || 0) + (rotation || 0)) % 360;
@@ -107,7 +107,7 @@ function PageThumbnail({
         return () => {
             isCancelled = true;
         };
-    }, [strokes, boxes, canvasSize.w, canvasSize.h, pdfId, pdfUrl, pageIndex, rotation]);
+    }, [strokes, boxes, canvasSize.w, canvasSize.h, pdfId, pdfUrl, pdfPageNumber, rotation]);
 
     return <canvas ref={ref} aria-hidden="true" className="block" />;
 }
@@ -123,12 +123,14 @@ interface PageThumbnailsProps {
     current: number;
     pdfId?: string;
     pdfUrl?: string;
+    pdfPageMap?: (number | null)[];
     bookmarks?: number[];
     onToggleBookmark?: (pageNumber: number) => void;
     rotations?: Record<number, number>;
     onRotatePage?: (pageNumber: number) => void;
     onSelect: (index: number) => void;
     onAdd: () => void;
+    onInsertBlankAfter?: (index: number) => void;
     onDuplicate: (index: number) => void;
     onDelete: (index: number) => void;
     onMove: (from: number, to: number) => void;
@@ -145,12 +147,14 @@ export function PageThumbnails({
     current,
     pdfId,
     pdfUrl,
+    pdfPageMap,
     bookmarks = [],
     onToggleBookmark,
     rotations = {},
     onRotatePage,
     onSelect,
     onAdd,
+    onInsertBlankAfter,
     onDuplicate,
     onDelete,
     onMove,
@@ -280,6 +284,11 @@ export function PageThumbnails({
                         <div className="flex-1 overflow-y-auto p-2 space-y-2.5">
                             {pages.map((strokes, i) => {
                                 const pageNumber = i + 1;
+                                const mappedPdfPage = pdfId
+                                    ? pdfPageMap
+                                        ? (pdfPageMap[i] ?? null)
+                                        : pageNumber
+                                    : null;
                                 const isBookmarked = bookmarks.includes(pageNumber);
                                 if (filterOnlyBookmarks && !isBookmarked) return null;
 
@@ -317,7 +326,7 @@ export function PageThumbnails({
                                                         canvasSize={canvasSize}
                                                         pdfId={pdfId}
                                                         pdfUrl={pdfUrl}
-                                                        pageIndex={i}
+                                                        pdfPageNumber={mappedPdfPage}
                                                         rotation={pageRotation}
                                                     />
                                                 </div>
@@ -335,6 +344,14 @@ export function PageThumbnails({
                                                 >
                                                     {pageNumber}
                                                 </span>
+                                                {pdfId && (!mappedPdfPage || mappedPdfPage <= 0) && (
+                                                    <span
+                                                        className="px-1 py-0.5 rounded bg-emerald-600/90 text-white text-[9px] font-bold"
+                                                        title="Araya eklenmiş çalışma sayfası"
+                                                    >
+                                                        Not
+                                                    </span>
+                                                )}
                                                 {hasNotes && (
                                                     <span className="p-0.5 rounded bg-black/70 text-sky-400" title="Anotasyon/Not mevcut">
                                                         <PenTool className="w-2.5 h-2.5" />
@@ -414,6 +431,19 @@ export function PageThumbnails({
                                                     </button>
                                                 </div>
                                                 <div className="flex gap-0.5">
+                                                    {onInsertBlankAfter && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onInsertBlankAfter(i);
+                                                            }}
+                                                            aria-label="Arkasına boş çalışma sayfası ekle"
+                                                            title="Arkasına Boş Sayfa Ekle (GoodNotes)"
+                                                            className="w-5 h-5 rounded bg-[#202234] border border-white/20 text-emerald-400 hover:bg-emerald-500/20 flex items-center justify-center shadow-sm"
+                                                        >
+                                                            <Plus className="w-3 h-3" />
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() => onDuplicate(i)}
                                                         aria-label="Sayfayı çoğalt"

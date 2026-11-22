@@ -57,7 +57,7 @@ import { useConfirm } from '../common/ConfirmDialog';
 import { cn } from '../../utils/cn';
 import { BG_COLORS } from '../../constants/drawing';
 import { PAPER_STYLES, paperBackground } from './paper';
-import { PAGE_SIZES, pageDims } from '../../constants/pageSizes';
+import { PAGE_SIZES, pageDims, pdfBoxFromPoints } from '../../constants/pageSizes';
 import { PageThumbnails } from './PageThumbnails';
 import { importImageFile } from '../drawing/imageStore';
 import { measurePages } from './pageCodec';
@@ -992,6 +992,40 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     // ── Sayfa yönetimi ───────────────────────────────────────────────
     const currentBoxes = boxesByPage[pageInfo.current] ?? [];
 
+    /**
+     * GoodNotes sayfa eşlemesi: Defterin her sayfasının hangi PDF sayfasına
+     * (1-based) bağlı olduğunu döndürür. `null` veya `0` ise o yaprak boş
+     * çalışma sayfasıdır (kareli/çizgili kağıt).
+     */
+    const getEffectivePdfPageMap = React.useCallback(
+        (totalPages = pageInfo.total): (number | null)[] => {
+            if (!notebook.pdf_id) return [];
+            const pdfTotal = notebook.pdf_total_pages || totalPages;
+            const raw = notebook.pdf_page_map;
+            if (Array.isArray(raw) && raw.length > 0) {
+                const out = [...raw];
+                while (out.length < totalPages) {
+                    const idx = out.length;
+                    out.push(idx < pdfTotal ? idx + 1 : null);
+                }
+                return out.slice(0, totalPages);
+            }
+            return Array.from({ length: totalPages }, (_, i) =>
+                i < pdfTotal ? i + 1 : null
+            );
+        },
+        [notebook.pdf_id, notebook.pdf_page_map, notebook.pdf_total_pages, pageInfo.total]
+    );
+
+    const effectivePdfPageMap = React.useMemo(
+        () => getEffectivePdfPageMap(pageInfo.total),
+        [getEffectivePdfPageMap, pageInfo.total]
+    );
+
+    const currentMappedPdfPage = notebook.pdf_id
+        ? (effectivePdfPageMap[pageInfo.current] ?? null)
+        : null;
+
     const updateCurrentBoxes = (updater: (list: TextBoxData[]) => TextBoxData[]) => {
         const page = pageInfo.current;
         const boxes = updater(boxesRef.current[page] ?? []);
@@ -1007,11 +1041,37 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     };
 
     const handleAddPage = () => {
+        if (notebook.pdf_id) {
+            const nextMap = [...getEffectivePdfPageMap(pageInfo.total), null];
+            onMetaChange({ pdf_page_map: nextMap, page_count: nextMap.length });
+        }
         setBoxesByPage((prev) => [...prev, []]);
         canvasRef.current?.addPage();
         // Sayfa yapısı işlem akışıyla değil, anlık görüntüyle paylaşılır;
         // diğer cihaz beklemesin diye hemen yazılır.
         saveSoon();
+    };
+
+    /**
+     * Belirtilen sayfanın hemen arkasına boş çalışma sayfası (kareli/çizgili)
+     * ekler — GoodNotes'ta PDF sayfasının arkasına çözüm yaprağı ekleme.
+     */
+    const handleInsertBlankPageAfter = (index = pageInfo.current) => {
+        const insertAt = Math.max(0, Math.min(pageInfo.total, index + 1));
+        if (notebook.pdf_id) {
+            const nextMap = [...getEffectivePdfPageMap(pageInfo.total)];
+            nextMap.splice(insertAt, 0, null);
+            onMetaChange({ pdf_page_map: nextMap, page_count: nextMap.length });
+        }
+        setBoxesByPage((prev) => {
+            const next = [...prev];
+            while (next.length < pageInfo.total) next.push([]);
+            next.splice(insertAt, 0, []);
+            return next;
+        });
+        canvasRef.current?.insertPageAfter(index);
+        saveSoon();
+        toast.info(`${insertAt + 1}. sıraya boş çalışma sayfası eklendi.`);
     };
 
     /**
@@ -1027,6 +1087,11 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             variant: 'danger',
         });
         if (!ok) return;
+        if (notebook.pdf_id && pageInfo.total > 1) {
+            const nextMap = [...getEffectivePdfPageMap(pageInfo.total)];
+            nextMap.splice(index, 1);
+            onMetaChange({ pdf_page_map: nextMap, page_count: nextMap.length });
+        }
         canvasRef.current?.goToPage(index);
         setBoxesByPage((prev) => {
             if (prev.length <= 1) return [[]];
@@ -1040,6 +1105,12 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     };
 
     const handleDuplicatePage = (index: number) => {
+        if (notebook.pdf_id) {
+            const nextMap = [...getEffectivePdfPageMap(pageInfo.total)];
+            const sourcePdfPage = nextMap[index] ?? null;
+            nextMap.splice(index + 1, 0, sourcePdfPage);
+            onMetaChange({ pdf_page_map: nextMap, page_count: nextMap.length });
+        }
         canvasRef.current?.goToPage(index);
         setBoxesByPage((prev) => {
             const next = [...prev];
@@ -1057,6 +1128,12 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
 
     const handleMovePage = (from: number, to: number) => {
         if (to < 0 || to >= pageInfo.total || from === to) return;
+        if (notebook.pdf_id) {
+            const nextMap = [...getEffectivePdfPageMap(pageInfo.total)];
+            const [movedPdfPage] = nextMap.splice(from, 1);
+            nextMap.splice(to, 0, movedPdfPage ?? null);
+            onMetaChange({ pdf_page_map: nextMap });
+        }
         setBoxesByPage((prev) => {
             const next = [...prev];
             while (next.length < pageInfo.total) next.push([]);
@@ -1099,6 +1176,13 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             await savePdfToDB(pdfId, file.name, buffer);
             const doc = await getPdfDocument(pdfId, buffer);
             const numPages = doc.numPages || 1;
+            const firstPage = await doc.getPage(1);
+            const pt = firstPage.getViewport({ scale: 1 });
+            const pdf_box = pdfBoxFromPoints(pt.width, pt.height);
+            const totalAfterAttach = Math.max(pageInfo.total, numPages);
+            const pdf_page_map = Array.from({ length: totalAfterAttach }, (_, i) =>
+                i < numPages ? i + 1 : null
+            );
 
             if (numPages > pageInfo.total) {
                 setBoxesByPage((prev) => {
@@ -1115,17 +1199,22 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 pdf_id: pdfId,
                 pdf_name: file.name,
                 pdf_total_pages: numPages,
-                page_count: Math.max(pageInfo.total, numPages),
+                pdf_box,
+                pdf_page_map,
+                page_count: totalAfterAttach,
             });
 
             // Buluta yükleme (Tüm cihazlarda anında açılabilmesi için)
-            uploadPdfToCloud(pdfId, file.name, buffer).then(({ url, path }) => {
+            uploadPdfToCloud(pdfId, file.name, buffer).then(({ url, path, error }) => {
                 if (url) {
                     onMetaChange({ pdf_url: url, pdf_storage_path: path });
                     toast.success('PDF bulut ile eşitlendi, tüm cihazlarınızda hazır.');
+                } else if (error) {
+                    console.warn('PDF buluta yüklenemedi:', error);
                 }
             });
 
+            window.setTimeout(() => canvasRef.current?.fitPage(), 80);
             toast.success(`"${file.name}" deftere bağlandı (${numPages} sayfa).`);
         } catch (err: any) {
             toast.error('PDF eklenemedi: ' + (err?.message || 'Hata'));
@@ -1145,13 +1234,17 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             pdf_name: undefined,
             pdf_total_pages: undefined,
             pdf_box: undefined,
+            pdf_page_map: undefined,
+            pdf_url: undefined,
+            pdf_storage_path: undefined,
         });
         setShowPdfMenu(false);
         toast.success('PDF bağlantısı kaldırıldı. Sayfalarınız korunuyor.');
     };
 
-    const handleExportPdf = async (allPages: boolean) => {
+    const handleExportPdf = async (mode: 'all' | 'current' | 'annotated') => {
         try {
+            const allPages = mode !== 'current';
             setIsExporting(true);
             setExportProgress(allPages ? 'Sayfalar taranıyor…' : 'Sayfa hazırlanıyor…');
             setShowExportMenu(false);
@@ -1165,14 +1258,28 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 }
             }
 
-            const pagesToExport = allPages
-                ? Array.from({ length: pageInfo.total }, (_, i) => i)
-                : [pageInfo.current];
+            const allStrokes = canvasRef.current?.getPages() ?? [];
+            let pagesToExport =
+                mode === 'current'
+                    ? [pageInfo.current]
+                    : Array.from({ length: pageInfo.total }, (_, i) => i);
+
+            if (mode === 'annotated') {
+                pagesToExport = pagesToExport.filter(
+                    (i) => (allStrokes[i]?.length ?? 0) > 0 || (boxesByPage[i]?.length ?? 0) > 0
+                );
+                if (pagesToExport.length === 0) {
+                    toast.info('Üzerine not alınmış sayfa bulunamadı; mevcut sayfa dışa aktarılıyor.');
+                    pagesToExport = [pageInfo.current];
+                }
+            }
 
             const renderedPages: PageImageInput[] = [];
+            const pageMap = getEffectivePdfPageMap(pageInfo.total);
 
             for (let idx = 0; idx < pagesToExport.length; idx++) {
                 const pageIndex = pagesToExport[idx];
+                const mappedPdfPage = notebook.pdf_id ? (pageMap[pageIndex] ?? null) : null;
                 const pageRotation = notebook.pdf_rotations?.[pageIndex + 1] || 0;
                 setExportProgress(
                     allPages
@@ -1181,9 +1288,9 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 );
 
                 let pdfBgCanvas: HTMLCanvasElement | null = null;
-                if (pdfDoc && pageIndex < pdfDoc.numPages) {
+                if (pdfDoc && mappedPdfPage && mappedPdfPage >= 1 && mappedPdfPage <= pdfDoc.numPages) {
                     try {
-                        const page = await pdfDoc.getPage(pageIndex + 1);
+                        const page = await pdfDoc.getPage(mappedPdfPage);
                         const unscaled = page.getViewport({ scale: 1 });
                         const targetW = pdfBox ? pdfBox.w : (pageDims(pageSize)?.w ?? 1200);
                         const fitScale = targetW / unscaled.width;
@@ -1198,7 +1305,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             pdfBgCanvas = c;
                         }
                     } catch (e) {
-                        console.warn(`PDF sayfa ${pageIndex + 1} render edilemedi:`, e);
+                        console.warn(`PDF sayfa ${mappedPdfPage} render edilemedi:`, e);
                     }
                 }
 
@@ -1479,7 +1586,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
 
                         <button
                             type="button"
-                            onClick={() => void handleExportPdf(true)}
+                            onClick={() => void handleExportPdf('all')}
                             className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
                         >
                             <FileDown className="w-4 h-4 text-rose-600 shrink-0" />
@@ -1491,9 +1598,25 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             </div>
                         </button>
 
+                        {pageInfo.total > 1 && (
+                            <button
+                                type="button"
+                                onClick={() => void handleExportPdf('annotated')}
+                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                            >
+                                <FileDown className="w-4 h-4 text-amber-600 shrink-0" />
+                                <div>
+                                    <div>Yalnızca Not Alınan Sayfaları İndir</div>
+                                    <div className="text-[10.5px] font-normal text-on-surface-variant">
+                                        Üzerine çizim veya not eklenmiş sayfalar
+                                    </div>
+                                </div>
+                            </button>
+                        )}
+
                         <button
                             type="button"
-                            onClick={() => void handleExportPdf(false)}
+                            onClick={() => void handleExportPdf('current')}
                             className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
                         >
                             <FileText className="w-4 h-4 text-rose-500 shrink-0" />
@@ -1773,6 +1896,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         <div className="nb-menu-paper">{renderPaperDropdown(false)}</div>
                         <p>Kağıt rengi</p><div className="nb-paper-colors">{BG_COLORS.map(b => <button type="button" key={b.color} style={{background:b.color}} aria-label={`Zemin rengi: ${b.label}`} title={b.label} className={bgColor === b.color ? 'is-selected' : ''} onClick={() => changeBg(b.color)}/>)}</div>
                         <hr/>
+                        <button type="button" className="nb-menu-item" onClick={() => {handleInsertBlankPageAfter(pageInfo.current);setEditorMenu(null);}}><Plus size={16}/> Arkasına boş çalışma sayfası ekle</button>
                         <button type="button" className="nb-menu-item" onClick={() => handleToggleBookmark(pageInfo.current + 1)}><Bookmark size={16}/> {notebook.pdf_bookmarks?.includes(pageInfo.current + 1) ? 'Yer imini kaldır' : 'Sayfayı yer imlerine ekle'}</button>
                         <button type="button" className="nb-menu-item" onClick={handleRotateCurrentPage}><RotateCw size={16}/> Sayfayı döndür</button>
                         {notebook.pdf_id && <>
@@ -1828,12 +1952,14 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     current={pageInfo.current}
                     pdfId={notebook.pdf_id}
                     pdfUrl={notebook.pdf_url}
+                    pdfPageMap={effectivePdfPageMap}
                     bookmarks={notebook.pdf_bookmarks || []}
                     onToggleBookmark={handleToggleBookmark}
                     rotations={notebook.pdf_rotations || {}}
                     onRotatePage={handleRotatePage}
                     onSelect={(i) => canvasRef.current?.goToPage(i)}
                     onAdd={handleAddPage}
+                    onInsertBlankAfter={handleInsertBlankPageAfter}
                     onDuplicate={handleDuplicatePage}
                     onDelete={(i) => void handleDeletePage(i)}
                     onMove={handleMovePage}
@@ -1874,7 +2000,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                         pdfName={notebook.pdf_name}
                         pdfUrl={notebook.pdf_url}
                         rotation={notebook.pdf_rotations?.[pageInfo.current + 1] || 0}
-                        pageNumber={pageInfo.current + 1}
+                        pageNumber={currentMappedPdfPage}
                         view={view}
                         canvasSize={canvasSize}
                         box={pdfBox}
@@ -2075,8 +2201,11 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 open={showSearchModal}
                 onClose={() => setShowSearchModal(false)}
                 pdfDoc={pdfDocInstance}
-                currentPage={pageInfo.current + 1}
-                onJumpToPage={(p) => canvasRef.current?.goToPage(p - 1)}
+                currentPage={currentMappedPdfPage || pageInfo.current + 1}
+                onJumpToPage={(pdfPageNum) => {
+                    const idx = effectivePdfPageMap.indexOf(pdfPageNum);
+                    canvasRef.current?.goToPage(idx !== -1 ? idx : pdfPageNum - 1);
+                }}
             />
 
             {/* PDF İçindekiler / Bölümler Modalı */}
@@ -2084,8 +2213,11 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 open={showOutlineModal}
                 onClose={() => setShowOutlineModal(false)}
                 pdfDoc={pdfDocInstance}
-                currentPage={pageInfo.current + 1}
-                onJumpToPage={(p) => canvasRef.current?.goToPage(p - 1)}
+                currentPage={currentMappedPdfPage || pageInfo.current + 1}
+                onJumpToPage={(pdfPageNum) => {
+                    const idx = effectivePdfPageMap.indexOf(pdfPageNum);
+                    canvasRef.current?.goToPage(idx !== -1 ? idx : pdfPageNum - 1);
+                }}
             />
 
             {/* PDF Tanı & Performans Paneli (Diagnostics Debug Overlay) */}
