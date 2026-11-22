@@ -89,6 +89,25 @@ export function pdfBoxFromPoints(wPt: number, hPt: number): { w: number; h: numb
     };
 }
 
+/** Dikey sürekli kaydırmada (GoodNotes alt alta sayfa görünümü) iki sayfa arasındaki dünya boşluğu. */
+export const VERTICAL_PAGE_GAP = 48;
+
+/**
+ * Alt alta dizilen sayfaların bir sayfası için dünya yüksekliği (sayfa boyu + aradaki boşluk).
+ */
+export function verticalPageStride(box?: { w: number; h: number } | null): number {
+    if (!box) return 0;
+    return box.h + VERTICAL_PAGE_GAP;
+}
+
+/**
+ * Verilen sayfa indeksinin dünya koordinatındaki başlangıç Y konumu.
+ */
+export function verticalPageOffsetY(pageIndex: number, box?: { w: number; h: number } | null): number {
+    if (!box) return 0;
+    return pageIndex * verticalPageStride(box);
+}
+
 /** Seçilen boyutun dünya ölçüsü; sınırsızda `null`. */
 export function pageDims(size?: PageSize): { w: number; h: number } | null {
     if (!size || size === 'free') return null;

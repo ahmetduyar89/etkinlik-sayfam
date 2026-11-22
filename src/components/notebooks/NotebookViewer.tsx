@@ -14,7 +14,7 @@ import { watchDocById } from '../../lib/firebase';
 import { loadNotebookPages } from './notebookContent';
 import { watchOps } from './notebookOps';
 import { paperBackground } from './paper';
-import { pageDims } from '../../constants/pageSizes';
+import { pageDims, verticalPageOffsetY, verticalPageStride } from '../../constants/pageSizes';
 import { PdfPageBackground } from './PdfPageBackground';
 import { firestoreErrorMessage } from './errors';
 import type {
@@ -214,13 +214,37 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
     const pageBox = pdfBox ?? pageDims(notebook.page_size);
     const canGoPrev = pageInfo.current > 0;
     const canGoNext = pageInfo.current < pageInfo.total - 1;
-    const currentMappedPdfPage = notebook.pdf_id
-        ? Array.isArray(notebook.pdf_page_map) && notebook.pdf_page_map.length > 0
-            ? (notebook.pdf_page_map[pageInfo.current] ?? null)
-            : pageInfo.current < (notebook.pdf_total_pages || pageInfo.total)
-            ? pageInfo.current + 1
-            : null
-        : null;
+    const isStackedPdf = Boolean(notebook.pdf_id && pageBox && pageInfo.total > 1);
+
+    const resolveMappedPdfPage = (pIdx: number): number | null => {
+        if (!notebook.pdf_id) return null;
+        if (Array.isArray(notebook.pdf_page_map) && notebook.pdf_page_map.length > 0) {
+            return notebook.pdf_page_map[pIdx] ?? null;
+        }
+        return pIdx < (notebook.pdf_total_pages || pageInfo.total) ? pIdx + 1 : null;
+    };
+
+    const currentMappedPdfPage = resolveMappedPdfPage(pageInfo.current);
+
+    const visibleStackedPageIndexes = React.useMemo(() => {
+        if (!isStackedPdf || !pageBox) return [pageInfo.current];
+        const stride = verticalPageStride(pageBox);
+        if (stride <= 0) return [pageInfo.current];
+        const bufferScreenPx = Math.max(600, canvasSize.h * 0.9);
+        const minWorldY = (-view.ty - bufferScreenPx) / view.scale;
+        const maxWorldY = (canvasSize.h - view.ty + bufferScreenPx) / view.scale;
+        const startIdx = Math.max(0, Math.floor(minWorldY / stride));
+        const endIdx = Math.min(pageInfo.total - 1, Math.ceil(maxWorldY / stride));
+        const list: number[] = [];
+        for (let i = startIdx; i <= endIdx; i++) {
+            list.push(i);
+        }
+        if (!list.includes(pageInfo.current)) {
+            list.push(pageInfo.current);
+            list.sort((a, b) => a - b);
+        }
+        return list;
+    }, [isStackedPdf, pageBox, pageInfo.current, pageInfo.total, canvasSize.h, view.ty, view.scale]);
 
     return (
         <div ref={stageRef} className="h-[100dvh] flex flex-col bg-background">
@@ -236,21 +260,45 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
 
             <div className="flex-1 min-h-0 relative overflow-hidden">
                 {pageBox ? (
-                    <div
-                        className="absolute shadow-[0_8px_30px_rgba(15,23,42,0.18)] ring-1 ring-black/10"
-                        style={{
-                            left: view.tx,
-                            top: view.ty,
-                            width: pageBox.w * view.scale,
-                            height: pageBox.h * view.scale,
-                            ...paperBackground(
-                                paper,
-                                bgColor,
-                                { scale: view.scale, tx: 0, ty: 0 },
-                                pageBox
-                            ),
-                        }}
-                    />
+                    isStackedPdf ? (
+                        visibleStackedPageIndexes.map((pIdx) => {
+                            const offsetY = verticalPageOffsetY(pIdx, pageBox);
+                            return (
+                                <div
+                                    key={`viewer-paper-${pIdx}`}
+                                    className="absolute shadow-[0_8px_30px_rgba(15,23,42,0.18)] ring-1 ring-black/10"
+                                    style={{
+                                        left: view.tx,
+                                        top: view.ty + offsetY * view.scale,
+                                        width: pageBox.w * view.scale,
+                                        height: pageBox.h * view.scale,
+                                        ...paperBackground(
+                                            paper,
+                                            bgColor,
+                                            { scale: view.scale, tx: 0, ty: 0 },
+                                            pageBox
+                                        ),
+                                    }}
+                                />
+                            );
+                        })
+                    ) : (
+                        <div
+                            className="absolute shadow-[0_8px_30px_rgba(15,23,42,0.18)] ring-1 ring-black/10"
+                            style={{
+                                left: view.tx,
+                                top: view.ty,
+                                width: pageBox.w * view.scale,
+                                height: pageBox.h * view.scale,
+                                ...paperBackground(
+                                    paper,
+                                    bgColor,
+                                    { scale: view.scale, tx: 0, ty: 0 },
+                                    pageBox
+                                ),
+                            }}
+                        />
+                    )
                 ) : (
                     <div
                         className="absolute inset-0"
@@ -258,16 +306,37 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
                     />
                 )}
                 {notebook.pdf_id && (
-                    <PdfPageBackground
-                        pdfId={notebook.pdf_id}
-                        pdfName={notebook.pdf_name}
-                        pdfUrl={notebook.pdf_url}
-                        rotation={notebook.pdf_rotations?.[pageInfo.current + 1] || 0}
-                        pageNumber={currentMappedPdfPage}
-                        view={view}
-                        canvasSize={canvasSize}
-                        box={pdfBox}
-                    />
+                    isStackedPdf ? (
+                        visibleStackedPageIndexes.map((pIdx) => {
+                            const offsetY = verticalPageOffsetY(pIdx, pageBox);
+                            return (
+                                <PdfPageBackground
+                                    key={`viewer-pdf-${pIdx}`}
+                                    pdfId={notebook.pdf_id!}
+                                    pdfName={notebook.pdf_name}
+                                    pdfUrl={notebook.pdf_url}
+                                    rotation={notebook.pdf_rotations?.[pIdx + 1] || 0}
+                                    pageNumber={resolveMappedPdfPage(pIdx)}
+                                    view={view}
+                                    canvasSize={canvasSize}
+                                    box={pdfBox}
+                                    worldYOffset={offsetY}
+                                    pageBadgeLabel={`${pIdx + 1} / ${pageInfo.total}`}
+                                />
+                            );
+                        })
+                    ) : (
+                        <PdfPageBackground
+                            pdfId={notebook.pdf_id}
+                            pdfName={notebook.pdf_name}
+                            pdfUrl={notebook.pdf_url}
+                            rotation={notebook.pdf_rotations?.[pageInfo.current + 1] || 0}
+                            pageNumber={currentMappedPdfPage}
+                            view={view}
+                            canvasSize={canvasSize}
+                            box={pdfBox}
+                        />
+                    )
                 )}
                 <DrawingCanvas
                     ref={canvasRef}
@@ -278,6 +347,7 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
                     initialPages={pages}
                     panMode="viewport"
                     pageBox={pageBox}
+                    verticalScroll={isStackedPdf}
                     onPageChange={(current, total) => setPageInfo({ current, total })}
                     onViewChange={(v, size) => {
                         setView(v);
@@ -292,7 +362,16 @@ export function NotebookViewer({ notebookId }: NotebookViewerProps) {
                 <TextBoxLayer
                     boxes={boxesByPage[pageInfo.current] ?? []}
                     enabled={false}
-                    view={view}
+                    view={
+                        isStackedPdf && pageBox
+                            ? {
+                                  ...view,
+                                  ty:
+                                      view.ty +
+                                      verticalPageOffsetY(pageInfo.current, pageBox) * view.scale,
+                              }
+                            : view
+                    }
                     onAdd={() => {}}
                     onUpdate={() => {}}
                     onDelete={() => {}}

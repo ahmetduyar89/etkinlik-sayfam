@@ -24,8 +24,8 @@ import { paperBackground } from './paper';
 import { getPdfDocument } from '../../lib/pdfStorage';
 import type { PaperStyle, Stroke, TextBoxData } from '../../types';
 
-/** Küçük resmin genişliği (CSS px). */
-const THUMB_WIDTH = 116;
+/** Küçük resmin genişliği (CSS px) — sol panel iç genişliğine (176 - 16 - 4 = 156px) tam oturur. */
+const THUMB_WIDTH = 156;
 
 interface PageThumbnailProps {
     strokes: Stroke[];
@@ -54,22 +54,14 @@ function PageThumbnail({
         let isCancelled = false;
         const canvas = ref.current;
         if (!canvas) return;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const srcW = canvasSize.w || 1000;
         const srcH = canvasSize.h || 700;
-        const scale = THUMB_WIDTH / srcW;
-        const h = Math.max(60, Math.round(srcH * scale));
-        const dpr = window.devicePixelRatio || 1;
-        canvas.width = THUMB_WIDTH * dpr;
-        canvas.height = h * dpr;
-        canvas.style.width = `${THUMB_WIDTH}px`;
-        canvas.style.height = `${h}px`;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.clearRect(0, 0, THUMB_WIDTH, h);
+        let drawScale = THUMB_WIDTH / srcW;
+        let h = Math.max(60, Math.round(srcH * drawScale));
 
         (async () => {
+            let offscreenPdf: HTMLCanvasElement | null = null;
             if (pdfId && pdfPageNumber && pdfPageNumber > 0) {
                 try {
                     const doc = await getPdfDocument(pdfId, undefined, pdfUrl);
@@ -77,18 +69,46 @@ function PageThumbnail({
                     if (pdfPageNumber <= doc.numPages) {
                         const page = await doc.getPage(pdfPageNumber);
                         if (isCancelled) return;
-                        const origVp = page.getViewport({ scale: 1 });
-                        const targetRot = ((origVp.rotation || 0) + (rotation || 0)) % 360;
-                        const pdfScale = (THUMB_WIDTH / origVp.width) * dpr;
+                        const baseVp = page.getViewport({ scale: 1 });
+                        const targetRot = ((baseVp.rotation || 0) + (rotation || 0)) % 360;
+                        const rotatedVp = page.getViewport({ scale: 1, rotation: targetRot });
+
+                        // Küçük resmi sayfanın kendi en-boy oranına (rotatedVp) göre tam sığdır
+                        h = Math.max(60, Math.round((THUMB_WIDTH * rotatedVp.height) / rotatedVp.width));
+                        drawScale = THUMB_WIDTH / (canvasSize.w || rotatedVp.width || 1000);
+
+                        const pdfScale = (THUMB_WIDTH * dpr) / rotatedVp.width;
                         const thumbVp = page.getViewport({ scale: pdfScale, rotation: targetRot });
-                        await page.render({ canvasContext: ctx, viewport: thumbVp }).promise;
+
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = Math.round(thumbVp.width);
+                        tempCanvas.height = Math.round(thumbVp.height);
+                        const tempCtx = tempCanvas.getContext('2d');
+                        if (tempCtx) {
+                            // PDF.js'in iç transformasyonlarının 1x'te tam oturması için birim matrisle çiz
+                            await page.render({ canvasContext: tempCtx, viewport: thumbVp }).promise;
+                            offscreenPdf = tempCanvas;
+                        }
                     }
                 } catch {
                     // PDF sayfası çizilemediyse devam et
                 }
             }
             if (isCancelled) return;
-            ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
+
+            canvas.width = Math.round(THUMB_WIDTH * dpr);
+            canvas.height = Math.round(h * dpr);
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (offscreenPdf) {
+                ctx.drawImage(offscreenPdf, 0, 0, canvas.width, canvas.height);
+            }
+
+            ctx.setTransform(dpr * drawScale, 0, 0, dpr * drawScale, 0, 0);
             strokes.forEach((s) => drawStroke(ctx, s));
 
             // Yapışkan notlar basit kutu olarak temsil edilir.
@@ -109,7 +129,7 @@ function PageThumbnail({
         };
     }, [strokes, boxes, canvasSize.w, canvasSize.h, pdfId, pdfUrl, pdfPageNumber, rotation]);
 
-    return <canvas ref={ref} aria-hidden="true" className="block" />;
+    return <canvas ref={ref} aria-hidden="true" className="block w-full h-auto" />;
 }
 
 interface PageThumbnailsProps {
@@ -292,6 +312,7 @@ export function PageThumbnails({
                                 const isBookmarked = bookmarks.includes(pageNumber);
                                 if (filterOnlyBookmarks && !isBookmarked) return null;
 
+                                const hasPdfPage = Boolean(pdfId && mappedPdfPage && mappedPdfPage > 0);
                                 const hasNotes = strokes.length > 0 || (boxesByPage[i] && boxesByPage[i].length > 0);
                                 const pageRotation = rotations[pageNumber] || 0;
 
@@ -319,7 +340,10 @@ export function PageThumbnails({
                                                         : 'border-white/10 hover:border-sky-500/50'
                                                 )}
                                             >
-                                                <div style={paperStyle}>
+                                                <div
+                                                    style={hasPdfPage ? { backgroundColor: '#ffffff' } : paperStyle}
+                                                    className="w-full flex items-center justify-center overflow-hidden"
+                                                >
                                                     <PageThumbnail
                                                         strokes={strokes}
                                                         boxes={boxesByPage[i] ?? []}

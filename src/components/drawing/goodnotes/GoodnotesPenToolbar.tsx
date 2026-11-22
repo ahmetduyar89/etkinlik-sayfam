@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { PenTool, Highlighter, Eraser, Lasso, Hand, Type, Shapes, Undo, Redo, BookOpen, FlaskConical, ChevronDown, SlidersHorizontal, ImagePlus, Camera, Minus, Plus, Scan, X, Grid2X2, Ruler, Circle, Square, Triangle, Diamond, ArrowUpRight, Paintbrush, Pencil, Check, Sticker, MoreHorizontal } from 'lucide-react';
+import { PenTool, Highlighter, Eraser, Lasso, Hand, Type, Shapes, Undo, Redo, BookOpen, FlaskConical, ChevronDown, SlidersHorizontal, ImagePlus, Camera, Minus, Plus, Scan, X, Grid2X2, Ruler, Circle, Square, Triangle, Diamond, ArrowUpRight, Paintbrush, Pencil, Check, Sticker, MoreHorizontal, Sparkles } from 'lucide-react';
 import type { DrawConfig, DrawingTool, PaperStyle } from '../../../types';
 import type { DrawingToolbarProps } from './toolbarTypes';
 import { ObjectLibraryPanel } from '../ObjectLibraryPanel';
@@ -144,7 +144,7 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
             const el = e.target as HTMLElement;
             if (el.isContentEditable || el.closest('input,textarea,select,button,[role="dialog"]'))
                 return;
-            const tools: Record<string, DrawingTool> = { p: 'pencil', e: 'eraser', h: 'highlighter', l: 'lasso', v: 'select', t: 'text' };
+            const tools: Record<string, DrawingTool> = { p: 'pencil', e: 'eraser', h: 'highlighter', l: 'lasso', v: 'select', t: 'text', g: 'sun' };
             if (tools[e.key.toLowerCase()]) {
                 e.preventDefault();
                 select(tools[e.key.toLowerCase()]);
@@ -193,11 +193,12 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
         setPrefs({ ...prefs, colors });
         patch({ color: value });
     };
-    const button = (title: string, Icon: typeof PenTool, action: () => void, active = false, disabled = false) => <button type="button" key={title} data-tone={Icon === Eraser ? 'rose' : Icon === Highlighter ? 'amber' : Icon === Shapes || Icon === FlaskConical || Icon === Lasso || Icon === Sticker ? 'violet' : Icon === Hand || Icon === BookOpen ? 'teal' : 'blue'} className={`gn-icon ${active ? 'is-active' : ''}`} title={title} aria-label={title} aria-pressed={active ? true : undefined} onClick={action} disabled={disabled}><Icon size={21}/></button>;
+    const button = (title: string, Icon: typeof PenTool, action: () => void, active = false, disabled = false) => <button type="button" key={title} data-tone={Icon === Eraser || Icon === Sparkles ? 'rose' : Icon === Highlighter ? 'amber' : Icon === Shapes || Icon === FlaskConical || Icon === Lasso || Icon === Sticker ? 'violet' : Icon === Hand || Icon === BookOpen ? 'teal' : 'blue'} className={`gn-icon ${active ? 'is-active' : ''}`} title={title} aria-label={title} aria-pressed={active ? true : undefined} onClick={action} disabled={disabled}><Icon size={21}/></button>;
     return <div ref={root} data-drawing-toolbar data-tool={config.tool} className={`gn-toolbar ${fixed ? 'gn-fixed' : 'gn-floating'} ${compact ? 'gn-compact gn-notebook' : ''} ${board ? 'gn-board' : ''} ${props.dockSide ? `gn-dock gn-dock-${props.dockSide}` : ''}`} onPointerDown={e => e.stopPropagation()}>
         {compact ? <div className="gn-main gn-notebook-main" role="toolbar" aria-label="Çizim araçları">
             {button('Kalem (P)', PenTool, () => config.tool === 'pencil' ? toggle('pen') : select('pencil'), config.tool === 'pencil')}
             {button('Fosforlu kalem (H)', Highlighter, () => config.tool === 'highlighter' ? toggle('width') : select('highlighter'), config.tool === 'highlighter')}
+            {button('Lazer kalem (G)', Sparkles, () => select('sun'), config.tool === 'sun')}
             {button('Silgi (E)', Eraser, () => config.tool === 'eraser' ? toggle('eraser') : select('eraser'), config.tool === 'eraser')}
             {button('Kement (L)', Lasso, () => config.tool === 'lasso' ? toggle('lasso') : select('lasso'), config.tool === 'lasso')}
             {!props.dockSide && button('Metin (T)', Type, () => select('text'), config.tool === 'text')}
@@ -216,6 +217,7 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
             {button('Kement (L)', Lasso, () => config.tool === 'lasso' ? toggle('lasso') : select('lasso'), config.tool === 'lasso')}
             {button('Kalem (P)', PenTool, () => config.tool === 'pencil' ? toggle('pen') : select('pencil'), config.tool === 'pencil')}
             {button('Fosforlu kalem (H)', Highlighter, () => select('highlighter'), config.tool === 'highlighter')}
+            {button('Lazer kalem (G)', Sparkles, () => select('sun'), config.tool === 'sun')}
             {button('Silgi (E)', Eraser, () => config.tool === 'eraser' ? toggle('eraser') : select('eraser'), config.tool === 'eraser')}
             {button('Metin (T)', Type, () => select('text'), config.tool === 'text')}
             {props.onInsertElement && button('Öğeler', Sticker, () => toggle('elements'), panel === 'elements')}
@@ -259,6 +261,7 @@ export function GoodnotesPenToolbar(props: DrawingToolbarProps) {
                 </div>
             </div>}
             {config.tool === 'text' && <div className="gn-context gn-text-context" role="status"><Type size={18}/><span>Sayfaya dokunup yazın. Düzenlemek için metne dokunun.</span></div>}
+            {config.tool === 'sun' && <div className="gn-context gn-text-context" role="status"><Sparkles size={18}/><span>Lazer işaretçi: Çizdiğiniz ışın izi sayfaya kaydedilmez, kendiliğinden sönerek kaybolur.</span></div>}
             {config.tool === 'eraser' && <div className="gn-context gn-eraser-context" role="toolbar" aria-label="Silgi araç çubuğu">
                 <button type="button" className="gn-eraser-kind" aria-expanded={panel === 'eraser'} onClick={() => toggle('eraser')}><Eraser/><span>{config.eraserMode === 'stroke' ? 'Çizgi' : config.eraserMode === 'precision' ? 'Detaylı' : 'Standart'}</span><ChevronDown size={16}/></button>
                 <button type="button" className={`gn-tip ${config.autoSwitchBackEraser ? 'is-active' : ''}`} aria-label="Silme sonrası kaleme dön" aria-pressed={config.autoSwitchBackEraser ?? false} onClick={() => patch({autoSwitchBackEraser:!config.autoSwitchBackEraser})}><PenTool size={22}/></button>

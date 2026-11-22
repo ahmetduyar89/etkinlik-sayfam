@@ -57,7 +57,13 @@ import { useConfirm } from '../common/ConfirmDialog';
 import { cn } from '../../utils/cn';
 import { BG_COLORS } from '../../constants/drawing';
 import { PAPER_STYLES, paperBackground } from './paper';
-import { PAGE_SIZES, pageDims, pdfBoxFromPoints } from '../../constants/pageSizes';
+import {
+    PAGE_SIZES,
+    pageDims,
+    pdfBoxFromPoints,
+    verticalPageOffsetY,
+    verticalPageStride,
+} from '../../constants/pageSizes';
 import { PageThumbnails } from './PageThumbnails';
 import { importImageFile } from '../drawing/imageStore';
 import { measurePages } from './pageCodec';
@@ -1408,6 +1414,33 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     // PDF bağlı defterlerde sayfayı PDF belirler; kağıt ölçüsü uygulanmaz.
     // Eski defterlerde PDF kutusu kayıtlı olmadığı için sayfa sınırı çizilmez.
     const pageBox = hasPdf ? pdfBox : pageDims(pageSize);
+    const isStackedPdf = Boolean(hasPdf && pageBox && pageInfo.total > 1);
+
+    /**
+     * Alt alta çoklu sayfa görünümünde (GoodNotes dikey kaydırma) ekranda
+     * görünen (veya yakınında olan) sayfaların indekslerini hesaplar.
+     * Böylece 200 sayfalık bir kitapta yalnızca ekrandaki 2-3 sayfa DOM'da
+     * işlenir; bellek şişmez ve kaydırma 60 FPS akıcı kalır.
+     */
+    const visibleStackedPageIndexes = React.useMemo(() => {
+        if (!isStackedPdf || !pageBox) return [pageInfo.current];
+        const stride = verticalPageStride(pageBox);
+        if (stride <= 0) return [pageInfo.current];
+        const bufferScreenPx = Math.max(600, canvasSize.h * 0.9);
+        const minWorldY = (-view.ty - bufferScreenPx) / view.scale;
+        const maxWorldY = (canvasSize.h - view.ty + bufferScreenPx) / view.scale;
+        const startIdx = Math.max(0, Math.floor(minWorldY / stride));
+        const endIdx = Math.min(pageInfo.total - 1, Math.ceil(maxWorldY / stride));
+        const list: number[] = [];
+        for (let i = startIdx; i <= endIdx; i++) {
+            list.push(i);
+        }
+        if (!list.includes(pageInfo.current)) {
+            list.push(pageInfo.current);
+            list.sort((a, b) => a - b);
+        }
+        return list;
+    }, [isStackedPdf, pageBox, pageInfo.current, pageInfo.total, canvasSize.h, view.ty, view.scale]);
 
     const changePaper = (next: PaperStyle) => {
         setPaper(next);
@@ -1969,23 +2002,48 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 {/* Kağıt katmanı. Sayfa ölçüsü tanımlıysa desen ekranın değil
                     SAYFANIN kutusuna oturur: Cornell, soru/cevap ve deney
                     raporu gibi bölmeli şablonlar artık yakınlaştırınca da
-                    içerikle birlikte hareket eder. */}
+                    içerikle birlikte hareket eder. Çok sayfalı PDF'lerde
+                    sayfalar GoodNotes mantığında alt alta dizilir. */}
                 {pageBox ? (
-                    <div
-                        className="absolute shadow-[0_8px_30px_rgba(15,23,42,0.18)] ring-1 ring-black/10"
-                        style={{
-                            left: view.tx,
-                            top: view.ty,
-                            width: pageBox.w * view.scale,
-                            height: pageBox.h * view.scale,
-                            ...paperBackground(
-                                paper,
-                                bgColor,
-                                { scale: view.scale, tx: 0, ty: 0 },
-                                pageBox
-                            ),
-                        }}
-                    />
+                    isStackedPdf ? (
+                        visibleStackedPageIndexes.map((pIdx) => {
+                            const offsetY = verticalPageOffsetY(pIdx, pageBox);
+                            return (
+                                <div
+                                    key={`paper-${pIdx}`}
+                                    className="absolute shadow-[0_8px_30px_rgba(15,23,42,0.18)] ring-1 ring-black/10"
+                                    style={{
+                                        left: view.tx,
+                                        top: view.ty + offsetY * view.scale,
+                                        width: pageBox.w * view.scale,
+                                        height: pageBox.h * view.scale,
+                                        ...paperBackground(
+                                            paper,
+                                            bgColor,
+                                            { scale: view.scale, tx: 0, ty: 0 },
+                                            pageBox
+                                        ),
+                                    }}
+                                />
+                            );
+                        })
+                    ) : (
+                        <div
+                            className="absolute shadow-[0_8px_30px_rgba(15,23,42,0.18)] ring-1 ring-black/10"
+                            style={{
+                                left: view.tx,
+                                top: view.ty,
+                                width: pageBox.w * view.scale,
+                                height: pageBox.h * view.scale,
+                                ...paperBackground(
+                                    paper,
+                                    bgColor,
+                                    { scale: view.scale, tx: 0, ty: 0 },
+                                    pageBox
+                                ),
+                            }}
+                        />
+                    )
                 ) : (
                     <div
                         className="absolute inset-0"
@@ -1993,22 +2051,61 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                     />
                 )}
 
-                {/* GoodNotes Tarzı Doğrudan PDF Sayfası */}
+                {/* GoodNotes Tarzı Doğrudan PDF Sayfaları (Çok sayfalıda alt alta) */}
                 {notebook.pdf_id && (
-                    <PdfPageBackground
-                        pdfId={notebook.pdf_id}
-                        pdfName={notebook.pdf_name}
-                        pdfUrl={notebook.pdf_url}
-                        rotation={notebook.pdf_rotations?.[pageInfo.current + 1] || 0}
-                        pageNumber={currentMappedPdfPage}
-                        view={view}
-                        canvasSize={canvasSize}
-                        box={pdfBox}
-                        onCanvasReady={handlePdfCanvas}
-                        onCloudUrlReady={(url, path) => onMetaChange({ pdf_url: url, pdf_storage_path: path })}
-                        onDocLoaded={(doc) => setPdfDocInstance(doc)}
-                        onMissingChange={(missing) => setIsPdfMissing(missing)}
-                    />
+                    isStackedPdf ? (
+                        visibleStackedPageIndexes.map((pIdx) => {
+                            const mappedPage = effectivePdfPageMap[pIdx] ?? null;
+                            const offsetY = verticalPageOffsetY(pIdx, pageBox);
+                            const isCurrent = pIdx === pageInfo.current;
+                            return (
+                                <PdfPageBackground
+                                    key={`pdf-page-${pIdx}`}
+                                    pdfId={notebook.pdf_id!}
+                                    pdfName={notebook.pdf_name}
+                                    pdfUrl={notebook.pdf_url}
+                                    rotation={notebook.pdf_rotations?.[pIdx + 1] || 0}
+                                    pageNumber={mappedPage}
+                                    view={view}
+                                    canvasSize={canvasSize}
+                                    box={pdfBox}
+                                    worldYOffset={offsetY}
+                                    pageBadgeLabel={`${pIdx + 1} / ${pageInfo.total}`}
+                                    onCanvasReady={isCurrent ? handlePdfCanvas : undefined}
+                                    onCloudUrlReady={
+                                        isCurrent
+                                            ? (url, path) =>
+                                                  onMetaChange({
+                                                      pdf_url: url,
+                                                      pdf_storage_path: path,
+                                                  })
+                                            : undefined
+                                    }
+                                    onDocLoaded={isCurrent ? (doc) => setPdfDocInstance(doc) : undefined}
+                                    onMissingChange={
+                                        isCurrent ? (missing) => setIsPdfMissing(missing) : undefined
+                                    }
+                                />
+                            );
+                        })
+                    ) : (
+                        <PdfPageBackground
+                            pdfId={notebook.pdf_id}
+                            pdfName={notebook.pdf_name}
+                            pdfUrl={notebook.pdf_url}
+                            rotation={notebook.pdf_rotations?.[pageInfo.current + 1] || 0}
+                            pageNumber={currentMappedPdfPage}
+                            view={view}
+                            canvasSize={canvasSize}
+                            box={pdfBox}
+                            onCanvasReady={handlePdfCanvas}
+                            onCloudUrlReady={(url, path) =>
+                                onMetaChange({ pdf_url: url, pdf_storage_path: path })
+                            }
+                            onDocLoaded={(doc) => setPdfDocInstance(doc)}
+                            onMissingChange={(missing) => setIsPdfMissing(missing)}
+                        />
+                    )
                 )}
 
                 {isLoading || initialStrokes === null ? (
@@ -2035,13 +2132,24 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             onPageChange={(current, total) => setPageInfo({ current, total })}
                             panMode="viewport"
                             pageBox={pageBox}
+                            verticalScroll={isStackedPdf}
                             onViewChange={handleViewChange}
                             onConfigChange={(patch) => setConfig((prev) => ({ ...prev, ...patch }))}
                         />
                         <TextBoxLayer
                             boxes={currentBoxes}
                             enabled={isTextBoxMode}
-                            view={view}
+                            view={
+                                isStackedPdf && pageBox
+                                    ? {
+                                          ...view,
+                                          ty:
+                                              view.ty +
+                                              verticalPageOffsetY(pageInfo.current, pageBox) *
+                                                  view.scale,
+                                      }
+                                    : view
+                            }
                             pageBox={pageBox}
                             onAdd={(b) => updateCurrentBoxes((list) => [...list, b])}
                             onUpdate={(id, upd) =>

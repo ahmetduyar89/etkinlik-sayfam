@@ -53,6 +53,7 @@ import { importImageFile, onImageReady } from './imageStore';
 import { applyOpToStrokes, newStrokeId, withIds } from './strokeOps';
 import { withAlpha } from './objectDrawing';
 import { drawPaper, paperBackground } from '../notebooks/paper';
+import { VERTICAL_PAGE_GAP, verticalPageOffsetY, verticalPageStride } from '../../constants/pageSizes';
 import {
     SHAPE_TOOLS,
     drawStroke,
@@ -117,6 +118,12 @@ interface DrawingCanvasProps {
      */
     pageBox?: { w: number; h: number } | null;
     /**
+     * Çok sayfalı belgelerde sayfaların alt alta (GoodNotes sürekli dikey kaydırma)
+     * dizilmesi. Etkin olduğunda tüm sayfalar aynı tuvalde alt alta görünür,
+     * kaydırarak sayfalar arasında gezilir ve her sayfaya doğrudan çizim yapılır.
+     */
+    verticalScroll?: boolean;
+    /**
      * Yakınlaştırma/kaydırma ya da tuval boyutu değiştiğinde tetiklenir.
      * `size`, kağıt deseninin çizimle aynı hizada durması için gerekir.
      */
@@ -154,6 +161,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             onHistoryChange,
             panMode = 'passthrough',
             pageBox,
+            verticalScroll = false,
             onViewChange,
             onConfigChange,
             onInkDiagnostic,
@@ -393,6 +401,37 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         );
         const pageRectRef = React.useRef(pageRect);
         pageRectRef.current = pageRect;
+        const verticalScrollRef = React.useRef(verticalScroll);
+        verticalScrollRef.current = verticalScroll;
+
+        const isStackedActive = () => Boolean(verticalScrollRef.current && pageRectRef.current);
+
+        /** Aktif sayfanın dünya Y başlangıç konumu (tek sayfada 0, alt alta görünümde index * stride). */
+        const activePageOffsetY = () => {
+            const page = pageRectRef.current;
+            if (!verticalScrollRef.current || !page) return 0;
+            return verticalPageOffsetY(currentPageRef.current, page);
+        };
+
+        /**
+         * Verilen küresel dünya noktasının hangi sayfa kutusunun içinde olduğunu bulur.
+         * Bulunamazsa `null` döner.
+         */
+        const findPageAtGlobalY = (globalY: number, tolerance = 0): number | null => {
+            const page = pageRectRef.current;
+            if (!verticalScrollRef.current || !page) return currentPageRef.current;
+            const stride = verticalPageStride(page);
+            if (stride <= 0) return currentPageRef.current;
+            const total = pagesRef.current.length;
+            for (let i = 0; i < total; i++) {
+                const top = i * stride;
+                const bottom = top + page.h;
+                if (globalY >= top - tolerance && globalY <= bottom + tolerance) {
+                    return i;
+                }
+            }
+            return null;
+        };
 
         /**
          * Sayfalı defterlerde çalışma masasının kendisi çizim yüzeyi değildir.
@@ -423,24 +462,39 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             c.setTransform(dpr, 0, 0, dpr, 0, 0);
         };
 
-        const applyView = (c: CanvasRenderingContext2D) => {
+        const applyView = (c: CanvasRenderingContext2D, pageIndex = currentPageRef.current) => {
             const dpr = window.devicePixelRatio || 1;
             const v = viewRef.current;
-            c.setTransform(dpr * v.scale, 0, 0, dpr * v.scale, dpr * v.tx, dpr * v.ty);
+            const page = pageRectRef.current;
+            const offsetY = verticalScrollRef.current && page ? verticalPageOffsetY(pageIndex, page) : 0;
+            c.setTransform(
+                dpr * v.scale,
+                0,
+                0,
+                dpr * v.scale,
+                dpr * v.tx,
+                dpr * (v.ty + offsetY * v.scale)
+            );
         };
 
-        /** İşaretçi olayını çalışma alanı (dünya) koordinatına çevirir. */
-        const toWorld = (clientX: number, clientY: number): Point => {
+        /** İşaretçi olayını küresel çalışma alanı (dünya) koordinatına çevirir. */
+        const toGlobalWorld = (clientX: number, clientY: number): Point => {
             const canvas = canvasRef.current;
             const rect = canvas?.getBoundingClientRect();
             if (!canvas || !rect) return { x: 0, y: 0 };
-            // Üst katmanlarda CSS ölçeği varsa telafi et.
             const cssX = rect.width ? canvas.offsetWidth / rect.width : 1;
             const cssY = rect.height ? canvas.offsetHeight / rect.height : 1;
             const sx = (clientX - rect.left) * cssX;
             const sy = (clientY - rect.top) * cssY;
             const v = viewRef.current;
             return { x: (sx - v.tx) / v.scale, y: (sy - v.ty) / v.scale };
+        };
+
+        /** İşaretçi olayını aktif sayfanın yerel dünya koordinatına çevirir. */
+        const toWorld = (clientX: number, clientY: number): Point => {
+            const globalPt = toGlobalWorld(clientX, clientY);
+            const offsetY = activePageOffsetY();
+            return offsetY ? { x: globalPt.x, y: globalPt.y - offsetY } : globalPt;
         };
 
         /**
@@ -477,19 +531,29 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             return { x: (clientX - rect.left) * cssX, y: (clientY - rect.top) * cssY };
         };
 
-        const toScreenPoint = (p: Point, v: Viewport): Point => ({
-            x: p.x * v.scale + v.tx,
-            y: p.y * v.scale + v.ty,
-        });
+        const toScreenPoint = (p: Point, v: Viewport): Point => {
+            const offsetY = activePageOffsetY();
+            return {
+                x: p.x * v.scale + v.tx,
+                y: (p.y + offsetY) * v.scale + v.ty,
+            };
+        };
 
-        /** Şu anda görünen dünya dikdörtgeni. */
+        /** Şu anda görünen dünya dikdörtgeni (aktif sayfanın yerel koordinatında). */
         const visibleWorldRect = React.useCallback(() => {
             const canvas = canvasRef.current;
             const dpr = window.devicePixelRatio || 1;
             const w = canvas ? canvas.width / dpr : 0;
             const h = canvas ? canvas.height / dpr : 0;
             const v = viewRef.current;
-            return { x: -v.tx / v.scale, y: -v.ty / v.scale, w: w / v.scale, h: h / v.scale };
+            const offsetY = activePageOffsetY();
+            return {
+                x: -v.tx / v.scale,
+                y: -v.ty / v.scale - offsetY,
+                w: w / v.scale,
+                h: h / v.scale,
+            };
+            // eslint-disable-next-line react-hooks/exhaustive-deps
         }, []);
 
         const deselect = () => {
@@ -575,6 +639,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             historyRef.current.finish(strokesRef.current);
             notifyHistory();
             spatialIndexRef.current.invalidate();
+            pagesRef.current[currentPageRef.current] = [...strokesRef.current];
             setStrokes([...strokesRef.current]);
             onDirtyRef.current?.();
         }, [notifyHistory]);
@@ -593,8 +658,46 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
             applyIdentity(bCtx);
             bCtx.clearRect(0, 0, w, h);
-            applyView(bCtx);
+
             const page = pageRectRef.current;
+            if (isStackedActive() && page) {
+                const pv = viewRef.current;
+                const stride = verticalPageStride(page);
+                const total = pagesRef.current.length;
+                for (let pIdx = 0; pIdx < total; pIdx++) {
+                    const offsetY = pIdx * stride;
+                    const screenTop = (page.y + offsetY) * pv.scale + pv.ty;
+                    const screenBottom = screenTop + page.h * pv.scale;
+                    if (screenBottom < -100 || screenTop > h + 100) continue;
+
+                    applyView(bCtx, pIdx);
+                    bCtx.save();
+                    bCtx.beginPath();
+                    bCtx.rect(page.x, page.y, page.w, page.h);
+                    bCtx.clip();
+
+                    const pageStrokes =
+                        pIdx === currentPageRef.current
+                            ? strokesRef.current
+                            : (pagesRef.current[pIdx] || []);
+                    pageStrokes.forEach((s, i) => {
+                        if (pIdx === currentPageRef.current && exclude?.has(i)) return;
+                        if (
+                            pIdx === currentPageRef.current &&
+                            inlineTextRef.current &&
+                            (inlineTextRef.current.strokeId
+                                ? inlineTextRef.current.strokeId === s.id
+                                : inlineTextRef.current.strokeIdx === i)
+                        )
+                            return;
+                        drawStroke(bCtx, s, simTimeRef.current, isDark);
+                    });
+                    bCtx.restore();
+                }
+                return;
+            }
+
+            applyView(bCtx);
             if (page) {
                 bCtx.save();
                 bCtx.beginPath();
@@ -645,19 +748,58 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (page) {
                 const pv = viewRef.current;
                 const px = page.x * pv.scale + pv.tx;
-                const py = page.y * pv.scale + pv.ty;
                 const pw = page.w * pv.scale;
                 const ph = page.h * pv.scale;
-                mainCtx.save();
-                mainCtx.fillStyle = 'rgba(226, 232, 240, 0.78)';
-                mainCtx.fillRect(0, 0, w, Math.max(0, py));
-                mainCtx.fillRect(0, py + ph, w, Math.max(0, h - py - ph));
-                mainCtx.fillRect(0, py, Math.max(0, px), ph);
-                mainCtx.fillRect(px + pw, py, Math.max(0, w - px - pw), ph);
-                mainCtx.strokeStyle = 'rgba(15, 23, 42, 0.28)';
-                mainCtx.lineWidth = 1;
-                mainCtx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
-                mainCtx.restore();
+
+                if (isStackedActive()) {
+                    const total = pagesRef.current.length;
+                    const stride = verticalPageStride(page);
+                    const firstPy = page.y * pv.scale + pv.ty;
+                    const lastPy = (page.y + Math.max(0, total - 1) * stride) * pv.scale + pv.ty;
+                    mainCtx.save();
+                    mainCtx.fillStyle = 'rgba(226, 232, 240, 0.78)';
+                    // Sol ve sağ masa boşlukları
+                    mainCtx.fillRect(0, 0, Math.max(0, px), h);
+                    mainCtx.fillRect(px + pw, 0, Math.max(0, w - px - pw), h);
+                    // İlk sayfanın üstü ve son sayfanın altı
+                    if (firstPy > 0) mainCtx.fillRect(px, 0, pw, Math.min(h, firstPy));
+                    if (lastPy + ph < h) {
+                        const startY = Math.max(0, lastPy + ph);
+                        mainCtx.fillRect(px, startY, pw, h - startY);
+                    }
+                    // Sayfalar arasındaki yatay boşluk şeritleri ve her sayfanın kenarlığı
+                    const gapScreen = VERTICAL_PAGE_GAP * pv.scale;
+                    for (let pIdx = 0; pIdx < total; pIdx++) {
+                        const py = (page.y + pIdx * stride) * pv.scale + pv.ty;
+                        if (py + ph + gapScreen < -50 || py > h + 50) continue;
+                        if (pIdx < total - 1) {
+                            const gapY = py + ph;
+                            if (gapY < h && gapY + gapScreen > 0) {
+                                mainCtx.fillStyle = 'rgba(226, 232, 240, 0.78)';
+                                mainCtx.fillRect(px, gapY, pw, gapScreen);
+                            }
+                        }
+                        mainCtx.strokeStyle =
+                            pIdx === currentPageRef.current
+                                ? 'rgba(59, 130, 246, 0.45)'
+                                : 'rgba(15, 23, 42, 0.24)';
+                        mainCtx.lineWidth = pIdx === currentPageRef.current ? 1.5 : 1;
+                        mainCtx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
+                    }
+                    mainCtx.restore();
+                } else {
+                    const py = page.y * pv.scale + pv.ty;
+                    mainCtx.save();
+                    mainCtx.fillStyle = 'rgba(226, 232, 240, 0.78)';
+                    mainCtx.fillRect(0, 0, w, Math.max(0, py));
+                    mainCtx.fillRect(0, py + ph, w, Math.max(0, h - py - ph));
+                    mainCtx.fillRect(0, py, Math.max(0, px), ph);
+                    mainCtx.fillRect(px + pw, py, Math.max(0, w - px - pw), ph);
+                    mainCtx.strokeStyle = 'rgba(15, 23, 42, 0.28)';
+                    mainCtx.lineWidth = 1;
+                    mainCtx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
+                    mainCtx.restore();
+                }
             }
 
             // Seçim çerçevesi ekran uzayında çizilir ki kalınlığı sabit kalsın.
@@ -842,6 +984,10 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
          * testleri ve dünya/ekran dönüşümleri doğru kalsın), ekrana yansıması
          * bir sonraki çizim karesine bırakılır.
          */
+        const notifyPageChange = React.useCallback(() => {
+            onPageChange?.(currentPageRef.current, pagesRef.current.length);
+        }, [onPageChange]);
+
         const viewFrameRef = React.useRef<number | null>(null);
         const pendingViewRef = React.useRef<Viewport | null>(null);
 
@@ -854,11 +1000,46 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             // konumunu besler, mürekkep ve seçim çerçevesi zaten `viewRef` ile
             // çizilir. Hareket bitince (stopDrawing) bir kez eşitlenir.
             if (!pinchRef.current && !panRef.current) setViewState(pending);
-            onViewChangeRef.current?.(pending, getCanvasSize());
+            const cSize = getCanvasSize();
+            onViewChangeRef.current?.(pending, cSize);
+
+            // Alt alta sayfa görünümünde kaydırırken ekranın ortasındaki sayfayı otomatik aktif sayfa yap
+            const page = pageRectRef.current;
+            if (
+                isStackedActive() &&
+                page &&
+                cSize.h > 0 &&
+                !isDrawingRef.current &&
+                !dragStateRef.current &&
+                !inlineTextRef.current &&
+                selectedIdxsRef.current.length === 0
+            ) {
+                const centerWorldY = (cSize.h * 0.42 - pending.ty) / pending.scale;
+                const stride = verticalPageStride(page);
+                if (stride > 0) {
+                    const candidate = Math.max(
+                        0,
+                        Math.min(
+                            pagesRef.current.length - 1,
+                            Math.floor((centerWorldY + VERTICAL_PAGE_GAP * 0.5) / stride)
+                        )
+                    );
+                    if (candidate !== currentPageRef.current) {
+                        pagesRef.current[currentPageRef.current] = [...strokesRef.current];
+                        currentPageRef.current = candidate;
+                        strokesRef.current = [...(pagesRef.current[candidate] || [])];
+                        setStrokes([...strokesRef.current]);
+                        resetHistory();
+                        spatialIndexRef.current.invalidate();
+                        notifyPageChange();
+                    }
+                }
+            }
+
             redraw();
             if (rulerRef.current) clearOverlay();
             // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [redraw]);
+        }, [notifyPageChange, redraw, resetHistory]);
 
         /** Jest bitince görünüm durumunu tuvalin gerçek görünümüyle eşitler. */
         const syncViewState = React.useCallback(() => {
@@ -913,12 +1094,8 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         // Fotoğraf yüklenince sayfayı tazele.
         React.useEffect(() => onImageReady(() => redraw()), [redraw]);
 
-        const notifyPageChange = React.useCallback(() => {
-            onPageChange?.(currentPageRef.current, pagesRef.current.length);
-        }, [onPageChange]);
-
         const switchPage = React.useCallback(
-            (idx: number) => {
+            (idx: number, options?: { scrollIntoView?: boolean }) => {
                 commitTextRef.current();
                 pagesRef.current[currentPageRef.current] = [...strokesRef.current];
                 currentPageRef.current = idx;
@@ -926,10 +1103,22 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 setStrokes([...strokesRef.current]);
                 deselect();
                 resetHistory();
-                window.setTimeout(redraw, 0);
+                spatialIndexRef.current.invalidate();
+                if (options?.scrollIntoView && isStackedActive() && pageRectRef.current) {
+                    const page = pageRectRef.current;
+                    const v = viewRef.current;
+                    const offsetY = verticalPageOffsetY(idx, page);
+                    const margin = 24;
+                    applyViewChange({
+                        ...v,
+                        ty: margin - (page.y + offsetY) * v.scale,
+                    });
+                } else {
+                    window.setTimeout(redraw, 0);
+                }
                 notifyPageChange();
             },
-            [notifyPageChange, redraw, resetHistory]
+            [applyViewChange, notifyPageChange, redraw, resetHistory]
         );
 
 
@@ -1186,6 +1375,21 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     }
                     // Kenarlarda biraz boşluk bırakarak sayfayı ekrana oturt.
                     const margin = 24;
+                    if (isStackedActive()) {
+                        // Alt alta çoklu sayfa görünümünde sayfayı genişliğe/ekrana sığdırıp
+                        // aktif sayfanın üst kısmını ekrana hizala.
+                        const scale = Math.min(
+                            (w - margin * 2) / page.w,
+                            (h - margin * 2) / (page.h * 0.92)
+                        );
+                        const offsetY = verticalPageOffsetY(currentPageRef.current, page);
+                        applyViewChange({
+                            scale,
+                            tx: (w - page.w * scale) / 2 - page.x * scale,
+                            ty: margin - (page.y + offsetY) * scale,
+                        });
+                        return;
+                    }
                     const scale = Math.min(
                         (w - margin * 2) / page.w,
                         (h - margin * 2) / page.h
@@ -1256,26 +1460,38 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 },
                 nextPage: () => {
                     if (currentPageRef.current < pagesRef.current.length - 1)
-                        switchPage(currentPageRef.current + 1);
+                        switchPage(currentPageRef.current + 1, { scrollIntoView: true });
                 },
                 prevPage: () => {
-                    if (currentPageRef.current > 0) switchPage(currentPageRef.current - 1);
+                    if (currentPageRef.current > 0)
+                        switchPage(currentPageRef.current - 1, { scrollIntoView: true });
                 },
                 goToPage: (index: number) => {
-                    if (index >= 0 && index < pagesRef.current.length && index !== currentPageRef.current)
-                        switchPage(index);
+                    if (index >= 0 && index < pagesRef.current.length) {
+                        if (index !== currentPageRef.current) {
+                            switchPage(index, { scrollIntoView: true });
+                        } else if (isStackedActive() && pageRectRef.current) {
+                            const page = pageRectRef.current;
+                            const v = viewRef.current;
+                            const offsetY = verticalPageOffsetY(index, page);
+                            applyViewChange({
+                                ...v,
+                                ty: 24 - (page.y + offsetY) * v.scale,
+                            });
+                        }
+                    }
                 },
                 addPage: () => {
                     pagesRef.current[currentPageRef.current] = [...strokesRef.current];
                     pagesRef.current.push([]);
-                    switchPage(pagesRef.current.length - 1);
+                    switchPage(pagesRef.current.length - 1, { scrollIntoView: true });
                 },
                 insertPageAfter: (index = currentPageRef.current) => {
                     commitTextRef.current();
                     pagesRef.current[currentPageRef.current] = [...strokesRef.current];
                     const insertAt = Math.max(0, Math.min(pagesRef.current.length, index + 1));
                     pagesRef.current.splice(insertAt, 0, []);
-                    switchPage(insertAt);
+                    switchPage(insertAt, { scrollIntoView: true });
                 },
                 duplicatePage: () => {
                     commitTextRef.current();
@@ -1284,7 +1500,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         JSON.stringify(pagesRef.current[currentPageRef.current])
                     );
                     pagesRef.current.splice(currentPageRef.current + 1, 0, copy);
-                    switchPage(currentPageRef.current + 1);
+                    switchPage(currentPageRef.current + 1, { scrollIntoView: true });
                 },
                 movePage: (from: number, to: number) => {
                     const pages = pagesRef.current;
@@ -1819,6 +2035,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             if (rulerRef.current) drawRuler(oCtx, rulerRef.current, viewRef.current);
             if (guides.x.length === 0 && guides.y.length === 0) return;
             const v = viewRef.current;
+            const offsetY = activePageOffsetY();
             oCtx.save();
             oCtx.strokeStyle = '#f43f5e';
             oCtx.lineWidth = 1;
@@ -1831,7 +2048,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 oCtx.stroke();
             }
             for (const gy of guides.y) {
-                const sy = gy * v.scale + v.ty;
+                const sy = (gy + offsetY) * v.scale + v.ty;
                 oCtx.beginPath();
                 oCtx.moveTo(0, sy);
                 oCtx.lineTo(w, sy);
@@ -1904,8 +2121,9 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
             const buffer = bufferCanvasRef.current;
             if (!mainCtx || !buffer || !region) return;
             const v = viewRef.current;
+            const offsetY = activePageOffsetY();
             const minX = region.x1 * v.scale + v.tx;
-            const minY = region.y1 * v.scale + v.ty;
+            const minY = (region.y1 + offsetY) * v.scale + v.ty;
             const width = (region.x2 - region.x1) * v.scale;
             const height = (region.y2 - region.y1) * v.scale;
             const dpr = window.devicePixelRatio || 1;
@@ -2576,7 +2794,28 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
 
             if (config.tool === 'sun') {
                 isDrawingRef.current = true;
-                const { x, y } = toWorld(e.clientX, e.clientY);
+                // Alt alta çoklu sayfa görünümünde dokunulan nokta başka bir sayfanın
+            // kutusu içindeyse anında o sayfayı aktif sayfa yap (kaydırdıktan sonra
+            // doğrudan alttaki sayfaya yazmaya devam edebilmek için).
+            if (isStackedActive()) {
+                const globalPt = toGlobalWorld(e.clientX, e.clientY);
+                const hitPage = findPageAtGlobalY(globalPt.y, 1 / viewRef.current.scale);
+                if (hitPage !== null && hitPage !== currentPageRef.current) {
+                    if (inlineTextRef.current) {
+                        commitInlineText();
+                    }
+                    pagesRef.current[currentPageRef.current] = [...strokesRef.current];
+                    currentPageRef.current = hitPage;
+                    strokesRef.current = [...(pagesRef.current[hitPage] || [])];
+                    setStrokes([...strokesRef.current]);
+                    deselect();
+                    resetHistory();
+                    spatialIndexRef.current.invalidate();
+                    notifyPageChange();
+                }
+            }
+
+            const { x, y } = toWorld(e.clientX, e.clientY);
                 laserPosRef.current = { x, y };
                 laserTrailRef.current.push({ x, y, time: performance.now() });
                 if (!laserRafRef.current) {
@@ -2596,6 +2835,27 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                     ty: viewRef.current.ty,
                 };
                 return;
+            }
+
+            // Alt alta çoklu sayfa görünümünde dokunulan nokta başka bir sayfanın
+            // kutusu içindeyse anında o sayfayı aktif sayfa yap (kaydırdıktan sonra
+            // doğrudan alttaki sayfaya yazmaya devam edebilmek için).
+            if (isStackedActive()) {
+                const globalPt = toGlobalWorld(e.clientX, e.clientY);
+                const hitPage = findPageAtGlobalY(globalPt.y, 1 / viewRef.current.scale);
+                if (hitPage !== null && hitPage !== currentPageRef.current) {
+                    if (inlineTextRef.current) {
+                        commitInlineText();
+                    }
+                    pagesRef.current[currentPageRef.current] = [...strokesRef.current];
+                    currentPageRef.current = hitPage;
+                    strokesRef.current = [...(pagesRef.current[hitPage] || [])];
+                    setStrokes([...strokesRef.current]);
+                    deselect();
+                    resetHistory();
+                    spatialIndexRef.current.invalidate();
+                    notifyPageChange();
+                }
             }
 
             const { x, y } = toWorld(e.clientX, e.clientY);
@@ -3642,12 +3902,13 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
         const simControls =
             simSpec?.controls && simRect && selSimMath ? simSpec.controls(simRect, selSimMath) : [];
 
+        const activeOffsetY = activePageOffsetY();
         const selScreenBB = selBB
             ? {
                   x1: selBB.x1 * view.scale + view.tx,
-                  y1: selBB.y1 * view.scale + view.ty,
+                  y1: (selBB.y1 + activeOffsetY) * view.scale + view.ty,
                   x2: selBB.x2 * view.scale + view.tx,
-                  y2: selBB.y2 * view.scale + view.ty,
+                  y2: (selBB.y2 + activeOffsetY) * view.scale + view.ty,
               }
             : null;
 
@@ -3955,12 +4216,23 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                         e.preventDefault();
                         const canvas = canvasRef.current;
                         if (!canvas) return;
-                        const rect = canvas.getBoundingClientRect();
-                        const clientX = e.clientX - rect.left;
-                        const clientY = e.clientY - rect.top;
-                        const v = viewRef.current;
-                        const dropWorldX = (clientX - v.tx) / v.scale;
-                        const dropWorldY = (clientY - v.ty) / v.scale;
+                        const globalDrop = toGlobalWorld(e.clientX, e.clientY);
+                        if (isStackedActive()) {
+                            const hitPage = findPageAtGlobalY(globalDrop.y, 0);
+                            if (hitPage !== null && hitPage !== currentPageRef.current) {
+                                pagesRef.current[currentPageRef.current] = [...strokesRef.current];
+                                currentPageRef.current = hitPage;
+                                strokesRef.current = [...(pagesRef.current[hitPage] || [])];
+                                setStrokes([...strokesRef.current]);
+                                deselect();
+                                resetHistory();
+                                spatialIndexRef.current.invalidate();
+                                notifyPageChange();
+                            }
+                        }
+                        const dropLocal = toWorld(e.clientX, e.clientY);
+                        const dropWorldX = dropLocal.x;
+                        const dropWorldY = dropLocal.y;
 
                         const files = Array.from(e.dataTransfer.files).filter((f) =>
                             f.type.startsWith('image/')
@@ -4801,7 +5073,7 @@ export const DrawingCanvas = React.forwardRef<DrawingCanvasHandle, DrawingCanvas
                 )}
 
                 {inlineText && <InlineTextEditor
-                    draft={inlineText} view={view} pageBox={pageBox} containerRef={textBoxContainerRef}
+                    draft={inlineText} view={{ ...view, ty: view.ty + activeOffsetY * view.scale }} pageBox={pageBox} containerRef={textBoxContainerRef}
                     viewport={{w:canvasRef.current?.clientWidth ?? window.innerWidth, h:canvasRef.current?.clientHeight ?? window.innerHeight}}
                     onChange={patch => {
                         const next = inlineTextRef.current;

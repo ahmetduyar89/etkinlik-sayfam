@@ -63,7 +63,7 @@
 
 /* Small colored glyphs; button dimensions and layout stay unchanged. */
 .gn-toolbar{--gn-blue:#4b66bd;--gn-soft:#eef2ff;--gn-edge:#dce4fa}
-.gn-toolbar[data-tool="eraser"]{--gn-blue:#ad5076;--gn-soft:#fdf0f5;--gn-edge:#f3dce7}
+.gn-toolbar:is([data-tool="eraser"],[data-tool="sun"]){--gn-blue:#ad5076;--gn-soft:#fdf0f5;--gn-edge:#f3dce7}
 .gn-toolbar[data-tool="highlighter"]{--gn-blue:#986319;--gn-soft:#fff7e5;--gn-edge:#f1e3bd}
 .gn-toolbar:is([data-tool="lasso"],[data-tool="rect"],[data-tool="circle"],[data-tool="ellipse"],[data-tool="triangle"],[data-tool="diamond"],[data-tool="line"],[data-tool="arrow"]){--gn-blue:#7c58ad;--gn-soft:#f5f0fc;--gn-edge:#e8ddf6}
 .gn-toolbar[data-tool="pan"]{--gn-blue:#287c78;--gn-soft:#edf8f5;--gn-edge:#d3ebe4}

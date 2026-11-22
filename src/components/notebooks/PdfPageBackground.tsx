@@ -24,6 +24,10 @@ interface PdfPageBackgroundProps {
      * koşulda değişmez; verilmezse eski yerleşim kullanılır (eski defterler).
      */
     box?: { w: number; h: number } | null;
+    /** Alt alta sayfa görünümünde bu sayfanın dünya Y konumu (varsayılan: 0). */
+    worldYOffset?: number;
+    /** Sayfa numarası rozeti gösterilsin mi (alt alta çoklu sayfa görünümünde). */
+    pageBadgeLabel?: string;
     onPageDimensions?: (w: number, h: number, numPages: number) => void;
     /** İşlenmiş sayfa tuvalini dışarı verir (PNG çıktısına PDF de girsin). */
     onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
@@ -42,6 +46,8 @@ export function PdfPageBackground({
     view,
     canvasSize,
     box,
+    worldYOffset = 0,
+    pageBadgeLabel,
     onPageDimensions,
     onCanvasReady,
     onRebindSuccess,
@@ -58,13 +64,26 @@ export function PdfPageBackground({
     const [rendering, setRendering] = React.useState(false);
 
     const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    const onPageDimensionsRef = React.useRef(onPageDimensions);
+    onPageDimensionsRef.current = onPageDimensions;
+    const onCanvasReadyRef = React.useRef(onCanvasReady);
+    onCanvasReadyRef.current = onCanvasReady;
+    const onDocLoadedRef = React.useRef(onDocLoaded);
+    onDocLoadedRef.current = onDocLoaded;
+    const onMissingChangeRef = React.useRef(onMissingChange);
+    onMissingChangeRef.current = onMissingChange;
+
     React.useEffect(() => {
-        onCanvasReady?.(canvasRef.current);
-        return () => onCanvasReady?.(null);
-    }, [onCanvasReady]);
+        onCanvasReadyRef.current?.(canvasRef.current);
+        return () => onCanvasReadyRef.current?.(null);
+    }, []);
     const renderTaskRef = React.useRef<any>(null);
     const pdfDocRef = React.useRef<any>(null);
-    const lastRenderedPageRef = React.useRef<number>(-1);
+    const lastRenderedKeyRef = React.useRef<string>('');
+    const viewScaleRef = React.useRef(view.scale);
+    viewScaleRef.current = view.scale;
+    const canvasWidthRef = React.useRef(canvasSize.w);
+    canvasWidthRef.current = canvasSize.w;
 
     // PDF Dokümanını yükle (Yerel IndexedDB veya Bulut Bağlantısından)
     React.useEffect(() => {
@@ -88,17 +107,18 @@ export function PdfPageBackground({
                 );
                 if (!isMounted) return;
                 pdfDocRef.current = doc;
+                lastRenderedKeyRef.current = '';
                 setIsLoading(false);
                 setDownloadProgress(null);
-                onDocLoaded?.(doc);
-                onMissingChange?.(false);
+                onDocLoadedRef.current?.(doc);
+                onMissingChangeRef.current?.(false);
             } catch (err: any) {
                 if (!isMounted) return;
                 setIsLoading(false);
                 setDownloadProgress(null);
                 if (err?.message?.includes('PDF verisi bulunamadı') || err?.message?.includes('buluttan indirilemedi')) {
                     setMissingInDb(true);
-                    onMissingChange?.(true);
+                    onMissingChangeRef.current?.(true);
                 } else {
                     setError('PDF dokümanı yüklenemedi: ' + (err?.message || 'Bilinmeyen hata'));
                 }
@@ -108,14 +128,25 @@ export function PdfPageBackground({
         return () => {
             isMounted = false;
         };
-    }, [pdfId, pdfUrl, onDocLoaded, onMissingChange]);
+    }, [pdfId, pdfUrl]);
 
-    // Sayfayı render et
+    const boxW = box?.w ?? null;
+    const boxH = box?.h ?? null;
+
+    // Sayfayı render et (Çift tamponlama / Double-buffering ile ekranda beyazlama olmadan)
     const renderPage = React.useCallback(
-        async (pageNum: number) => {
+        async (pageNum: number, scaleForRender: number, isZoomRefresh = false) => {
             const doc = pdfDocRef.current;
             if (!doc) return;
             if (pageNum < 1 || pageNum > doc.numPages) return;
+
+            // Zoom seviyesini 0.25'lik dilimlere yuvarla ki mikroskobik zoom
+            // farklarında gereksiz yeniden çizim yapılmasın.
+            const quantizedZoom = Math.round(Math.max(1, Math.min(scaleForRender, 2.5)) * 4) / 4;
+            const renderKey = `${pdfId}:${pageNum}:${rotation}:${boxW ?? 'auto'}:${quantizedZoom}`;
+            if (lastRenderedKeyRef.current === renderKey) {
+                return;
+            }
 
             try {
                 if (renderTaskRef.current) {
@@ -123,7 +154,11 @@ export function PdfPageBackground({
                     renderTaskRef.current = null;
                 }
 
-                setRendering(true);
+                // Yalnızca yeni bir sayfaya geçildiğinde "Sayfa işleniyor" rozeti göster;
+                // yakınlaştırma (zoom) netleştirmesinde kullanıcıyı rahatsız etme.
+                if (!isZoomRefresh) {
+                    setRendering(true);
+                }
                 const page = await doc.getPage(pageNum);
 
                 // Standart 1x ölçekteki sayfa boyutu
@@ -131,18 +166,21 @@ export function PdfPageBackground({
                 const baseW = unscaledViewport.width;
                 const baseH = unscaledViewport.height;
 
-                const targetWorldW = box
-                    ? box.w
+                const cw = canvasWidthRef.current;
+                const targetWorldW = boxW
+                    ? boxW
                     : Math.max(
                           baseW,
-                          Math.min(1000, canvasSize.w > 200 ? canvasSize.w - 80 : 900)
+                          Math.min(1000, cw > 200 ? cw - 80 : 900)
                       );
                 const fitScale = targetWorldW / baseW;
-                const worldW = box ? box.w : baseW * fitScale;
-                const worldH = box ? box.h : baseH * fitScale;
+                const worldW = boxW ? boxW : baseW * fitScale;
+                const worldH = boxH ? boxH : baseH * fitScale;
 
-                setPageSize({ w: worldW, h: worldH });
-                onPageDimensions?.(worldW, worldH, doc.numPages);
+                setPageSize((prev) =>
+                    prev && prev.w === worldW && prev.h === worldH ? prev : { w: worldW, h: worldH }
+                );
+                onPageDimensionsRef.current?.(worldW, worldH, doc.numPages);
 
                 const canvas = canvasRef.current;
                 if (!canvas) {
@@ -152,29 +190,40 @@ export function PdfPageBackground({
 
                 // Yüksek DPI keskinliği (Retina netliği ve zoom keskinliği)
                 const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-                const renderScale = fitScale * Math.max(1, Math.min(view.scale, 2.5)) * dpr;
+                const renderScale = fitScale * quantizedZoom * dpr;
                 const targetRotation = ((page.rotate || 0) + (rotation || 0)) % 360;
                 const viewport = page.getViewport({ scale: renderScale, rotation: targetRotation });
 
-                canvas.width = viewport.width;
-                canvas.height = viewport.height;
-
-                const ctx = canvas.getContext('2d');
-                if (!ctx) {
+                // Arka planda geçici (offscreen) tuvale çiz; bitince ana tuvale tek karede aktar.
+                // Böylece ana tuvalin width/height değeri erken sıfırlanıp ekran beyazlamaz!
+                const offscreen = document.createElement('canvas');
+                offscreen.width = viewport.width;
+                offscreen.height = viewport.height;
+                const offCtx = offscreen.getContext('2d');
+                if (!offCtx) {
                     setRendering(false);
                     return;
                 }
 
-                const renderContext = {
-                    canvasContext: ctx,
-                    viewport: viewport,
-                };
-
-                const task = page.render(renderContext);
+                const task = page.render({
+                    canvasContext: offCtx,
+                    viewport,
+                });
                 renderTaskRef.current = task;
                 await task.promise;
                 renderTaskRef.current = null;
-                lastRenderedPageRef.current = pageNum;
+
+                // Çizim tamamlandı: şimdi görünür tuvale tek seferde kopyala
+                const visibleCanvas = canvasRef.current;
+                if (visibleCanvas) {
+                    visibleCanvas.width = offscreen.width;
+                    visibleCanvas.height = offscreen.height;
+                    const visibleCtx = visibleCanvas.getContext('2d');
+                    visibleCtx?.drawImage(offscreen, 0, 0);
+                    onCanvasReadyRef.current?.(visibleCanvas);
+                }
+
+                lastRenderedKeyRef.current = renderKey;
                 setRendering(false);
             } catch (err: any) {
                 if (err?.name === 'RenderingCancelledException') {
@@ -183,10 +232,10 @@ export function PdfPageBackground({
                 setRendering(false);
             }
         },
-        [box, canvasSize.w, view.scale, rotation, onPageDimensions]
+        [pdfId, boxW, boxH, rotation]
     );
 
-    // Sayfa numarası, dönüş açısı veya doküman değiştiğinde çiz
+    // Sayfa numarası, dönüş açısı veya doküman değiştiğinde çiz (Kaydırma/Pan sırasında TETİKLENMEZ)
     React.useEffect(() => {
         if (!pageNumber || pageNumber <= 0) {
             if (renderTaskRef.current) {
@@ -198,24 +247,22 @@ export function PdfPageBackground({
                 const ctx = canvas.getContext('2d');
                 ctx?.clearRect(0, 0, canvas.width, canvas.height);
             }
-            onCanvasReady?.(null);
+            lastRenderedKeyRef.current = '';
+            onCanvasReadyRef.current?.(null);
             setRendering(false);
             return;
         }
-        onCanvasReady?.(canvasRef.current);
         if (!isLoading && pdfDocRef.current) {
-            void renderPage(pageNumber);
+            void renderPage(pageNumber, viewScaleRef.current, false);
         }
-    }, [isLoading, pageNumber, rotation, renderPage, onCanvasReady]);
+    }, [isLoading, pageNumber, rotation, renderPage]);
 
-    // Yakınlaştırma (zoom) bittiğinde daha yüksek çözünürlük için debounced yeniden çizim
+    // YALNIZCA yakınlaştırma (view.scale) değişip durduğunda çözünürlüğü sessizce netleştir
     React.useEffect(() => {
         if (isLoading || !pdfDocRef.current || !pageNumber || pageNumber <= 0) return;
         const timer = setTimeout(() => {
-            if (lastRenderedPageRef.current === pageNumber) {
-                void renderPage(pageNumber);
-            }
-        }, 300);
+            void renderPage(pageNumber, viewScaleRef.current, true);
+        }, 320);
         return () => clearTimeout(timer);
     }, [view.scale, pageNumber, isLoading, renderPage]);
 
@@ -231,13 +278,14 @@ export function PdfPageBackground({
             onMissingChange?.(false);
             const doc = await getPdfDocument(pdfId, buffer);
             pdfDocRef.current = doc;
+            lastRenderedKeyRef.current = '';
             setIsLoading(false);
             if (pageNumber && pageNumber > 0) {
-                void renderPage(pageNumber);
+                void renderPage(pageNumber, viewScaleRef.current, false);
             }
             toast.success('PDF bu cihaza bağlandı.');
             onRebindSuccess?.();
-            onDocLoaded?.(doc);
+            onDocLoadedRef.current?.(doc);
 
             // Arka planda Firebase Storage'a yükleyerek diğer tüm cihazlar için de hazırla!
             uploadPdfToCloud(pdfId, file.name, buffer).then(({ url, path }) => {
@@ -328,12 +376,12 @@ export function PdfPageBackground({
 
     // Sayfa konumu
     const worldX = box ? 0 : 40;
-    const worldY = box ? 0 : 24;
+    const worldY = (box ? 0 : 24) + worldYOffset;
 
     const screenX = worldX * view.scale + view.tx;
     const screenY = worldY * view.scale + view.ty;
-    const screenW = (pageSize?.w || 900) * view.scale;
-    const screenH = (pageSize?.h || 1200) * view.scale;
+    const screenW = (pageSize?.w || box?.w || 900) * view.scale;
+    const screenH = (pageSize?.h || box?.h || 1200) * view.scale;
 
     return (
         <div
@@ -359,6 +407,12 @@ export function PdfPageBackground({
                         imageRendering: 'auto',
                     }}
                 />
+
+                {pageBadgeLabel && (
+                    <div className="absolute bottom-2.5 right-3 bg-slate-900/60 text-white text-[10.5px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm">
+                        {pageBadgeLabel}
+                    </div>
+                )}
 
                 {/* Yükleniyor Göstergesi */}
                 {(isLoading || rendering) && (
