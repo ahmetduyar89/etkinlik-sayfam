@@ -291,6 +291,9 @@ export function NotebooksView() {
             const pdf_box = pdfBoxFromPoints(pt.width, pt.height);
             const pdf_page_map = Array.from({ length: numPages }, (_, i) => i + 1);
 
+            // Bulut dosyası hazır olmadan başka cihazlarda eksik bir defter oluşturma.
+            const { url, path, size } = await uploadPdfToCloud(pdfId, file.name, file);
+
             // GoodNotes tarzı defteri oluştur
             const ref = await notebooksHandler.add({
                 title: file.name.replace(/\.pdf$/i, ''),
@@ -304,24 +307,13 @@ export function NotebooksView() {
                 pdf_total_pages: numPages,
                 pdf_box,
                 pdf_page_map,
-                pdf_size: file.size,
+                pdf_url: url,
+                pdf_storage_path: path,
+                pdf_size: size,
                 updated_at: new Date().toISOString(),
             });
 
-            // Buluta yükleme (Tüm cihazlarda otomatik görünür olması için) - Neutering olmaması için orijinal File nesnesi verilir
-            uploadPdfToCloud(pdfId, file.name, file).then(({ url, path, size, error }) => {
-                if (url && size > 0) {
-                    notebooksHandler.update(ref.id, {
-                        pdf_url: url,
-                        pdf_storage_path: path,
-                        pdf_size: size,
-                    });
-                } else if (error) {
-                    console.warn('PDF buluta yüklenemedi:', error);
-                }
-            });
-
-            toast.success(`"${file.name}" başarıyla açıldı (${numPages} sayfa).`);
+            toast.success(`"${file.name}" buluta kaydedildi; tüm cihazlarda hazır (${numPages} sayfa).`);
             setOpenNotebookId(ref.id);
         } catch (err: any) {
             toast.error('PDF açılırken hata oluştu: ' + (err?.message || 'Bilinmeyen hata'));
@@ -1186,7 +1178,10 @@ export function NotebooksView() {
                     notebook={openNotebook}
                     onClose={() => setOpenNotebookId(null)}
                     onMetaChange={(patch) => {
-                        void notebooksHandler.update(openNotebook.id, patch).catch(() => undefined);
+                        return notebooksHandler.update(openNotebook.id, patch).catch((err) => {
+                            toast.error('Defter bilgileri kaydedilemedi. Lütfen tekrar deneyin.');
+                            throw err;
+                        });
                     }}
                 />
             )}

@@ -32,7 +32,7 @@ interface PdfPageBackgroundProps {
     /** İşlenmiş sayfa tuvalini dışarı verir (PNG çıktısına PDF de girsin). */
     onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
     onRebindSuccess?: () => void;
-    onCloudUrlReady?: (url: string, path: string, size?: number) => void;
+    onCloudUrlReady?: (url: string, path: string, size?: number) => Promise<void>;
     onDocLoaded?: (doc: any) => void;
     onMissingChange?: (missing: boolean) => void;
 }
@@ -293,20 +293,21 @@ export function PdfPageBackground({
             if (pageNumber && pageNumber > 0) {
                 void renderPage(pageNumber, viewScaleRef.current, false);
             }
-            toast.success('PDF bu cihaza bağlandı.');
             onRebindSuccess?.();
             onDocLoadedRef.current?.(doc);
 
-            // Arka planda Firebase Storage'a yükleyerek diğer tüm cihazlar için de hazırla!
-            uploadPdfToCloud(pdfId, file.name, file).then(({ url, path, size }) => {
-                if (url && size > 0) {
-                    onCloudUrlReady?.(url, path, size);
-                    toast.success('PDF bulut ile eşitlendi, diğer tüm cihazlarda açılmaya hazır.');
-                }
-            });
-        } catch {
+            if (onCloudUrlReady) {
+                const { url, path, size } = await uploadPdfToCloud(pdfId, file.name, file);
+                await onCloudUrlReady(url, path, size);
+                toast.success('PDF bulut ile eşitlendi, diğer tüm cihazlarda açılmaya hazır.');
+            } else {
+                toast.success('PDF bu cihaza bağlandı.');
+            }
+        } catch (err: unknown) {
             setIsLoading(false);
-            toast.error('PDF dosyası okunamadı.');
+            toast.error(err instanceof Error ? err.message : 'PDF dosyası okunamadı.');
+        } finally {
+            e.target.value = '';
         }
     };
 
@@ -352,12 +353,14 @@ export function PdfPageBackground({
                             Bu defter <span className="font-semibold text-primary">{pdfName}</span> dokümanına bağlıdır.
                         </p>
                         <p className="text-[11px] text-slate-400 mt-2">
-                            PDF dosyasını bir kez seçtiğinizde dosya bulut ile eşitlenecek ve sonraki girişlerde tüm cihazlarınızda otomatik olarak açılacaktır.
+                            {onCloudUrlReady
+                                ? 'PDF bu bilgisayarda bulunamadı. Dosyayı seçerek buluta kaydedin veya ilk yüklediğiniz bilgisayarda defteri açıp eşitleyin.'
+                                : 'PDF bu bilgisayarda bulunamadı. Dosyayı bu cihazda açmak için seçin. Kalıcı eşitleme için öğretmeniniz defteri kendi bilgisayarında açmalıdır.'}
                         </p>
                     </div>
                     <label className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary/90 cursor-pointer shadow-md transition-all">
                         <FileUp className="w-4 h-4" />
-                        <span>PDF Dosyasını Seç & Buluta Eşitle</span>
+                        <span>{onCloudUrlReady ? 'PDF Dosyasını Seç & Buluta Eşitle' : 'PDF Dosyasını Seç'}</span>
                         <input
                             type="file"
                             accept="application/pdf"

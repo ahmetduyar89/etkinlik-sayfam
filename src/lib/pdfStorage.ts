@@ -140,14 +140,14 @@ export function ensurePdfjsLoaded(): Promise<any> {
 /**
  * PDF dosyasını Firebase Storage'a yükler ve indirme bağlantısını döner.
  * data parametresi File, Blob, ArrayBuffer veya Uint8Array kabul eder.
- * Dosya boyutu 0 byte ise yükleme yapılmaz ve hata döndürülür.
+ * Yükleme tamamlanmadan başarı dönmez; başarısız olursa hata fırlatır.
  */
 export async function uploadPdfToCloud(
     id: string,
     name: string,
     data: ArrayBuffer | Blob | Uint8Array,
     onProgress?: (ratio: number) => void
-): Promise<{ url: string; path: string; size: number; error?: string }> {
+): Promise<{ url: string; path: string; size: number }> {
     try {
         let blob: Blob;
         let size = 0;
@@ -169,7 +169,12 @@ export async function uploadPdfToCloud(
 
         if (!size || size === 0) {
             console.error(`[uploadPdfToCloud] PDF verisi boş (0 bytes)! id=${id}, name=${name}`);
-            return { url: '', path: '', size: 0, error: 'Yüklenecek PDF verisi boş (0 byte).' };
+            throw new Error('Yüklenecek PDF verisi boş (0 byte).');
+        }
+
+        if (size > 100 * 1024 * 1024) throw new Error('PDF en fazla 100 MB olabilir.');
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            throw new Error('PDF’i diğer cihazlarla eşitlemek için internet bağlantısı gerekiyor.');
         }
 
         const sanitizedName = name.replace(/[^a-zA-Z0-9._-]/g, '_') || 'document.pdf';
@@ -197,7 +202,10 @@ export async function uploadPdfToCloud(
         return { url, path: storagePath, size };
     } catch (err: any) {
         console.warn('PDF Firebase Storage yükleme uyarısı:', err);
-        return { url: '', path: '', size: 0, error: err?.message || 'Bulut yükleme hatası' };
+        const detail = err?.code === 'storage/unauthorized'
+            ? 'Yükleme izni alınamadı. Öğretmen hesabınızla yeniden giriş yapın.'
+            : err?.message || 'Bağlantınızı kontrol edip tekrar deneyin.';
+        throw new Error('PDF buluta kaydedilemedi; diğer cihazlarda henüz açılamaz. ' + detail);
     }
 }
 

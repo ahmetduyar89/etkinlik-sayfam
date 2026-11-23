@@ -93,7 +93,7 @@ import { LinearGraphTool } from '../tools/LinearGraphTool';
 import { MathFormulaTool } from '../tools/MathFormulaTool';
 import { PdfViewerTool } from '../tools/PdfViewerTool';
 import { PdfPageBackground } from './PdfPageBackground';
-import { savePdfToDB, getPdfDocument, loadPdfFromDB, uploadPdfToCloud, clearPdfDocCache } from '../../lib/pdfStorage';
+import { savePdfToDB, getPdfDocument, loadPdfFromDB, uploadPdfToCloud } from '../../lib/pdfStorage';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
@@ -113,7 +113,7 @@ interface NotebookEditorProps {
     notebook: Notebook;
     onClose: () => void;
     /** Defterin üst verisini (ad, kağıt, zemin, sayfa sayısı) günceller. */
-    onMetaChange: (patch: Partial<Notebook>) => void;
+    onMetaChange: (patch: Partial<Notebook>) => Promise<void>;
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -133,7 +133,11 @@ const PAPER_GROUPS = PAPER_STYLES.reduce<
     return groups;
 }, []);
 
-export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEditorProps) {
+export function NotebookEditor({ notebook, onClose, onMetaChange: persistMeta }: NotebookEditorProps) {
+    const onMetaChange = (patch: Partial<Notebook>) => {
+        // Basit menü işlemlerindeki hata üst bileşende gösterilir.
+        void persistMeta(patch).catch(() => undefined);
+    };
     const canvasRef = React.useRef<DrawingCanvasHandle>(null);
 
     // Defter tam ekran açılır; kurulu uygulamada saat/pil şeridi üst şeridin
@@ -303,24 +307,25 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const [showOutlineModal, setShowOutlineModal] = React.useState(false);
     const [showPdfDebug, setShowPdfDebug] = React.useState(false);
 
-    // Çoklu cihaz bulut eşitlemesi:
-    // Bu cihazda PDF varsa ve henüz buluta yüklenmemişse VEYA buluttaki kopya eksik/0-byte ise arka planda Firebase Storage'a yükle
+    const onMetaChangeRef = React.useRef(persistMeta);
+    onMetaChangeRef.current = persistMeta;
+    // Önceki sürümlerde yalnız bu bilgisayarda kalan PDF'leri kurtar.
     React.useEffect(() => {
-        if (!notebook.pdf_id) return;
-        loadPdfFromDB(notebook.pdf_id).then((buffer) => {
-            if (!buffer || buffer.byteLength === 0) return;
-            const needsUpload = !notebook.pdf_url || !notebook.pdf_size || notebook.pdf_size === 0;
-            if (needsUpload) {
-                clearPdfDocCache(notebook.pdf_id);
-                uploadPdfToCloud(notebook.pdf_id!, notebook.pdf_name || 'belge.pdf', buffer.slice(0)).then(({ url, path, size }) => {
-                    if (url && size > 0) {
-                        onMetaChange({ pdf_url: url, pdf_storage_path: path, pdf_size: size });
-                        toast.success('PDF bulut ile eşitlendi, tüm cihazlarınızda hazır.');
-                    }
-                });
-            }
+        const pdfId = notebook.pdf_id;
+        if (!pdfId || (notebook.pdf_url && notebook.pdf_size)) return;
+        let cancelled = false;
+        (async () => {
+            const buffer = await loadPdfFromDB(pdfId);
+            if (cancelled || !buffer?.byteLength) return;
+            const { url, path, size } = await uploadPdfToCloud(pdfId, notebook.pdf_name || 'belge.pdf', buffer);
+            if (cancelled) return;
+            await onMetaChangeRef.current({ pdf_url: url, pdf_storage_path: path, pdf_size: size });
+            if (!cancelled) toast.success('PDF bulut ile eşitlendi, tüm cihazlarınızda hazır.');
+        })().catch((err) => {
+            if (!cancelled) toast.error(err?.message || 'PDF eşitlenemedi. Defteri yeniden açıp tekrar deneyin.');
         });
-    }, [notebook.pdf_id, notebook.pdf_url, notebook.pdf_size, notebook.pdf_name, onMetaChange]);
+        return () => { cancelled = true; };
+    }, [notebook.pdf_id, notebook.pdf_url, notebook.pdf_size, notebook.pdf_name, toast]);
 
     const handleToggleBookmark = (pageNum: number) => {
         const curBookmarks = notebook.pdf_bookmarks || [];
@@ -1193,6 +1198,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 i < numPages ? i + 1 : null
             );
 
+            const { url, path, size } = await uploadPdfToCloud(pdfId, file.name, file);
+
             if (numPages > pageInfo.total) {
                 setBoxesByPage((prev) => {
                     const next = [...prev];
@@ -1204,28 +1211,20 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 }
             }
 
-            onMetaChange({
+            await persistMeta({
                 pdf_id: pdfId,
                 pdf_name: file.name,
                 pdf_total_pages: numPages,
                 pdf_box,
                 pdf_page_map,
-                pdf_size: file.size,
+                pdf_url: url,
+                pdf_storage_path: path,
+                pdf_size: size,
                 page_count: totalAfterAttach,
             });
 
-            // Buluta yükleme (Tüm cihazlarda anında açılabilmesi için) - Orijinal file (Blob) kullanılır
-            uploadPdfToCloud(pdfId, file.name, file).then(({ url, path, size, error }) => {
-                if (url && size > 0) {
-                    onMetaChange({ pdf_url: url, pdf_storage_path: path, pdf_size: size });
-                    toast.success('PDF bulut ile eşitlendi, tüm cihazlarınızda hazır.');
-                } else if (error) {
-                    console.warn('PDF buluta yüklenemedi:', error);
-                }
-            });
-
             window.setTimeout(() => canvasRef.current?.fitPage(), 80);
-            toast.success(`"${file.name}" deftere bağlandı (${numPages} sayfa).`);
+            toast.success(`"${file.name}" deftere bağlandı ve buluta kaydedildi (${numPages} sayfa).`);
         } catch (err: any) {
             toast.error('PDF eklenemedi: ' + (err?.message || 'Hata'));
         }
@@ -2079,7 +2078,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                                     onCloudUrlReady={
                                         isCurrent
                                             ? (url, path, size) =>
-                                                  onMetaChange({
+                                                  persistMeta({
                                                       pdf_url: url,
                                                       pdf_storage_path: path,
                                                       ...(size ? { pdf_size: size } : {}),
@@ -2105,7 +2104,7 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             box={pdfBox}
                             onCanvasReady={handlePdfCanvas}
                             onCloudUrlReady={(url, path, size) =>
-                                onMetaChange({
+                                persistMeta({
                                     pdf_url: url,
                                     pdf_storage_path: path,
                                     ...(size ? { pdf_size: size } : {}),
