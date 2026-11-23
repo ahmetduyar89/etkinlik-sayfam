@@ -7,7 +7,7 @@
 import React from 'react';
 import { FileUp, Loader2, AlertCircle, DownloadCloud, Cloud } from 'lucide-react';
 import type { Viewport } from '../../types';
-import { getPdfDocument, savePdfToDB, uploadPdfToCloud } from '../../lib/pdfStorage';
+import { getPdfDocument, savePdfToDB, uploadPdfToCloud, clearPdfDocCache } from '../../lib/pdfStorage';
 import { useToast } from '../common/ToastProvider';
 
 interface PdfPageBackgroundProps {
@@ -32,7 +32,7 @@ interface PdfPageBackgroundProps {
     /** İşlenmiş sayfa tuvalini dışarı verir (PNG çıktısına PDF de girsin). */
     onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
     onRebindSuccess?: () => void;
-    onCloudUrlReady?: (url: string, path: string) => void;
+    onCloudUrlReady?: (url: string, path: string, size?: number) => void;
     onDocLoaded?: (doc: any) => void;
     onMissingChange?: (missing: boolean) => void;
 }
@@ -116,11 +116,20 @@ export function PdfPageBackground({
                 if (!isMounted) return;
                 setIsLoading(false);
                 setDownloadProgress(null);
-                if (err?.message?.includes('PDF verisi bulunamadı') || err?.message?.includes('buluttan indirilemedi')) {
+                const msg = err?.message || '';
+                if (
+                    msg.includes('PDF verisi bulunamadı') ||
+                    msg.includes('buluttan indirilemedi') ||
+                    msg.includes('zero bytes') ||
+                    msg.includes('is empty') ||
+                    msg.includes('boş') ||
+                    msg.includes('Invalid PDF') ||
+                    msg.includes('FormatError')
+                ) {
                     setMissingInDb(true);
                     onMissingChangeRef.current?.(true);
                 } else {
-                    setError('PDF dokümanı yüklenemedi: ' + (err?.message || 'Bilinmeyen hata'));
+                    setError('PDF dokümanı yüklenemedi: ' + msg);
                 }
             }
         })();
@@ -273,10 +282,11 @@ export function PdfPageBackground({
         try {
             setIsLoading(true);
             const buffer = await file.arrayBuffer();
-            await savePdfToDB(pdfId, file.name, buffer);
+            await savePdfToDB(pdfId, file.name, buffer.slice(0));
             setMissingInDb(false);
             onMissingChange?.(false);
-            const doc = await getPdfDocument(pdfId, buffer);
+            clearPdfDocCache(pdfId);
+            const doc = await getPdfDocument(pdfId, buffer.slice(0));
             pdfDocRef.current = doc;
             lastRenderedKeyRef.current = '';
             setIsLoading(false);
@@ -288,9 +298,9 @@ export function PdfPageBackground({
             onDocLoadedRef.current?.(doc);
 
             // Arka planda Firebase Storage'a yükleyerek diğer tüm cihazlar için de hazırla!
-            uploadPdfToCloud(pdfId, file.name, buffer).then(({ url, path }) => {
-                if (url) {
-                    onCloudUrlReady?.(url, path);
+            uploadPdfToCloud(pdfId, file.name, file).then(({ url, path, size }) => {
+                if (url && size > 0) {
+                    onCloudUrlReady?.(url, path, size);
                     toast.success('PDF bulut ile eşitlendi, diğer tüm cihazlarda açılmaya hazır.');
                 }
             });

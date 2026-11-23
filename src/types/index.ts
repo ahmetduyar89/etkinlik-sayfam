@@ -727,6 +727,8 @@ export interface Notebook {
     pdf_url?: string;
     /** Firebase Storage yolu */
     pdf_storage_path?: string;
+    /** PDF dosya boyutu (byte cinsinden) */
+    pdf_size?: number;
     /** PDF sayfa döndürme açıları (1 tabanlı sayfa numarası -> derece: 0, 90, 180, 270) */
     pdf_rotations?: Record<number, number>;
     /** PDF yer imleri (1 tabanlı sayfa numaraları dizisi) */

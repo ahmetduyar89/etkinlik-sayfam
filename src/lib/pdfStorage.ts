@@ -27,12 +27,19 @@ export function openPdfDB(): Promise<IDBDatabase> {
     });
 }
 
-export async function savePdfToDB(id: string, name: string, data: ArrayBuffer): Promise<void> {
+export async function savePdfToDB(id: string, name: string, data: ArrayBuffer | Uint8Array): Promise<void> {
+    const buffer = data instanceof Uint8Array
+        ? (data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer)
+        : data.slice(0);
+    if (!buffer || buffer.byteLength === 0) {
+        console.warn('savePdfToDB: 0 byte veri kaydedilmeye çalışıldı, atlandı.');
+        return;
+    }
     const db = await openPdfDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(DB_STORE, 'readwrite');
         const store = tx.objectStore(DB_STORE);
-        const req = store.put({ id, name, data, updatedAt: Date.now() });
+        const req = store.put({ id, name, data: buffer, updatedAt: Date.now() });
         req.onsuccess = () => resolve();
         req.onerror = () => reject(req.error);
     });
@@ -42,10 +49,23 @@ export async function loadPdfFromDB(id: string): Promise<ArrayBuffer | null> {
     try {
         const db = await openPdfDB();
         return new Promise((resolve) => {
-            const tx = db.transaction(DB_STORE, 'readonly');
+            const tx = db.transaction(DB_STORE, 'readwrite');
             const store = tx.objectStore(DB_STORE);
             const req = store.get(id);
-            req.onsuccess = () => resolve(req.result?.data || null);
+            req.onsuccess = () => {
+                const item = req.result;
+                const data = item?.data;
+                if (data && data instanceof ArrayBuffer && data.byteLength > 0) {
+                    resolve(data);
+                } else {
+                    if (item) {
+                        try {
+                            store.delete(id);
+                        } catch {}
+                    }
+                    resolve(null);
+                }
+            };
             req.onerror = () => resolve(null);
         });
     } catch {
@@ -119,22 +139,48 @@ export function ensurePdfjsLoaded(): Promise<any> {
 
 /**
  * PDF dosyasını Firebase Storage'a yükler ve indirme bağlantısını döner.
- * Böylece yüklenen PDF kullanıcının tüm cihazlarında (iPad, akıllı tahta, laptop, telefon) görünür.
+ * data parametresi File, Blob, ArrayBuffer veya Uint8Array kabul eder.
+ * Dosya boyutu 0 byte ise yükleme yapılmaz ve hata döndürülür.
  */
 export async function uploadPdfToCloud(
     id: string,
     name: string,
-    data: ArrayBuffer,
+    data: ArrayBuffer | Blob | Uint8Array,
     onProgress?: (ratio: number) => void
-): Promise<{ url: string; path: string; error?: string }> {
+): Promise<{ url: string; path: string; size: number; error?: string }> {
     try {
+        let blob: Blob;
+        let size = 0;
+
+        if (data instanceof Blob) {
+            blob = data;
+            size = data.size;
+        } else if (data instanceof Uint8Array) {
+            size = data.byteLength;
+            blob = new Blob([data.slice()], {
+                type: 'application/pdf',
+            });
+        } else if (data instanceof ArrayBuffer) {
+            size = data.byteLength;
+            blob = new Blob([data.slice(0)], { type: 'application/pdf' });
+        } else {
+            throw new Error('Geçersiz PDF veri formatı');
+        }
+
+        if (!size || size === 0) {
+            console.error(`[uploadPdfToCloud] PDF verisi boş (0 bytes)! id=${id}, name=${name}`);
+            return { url: '', path: '', size: 0, error: 'Yüklenecek PDF verisi boş (0 byte).' };
+        }
+
         const sanitizedName = name.replace(/[^a-zA-Z0-9._-]/g, '_') || 'document.pdf';
         const storagePath = `notebooks/pdfs/${id}/${sanitizedName}`;
         const storageRef = ref(storage, storagePath);
-        const blob = new Blob([data], { type: 'application/pdf' });
 
         await new Promise<void>((resolve, reject) => {
-            const task = uploadBytesResumable(storageRef, blob, { contentType: 'application/pdf' });
+            const task = uploadBytesResumable(storageRef, blob, {
+                contentType: 'application/pdf',
+                customMetadata: { originalName: name, originalSize: String(size) },
+            });
             task.on(
                 'state_changed',
                 (snapshot) => {
@@ -148,10 +194,10 @@ export async function uploadPdfToCloud(
         });
 
         const url = await getDownloadURL(storageRef);
-        return { url, path: storagePath };
+        return { url, path: storagePath, size };
     } catch (err: any) {
         console.warn('PDF Firebase Storage yükleme uyarısı:', err);
-        return { url: '', path: '', error: err?.message || 'Bulut yükleme hatası' };
+        return { url: '', path: '', size: 0, error: err?.message || 'Bulut yükleme hatası' };
     }
 }
 
@@ -215,9 +261,15 @@ export async function fetchAndCachePdf(
         buffer = await res.arrayBuffer();
     }
 
+    if (!buffer || buffer.byteLength === 0) {
+        // İndirilen dosya boş (0 bytes) ise IndexedDB'ye kaydetme ve eski bozuk kaydı temizle
+        await deletePdfFromDB(id);
+        throw new Error('The PDF file is empty, i.e. its size is zero bytes.');
+    }
+
     // Yerel IndexedDB'ye hemen önbellekle (sonraki açılışlarda anında yüklensin)
     try {
-        await savePdfToDB(id, name, buffer);
+        await savePdfToDB(id, name, buffer.slice(0));
     } catch (e) {
         console.warn('PDF IndexedDB önbellekleme hatası:', e);
     }
@@ -238,19 +290,29 @@ export async function getPdfDocument(
     }
 
     const loadPromise = (async () => {
-        const pdfjs = await ensurePdfjsLoaded();
-        let buffer: ArrayBuffer | null | undefined = data;
-        if (!buffer) {
-            buffer = await loadPdfFromDB(id);
+        try {
+            const pdfjs = await ensurePdfjsLoaded();
+            let buffer: ArrayBuffer | null | undefined = data ? data.slice(0) : undefined;
+            if (!buffer || buffer.byteLength === 0) {
+                buffer = await loadPdfFromDB(id);
+            }
+            if ((!buffer || buffer.byteLength === 0) && fallbackUrl) {
+                buffer = await fetchAndCachePdf(id, fallbackUrl, 'cloud-doc.pdf', onProgress);
+            }
+            if (!buffer || buffer.byteLength === 0) {
+                throw new Error('PDF verisi bulunamadı');
+            }
+
+            // PDF.js worker transferi sırasında ana buffer'ın nötrleşmesini (neutered / 0 byte)
+            // önlemek için worker'a kopya TypedArray geçiriyoruz.
+            const workerData = new Uint8Array(buffer.slice(0));
+            const loadingTask = pdfjs.getDocument({ data: workerData });
+            return await loadingTask.promise;
+        } catch (err) {
+            // Hata durumunda cache'i temizle ki tekrar denendiğinde takılı kalmasın
+            docCache.delete(id);
+            throw err;
         }
-        if (!buffer && fallbackUrl) {
-            buffer = await fetchAndCachePdf(id, fallbackUrl, 'cloud-doc.pdf', onProgress);
-        }
-        if (!buffer) {
-            throw new Error('PDF verisi bulunamadı');
-        }
-        const loadingTask = pdfjs.getDocument({ data: buffer });
-        return loadingTask.promise;
     })();
 
     docCache.set(id, loadPromise);

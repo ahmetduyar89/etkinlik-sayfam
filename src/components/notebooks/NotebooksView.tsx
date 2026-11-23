@@ -279,10 +279,10 @@ export function NotebooksView() {
             const pdfId = 'pdf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
 
             // IndexedDB'ye yerel olarak kaydet (sıfır Firestore kotası)
-            await savePdfToDB(pdfId, file.name, buffer);
+            await savePdfToDB(pdfId, file.name, buffer.slice(0));
 
             // Sayfa sayısını ve ilk sayfanın ölçüsünü algıla
-            const doc = await getPdfDocument(pdfId, buffer);
+            const doc = await getPdfDocument(pdfId, buffer.slice(0));
             const numPages = doc.numPages || 1;
             // Sayfa kutusu PDF'in kendi punto ölçüsünden bir kez hesaplanır;
             // böylece defter hangi ekranda açılırsa açılsın aynı boyutta durur.
@@ -304,15 +304,17 @@ export function NotebooksView() {
                 pdf_total_pages: numPages,
                 pdf_box,
                 pdf_page_map,
+                pdf_size: file.size,
                 updated_at: new Date().toISOString(),
             });
 
-            // Buluta yükleme (Tüm cihazlarda otomatik görünür olması için)
-            uploadPdfToCloud(pdfId, file.name, buffer).then(({ url, path, error }) => {
-                if (url) {
+            // Buluta yükleme (Tüm cihazlarda otomatik görünür olması için) - Neutering olmaması için orijinal File nesnesi verilir
+            uploadPdfToCloud(pdfId, file.name, file).then(({ url, path, size, error }) => {
+                if (url && size > 0) {
                     notebooksHandler.update(ref.id, {
                         pdf_url: url,
                         pdf_storage_path: path,
+                        pdf_size: size,
                     });
                 } else if (error) {
                     console.warn('PDF buluta yüklenemedi:', error);

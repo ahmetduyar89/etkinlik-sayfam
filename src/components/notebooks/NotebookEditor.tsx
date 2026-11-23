@@ -93,7 +93,7 @@ import { LinearGraphTool } from '../tools/LinearGraphTool';
 import { MathFormulaTool } from '../tools/MathFormulaTool';
 import { PdfViewerTool } from '../tools/PdfViewerTool';
 import { PdfPageBackground } from './PdfPageBackground';
-import { savePdfToDB, getPdfDocument, loadPdfFromDB, uploadPdfToCloud } from '../../lib/pdfStorage';
+import { savePdfToDB, getPdfDocument, loadPdfFromDB, uploadPdfToCloud, clearPdfDocCache } from '../../lib/pdfStorage';
 import { firestoreErrorMessage } from './errors';
 import type {
     DrawConfig,
@@ -304,20 +304,23 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
     const [showPdfDebug, setShowPdfDebug] = React.useState(false);
 
     // Çoklu cihaz bulut eşitlemesi:
-    // Bu cihazda PDF varsa ve henüz buluta yüklenmemişse arka planda Firebase Storage'a yükle
+    // Bu cihazda PDF varsa ve henüz buluta yüklenmemişse VEYA buluttaki kopya eksik/0-byte ise arka planda Firebase Storage'a yükle
     React.useEffect(() => {
-        if (notebook.pdf_id && !notebook.pdf_url) {
-            loadPdfFromDB(notebook.pdf_id).then((buffer) => {
-                if (buffer) {
-                    uploadPdfToCloud(notebook.pdf_id!, notebook.pdf_name || 'belge.pdf', buffer).then(({ url, path }) => {
-                        if (url) {
-                            onMetaChange({ pdf_url: url, pdf_storage_path: path });
-                        }
-                    });
-                }
-            });
-        }
-    }, [notebook.pdf_id, notebook.pdf_url, notebook.pdf_name, onMetaChange]);
+        if (!notebook.pdf_id) return;
+        loadPdfFromDB(notebook.pdf_id).then((buffer) => {
+            if (!buffer || buffer.byteLength === 0) return;
+            const needsUpload = !notebook.pdf_url || !notebook.pdf_size || notebook.pdf_size === 0;
+            if (needsUpload) {
+                clearPdfDocCache(notebook.pdf_id);
+                uploadPdfToCloud(notebook.pdf_id!, notebook.pdf_name || 'belge.pdf', buffer.slice(0)).then(({ url, path, size }) => {
+                    if (url && size > 0) {
+                        onMetaChange({ pdf_url: url, pdf_storage_path: path, pdf_size: size });
+                        toast.success('PDF bulut ile eşitlendi, tüm cihazlarınızda hazır.');
+                    }
+                });
+            }
+        });
+    }, [notebook.pdf_id, notebook.pdf_url, notebook.pdf_size, notebook.pdf_name, onMetaChange]);
 
     const handleToggleBookmark = (pageNum: number) => {
         const curBookmarks = notebook.pdf_bookmarks || [];
@@ -1179,8 +1182,8 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
             toast.info('PDF işleniyor ve sayfalara bağlanıyor…');
             const buffer = await file.arrayBuffer();
             const pdfId = 'pdf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-            await savePdfToDB(pdfId, file.name, buffer);
-            const doc = await getPdfDocument(pdfId, buffer);
+            await savePdfToDB(pdfId, file.name, buffer.slice(0));
+            const doc = await getPdfDocument(pdfId, buffer.slice(0));
             const numPages = doc.numPages || 1;
             const firstPage = await doc.getPage(1);
             const pt = firstPage.getViewport({ scale: 1 });
@@ -1207,13 +1210,14 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                 pdf_total_pages: numPages,
                 pdf_box,
                 pdf_page_map,
+                pdf_size: file.size,
                 page_count: totalAfterAttach,
             });
 
-            // Buluta yükleme (Tüm cihazlarda anında açılabilmesi için)
-            uploadPdfToCloud(pdfId, file.name, buffer).then(({ url, path, error }) => {
-                if (url) {
-                    onMetaChange({ pdf_url: url, pdf_storage_path: path });
+            // Buluta yükleme (Tüm cihazlarda anında açılabilmesi için) - Orijinal file (Blob) kullanılır
+            uploadPdfToCloud(pdfId, file.name, file).then(({ url, path, size, error }) => {
+                if (url && size > 0) {
+                    onMetaChange({ pdf_url: url, pdf_storage_path: path, pdf_size: size });
                     toast.success('PDF bulut ile eşitlendi, tüm cihazlarınızda hazır.');
                 } else if (error) {
                     console.warn('PDF buluta yüklenemedi:', error);
@@ -2074,10 +2078,11 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                                     onCanvasReady={isCurrent ? handlePdfCanvas : undefined}
                                     onCloudUrlReady={
                                         isCurrent
-                                            ? (url, path) =>
+                                            ? (url, path, size) =>
                                                   onMetaChange({
                                                       pdf_url: url,
                                                       pdf_storage_path: path,
+                                                      ...(size ? { pdf_size: size } : {}),
                                                   })
                                             : undefined
                                     }
@@ -2099,8 +2104,12 @@ export function NotebookEditor({ notebook, onClose, onMetaChange }: NotebookEdit
                             canvasSize={canvasSize}
                             box={pdfBox}
                             onCanvasReady={handlePdfCanvas}
-                            onCloudUrlReady={(url, path) =>
-                                onMetaChange({ pdf_url: url, pdf_storage_path: path })
+                            onCloudUrlReady={(url, path, size) =>
+                                onMetaChange({
+                                    pdf_url: url,
+                                    pdf_storage_path: path,
+                                    ...(size ? { pdf_size: size } : {}),
+                                })
                             }
                             onDocLoaded={(doc) => setPdfDocInstance(doc)}
                             onMissingChange={(missing) => setIsPdfMissing(missing)}
