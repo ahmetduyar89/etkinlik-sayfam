@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Güvenli Sokak | Atölye</title>
+<meta name="description" content="Trafik ışığında karşıdan karşıya geçme, trafik işaretleri, güvenli okul yolu haritası ve bisiklet güvenliği.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚦</text></svg>">
+<link rel="stylesheet" href="/shared/ilkokul.css">
+<style>
+  :root { --ik-accent: #16a34a; --ik-accent-2: #facc15; }
+  .scene { width: 100%; height: auto; display: block; border-radius: 18px; background: #bbf7d0; }
+  .steps { display: flex; flex-direction: column; gap: 6px; }
+  .step { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 14px; background: #f8f5ef; font-weight: 700; }
+  .step.done { background: var(--ik-ok-bg); color: #146c41; }
+  .step .ck { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: #fff; border: 2px solid var(--ik-line); font-size: 14px; flex-shrink: 0; }
+  .step.done .ck { background: var(--ik-ok); border-color: var(--ik-ok); color: #fff; }
+  .sign-wrap { display: grid; place-items: center; min-height: 220px; }
+  .sign-wrap svg { width: 190px; height: 190px; filter: drop-shadow(0 10px 14px rgba(0,0,0,.18)); }
+  .sign-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; }
+  .sign-gallery button { border: 2px solid var(--ik-line); background: #fff; border-radius: 16px; padding: 8px; font-size: 12px; font-weight: 800; }
+  .sign-gallery svg { width: 60px; height: 60px; display: block; margin: 0 auto 4px; }
+  .map { display: grid; gap: 3px; background: #94a3b8; padding: 3px; border-radius: 16px; touch-action: manipulation; user-select: none; }
+  .cell { aspect-ratio: 1; border: 0; padding: 0; font-size: clamp(16px, 3.6vw, 30px); display: grid; place-items: center; position: relative; border-radius: 6px; }
+  .cell.g { background: #bbf7d0; } .cell.w { background: #e7e5e4; } .cell.r { background: #475569; } .cell.z { background: repeating-linear-gradient(90deg, #f8fafc 0 7px, #475569 7px 14px); }
+  .cell.zv { background: repeating-linear-gradient(0deg, #f8fafc 0 7px, #475569 7px 14px); }
+  .cell.path::after { content: ''; position: absolute; inset: 22%; border-radius: 50%; background: #f97316; box-shadow: 0 0 0 4px rgba(249,115,22,.3); }
+  .cell.path.e::after { display: none; }
+  .cell.last { outline: 3px solid #f97316; outline-offset: -3px; }
+  .gear { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+  .gear button { border: 2px solid var(--ik-line); background: #fff; border-radius: 18px; padding: 10px; font-weight: 800; box-shadow: 0 3px 0 var(--ik-line); }
+  .gear button .em { font-size: 38px; display: block; }
+  .gear button.on { border-color: var(--ik-ok); background: var(--ik-ok-bg); }
+  .gear button.no { border-color: var(--ik-bad); background: var(--ik-bad-bg); }
+  .rider { font-size: 90px; text-align: center; line-height: 1.1; }
+  .tf { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .tf .ik-choice { font-size: 34px; min-height: 80px; }
+  .scen { font-size: 19px; font-weight: 800; display: flex; gap: 12px; align-items: center; min-height: 80px; }
+  .scen .em { font-size: 52px; }
+</style>
+</head>
+<body>
+<header class="ik-top">
+  <div class="ik-brand">
+    <div class="ik-logo">🚦</div>
+    <div><h1>Güvenli Sokak</h1><p>Trafik güvenliği parkı</p></div>
+  </div>
+  <nav class="ik-tabs" role="tablist">
+    <button class="ik-tab" data-tab="gecit"><span class="e">🚸</span>Karşıya Geç</button>
+    <button class="ik-tab" data-tab="isaret"><span class="e">⛔</span>İşaretler</button>
+    <button class="ik-tab" data-tab="yol"><span class="e">🗺️</span>Okul Yolu</button>
+    <button class="ik-tab" data-tab="bisiklet"><span class="e">🚲</span>Güvenli Yolcu</button>
+  </nav>
+  <span class="ik-stars">⭐ <span id="ik-stars">0</span></span>
+</header>
+
+<main class="ik-main">
+  <!-- GEÇİT -->
+  <section class="ik-panel" data-panel="gecit">
+    <div class="ik-head"><div><h2>Karşıdan Karşıya Geçelim</h2><p>Kaldırımda dur, sola-sağa-sola bak ve yaya ışığı <b style="color:#16a34a">yeşil</b> yanınca yaya geçidinden geç.</p></div></div>
+    <div class="ik-grid two">
+      <div class="ik-card" style="padding:10px"><svg class="scene" id="scene" viewBox="0 0 600 380"></svg></div>
+      <div class="ik-card">
+        <div class="steps" id="steps"></div>
+        <div class="ik-row" style="margin-top:14px">
+          <button class="ik-btn blue" id="look-l">👈 Sola bak</button>
+          <button class="ik-btn blue" id="look-r">👉 Sağa bak</button>
+          <button class="ik-btn" id="cross">🚶 Karşıya geç</button>
+        </div>
+        <div class="ik-feedback" id="cross-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- İŞARETLER -->
+  <section class="ik-panel" data-panel="isaret">
+    <div class="ik-head"><div><h2>Trafik İşaretleri</h2><p>İşaretlerin şekli ve rengi bize bir şey söyler. Önce tanı, sonra oyunu oyna!</p></div>
+      <div class="ik-row"><button class="ik-btn ghost" id="sg-learn">📖 Tanı</button><button class="ik-btn" id="sg-play">🎯 Oyna</button></div></div>
+    <div id="sg-learn-box" class="ik-card"><div class="sign-gallery" id="sg-gallery"></div><p class="words" id="sg-info" style="text-align:center;margin:16px 0 0;font-size:18px">Bir işarete dokun 👆</p></div>
+    <div id="sg-play-box" class="ik-grid two" style="display:none">
+      <div class="ik-card sign-wrap" id="sg-show"></div>
+      <div class="ik-card"><div class="ik-label">Bu işaret ne anlama gelir?</div><div class="ik-choices" id="sg-choices" style="grid-template-columns:1fr;margin-top:10px"></div><div class="ik-feedback" id="sg-fb"></div></div>
+    </div>
+  </section>
+
+  <!-- YOL -->
+  <section class="ik-panel" data-panel="yol">
+    <div class="ik-head"><div><h2>Güvenli Okul Yolu</h2><p>🏠 Evden 🏫 okula yan yana karelere dokunarak yol çiz. Yoldan sadece <b>yaya geçidi</b> çizgilerinden geçebilirsin!</p></div>
+      <div class="ik-row"><button class="ik-btn ghost" id="map-undo">↩ Geri al</button><button class="ik-btn ghost" id="map-new">🗺️ Yeni harita</button></div></div>
+    <div class="ik-grid two">
+      <div class="ik-card" style="padding:12px"><div class="map" id="map"></div></div>
+      <div class="ik-card">
+        <div class="ik-label">Harita anahtarı</div>
+        <div class="ik-row" style="margin:10px 0 16px;gap:8px">
+          <span class="ik-chip">🟩 Çim / park</span><span class="ik-chip">⬜ Kaldırım</span><span class="ik-chip">⬛ Taşıt yolu</span><span class="ik-chip">🦓 Yaya geçidi</span><span class="ik-chip">🚧 Çalışma var</span>
+        </div>
+        <div class="ik-big" id="map-count">0 adım</div>
+        <div class="ik-feedback" id="map-fb">Evden başla!</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BİSİKLET -->
+  <section class="ik-panel" data-panel="bisiklet">
+    <div class="ik-head"><div><h2>Güvenli Yolcu</h2><p>Bisiklete binmeden önce doğru eşyaları seç. Sonra davranışların güvenli olup olmadığına karar ver.</p></div></div>
+    <div class="ik-grid half">
+      <div class="ik-card">
+        <div class="ik-label">Bisiklet çantamı hazırlıyorum</div>
+        <div class="rider" id="rider">🚴</div>
+        <div class="gear" id="gear"></div>
+        <div class="ik-feedback" id="gear-fb"></div>
+      </div>
+      <div class="ik-card">
+        <div class="ik-label">Güvenli mi? <span id="tf-count" class="ik-chip" style="margin-left:6px">1/10</span></div>
+        <div class="scen" id="scen"></div>
+        <div class="tf"><button class="ik-choice" id="tf-yes" aria-label="Güvenli">👍</button><button class="ik-choice" id="tf-no" aria-label="Güvenli değil">👎</button></div>
+        <div class="ik-feedback" id="tf-fb"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="/shared/ilkokul.js"></script>
+<script>
+const { $, $$, el, say, pick, shuffle, rand } = IK;
+IK.tabs();
+
+/* ═════ KARŞIYA GEÇ ═════ */
+const STEPS = ['Kaldırımda dur', 'Sola bak', 'Sağa bak', 'Tekrar sola bak', 'Yeşil ışıkta yaya geçidinden geç'];
+let done = 0, light = 'red', crossing = false, cars = [];
+function drawSteps() { $('#steps').innerHTML = STEPS.map((s, i) => `<div class="step ${i < done ? 'done' : ''}"><span class="ck">${i < done ? '✓' : i + 1}</span>${s}</div>`).join(''); }
+function scene(kidY, look) {
+  const pedRed = light === 'red';
+  let s = `<rect width="600" height="380" fill="#bbf7d0"/>
+  <rect x="0" y="60" width="600" height="40" fill="#e7e5e4"/><rect x="0" y="280" width="600" height="40" fill="#e7e5e4"/>
+  <rect x="0" y="100" width="600" height="180" fill="#475569"/>
+  <line x1="0" y1="190" x2="600" y2="190" stroke="#facc15" stroke-width="5" stroke-dasharray="30 22"/>`;
+  for (let i = 0; i < 8; i++) s += `<rect x="250" y="${106 + i * 22}" width="100" height="13" fill="#f8fafc"/>`;
+  s += `<text x="80" y="45" font-size="40">🏠</text><text x="480" y="45" font-size="40">🌳</text><text x="80" y="365" font-size="40">🌳</text><text x="470" y="365" font-size="40">🏫</text>`;
+  // yaya ışığı
+  s += `<rect x="380" y="290" width="8" height="70" fill="#334155"/><rect x="364" y="236" width="40" height="66" rx="8" fill="#1e293b"/>
+  <circle cx="384" cy="254" r="12" fill="${pedRed ? '#ef4444' : '#450a0a'}"/><circle cx="384" cy="284" r="12" fill="${pedRed ? '#14532d' : '#22c55e'}"/>
+  <text x="376" y="259" font-size="13">${pedRed ? '🧍' : ''}</text><text x="376" y="289" font-size="13">${pedRed ? '' : '🚶'}</text>`;
+  cars.forEach((c) => { s += `<text x="${c.x}" y="${c.y}" font-size="54" transform="${c.dir < 0 ? `scale(-1,1) translate(${-2 * c.x - 60},0)` : ''}">${c.e}</text>`; });
+  s += `<text x="282" y="${kidY}" font-size="42">${look === 'l' ? '👀' : ''}🧒${look === 'r' ? '👀' : ''}</text>`;
+  $('#scene').innerHTML = s;
+}
+let kidY = 312, look = '';
+function tick() {
+  cars.forEach((c) => { c.x += c.dir * c.v; });
+  cars = cars.filter((c) => c.x > -120 && c.x < 720);
+  if (light === 'red' && Math.random() < 0.025 && cars.length < 4) {
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    cars.push({ x: dir > 0 ? -90 : 680, y: dir > 0 ? 175 : 255, dir, v: rand(4, 7), e: pick(['🚗', '🚕', '🚙', '🚌', '🚚']) });
+  }
+  scene(kidY, look);
+  requestAnimationFrame(tick);
+}
+// Işık döngüsü: araçlar yoldan çekilene kadar yeşil yanmaz.
+function cycle() {
+  if (crossing) return setTimeout(cycle, 600);
+  if (light === 'red') {
+    if (cars.length) return setTimeout(cycle, 500);
+    light = 'green'; setTimeout(cycle, 5000);
+  } else { light = 'red'; setTimeout(cycle, 5500); }
+}
+setTimeout(cycle, 4000);
+function fb(t, k) { $('#cross-fb').textContent = t; $('#cross-fb').className = 'ik-feedback ' + (k || ''); }
+function resetCross() { done = 1; kidY = 312; look = ''; drawSteps(); fb('Hazır! Önce sola bak.'); }
+$('#look-l').onclick = () => {
+  if (crossing) return; look = 'l'; setTimeout(() => look = '', 900);
+  if (done === 1) done = 2; else if (done === 3) done = 4; else if (done === 2) { fb('Şimdi sağa bakmalısın.', 'bad'); return; }
+  drawSteps(); fb(done === 4 ? 'Harika! Şimdi ışığa bak.' : 'Sola baktın. Şimdi sağa bak.', 'ok'); IK.beep('tick');
+};
+$('#look-r').onclick = () => {
+  if (crossing) return; look = 'r'; setTimeout(() => look = '', 900);
+  if (done === 2) { done = 3; drawSteps(); fb('Sağa baktın. Bir kez daha sola bak!', 'ok'); IK.beep('tick'); }
+  else fb(done < 2 ? 'Önce sola bakmalısın.' : 'Sağa zaten baktın, şimdi sola bak.', 'bad');
+};
+$('#cross').onclick = () => {
+  if (crossing) return;
+  if (done < 4) { IK.wrong(); fb('Dur! Önce sola, sağa, sonra tekrar sola bakmalısın.', 'bad'); say('Dur! Önce sola, sağa ve tekrar sola bak.'); return; }
+  if (light === 'red' || cars.length) { IK.wrong(); fb('Dur! Yaya ışığı kırmızı. Yeşili bekle. 🛑', 'bad'); say('Dur! Kırmızı ışıkta beklemeliyiz.'); return; }
+  crossing = true;
+  const anim = setInterval(() => {
+    kidY -= 6;
+    if (kidY <= 88) {
+      clearInterval(anim); crossing = false; done = 5; drawSteps();
+      IK.win('Güvenle karşıya geçtin! 🎉'); fb('Süper! Kurallara uyarak geçtin.', 'ok');
+      setTimeout(resetCross, 3500);
+    }
+  }, 40);
+};
+resetCross(); tick();
+
+/* ═════ İŞARETLER ═════ */
+const tri = (inner) => `<svg viewBox="0 0 100 100"><polygon points="50,6 96,90 4,90" fill="#fff" stroke="#dc2626" stroke-width="9" stroke-linejoin="round"/>${inner}</svg>`;
+const circ = (fill, stroke, inner) => `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="${fill}" stroke="${stroke}" stroke-width="8"/>${inner}</svg>`;
+const sq = (fill, inner) => `<svg viewBox="0 0 100 100"><rect x="6" y="6" width="88" height="88" rx="10" fill="${fill}" stroke="#fff" stroke-width="4"/>${inner}</svg>`;
+const SIGNS = [
+  ['Dur', 'Tamamen dur, yolu kontrol et, sonra devam et.', `<svg viewBox="0 0 100 100"><polygon points="30,4 70,4 96,30 96,70 70,96 30,96 4,70 4,30" fill="#dc2626" stroke="#fff" stroke-width="4"/><text x="50" y="62" text-anchor="middle" font-family="Arial" font-weight="900" font-size="28" fill="#fff">DUR</text></svg>`],
+  ['Yaya geçidi', 'Yayalar buradan karşıya geçer. Sürücüler yavaşlamalı.', sq('#2563eb', `<polygon points="50,14 86,82 14,82" fill="#fff"/><text x="50" y="76" text-anchor="middle" font-size="34">🚶</text>`)],
+  ['Okul geçidi', 'Yakında okul var, çocuklar karşıya geçebilir. Dikkat!', tri(`<text x="50" y="80" text-anchor="middle" font-size="34">🚸</text>`)],
+  ['Taşıt giremez', 'Bu yola hiçbir taşıt giremez.', circ('#dc2626', '#dc2626', `<rect x="18" y="42" width="64" height="16" rx="3" fill="#fff"/>`)],
+  ['Bisiklet yolu', 'Burası bisikletliler için ayrılmış bir yoldur.', circ('#2563eb', '#fff', `<text x="50" y="66" text-anchor="middle" font-size="42">🚲</text>`)],
+  ['Hız sınırı 30', 'Burada en fazla saatte 30 km hızla gidilebilir.', circ('#fff', '#dc2626', `<text x="50" y="64" text-anchor="middle" font-family="Arial" font-weight="900" font-size="38" fill="#111">30</text>`)],
+  ['Park yeri', 'Araçlar buraya park edebilir.', sq('#2563eb', `<text x="50" y="72" text-anchor="middle" font-family="Arial" font-weight="900" font-size="60" fill="#fff">P</text>`)],
+  ['Hastane', 'Yakında hastane var, korna çalma, sessiz ol.', sq('#2563eb', `<rect x="20" y="20" width="60" height="60" fill="#fff"/><rect x="43" y="28" width="14" height="44" fill="#dc2626"/><rect x="28" y="43" width="44" height="14" fill="#dc2626"/>`)],
+  ['Otobüs durağı', 'Otobüse binmek için burada beklenir.', sq('#2563eb', `<text x="50" y="68" text-anchor="middle" font-size="46">🚌</text>`)],
+  ['Trafik ışığı var', 'İleride trafik ışığı var, dikkatli ol.', tri(`<rect x="41" y="40" width="18" height="42" rx="4" fill="#111"/><circle cx="50" cy="48" r="5" fill="#ef4444"/><circle cx="50" cy="61" r="5" fill="#facc15"/><circle cx="50" cy="74" r="5" fill="#22c55e"/>`)],
+  ['Yol çalışması', 'İleride yolda çalışma var, yavaş ve dikkatli git.', tri(`<text x="50" y="80" text-anchor="middle" font-size="34">🚧</text>`)],
+  ['Hayvan çıkabilir', 'Yola hayvanlar çıkabilir, yavaşla.', tri(`<text x="50" y="80" text-anchor="middle" font-size="32">🐄</text>`)],
+];
+SIGNS.forEach((s) => {
+  const b = el('button', null, s[2] + s[0]);
+  b.onclick = () => { $('#sg-info').innerHTML = `<b>${s[0]}:</b> ${s[1]}`; say(s[0] + '. ' + s[1]); };
+  $('#sg-gallery').appendChild(b);
+});
+$('#sg-learn').onclick = () => { $('#sg-learn-box').style.display = ''; $('#sg-play-box').style.display = 'none'; };
+$('#sg-play').onclick = () => { $('#sg-learn-box').style.display = 'none'; $('#sg-play-box').style.display = ''; signQ(); };
+let lastSign = -1;
+function signQ() {
+  let i; do i = rand(0, SIGNS.length - 1); while (i === lastSign); lastSign = i;
+  const s = SIGNS[i]; $('#sg-show').innerHTML = s[2]; $('#sg-fb').textContent = '';
+  const opts = shuffle([s, ...shuffle(SIGNS.filter((x) => x !== s)).slice(0, 3)]);
+  const box = $('#sg-choices'); box.innerHTML = '';
+  opts.forEach((o) => {
+    const b = el('button', { class: 'ik-choice' }, o[0]);
+    b.onclick = () => {
+      if (o === s) { b.classList.add('ok'); $('#sg-fb').className = 'ik-feedback ok'; $('#sg-fb').textContent = s[1]; IK.right(); say(s[0]); setTimeout(signQ, 2000); }
+      else { b.classList.add('bad'); IK.wrong(); }
+    };
+    box.appendChild(b);
+  });
+}
+
+/* ═════ OKUL YOLU ═════ */
+// g: çim, w: kaldırım, r: yol, z: yaya geçidi (yatay), v: yaya geçidi (dikey), x: çalışma, h: ev, s: okul, t: ağaç
+const MAPS = [
+  ['hwwwwwwgtg', 'wgtgggwggg', 'rrrrzrrrrr', 'wwwwwwwwgg', 'gtgggxggwg', 'gggggwggwg', 'rrrrrrrrzr', 'gtwwwwwwws'],
+  ['gtggwwwwwh', 'gggxwgtggw', 'rrrrrrrzrr', 'wwwwwwwwwg', 'wgtgxggtgg', 'wggggggggg', 'rzrrrrrrrr', 'wwwwswgtgg'],
+  ['hwwgtggggg', 'gxwwwwwwgt', 'rrrrrrrzrr', 'gggtgwwwgg', 'gtggwwgxgg', 'ggggwggggg', 'rrrrzrrrrr', 'gtggwwwsgt'],
+];
+const EMO = { h: '🏠', s: '🏫', x: '🚧', t: '🌳' };
+let map, path = [], mapIdx = 0;
+function newMap(idx) {
+  mapIdx = idx == null ? (mapIdx + 1) % MAPS.length : idx;
+  map = MAPS[mapIdx].map((r) => r.split(''));
+  const start = []; map.forEach((r, y) => r.forEach((c, x) => { if (c === 'h') start.push(x, y); }));
+  path = [start]; drawMap(); mfb('Evden başla! Yan yana karelere dokun.');
+}
+function mfb(t, k) { $('#map-fb').textContent = t; $('#map-fb').className = 'ik-feedback ' + (k || ''); }
+function drawMap() {
+  const m = $('#map'); m.style.gridTemplateColumns = `repeat(${map[0].length}, 1fr)`; m.innerHTML = '';
+  map.forEach((row, y) => row.forEach((c, x) => {
+    const cls = { g: 'g', t: 'g', x: 'w', h: 'w', s: 'w', w: 'w', r: 'r', z: 'z', v: 'zv' }[c];
+    const onPath = path.findIndex((p) => p[0] === x && p[1] === y);
+    const b = el('button', { class: `cell ${cls} ${onPath >= 0 ? 'path' : ''} ${EMO[c] ? 'e' : ''} ${onPath === path.length - 1 ? 'last' : ''}`, 'aria-label': `${x},${y}` }, EMO[c] || '');
+    b.onclick = () => stepTo(x, y);
+    m.appendChild(b);
+  }));
+  $('#map-count').textContent = (path.length - 1) + ' adım';
+}
+function stepTo(x, y) {
+  const [lx, ly] = path[path.length - 1];
+  const prev = path.findIndex((p) => p[0] === x && p[1] === y);
+  if (prev >= 0) { path = path.slice(0, prev + 1); drawMap(); return; }
+  if (Math.abs(lx - x) + Math.abs(ly - y) !== 1) { mfb('Sadece son karenin yanındaki karelere gidebilirsin.', 'bad'); return; }
+  const c = map[y][x];
+  if (c === 'r') { IK.wrong(); mfb('Dikkat! Taşıt yolunda yürünmez. Yaya geçidini bul. 🦓', 'bad'); say('Dikkat! Yaya geçidini kullan.'); return; }
+  if (c === 'x') { IK.wrong(); mfb('Burada yol çalışması var, etrafından dolaş. 🚧', 'bad'); return; }
+  if (c === 't') { mfb('Ağacın içinden geçemezsin 🌳', 'bad'); return; }
+  // Yaya geçidinden çıkarken yön değiştirmek yok: dümdüz karşıya geç.
+  if ((map[ly][lx] === 'z') && x !== lx) { mfb('Yaya geçidinde dümdüz karşıya yürü!', 'bad'); return; }
+  path.push([x, y]); IK.beep('tick'); drawMap();
+  if (c === 'z') mfb('Yaya geçidindesin: sola, sağa, sola bak! 👀', 'ok');
+  else if (c === 's') { IK.win('Okula güvenle vardın! 🏫'); mfb(`Tebrikler! ${path.length - 1} adımda güvenle geldin.`, 'ok'); }
+  else mfb('Devam et…');
+}
+$('#map-undo').onclick = () => { if (path.length > 1) { path.pop(); drawMap(); } };
+$('#map-new').onclick = () => newMap();
+newMap(0);
+
+/* ═════ GÜVENLİ YOLCU ═════ */
+const GEAR = [['⛑️', 'Kask', 1], ['🦺', 'Reflektörlü yelek', 1], ['🔔', 'Zil', 1], ['🔦', 'Ön far', 1], ['🧤', 'Eldiven', 1], ['🩴', 'Terlik', 0], ['🎧', 'Kulaklık', 0], ['🧣', 'Uzun atkı', 0], ['📱', 'Telefonla oynamak', 0]];
+const chosen = new Set();
+function drawGear() {
+  const box = $('#gear'); box.innerHTML = '';
+  shuffle(GEAR).forEach((g) => {
+    const b = el('button', { class: chosen.has(g[1]) ? 'on' : '' }, `<span class="em">${g[0]}</span>${g[1]}`);
+    b.onclick = () => {
+      if (chosen.has(g[1])) return;
+      if (g[2]) {
+        chosen.add(g[1]); b.classList.add('on'); IK.right(); say(g[1]);
+        $('#rider').textContent = '🚴' + [...chosen].map((n) => GEAR.find((x) => x[1] === n)[0]).join('');
+        const need = GEAR.filter((x) => x[2]).length;
+        $('#gear-fb').className = 'ik-feedback ok';
+        $('#gear-fb').textContent = chosen.size === need ? 'Bisiklet yolculuğuna hazırsın!' : `${chosen.size}/${need} güvenlik eşyası`;
+        if (chosen.size === need) IK.win('Güvenli sürücü! 🚴');
+      } else {
+        b.classList.add('no'); IK.wrong();
+        const why = { 'Terlik': 'Terlik pedaldan kayar, kapalı ayakkabı giy.', 'Kulaklık': 'Kulaklık çevredeki sesleri duymanı engeller.', 'Uzun atkı': 'Uzun atkı tekerleğe dolanabilir.', 'Telefonla oynamak': 'Sürerken gözün hep yolda olmalı.' }[g[1]];
+        $('#gear-fb').className = 'ik-feedback bad'; $('#gear-fb').textContent = why;
+        setTimeout(() => b.classList.remove('no'), 1200);
+      }
+    };
+    box.appendChild(b);
+  });
+}
+drawGear();
+const TF = [
+  ['💺', 'Arabada emniyet kemerimi takarım.', 1], ['⚽', 'Topum yola kaçınca hemen arkasından koşarım.', 0], ['🚌', 'Servis aracında koltuğumda otururum.', 1],
+  ['🪟', 'Arabanın camından kolumu dışarı çıkarırım.', 0], ['👨‍👧', 'Yolda büyüklerimin elini tutarım.', 1], ['🌙', 'Akşam yürürken açık renk ya da ışık yansıtan giysi giyerim.', 1],
+  ['🚗', 'Park etmiş iki arabanın arasından aniden yola çıkarım.', 0], ['🛴', 'Scooter sürerken kask takarım.', 1], ['🚦', 'Sarı ışık yanınca koşarak karşıya geçerim.', 0],
+  ['🧒', '10 yaşından küçüksem arabada arka koltukta otururum.', 1], ['📱', 'Karşıdan karşıya geçerken telefona bakarım.', 0], ['🚏', 'Otobüsten inince otobüsün önünden hemen geçerim.', 0],
+];
+let tfList = [], tfI = 0;
+function tfStart() { tfList = shuffle(TF).slice(0, 10); tfI = 0; tfShow(); }
+function tfShow() {
+  const q = tfList[tfI]; $('#scen').innerHTML = `<span class="em">${q[0]}</span><span>${q[1]}</span>`;
+  $('#tf-count').textContent = `${tfI + 1}/${tfList.length}`; $('#tf-fb').textContent = '';
+  ['#tf-yes', '#tf-no'].forEach((s) => $(s).className = 'ik-choice');
+}
+function tfAnswer(yes) {
+  const q = tfList[tfI]; const ok = !!q[2] === yes;
+  $(yes ? '#tf-yes' : '#tf-no').classList.add(ok ? 'ok' : 'bad');
+  $('#tf-fb').className = 'ik-feedback ' + (ok ? 'ok' : 'bad');
+  $('#tf-fb').textContent = (ok ? 'Doğru! ' : 'Hmm… ') + (q[2] ? 'Bu güvenli bir davranış. 👍' : 'Bu tehlikeli bir davranış. 👎');
+  ok ? IK.right() : IK.wrong();
+  setTimeout(() => { tfI++; if (tfI >= tfList.length) { IK.win('Trafik dedektifi oldun!'); tfStart(); } else tfShow(); }, 1500);
+}
+$('#tf-yes').onclick = () => tfAnswer(true);
+$('#tf-no').onclick = () => tfAnswer(false);
+$('#scen').addEventListener('click', () => say(tfList[tfI][1]));
+tfStart();
+</script>
+</body>
+</html>

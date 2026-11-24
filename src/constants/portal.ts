@@ -16,11 +16,13 @@
 //       Defterlerim → 'notebooks'). Kabuk gerisini halleder.
 // ─────────────────────────────────────────────────────────────────────
 import type { LucideIcon } from 'lucide-react';
-import { BookOpen, Bot, Coins, Crown, Dna, FlaskConical, FolderOpen, Globe, LayoutGrid, Music, NotebookPen, Orbit, Puzzle, School, Shapes, Swords } from 'lucide-react';
+import { BookOpen, Bot, Clock, Coins, Compass, Crown, Dna, FlaskConical, FolderOpen, Globe, HeartHandshake, Languages, LayoutGrid, Music, NotebookPen, Orbit, Palette, Pizza, Puzzle, School, Shapes, Swords, TrafficCone, TrainFront } from 'lucide-react';
 import type { MainView } from '../types';
 
 export type ModuleKind = 'internal' | 'static' | 'folder';
 export type ModuleStatus = 'ready' | 'soon';
+/** Keşif Alanı'ndaki seviye süzgeci için. 'hepsi' her iki süzgeçte de görünür. */
+export type ModuleLevel = 'ilkokul' | 'ortaokul' | 'hepsi';
 
 export interface PortalModule {
     /** Kısa kimlik — URL yolunda ve durum kaydında kullanılır. */
@@ -53,6 +55,8 @@ export interface PortalModule {
      */
     view?: MainView;
     status: ModuleStatus;
+    /** Yalnızca Keşif Alanı çalışmaları için: hangi kademeye uygun olduğu. */
+    level?: ModuleLevel;
 }
 
 export const PORTAL_MODULES: PortalModule[] = [
@@ -152,6 +156,7 @@ export const PORTAL_MODULES: PortalModule[] = [
         kind: 'static',
         href: '/deneyler/',
         status: 'ready',
+        level: 'hepsi',
     },
     {
         id: 'gunes-sistemi',
@@ -168,6 +173,7 @@ export const PORTAL_MODULES: PortalModule[] = [
         kind: 'static',
         href: '/gunes-sistemi/',
         status: 'ready',
+        level: 'hepsi',
     },
     {
         id: 'akil-oyunlari',
@@ -184,6 +190,7 @@ export const PORTAL_MODULES: PortalModule[] = [
         kind: 'static',
         href: '/akil-oyunlari/',
         status: 'ready',
+        level: 'ortaokul',
     },
     {
         id: 'kodlama',
@@ -200,6 +207,7 @@ export const PORTAL_MODULES: PortalModule[] = [
         kind: 'static',
         href: '/kodlama/',
         status: 'ready',
+        level: 'hepsi',
     },
     {
         id: 'insan-vucudu',
@@ -216,6 +224,7 @@ export const PORTAL_MODULES: PortalModule[] = [
         kind: 'static',
         href: '/insan-vucudu/',
         status: 'ready',
+        level: 'ortaokul',
     },
     {
         id: 'geometri',
@@ -232,6 +241,7 @@ export const PORTAL_MODULES: PortalModule[] = [
         kind: 'static',
         href: '/geometri/',
         status: 'ready',
+        level: 'ortaokul',
     },
     {
         id: 'muzik',
@@ -248,6 +258,7 @@ export const PORTAL_MODULES: PortalModule[] = [
         kind: 'static',
         href: '/muzik/',
         status: 'ready',
+        level: 'hepsi',
     },
     {
         id: 'turkce',
@@ -264,6 +275,7 @@ export const PORTAL_MODULES: PortalModule[] = [
         kind: 'static',
         href: '/turkce/',
         status: 'ready',
+        level: 'ortaokul',
     },
     {
         id: 'tarih-atlasi',
@@ -280,6 +292,7 @@ export const PORTAL_MODULES: PortalModule[] = [
         kind: 'static',
         href: '/tarih-atlasi/',
         status: 'ready',
+        level: 'ortaokul',
     },
     {
         id: 'finans-pazar',
@@ -296,6 +309,143 @@ export const PORTAL_MODULES: PortalModule[] = [
         kind: 'static',
         href: '/finans-pazar/',
         status: 'ready',
+        level: 'ortaokul',
+    },
+    {
+        id: 'zaman-makinesi',
+        title: 'Zaman Makinesi',
+        description:
+            'Akrep ve yelkovanı sürükleyerek saat kurma ve okuma, günlük rutini sıralama, aylar ve mevsimler çarkı, süre tahmini oyunları.',
+        meta: 'Saat Okuma · Günüm · Takvim Çarkı · Süre',
+        icon: Clock,
+        accent: {
+            icon: 'from-orange-400 to-amber-500',
+            strip: 'from-orange-300 via-amber-300 to-yellow-200',
+            glow: 'rgba(249, 115, 22, 0.3)',
+        },
+        kind: 'static',
+        href: '/zaman-makinesi/',
+        status: 'ready',
+        level: 'ilkokul',
+    },
+    {
+        id: 'kesir-atolyesi',
+        title: 'Pizza Kesir Atölyesi',
+        description:
+            'Pizzayı eşit dilimlere bölüp boyama, kesir duvarında karşılaştırma, sayı doğrusunda kesir bulma ve bir çokluğun kesrini hesaplama.',
+        meta: 'Pizza Dilimle · Kesir Duvarı · Sayı Doğrusu',
+        icon: Pizza,
+        accent: {
+            icon: 'from-rose-500 to-orange-400',
+            strip: 'from-rose-300 via-orange-300 to-amber-200',
+            glow: 'rgba(225, 29, 72, 0.28)',
+        },
+        kind: 'static',
+        href: '/kesir-atolyesi/',
+        status: 'ready',
+        level: 'ilkokul',
+    },
+    {
+        id: 'trafik-parki',
+        title: 'Güvenli Sokak',
+        description:
+            'Trafik ışığında sola-sağa-sola bakarak karşıya geçme, trafik işaretleri, güvenli okul yolu haritası ve bisiklet güvenliği.',
+        meta: 'Karşıya Geç · İşaretler · Okul Yolu · Güvenli Yolcu',
+        icon: TrafficCone,
+        accent: {
+            icon: 'from-green-500 to-lime-500',
+            strip: 'from-green-300 via-lime-300 to-yellow-200',
+            glow: 'rgba(22, 163, 74, 0.28)',
+        },
+        kind: 'static',
+        href: '/trafik-parki/',
+        status: 'ready',
+        level: 'ilkokul',
+    },
+    {
+        id: 'duygu-bahcesi',
+        title: 'Duygu Bahçesi',
+        description:
+            'Yüz ifadelerinden duyguları tanıma, sosyal durumlarda doğru davranışı seçme, nefes balonu ile sakinleşme ve haftalık duygu günlüğü.',
+        meta: 'Duygu Yüzleri · Ne Yapardın? · Nefes Balonu',
+        icon: HeartHandshake,
+        accent: {
+            icon: 'from-pink-500 to-rose-400',
+            strip: 'from-pink-300 via-rose-300 to-orange-200',
+            glow: 'rgba(219, 39, 119, 0.28)',
+        },
+        kind: 'static',
+        href: '/duygu-bahcesi/',
+        status: 'ready',
+        level: 'ilkokul',
+    },
+    {
+        id: 'harf-treni',
+        title: 'Harf Treni',
+        description:
+            'Ses temelli ilk okuma-yazma: sesi dinleyip harf balonunu patlatma, hece vagonlarıyla kelime kurma, resim-kelime eşleştirme ve parmakla harf yazma.',
+        meta: 'Harf Avı · Hece Treni · Harf Yazma',
+        icon: TrainFront,
+        accent: {
+            icon: 'from-blue-500 to-sky-400',
+            strip: 'from-blue-300 via-sky-300 to-cyan-200',
+            glow: 'rgba(37, 99, 235, 0.28)',
+        },
+        kind: 'static',
+        href: '/harf-treni/',
+        status: 'ready',
+        level: 'ilkokul',
+    },
+    {
+        id: 'minik-ressam',
+        title: 'Minik Ressam Stüdyosu',
+        description:
+            'Ana renkleri karıştırma laboratuvarı, simetri aynasıyla kelebek ve kar tanesi çizimi, örüntü tamamlama ve sayılarla boyama.',
+        meta: 'Renk Lab · Simetri Aynası · Örüntüler',
+        icon: Palette,
+        accent: {
+            icon: 'from-violet-500 to-fuchsia-400',
+            strip: 'from-violet-300 via-fuchsia-300 to-pink-200',
+            glow: 'rgba(124, 58, 237, 0.28)',
+        },
+        kind: 'static',
+        href: '/minik-ressam/',
+        status: 'ready',
+        level: 'ilkokul',
+    },
+    {
+        id: 'ingilizce-kasaba',
+        title: 'Hello Kasabası',
+        description:
+            'İlkokul İngilizcesi: kasaba haritasında yer adları, dinle ve seç kelime oyunu (renkler, sayılar, hayvanlar…), basit diyaloglar ve hafıza kartları.',
+        meta: 'Town · Listen & Click · Let’s Talk · Memory',
+        icon: Languages,
+        accent: {
+            icon: 'from-cyan-500 to-teal-400',
+            strip: 'from-cyan-300 via-teal-300 to-lime-200',
+            glow: 'rgba(8, 145, 178, 0.28)',
+        },
+        kind: 'static',
+        href: '/ingilizce-kasaba/',
+        status: 'ready',
+        level: 'ilkokul',
+    },
+    {
+        id: 'mahallem-haritam',
+        title: 'Mahallem ve Haritam',
+        description:
+            'Kendi mahalle krokini çizme, pusula yönleriyle hedef bulma, kuşbakışı görünüm eşleştirme ve meslekleri çalıştıkları yerlere taşıma.',
+        meta: 'Kroki · Pusula · Kuşbakışı · Meslekler',
+        icon: Compass,
+        accent: {
+            icon: 'from-teal-500 to-emerald-400',
+            strip: 'from-teal-300 via-emerald-300 to-amber-200',
+            glow: 'rgba(13, 148, 136, 0.28)',
+        },
+        kind: 'static',
+        href: '/mahallem-haritam/',
+        status: 'ready',
+        level: 'ilkokul',
     },
 ];
 

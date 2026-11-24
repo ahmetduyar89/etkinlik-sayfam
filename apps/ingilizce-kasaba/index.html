@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hello Kasabası | Atölye</title>
+<meta name="description" content="İlkokul İngilizcesi: kasaba haritasında yer adları, dinle-seç kelime oyunu, basit diyaloglar ve hafıza kartları.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏘️</text></svg>">
+<link rel="stylesheet" href="/shared/ilkokul.css">
+<style>
+  :root { --ik-accent: #0891b2; --ik-accent-2: #a3e635; --ik-bg: #f1fbfd; }
+  .town { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; background: #bbf7d0; padding: 14px; border-radius: 22px; position: relative;
+    background-image: linear-gradient(#94a3b8 0 0), linear-gradient(#94a3b8 0 0); background-size: 100% 10px, 10px 100%; background-position: 0 50%, 50% 0; background-repeat: no-repeat; }
+  .bld { border: 0; background: #fff; border-radius: 18px; padding: 10px 4px; box-shadow: 0 4px 0 rgba(0,0,0,.12); font-weight: 800; font-size: 13px; position: relative; z-index: 1; transition: transform .12s; }
+  .bld .em { font-size: 44px; display: block; line-height: 1.1; }
+  .bld:hover { transform: translateY(-3px); }
+  .bld.ok { background: var(--ik-ok-bg); outline: 3px solid var(--ik-ok); }
+  .bld.bad { animation: ik-shake .35s; outline: 3px solid var(--ik-bad); }
+  .bubble { background: #fff; border: 3px solid #0e7490; border-radius: 22px; padding: 14px 18px; font-size: 20px; font-weight: 800; position: relative; display: inline-block; }
+  .bubble.me { border-color: #65a30d; background: #f7fee7; }
+  .bubble::after { content: ''; position: absolute; bottom: -14px; left: 30px; border: 10px solid transparent; border-top: 14px solid #0e7490; }
+  .bubble.me::after { left: auto; right: 30px; border-top-color: #65a30d; }
+  .chat { display: flex; flex-direction: column; gap: 22px; min-height: 160px; }
+  .chat .row { display: flex; align-items: flex-end; gap: 10px; }
+  .chat .row.me { justify-content: flex-end; }
+  .chat .av { font-size: 46px; }
+  .en { font-family: 'Baloo 2'; }
+  .tr { display: block; font-size: 13px; color: var(--ik-soft); font-weight: 700; }
+  .cats { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cats button { border: 2px solid var(--ik-line); background: #fff; border-radius: 12px; padding: 7px 12px; font-weight: 800; font-size: 14px; }
+  .cats button.on { background: var(--ik-accent); border-color: var(--ik-accent); color: #fff; }
+  .pic-opts .ik-choice { font-size: 54px; min-height: 104px; }
+  .pic-opts .ik-choice small { display: block; font-size: 14px; margin-top: 4px; }
+  .memory { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; max-width: 640px; margin: 0 auto; perspective: 800px; }
+  .card { aspect-ratio: 3/4; border: 0; padding: 0; background: none; position: relative; transform-style: preserve-3d; transition: transform .45s; }
+  .card.flip { transform: rotateY(180deg); }
+  .card .f, .card .b { position: absolute; inset: 0; border-radius: 16px; display: grid; place-items: center; backface-visibility: hidden; -webkit-backface-visibility: hidden; box-shadow: 0 4px 0 rgba(0,0,0,.12); }
+  .card .f { background: linear-gradient(135deg, #22d3ee, #0891b2); color: #fff; font-size: 34px; }
+  .card .b { background: #fff; transform: rotateY(180deg); font-size: clamp(16px, 3.4vw, 24px); font-family: 'Baloo 2'; font-weight: 800; padding: 4px; text-align: center; }
+  .card .b.pic { font-size: clamp(34px, 7vw, 52px); }
+  .card.done .b { background: var(--ik-ok-bg); }
+  @media (max-width: 560px) { .town { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<header class="ik-top">
+  <div class="ik-brand">
+    <div class="ik-logo">🏘️</div>
+    <div><h1>Hello Kasabası</h1><p>İngilizce kelime ve konuşma parkı</p></div>
+  </div>
+  <nav class="ik-tabs" role="tablist">
+    <button class="ik-tab" data-tab="town"><span class="e">🗺️</span>Town</button>
+    <button class="ik-tab" data-tab="listen"><span class="e">👂</span>Listen &amp; Click</button>
+    <button class="ik-tab" data-tab="talk"><span class="e">💬</span>Let's Talk</button>
+    <button class="ik-tab" data-tab="memory"><span class="e">🃏</span>Memory</button>
+  </nav>
+  <span class="ik-stars">⭐ <span id="ik-stars">0</span></span>
+</header>
+
+<main class="ik-main">
+  <!-- TOWN -->
+  <section class="ik-panel" data-panel="town">
+    <div class="ik-head"><div><h2>Welcome to Hello Town!</h2><p>Binalara dokun ve İngilizce adlarını dinle. Sonra <b>Find it!</b> oyununu oyna.</p></div>
+      <div class="ik-row"><button class="ik-btn ghost" id="town-explore">🔍 Explore</button><button class="ik-btn" id="town-find">🎯 Find it!</button></div></div>
+    <div class="ik-grid two">
+      <div class="ik-card" style="padding:10px"><div class="town" id="town"></div></div>
+      <div class="ik-card ik-center" style="gap:12px">
+        <div class="ik-label" id="town-mode-label">Explore</div>
+        <div class="ik-big en" id="town-word" style="font-size:40px">👆</div>
+        <div class="ik-muted" id="town-tr">Bir binaya dokun</div>
+        <div class="bubble" id="town-sentence" style="display:none"></div>
+        <button class="ik-btn blue" id="town-say">🔊 Listen again</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- LISTEN -->
+  <section class="ik-panel" data-panel="listen">
+    <div class="ik-head"><div><h2>Listen &amp; Click</h2><p>Kelimeyi dinle ve doğru resme dokun. Bir kategori seç.</p></div><div class="cats" id="cats"></div></div>
+    <div class="ik-card">
+      <div class="ik-center" style="gap:10px;margin-bottom:16px">
+        <button class="ik-btn blue" id="ls-play" style="font-size:20px;min-height:64px;padding:12px 28px">🔊 Listen</button>
+        <label class="ik-row" style="font-size:14px"><input type="checkbox" id="ls-show"> Kelimeyi yazılı göster</label>
+        <div class="ik-big en" id="ls-word" style="min-height:44px"></div>
+      </div>
+      <div class="ik-choices pic-opts" id="ls-opts"></div>
+      <div class="ik-feedback" id="ls-fb" style="text-align:center"></div>
+    </div>
+  </section>
+
+  <!-- TALK -->
+  <section class="ik-panel" data-panel="talk">
+    <div class="ik-head"><div><h2>Let's Talk!</h2><p>Arkadaşın sana bir şey söylüyor. En uygun cevabı seç.</p></div><span class="ik-chip" id="talk-count"></span></div>
+    <div class="ik-card" style="max-width:760px;margin:0 auto">
+      <div class="chat" id="chat"></div>
+      <div class="ik-choices" id="talk-opts" style="grid-template-columns:1fr;margin-top:18px"></div>
+      <div class="ik-feedback" id="talk-fb"></div>
+    </div>
+  </section>
+
+  <!-- MEMORY -->
+  <section class="ik-panel" data-panel="memory">
+    <div class="ik-head"><div><h2>Memory Game</h2><p>Kartları çevir, İngilizce kelimeyi resmiyle eşleştir.</p></div>
+      <div class="ik-row"><span class="ik-chip" id="mem-moves">0 hamle</span><button class="ik-btn ghost" id="mem-new">🔄 New game</button></div></div>
+    <div class="memory" id="memory"></div>
+  </section>
+</main>
+
+<script src="/shared/ilkokul.js"></script>
+<script>
+const { $, $$, el, pick, shuffle, rand } = IK;
+const en = (t) => IK.say(t, 'en-GB');
+const tr = (t) => IK.say(t, 'tr-TR');
+
+/* ═════ TOWN ═════ */
+const PLACES = [
+  ['🏫', 'school', 'okul'], ['🏥', 'hospital', 'hastane'], ['🏞️', 'park', 'park'], ['🥖', 'bakery', 'fırın'], ['📚', 'library', 'kütüphane'], ['🦁', 'zoo', 'hayvanat bahçesi'],
+  ['🛒', 'supermarket', 'süpermarket'], ['🚓', 'police station', 'karakol'], ['🚒', 'fire station', 'itfaiye'], ['🏠', 'house', 'ev'], ['🎬', 'cinema', 'sinema'], ['🏛️', 'museum', 'müze'],
+];
+let townMode = 'explore', townTarget = null;
+const article = (w) => (/^[aeiou]/.test(w) ? 'an ' : 'a ') + w;
+PLACES.forEach((p) => {
+  const b = el('button', { class: 'bld' }, `<span class="em">${p[0]}</span><span class="lbl">${p[1]}</span>`);
+  b.onclick = () => {
+    if (townMode === 'explore') {
+      $('#town-word').textContent = p[1]; $('#town-tr').textContent = p[2];
+      const s = `This is ${article(p[1])}.`; $('#town-sentence').style.display = ''; $('#town-sentence').textContent = s;
+      en(`${p[1]}. ${s}`);
+    } else {
+      if (p === townTarget) { b.classList.add('ok'); IK.right('Great job! 👏'); en('Great job!'); setTimeout(() => { b.classList.remove('ok'); townFind(); }, 1200); }
+      else { b.classList.remove('bad'); void b.offsetWidth; b.classList.add('bad'); IK.beep('bad'); en(`No, this is ${article(p[1])}.`); }
+    }
+  };
+  $('#town').appendChild(b);
+});
+function townFind() {
+  let t; do t = pick(PLACES); while (t === townTarget); townTarget = t;
+  $('#town-word').textContent = '❓'; $('#town-tr').textContent = 'Where is the …?';
+  $('#town-sentence').style.display = ''; $('#town-sentence').textContent = `Where is the ${t[1]}?`;
+  en(`Where is the ${t[1]}?`);
+}
+function setTownMode(m) {
+  townMode = m; $('#town-mode-label').textContent = m === 'explore' ? 'Explore' : 'Find it!';
+  $$('.bld .lbl').forEach((l) => l.style.visibility = m === 'find' ? 'hidden' : '');
+  if (m === 'find') townFind(); else { $('#town-word').textContent = '👆'; $('#town-tr').textContent = 'Bir binaya dokun'; $('#town-sentence').style.display = 'none'; }
+}
+$('#town-explore').onclick = () => setTownMode('explore');
+$('#town-find').onclick = () => setTownMode('find');
+$('#town-say').onclick = () => { const s = $('#town-sentence'); if (s.style.display !== 'none') en(s.textContent); };
+
+/* ═════ LISTEN ═════ */
+const CATS = {
+  'Colours': [['🔴', 'red', 'kırmızı'], ['🔵', 'blue', 'mavi'], ['🟡', 'yellow', 'sarı'], ['🟢', 'green', 'yeşil'], ['🟠', 'orange', 'turuncu'], ['🟣', 'purple', 'mor'], ['⚫', 'black', 'siyah'], ['⚪', 'white', 'beyaz'], ['🟤', 'brown', 'kahverengi']],
+  'Numbers': [['1️⃣', 'one', 'bir'], ['2️⃣', 'two', 'iki'], ['3️⃣', 'three', 'üç'], ['4️⃣', 'four', 'dört'], ['5️⃣', 'five', 'beş'], ['6️⃣', 'six', 'altı'], ['7️⃣', 'seven', 'yedi'], ['8️⃣', 'eight', 'sekiz'], ['9️⃣', 'nine', 'dokuz'], ['🔟', 'ten', 'on']],
+  'Animals': [['🐱', 'cat', 'kedi'], ['🐶', 'dog', 'köpek'], ['🐦', 'bird', 'kuş'], ['🐟', 'fish', 'balık'], ['🐰', 'rabbit', 'tavşan'], ['🐘', 'elephant', 'fil'], ['🦁', 'lion', 'aslan'], ['🐒', 'monkey', 'maymun'], ['🐄', 'cow', 'inek'], ['🐴', 'horse', 'at']],
+  'Fruits': [['🍎', 'apple', 'elma'], ['🍌', 'banana', 'muz'], ['🍊', 'orange', 'portakal'], ['🍇', 'grapes', 'üzüm'], ['🍓', 'strawberry', 'çilek'], ['🍉', 'watermelon', 'karpuz'], ['🍐', 'pear', 'armut'], ['🍒', 'cherry', 'kiraz'], ['🍋', 'lemon', 'limon']],
+  'Classroom': [['✏️', 'pencil', 'kurşun kalem'], ['📕', 'book', 'kitap'], ['🎒', 'bag', 'çanta'], ['📏', 'ruler', 'cetvel'], ['✂️', 'scissors', 'makas'], ['🖍️', 'crayon', 'boya kalemi'], ['🪑', 'chair', 'sandalye'], ['🧽', 'eraser', 'silgi'], ['🖊️', 'pen', 'tükenmez kalem']],
+  'Body': [['👁️', 'eye', 'göz'], ['👂', 'ear', 'kulak'], ['👃', 'nose', 'burun'], ['👄', 'mouth', 'ağız'], ['✋', 'hand', 'el'], ['🦶', 'foot', 'ayak'], ['🦵', 'leg', 'bacak'], ['💪', 'arm', 'kol'], ['🦷', 'tooth', 'diş']],
+  'Family': [['👩', 'mother', 'anne'], ['👨', 'father', 'baba'], ['👧', 'sister', 'kız kardeş'], ['👦', 'brother', 'erkek kardeş'], ['👵', 'grandmother', 'büyükanne'], ['👴', 'grandfather', 'büyükbaba'], ['👶', 'baby', 'bebek']],
+};
+let cat = 'Colours', lsTarget = null;
+Object.keys(CATS).forEach((c) => {
+  const b = el('button', { class: c === cat ? 'on' : '' }, c);
+  b.onclick = () => { cat = c; $$('#cats button').forEach((x) => x.classList.toggle('on', x === b)); lsRound(true); };
+  $('#cats').appendChild(b);
+});
+function lsRound(speak) {
+  const list = CATS[cat]; let t; do t = pick(list); while (t === lsTarget); lsTarget = t;
+  $('#ls-word').textContent = $('#ls-show').checked ? t[1] : ''; $('#ls-fb').textContent = '';
+  const box = $('#ls-opts'); box.innerHTML = '';
+  shuffle([t, ...shuffle(list.filter((x) => x !== t)).slice(0, 3)]).forEach((o) => {
+    const b = el('button', { class: 'ik-choice', 'aria-label': o[2] }, o[0]);
+    b.onclick = () => {
+      if (o === t) { b.classList.add('ok'); b.innerHTML += `<small>${o[1]}</small>`; $('#ls-fb').className = 'ik-feedback ok'; $('#ls-fb').textContent = `${o[1]} = ${o[2]}`; IK.right(); en(o[1]); setTimeout(() => lsRound(true), 1500); }
+      else { b.classList.add('bad'); IK.beep('bad'); en(`This is ${o[1]}. Listen: ${t[1]}`); }
+    };
+    box.appendChild(b);
+  });
+  if (speak) setTimeout(() => en(t[1]), 250);
+}
+$('#ls-play').onclick = () => en(lsTarget[1]);
+$('#ls-show').onchange = () => { $('#ls-word').textContent = $('#ls-show').checked ? lsTarget[1] : ''; };
+lsRound(false);
+
+/* ═════ TALK ═════ */
+const TALK = [
+  ['Hello! What\'s your name?', 'Merhaba! Adın ne?', ['My name is Ela.', 'I am fine.', 'It is red.']],
+  ['How are you?', 'Nasılsın?', ['I\'m fine, thank you.', 'I\'m eight.', 'Goodbye!']],
+  ['How old are you?', 'Kaç yaşındasın?', ['I\'m nine years old.', 'It\'s a cat.', 'Yes, please.']],
+  ['Nice to meet you!', 'Tanıştığıma memnun oldum!', ['Nice to meet you, too!', 'Good night!', 'It\'s blue.']],
+  ['What colour is the apple?', 'Elma ne renk?', ['It\'s red.', 'It\'s an apple.', 'I\'m red.']],
+  ['Can I have a pencil, please?', 'Bir kalem alabilir miyim lütfen?', ['Here you are.', 'Thank you.', 'I\'m ten.']],
+  ['Thank you!', 'Teşekkür ederim!', ['You\'re welcome.', 'Hello!', 'It\'s a dog.']],
+  ['Where are you from?', 'Nerelisin?', ['I\'m from Türkiye.', 'I\'m happy.', 'It\'s Monday.']],
+  ['Do you like bananas?', 'Muz sever misin?', ['Yes, I do!', 'Yes, it is.', 'My name is Can.']],
+  ['What\'s this?', 'Bu ne?', ['It\'s a book.', 'I\'m fine.', 'Goodbye.']],
+  ['Let\'s play football!', 'Hadi futbol oynayalım!', ['OK, let\'s go!', 'I\'m seven.', 'It\'s yellow.']],
+  ['Goodbye! See you tomorrow!', 'Hoşça kal! Yarın görüşürüz!', ['Bye! See you!', 'Hello!', 'Nice to meet you!']],
+];
+const TR_ANS = { 'My name is Ela.': 'Benim adım Ela.', "I'm fine, thank you.": 'İyiyim, teşekkürler.', "I'm nine years old.": 'Dokuz yaşındayım.', 'Nice to meet you, too!': 'Ben de memnun oldum!', "It's red.": 'Kırmızı.', 'Here you are.': 'Buyurun.', "You're welcome.": 'Rica ederim.', "I'm from Türkiye.": 'Türkiyeliyim.', 'Yes, I do!': 'Evet, severim!', "It's a book.": 'Bu bir kitap.', "OK, let's go!": 'Tamam, hadi!', 'Bye! See you!': 'Hoşça kal! Görüşürüz!' };
+let talkList = shuffle(TALK), talkI = 0;
+function talkShow() {
+  const [q, qtr, opts] = talkList[talkI]; const right = opts[0];
+  $('#talk-count').textContent = `${talkI + 1} / ${talkList.length}`; $('#talk-fb').textContent = '';
+  $('#chat').innerHTML = `<div class="row"><span class="av">🧒🏽</span><div class="bubble"><span class="en">${q}</span><span class="tr">${qtr}</span></div></div>`;
+  en(q);
+  const box = $('#talk-opts'); box.innerHTML = '';
+  shuffle(opts).forEach((o) => {
+    const b = el('button', { class: 'ik-choice en', style: 'font-size:19px' }, o);
+    b.onclick = () => {
+      if (o === right) {
+        b.classList.add('ok');
+        $('#chat').insertAdjacentHTML('beforeend', `<div class="row me"><div class="bubble me"><span class="en">${o}</span><span class="tr">${TR_ANS[o] || ''}</span></div><span class="av">🙋</span></div>`);
+        en(o); IK.right();
+        setTimeout(() => { talkI++; if (talkI >= talkList.length) { IK.win('Super speaker! 🗣️'); talkList = shuffle(TALK); talkI = 0; } talkShow(); }, 2200);
+      } else { b.classList.add('bad'); IK.beep('bad'); $('#talk-fb').className = 'ik-feedback bad'; $('#talk-fb').textContent = 'Soruyu tekrar oku: ' + qtr; }
+    };
+    box.appendChild(b);
+  });
+}
+$('#chat').addEventListener('click', () => en(talkList[talkI][0]));
+talkShow();
+
+/* ═════ MEMORY ═════ */
+let open = [], moves = 0, matched = 0, lock = false;
+function memNew() {
+  const seen = new Set(); const pool = shuffle(Object.values(CATS).flat()).filter((p) => !seen.has(p[1]) && seen.add(p[1])).slice(0, 6);
+  const cards = shuffle(pool.flatMap((p) => [[p, 'pic'], [p, 'word']]));
+  moves = 0; matched = 0; open = []; $('#mem-moves').textContent = '0 hamle';
+  const box = $('#memory'); box.innerHTML = '';
+  cards.forEach(([p, kind]) => {
+    const c = el('button', { class: 'card', 'aria-label': 'kart' }, `<div class="f">❓</div><div class="b ${kind === 'pic' ? 'pic' : ''}">${kind === 'pic' ? p[0] : p[1]}</div>`);
+    c.onclick = () => {
+      if (lock || c.classList.contains('flip')) return;
+      c.classList.add('flip'); en(p[1]); open.push([c, p]);
+      if (open.length === 2) {
+        moves++; $('#mem-moves').textContent = moves + ' hamle'; lock = true;
+        const [[c1, p1], [c2, p2]] = open;
+        if (p1 === p2) { setTimeout(() => { c1.classList.add('done'); c2.classList.add('done'); IK.right(); open = []; lock = false; matched++; if (matched === 6) IK.win(`Well done! ${moves} hamlede bitirdin.`); }, 500); }
+        else setTimeout(() => { c1.classList.remove('flip'); c2.classList.remove('flip'); open = []; lock = false; }, 1100);
+      }
+    };
+    box.appendChild(c);
+  });
+}
+$('#mem-new').onclick = memNew;
+memNew();
+
+IK.tabs();
+</script>
+</body>
+</html>

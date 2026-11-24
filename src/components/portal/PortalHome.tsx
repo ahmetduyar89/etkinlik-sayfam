@@ -7,10 +7,10 @@ import { QrLoginHelpButton } from '../common/QrLogin';
 // Kartların içeriği `src/constants/portal.ts` içindeki kayıt defterinden
 // gelir; yeni bir çalışma eklemek için bu dosyaya dokunmaya gerek yoktur.
 // ─────────────────────────────────────────────────────────────────────
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Lock, Sparkles, Crown, School } from 'lucide-react';
-import { PORTAL_HOME_ENTRIES, PORTAL_MODULES, type PortalFolder, type PortalModule } from '../../constants/portal';
+import { PORTAL_HOME_ENTRIES, PORTAL_MODULES, type ModuleLevel, type PortalFolder, type PortalModule } from '../../constants/portal';
 import { cn } from '../../utils/cn';
 import { InstallAppButton } from '../common/InstallAppButton';
 import { lockApp } from '../../utils/auth';
@@ -32,10 +32,45 @@ interface PortalHomeProps {
     folder?: PortalFolder;
 }
 
+type LevelFilter = 'tumu' | Exclude<ModuleLevel, 'hepsi'>;
+const LEVEL_FILTERS: { id: LevelFilter; label: string }[] = [
+    { id: 'tumu', label: 'Tümü' },
+    { id: 'ilkokul', label: 'İlkokul' },
+    { id: 'ortaokul', label: 'Ortaokul' },
+];
+const LEVEL_BADGE: Record<ModuleLevel, { label: string; className: string }> = {
+    ilkokul: { label: 'İlkokul', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+    ortaokul: { label: 'Ortaokul', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+    hepsi: { label: 'Her kademe', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+};
+
+function readLevelFilter(): LevelFilter {
+    try {
+        const v = localStorage.getItem('portal:seviye');
+        return v === 'ilkokul' || v === 'ortaokul' ? v : 'tumu';
+    } catch {
+        return 'tumu';
+    }
+}
+
 export function PortalHome({ onOpenInternal, folder }: PortalHomeProps) {
-    const modules = folder
+    const [levelFilter, setLevelFilter] = useState<LevelFilter>(readLevelFilter);
+    const folderModules = folder
         ? PORTAL_MODULES.filter((mod) => folder.moduleIds.includes(mod.id))
         : PORTAL_HOME_ENTRIES;
+    // Süzgeç yalnızca seviye bilgisi taşıyan klasörlerde (Keşif Alanı) görünür.
+    const hasLevels = !!folder && folderModules.some((mod) => mod.level);
+    const modules = hasLevels && levelFilter !== 'tumu'
+        ? folderModules.filter((mod) => !mod.level || mod.level === levelFilter || mod.level === 'hepsi')
+        : folderModules;
+    const chooseLevel = (id: LevelFilter) => {
+        setLevelFilter(id);
+        try {
+            localStorage.setItem('portal:seviye', id);
+        } catch {
+            /* depolama kapalıysa yalnızca bu oturumda geçerli */
+        }
+    };
     const hazirSayisi = modules.filter((m) => m.status === 'ready').length;
     const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -118,11 +153,31 @@ export function PortalHome({ onOpenInternal, folder }: PortalHomeProps) {
                         </p>
                     </motion.div>
 
+                    {hasLevels && (
+                        <div role="group" aria-label="Kademeye göre süz" className="mt-8 inline-flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white/80 p-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                            {LEVEL_FILTERS.map((f) => (
+                                <button
+                                    key={f.id}
+                                    type="button"
+                                    aria-pressed={levelFilter === f.id}
+                                    onClick={() => chooseLevel(f.id)}
+                                    className={cn(
+                                        'min-h-10 rounded-xl px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                                        levelFilter === f.id ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
+                                    )}
+                                >
+                                    {f.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
                     <motion.div
+                        key={levelFilter}
                         variants={listVariants}
                         initial="hidden"
                         animate="show"
-                        className="mt-9 grid grid-cols-1 gap-5 sm:mt-12 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                        className={cn(hasLevels ? 'mt-6 sm:mt-8' : 'mt-9 sm:mt-12', 'grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4')}
                     >
                         {modules.map((mod) => (
                             <ModuleCard key={mod.id} mod={mod} onOpenInternal={onOpenInternal} />
@@ -200,6 +255,11 @@ function ModuleCard({ mod, onOpenInternal }: { mod: PortalModule; onOpenInternal
                     </h2>
                     {mod.meta && (
                         <p className="mt-1 text-[12px] font-semibold text-slate-400">{mod.meta}</p>
+                    )}
+                    {mod.level && (
+                        <span className={cn('mt-2 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-bold', LEVEL_BADGE[mod.level].className)}>
+                            {LEVEL_BADGE[mod.level].label}
+                        </span>
                     )}
                 </div>
             </div>

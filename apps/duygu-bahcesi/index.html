@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duygu Bahçesi | Atölye</title>
+<meta name="description" content="Yüz ifadelerinden duyguları tanıma, sosyal durumlarda doğru davranışı seçme, nefes balonu ile sakinleşme ve duygu günlüğü.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💛</text></svg>">
+<link rel="stylesheet" href="/shared/ilkokul.css">
+<style>
+  :root { --ik-accent: #db2777; --ik-accent-2: #f9a8d4; --ik-bg: #fdf6fb; }
+  .face { width: min(100%, 300px); display: block; margin: 0 auto; }
+  .face * { transition: all .35s ease; }
+  .slider { display: grid; grid-template-columns: 70px 1fr; gap: 10px; align-items: center; font-weight: 800; font-size: 14px; }
+  input[type=range] { width: 100%; accent-color: var(--ik-accent); height: 32px; }
+  .emo-name { font-family: 'Baloo 2'; font-size: 30px; font-weight: 800; text-align: center; min-height: 40px; }
+  .scenario { display: flex; gap: 14px; align-items: flex-start; font-size: 19px; font-weight: 800; }
+  .scenario .em { font-size: 64px; line-height: 1; }
+  .opt { text-align: left; font-size: 16px; padding: 14px 16px; }
+  .opt.soso { background: #fff7e0; border-color: #f5c451; color: #8a5a00; }
+  .balloon-stage { display: grid; place-items: center; height: 340px; position: relative; }
+  .balloon { width: 120px; height: 140px; border-radius: 50% 50% 48% 48%; background: radial-gradient(circle at 35% 30%, #fbcfe8, #ec4899 60%, #be185d); position: relative; transform: scale(.6); transition: transform 1s linear; box-shadow: inset -10px -14px 0 rgba(0,0,0,.08); }
+  .balloon::after { content: ''; position: absolute; left: 50%; bottom: -12px; transform: translateX(-50%); border: 8px solid transparent; border-top: 12px solid #be185d; }
+  .string { position: absolute; top: 50%; width: 2px; height: 140px; background: #9ca3af; margin-top: 90px; z-index: -1; }
+  .breath-word { font-family: 'Baloo 2'; font-size: 34px; font-weight: 800; text-align: center; min-height: 46px; }
+  .moods { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+  .mood { border: 2px solid var(--ik-line); background: #fff; border-radius: 18px; padding: 8px 4px; font-weight: 800; font-size: 13px; }
+  .mood .em { font-size: 40px; display: block; }
+  .mood.on { border-color: var(--ik-accent); background: #fdf2f8; transform: scale(1.04); }
+  .thermo { display: flex; gap: 6px; align-items: flex-end; height: 120px; }
+  .thermo button { flex: 1; border: 0; border-radius: 10px 10px 4px 4px; background: #f1e7ee; font-weight: 800; color: #6b6f85; }
+  .thermo button.on { color: #fff; }
+  .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; text-align: center; }
+  .week div { background: #fbf4f8; border-radius: 14px; padding: 8px 2px; font-size: 12px; font-weight: 800; color: var(--ik-soft); }
+  .week .em { font-size: 30px; display: block; min-height: 38px; }
+  .week .today { outline: 3px solid var(--ik-accent-2); }
+  .reasons { display: flex; flex-wrap: wrap; gap: 6px; }
+  .reasons button { border: 2px solid var(--ik-line); background: #fff; border-radius: 999px; padding: 6px 12px; font-weight: 800; font-size: 14px; }
+  .reasons button.on { background: var(--ik-accent); border-color: var(--ik-accent); color: #fff; }
+</style>
+</head>
+<body>
+<header class="ik-top">
+  <div class="ik-brand">
+    <div class="ik-logo">💛</div>
+    <div><h1>Duygu Bahçesi</h1><p>Duygularımı tanıyorum, ifade ediyorum</p></div>
+  </div>
+  <nav class="ik-tabs" role="tablist">
+    <button class="ik-tab" data-tab="yuz"><span class="e">😊</span>Duygu Yüzleri</button>
+    <button class="ik-tab" data-tab="durum"><span class="e">🤝</span>Ne Yapardın?</button>
+    <button class="ik-tab" data-tab="nefes"><span class="e">🎈</span>Nefes Balonu</button>
+    <button class="ik-tab" data-tab="gunluk"><span class="e">🌡️</span>Duygu Günlüğüm</button>
+  </nav>
+  <span class="ik-stars">⭐ <span id="ik-stars">0</span></span>
+</header>
+
+<main class="ik-main">
+  <!-- YÜZLER -->
+  <section class="ik-panel" data-panel="yuz">
+    <div class="ik-head"><div><h2>Bu Yüz Ne Hissediyor?</h2><p>Kaşlara, gözlere ve ağza dikkat et. Sonra kendi duygu yüzünü yap!</p></div></div>
+    <div class="ik-grid half">
+      <div class="ik-card">
+        <div class="ik-label">Tahmin et</div>
+        <svg class="face" id="face-q" viewBox="0 0 200 200"></svg>
+        <div class="ik-choices" id="face-choices" style="margin-top:10px"></div>
+        <div class="ik-feedback" id="face-fb"></div>
+      </div>
+      <div class="ik-card">
+        <div class="ik-label">Yüz yapıcı</div>
+        <svg class="face" id="face-maker" viewBox="0 0 200 200"></svg>
+        <div class="emo-name" id="maker-name"></div>
+        <div style="display:grid;gap:4px;margin-top:8px">
+          <label class="slider">Kaşlar<input type="range" id="s-brow" min="-1" max="1" step="0.05" value="0"></label>
+          <label class="slider">Gözler<input type="range" id="s-eye" min="0.3" max="1.6" step="0.05" value="1"></label>
+          <label class="slider">Ağız<input type="range" id="s-mouth" min="-1" max="1" step="0.05" value="0.6"></label>
+          <label class="slider">Ağız açık<input type="range" id="s-open" min="0" max="1" step="0.05" value="0"></label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DURUM -->
+  <section class="ik-panel" data-panel="durum">
+    <div class="ik-head"><div><h2>Ne Yapardın?</h2><p>Her durumda birden çok seçenek var. Hem kendine hem arkadaşına iyi gelecek olanı seç.</p></div><span class="ik-chip" id="sc-count"></span></div>
+    <div class="ik-card" style="max-width:820px;margin:0 auto">
+      <div class="scenario" id="sc-text"></div>
+      <button class="ik-speak" id="sc-say" style="margin:10px 0">🔊 Dinle</button>
+      <div class="ik-choices" id="sc-opts" style="grid-template-columns:1fr"></div>
+      <div class="ik-feedback" id="sc-fb"></div>
+      <button class="ik-btn ghost small" id="sc-next" style="margin-top:6px">Sonraki durum ➜</button>
+    </div>
+  </section>
+
+  <!-- NEFES -->
+  <section class="ik-panel" data-panel="nefes">
+    <div class="ik-head"><div><h2>Nefes Balonu</h2><p>Kızgın, telaşlı ya da üzgün hissettiğinde balonla birlikte nefes al. Burnundan al, ağzından yavaşça ver.</p></div></div>
+    <div class="ik-grid two">
+      <div class="ik-card">
+        <div class="balloon-stage"><div class="balloon" id="balloon"></div><div class="string"></div></div>
+        <div class="breath-word" id="breath-word">Hazır olduğunda başla</div>
+      </div>
+      <div class="ik-card ik-center" style="gap:14px">
+        <div class="ik-label">Tamamlanan nefes</div>
+        <div class="ik-big" id="breath-count">0 / 5</div>
+        <button class="ik-btn" id="breath-btn" style="min-width:200px">▶ Başla</button>
+        <label class="ik-row" style="justify-content:center;font-size:14px"><input type="checkbox" id="breath-voice" checked> Sesli yönlendirme</label>
+        <div style="text-align:left;background:#fdf2f8;border-radius:16px;padding:14px;font-size:14.5px">
+          <b>Sakinleşme köşesi ipuçları</b>
+          <ul style="margin:6px 0 0;padding-left:18px">
+            <li>5 şey gör, 4 şey dokun, 3 ses duy.</li><li>10'dan geriye doğru say.</li><li>Güvendiğin bir büyüğe nasıl hissettiğini anlat.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GÜNLÜK -->
+  <section class="ik-panel" data-panel="gunluk">
+    <div class="ik-head"><div><h2>Duygu Günlüğüm</h2><p>Bugün nasıl hissediyorsun? Duygunu, ne kadar güçlü olduğunu ve nedenini seç. Bu kayıt sadece bu cihazda durur.</p></div></div>
+    <div class="ik-grid two">
+      <div class="ik-card">
+        <div class="ik-label">1. Duygum</div>
+        <div class="moods" id="moods" style="margin:10px 0 16px"></div>
+        <div class="ik-label">2. Ne kadar güçlü?</div>
+        <div class="thermo" id="thermo" style="margin:10px 0 16px"></div>
+        <div class="ik-label">3. Neden?</div>
+        <div class="reasons" id="reasons" style="margin:10px 0 16px"></div>
+        <button class="ik-btn green" id="save-mood">💾 Günlüğe yaz</button>
+      </div>
+      <div class="ik-card">
+        <div class="ik-label">Bu haftam</div>
+        <div class="week" id="week" style="margin-top:10px"></div>
+        <p id="mood-note" class="ik-muted" style="margin:16px 0 0"></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="/shared/ilkokul.js"></script>
+<script>
+const { $, $$, el, say, pick, shuffle, rand } = IK;
+IK.tabs();
+
+/* ═════ YÜZ ═════ */
+// brow: -1 (kızgın, içe çatık) .. 1 (yukarı/şaşkın) ; eye: açıklık ; mouth: -1 üzgün .. 1 gülen ; open: ağız açıklığı
+const EMOS = {
+  'Mutlu': { brow: 0.2, eye: 1, mouth: 0.9, open: 0.25, c: '#fde047' },
+  'Üzgün': { brow: 0.6, eye: 0.7, mouth: -0.8, open: 0, c: '#93c5fd', tilt: 1 },
+  'Kızgın': { brow: -1, eye: 0.8, mouth: -0.5, open: 0.1, c: '#fca5a5' },
+  'Şaşkın': { brow: 1, eye: 1.5, mouth: 0, open: 0.9, c: '#fde68a' },
+  'Korkmuş': { brow: 0.8, eye: 1.4, mouth: -0.35, open: 0.5, c: '#c4b5fd', tilt: 1 },
+  'Sakin': { brow: 0, eye: 0.45, mouth: 0.4, open: 0, c: '#bbf7d0' },
+};
+function faceSVG(p) {
+  const by = 62 - p.brow * 10, tilt = p.tilt ? 1 : (p.brow < -0.3 ? -1 : 0);
+  const inner = tilt * 9 * Math.abs(p.tilt ? 1 : p.brow);
+  const ey = 85, ery = 11 * p.eye;
+  const my = 135, curve = p.mouth * 22, open = p.open * 26;
+  const mouth = open > 2
+    ? `<path d="M68,${my} Q100,${my + curve} 132,${my} Q100,${my + curve + open * 1.3 + 6} 68,${my}Z" fill="#7f1d1d" stroke="#3f2a1d" stroke-width="5" stroke-linejoin="round"/>`
+    : `<path d="M66,${my} Q100,${my + curve * 1.4} 134,${my}" fill="none" stroke="#3f2a1d" stroke-width="6" stroke-linecap="round"/>`;
+  return `<circle cx="100" cy="100" r="88" fill="${p.c || '#fde68a'}" stroke="#3f2a1d" stroke-width="5"/>
+  <circle cx="55" cy="118" r="11" fill="#f472b6" opacity="${p.mouth > 0.3 ? .45 : 0}"/><circle cx="145" cy="118" r="11" fill="#f472b6" opacity="${p.mouth > 0.3 ? .45 : 0}"/>
+  <line x1="52" y1="${by - inner}" x2="82" y2="${by + inner}" stroke="#3f2a1d" stroke-width="7" stroke-linecap="round"/>
+  <line x1="118" y1="${by + inner}" x2="148" y2="${by - inner}" stroke="#3f2a1d" stroke-width="7" stroke-linecap="round"/>
+  <ellipse cx="67" cy="${ey}" rx="${9 + p.eye * 2}" ry="${Math.max(ery, 2.5)}" fill="#fff" stroke="#3f2a1d" stroke-width="4"/>
+  <ellipse cx="133" cy="${ey}" rx="${9 + p.eye * 2}" ry="${Math.max(ery, 2.5)}" fill="#fff" stroke="#3f2a1d" stroke-width="4"/>
+  <circle cx="67" cy="${ey + 1}" r="${Math.min(5.5, ery * 0.6)}" fill="#3f2a1d"/><circle cx="133" cy="${ey + 1}" r="${Math.min(5.5, ery * 0.6)}" fill="#3f2a1d"/>
+  ${mouth}
+  ${p === EMOS['Üzgün'] ? '<path d="M138,100 q4,10 0,14 q-4,-4 0,-14Z" fill="#60a5fa"/>' : ''}`;
+}
+let lastEmo = '';
+function faceQ() {
+  let name; do name = pick(Object.keys(EMOS)); while (name === lastEmo); lastEmo = name;
+  $('#face-q').innerHTML = faceSVG(EMOS[name]); $('#face-fb').textContent = '';
+  const box = $('#face-choices'); box.innerHTML = '';
+  shuffle([name, ...shuffle(Object.keys(EMOS).filter((n) => n !== name)).slice(0, 3)]).forEach((n) => {
+    const b = el('button', { class: 'ik-choice' }, n);
+    b.onclick = () => {
+      if (n === name) { b.classList.add('ok'); $('#face-fb').className = 'ik-feedback ok'; $('#face-fb').textContent = `Evet, bu yüz ${n.toLowerCase()}!`; IK.right(); say(n); setTimeout(faceQ, 1300); }
+      else { b.classList.add('bad'); $('#face-fb').className = 'ik-feedback bad'; $('#face-fb').textContent = 'Kaşlara ve ağza tekrar bak 👀'; IK.wrong(); }
+    };
+    box.appendChild(b);
+  });
+}
+faceQ();
+function maker() {
+  const p = { brow: +$('#s-brow').value, eye: +$('#s-eye').value, mouth: +$('#s-mouth').value, open: +$('#s-open').value };
+  let best = '', bd = 1e9;
+  for (const [n, e] of Object.entries(EMOS)) { const d = (e.brow - p.brow) ** 2 + (e.eye - p.eye) ** 2 + (e.mouth - p.mouth) ** 2 + (e.open - p.open) ** 2; if (d < bd) { bd = d; best = n; } }
+  p.c = EMOS[best].c; p.tilt = EMOS[best].tilt && p.brow > 0.3;
+  $('#face-maker').innerHTML = faceSVG(p);
+  $('#maker-name').textContent = (bd < 0.6 ? '' : 'Biraz ') + best;
+}
+$$('#face-maker ~ div input, .slider input').forEach((i) => i.addEventListener('input', maker));
+maker();
+
+/* ═════ NE YAPARDIN ═════ */
+// 2: en iyi, 1: idare eder, 0: iyi değil
+const SC = [
+  ['😞', 'Teneffüste arkadaşların seni oyuna almadı.', [['Bir arkadaşıma "Ben de oynayabilir miyim?" diye sorarım ya da başka bir oyun öneririm.', 2, 'Kendini ifade etmek çok cesurca!'], ['Oyunlarını bozarım.', 0, 'Bu herkesi üzer ve sorunu büyütür.'], ['Bir köşede tek başıma ağlarım.', 1, 'Üzülmek normal; ama bir öğretmene ya da arkadaşına anlatmak daha iyi gelir.']]],
+  ['😡', 'Kardeşin en sevdiğin oyuncağını izinsiz aldı.', [['Ona bağırır, oyuncağı çekip alırım.', 0, 'Kızgınlık normal ama bağırmak kavgayı büyütür.'], ['Derin nefes alır, "Oyuncağımı geri verir misin? Sonra birlikte oynayabiliriz." derim.', 2, 'Harika! Sakinleşip duygunu sözle anlattın.'], ['Hiçbir şey demem ama bütün gün küserim.', 1, 'Duygunu saklamak yerine söylemek daha iyi olur.']]],
+  ['😢', 'Sınıfa yeni gelen bir arkadaş yalnız oturuyor.', [['Yanına gidip kendimi tanıtır, onu oyuna çağırırım.', 2, 'Ne güzel! Onu çok mutlu edeceksin.'], ['Onunla ilgilenmem, nasılsa alışır.', 0, 'Yeni olmak zordur; küçük bir merhaba çok şey değiştirir.'], ['Öğretmene onun yalnız olduğunu söylerim.', 1, 'Güzel bir fikir; sen de bir merhaba diyebilirsin.']]],
+  ['😳', 'Sınıfta sesli okurken bir kelimeyi yanlış okudun ve bazıları güldü.', [['Bir daha asla sesli okumam.', 0, 'Herkes hata yapar; hatalar öğrenmemizi sağlar.'], ['Gülümser, kelimeyi düzeltip okumaya devam ederim.', 2, 'Çok güçlü bir davranış! Hata yapmak öğrenmenin parçası.'], ['Gülenlere kızarım.', 1, 'Kırılman normal; sonra onlara bunun seni üzdüğünü sakin bir dille söyleyebilirsin.']]],
+  ['🏆', 'Oyunda kaybettin, arkadaşın kazandı.', [['"Tebrikler! Bir dahaki sefere tekrar oynayalım." derim.', 2, 'Gerçek bir sporcu gibi davrandın!'], ['Kurallara hile yapıldığını söyleyip bağırırım.', 0, 'Kaybetmek üzücü ama suçlamak arkadaşlığı bozar.'], ['Bir süre sessizce otururum.', 1, 'Biraz sakinleşmek iyi; sonra tebrik edebilirsin.']]],
+  ['🤕', 'Bahçede bir arkadaşın düştü ve dizi kanıyor.', [['Gülerim.', 0, 'Bu, arkadaşını daha çok üzer.'], ['Yanına gidip "İyi misin?" derim ve bir öğretmene haber veririm.', 2, 'Çok yardımsever ve doğru bir davranış!'], ['Oyunuma devam ederim.', 1, 'Belki yardıma ihtiyacı vardır; bir büyüğe haber vermek iyi olur.']]],
+  ['😨', 'Yarın ilk kez bir gösteriye çıkacaksın ve çok heyecanlısın.', [['Annem, babam ya da öğretmenimle heyecanımı konuşur, evde prova yaparım.', 2, 'Duygunu paylaşmak ve hazırlanmak heyecanı azaltır.'], ['Hasta olduğumu söyleyip gitmem.', 0, 'Kaçmak yerine heyecanla başa çıkmayı öğrenmek seni güçlendirir.'], ['Gece hiç uyumam, sürekli düşünürüm.', 1, 'Yatmadan önce nefes balonu egzersizi yapmayı dene!']]],
+  ['🙊', 'Bir arkadaşın sana bir sır verdi.', [['Herkese anlatırım.', 0, 'Bu arkadaşının sana olan güvenini kırar.'], ['Sırrını saklarım; ama tehlikeli bir şeyse güvendiğim bir büyüğe söylerim.', 2, 'Çok olgun bir davranış!'], ['Sadece en yakın arkadaşıma söylerim.', 1, 'Sır sır olarak kalmalı.']]],
+];
+let scList = shuffle(SC), scI = 0;
+function scShow() {
+  const s = scList[scI]; $('#sc-count').textContent = `${scI + 1} / ${scList.length}`;
+  $('#sc-text').innerHTML = `<span class="em">${s[0]}</span><span>${s[1]}</span>`; $('#sc-fb').textContent = '';
+  const box = $('#sc-opts'); box.innerHTML = '';
+  shuffle(s[2]).forEach((o) => {
+    const b = el('button', { class: 'ik-choice opt' }, o[0]);
+    b.onclick = () => {
+      b.classList.add(o[1] === 2 ? 'ok' : o[1] === 1 ? 'soso' : 'bad');
+      $('#sc-fb').className = 'ik-feedback ' + (o[1] === 2 ? 'ok' : o[1] === 0 ? 'bad' : '');
+      $('#sc-fb').textContent = o[2];
+      if (o[1] === 2) IK.right(); else IK.beep(o[1] ? 'tick' : 'bad');
+      say(o[2]);
+    };
+    box.appendChild(b);
+  });
+}
+$('#sc-next').onclick = () => { scI = (scI + 1) % scList.length; if (!scI) scList = shuffle(SC); scShow(); };
+$('#sc-say').onclick = () => { const s = scList[scI]; say(s[1] + ' Ne yapardın?'); };
+scShow();
+
+/* ═════ NEFES ═════ */
+let breathing = false, bCount = 0, bTimer = null;
+const PHASES = [['Burnundan nefes al… 🌬️', 4, 1.15, 'Nefes al'], ['Tut… 🤐', 2, 1.15, 'Tut'], ['Ağzından yavaşça ver… 😮‍💨', 6, 0.6, 'Yavaşça ver']];
+function runPhase(i) {
+  if (!breathing) return;
+  const [txt, sec, scale, voice] = PHASES[i];
+  $('#breath-word').textContent = txt;
+  const b = $('#balloon'); b.style.transitionDuration = sec + 's'; b.style.transform = `scale(${scale})`;
+  if ($('#breath-voice').checked) say(voice);
+  let left = sec;
+  bTimer = setInterval(() => {
+    left--;
+    if (left <= 0) {
+      clearInterval(bTimer);
+      if (i === 2) {
+        bCount++; $('#breath-count').textContent = `${bCount} / 5`;
+        if (bCount >= 5) { stopBreath(); $('#breath-word').textContent = 'Aferin! Şimdi nasıl hissediyorsun? 💗'; IK.win('5 sakin nefes!'); return; }
+      }
+      runPhase((i + 1) % 3);
+    }
+  }, 1000);
+}
+function stopBreath() { breathing = false; clearInterval(bTimer); $('#breath-btn').textContent = '▶ Başla'; const b = $('#balloon'); b.style.transitionDuration = '1s'; b.style.transform = 'scale(.6)'; }
+$('#breath-btn').onclick = () => {
+  if (breathing) { stopBreath(); $('#breath-word').textContent = 'Durduruldu'; return; }
+  breathing = true; bCount = 0; $('#breath-count').textContent = '0 / 5'; $('#breath-btn').textContent = '⏸ Durdur'; runPhase(0);
+};
+document.addEventListener('visibilitychange', () => { if (document.hidden && breathing) stopBreath(); });
+
+/* ═════ GÜNLÜK ═════ */
+const MOODS = [['😄', 'Mutlu', '#fde047'], ['😌', 'Sakin', '#86efac'], ['🤩', 'Heyecanlı', '#fdba74'], ['😢', 'Üzgün', '#93c5fd'], ['😠', 'Kızgın', '#fca5a5'], ['😨', 'Korkmuş', '#c4b5fd'], ['😴', 'Yorgun', '#cbd5e1'], ['🤔', 'Kararsız', '#f9a8d4']];
+const REASONS = ['Ailem', 'Arkadaşlarım', 'Okul', 'Oyun', 'Ders', 'Uyku', 'Sağlığım', 'Hava', 'Bilmiyorum'];
+const DAYN = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+let selMood = null, selLvl = 3; const selReasons = new Set();
+MOODS.forEach((m) => {
+  const b = el('button', { class: 'mood' }, `<span class="em">${m[0]}</span>${m[1]}`);
+  b.onclick = () => { selMood = m; $$('.mood').forEach((x) => x.classList.toggle('on', x === b)); say(m[1]); drawThermo(); };
+  $('#moods').appendChild(b);
+});
+function drawThermo() {
+  const box = $('#thermo'); box.innerHTML = '';
+  for (let i = 1; i <= 5; i++) {
+    const b = el('button', { class: i <= selLvl ? 'on' : '', style: `height:${20 + i * 18}%;${i <= selLvl ? `background:${selMood ? selMood[2] : '#f9a8d4'};color:#2b2d42` : ''}` }, i);
+    b.onclick = () => { selLvl = i; drawThermo(); };
+    box.appendChild(b);
+  }
+}
+drawThermo();
+REASONS.forEach((r) => {
+  const b = el('button', null, r);
+  b.onclick = () => { selReasons.has(r) ? selReasons.delete(r) : selReasons.add(r); b.classList.toggle('on'); };
+  $('#reasons').appendChild(b);
+});
+function weekKey(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x.toISOString().slice(0, 10); }
+function drawWeek() {
+  const data = IK.store.get('week', {}); const wk = weekKey(new Date()); const rec = data[wk] || {};
+  const today = (new Date().getDay() + 6) % 7;
+  $('#week').innerHTML = DAYN.map((d, i) => `<div class="${i === today ? 'today' : ''}"><span class="em">${rec[i] ? rec[i].e : ''}</span>${d}</div>`).join('');
+  const t = rec[today];
+  $('#mood-note').textContent = t ? `Bugün kendini ${t.n.toLowerCase()} hissettin (güç: ${t.l}/5)${t.r.length ? ', sebebi: ' + t.r.join(', ').toLowerCase() : ''}. Duygularını fark etmek çok önemli! 💗` : 'Bugün için henüz bir şey yazmadın.';
+}
+$('#save-mood').onclick = () => {
+  if (!selMood) { IK.toast('Önce bir duygu seç 🙂', 'bad'); return; }
+  const data = IK.store.get('week', {}); const wk = weekKey(new Date());
+  data[wk] = data[wk] || {}; data[wk][(new Date().getDay() + 6) % 7] = { e: selMood[0], n: selMood[1], l: selLvl, r: [...selReasons] };
+  for (const k of Object.keys(data)) if (k < weekKey(Date.now() - 28 * 864e5)) delete data[k];
+  IK.store.set('week', data); drawWeek(); IK.right('Günlüğüne yazıldı 📔');
+  if (['Üzgün', 'Kızgın', 'Korkmuş'].includes(selMood[1]) && selLvl >= 4) setTimeout(() => IK.toast('Güçlü bir duygu. Nefes Balonu’nu denemek ya da bir büyüğünle konuşmak iyi gelebilir 💗'), 2300);
+};
+drawWeek();
+</script>
+</body>
+</html>

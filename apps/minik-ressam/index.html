@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minik Ressam Stüdyosu | Atölye</title>
+<meta name="description" content="Ana renkleri karıştırma laboratuvarı, simetri aynası ile çizim, örüntü tamamlama ve sayılarla boyama.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎨</text></svg>">
+<link rel="stylesheet" href="/shared/ilkokul.css">
+<style>
+  :root { --ik-accent: #7c3aed; --ik-accent-2: #f472b6; --ik-bg: #faf6ff; }
+  .pots { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .pot { width: 82px; border: 0; background: none; padding: 0; text-align: center; font-weight: 800; font-size: 13px; }
+  .pot .jar { width: 70px; height: 70px; border-radius: 16px 16px 26px 26px; margin: 0 auto 4px; border: 4px solid rgba(0,0,0,.15); box-shadow: inset 0 -10px 0 rgba(0,0,0,.12); transition: transform .12s; }
+  .pot:active .jar { transform: translateY(4px) scale(.96); }
+  .pot .n { display: block; color: var(--ik-soft); font-size: 12px; }
+  .bowl { width: 220px; height: 220px; border-radius: 50%; margin: 10px auto; border: 10px solid #e9e3f5; box-shadow: inset 0 14px 30px rgba(0,0,0,.18); transition: background .4s; position: relative; }
+  .bowl::after { content: ''; position: absolute; left: 22%; top: 18%; width: 30%; height: 16%; border-radius: 50%; background: rgba(255,255,255,.35); }
+  .target { display: flex; align-items: center; gap: 12px; justify-content: center; }
+  .swatch { width: 56px; height: 56px; border-radius: 16px; border: 3px solid #fff; box-shadow: 0 4px 12px -4px rgba(0,0,0,.3); }
+  .mirror-wrap { position: relative; width: min(100%, 560px); aspect-ratio: 1; margin: 0 auto; border-radius: 22px; overflow: hidden; background: #fff; border: 2px solid var(--ik-line); }
+  .mirror-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .palette { display: flex; flex-wrap: wrap; gap: 8px; }
+  .palette button { width: 40px; height: 40px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 2px var(--ik-line); }
+  .palette button.on { box-shadow: 0 0 0 3px var(--ik-ink); transform: scale(1.1); }
+  .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+  .seg button { border: 2px solid var(--ik-line); background: #fff; border-radius: 12px; padding: 7px 12px; font-weight: 800; font-size: 14px; }
+  .seg button.on { background: var(--ik-accent); border-color: var(--ik-accent); color: #fff; }
+  .pattern { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; padding: 18px 8px; }
+  .pattern .sh, .pat-opts .sh { width: 62px; height: 62px; display: grid; place-items: center; }
+  .pattern .sh svg, .pat-opts svg { width: 56px; height: 56px; }
+  .pattern .gap { border: 3px dashed var(--ik-accent); border-radius: 16px; font-family: 'Baloo 2'; font-size: 34px; color: var(--ik-accent); }
+  .pat-opts { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .pat-opts .ik-choice { padding: 8px; }
+  .pix { display: grid; gap: 2px; background: #e9e3f5; padding: 4px; border-radius: 14px; width: min(100%, 520px); margin: 0 auto; touch-action: none; }
+  .px { aspect-ratio: 1; border: 0; background: #fff; border-radius: 3px; font-size: clamp(8px, 1.6vw, 13px); font-weight: 800; color: #9a90b0; padding: 0; }
+  .px.done { color: transparent; }
+  .key { display: flex; flex-wrap: wrap; gap: 8px; }
+  .key button { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; border: 2px solid var(--ik-line); background: #fff; font-weight: 800; }
+  .key button span { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.5); font-size: 14px; }
+  .key button.on { border-color: var(--ik-ink); }
+</style>
+</head>
+<body>
+<header class="ik-top">
+  <div class="ik-brand">
+    <div class="ik-logo">🎨</div>
+    <div><h1>Minik Ressam Stüdyosu</h1><p>Renk, simetri ve örüntü atölyesi</p></div>
+  </div>
+  <nav class="ik-tabs" role="tablist">
+    <button class="ik-tab" data-tab="renk"><span class="e">🧪</span>Renk Lab</button>
+    <button class="ik-tab" data-tab="ayna"><span class="e">🪞</span>Simetri Aynası</button>
+    <button class="ik-tab" data-tab="oruntu"><span class="e">🔷</span>Örüntüler</button>
+    <button class="ik-tab" data-tab="boya"><span class="e">🖌️</span>Sayılarla Boya</button>
+  </nav>
+  <span class="ik-stars">⭐ <span id="ik-stars">0</span></span>
+</header>
+
+<main class="ik-main">
+  <!-- RENK -->
+  <section class="ik-panel" data-panel="renk">
+    <div class="ik-head"><div><h2>Renk Laboratuvarı</h2><p><b>Kırmızı, sarı ve mavi</b> ana renklerdir. Kavanozlara dokunarak kaseye boya damlat ve istenen rengi elde et!</p></div>
+      <div class="seg" id="color-mode"><button data-m="gorev" class="on">Görev</button><button data-m="serbest">Serbest</button></div></div>
+    <div class="ik-grid two">
+      <div class="ik-card">
+        <div class="pots" id="pots"></div>
+        <div class="bowl" id="bowl"></div>
+        <div class="ik-row" style="justify-content:center"><button class="ik-btn ghost small" id="bowl-empty">🫗 Kaseyi boşalt</button></div>
+      </div>
+      <div class="ik-card ik-center" style="gap:14px">
+        <div id="color-task" class="target"></div>
+        <div class="ik-big" id="mix-name" style="font-size:28px"></div>
+        <div class="ik-muted" id="mix-recipe"></div>
+        <button class="ik-btn green" id="color-check">✔ Bu renk oldu mu?</button>
+        <div class="ik-feedback" id="color-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AYNA -->
+  <section class="ik-panel" data-panel="ayna">
+    <div class="ik-head"><div><h2>Simetri Aynası</h2><p>Bir tarafa çiz, ayna diğer tarafı senin için çizsin. Kar tanesi, kelebek ya da mandala yap!</p></div>
+      <div class="seg" id="sym-seg"><button data-n="2" class="on">🦋 2 parça</button><button data-n="4">🌸 4 parça</button><button data-n="8">❄️ 8 parça</button></div></div>
+    <div class="ik-grid two">
+      <div class="ik-card" style="padding:12px"><div class="mirror-wrap"><canvas id="sym-guide"></canvas><canvas id="sym"></canvas></div></div>
+      <div class="ik-card">
+        <div class="ik-label">Renk</div><div class="palette" id="sym-pal" style="margin:10px 0 16px"></div>
+        <div class="ik-label">Fırça kalınlığı</div><input type="range" id="sym-size" min="3" max="40" value="12" style="width:100%;accent-color:var(--ik-accent)">
+        <div class="ik-row" style="margin-top:14px">
+          <button class="ik-btn ghost small" id="sym-guide-btn">📐 Çizgileri gizle</button>
+          <button class="ik-btn ghost small" id="sym-clear">🧽 Temizle</button>
+          <button class="ik-btn small" id="sym-save">💾 Resmi kaydet</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ÖRÜNTÜ -->
+  <section class="ik-panel" data-panel="oruntu">
+    <div class="ik-head"><div><h2>Örüntüyü Tamamla</h2><p>Şekiller ve renkler bir kurala göre tekrar ediyor. Kuralı bul, boşluğa ne gelmeli?</p></div><span class="ik-chip" id="pat-level"></span></div>
+    <div class="ik-card">
+      <div class="pattern" id="pattern"></div>
+      <div class="pat-opts" id="pat-opts"></div>
+      <div class="ik-feedback" id="pat-fb" style="text-align:center"></div>
+    </div>
+  </section>
+
+  <!-- BOYA -->
+  <section class="ik-panel" data-panel="boya">
+    <div class="ik-head"><div><h2>Sayılarla Boya</h2><p>Bir renk seç, aynı numaralı karelere dokun ya da parmağını sürükle. Gizli resmi ortaya çıkar!</p></div><div class="seg" id="pic-seg"></div></div>
+    <div class="ik-grid two">
+      <div class="ik-card" style="padding:12px"><div class="pix" id="pix"></div></div>
+      <div class="ik-card"><div class="ik-label">Renk anahtarı</div><div class="key" id="key" style="margin:10px 0 16px"></div><div class="ik-big" id="pix-progress">%0</div></div>
+    </div>
+  </section>
+</main>
+
+<script src="/shared/ilkokul.js"></script>
+<script>
+const { $, $$, el, say, pick, shuffle, rand } = IK;
+
+/* ═════ RENK LAB ═════ */
+// RYB küpünden RGB'ye üç doğrusal enterpolasyon (ressam renk karışımına yakın sonuç verir).
+const RYB = [[1, 1, 1], [1, 0, 0], [1, 1, 0], [1, 0.5, 0], [0.163, 0.373, 0.6], [0.5, 0, 0.5], [0, 0.66, 0.2], [0.2, 0.094, 0]];
+function ryb2rgb(r, y, b) {
+  const L = (a, c, t) => a + (c - a) * t;
+  const out = [0, 1, 2].map((i) => {
+    const x0 = L(RYB[0][i], RYB[4][i], b), x1 = L(RYB[1][i], RYB[5][i], b), x2 = L(RYB[2][i], RYB[6][i], b), x3 = L(RYB[3][i], RYB[7][i], b);
+    return L(L(x0, x1, r), L(x2, x3, r), y);
+  });
+  return out;
+}
+const PAINTS = [['Kırmızı', 'r', '#e11d1d'], ['Sarı', 'y', '#facc15'], ['Mavi', 'b', '#1d4ed8'], ['Beyaz', 'w', '#ffffff'], ['Siyah', 'k', '#1f1f1f']];
+let drops = { r: 0, y: 0, b: 0, w: 0, k: 0 };
+function mixRGB(d) {
+  const c = d.r + d.y + d.b, tot = c + d.w + d.k;
+  if (!tot) return null;
+  const m = Math.max(d.r, d.y, d.b) || 1;
+  let rgb = c ? ryb2rgb(d.r / m, d.y / m, d.b / m) : [1, 1, 1];
+  // beyaz açar, siyah koyulaştırır
+  const wt = d.w / tot, kt = d.k / tot;
+  rgb = rgb.map((v) => v * (1 - wt) + wt);
+  rgb = rgb.map((v) => v * (1 - kt * 0.9));
+  return rgb.map((v) => Math.round(Math.max(0, Math.min(1, v)) * 255));
+}
+const css = (rgb) => rgb ? `rgb(${rgb.join(',')})` : '#f5f2fa';
+const TARGETS = [
+  ['Turuncu', { r: 1, y: 1 }], ['Yeşil', { y: 1, b: 1 }], ['Mor', { r: 1, b: 1 }], ['Pembe', { r: 1, w: 2 }], ['Açık mavi', { b: 1, w: 2 }],
+  ['Kahverengi', { r: 1, y: 1, b: 1 }], ['Gri', { w: 2, k: 1 }], ['Açık yeşil', { y: 2, b: 1, w: 1 }], ['Lacivert', { b: 2, k: 1 }], ['Krem', { y: 1, w: 3 }],
+];
+const full = (o) => Object.assign({ r: 0, y: 0, b: 0, w: 0, k: 0 }, o);
+let colorMode = 'gorev', ctarget = null;
+PAINTS.forEach(([n, k, c]) => {
+  const b = el('button', { class: 'pot' }, `<div class="jar" style="background:${c}"></div>${n}<span class="n" id="n-${k}">0 damla</span>`);
+  b.onclick = () => { if (Object.values(drops).reduce((a, v) => a + v, 0) >= 24) { IK.toast('Kase doldu! Boşaltıp yeniden dene.'); return; } drops[k]++; IK.beep('tick'); paintBowl(); };
+  $('#pots').appendChild(b);
+});
+function nameOf(rgb) {
+  let best = '', bd = 1e9;
+  TARGETS.concat([['Kırmızı', { r: 1 }], ['Sarı', { y: 1 }], ['Mavi', { b: 1 }], ['Beyaz', { w: 1 }], ['Siyah', { k: 1 }]]).forEach(([n, rec]) => {
+    const t = mixRGB(full(rec)); const d = t.reduce((a, v, i) => a + (v - rgb[i]) ** 2, 0); if (d < bd) { bd = d; best = n; }
+  });
+  return bd < 2600 ? best : 'Yeni bir renk!';
+}
+function paintBowl() {
+  const rgb = mixRGB(drops); $('#bowl').style.background = css(rgb);
+  PAINTS.forEach(([, k]) => $('#n-' + k).textContent = drops[k] + ' damla');
+  $('#mix-name').textContent = rgb ? nameOf(rgb) : 'Kase boş';
+  $('#mix-recipe').textContent = PAINTS.filter(([, k]) => drops[k]).map(([n, k]) => `${drops[k]} ${n.toLowerCase()}`).join(' + ');
+}
+$('#bowl-empty').onclick = () => { drops = full({}); paintBowl(); $('#color-fb').textContent = ''; };
+function colorTask() {
+  drops = full({}); paintBowl(); $('#color-fb').textContent = '';
+  if (colorMode === 'serbest') { $('#color-task').innerHTML = '<span class="ik-muted">Dilediğin gibi karıştır, rengin adını öğren!</span>'; $('#color-check').style.display = 'none'; return; }
+  $('#color-check').style.display = '';
+  let t; do t = pick(TARGETS); while (t === ctarget); ctarget = t;
+  $('#color-task').innerHTML = `<div class="swatch" style="background:${css(mixRGB(full(t[1])))}"></div><div style="text-align:left"><div class="ik-label">Hedef renk</div><div class="ik-big" style="font-size:28px">${t[0]}</div></div>`;
+  say(t[0] + ' rengini yap');
+}
+$('#color-check').onclick = () => {
+  const rgb = mixRGB(drops); if (!rgb) { IK.toast('Önce kaseye boya damlat 🎨'); return; }
+  const t = mixRGB(full(ctarget[1])); const d = Math.sqrt(t.reduce((a, v, i) => a + (v - rgb[i]) ** 2, 0));
+  const fb = $('#color-fb');
+  if (d < 45) { fb.className = 'ik-feedback ok'; fb.textContent = `Tebrikler, ${ctarget[0].toLowerCase()} oldu! 🎉`; IK.win(); setTimeout(colorTask, 2000); }
+  else if (d < 90) { fb.className = 'ik-feedback'; fb.textContent = 'Çok yaklaştın! Biraz daha dene.'; IK.beep('tick'); }
+  else {
+    const hint = Object.entries(ctarget[1]).map(([k]) => PAINTS.find((p) => p[1] === k)[0].toLowerCase()).join(' ve ');
+    fb.className = 'ik-feedback bad'; fb.textContent = `İpucu: ${hint} boyaları kullan.`; IK.wrong();
+  }
+};
+$$('#color-mode button').forEach((b) => b.onclick = () => { $$('#color-mode button').forEach((x) => x.classList.toggle('on', x === b)); colorMode = b.dataset.m; colorTask(); });
+colorTask();
+
+/* ═════ SİMETRİ ═════ */
+const S = 800, sym = $('#sym'), guide = $('#sym-guide'), sctx = sym.getContext('2d'), gctx = guide.getContext('2d');
+[sym, guide].forEach((c) => { c.width = S; c.height = S; });
+let parts = 2, scol = '#7c3aed', showGuide = true, sdraw = false, slast = null;
+const PAL = ['#ef4444', '#f97316', '#facc15', '#22c55e', '#06b6d4', '#3b82f6', '#7c3aed', '#ec4899', '#78350f', '#111827', '#ffffff'];
+PAL.forEach((c, i) => {
+  const b = el('button', { style: `background:${c}`, 'aria-label': 'renk ' + (i + 1), class: c === scol ? 'on' : '' });
+  b.onclick = () => { scol = c; $$('#sym-pal button').forEach((x) => x.classList.toggle('on', x === b)); };
+  $('#sym-pal').appendChild(b);
+});
+function drawGuide() {
+  gctx.clearRect(0, 0, S, S); if (!showGuide) return;
+  gctx.strokeStyle = '#d8ccf0'; gctx.lineWidth = 3; gctx.setLineDash([12, 12]);
+  const n = parts === 2 ? 1 : parts / 2;
+  for (let i = 0; i < n; i++) { const a = Math.PI / 2 + i * Math.PI / n; gctx.beginPath(); gctx.moveTo(S / 2 + Math.cos(a) * S, S / 2 + Math.sin(a) * S); gctx.lineTo(S / 2 - Math.cos(a) * S, S / 2 - Math.sin(a) * S); gctx.stroke(); }
+  gctx.setLineDash([]);
+}
+function seg(a, b) {
+  sctx.strokeStyle = scol; sctx.lineWidth = +$('#sym-size').value * 1.6; sctx.lineCap = 'round'; sctx.lineJoin = 'round';
+  const cx = S / 2, cy = S / 2;
+  const pts = [];
+  if (parts === 2) { pts.push([a, b], [[S - a[0], a[1]], [S - b[0], b[1]]]); }
+  else {
+    const n = parts / 2;
+    for (let i = 0; i < n; i++) {
+      const ang = i * 2 * Math.PI / n;
+      const rot = (p, m) => { let x = p[0] - cx, y = p[1] - cy; if (m) x = -x; return [cx + x * Math.cos(ang) - y * Math.sin(ang), cy + x * Math.sin(ang) + y * Math.cos(ang)]; };
+      pts.push([rot(a, 0), rot(b, 0)], [rot(a, 1), rot(b, 1)]);
+    }
+  }
+  pts.forEach(([p, q]) => { sctx.beginPath(); sctx.moveTo(p[0], p[1]); sctx.lineTo(q[0], q[1]); sctx.stroke(); });
+}
+const spos = (e) => { const r = sym.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * S, (e.clientY - r.top) / r.height * S]; };
+sym.addEventListener('pointerdown', (e) => { sdraw = true; slast = spos(e); sym.setPointerCapture(e.pointerId); seg(slast, [slast[0] + .1, slast[1] + .1]); });
+sym.addEventListener('pointermove', (e) => { if (!sdraw) return; const p = spos(e); seg(slast, p); slast = p; });
+sym.addEventListener('pointerup', () => sdraw = false);
+$$('#sym-seg button').forEach((b) => b.onclick = () => { $$('#sym-seg button').forEach((x) => x.classList.toggle('on', x === b)); parts = +b.dataset.n; drawGuide(); });
+$('#sym-guide-btn').onclick = () => { showGuide = !showGuide; $('#sym-guide-btn').textContent = showGuide ? '📐 Çizgileri gizle' : '📐 Çizgileri göster'; drawGuide(); };
+$('#sym-clear').onclick = () => sctx.clearRect(0, 0, S, S);
+$('#sym-save').onclick = () => {
+  const out = document.createElement('canvas'); out.width = S; out.height = S; const o = out.getContext('2d');
+  o.fillStyle = '#fff'; o.fillRect(0, 0, S, S); o.drawImage(sym, 0, 0);
+  const a = document.createElement('a'); a.download = 'simetri-resmim.png'; a.href = out.toDataURL('image/png'); a.click();
+};
+drawGuide();
+
+/* ═════ ÖRÜNTÜ ═════ */
+const SHAPES = {
+  daire: (c) => `<svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="24" fill="${c}"/></svg>`,
+  kare: (c) => `<svg viewBox="0 0 60 60"><rect x="7" y="7" width="46" height="46" rx="6" fill="${c}"/></svg>`,
+  üçgen: (c) => `<svg viewBox="0 0 60 60"><polygon points="30,5 56,53 4,53" fill="${c}" stroke-linejoin="round"/></svg>`,
+  yıldız: (c) => `<svg viewBox="0 0 60 60"><polygon points="30,3 37,22 57,22 41,35 47,55 30,43 13,55 19,35 3,22 23,22" fill="${c}"/></svg>`,
+  kalp: (c) => `<svg viewBox="0 0 60 60"><path d="M30 53 C6 36 4 20 14 12 C22 6 28 10 30 16 C32 10 38 6 46 12 C56 20 54 36 30 53Z" fill="${c}"/></svg>`,
+};
+const COLS = ['#ef4444', '#3b82f6', '#facc15', '#22c55e', '#a855f7', '#f97316'];
+const RULES = [['AB', 0], ['AAB', 0], ['ABB', 1], ['ABC', 1], ['AABB', 2], ['ABCB', 2], ['ABAC', 3], ['AABC', 3]];
+let patLevel = 0, patOk = 0;
+const token = (t) => SHAPES[t[0]](t[1]);
+function patRound() {
+  const rules = RULES.filter((r) => r[1] <= patLevel);
+  const rule = pick(rules)[0];
+  const letters = [...new Set(rule)];
+  const shapeKeys = shuffle(Object.keys(SHAPES)), cols = shuffle(COLS);
+  // Seviye ilerledikçe hem şekil hem renk değişir.
+  const map = {}; letters.forEach((L, i) => map[L] = [patLevel < 1 ? shapeKeys[0] : shapeKeys[i], cols[i]]);
+  if (patLevel < 1) letters.forEach((L, i) => map[L] = [shapeKeys[i], cols[i]]);
+  const len = rule.length * 2 + 2, seq = Array.from({ length: len }, (_, i) => map[rule[i % rule.length]]);
+  const gapCount = patLevel >= 2 ? 2 : 1;
+  const answer = seq.slice(len - gapCount);
+  const box = $('#pattern'); box.innerHTML = '';
+  seq.forEach((t, i) => box.appendChild(el('div', { class: 'sh' + (i >= len - gapCount ? ' gap' : '') }, i >= len - gapCount ? '?' : token(t))));
+  $('#pat-level').textContent = `Seviye ${patLevel + 1} · ${patOk}/4`; $('#pat-fb').textContent = '';
+  // seçenekler
+  const key = (arr) => arr.map((t) => t.join()).join('|');
+  const opts = new Map([[key(answer), answer]]);
+  const pool = Object.values(map).concat([[shapeKeys[4], cols[5]]]);
+  let guard = 0;
+  while (opts.size < 3 && guard++ < 50) { const o = Array.from({ length: gapCount }, () => pick(pool)); opts.set(key(o), o); }
+  const obox = $('#pat-opts'); obox.innerHTML = '';
+  shuffle([...opts.entries()]).forEach(([k, o]) => {
+    const b = el('button', { class: 'ik-choice' }, `<div style="display:flex;gap:4px">${o.map(token).join('')}</div>`);
+    b.onclick = () => {
+      if (k === key(answer)) {
+        b.classList.add('ok'); $$('.gap', box).forEach((g, i) => { g.classList.remove('gap'); g.innerHTML = token(answer[i]); });
+        patOk++; $('#pat-fb').className = 'ik-feedback ok'; $('#pat-fb').textContent = `Kural: ${rule.split('').join(' - ')}`;
+        if (patOk >= 4) { patOk = 0; if (patLevel < 3) { patLevel++; IK.win('Yeni seviye!'); } else IK.win('Örüntü ustası! 🏆'); } else IK.right();
+        setTimeout(patRound, 1500);
+      } else { b.classList.add('bad'); IK.wrong(); $('#pat-fb').className = 'ik-feedback bad'; $('#pat-fb').textContent = 'Baştan tekrar eden parçayı bul.'; }
+    };
+    obox.appendChild(b);
+  });
+}
+patRound();
+
+/* ═════ SAYILARLA BOYA ═════ */
+const PICS = {
+  'Kalp': { c: { 1: '#ef4444', 2: '#fecaca' }, g: ['000000000000', '011100011100', '122110111110', '121111111110', '111111111110', '011111111100', '001111111000', '000111110000', '000011100000', '000001000000', '000000000000', '000000000000'] },
+  'Balık': { c: { 1: '#f97316', 2: '#fde047', 3: '#38bdf8', 4: '#111827' }, g: ['333333333333', '333333333333', '333311113333', '331111111331', '311141111111', '111111211113', '311111211111', '331111111331', '333311113333', '333333333333', '333333333333', '333333333333'] },
+  'Çiçek': { c: { 1: '#ec4899', 2: '#facc15', 3: '#22c55e', 4: '#bae6fd' }, g: ['444444444444', '444411114444', '444111111444', '441112211144', '441122221144', '441112211144', '444111111444', '444413314444', '443344334444', '444443344444', '444443344444', '333333333333'] },
+  'Ev': { c: { 1: '#dc2626', 2: '#fde68a', 3: '#7c2d12', 4: '#93c5fd', 5: '#22c55e' }, g: ['444444444444', '444441144444', '444411114444', '444111111444', '441111111144', '411111111114', '442222222244', '442442233244', '442442233244', '442222233244', '555555555555', '555555555555'] },
+};
+let picName = 'Kalp', curCol = 1, cells = [], painting = false;
+Object.keys(PICS).forEach((n) => {
+  const b = el('button', null, n);
+  b.onclick = () => { picName = n; $$('#pic-seg button').forEach((x) => x.classList.toggle('on', x === b)); buildPic(); };
+  $('#pic-seg').appendChild(b);
+});
+$$('#pic-seg button')[0].classList.add('on');
+function buildPic() {
+  const p = PICS[picName]; const pix = $('#pix'); pix.innerHTML = ''; pix.style.gridTemplateColumns = `repeat(${p.g[0].length}, 1fr)`;
+  cells = [];
+  p.g.forEach((row) => row.split('').forEach((ch) => {
+    const n = +ch === 0 ? 0 : +ch; const b = el('button', { class: 'px' }, n ? n : '');
+    if (!n) { b.classList.add('done'); }
+    b.dataset.n = n; cells.push(b); pix.appendChild(b);
+  }));
+  const key = $('#key'); key.innerHTML = '';
+  Object.entries(p.c).forEach(([n, c]) => {
+    const b = el('button', { class: +n === 1 ? 'on' : '' }, `<span style="background:${c}">${n}</span>${n}`);
+    b.onclick = () => { curCol = +n; $$('#key button').forEach((x) => x.classList.toggle('on', x === b)); };
+    key.appendChild(b);
+  });
+  curCol = 1; progress();
+}
+function fill(b) {
+  if (!b || !b.classList.contains('px') || b.classList.contains('done')) return;
+  if (+b.dataset.n === curCol) { b.style.background = PICS[picName].c[curCol]; b.classList.add('done'); progress(true); }
+  else if (!painting) IK.beep('bad');
+}
+function progress(changed) {
+  const need = cells.filter((c) => +c.dataset.n), done = need.filter((c) => c.classList.contains('done'));
+  const pct = Math.round(done.length / need.length * 100); $('#pix-progress').textContent = '%' + pct;
+  if (changed && pct === 100) IK.win(`${picName} resmi tamamlandı! 🖼️`);
+}
+$('#pix').addEventListener('pointerdown', (e) => { painting = true; fill(e.target); });
+document.addEventListener('pointermove', (e) => { if (painting) fill(document.elementFromPoint(e.clientX, e.clientY)); });
+document.addEventListener('pointerup', () => painting = false);
+buildPic();
+
+IK.tabs();
+</script>
+</body>
+</html>

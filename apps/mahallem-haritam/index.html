@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mahallem ve Haritam | Atölye</title>
+<meta name="description" content="Kendi mahalle krokini çiz, pusula ile yön bul, kuşbakışı görünümleri eşleştir, meslekleri çalıştıkları yerlerle buluştur.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
+<link rel="stylesheet" href="/shared/ilkokul.css">
+<style>
+  :root { --ik-accent: #0d9488; --ik-accent-2: #fbbf24; --ik-bg: #f3faf7; }
+  .grid-map { display: grid; gap: 2px; background: #cbd5c0; padding: 3px; border-radius: 14px; touch-action: none; user-select: none; }
+  .tile { aspect-ratio: 1; border: 0; padding: 0; background: #dcfce7; font-size: clamp(14px, 3vw, 26px); display: grid; place-items: center; border-radius: 4px; position: relative; }
+  .tile.road { background: #64748b; }
+  .tile .lbl { position: absolute; bottom: 0; left: 0; right: 0; font-size: 8px; font-weight: 800; color: #334155; line-height: 1; }
+  .tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 6px; }
+  .tools button { border: 2px solid var(--ik-line); background: #fff; border-radius: 14px; padding: 6px 2px; font-weight: 800; font-size: 11.5px; }
+  .tools button .em { font-size: 26px; display: block; }
+  .tools button.on { border-color: var(--ik-accent); background: #ecfdf5; }
+  .compass { width: 200px; height: 200px; display: block; margin: 0 auto; }
+  .compass .dir { cursor: pointer; }
+  .dpad { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(3, 64px); gap: 6px; justify-content: center; }
+  .dpad button { border: 0; border-radius: 16px; background: var(--ik-accent); color: #fff; font-family: 'Baloo 2'; font-weight: 800; font-size: 18px; box-shadow: 0 4px 0 rgba(0,0,0,.2); line-height: 1; }
+  .dpad button small { display: block; font-size: 11px; font-family: 'Nunito'; }
+  .dpad .c { background: #f4ede2; color: var(--ik-soft); box-shadow: none; font-size: 26px; }
+  .instr { display: flex; flex-direction: column; gap: 6px; }
+  .instr div { padding: 8px 12px; border-radius: 12px; background: #f6f2ea; font-weight: 800; }
+  .instr div.cur { background: #fef3c7; outline: 2px solid var(--ik-accent-2); }
+  .instr div.ok { background: var(--ik-ok-bg); color: #146c41; }
+  .view-obj { font-size: 120px; text-align: center; line-height: 1.1; }
+  .view-opts .ik-choice svg { width: 90px; height: 90px; }
+  .jobs { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; min-height: 100px; }
+  .job { border: 2px solid var(--ik-line); background: #fff; border-radius: 18px; padding: 8px 12px; text-align: center; font-weight: 800; font-size: 13px; box-shadow: 0 3px 0 var(--ik-line); }
+  .job .em { font-size: 40px; display: block; }
+  .places { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  .place { border: 3px dashed #b6c9bf; border-radius: 18px; padding: 10px; text-align: center; font-weight: 800; min-height: 120px; background: #fff; transition: background .2s; }
+  .place .em { font-size: 40px; display: block; }
+  .place .who { font-size: 30px; min-height: 36px; }
+  .place.ok { border-style: solid; border-color: var(--ik-ok); background: var(--ik-ok-bg); }
+  .place.bad { animation: ik-shake .35s; border-color: var(--ik-bad); }
+</style>
+</head>
+<body>
+<header class="ik-top">
+  <div class="ik-brand">
+    <div class="ik-logo">🧭</div>
+    <div><h1>Mahallem ve Haritam</h1><p>Kroki, yön ve bakış açısı atölyesi</p></div>
+  </div>
+  <nav class="ik-tabs" role="tablist">
+    <button class="ik-tab" data-tab="kroki"><span class="e">✏️</span>Krokim</button>
+    <button class="ik-tab" data-tab="yon"><span class="e">🧭</span>Yön Bul</button>
+    <button class="ik-tab" data-tab="bakis"><span class="e">🦅</span>Kuşbakışı</button>
+    <button class="ik-tab" data-tab="meslek"><span class="e">👩‍🚒</span>Meslekler</button>
+  </nav>
+  <span class="ik-stars">⭐ <span id="ik-stars">0</span></span>
+</header>
+
+<main class="ik-main">
+  <!-- KROKİ -->
+  <section class="ik-panel" data-panel="kroki">
+    <div class="ik-head"><div><h2>Mahallemin Krokisi</h2><p><b>Kroki</b>, bir yerin kuşbakışı basit çizimidir. Bir sembol seç ve karelere dokunarak kendi mahalleni çiz. Çalışman bu cihazda saklanır.</p></div>
+      <div class="ik-row"><button class="ik-btn ghost small" id="kr-sample">🏘️ Örnek kroki</button><button class="ik-btn ghost small" id="kr-clear">🧽 Temizle</button></div></div>
+    <div class="ik-grid two">
+      <div class="ik-card" style="padding:10px"><div class="grid-map" id="kroki"></div></div>
+      <div class="ik-card">
+        <div class="ik-label">Semboller</div>
+        <div class="tools" id="tools" style="margin:10px 0 14px"></div>
+        <div class="ik-label">Krokimde neler var?</div>
+        <p id="kr-summary" class="ik-muted" style="margin:6px 0 0"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- YÖN -->
+  <section class="ik-panel" data-panel="yon">
+    <div class="ik-head"><div><h2>Pusula ile Yön Bul</h2><p>Talimatları sırayla uygula: Kuzey (K), Güney (G), Doğu (D), Batı (B). Hedefe ulaşabilecek misin?</p></div><button class="ik-btn ghost" id="dir-new">🗺️ Yeni görev</button></div>
+    <div class="ik-grid two">
+      <div class="ik-card" style="padding:10px"><div class="grid-map" id="dirmap"></div></div>
+      <div class="ik-grid">
+        <div class="ik-card"><div class="ik-label">Talimatlar</div><div class="instr" id="instr" style="margin-top:8px"></div><div class="ik-feedback" id="dir-fb"></div></div>
+        <div class="ik-card ik-grid half" style="align-items:center">
+          <div class="dpad">
+            <span></span><button data-d="K">↑<small>Kuzey</small></button><span></span>
+            <button data-d="B">←<small>Batı</small></button><span class="c" style="display:grid;place-items:center">🧭</span><button data-d="D">→<small>Doğu</small></button>
+            <span></span><button data-d="G">↓<small>Güney</small></button><span></span>
+          </div>
+          <div><svg class="compass" id="compass" viewBox="-100 -100 200 200"></svg><p class="ik-muted" id="comp-info" style="text-align:center;font-size:13.5px;margin:4px 0 0">Pusula gülünde bir yöne dokun</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BAKIŞ -->
+  <section class="ik-panel" data-panel="bakis">
+    <div class="ik-head"><div><h2>Kuşbakışı Görünüm</h2><p>Bir kuş gibi tepeden baksaydın bu nesneyi nasıl görürdün? Doğru kuşbakışı çizimi seç.</p></div><span class="ik-chip" id="view-count"></span></div>
+    <div class="ik-grid two">
+      <div class="ik-card ik-center"><div class="ik-label">Önden görünüm</div><div class="view-obj" id="view-obj"></div><div class="ik-big" id="view-name" style="font-size:26px"></div></div>
+      <div class="ik-card"><div class="ik-label">Kuşbakışı hangisi?</div><div class="ik-choices view-opts" id="view-opts" style="margin-top:10px"></div><div class="ik-feedback" id="view-fb"></div></div>
+    </div>
+  </section>
+
+  <!-- MESLEK -->
+  <section class="ik-panel" data-panel="meslek">
+    <div class="ik-head"><div><h2>Mahallemizdeki Meslekler</h2><p>Her meslek sahibini çalıştığı yere sürükle. Hepsi mahallemizin yardımcıları!</p></div><button class="ik-btn ghost" id="job-reset">🔄 Yeniden başla</button></div>
+    <div class="ik-card" style="margin-bottom:16px"><div class="jobs" id="jobs"></div></div>
+    <div class="places" id="places"></div>
+  </section>
+</main>
+
+<script src="/shared/ilkokul.js"></script>
+<script>
+const { $, $$, el, say, pick, shuffle, rand } = IK;
+
+/* ═════ KROKİ ═════ */
+const W = 10, Hh = 8;
+const TOOLS = [['road', '⬛', 'Yol'], ['🏠', '🏠', 'Ev'], ['🏫', '🏫', 'Okul'], ['🌳', '🌳', 'Ağaç'], ['🏞️', '🏞️', 'Park'], ['🛒', '🛒', 'Market'], ['🕌', '🕌', 'Cami'], ['🏥', '🏥', 'Sağlık ocağı'], ['📮', '📮', 'Postane'], ['🥖', '🥖', 'Fırın'], ['🚏', '🚏', 'Durak'], ['⛲', '⛲', 'Çeşme'], ['🧽', '🧽', 'Silgi']];
+let tool = '🏠', kgrid = IK.store.get('kroki', null) || Array(W * Hh).fill(''), kpaint = false;
+TOOLS.forEach((t) => {
+  const b = el('button', { class: t[0] === tool ? 'on' : '' }, `<span class="em">${t[1]}</span>${t[2]}`);
+  b.onclick = () => { tool = t[0]; $$('#tools button').forEach((x) => x.classList.toggle('on', x === b)); };
+  $('#tools').appendChild(b);
+});
+function drawKroki() {
+  const m = $('#kroki'); m.style.gridTemplateColumns = `repeat(${W}, 1fr)`; m.innerHTML = '';
+  kgrid.forEach((v, i) => {
+    const b = el('button', { class: 'tile' + (v === 'road' ? ' road' : ''), 'data-i': i }, v && v !== 'road' ? v : '');
+    m.appendChild(b);
+  });
+  const counts = {}; kgrid.forEach((v) => { if (v && v !== 'road') counts[v] = (counts[v] || 0) + 1; });
+  const names = Object.fromEntries(TOOLS.map((t) => [t[0], t[2]]));
+  $('#kr-summary').textContent = Object.keys(counts).length ? Object.entries(counts).map(([k, n]) => `${n} ${names[k].toLowerCase()}`).join(', ') + '.' : 'Henüz bir şey çizmedin.';
+}
+function paintTile(t) {
+  if (!t || !t.classList.contains('tile')) return;
+  const i = +t.dataset.i, v = tool === '🧽' ? '' : tool; if (kgrid[i] === v) return;
+  kgrid[i] = v; t.className = 'tile' + (v === 'road' ? ' road' : ''); t.textContent = v && v !== 'road' ? v : '';
+  IK.store.set('kroki', kgrid);
+}
+$('#kroki').addEventListener('pointerdown', (e) => { kpaint = true; paintTile(e.target.closest('.tile')); });
+document.addEventListener('pointermove', (e) => { if (kpaint) { const t = document.elementFromPoint(e.clientX, e.clientY); paintTile(t && t.closest('.tile')); } });
+document.addEventListener('pointerup', () => { if (kpaint) { kpaint = false; drawKroki(); } });
+$('#kr-clear').onclick = () => { kgrid = Array(W * Hh).fill(''); IK.store.set('kroki', kgrid); drawKroki(); };
+$('#kr-sample').onclick = () => {
+  const S = ['🏠🏠🌳r🏫🏫🌳🏞️🏞️🌳', '🏠🌳..r...⛲.', 'rrrrrrrrrr', '🛒🥖.r🕌.🚏...', '🏠🏠.r..🏥🌳🏠🏠', 'rrrrrrrrrr', '🌳🏠🏠r📮🌳..🏠🌳', '🌳🌳.r..🏠🏠🌳🌳'];
+  // Emoji + varyasyon seçicisini tek karakter say.
+  kgrid = S.flatMap((row) => row.match(/\p{Extended_Pictographic}\uFE0F?|./gu).map((c) => c === 'r' ? 'road' : c === '.' ? '' : c));
+  IK.store.set('kroki', kgrid); drawKroki();
+};
+drawKroki();
+
+/* ═════ YÖN ═════ */
+const DW = 9, DH = 7, DV = { K: [0, -1], G: [0, 1], D: [1, 0], B: [-1, 0] }, DN = { K: 'kuzeye', G: 'güneye', D: 'doğuya', B: 'batıya' };
+const GOALS = [['🍦', 'dondurmacıya'], ['📚', 'kütüphaneye'], ['🎠', 'lunaparka'], ['🏫', 'okula'], ['🐶', 'köpeğine'], ['🏥', 'hastaneye']];
+let me, path0, steps, stepI, moved, goal, trees;
+function dirNew() {
+  me = [rand(1, DW - 2), rand(1, DH - 2)]; path0 = me.slice();
+  steps = []; let p = me.slice(), last = ''; const cellsOnPath = [me.slice()];
+  const n = rand(2, 3);
+  for (let i = 0; i < n; i++) {
+    let d, k, q; let guard = 0;
+    do { d = pick(['K', 'G', 'D', 'B']); k = rand(1, 3); q = [p[0] + DV[d][0] * k, p[1] + DV[d][1] * k]; guard++; }
+    while (guard < 60 && (d === last || q[0] < 0 || q[1] < 0 || q[0] >= DW || q[1] >= DH || (DV[d][0] && DV[last]?.[0]) || (DV[d][1] && DV[last]?.[1])));
+    if (guard >= 60) return dirNew();
+    for (let s = 1; s <= k; s++) cellsOnPath.push([p[0] + DV[d][0] * s, p[1] + DV[d][1] * s]);
+    steps.push([d, k]); p = q; last = d;
+  }
+  goal = [p, pick(GOALS)];
+  trees = []; for (let i = 0; i < 6; i++) { const t = [rand(0, DW - 1), rand(0, DH - 1)]; if (!cellsOnPath.some((c) => c[0] === t[0] && c[1] === t[1])) trees.push(t); }
+  stepI = 0; moved = 0; dfb(''); drawDir(); drawInstr();
+  say(`Hedef: ${goal[1][1]} git. ` + steps.map(([d, k]) => `${DN[d]} ${k} kare`).join(', sonra '));
+}
+function drawInstr() {
+  $('#instr').innerHTML = steps.map(([d, k], i) => `<div class="${i < stepI ? 'ok' : i === stepI ? 'cur' : ''}">${i + 1}. ${DN[d][0].toLocaleUpperCase('tr')}${DN[d].slice(1)} ${k} kare git ${i === stepI && moved ? `(${moved}/${k})` : ''}</div>`).join('') + `<div>🏁 ${goal[1][0]} ${goal[1][1]} vardın mı?</div>`;
+}
+function drawDir() {
+  const m = $('#dirmap'); m.style.gridTemplateColumns = `repeat(${DW}, 1fr)`; m.innerHTML = '';
+  for (let y = 0; y < DH; y++) for (let x = 0; x < DW; x++) {
+    let c = '';
+    if (x === me[0] && y === me[1]) c = '🧒';
+    else if (x === goal[0][0] && y === goal[0][1]) c = goal[1][0];
+    else if (trees.some((t) => t[0] === x && t[1] === y)) c = '🌳';
+    else if (x === path0[0] && y === path0[1]) c = '🏠';
+    m.appendChild(el('div', { class: 'tile' }, c));
+  }
+}
+function dfb(t, k) { $('#dir-fb').textContent = t; $('#dir-fb').className = 'ik-feedback ' + (k || ''); }
+$$('.dpad [data-d]').forEach((b) => b.onclick = () => {
+  if (stepI >= steps.length) return;
+  const d = b.dataset.d, [sd, sk] = steps[stepI];
+  if (d !== sd) { IK.wrong(); dfb(`Talimat ${DN[sd]} gitmeni söylüyor. Pusulaya bak!`, 'bad'); return; }
+  const q = [me[0] + DV[d][0], me[1] + DV[d][1]]; me = q; moved++; IK.beep('tick');
+  if (moved === sk) { stepI++; moved = 0; }
+  drawDir(); drawInstr(); dfb('');
+  if (stepI === steps.length) {
+    if (me[0] === goal[0][0] && me[1] === goal[0][1]) { IK.win(`${goal[1][1]} vardın! 🎉`); dfb('Harika! Hedefe ulaştın.', 'ok'); setTimeout(dirNew, 2600); }
+  }
+});
+$('#dir-new').onclick = dirNew;
+(function compass() {
+  let s = `<circle r="92" fill="#fff" stroke="#e5ddcf" stroke-width="4"/>`;
+  const D = [['K', 0, 'Kuzey', 'Kutup yıldızı kuzeyi gösterir.'], ['D', 90, 'Doğu', 'Güneş doğudan doğar.'], ['G', 180, 'Güney', 'Öğle vakti gölgemiz kuzeye düşer, güneş güneydedir.'], ['B', 270, 'Batı', 'Güneş batıdan batar.']];
+  D.forEach(([k, a, n, info]) => {
+    s += `<g class="dir" data-n="${n}" data-info="${info}" transform="rotate(${a})"><polygon points="0,-82 14,-14 0,0 -14,-14" fill="${k === 'K' ? '#ef4444' : '#0d9488'}"/><polygon points="0,-82 0,0 14,-14" fill="rgba(0,0,0,.15)"/><text x="0" y="-60" transform="rotate(${-a} 0 -60)" text-anchor="middle" dy="6" fill="#fff" font-family="Baloo 2" font-weight="800" font-size="20">${k}</text></g>`;
+  });
+  s += `<circle r="8" fill="#2b2d42"/>`;
+  $('#compass').innerHTML = s;
+  $$('#compass .dir').forEach((g) => g.addEventListener('click', () => { $('#comp-info').textContent = `${g.dataset.n}: ${g.dataset.info}`; say(`${g.dataset.n}. ${g.dataset.info}`); }));
+})();
+dirNew();
+
+/* ═════ KUŞBAKIŞI ═════ */
+const st = 'stroke="#334155" stroke-width="4" stroke-linejoin="round"';
+const VIEWS = [
+  ['🥤', 'Bardak', `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="36" fill="#bae6fd" ${st}/><circle cx="50" cy="50" r="28" fill="#e0f2fe" ${st}/></svg>`],
+  ['🏠', 'Ev', `<svg viewBox="0 0 100 100"><rect x="14" y="24" width="72" height="52" fill="#fca5a5" ${st}/><line x1="14" y1="50" x2="86" y2="50" ${st}/><rect x="62" y="30" width="10" height="10" fill="#94a3b8" ${st}/></svg>`],
+  ['☂️', 'Şemsiye', `<svg viewBox="0 0 100 100"><polygon points="50,10 78,22 90,50 78,78 50,90 22,78 10,50 22,22" fill="#c4b5fd" ${st}/>${[0, 45, 90, 135].map((a) => `<line x1="50" y1="50" x2="${50 + 40 * Math.cos(a * Math.PI / 180)}" y2="${50 + 40 * Math.sin(a * Math.PI / 180)}" ${st}/><line x1="50" y1="50" x2="${50 - 40 * Math.cos(a * Math.PI / 180)}" y2="${50 - 40 * Math.sin(a * Math.PI / 180)}" ${st}/>`).join('')}<circle cx="50" cy="50" r="4" fill="#334155"/></svg>`],
+  ['🪑', 'Sandalye', `<svg viewBox="0 0 100 100"><rect x="22" y="30" width="56" height="50" rx="4" fill="#fcd34d" ${st}/><rect x="22" y="20" width="56" height="12" rx="3" fill="#b45309" ${st}/></svg>`],
+  ['🚗', 'Araba', `<svg viewBox="0 0 100 100"><rect x="30" y="8" width="40" height="84" rx="14" fill="#ef4444" ${st}/><rect x="36" y="26" width="28" height="14" rx="3" fill="#bae6fd" ${st}/><rect x="36" y="62" width="28" height="12" rx="3" fill="#bae6fd" ${st}/></svg>`],
+  ['⚽', 'Top', `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="36" fill="#fff" ${st}/><polygon points="50,38 61,46 57,59 43,59 39,46" fill="#334155"/></svg>`],
+  ['🌳', 'Ağaç', `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="38" fill="#4ade80" ${st}/><circle cx="36" cy="40" r="12" fill="#22c55e"/><circle cx="62" cy="58" r="14" fill="#22c55e"/><circle cx="50" cy="50" r="5" fill="#92400e"/></svg>`],
+  ['📕', 'Kitap (masada)', `<svg viewBox="0 0 100 100"><rect x="22" y="14" width="56" height="72" rx="4" fill="#dc2626" ${st}/><line x1="30" y1="14" x2="30" y2="86" ${st}/></svg>`],
+  ['⛺', 'Çadır', `<svg viewBox="0 0 100 100"><rect x="14" y="20" width="72" height="60" fill="#fdba74" ${st}/><line x1="14" y1="20" x2="86" y2="80" ${st}/><line x1="86" y1="20" x2="14" y2="80" ${st}/></svg>`],
+  ['🧁', 'Kek', `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="38" fill="#fbcfe8" ${st}/><circle cx="50" cy="50" r="22" fill="#f9a8d4" ${st}/><circle cx="50" cy="50" r="8" fill="#dc2626"/></svg>`],
+];
+let vList = shuffle(VIEWS), vI = 0;
+function viewShow() {
+  const v = vList[vI]; $('#view-obj').textContent = v[0]; $('#view-name').textContent = v[1]; $('#view-fb').textContent = '';
+  $('#view-count').textContent = `${vI + 1} / ${vList.length}`;
+  const box = $('#view-opts'); box.innerHTML = '';
+  shuffle([v, ...shuffle(VIEWS.filter((x) => x !== v)).slice(0, 2)]).forEach((o) => {
+    const b = el('button', { class: 'ik-choice', 'aria-label': o[1] + ' kuşbakışı' }, o[2]);
+    b.onclick = () => {
+      if (o === v) { b.classList.add('ok'); $('#view-fb').className = 'ik-feedback ok'; $('#view-fb').textContent = `Evet! ${v[1]} tepeden böyle görünür.`; IK.right(); setTimeout(() => { vI++; if (vI >= vList.length) { IK.win('Kuş gözlü kaşif! 🦅'); vList = shuffle(VIEWS); vI = 0; } viewShow(); }, 1400); }
+      else { b.classList.add('bad'); $('#view-fb').className = 'ik-feedback bad'; $('#view-fb').textContent = `Bu, ${o[1].toLowerCase()} nesnesinin kuşbakışı görünümü.`; IK.wrong(); }
+    };
+    box.appendChild(b);
+  });
+}
+viewShow();
+
+/* ═════ MESLEKLER ═════ */
+const JOBS = [['👩‍⚕️', 'Doktor', '🏥', 'Hastane'], ['👨‍🏫', 'Öğretmen', '🏫', 'Okul'], ['🧑‍🚒', 'İtfaiyeci', '🚒', 'İtfaiye'], ['👮', 'Polis', '🚓', 'Karakol'], ['🧑‍🌾', 'Çiftçi', '🌾', 'Tarla'], ['🧑‍🍳', 'Aşçı', '🍽️', 'Lokanta'],
+  ['📬', 'Postacı', '📮', 'Postane'], ['🥖', 'Fırıncı', '🏪', 'Fırın'], ['💊', 'Eczacı', '⚕️', 'Eczane'], ['💈', 'Berber', '✂️', 'Berber dükkânı'], ['🧑‍🔧', 'Tamirci', '🔧', 'Tamirhane'], ['📚', 'Kütüphaneci', '🏛️', 'Kütüphane']];
+function jobsStart() {
+  const set = shuffle(JOBS).slice(0, 6);
+  const pl = $('#places'); pl.innerHTML = '';
+  shuffle(set).forEach((j) => pl.appendChild(el('div', { class: 'place', 'data-job': j[1] }, `<span class="em">${j[2]}</span>${j[3]}<div class="who"></div>`)));
+  const jb = $('#jobs'); jb.innerHTML = '';
+  set.forEach((j) => {
+    const c = el('div', { class: 'job', tabindex: '0', role: 'button', 'aria-label': j[1] }, `<span class="em">${j[0]}</span>${j[1]}`);
+    IK.drag(c, {
+      zones: '.place',
+      onDrop: (node, zone) => {
+        if (!zone) return;
+        if (zone.dataset.job === j[1] && !zone.classList.contains('ok')) {
+          zone.classList.add('ok'); zone.querySelector('.who').textContent = j[0]; node.remove(); IK.right(); say(`${j[1]}: ${j[3]}`);
+          if (!$$('#jobs .job').length) IK.win('Mahallenin tüm yardımcılarını buldun!');
+        } else if (!zone.classList.contains('ok')) { zone.classList.remove('bad'); void zone.offsetWidth; zone.classList.add('bad'); IK.wrong(); }
+      },
+    });
+    // Klavye/dokunma alternatifi: karta dokun, sonra yere dokun.
+    c.addEventListener('click', () => { say(j[1]); });
+    jb.appendChild(c);
+  });
+}
+$('#job-reset').onclick = jobsStart;
+jobsStart();
+
+IK.tabs();
+</script>
+</body>
+</html>

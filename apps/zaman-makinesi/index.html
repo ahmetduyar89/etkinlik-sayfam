@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zaman Makinesi | Atölye</title>
+<meta name="description" content="Akrep ve yelkovanı sürükleyerek saat okuma, günlük rutin sıralama, takvim ve mevsim çarkı, süre tahmini oyunları.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏰</text></svg>">
+<link rel="stylesheet" href="/shared/ilkokul.css">
+<style>
+  :root { --ik-accent: #f97316; --ik-accent-2: #facc15; }
+  .clock-wrap { position: relative; width: min(100%, 380px); margin: 0 auto; }
+  .clock { width: 100%; height: auto; display: block; touch-action: none; }
+  .hand { cursor: grab; }
+  .hand:active { cursor: grabbing; }
+  .digital { font-family: 'Baloo 2', sans-serif; font-size: 46px; font-weight: 800; letter-spacing: .04em; background: #2b2d42; color: #7cf29c; border-radius: 18px; padding: 4px 22px; display: inline-block; }
+  .words { font-size: 22px; font-weight: 800; min-height: 34px; }
+  .task-box { background: #fff7e6; border: 2px dashed #f9c46b; border-radius: 18px; padding: 14px; text-align: center; }
+  .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+  .seg button { border: 2px solid var(--ik-line); background: #fff; border-radius: 12px; padding: 7px 12px; font-weight: 800; font-size: 14px; }
+  .seg button.on { background: var(--ik-accent); border-color: var(--ik-accent); color: #fff; }
+
+  .routine-pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .rcard { border: 2px solid var(--ik-line); background: #fff; border-radius: 18px; padding: 12px; text-align: center; box-shadow: 0 3px 0 var(--ik-line); font-weight: 800; transition: transform .12s; }
+  .rcard:hover { transform: translateY(-2px); }
+  .rcard .em { font-size: 40px; display: block; }
+  .rcard.bad { animation: ik-shake .35s; border-color: var(--ik-bad); }
+  .timeline { display: flex; flex-direction: column; gap: 8px; }
+  .tl-item { display: flex; align-items: center; gap: 12px; background: #fff; border: 2px solid var(--ik-line); border-radius: 16px; padding: 8px 12px; animation: ik-in .3s; }
+  .tl-item .em { font-size: 28px; }
+  .tl-item .tm { margin-left: auto; font-family: 'Baloo 2'; font-size: 20px; color: var(--ik-accent); }
+  .tl-empty { border: 2px dashed var(--ik-line); border-radius: 16px; padding: 14px; text-align: center; color: var(--ik-soft); }
+  .part-chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; font-weight: 800; }
+
+  .wheel { width: min(100%, 400px); display: block; margin: 0 auto; }
+  .wheel .m { cursor: pointer; transition: opacity .15s; }
+  .wheel .m:hover { opacity: .85; }
+  .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .day { border: 2px solid var(--ik-line); border-radius: 12px; padding: 8px 2px; text-align: center; font-weight: 800; font-size: 13px; background: #fff; }
+  .day.slot { min-height: 46px; background: #fbf7f0; border-style: dashed; }
+  .day.filled { background: #e7f0ff; border-color: #93b8ff; border-style: solid; }
+
+  .hourglass { font-size: 110px; line-height: 1; transition: transform .6s; }
+  .hourglass.spin { animation: hg 2s linear infinite; }
+  @keyframes hg { 0%, 45% { transform: rotate(0); } 50%, 95% { transform: rotate(180deg); } 100% { transform: rotate(360deg); } }
+  .vs { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; }
+  .vs .ik-choice { min-height: 120px; font-size: 16px; }
+  .vs .ik-choice .em { font-size: 44px; display: block; }
+</style>
+</head>
+<body>
+<header class="ik-top">
+  <div class="ik-brand">
+    <div class="ik-logo">⏰</div>
+    <div><h1>Zaman Makinesi</h1><p>Saat, gün, ay ve mevsim atölyesi</p></div>
+  </div>
+  <nav class="ik-tabs" role="tablist">
+    <button class="ik-tab" data-tab="saat"><span class="e">🕒</span>Saat Kur</button>
+    <button class="ik-tab" data-tab="gun"><span class="e">🌞</span>Günüm</button>
+    <button class="ik-tab" data-tab="takvim"><span class="e">📅</span>Takvim Çarkı</button>
+    <button class="ik-tab" data-tab="sure"><span class="e">⏳</span>Süre Tahmini</button>
+  </nav>
+  <span class="ik-stars">⭐ <span id="ik-stars">0</span></span>
+</header>
+
+<main class="ik-main">
+  <!-- 1. SAAT KUR -->
+  <section class="ik-panel" data-panel="saat">
+    <div class="ik-head">
+      <div><h2>Akrep ve Yelkovan</h2><p>Kısa kol <b>akrep</b> saati, uzun kol <b>yelkovan</b> dakikayı gösterir. Kolları parmağınla sürükle!</p></div>
+      <div class="seg" id="mode-seg">
+        <button data-mode="serbest" class="on">Serbest</button>
+        <button data-mode="gorev">Görev</button>
+        <button data-mode="oku">Saati Oku</button>
+      </div>
+    </div>
+    <div class="ik-grid two">
+      <div class="ik-card">
+        <div class="clock-wrap"><svg class="clock" id="clock" viewBox="0 0 300 300" aria-label="Analog saat"></svg></div>
+      </div>
+      <div class="ik-card ik-center" style="gap:14px">
+        <div class="digital" id="digital">03:00</div>
+        <div class="words" id="words">Saat üç.</div>
+        <button class="ik-speak" id="say-time">🔊 Sesli oku</button>
+        <div class="ik-row" style="justify-content:center">
+          <button class="ik-btn ghost small" data-step="-60">− 1 saat</button>
+          <button class="ik-btn ghost small" data-step="-5">− 5 dk</button>
+          <button class="ik-btn ghost small" data-step="5">+ 5 dk</button>
+          <button class="ik-btn ghost small" data-step="60">+ 1 saat</button>
+        </div>
+        <div id="task-area" style="width:100%"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. GÜNÜM -->
+  <section class="ik-panel" data-panel="gun">
+    <div class="ik-head">
+      <div><h2>Bir Günüm</h2><p>Kartlara günün sırasıyla dokun: sabah ilk ne yaparsın, gece en son ne yaparsın?</p></div>
+      <button class="ik-btn ghost" id="routine-reset">🔄 Yeniden karıştır</button>
+    </div>
+    <div class="ik-grid two">
+      <div class="ik-card"><div class="ik-label" style="margin-bottom:10px">Karışık kartlar</div><div class="routine-pool" id="routine-pool"></div></div>
+      <div class="ik-card"><div class="ik-label" style="margin-bottom:10px">Günüm (sırayla)</div><div class="timeline" id="timeline"></div></div>
+    </div>
+  </section>
+
+  <!-- 3. TAKVİM -->
+  <section class="ik-panel" data-panel="takvim">
+    <div class="ik-head">
+      <div><h2>Takvim ve Mevsim Çarkı</h2><p>Bir aya dokun, adını ve mevsimini dinle. Sonra soruları cevapla, haftanın günlerini sırala.</p></div>
+    </div>
+    <div class="ik-grid two">
+      <div class="ik-card">
+        <svg class="wheel" id="wheel" viewBox="0 0 400 400" aria-label="Aylar ve mevsimler çarkı"></svg>
+        <p class="ik-center words" id="month-info" style="margin:10px 0 0">Bir aya dokun 👆</p>
+      </div>
+      <div class="ik-grid">
+        <div class="ik-card">
+          <div class="ik-label">Soru</div>
+          <p class="words" id="cal-q" style="margin:6px 0 12px"></p>
+          <div class="ik-choices" id="cal-choices"></div>
+          <div class="ik-feedback" id="cal-fb"></div>
+        </div>
+        <div class="ik-card">
+          <div class="ik-row" style="justify-content:space-between;margin-bottom:10px"><div class="ik-label">Haftanın günlerini sırala</div><button class="ik-btn ghost small" id="days-reset">🔄</button></div>
+          <div class="days" id="day-slots"></div>
+          <div class="ik-row" id="day-pool" style="margin-top:12px;justify-content:center"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. SÜRE -->
+  <section class="ik-panel" data-panel="sure">
+    <div class="ik-head"><div><h2>Süre Tahmini</h2><p>Zaman hissin ne kadar iyi? Gözlerini kapat, içinden say ve doğru anda dur!</p></div></div>
+    <div class="ik-grid half">
+      <div class="ik-card ik-center" style="gap:12px">
+        <div class="ik-label">Hedef süre</div>
+        <div class="seg" id="target-seg">
+          <button data-sec="5">5 sn</button><button data-sec="10" class="on">10 sn</button><button data-sec="15">15 sn</button><button data-sec="30">30 sn</button>
+        </div>
+        <div class="hourglass" id="hg">⏳</div>
+        <button class="ik-btn" id="hg-btn" style="min-width:200px">▶ Başla</button>
+        <div class="words" id="hg-result"></div>
+        <p class="ik-muted" style="margin:0;font-size:14px">İpucu: "bir-bin, iki-bin, üç-bin…" diye saymak bir saniyeye çok yakındır.</p>
+      </div>
+      <div class="ik-card">
+        <div class="ik-label">Hangisi daha uzun sürer?</div>
+        <div class="vs" id="vs" style="margin-top:12px"></div>
+        <div class="ik-feedback" id="vs-fb"></div>
+        <button class="ik-btn ghost small" id="vs-next" style="margin-top:6px">Sonraki ➜</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="/shared/ilkokul.js"></script>
+<script>
+const { $, $$, el, say, pick, shuffle, rand } = IK;
+IK.tabs();
+
+/* ═════ SAAT ═════ */
+const NUM = ['on iki','bir','iki','üç','dört','beş','altı','yedi','sekiz','dokuz','on','on bir','on iki'];
+const ACC = ['on ikiyi','biri','ikiyi','üçü','dördü','beşi','altıyı','yediyi','sekizi','dokuzu','onu','on biri','on ikiyi'];
+const DAT = ['on ikiye','bire','ikiye','üçe','dörde','beşe','altıya','yediye','sekize','dokuza','ona','on bire','on ikiye'];
+const MIN = { 5: 'beş', 10: 'on', 15: 'çeyrek', 20: 'yirmi', 25: 'yirmi beş' };
+function timeWords(h, m) {
+  h = ((h - 1) % 12 + 12) % 12 + 1;
+  const nh = h % 12 + 1;
+  if (m === 0) return `Saat ${NUM[h]}.`;
+  if (m === 30) return `Saat ${NUM[h]} buçuk.`;
+  if (m < 30) return `Saat ${ACC[h]} ${MIN[m] || m} geçiyor.`;
+  return `Saat ${DAT[nh]} ${MIN[60 - m] || (60 - m)} var.`;
+}
+let H = 3, M = 0;
+const clock = $('#clock');
+(function drawFace() {
+  let s = `<circle cx="150" cy="150" r="142" fill="#fff" stroke="#2b2d42" stroke-width="8"/><circle cx="150" cy="150" r="128" fill="#fffaf0"/>`;
+  for (let i = 0; i < 60; i++) {
+    const a = i * 6 * Math.PI / 180, big = i % 5 === 0;
+    const r1 = big ? 112 : 119, r2 = 126;
+    s += `<line x1="${150 + r1 * Math.sin(a)}" y1="${150 - r1 * Math.cos(a)}" x2="${150 + r2 * Math.sin(a)}" y2="${150 - r2 * Math.cos(a)}" stroke="${big ? '#2b2d42' : '#c9bfae'}" stroke-width="${big ? 4 : 2}" stroke-linecap="round"/>`;
+  }
+  for (let i = 1; i <= 12; i++) {
+    const a = i * 30 * Math.PI / 180;
+    s += `<text x="${150 + 92 * Math.sin(a)}" y="${150 - 92 * Math.cos(a) + 10}" text-anchor="middle" font-family="Baloo 2" font-weight="800" font-size="28" fill="#2b2d42">${i}</text>`;
+    const am = i * 30 * Math.PI / 180;
+    s += `<text x="${150 + 136 * Math.sin(am)}" y="${150 - 136 * Math.cos(am) + 4}" text-anchor="middle" font-size="9" font-weight="800" fill="#f97316">${(i * 5) % 60 || '00'}</text>`;
+  }
+  s += `<g id="hand-h" class="hand"><line x1="150" y1="160" x2="150" y2="85" stroke="#ef4444" stroke-width="12" stroke-linecap="round"/><circle cx="150" cy="85" r="14" fill="transparent"/></g>`;
+  s += `<g id="hand-m" class="hand"><line x1="150" y1="165" x2="150" y2="42" stroke="#2563eb" stroke-width="7" stroke-linecap="round"/><circle cx="150" cy="48" r="16" fill="transparent"/></g>`;
+  s += `<circle cx="150" cy="150" r="10" fill="#2b2d42"/><circle cx="150" cy="150" r="4" fill="#facc15"/>`;
+  clock.innerHTML = s;
+})();
+function render() {
+  $('#hand-h').setAttribute('transform', `rotate(${(H % 12 + M / 60) * 30} 150 150)`);
+  $('#hand-m').setAttribute('transform', `rotate(${M * 6} 150 150)`);
+  const hidden = mode === 'oku' && !revealed;
+  $('#digital').textContent = hidden ? '??:??' : String(H).padStart(2, '0') + ':' + String(M).padStart(2, '0');
+  $('#words').textContent = hidden ? 'Bu saat kaç?' : timeWords(H, M);
+}
+function setTime(h, m) { H = ((h - 1) % 12 + 12) % 12 + 1; M = ((m % 60) + 60) % 60; render(); }
+function svgAngle(e) {
+  const r = clock.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width * 300 - 150, y = (e.clientY - r.top) / r.height * 300 - 150;
+  return (Math.atan2(x, -y) * 180 / Math.PI + 360) % 360;
+}
+let dragging = null;
+['h', 'm'].forEach((k) => $('#hand-' + k).addEventListener('pointerdown', (e) => { if (mode === 'oku') return; dragging = k; clock.setPointerCapture(e.pointerId); e.preventDefault(); }));
+clock.addEventListener('pointermove', (e) => {
+  if (!dragging) return;
+  const a = svgAngle(e);
+  if (dragging === 'm') {
+    const nm = Math.round(a / 30) * 5 % 60;
+    if (nm !== M) {
+      let h = H;
+      if (M >= 45 && nm <= 15) h++;
+      else if (M <= 15 && nm >= 45) h--;
+      setTime(h, nm); IK.beep('tick');
+    }
+  } else {
+    const nh = Math.floor((a + 0.0001) / 30) || 12;
+    if (nh !== H) setTime(nh, M);
+  }
+});
+clock.addEventListener('pointerup', () => { if (dragging && mode === 'gorev') checkTask(false); dragging = null; });
+$$('[data-step]').forEach((b) => b.addEventListener('click', () => { if (mode === 'oku') return; const t = H * 60 + M + +b.dataset.step; setTime(Math.floor(t / 60), t % 60); }));
+$('#say-time').addEventListener('click', () => say($('#words').textContent));
+
+let mode = 'serbest', target = null, revealed = false;
+const levelMins = [[0], [0, 30], [0, 15, 30, 45], [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]];
+let level = 0, streak = 0;
+$$('#mode-seg button').forEach((b) => b.addEventListener('click', () => {
+  $$('#mode-seg button').forEach((x) => x.classList.toggle('on', x === b));
+  mode = b.dataset.mode; newTask();
+}));
+function levelName() { return ['Tam saatler', 'Buçuklar', 'Çeyrekler', '5 dakikalar'][level]; }
+function newTask() {
+  const area = $('#task-area');
+  revealed = false;
+  if (mode === 'serbest') { area.innerHTML = ''; render(); return; }
+  target = { h: rand(1, 12), m: pick(levelMins[level]) };
+  if (mode === 'gorev') {
+    area.innerHTML = `<div class="task-box"><div class="ik-label">${levelName()} · ${streak}/5</div><div class="words" style="margin:6px 0">${timeWords(target.h, target.m)}</div><p class="ik-muted" style="margin:0 0 10px;font-size:14px">Bu saati kollarla kur!</p><button class="ik-btn green" id="check">✔ Kontrol et</button></div>`;
+    $('#check').onclick = () => checkTask(true);
+    say(timeWords(target.h, target.m));
+  } else {
+    setTime(target.h, target.m);
+    const opts = new Set([timeWords(target.h, target.m)]);
+    while (opts.size < 4) opts.add(timeWords(rand(1, 12), pick(levelMins[Math.max(level, 1)])));
+    area.innerHTML = `<div class="task-box"><div class="ik-label">${levelName()} · ${streak}/5</div><div class="ik-choices" style="grid-template-columns:1fr;margin-top:8px" id="read-opts"></div></div>`;
+    shuffle([...opts]).forEach((t) => {
+      const c = el('button', { class: 'ik-choice' }, t);
+      c.onclick = () => {
+        if (t === timeWords(target.h, target.m)) { c.classList.add('ok'); revealed = true; render(); progress(); }
+        else { c.classList.add('bad'); IK.wrong('Tekrar dene: akrep ve yelkovana dikkat!'); }
+      };
+      $('#read-opts').appendChild(c);
+    });
+  }
+  render();
+}
+function checkTask(manual) {
+  if (H === target.h && M === target.m) progress();
+  else if (manual) IK.wrong(M !== target.m ? 'Yelkovanı kontrol et (uzun mavi kol)' : 'Akrebi kontrol et (kısa kırmızı kol)');
+}
+function progress() {
+  streak++;
+  if (streak >= 5) {
+    streak = 0;
+    if (level < 3) { level++; IK.win('Seviye atladın: ' + levelName() + '!'); } else IK.win('Saat ustası oldun! 🏆');
+  } else IK.right('Doğru! 👏');
+  setTimeout(newTask, 900);
+}
+render();
+
+/* ═════ GÜNÜM ═════ */
+const ROUTINE = [
+  ['⏰', 'Uyanırım', 7, 0, 'sabah'], ['🪥', 'Dişlerimi fırçalarım', 7, 15, 'sabah'], ['🥣', 'Kahvaltı yaparım', 7, 30, 'sabah'],
+  ['🎒', 'Okula giderim', 8, 15, 'sabah'], ['🍝', 'Öğle yemeği yerim', 12, 30, 'öğle'], ['📚', 'Ödevimi yaparım', 16, 0, 'öğleden sonra'],
+  ['⚽', 'Parkta oynarım', 17, 0, 'öğleden sonra'], ['🍲', 'Akşam yemeği yerim', 19, 0, 'akşam'], ['🛁', 'Banyo yaparım', 20, 0, 'akşam'], ['😴', 'Uyurum', 21, 0, 'gece'],
+];
+const PART_COLORS = { 'sabah': '#fde68a', 'öğle': '#fdba74', 'öğleden sonra': '#a5f3fc', 'akşam': '#c4b5fd', 'gece': '#94a3b8' };
+let nextIdx = 0;
+function resetRoutine() {
+  nextIdx = 0;
+  const pool = $('#routine-pool'); pool.innerHTML = '';
+  $('#timeline').innerHTML = '<div class="tl-empty">İlk kart buraya gelecek…</div>';
+  shuffle(ROUTINE.map((r, i) => [r, i])).forEach(([r, i]) => {
+    const c = el('button', { class: 'rcard' }, `<span class="em">${r[0]}</span>${r[1]}`);
+    c.onclick = () => {
+      if (i === nextIdx) {
+        if (nextIdx === 0) $('#timeline').innerHTML = '';
+        c.remove(); nextIdx++;
+        const t = `${String(r[2]).padStart(2, '0')}:${String(r[3]).padStart(2, '0')}`;
+        $('#timeline').appendChild(el('div', { class: 'tl-item' }, `<span class="em">${r[0]}</span><div><div>${r[1]}</div><span class="part-chip" style="background:${PART_COLORS[r[4]]}">${r[4]}</span></div><span class="tm">${t}</span>`));
+        say(r[1]); IK.beep('tick');
+        if (nextIdx === ROUTINE.length) IK.win('Günün tamamlandı! 🌙');
+      } else {
+        c.classList.remove('bad'); void c.offsetWidth; c.classList.add('bad');
+        IK.wrong('Bundan önce yapılacak bir şey var 🤔');
+      }
+    };
+    pool.appendChild(c);
+  });
+}
+$('#routine-reset').onclick = resetRoutine;
+resetRoutine();
+
+/* ═════ TAKVİM ═════ */
+const MONTHS = [['Ocak', 31, 'kış'], ['Şubat', 28, 'kış'], ['Mart', 31, 'ilkbahar'], ['Nisan', 30, 'ilkbahar'], ['Mayıs', 31, 'ilkbahar'], ['Haziran', 30, 'yaz'], ['Temmuz', 31, 'yaz'], ['Ağustos', 31, 'yaz'], ['Eylül', 30, 'sonbahar'], ['Ekim', 31, 'sonbahar'], ['Kasım', 30, 'sonbahar'], ['Aralık', 31, 'kış']];
+const SEASON = { 'kış': ['#bfdbfe', '❄️'], 'ilkbahar': ['#bbf7d0', '🌷'], 'yaz': ['#fde68a', '☀️'], 'sonbahar': ['#fed7aa', '🍂'] };
+(function drawWheel() {
+  let s = '';
+  const R = 190, r = 70, cx = 200, cy = 200;
+  MONTHS.forEach((m, i) => {
+    const a0 = (i * 30 - 90 - 15) * Math.PI / 180, a1 = ((i + 1) * 30 - 90 - 15) * Math.PI / 180;
+    const p = (a, rad) => `${cx + rad * Math.cos(a)},${cy + rad * Math.sin(a)}`;
+    s += `<path class="m" data-i="${i}" d="M${p(a0, r)} L${p(a0, R)} A${R},${R} 0 0 1 ${p(a1, R)} L${p(a1, r)} A${r},${r} 0 0 0 ${p(a0, r)}Z" fill="${SEASON[m[2]][0]}" stroke="#fff" stroke-width="3"/>`;
+    const am = (a0 + a1) / 2;
+    s += `<text x="${cx + 150 * Math.cos(am)}" y="${cy + 150 * Math.sin(am) + 5}" text-anchor="middle" font-family="Baloo 2" font-weight="800" font-size="16" fill="#2b2d42" pointer-events="none">${m[0]}</text>`;
+    s += `<text x="${cx + 102 * Math.cos(am)}" y="${cy + 102 * Math.sin(am) + 7}" text-anchor="middle" font-size="18" pointer-events="none">${SEASON[m[2]][1]}</text>`;
+  });
+  s += `<circle cx="200" cy="200" r="64" fill="#fff" stroke="#eadfcd" stroke-width="3"/><text id="wheel-center" x="200" y="210" text-anchor="middle" font-family="Baloo 2" font-weight="800" font-size="30">📅</text>`;
+  $('#wheel').innerHTML = s;
+  $$('#wheel .m').forEach((p) => p.addEventListener('click', () => {
+    const m = MONTHS[+p.dataset.i];
+    $$('#wheel .m').forEach((q) => q.setAttribute('stroke', '#fff'));
+    p.setAttribute('stroke', '#2b2d42');
+    $('#wheel-center').textContent = SEASON[m[2]][1];
+    const t = `${m[0]}: ${m[2]} mevsimi, ${m[1]} gün${m[0] === 'Şubat' ? ' (4 yılda bir 29 gün)' : ''}.`;
+    $('#month-info').textContent = t; say(t);
+  }));
+})();
+const DAYS = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+const calQs = [
+  () => { const i = rand(0, 11); return [`${MONTHS[i][0]} ayı hangi mevsimdedir?`, MONTHS[i][2], ['kış', 'ilkbahar', 'yaz', 'sonbahar']]; },
+  () => { const i = rand(0, 11); return [`${MONTHS[i][0]} ayından sonra hangi ay gelir?`, MONTHS[(i + 1) % 12][0], [MONTHS[(i + 1) % 12][0], MONTHS[(i + 11) % 12][0], MONTHS[(i + 2) % 12][0], MONTHS[(i + 6) % 12][0]]]; },
+  () => { const i = rand(0, 6); return [`${DAYS[i]} gününden sonra hangi gün gelir?`, DAYS[(i + 1) % 7], [DAYS[(i + 1) % 7], DAYS[(i + 6) % 7], DAYS[(i + 2) % 7], DAYS[(i + 4) % 7]]]; },
+  () => ['Bir haftada kaç gün vardır?', '7', ['5', '7', '10', '12']],
+  () => ['Bir yılda kaç ay vardır?', '12', ['7', '10', '12', '30']],
+  () => ['Bir yılda kaç mevsim vardır?', '4', ['2', '3', '4', '12']],
+  () => ['Bir günde kaç saat vardır?', '24', ['12', '24', '60', '100']],
+  () => ['Bir saatte kaç dakika vardır?', '60', ['10', '24', '60', '100']],
+  () => ['Hafta sonu hangi günlerdir?', 'Cumartesi ve Pazar', ['Cuma ve Cumartesi', 'Cumartesi ve Pazar', 'Pazar ve Pazartesi', 'Salı ve Çarşamba']],
+  () => ['Okullar genellikle hangi ay açılır?', 'Eylül', ['Ocak', 'Mayıs', 'Temmuz', 'Eylül']],
+];
+function calQuestion() {
+  const [q, ans, opts] = pick(calQs)();
+  $('#cal-q').textContent = q; $('#cal-fb').textContent = ''; $('#cal-fb').className = 'ik-feedback';
+  const box = $('#cal-choices'); box.innerHTML = '';
+  shuffle([...new Set(opts)]).forEach((o) => {
+    const b = el('button', { class: 'ik-choice' }, o);
+    b.onclick = () => {
+      if (o === ans) { b.classList.add('ok'); $('#cal-fb').textContent = 'Doğru! 🎉'; $('#cal-fb').className = 'ik-feedback ok'; IK.right(); setTimeout(calQuestion, 1100); }
+      else { b.classList.add('bad'); $('#cal-fb').textContent = 'Bir daha düşün…'; $('#cal-fb').className = 'ik-feedback bad'; IK.wrong(); }
+    };
+    box.appendChild(b);
+  });
+}
+calQuestion();
+let dayNext = 0;
+function resetDays() {
+  dayNext = 0;
+  $('#day-slots').innerHTML = DAYS.map((_, i) => `<div class="day slot" id="ds${i}">${i + 1}</div>`).join('');
+  const pool = $('#day-pool'); pool.innerHTML = '';
+  shuffle(DAYS).forEach((d) => {
+    const b = el('button', { class: 'ik-btn ghost small' }, d);
+    b.onclick = () => {
+      if (d === DAYS[dayNext]) { const s = $('#ds' + dayNext); s.textContent = d.slice(0, 3); s.title = d; s.className = 'day filled'; b.remove(); say(d); dayNext++; if (dayNext === 7) IK.win('Haftayı sıraladın!'); }
+      else IK.wrong('Hangi gün daha önce gelir?');
+    };
+    pool.appendChild(b);
+  });
+}
+$('#days-reset').onclick = resetDays;
+resetDays();
+
+/* ═════ SÜRE ═════ */
+let targetSec = 10, t0 = null;
+$$('#target-seg button').forEach((b) => b.addEventListener('click', () => { if (t0) return; $$('#target-seg button').forEach((x) => x.classList.toggle('on', x === b)); targetSec = +b.dataset.sec; }));
+$('#hg-btn').onclick = () => {
+  if (!t0) {
+    t0 = performance.now(); $('#hg').classList.add('spin'); $('#hg-btn').textContent = '⏹ Dur!'; $('#hg-result').textContent = 'İçinden say… 🤫'; IK.beep('tick');
+  } else {
+    const sec = (performance.now() - t0) / 1000; t0 = null;
+    $('#hg').classList.remove('spin'); $('#hg-btn').textContent = '▶ Tekrar dene';
+    const diff = Math.abs(sec - targetSec);
+    let msg = `${sec.toFixed(1)} saniyede durdun. `;
+    if (diff < 0.5) { msg += 'İnanılmaz! Tam isabet 🎯'; IK.win(); }
+    else if (diff < 1.5) { msg += 'Çok yakın! 👏'; IK.right(); }
+    else msg += sec < targetSec ? 'Biraz erken durdun, daha yavaş say.' : 'Biraz geç kaldın, daha hızlı say.';
+    $('#hg-result').textContent = msg;
+  }
+};
+const DUR = [
+  ['🪥', 'Diş fırçalamak', 2, '🛌', 'Gece uyumak', 600], ['👏', 'El çırpmak', 0.01, '🍳', 'Yumurta haşlamak', 10], ['🎬', 'Bir film izlemek', 120, '🍎', 'Elma yemek', 5],
+  ['🏫', 'Bir ders saati', 40, '🤧', 'Hapşırmak', 0.02], ['✈️', 'İstanbul’dan Ankara’ya uçmak', 60, '🚶', 'Sınıfın içinde yürümek', 0.5], ['🌱', 'Fasulyenin filizlenmesi', 7000, '🍪', 'Kurabiye pişirmek', 15],
+  ['📖', 'Bir kitap okumak', 180, '✏️', 'Adını yazmak', 0.3], ['🎂', 'Bir yaş büyümek', 500000, '🗓️', 'Bir hafta geçmesi', 10000], ['🛁', 'Banyo yapmak', 20, '😉', 'Göz kırpmak', 0.005],
+];
+function vsQuestion() {
+  const d = pick(DUR); $('#vs-fb').textContent = '';
+  const items = shuffle([[d[0], d[1], d[2]], [d[3], d[4], d[5]]]);
+  const longer = d[2] > d[5] ? d[1] : d[4];
+  const box = $('#vs'); box.innerHTML = '';
+  items.forEach((it, i) => {
+    const b = el('button', { class: 'ik-choice' }, `<span class="em">${it[0]}</span>${it[1]}`);
+    b.onclick = () => {
+      if (it[1] === longer) { b.classList.add('ok'); $('#vs-fb').className = 'ik-feedback ok'; $('#vs-fb').textContent = 'Doğru! ' + longer + ' daha uzun sürer.'; IK.right(); }
+      else { b.classList.add('bad'); $('#vs-fb').className = 'ik-feedback bad'; $('#vs-fb').textContent = 'Hmm, bir daha düşün.'; IK.wrong(); }
+    };
+    box.appendChild(b);
+    if (i === 0) box.appendChild(el('div', { class: 'ik-big' }, 'mi?'));
+  });
+}
+$('#vs-next').onclick = vsQuestion;
+vsQuestion();
+</script>
+</body>
+</html>
