@@ -1,0 +1,317 @@
+/**
+ * chessboard.css — Etkileşimli tahta bileşeninin (ChessBoard.js) görünümü.
+ * Board3D'nin statik ders diyagramı stillerinden ayrıdır.
+ */
+
+.cb-root {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 0.25rem 0 1rem;
+}
+
+.cb-stage {
+  position: relative;
+  /*
+   * Tahta KARE olduğu için boyutunu üç sınırın en küçüğü belirler:
+   *   100%   → sütunun izin verdiği genişlik
+   *   46rem  → gereğinden fazla büyümesin
+   *   66vh   → EKRANA SIĞSIN
+   *
+   * Üçüncüsü olmadan geniş ama kısa ekranlarda (dizüstü, akıllı tahta) tahta
+   * genişliğe göre büyüyüp ekrandan taşıyor, son yatay görünmüyordu. Tahtanın
+   * tamamı tek bakışta görünmeden satranç öğretilemez.
+   * Ayrılan pay üstteki başlık, alınan taş satırları ve alt boşluk içindir.
+   */
+  width: min(100%, 46rem, 66vh);
+  margin-inline: auto;
+}
+
+.cb-grid {
+  /* Animasyon katmanı mutlak konumlanır; ızgara ona referans olur. */
+  position: relative;
+  /* Taş boyutunu KARE boyutuna bağlamak için ızgarayı ölçüm kabı yaparız.
+     1 kare = 12.5cqw olduğundan taşlar her ekranda kareyi aynı oranda doldurur. */
+  container-type: inline-size;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  /* Satırlar da AÇIKÇA sekize bölünür.
+     Bırakılırsa satır yüksekliği içeriğe göre belirlenir; taş yazı ölçüsü
+     kareden büyük olduğu için (14cqw = karenin ~%112'si) taş BULUNAN satırlar
+     uzuyor, kare kare kaldığından altında tahtanın kahverengi zemini şerit
+     gibi görünüyor ve biriken fazlalık son yatayı taşırıp kırpıyordu. */
+  grid-template-rows: repeat(8, 1fr);
+  aspect-ratio: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 0.32rem solid #7b5832;
+  background: #7b5832;
+  box-shadow: 0 10px 26px rgba(36, 57, 77, 0.18);
+  /* DÜZ tahta.
+     Önceden `rotateX(12deg)` ile hafif yatırılıyordu; hoş duruyordu ama
+     kareleri yamultuyor, üst sıradaki taşları küçültüyor ve kare renklerini
+     eğimden dolayı soluklaştırıyordu. Satrançta tahtanın NET okunması
+     süslemeden önce gelir — özellikle akıllı tahtaya yansıtıldığında ve
+     karesini daha yeni öğrenen bir çocuk için. */
+  transform: none;
+  transform-origin: center;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Tahtayı çevirmek: ızgarayı 180° döndürüp taşları geri döndürürüz. */
+.cb-stage.flipped .cb-grid { transform: rotate(180deg); }
+.cb-stage.flipped .cb-square > * { transform: rotate(180deg); }
+.cb-stage.flipped .cb-piece { transform: rotate(180deg); }
+
+.cb-square {
+  position: relative;
+  /* min-height OLMADAN ızgara ögesi en az içeriği kadar yüksek olmak ister
+     (min-height: auto) ve satırı şişirir. Kare, ızgaranın verdiği hücreyi
+     doldurur; boyutunu içeriği belirlememelidir. */
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: default;
+  transition: filter 140ms ease, box-shadow 140ms ease;
+}
+
+/* Düz renkler: sistemin krem/çam yeşili paleti, degradenin ortalaması. */
+.cb-square.light { background: #fff3d2; }
+.cb-square.dark { background: #3d9282; }
+
+/* Oynanabilir taşlar imleçle davet eder. */
+.cb-square.playable { cursor: grab; }
+.cb-square.playable:active { cursor: grabbing; }
+.cb-square.playable:hover { filter: brightness(1.1) saturate(1.1); }
+
+.cb-piece {
+  /* Taşı kareye TAM ORTALAR.
+     Önceden yalnızca satır kutusuna güveniyordu; SVG taşlar (kavuklu şah, fil)
+     `vertical-align` ile taban çizgisine göre hizalandığı için, satır kutusu
+     kareden büyük olduğunda yukarı kayıp üst yatayda kırpılıyorlardı. */
+  display: grid;
+  place-items: center;
+  /* Yedek ölçü: ölçüm kabını desteklemeyen eski tarayıcılar için. */
+  font-size: clamp(1.6rem, 7.7vw, 3.7rem);
+  /* Asıl ölçü. 1 kare = 12.5cqw; taş 1em boyunda çizilir (bkz. .piece-svg),
+     yani 10cqw taşı karenin %80'ine oturtur — basılı satranç kitaplarındaki
+     oran. Taşlar artık vektör olduğu için bu oran her yerde birebir tutar. */
+  font-size: 10cqw;
+  line-height: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 0.28rem 0.18rem rgba(0, 0, 0, 0.28));
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+/* Tahtada SVG taş, ızgara ögesi olarak ortalanır; taban çizgisi hizası devre dışı.
+   (Tahta dışında — ders kartları, terfi penceresi — satır içi hizalama sürer.) */
+.cb-piece .piece-svg { display: block; }
+
+/* Taş yeni kareye yerleşirken küçük bir zıplama. */
+@keyframes cb-drop-in {
+  0% { transform: translateY(-38%) scale(1.18); opacity: 0.6; }
+  60% { transform: translateY(2%) scale(0.97); opacity: 1; }
+  100% { transform: translateY(0) scale(1); }
+}
+.cb-piece.cb-drop { animation: cb-drop-in 260ms cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* --- Vurgular --- */
+
+.cb-square.selected {
+  box-shadow: inset 0 0 0 0.28rem rgba(255, 206, 61, 0.95);
+  filter: brightness(1.14);
+}
+
+.cb-square.last-from { box-shadow: inset 0 0 0 100vmax rgba(255, 214, 92, 0.28); }
+.cb-square.last-to { box-shadow: inset 0 0 0 100vmax rgba(255, 214, 92, 0.42); }
+
+.cb-square.in-check {
+  box-shadow: inset 0 0 0 0.3rem rgba(226, 62, 62, 0.9);
+  animation: cb-check-pulse 1s ease-in-out infinite;
+}
+
+@keyframes cb-check-pulse {
+  50% { box-shadow: inset 0 0 0 0.3rem rgba(226, 62, 62, 0.45); }
+}
+
+/* Yasal hamle işaretleri: boş kareye nokta, dolu kareye halka. */
+.cb-hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.cb-square.target .cb-hint::after {
+  content: "";
+  width: 30%;
+  height: 30%;
+  border-radius: 50%;
+  background: rgba(24, 52, 44, 0.34);
+  animation: cb-pop 200ms ease-out;
+}
+
+.cb-square.target-capture .cb-hint::after {
+  width: 84%;
+  height: 84%;
+  background: none;
+  border: 0.32rem solid rgba(226, 88, 62, 0.75);
+}
+
+@keyframes cb-pop {
+  from { transform: scale(0.2); opacity: 0; }
+}
+
+/* İpucu oku vurgusu */
+.cb-square.hint-from { box-shadow: inset 0 0 0 0.28rem rgba(61, 124, 255, 0.85); }
+.cb-square.hint-to {
+  box-shadow: inset 0 0 0 0.28rem rgba(61, 124, 255, 0.85);
+  animation: cb-hint-flash 700ms ease-in-out 3;
+}
+
+@keyframes cb-hint-flash {
+  50% { box-shadow: inset 0 0 0 0.5rem rgba(61, 124, 255, 0.45); }
+}
+
+@keyframes cb-shake-key {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8%); }
+  75% { transform: translateX(8%); }
+}
+.cb-square.cb-shake { animation: cb-shake-key 240ms ease-in-out 2; }
+
+/* --- Koordinatlar --- */
+
+.cb-rank, .cb-file {
+  position: absolute;
+  font-size: clamp(0.5rem, 1.5vw, 0.7rem);
+  font-weight: 900;
+  opacity: 0.68;
+  pointer-events: none;
+}
+
+.cb-rank { top: 0.15rem; left: 0.22rem; }
+.cb-file { right: 0.24rem; bottom: 0.12rem; }
+.cb-square.light .cb-rank, .cb-square.light .cb-file { color: #2a7d76; }
+.cb-square.dark .cb-rank, .cb-square.dark .cb-file { color: #fff8de; }
+
+/* --- Terfi penceresi --- */
+
+.cb-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(12, 26, 36, 0.55);
+  backdrop-filter: blur(6px);
+  border-radius: 10px;
+  z-index: 5;
+}
+
+.cb-overlay[hidden] { display: none; }
+
+.cb-promotion {
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 1.2rem;
+  padding: 1.1rem 1.2rem;
+  box-shadow: var(--shadow);
+  text-align: center;
+  max-width: 92%;
+  animation: cb-pop 220ms ease-out;
+}
+
+.cb-promotion-title {
+  margin: 0 0 0.75rem;
+  font-weight: 800;
+  color: var(--ink);
+  font-size: 0.98rem;
+}
+
+.cb-promotion-row {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.cb-promotion-choice {
+  display: grid;
+  place-items: center;
+  gap: 0.15rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(150deg, #fff, #eef7f4);
+  border: 2px solid var(--line);
+  transition: transform 140ms ease, border-color 140ms ease;
+}
+
+.cb-promotion-choice:hover {
+  transform: translateY(-3px) scale(1.04);
+  border-color: var(--primary);
+}
+
+.cb-promotion-symbol { font-size: 2rem; line-height: 1; }
+.cb-promotion-label { font-size: 0.72rem; font-weight: 700; color: var(--muted); }
+
+.cb-promotion-cancel {
+  margin-top: 0.8rem;
+  background: none;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+@media (max-width: 560px) {
+  .cb-grid { border-width: 0.22rem; }
+  .cb-root { padding: 0.25rem 0 0.75rem; }
+  /* Telefonda sayfa zaten dikey kayıyor; tahtayı genişliğe göre büyütmek
+     daha iyi. Yükseklik sınırını kaldırırız. */
+  .cb-stage { width: 100%; }
+}
+
+/* Akıllı tahta / büyük ekran: tahtayı daha da büyüt. */
+@media (min-width: 1500px) {
+  .cb-stage { width: min(100%, 56rem, 72vh); }
+}
+
+/* ================================================================== *
+ * Hareket animasyonu
+ *
+ * Taş, hedefe ışınlanmak yerine kendi karesinden çıkıp izlemesi gereken yol
+ * boyunca gider. At için bu yol "L" biçimindedir; ara nokta JS tarafında
+ * hesaplanır (ChessBoard.js → waypointFor).
+ * ================================================================== */
+
+.cb-anim-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* Uçan taş kareler ve ipucu noktalarının üstünde, terfi penceresinin altında. */
+  z-index: 3;
+}
+
+.cb-ghost .piece-svg { display: block; }
+
+.cb-ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(2rem, 9.6vw, 4.6rem);
+  font-size: 14cqw;
+  line-height: 1;
+  will-change: transform;
+  /* Hareket eden taş, duran taşlardan biraz daha belirgin görünsün. */
+  filter: drop-shadow(0 0.5rem 0.4rem rgba(0, 0, 0, 0.34));
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+/* Hareket kapalıysa uçan taş hiç görünmez (JS zaten animasyonu atlar). */
+.reduced-motion .cb-ghost { display: none; }

@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Canlılar Sınıflandırma Safarisi | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .pushable:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+    .safari-bg { background: linear-gradient(#fde68a 0%, #fef3c7 55%, #bef264 55%, #84cc16 100%); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-sm font-black flex items-center gap-1"><span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span></a>
+      <div>
+        <div class="flex items-center gap-2"><span class="text-2xl sm:text-3xl">🦁</span><h1 class="display text-lg sm:text-2xl font-black tracking-wide">Canlılar Sınıflandırma Safarisi</h1></div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Safaride karşılaştığın hayvanları özelliklerine göre doğru gruba yerleştir! 🔍🐾</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab">🧭 1. Safari</button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white">📖 2. Safari Albümü</button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">ROTA 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">Omurgası Var mı?</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 p-2.5 bg-amber-50 rounded-xl border-2 border-ink">
+          <p id="taskText" class="text-xs sm:text-sm font-black">🎯 Karşına çıkan canlının omurgalı mı, omurgasız mı olduğunu bul!</p>
+          <div class="text-right shrink-0">
+            <p class="text-[10px] font-black text-gray-500">CANLI</p>
+            <p id="roundText" class="display text-xl font-black leading-none">1/8</p>
+          </div>
+        </div>
+
+        <!-- SAFARİ SAHNESİ -->
+        <div id="stage" class="safari-bg relative w-full rounded-2xl border-3 border-ink overflow-hidden p-3 sm:p-4 min-h-[300px] flex flex-col items-center justify-center gap-3">
+          <div class="absolute left-3 top-3 text-3xl">🌴</div>
+          <div class="absolute right-4 top-6 text-2xl">☀️</div>
+          <div class="absolute right-3 bottom-3 text-3xl">🌳</div>
+          <div id="animalCard" class="relative z-10 bg-white rounded-3xl border-3 border-ink shadow-hard px-6 py-3 text-center">
+            <div id="animalEmoji" class="text-7xl sm:text-8xl leading-none">🐈</div>
+            <p id="animalName" class="display text-xl font-black mt-1">Kedi</p>
+          </div>
+          <div id="playArea" class="relative z-10 w-full"></div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-xs font-black">🔄 Baştan</button>
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black">💡 İpucu</button>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-amber-50 to-lime-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">Bilim insanları milyonlarca canlıyı incelemeyi kolaylaştırmak için onları <b>ortak özelliklerine</b> göre gruplara ayırır. Buna <b>sınıflandırma</b> denir.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">Kâşif Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">📖</span><h3 class="display text-base font-black">Albüm</h3></div>
+          <span id="albumCount" class="text-xs font-bold text-gray-500">0</span>
+        </div>
+        <div id="albumMini" class="flex flex-wrap gap-1 text-2xl"></div>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Fen Bilgisi Rehberi</h3></div>
+        <div id="guide" class="space-y-1.5 text-xs"></div>
+      </div>
+    </div>
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Rota Tamam!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-amber-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-amber-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      correct() { tone('triangle', 660, 990, 0.12, 0.2); tone('triangle', 990, 1320, 0.15, 0.18, 0.08); },
+      wrong() { tone('sawtooth', 220, 110, 0.3, 0.15); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. CANLI VERİLERİ ---
+    const GROUPS = {
+      memeli: { n: 'Memeliler', e: '🐾', c: '#fecaca', f: 'Vücudu kıllarla örtülüdür, akciğerle solunum yapar, çoğu yavru doğurur ve yavrusunu <b>sütle besler</b>.' },
+      kus: { n: 'Kuşlar', e: '🪶', c: '#fde68a', f: 'Vücudu <b>tüylerle</b> örtülüdür, gagası vardır, akciğerle solunum yapar ve yumurtlar.' },
+      surungen: { n: 'Sürüngenler', e: '🦎', c: '#bbf7d0', f: 'Derisi <b>kuru ve pullu</b>dur, akciğerle solunum yapar, çoğu karaya yumurtlar.' },
+      balik: { n: 'Balıklar', e: '🐟', c: '#bae6fd', f: 'Suda yaşar, <b>solungaçla</b> solunum yapar, vücudu genellikle pullarla örtülüdür ve yüzgeçleri vardır.' },
+      ikiyasamli: { n: 'İki Yaşamlılar', e: '🐸', c: '#d9f99d', f: 'Yavruyken suda solungaçla, büyüyünce karada <b>akciğer ve nemli deriyle</b> solunum yapar.' },
+      omurgasiz: { n: 'Omurgasızlar', e: '🐛', c: '#e9d5ff', f: 'Vücutlarında <b>omurga yoktur</b>. Böcekler, örümcekler, solucanlar, salyangozlar ve ahtapotlar bu gruptadır.' }
+    };
+
+    const ANIMALS = [
+      { e: '🐈', n: 'Kedi', g: 'memeli', cover: 'Kıllarla örtülü', breath: 'Akciğer', birth: 'Doğurur, sütle besler', home: 'Karada', fact: 'Kediler bıyıklarıyla karanlıkta yollarını bulabilir.' },
+      { e: '🐄', n: 'İnek', g: 'memeli', cover: 'Kıllarla örtülü', breath: 'Akciğer', birth: 'Doğurur, sütle besler', home: 'Çiftlikte', fact: 'İçtiğimiz süt, ineğin yavrusunu beslemek için ürettiği besindir.' },
+      { e: '🐘', n: 'Fil', g: 'memeli', cover: 'Seyrek kıllı kalın deri', breath: 'Akciğer', birth: 'Doğurur, sütle besler', home: 'Savanda', fact: 'Fil, karada yaşayan en büyük hayvandır. Yavrusu yaklaşık 22 ay anne karnında kalır.' },
+      { e: '🐬', n: 'Yunus', g: 'memeli', tricky: true, cover: 'Neredeyse tüysüz, kaygan deri', breath: 'Akciğer (su yüzeyine çıkar)', birth: 'Doğurur, sütle besler', home: 'Denizde', fact: 'Yunus balık değildir! Nefes almak için su yüzeyine çıkar ve yavrusunu emzirir.' },
+      { e: '🐋', n: 'Balina', g: 'memeli', tricky: true, cover: 'Kalın, tüysüz deri', breath: 'Akciğer (başındaki delikten)', birth: 'Doğurur, sütle besler', home: 'Okyanusta', fact: 'Mavi balina dünyanın en büyük hayvanıdır ve bir memelidir.' },
+      { e: '🦇', n: 'Yarasa', g: 'memeli', tricky: true, cover: 'Kıllarla örtülü', breath: 'Akciğer', birth: 'Doğurur, sütle besler', home: 'Mağarada', fact: 'Yarasa kanatları olmasına rağmen kuş değildir. Uçabilen tek memelidir!' },
+      { e: '🦔', n: 'Kirpi', g: 'memeli', tricky: true, cover: 'Dikenler (sertleşmiş kıllar)', breath: 'Akciğer', birth: 'Doğurur, sütle besler', home: 'Bahçede', fact: 'Kirpinin dikenleri aslında sertleşmiş kıllardır.' },
+      { e: '🦅', n: 'Kartal', g: 'kus', cover: 'Tüylerle örtülü', breath: 'Akciğer', birth: 'Yumurtlar', home: 'Dağlarda', fact: 'Kartallar kilometrelerce uzaktaki avlarını görebilecek kadar keskin gözlere sahiptir.' },
+      { e: '🐔', n: 'Tavuk', g: 'kus', cover: 'Tüylerle örtülü', breath: 'Akciğer', birth: 'Yumurtlar', home: 'Çiftlikte', fact: 'Tavuklar uzun süre uçamaz ama yine de tüylü ve gagalı birer kuştur.' },
+      { e: '🦉', n: 'Baykuş', g: 'kus', cover: 'Yumuşak tüylerle örtülü', breath: 'Akciğer', birth: 'Yumurtlar', home: 'Ormanda', fact: 'Baykuşlar başlarını çok geniş bir açıyla çevirebilir.' },
+      { e: '🐧', n: 'Penguen', g: 'kus', tricky: true, cover: 'Sık tüylerle örtülü', breath: 'Akciğer', birth: 'Yumurtlar', home: 'Kutuplarda', fact: 'Penguen uçamaz ama çok iyi yüzer. Tüyleri ve gagası olduğu için bir kuştur.' },
+      { e: '🦜', n: 'Papağan', g: 'kus', cover: 'Renkli tüylerle örtülü', breath: 'Akciğer', birth: 'Yumurtlar', home: 'Yağmur ormanında', fact: 'Bazı papağanlar duydukları sesleri taklit edebilir.' },
+      { e: '🐍', n: 'Yılan', g: 'surungen', cover: 'Kuru pullarla örtülü', breath: 'Akciğer', birth: 'Çoğu yumurtlar', home: 'Karada', fact: 'Yılanlar büyüdükçe eski derilerini değiştirir.' },
+      { e: '🦎', n: 'Kertenkele', g: 'surungen', cover: 'Kuru pullarla örtülü', breath: 'Akciğer', birth: 'Çoğu yumurtlar', home: 'Taşlık alanlarda', fact: 'Bazı kertenkeleler tehlikede kuyruklarını bırakıp kaçabilir.' },
+      { e: '🐢', n: 'Kaplumbağa', g: 'surungen', tricky: true, cover: 'Pullu deri ve sert kabuk', breath: 'Akciğer', birth: 'Karaya yumurtlar', home: 'Karada ve denizde', fact: 'Deniz kaplumbağaları denizde yaşasa da yumurtalarını kumsala bırakır. Türkiye kıyılarında da yumurtlarlar!' },
+      { e: '🐊', n: 'Timsah', g: 'surungen', tricky: true, cover: 'Kalın pullu deri', breath: 'Akciğer', birth: 'Yumurtlar', home: 'Nehir kıyısında', fact: 'Timsahlar suda çok vakit geçirir ama akciğerle solunum yapan sürüngenlerdir.' },
+      { e: '🐟', n: 'Hamsi', g: 'balik', cover: 'Pullarla örtülü', breath: 'Solungaç', birth: 'Yumurtlar', home: 'Karadeniz\'de', fact: 'Hamsi, Karadeniz\'in en sevilen balıklarındandır.' },
+      { e: '🐠', n: 'Palyaço Balığı', g: 'balik', cover: 'Pullarla örtülü', breath: 'Solungaç', birth: 'Yumurtlar', home: 'Mercan resiflerinde', fact: 'Palyaço balıkları dokunaçlı deniz şakayıklarının arasında saklanır.' },
+      { e: '🐡', n: 'Balon Balığı', g: 'balik', cover: 'Dikenli deri', breath: 'Solungaç', birth: 'Yumurtlar', home: 'Denizde', fact: 'Balon balığı tehlike anında su yutarak şişer.' },
+      { e: '🦈', n: 'Köpek Balığı', g: 'balik', tricky: true, cover: 'Zımpara gibi minik pullar', breath: 'Solungaç', birth: 'Türüne göre yumurtlar ya da doğurur', home: 'Okyanusta', fact: 'Bazı köpek balıkları yavru doğurur ama yavrularını sütle beslemez ve solungaçla solunum yapar. Bu yüzden balıktır.' },
+      { e: '🐸', n: 'Kurbağa', g: 'ikiyasamli', cover: 'Çıplak ve nemli deri', breath: 'Yavruyken solungaç, büyüyünce akciğer ve deri', birth: 'Suya yumurtlar', home: 'Gölde ve karada', fact: 'Kurbağa yavrusu (iribaş) suda balık gibi yaşar, büyüyünce bacakları çıkar ve karaya geçer.' },
+      { e: '🦋', n: 'Kelebek', g: 'omurgasiz', cover: 'Pullu kanatlar, dış iskelet', breath: 'Vücuttaki minik delikler', birth: 'Yumurtlar', home: 'Çiçekli bahçelerde', fact: 'Kelebek; yumurta, tırtıl, pupa ve ergin kelebek evrelerinden geçer.' },
+      { e: '🐌', n: 'Salyangoz', g: 'omurgasiz', cover: 'Yumuşak vücut, sert kabuk', breath: 'Akciğer benzeri boşluk', birth: 'Yumurtlar', home: 'Nemli yerlerde', fact: 'Salyangozun kabuğu bir iskelet değildir. İçinde omurga yoktur.' },
+      { e: '🕷️', n: 'Örümcek', g: 'omurgasiz', cover: 'Dış iskelet', breath: 'Kitapsı akciğerler', birth: 'Yumurtlar', home: 'Evlerde ve bahçelerde', fact: 'Örümceklerin 8 bacağı vardır, bu yüzden böcek değildirler.' },
+      { e: '🪱', n: 'Solucan', g: 'omurgasiz', cover: 'Yumuşak, nemli deri', breath: 'Deri', birth: 'Yumurtlar', home: 'Toprakta', fact: 'Solucanlar toprağı havalandırarak bitkilere yardım eder.' },
+      { e: '🐝', n: 'Arı', g: 'omurgasiz', cover: 'Tüycüklü dış iskelet', breath: 'Vücuttaki minik delikler', birth: 'Yumurtlar', home: 'Kovanda', fact: 'Arılar çiçekten çiçeğe konarak bitkilerin tozlaşmasını sağlar.' },
+      { e: '🐙', n: 'Ahtapot', g: 'omurgasiz', tricky: true, cover: 'Yumuşak deri', breath: 'Solungaç', birth: 'Yumurtlar', home: 'Denizde', fact: 'Ahtapot çok zeki bir hayvandır ama vücudunda hiç kemik yoktur. Omurgasızdır!' },
+      { e: '🦀', n: 'Yengeç', g: 'omurgasiz', cover: 'Sert dış iskelet', breath: 'Solungaç', birth: 'Yumurtlar', home: 'Kıyıda', fact: 'Yengecin sert kabuğu dış iskelettir. Büyüdükçe bu kabuğu değiştirir.' },
+      { e: '🪸', n: 'Mercan', g: 'omurgasiz', tricky: true, cover: 'Kireçten iskelet', breath: 'Vücut yüzeyi', birth: 'Yumurta ve tomurcuklanma', home: 'Sıcak denizlerde', fact: 'Mercan bir bitki ya da taş değil, minik hayvanlardan oluşan bir omurgasız topluluğudur!' },
+      { e: '🐞', n: 'Uğur Böceği', g: 'omurgasiz', cover: 'Sert kanat örtüsü', breath: 'Vücuttaki minik delikler', birth: 'Yumurtlar', home: 'Bahçede', fact: 'Uğur böcekleri bitkilere zarar veren yaprak bitlerini yiyerek bahçıvanlara yardım eder.' }
+    ];
+    const A = Object.fromEntries(ANIMALS.map(a => [a.n, a]));
+    const pick = names => names.map(n => A[n]);
+
+    // Soru ağacı
+    const TREE = [
+      { q: 'Vücudunda omurga var mı?', ans: a => a.g !== 'omurgasiz', no: 'omurgasiz', why: a => a.g === 'omurgasiz' ? `${a.n} bir omurgasızdır, iskeletinde omurga yoktur.` : `${a.n} omurgalıdır.` },
+      { q: 'Vücudu tüylerle örtülü mü?', ans: a => a.g === 'kus', yes: 'kus', why: a => a.g === 'kus' ? 'Tüyler yalnızca kuşlarda bulunur!' : `${a.n} tüylü değildir: ${a.cover.toLowerCase()}.` },
+      { q: 'Yavrusunu sütle besliyor mu?', ans: a => a.g === 'memeli', yes: 'memeli', why: a => a.g === 'memeli' ? 'Yavrusunu sütle besleyen canlılar memelidir.' : `${a.n} yavrusunu sütle beslemez.` },
+      { q: 'Hayatı boyunca solungaçla mı solunum yapıyor?', ans: a => a.g === 'balik', yes: 'balik', why: a => a.g === 'balik' ? 'Hayatı boyunca solungaçla solunum yapanlar balıktır.' : `${a.n}: ${a.breath.toLowerCase()}.` },
+      { q: 'Derisi çıplak ve nemli mi?', ans: a => a.g === 'ikiyasamli', yes: 'ikiyasamli', no: 'surungen', why: a => a.g === 'ikiyasamli' ? 'Nemli deri iki yaşamlıların özelliğidir.' : 'Kuru ve pullu deri sürüngenlerin özelliğidir.' }
+    ];
+
+    const LEVELS = [
+      { title: 'Omurgası Var mı?', type: 'sort', bins: ['omurgali', 'omurgasiz'], animals: pick(['Kedi', 'Kelebek', 'Kartal', 'Solucan', 'Hamsi', 'Örümcek', 'Yılan', 'Arı']), task: '🎯 Karşına çıkan canlının omurgalı mı, omurgasız mı olduğunu bul!', hint: 'Kemikli bir iskeleti ve sırtında omurgası olan canlılar omurgalıdır. Böcekler, solucanlar ve örümcekler omurgasızdır.', fact: 'Dünyadaki hayvan türlerinin çok büyük bir kısmı omurgasızdır! Sadece böceklerin bile bir milyondan fazla türü bilinir.' },
+      { title: 'Omurgalı Aileleri', type: 'sort', bins: ['memeli', 'kus', 'surungen', 'balik', 'ikiyasamli'], animals: pick(['İnek', 'Tavuk', 'Kertenkele', 'Palyaço Balığı', 'Kurbağa', 'Fil', 'Baykuş', 'Yılan', 'Hamsi', 'Papağan']), task: '🎯 Omurgalıları beş gruptan doğru olanına yerleştir!', hint: 'Tüy ➔ kuş. Sütle besleme ➔ memeli. Solungaç ➔ balık. Kuru pullu deri ➔ sürüngen. Nemli çıplak deri ➔ iki yaşamlı.', fact: 'Omurgalılar beş gruba ayrılır: <b>balıklar, iki yaşamlılar, sürüngenler, kuşlar ve memeliler</b>. Biz insanlar da memeliyiz!' },
+      { title: 'Soru Ağacı', type: 'tree', animals: pick(['Kartal', 'Hamsi', 'Kurbağa', 'Salyangoz', 'Kedi', 'Kertenkele']), task: '🎯 Soruları Evet ya da Hayır ile cevapla, canlıyı doğru gruba ulaştır!', hint: 'Her soruda canlının sadece o özelliğini düşün. Emin değilsen ipucu kartındaki özelliklere bak.', fact: 'Bilim insanları da canlıları tanımlamak için böyle evet-hayır sorularından oluşan <b>tanı anahtarları</b> kullanır.' },
+      { title: 'Şaşırtıcı Canlılar', type: 'sort', bins: ['memeli', 'kus', 'surungen', 'balik', 'ikiyasamli', 'omurgasiz'], animals: pick(['Yunus', 'Penguen', 'Yarasa', 'Köpek Balığı', 'Kaplumbağa', 'Ahtapot', 'Kirpi', 'Mercan', 'Balina', 'Timsah']), task: '🎯 Dikkat! Bu canlılar göründükleri gibi değil. Özelliklerine göre sınıflandır!', hint: 'Yaşadığı yere değil, özelliklerine bak! Denizde yaşayıp akciğerle solunum yapan, yavrusunu emziren bir canlı balık olamaz.', fact: 'Canlıları sınıflandırırken yaşadıkları yere ya da görünüşlerine değil, <b>vücut yapılarına ve özelliklerine</b> bakarız.' }
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: Omurga Uzmanı', text: 'İlk rotayı tamamla.' },
+      { id: 'm2', title: '2. Görev: Tanı Anahtarı', text: 'Soru Ağacında hiç hata yapmadan 6 canlıyı sınıflandır.' },
+      { id: 'm3', title: '3. Görev: Albüm Koleksiyoncusu', text: 'Safari Albümünde 20 canlının kartını incele.', progress: true },
+      { id: 'm4', title: '4. Görev: Baş Kâşif', text: '4 rotanın hepsini tamamla.' }
+    ];
+
+    // --- 3. DURUM ---
+    const $ = id => document.getElementById(id);
+    let mode = 'levels';
+    let levelIndex = 0;
+    let queue = [];
+    let round = 0;
+    let mistakes = 0;
+    let treeStep = 0;
+    let treePath = [];
+    let finished = false;
+    let locked = false;
+    let score = 0;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    const seen = new Set();
+    const albumViewed = new Set();
+    let modalTimer = null;
+
+    // --- 4. OYUN ---
+    function current() { return queue[round]; }
+
+    function showAnimal() {
+      const a = current();
+      $('animalEmoji').textContent = a.e;
+      $('animalName').textContent = a.n;
+      $('roundText').textContent = `${round + 1}/${queue.length}`;
+      if (typeof gsap !== 'undefined') gsap.fromTo('#animalCard', { scale: 0.6, rotate: -8 }, { scale: 1, rotate: 0, duration: 0.4, ease: 'back.out(2)' });
+      treeStep = 0; treePath = [];
+      renderPlay();
+    }
+
+    function renderPlay() {
+      const L = LEVELS[levelIndex];
+      const area = $('playArea');
+      if (L.type === 'sort') {
+        const bins = L.bins.map(b => b === 'omurgali' ? { id: 'omurgali', n: 'Omurgalılar', e: '🦴', c: '#fed7aa' } : { id: b, ...GROUPS[b] });
+        area.innerHTML = `<div class="grid ${bins.length <= 2 ? 'grid-cols-2' : 'grid-cols-3'} gap-2">${bins.map(b => `
+          <button data-b="${b.id}" class="bin pushable py-2.5 flex flex-col items-center" style="background:${b.c}">
+            <span class="text-2xl">${b.e}</span><span class="text-xs font-black">${b.n}</span></button>`).join('')}</div>`;
+        area.querySelectorAll('.bin').forEach(btn => btn.addEventListener('click', () => answerSort(btn.dataset.b, btn)));
+      } else {
+        const step = TREE[treeStep];
+        area.innerHTML = `<div class="bg-white/95 rounded-2xl border-3 border-ink p-3">
+          <div class="flex flex-wrap gap-1 mb-2">${treePath.map(p => `<span class="px-2 py-0.5 rounded-lg border-2 border-ink text-[10px] font-black ${p.ok ? 'bg-emerald-100' : 'bg-rose-100'}">${p.a ? '✔️ Evet' : '✖️ Hayır'}: ${p.q}</span>`).join('')}</div>
+          <p class="display text-lg font-black text-center mb-2">❓ ${step.q}</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button data-a="1" class="tans pushable py-3 bg-emerald-400 hover:bg-emerald-300 text-base font-black">👍 Evet</button>
+            <button data-a="0" class="tans pushable py-3 bg-rose-300 hover:bg-rose-200 text-base font-black">👎 Hayır</button>
+          </div></div>`;
+        area.querySelectorAll('.tans').forEach(btn => btn.addEventListener('click', () => answerTree(btn.dataset.a === '1')));
+      }
+    }
+
+    function card(a) {
+      return `<b>${a.e} ${a.n}</b> · Örtü: ${a.cover} · Solunum: ${a.breath} · ${a.birth}. ${a.fact}`;
+    }
+
+    function answerSort(bin, btn) {
+      if (locked || finished) return;
+      const a = current();
+      const correctBin = LEVELS[levelIndex].bins.includes('omurgali') ? (a.g === 'omurgasiz' ? 'omurgasiz' : 'omurgali') : a.g;
+      initAudio();
+      if (bin === correctBin) {
+        Sound.correct();
+        seen.add(a.n); renderAlbumMini();
+        $('scienceNote').innerHTML = `✅ ${card(a)}`;
+        nextRound();
+      } else {
+        mistakes++;
+        Sound.wrong();
+        if (typeof gsap !== 'undefined') gsap.fromTo(btn, { x: -8 }, { x: 0, duration: 0.45, ease: 'elastic.out(4,0.2)' });
+        $('scienceNote').innerHTML = `❌ Tekrar düşün! İpucu: ${a.n} için <b>örtü:</b> ${a.cover.toLowerCase()}, <b>solunum:</b> ${a.breath.toLowerCase()}, <b>üreme:</b> ${a.birth.toLowerCase()}.`;
+        btn.disabled = true;
+      }
+    }
+
+    function answerTree(yes) {
+      if (locked || finished) return;
+      const a = current();
+      const step = TREE[treeStep];
+      const truth = step.ans(a);
+      const ok = yes === truth;
+      initAudio();
+      if (!ok) { mistakes++; Sound.wrong(); } else Sound.click();
+      treePath.push({ q: step.q, a: truth, ok });
+      $('scienceNote').innerHTML = `${ok ? '✅' : '❌ Doğru cevap: <b>' + (truth ? 'Evet' : 'Hayır') + '</b>.'} ${step.why(a)}`;
+      const end = truth ? step.yes : step.no;
+      if (end) {
+        locked = true;
+        const g = GROUPS[end];
+        Sound.correct();
+        seen.add(a.n); renderAlbumMini();
+        $('playArea').innerHTML = `<div class="bg-white/95 rounded-2xl border-3 border-ink p-3 text-center"><p class="text-3xl">${g.e}</p><p class="display text-xl font-black">${a.n} ➔ ${g.n}</p><p class="text-xs font-semibold text-gray-700 mt-1">${g.f}</p></div>`;
+        setTimeout(() => { locked = false; nextRound(); }, 1600);
+        return;
+      }
+      treeStep++;
+      renderPlay();
+    }
+
+    function nextRound() {
+      round++;
+      if (round >= queue.length) { winLevel(); return; }
+      showAnimal();
+    }
+
+    function winLevel() {
+      finished = true;
+      const L = LEVELS[levelIndex];
+      const s = mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20;
+      if (levelIndex === 0) completeMission('m1');
+      if (L.type === 'tree' && mistakes === 0) completeMission('m2');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      updateScore(); renderLevelDots();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+      $('playArea').innerHTML = '<p class="text-center display text-xl font-black">🏁 Rota tamamlandı!</p>';
+      showModal({ emoji: '🦁', title: 'Rota Tamam!', stars: '⭐'.repeat(s) + '☆'.repeat(3 - s), info: mistakes === 0 ? 'Hiç hata yapmadın, harika kâşif!' : `${mistakes} hata yaptın.`, fact: L.fact, next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Albüme Git 📖' });
+    }
+
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info; $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next); if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 700);
+    }
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    // --- 5. ALBÜM ---
+    function renderAlbumMini() {
+      $('albumMini').innerHTML = ANIMALS.map(a => `<span title="${a.n}" class="${seen.has(a.n) || albumViewed.has(a.n) ? '' : 'grayscale opacity-20'}">${a.e}</span>`).join('');
+      $('albumCount').textContent = `${new Set([...seen, ...albumViewed]).size}/${ANIMALS.length}`;
+    }
+
+    function renderAlbum(selectedName) {
+      $('animalCard').classList.toggle('hidden', !selectedName);
+      if (selectedName) {
+        const a = A[selectedName];
+        $('animalEmoji').textContent = a.e;
+        $('animalName').textContent = a.n;
+      }
+      const a = selectedName ? A[selectedName] : null;
+      $('playArea').innerHTML = `
+        ${a ? `<div class="bg-white/95 rounded-2xl border-3 border-ink p-3 mb-2 text-xs">
+          <p class="font-black mb-1"><span class="px-2 py-0.5 rounded-lg border-2 border-ink" style="background:${GROUPS[a.g].c}">${GROUPS[a.g].e} ${GROUPS[a.g].n}</span></p>
+          <p class="font-bold">🧥 <b>Vücut örtüsü:</b> ${a.cover}</p>
+          <p class="font-bold">🫁 <b>Solunum:</b> ${a.breath}</p>
+          <p class="font-bold">🥚 <b>Üreme:</b> ${a.birth}</p>
+          <p class="font-bold">🏠 <b>Yaşam alanı:</b> ${a.home}</p>
+          <p class="font-semibold text-gray-700 mt-1">💡 ${a.fact}</p></div>` : '<p class="text-center text-sm font-black mb-2">👇 İncelemek istediğin canlıya dokun!</p>'}
+        <div class="grid grid-cols-6 sm:grid-cols-8 gap-1.5 bg-white/80 rounded-2xl border-3 border-ink p-2 max-h-48 overflow-y-auto">
+          ${ANIMALS.map(x => `<button data-n="${x.n}" class="alb pushable bg-white text-2xl py-1 ${albumViewed.has(x.n) ? 'ring-2 ring-emerald-400' : ''}">${x.e}</button>`).join('')}
+        </div>`;
+      $('playArea').querySelectorAll('.alb').forEach(b => b.addEventListener('click', () => {
+        albumViewed.add(b.dataset.n); Sound.click();
+        renderAlbumMini(); renderMissions();
+        if (albumViewed.size >= 20) completeMission('m3');
+        renderAlbum(b.dataset.n);
+      }));
+    }
+
+    function renderGuide() {
+      $('guide').innerHTML = Object.values(GROUPS).map(g => `<div class="p-2 rounded-lg border border-ink/30" style="background:${g.c}"><p class="font-extrabold">${g.e} ${g.n}</p><p class="text-[11px] font-semibold">${g.f}</p></div>`).join('');
+    }
+
+    // --- 6. AKIŞ ---
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        const extra = m.progress && !done ? ` <b class="text-sky-700">(${Math.min(20, albumViewed.size)}/20)</b>` : '';
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5"><span class="text-lg">${done ? '✅' : '⬜'}</span><div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}${extra}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Rotalar:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function loadLevel(i) {
+      closeModal();
+      mode = 'levels'; levelIndex = i; round = 0; mistakes = 0; finished = false; locked = false;
+      const L = LEVELS[i];
+      queue = [...L.animals].sort(() => Math.random() - 0.5);
+      $('levelBadge').textContent = `ROTA ${i + 1}`;
+      $('levelTitle').textContent = L.title;
+      $('taskText').textContent = L.task;
+      $('animalCard').classList.remove('hidden');
+      renderLevelDots();
+      showAnimal();
+    }
+
+    function switchMode(m) {
+      const isS = m === 'album';
+      $('tabLevels').classList.toggle('active-tab', !isS); $('tabLevels').classList.toggle('bg-white', isS);
+      $('tabSandbox').classList.toggle('active-tab', isS); $('tabSandbox').classList.toggle('bg-white', !isS);
+      $('levelDots').classList.toggle('hidden', isS);
+      if (isS) {
+        closeModal();
+        mode = 'album';
+        $('levelBadge').textContent = 'ALBÜM';
+        $('levelTitle').textContent = 'Safari Albümü';
+        $('taskText').textContent = '📖 Canlıların kartlarını incele, özelliklerini öğren!';
+        $('roundText').textContent = `${ANIMALS.length}`;
+        renderAlbum(null);
+      } else loadLevel(levelIndex);
+    }
+
+    $('btnReset').addEventListener('click', () => { Sound.click(); if (mode === 'levels') loadLevel(levelIndex); else renderAlbum(null); });
+    $('btnHint').addEventListener('click', () => {
+      Sound.click();
+      $('scienceNote').innerHTML = mode === 'levels' ? `<b>İpucu:</b> ${LEVELS[levelIndex].hint}` : '<b>Keşif fikri:</b> Denizde yaşayan canlıları bul. Hepsi aynı gruptan mı? Yunus, köpek balığı, ahtapot ve kaplumbağayı karşılaştır!';
+    });
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('album'); });
+    $('btnModalRetry').addEventListener('click', () => loadLevel(levelIndex));
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('album'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; Sound.click(); });
+
+    renderGuide(); renderMissions(); updateScore(); renderAlbumMini(); loadLevel(0);
+  </script>
+</body>
+</html>

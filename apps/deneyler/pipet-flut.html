@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sihirli Pipet Flütü — Havanın Titreşimiyle Ses Deneyi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <style>
+    :root {
+      --ink: #182b4d;
+      --paper: #fffdf7;
+      --panel: #f4efe2;
+      --line: #d8ceb8;
+      --sun: #ffc93c;
+      --grape: #7b5be6;
+      --sea: #2ba6c9;
+      --leaf: #3bb273;
+      --coral: #ff6b6b;
+      --sky: #0284c7;
+    }
+
+    body {
+      font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #fffdf7;
+      color: #182b4d;
+      background-image: radial-gradient(#d8ceb8 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+    }
+
+    .display {
+      font-family: 'Baloo 2', 'Nunito', cursive, sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .chunky {
+      border: 3.5px solid var(--ink);
+      border-radius: 20px;
+      box-shadow: 0 6px 0 var(--ink);
+    }
+
+    .pushable {
+      border: 3px solid var(--ink);
+      border-radius: 14px;
+      box-shadow: 0 4px 0 var(--ink);
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .pushable:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 var(--ink);
+    }
+
+    .pushable:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 var(--ink);
+    }
+
+    /* Renk Yardımcı Sınıfları */
+    .bg-coral { background-color: #ff5252 !important; }
+    .bg-grape { background-color: #7b5be6 !important; }
+    .bg-sun { background-color: #ffc93c !important; }
+    .bg-panel { background-color: #f4efe2 !important; }
+    .bg-paper { background-color: #fffdf7 !important; }
+    .bg-sky { background-color: #0284c7 !important; }
+    .bg-mint { background-color: #3bb273 !important; }
+    .text-ink { color: #182b4d !important; }
+    .border-ink { border-color: #182b4d !important; }
+
+    /* Range slider custom */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+    }
+    input[type=range]:focus {
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 14px;
+      cursor: pointer;
+      background: #e4dcce;
+      border: 2px solid var(--ink);
+      border-radius: 9999px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      height: 28px;
+      width: 28px;
+      border-radius: 50%;
+      background: var(--sun);
+      border: 2.5px solid var(--ink);
+      cursor: pointer;
+      -webkit-appearance: none;
+      margin-top: -8px;
+      box-shadow: 0 2px 0 var(--ink);
+    }
+
+    /* Animasyonlu titreşim çizgileri */
+    @keyframes wavePulse {
+      0% { transform: scale(0.85); opacity: 0.9; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
+    .wave-pulse {
+      transform-origin: center;
+      animation: wavePulse 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-3 sm:p-6 select-none">
+
+  <!-- Üst Bar -->
+  <div class="max-w-6xl mx-auto w-full mb-4">
+    <header class="flex flex-wrap items-center justify-between gap-4 bg-white/90 backdrop-blur p-4 rounded-2xl chunky">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="pushable bg-sun px-3.5 py-2 flex items-center gap-1.5 text-ink font-bold text-sm" title="Ana Sayfaya Dön">
+          <span>🏠</span> <span>Tüm Deneyler</span>
+        </a>
+        <h1 class="display text-2xl sm:text-3xl flex items-center gap-2">
+          <span>🎵</span> Sihirli Pipet Flütü
+        </h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="px-3 py-1 bg-amber-100 text-amber-900 text-xs sm:text-sm font-bold rounded-full border-2 border-ink">
+          3-4. Sınıf Fen · Havanın Titreşimi ve Ses
+        </span>
+        <button id="soundToggle" class="pushable bg-panel px-3 py-1.5 text-xs font-bold flex items-center gap-1">
+          <span id="soundIcon">🔊</span> <span id="soundLabel">Ses Açık</span>
+        </button>
+      </div>
+    </header>
+  </div>
+
+  <!-- Ana Düzen: Çalgı Sahnesi (Sol) + Deney Kontrol Paneli (Sağ) -->
+  <main class="max-w-6xl mx-auto w-full flex-1 flex flex-col lg:flex-row items-stretch gap-6 mb-6">
+
+    <!-- Sol Sütun: Simülasyon Sahnesi -->
+    <section class="chunky relative flex-1 flex flex-col justify-between overflow-hidden bg-white min-h-[500px]">
+      
+      <!-- Üst Osiloskop ve Canlı Frekans Bilgisi -->
+      <div class="bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 p-4 border-b-3 border-ink flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-ink text-sun flex items-center justify-center font-black text-xl border-2 border-ink">
+            〰️
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-extrabold uppercase tracking-wider text-gray-500">Ses Dalga Göstergesi</span>
+              <span id="waveToneTag" class="px-2 py-0.5 rounded-md text-[10px] font-black bg-sun border border-ink text-ink">Hazır</span>
+            </div>
+            <div class="text-base sm:text-lg font-black text-ink display flex items-center gap-2">
+              <span id="activeNoteName">Bir Pipete Tıkla veya Üfle!</span>
+              <span id="activeFreqText" class="text-xs font-bold text-gray-600"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Canlı Dalga Çizim Alanı -->
+        <div class="w-44 h-11 bg-slate-900 rounded-xl border-2 border-ink overflow-hidden relative flex items-center justify-center">
+          <canvas id="oscCanvas" width="176" height="44" class="w-full h-full"></canvas>
+        </div>
+      </div>
+
+      <!-- SVG Flüt ve Akustik Masası -->
+      <div class="relative flex-1 flex items-center justify-center p-2 sm:p-6 overflow-hidden bg-gradient-to-b from-sky-50/40 to-amber-50/40">
+        
+        <svg id="fluteSvg" viewBox="0 0 680 440" class="w-full h-full max-h-[460px]"
+             role="img" aria-label="Pipetten Üflemeli Çalgı" font-family="'Baloo 2', 'Nunito', sans-serif"
+             stroke-linecap="round" stroke-linejoin="round">
+
+          <defs>
+            <!-- Pipet gölge efekti -->
+            <filter id="shadowPipet" x="-10%" y="-5%" width="125%" height="110%">
+              <feDropShadow dx="3" dy="4" stdDeviation="1" flood-color="#182b4d" flood-opacity="0.2"/>
+            </filter>
+            <!-- Dalga halkaları gradyanı -->
+            <radialGradient id="soundRingGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#ffc93c" stop-opacity="0.8"/>
+              <stop offset="70%" stop-color="#ff6b6b" stop-opacity="0.4"/>
+              <stop offset="100%" stop-color="#7b5be6" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+
+          <!-- Masa / Zemin Çizgisi -->
+          <line x1="40" y1="390" x2="640" y2="390" stroke="#182b4d" stroke-width="4" stroke-dasharray="10 8" />
+          <rect x="50" y="394" width="580" height="24" rx="8" fill="#e2d9c8" stroke="#182b4d" stroke-width="2.5" />
+          <text x="340" y="411" text-anchor="middle" font-size="11" font-weight="bold" fill="#786e5e">
+            📏 Akustik Deney Tablası
+          </text>
+
+          <!-- ================= GÖRÜNÜM 1: PAN FLÜT (8 Pipet) ================= -->
+          <g id="viewPanFlute">
+            <!-- Arka Tutucu Bant / Bağlantı Çubuğu -->
+            <rect x="85" y="195" width="470" height="28" rx="7" fill="#ffc93c" stroke="#182b4d" stroke-width="3.5" />
+            <line x1="95" y1="209" x2="545" y2="209" stroke="#182b4d" stroke-width="2" stroke-dasharray="8 6" />
+            <text x="320" y="213" text-anchor="middle" font-size="11" font-weight="900" fill="#182b4d">
+              RENGÂRENK PİPET PAN FLÜTÜ
+            </text>
+
+            <!-- 8 Adet Pipet (Kırmızıdan Mora) -->
+            <!-- 1: Do (C4) - 20 cm -->
+            <g id="strawGroup0" class="cursor-pointer group" onclick="playStraw(0)">
+              <rect id="strawBody0" x="95" y="70" width="46" height="315" rx="10" fill="#ef4444" stroke="#182b4d" stroke-width="3.5" filter="url(#shadowPipet)" class="transition-transform duration-100 group-hover:-translate-y-1" />
+              <!-- İç Hava Sütunu & Titreşim Noktaları -->
+              <g id="particles0" class="opacity-80"></g>
+              <!-- Ağız Kısmı -->
+              <ellipse cx="118" cy="74" rx="20" ry="7" fill="#fca5a5" stroke="#182b4d" stroke-width="2.5" />
+              <!-- Etiket -->
+              <circle cx="118" cy="115" r="16" fill="#ffffff" stroke="#182b4d" stroke-width="2.5" />
+              <text x="118" y="121" text-anchor="middle" font-size="14" font-weight="900" fill="#182b4d">DO</text>
+              <text x="118" y="365" text-anchor="middle" font-size="11" font-weight="800" fill="#ffffff">20 cm</text>
+              <text x="118" y="380" text-anchor="middle" font-size="9" font-weight="bold" fill="#fef2f2">261 Hz</text>
+            </g>
+
+            <!-- 2: Re (D4) - 17.5 cm -->
+            <g id="strawGroup1" class="cursor-pointer group" onclick="playStraw(1)">
+              <rect id="strawBody1" x="155" y="105" width="46" height="280" rx="10" fill="#f97316" stroke="#182b4d" stroke-width="3.5" filter="url(#shadowPipet)" class="transition-transform duration-100 group-hover:-translate-y-1" />
+              <g id="particles1" class="opacity-80"></g>
+              <ellipse cx="178" cy="109" rx="20" ry="7" fill="#fed7aa" stroke="#182b4d" stroke-width="2.5" />
+              <circle cx="178" cy="150" r="16" fill="#ffffff" stroke="#182b4d" stroke-width="2.5" />
+              <text x="178" y="156" text-anchor="middle" font-size="14" font-weight="900" fill="#182b4d">RE</text>
+              <text x="178" y="365" text-anchor="middle" font-size="11" font-weight="800" fill="#ffffff">17.5 cm</text>
+              <text x="178" y="380" text-anchor="middle" font-size="9" font-weight="bold" fill="#fff7ed">294 Hz</text>
+            </g>
+
+            <!-- 3: Mi (E4) - 15.5 cm -->
+            <g id="strawGroup2" class="cursor-pointer group" onclick="playStraw(2)">
+              <rect id="strawBody2" x="215" y="135" width="46" height="250" rx="10" fill="#eab308" stroke="#182b4d" stroke-width="3.5" filter="url(#shadowPipet)" class="transition-transform duration-100 group-hover:-translate-y-1" />
+              <g id="particles2" class="opacity-80"></g>
+              <ellipse cx="238" cy="139" rx="20" ry="7" fill="#fef08a" stroke="#182b4d" stroke-width="2.5" />
+              <circle cx="238" cy="180" r="16" fill="#ffffff" stroke="#182b4d" stroke-width="2.5" />
+              <text x="238" y="186" text-anchor="middle" font-size="14" font-weight="900" fill="#182b4d">Mİ</text>
+              <text x="238" y="365" text-anchor="middle" font-size="11" font-weight="800" fill="#182b4d">15.5 cm</text>
+              <text x="238" y="380" text-anchor="middle" font-size="9" font-weight="bold" fill="#713f12">330 Hz</text>
+            </g>
+
+            <!-- 4: Fa (F4) - 14.5 cm -->
+            <g id="strawGroup3" class="cursor-pointer group" onclick="playStraw(3)">
+              <rect id="strawBody3" x="275" y="155" width="46" height="230" rx="10" fill="#22c55e" stroke="#182b4d" stroke-width="3.5" filter="url(#shadowPipet)" class="transition-transform duration-100 group-hover:-translate-y-1" />
+              <g id="particles3" class="opacity-80"></g>
+              <ellipse cx="298" cy="159" rx="20" ry="7" fill="#bbf7d0" stroke="#182b4d" stroke-width="2.5" />
+              <circle cx="298" cy="200" r="16" fill="#ffffff" stroke="#182b4d" stroke-width="2.5" />
+              <text x="298" y="206" text-anchor="middle" font-size="14" font-weight="900" fill="#182b4d">FA</text>
+              <text x="298" y="365" text-anchor="middle" font-size="11" font-weight="800" fill="#ffffff">14.5 cm</text>
+              <text x="298" y="380" text-anchor="middle" font-size="9" font-weight="bold" fill="#f0fdf4">349 Hz</text>
+            </g>
+
+            <!-- 5: Sol (G4) - 13 cm -->
+            <g id="strawGroup4" class="cursor-pointer group" onclick="playStraw(4)">
+              <rect id="strawBody4" x="335" y="175" width="46" height="210" rx="10" fill="#06b6d4" stroke="#182b4d" stroke-width="3.5" filter="url(#shadowPipet)" class="transition-transform duration-100 group-hover:-translate-y-1" />
+              <g id="particles4" class="opacity-80"></g>
+              <ellipse cx="358" cy="179" rx="20" ry="7" fill="#a5f3fc" stroke="#182b4d" stroke-width="2.5" />
+              <circle cx="358" cy="220" r="16" fill="#ffffff" stroke="#182b4d" stroke-width="2.5" />
+              <text x="358" y="226" text-anchor="middle" font-size="14" font-weight="900" fill="#182b4d">SOL</text>
+              <text x="358" y="365" text-anchor="middle" font-size="11" font-weight="800" fill="#ffffff">13 cm</text>
+              <text x="358" y="380" text-anchor="middle" font-size="9" font-weight="bold" fill="#ecfeff">392 Hz</text>
+            </g>
+
+            <!-- 6: La (A4) - 11.5 cm -->
+            <g id="strawGroup5" class="cursor-pointer group" onclick="playStraw(5)">
+              <rect id="strawBody5" x="395" y="195" width="46" height="190" rx="10" fill="#3b82f6" stroke="#182b4d" stroke-width="3.5" filter="url(#shadowPipet)" class="transition-transform duration-100 group-hover:-translate-y-1" />
+              <g id="particles5" class="opacity-80"></g>
+              <ellipse cx="418" cy="199" rx="20" ry="7" fill="#bfdbfe" stroke="#182b4d" stroke-width="2.5" />
+              <circle cx="418" cy="240" r="16" fill="#ffffff" stroke="#182b4d" stroke-width="2.5" />
+              <text x="418" y="246" text-anchor="middle" font-size="14" font-weight="900" fill="#182b4d">LA</text>
+              <text x="418" y="365" text-anchor="middle" font-size="11" font-weight="800" fill="#ffffff">11.5 cm</text>
+              <text x="418" y="380" text-anchor="middle" font-size="9" font-weight="bold" fill="#eff6ff">440 Hz</text>
+            </g>
+
+            <!-- 7: Si (B4) - 10 cm -->
+            <g id="strawGroup6" class="cursor-pointer group" onclick="playStraw(6)">
+              <rect id="strawBody6" x="455" y="220" width="46" height="165" rx="10" fill="#8b5cf6" stroke="#182b4d" stroke-width="3.5" filter="url(#shadowPipet)" class="transition-transform duration-100 group-hover:-translate-y-1" />
+              <g id="particles6" class="opacity-80"></g>
+              <ellipse cx="478" cy="224" rx="20" ry="7" fill="#ddd6fe" stroke="#182b4d" stroke-width="2.5" />
+              <circle cx="478" cy="265" r="16" fill="#ffffff" stroke="#182b4d" stroke-width="2.5" />
+              <text x="478" y="271" text-anchor="middle" font-size="14" font-weight="900" fill="#182b4d">Sİ</text>
+              <text x="478" y="365" text-anchor="middle" font-size="11" font-weight="800" fill="#ffffff">10 cm</text>
+              <text x="478" y="380" text-anchor="middle" font-size="9" font-weight="bold" fill="#f5f3ff">494 Hz</text>
+            </g>
+
+            <!-- 8: İnce Do (C5) - 9 cm -->
+            <g id="strawGroup7" class="cursor-pointer group" onclick="playStraw(7)">
+              <rect id="strawBody7" x="515" y="240" width="46" height="145" rx="10" fill="#ec4899" stroke="#182b4d" stroke-width="3.5" filter="url(#shadowPipet)" class="transition-transform duration-100 group-hover:-translate-y-1" />
+              <g id="particles7" class="opacity-80"></g>
+              <ellipse cx="538" cy="244" rx="20" ry="7" fill="#fbcfe8" stroke="#182b4d" stroke-width="2.5" />
+              <circle cx="538" cy="285" r="16" fill="#ffffff" stroke="#182b4d" stroke-width="2.5" />
+              <text x="538" y="291" text-anchor="middle" font-size="12" font-weight="900" fill="#182b4d">İ. DO</text>
+              <text x="538" y="365" text-anchor="middle" font-size="10" font-weight="800" fill="#ffffff">9 cm</text>
+              <text x="538" y="380" text-anchor="middle" font-size="9" font-weight="bold" fill="#fdf2f8">523 Hz</text>
+            </g>
+
+            <!-- Ses Halkaları Grubu (Aktif pipetin üstünde parlar) -->
+            <g id="soundWavesPan" class="pointer-events-none" opacity="0"></g>
+          </g>
+
+          <!-- ================= GÖRÜNÜM 2: MAKASLA KES & KEŞFET MODU ================= -->
+          <g id="viewCutLab" opacity="0" class="pointer-events-none">
+            <!-- Arka Ölçüm Cetveli -->
+            <g transform="translate(180, 50)">
+              <rect x="0" y="0" width="30" height="340" rx="6" fill="#fef3c7" stroke="#182b4d" stroke-width="2.5" />
+              <!-- Santimetre Çizgileri -->
+              <path d="M15 20 H30 M20 40 H30 M15 60 H30 M20 80 H30 M15 100 H30 M20 120 H30 M15 140 H30 M20 160 H30 M15 180 H30 M20 200 H30 M15 220 H30 M20 240 H30 M15 260 H30 M20 280 H30 M15 300 H30 M20 320 H30" stroke="#182b4d" stroke-width="1.5" />
+              <text x="12" y="30" text-anchor="middle" font-size="10" font-weight="bold" fill="#92400e">cm</text>
+            </g>
+
+            <!-- Kesilebilir Ana Pipet (Alt Kısım) -->
+            <g id="cuttableStrawGroup" class="cursor-pointer" onclick="blowCutStraw()">
+              <rect id="cutStrawBody" x="250" y="100" width="80" height="290" rx="16" fill="#3b82f6" stroke="#182b4d" stroke-width="4" filter="url(#shadowPipet)" />
+              <ellipse id="cutStrawRim" cx="290" cy="106" rx="34" ry="11" fill="#93c5fd" stroke="#182b4d" stroke-width="3" />
+              <!-- İç Hava Molekülleri Titreşim Grubu -->
+              <g id="cutStrawParticles"></g>
+              
+              <!-- Boy ve Frekans Göstergesi -->
+              <g id="cutStrawInfoBadge" transform="translate(290, 240)">
+                <rect x="-65" y="-20" width="130" height="40" rx="10" fill="#ffffff" stroke="#182b4d" stroke-width="2.5" />
+                <text id="cutStrawLenText" x="0" y="-2" text-anchor="middle" font-size="15" font-weight="900" fill="#182b4d">18.0 cm</text>
+                <text id="cutStrawFreqText" x="0" y="14" text-anchor="middle" font-size="11" font-weight="bold" fill="#0284c7">285 Hz (PES SES)</text>
+              </g>
+            </g>
+
+            <!-- Kesilen ve Düşen Üst Parça -->
+            <g id="fallingPiece" opacity="0">
+              <rect id="fallingPieceBody" x="250" y="50" width="80" height="50" rx="14" fill="#60a5fa" stroke="#182b4d" stroke-width="3.5" />
+              <ellipse cx="290" cy="55" rx="34" ry="10" fill="#bfdbfe" stroke="#182b4d" stroke-width="2.5" />
+            </g>
+
+            <!-- Makas İkonu ve Kesme Hattı -->
+            <g id="scissorGuide" transform="translate(350, 150)">
+              <!-- Kesik Çizgisi -->
+              <line x1="-120" y1="0" x2="20" y2="0" stroke="#ef4444" stroke-width="3" stroke-dasharray="6 4" />
+              <!-- Makas İllüstrasyonu -->
+              <g id="scissorIcon" class="cursor-pointer" onclick="executeCut()">
+                <circle cx="35" cy="-12" r="10" fill="none" stroke="#182b4d" stroke-width="3.5" />
+                <circle cx="35" cy="12" r="10" fill="none" stroke="#182b4d" stroke-width="3.5" />
+                <path d="M28 -8 L-5 5 M28 8 L-5 -5" stroke="#ef4444" stroke-width="4.5" stroke-linecap="round" />
+                <circle cx="15" cy="0" r="3.5" fill="#182b4d" />
+              </g>
+              <rect x="55" y="-14" width="115" height="28" rx="8" fill="#fee2e2" stroke="#182b4d" stroke-width="2" />
+              <text x="112" y="5" text-anchor="middle" font-size="11" font-weight="900" fill="#991b1b">✂️ TIKLA VE KES</text>
+            </g>
+
+            <!-- Kesim Modu Ses Halkaları -->
+            <g id="soundWavesCut" class="pointer-events-none" opacity="0"></g>
+          </g>
+
+          <!-- ================= SEVİMLİ RÜZGÂR BOBİ (ÜFLEYEN MASCOT) ================= -->
+          <g id="mascotBobi" transform="translate(40, 20)" class="pointer-events-none">
+            <!-- Bulut Gövdesi -->
+            <path d="M30 65 Q15 45 40 30 Q60 10 90 25 Q125 15 135 45 Q155 60 140 85 Q125 105 90 95 Q60 105 35 85 Z" fill="#ffffff" stroke="#182b4d" stroke-width="3.5" />
+            <!-- Yanaklar (Üflerken şişer) -->
+            <circle id="bobiCheekL" cx="55" cy="65" r="10" fill="#fecdd3" />
+            <circle id="bobiCheekR" cx="115" cy="65" r="10" fill="#fecdd3" />
+            <!-- Gözler -->
+            <circle cx="68" cy="50" r="4.5" fill="#182b4d" />
+            <circle cx="102" cy="50" r="4.5" fill="#182b4d" />
+            <!-- Kaşlar -->
+            <path d="M62 42 Q68 38 74 42" fill="none" stroke="#182b4d" stroke-width="2" />
+            <path d="M96 42 Q102 38 108 42" fill="none" stroke="#182b4d" stroke-width="2" />
+            <!-- Üfleyen Dudak / Ağız (O şeklinde) -->
+            <ellipse id="bobiMouth" cx="85" cy="68" rx="7" ry="9" fill="#f43f5e" stroke="#182b4d" stroke-width="2.5" />
+            <!-- Üfleme Rüzgâr İllüstrasyonu -->
+            <g id="bobiBreath" opacity="0">
+              <path d="M95 72 Q130 75 160 85" fill="none" stroke="#38bdf8" stroke-width="3.5" stroke-dasharray="6 4" />
+              <path d="M95 68 Q140 68 180 75" fill="none" stroke="#38bdf8" stroke-width="4.5" stroke-linecap="round" />
+            </g>
+            <text x="85" y="116" text-anchor="middle" font-size="11" font-weight="900" fill="#182b4d">Rüzgâr Bobi</text>
+          </g>
+
+        </svg>
+
+        <!-- Anlık Bilimsel Kavram Kartı (Pop-up) -->
+        <div id="conceptCard" class="absolute bottom-4 left-4 right-4 sm:left-6 sm:right-auto sm:max-w-md bg-white p-4 rounded-2xl chunky shadow-xl border-3 border-ink opacity-0 pointer-events-none transition-all duration-300 transform translate-y-3">
+          <div class="flex items-start gap-3">
+            <span id="conceptEmoji" class="text-3xl">💡</span>
+            <div>
+              <h4 id="conceptTitle" class="display text-base sm:text-lg text-ink">Biliyor musun?</h4>
+              <p id="conceptBody" class="text-xs text-gray-700 font-semibold leading-relaxed mt-0.5"></p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Alt Hızlı Eylem Çubuğu -->
+      <div class="p-3 bg-amber-50 border-t-3 border-ink flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <button id="btnPlayAllScale" class="pushable bg-sun hover:bg-amber-300 text-ink px-4 py-2 text-xs font-black flex items-center gap-1.5">
+            <span>🎶</span> <span>Gamı Çal (Do'dan Do'ya)</span>
+          </button>
+          <button id="btnSongTwinkle" class="pushable bg-sky text-white hover:bg-sky-600 px-3.5 py-2 text-xs font-black flex items-center gap-1.5">
+            <span>⭐</span> <span>"Daha Dün Annemizin" Çal</span>
+          </button>
+        </div>
+        <div class="text-xs font-bold text-gray-500 hidden sm:block">
+          💡 İpucu: Klavyendeki 1-8 tuşlarıyla da çalabilirsin!
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Sağ Sütun: Deney Kontrol & Keşif Paneli -->
+    <aside class="w-full lg:w-80 flex flex-col gap-4">
+
+      <!-- Mod Değiştirme Butonları -->
+      <div class="chunky bg-white p-4">
+        <span class="text-xs font-black uppercase text-gray-500 tracking-wider block mb-2">Deney Modunu Seç</span>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="tabPanFlute" class="pushable p-2.5 bg-sun text-ink font-extrabold text-xs flex flex-col items-center justify-center gap-1 text-center">
+            <span class="text-lg">🎼</span>
+            <span>Pan Flüt Modu</span>
+          </button>
+          <button id="tabCutLab" class="pushable p-2.5 bg-white hover:bg-amber-50 text-ink font-bold text-xs flex flex-col items-center justify-center gap-1 text-center">
+            <span class="text-lg">✂️</span>
+            <span>Makasla Kes & Test Et</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- MAKAS MODU KONTROLLERİ (Sadece Makas Modunda Görünür) -->
+      <div id="cutControlsPanel" class="chunky bg-white p-4 hidden">
+        <h3 class="display text-base text-ink flex items-center gap-2 mb-2">
+          <span>✂️</span> Pipet Boyunu Ayarla
+        </h3>
+        <p class="text-xs text-gray-600 font-semibold mb-3">
+          Pipeti istediğin santimetreye getir ve makasla kes! Sesin nasıl değiştiğini dinle.
+        </p>
+
+        <!-- Boy Kaydırıcısı -->
+        <div class="mb-4">
+          <div class="flex justify-between items-center text-xs font-black mb-1">
+            <span class="text-gray-500">Hedef Kesim Boyu:</span>
+            <span id="sliderLenVal" class="text-coral text-sm font-extrabold">12.0 cm</span>
+          </div>
+          <input id="strawLengthSlider" type="range" min="6" max="22" step="1" value="12" class="w-full">
+          <div class="flex justify-between text-[10px] font-bold text-gray-400 mt-1">
+            <span>6 cm (Çok Tiz)</span>
+            <span>14 cm</span>
+            <span>22 cm (Çok Pes)</span>
+          </div>
+        </div>
+
+        <!-- Aksiyon Butonları -->
+        <div class="flex flex-col gap-2">
+          <button id="btnExecuteCut" class="pushable bg-coral hover:bg-red-500 text-white py-2.5 text-xs font-black flex items-center justify-center gap-2">
+            <span>✂️</span> <span>Pipeti Buradan Kes!</span>
+          </button>
+          <button id="btnResetStraw" class="pushable bg-white hover:bg-gray-100 text-ink py-2 text-xs font-bold flex items-center justify-center gap-1.5">
+            <span>🔄</span> <span>Yeni Uzun Pipet Al (22 cm)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Bilimsel Kural: Neden Ses Değişir? -->
+      <div class="chunky bg-panel p-4">
+        <h3 class="display text-base text-ink flex items-center gap-2 mb-2">
+          <span>🔬</span> Ses Nasıl Oluşur?
+        </h3>
+        <ul class="text-xs text-gray-800 space-y-2 font-semibold">
+          <li class="flex items-start gap-1.5">
+            <span class="text-sm">🌬️</span>
+            <span><strong>Hava Titreşir:</strong> Pipetin ucuna üflediğimizde içindeki hava sütunu hızla ileri-geri titreşerek ses dalgası yaratır.</span>
+          </li>
+          <li class="flex items-start gap-1.5">
+            <span class="text-sm">📏</span>
+            <span><strong>Kısa Pipet = Tiz (İnce) Ses:</strong> İçeride az hava vardır; hava çok hızlı titreşir (yüksek frekans).</span>
+          </li>
+          <li class="flex items-start gap-1.5">
+            <span class="text-sm">🪵</span>
+            <span><strong>Uzun Pipet = Pes (Kalın) Ses:</strong> İçeride çok hava vardır; hava daha yavaş salınır (düşük frekans).</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Bilgi Yarışması (Tahmin Oyunu) -->
+      <div class="chunky bg-gradient-to-br from-purple-50 to-pink-50 p-4">
+        <h3 class="display text-base text-purple-900 flex items-center gap-2 mb-1">
+          <span>🎯</span> Küçük Bilim İnsanı Sorusu
+        </h3>
+        <p class="text-xs text-gray-700 font-semibold mb-3">
+          Bir flütü ya da pipeti ortadan ikiye kesip kısaltırsak çıkan ses nasıl değişir?
+        </p>
+        <div class="flex flex-col gap-2">
+          <button id="btnQuizHigh" class="pushable bg-white hover:bg-emerald-50 text-ink text-left p-2.5 text-xs font-extrabold flex items-center gap-2">
+            <span>🔺</span> <span>Daha İNCE (TİZ) ses çıkar</span>
+          </button>
+          <button id="btnQuizLow" class="pushable bg-white hover:bg-red-50 text-ink text-left p-2.5 text-xs font-extrabold flex items-center gap-2">
+            <span>🔻</span> <span>Daha KALIN (PES) ses çıkar</span>
+          </button>
+        </div>
+        <div id="quizFeedback" class="mt-2 text-xs font-black hidden"></div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="max-w-6xl mx-auto w-full text-center text-xs font-bold text-gray-500 py-2">
+    🧪 Küçük Mucitler Bilim Portalı · Havanın Titreşmesiyle Ses Oluşumu Simülasyonu
+  </footer>
+
+  <!-- SİMÜLASYON MOTORU VE SES SENTEZLEYİCİ -->
+  <script>
+    // --- 1. WEB AUDIO API SES SENTEZLEYİCİSİ (GERÇEK FLÜT VE NEFES TINISI) ---
+    let audioCtx = null;
+    let isSoundOn = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // Üflemeli Çalgı Tınısı: Temel Sinüs + Yumuşak Harmonikler + Filtrelenmiş Nefes Hışırtısı
+    function playFluteNote(frequency, duration = 0.55) {
+      if (!isSoundOn) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+
+      // Ana Osilatör (Temel Frekans)
+      const osc1 = audioCtx.createOscillator();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(frequency, now);
+
+      // 2. Harmonik (Hafif Üçgen - Flüt tınısını zenginleştirir)
+      const osc2 = audioCtx.createOscillator();
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(frequency * 2, now);
+
+      // Nefes Gürültüsü (Pink/White Noise bandpass filtered)
+      const bufferSize = audioCtx.sampleRate * duration;
+      const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      const whiteNoise = audioCtx.createBufferSource();
+      whiteNoise.buffer = noiseBuffer;
+
+      // Nefes Filtresi (Üfleme rüzgârı frekansı)
+      const breathFilter = audioCtx.createBiquadFilter();
+      breathFilter.type = 'bandpass';
+      breathFilter.frequency.setValueAtTime(frequency * 1.5, now);
+      breathFilter.Q.setValueAtTime(3, now);
+
+      // Kazanç (Gain) Zarfları
+      const oscGain = audioCtx.createGain();
+      oscGain.gain.setValueAtTime(0, now);
+      // Yumuşak üfleme başlangıcı (Attack)
+      oscGain.gain.linearRampToValueAtTime(0.45, now + 0.05);
+      // Decay & Release
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      const harmonicGain = audioCtx.createGain();
+      harmonicGain.gain.setValueAtTime(0, now);
+      harmonicGain.gain.linearRampToValueAtTime(0.08, now + 0.05);
+      harmonicGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      const breathGain = audioCtx.createGain();
+      breathGain.gain.setValueAtTime(0, now);
+      breathGain.gain.linearRampToValueAtTime(0.07, now + 0.03);
+      breathGain.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.7);
+
+      // Bağlantılar
+      osc1.connect(oscGain);
+      osc2.connect(harmonicGain);
+      whiteNoise.connect(breathFilter);
+      breathFilter.connect(breathGain);
+
+      oscGain.connect(audioCtx.destination);
+      harmonicGain.connect(audioCtx.destination);
+      breathGain.connect(audioCtx.destination);
+
+      // Başlat & Durdur
+      osc1.start(now);
+      osc2.start(now);
+      whiteNoise.start(now);
+      osc1.stop(now + duration);
+      osc2.stop(now + duration);
+      whiteNoise.stop(now + duration);
+    }
+
+    // Makas Kesme Sesi (Snip!)
+    function playScissorSound() {
+      if (!isSoundOn) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'highpass';
+      osc.frequency.setValueAtTime(1400, now);
+      osc.frequency.exponentialRampToValueAtTime(400, now + 0.1);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.1);
+    }
+
+    // Doğru Cevap Kutlama Akoru
+    function playWinChime() {
+      if (!isSoundOn) return;
+      initAudio();
+      [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+        setTimeout(() => {
+          playFluteNote(freq, 0.4);
+        }, i * 90);
+      });
+    }
+
+    // --- 2. PİPET VE FREKANS VERİLERİ (8 NOTA) ---
+    const STRAWS = [
+      { name: 'DO (Kalın)', note: 'C4', freq: 261.63, length: 20.0, color: '#ef4444', x: 118, yTop: 74 },
+      { name: 'RE', note: 'D4', freq: 293.66, length: 17.5, color: '#f97316', x: 178, yTop: 109 },
+      { name: 'Mİ', note: 'E4', freq: 329.63, length: 15.5, color: '#eab308', x: 238, yTop: 139 },
+      { name: 'FA', note: 'F4', freq: 349.23, length: 14.5, color: '#22c55e', x: 298, yTop: 159 },
+      { name: 'SOL', note: 'G4', freq: 392.00, length: 13.0, color: '#06b6d4', x: 358, yTop: 179 },
+      { name: 'LA', note: 'A4', freq: 440.00, length: 11.5, color: '#3b82f6', x: 418, yTop: 199 },
+      { name: 'Sİ', note: 'B4', freq: 493.88, length: 10.0, color: '#8b5cf6', x: 478, yTop: 224 },
+      { name: 'DO (İnce)', note: 'C5', freq: 523.25, length: 9.0, color: '#ec4899', x: 538, yTop: 244 }
+    ];
+
+    // --- 3. OSİLOSKOP ÇİZİCİ (CANVAS) ---
+    const oscCanvas = document.getElementById('oscCanvas');
+    const oscCtx = oscCanvas.getContext('2d');
+    let currentWaveFreq = 0;
+    let wavePhase = 0;
+
+    function renderOscilloscope() {
+      oscCtx.fillStyle = '#0f172a';
+      oscCtx.fillRect(0, 0, oscCanvas.width, oscCanvas.height);
+
+      // Izgara Çizgileri
+      oscCtx.strokeStyle = '#1e293b';
+      oscCtx.lineWidth = 1;
+      oscCtx.beginPath();
+      oscCtx.moveTo(0, oscCanvas.height / 2);
+      oscCtx.lineTo(oscCanvas.width, oscCanvas.height / 2);
+      oscCtx.stroke();
+
+      if (currentWaveFreq > 0) {
+        oscCtx.strokeStyle = '#ffc93c';
+        oscCtx.lineWidth = 2.5;
+        oscCtx.beginPath();
+        const amplitude = 14;
+        const cycles = (currentWaveFreq / 261) * 3;
+
+        for (let x = 0; x < oscCanvas.width; x++) {
+          const t = (x / oscCanvas.width) * cycles * 2 * Math.PI + wavePhase;
+          const y = (oscCanvas.height / 2) + Math.sin(t) * amplitude;
+          if (x === 0) oscCtx.moveTo(x, y);
+          else oscCtx.lineTo(x, y);
+        }
+        oscCtx.stroke();
+        wavePhase += 0.22;
+      } else {
+        // Durgun düz çizgi
+        oscCtx.strokeStyle = '#38bdf8';
+        oscCtx.lineWidth = 1.5;
+        oscCtx.beginPath();
+        oscCtx.moveTo(0, oscCanvas.height / 2);
+        oscCtx.lineTo(oscCanvas.width, oscCanvas.height / 2);
+        oscCtx.stroke();
+      }
+
+      requestAnimationFrame(renderOscilloscope);
+    }
+    requestAnimationFrame(renderOscilloscope);
+
+    // --- 4. PAN FLÜT ÇALMA VE ANİMASYON ---
+    const activeNoteName = document.getElementById('activeNoteName');
+    const activeFreqText = document.getElementById('activeFreqText');
+    const waveToneTag = document.getElementById('waveToneTag');
+    const mascotBobi = document.getElementById('mascotBobi');
+    const bobiCheekL = document.getElementById('bobiCheekL');
+    const bobiCheekR = document.getElementById('bobiCheekR');
+    const bobiMouth = document.getElementById('bobiMouth');
+    const bobiBreath = document.getElementById('bobiBreath');
+    const soundWavesPan = document.getElementById('soundWavesPan');
+
+    let isBlowing = false;
+
+    function playStraw(index) {
+      const item = STRAWS[index];
+      if (!item) return;
+
+      // Ses çal
+      playFluteNote(item.freq, 0.6);
+      currentWaveFreq = item.freq;
+
+      // Göstergeleri güncelle
+      activeNoteName.textContent = `${item.name} (${item.note})`;
+      activeFreqText.textContent = `• Frekans: ${Math.round(item.freq)} Hz · Boy: ${item.length} cm`;
+      
+      if (item.freq >= 440) {
+        waveToneTag.textContent = 'İnce (Tiz) Ses 🎶';
+        waveToneTag.className = 'px-2 py-0.5 rounded-md text-[10px] font-black bg-pink-100 text-pink-900 border border-pink-700';
+      } else if (item.freq <= 294) {
+        waveToneTag.textContent = 'Kalın (Pes) Ses 📢';
+        waveToneTag.className = 'px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-700';
+      } else {
+        waveToneTag.textContent = 'Orta Ses 🎵';
+        waveToneTag.className = 'px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-700';
+      }
+
+      // Rüzgâr Bobi Maskotunu Pipetin Ağzına Yaklaştır
+      animateBobiBlowing(item.x - 45, item.yTop - 65);
+
+      // Pipet Titreşimi ve Ses Halkaları
+      triggerStrawVibration(index, item.x, item.yTop, item.color);
+
+      // Küçük bilgi kartı ipucu
+      if (index === 0) {
+        showConcept('En Uzun Pipet = En Kalın Ses!', 'Pipet 20 cm olduğu için içindeki hava sütunu uzundur ve yavaş titreşir. Bu yüzden DO sesi en pes sestir.', '🪵');
+      } else if (index === 7) {
+        showConcept('En Kısa Pipet = En İnce Ses!', 'Pipet sadece 9 cm! Hava sütunu çok kısa olduğu için saniyede 523 kez hızla titreşir ve tiz ses çıkarır.', '✨');
+      }
+
+      // Dalga çizgisini 0.6 sn sonra söndür
+      setTimeout(() => {
+        currentWaveFreq = 0;
+      }, 650);
+    }
+
+    // Maskot Üfleme Hareketi
+    function animateBobiBlowing(targetX, targetY) {
+      if (!window.gsap) return;
+      gsap.to(mascotBobi, {
+        x: targetX,
+        y: targetY,
+        duration: 0.25,
+        ease: 'power2.out',
+        onComplete: () => {
+          // Yanakları şişir, ağzı büz, rüzgâr çıkar
+          gsap.to([bobiCheekL, bobiCheekR], { scale: 1.35, duration: 0.15, yoyo: true, repeat: 1 });
+          gsap.to(bobiMouth, { scale: 0.7, duration: 0.15, yoyo: true, repeat: 1 });
+          gsap.to(bobiBreath, { opacity: 1, duration: 0.1, yoyo: true, repeat: 1, repeatDelay: 0.3 });
+        }
+      });
+    }
+
+    // Pipet Üzerinde Titreşim Halkaları
+    function triggerStrawVibration(index, x, yTop, color) {
+      const body = document.getElementById(`strawBody${index}`);
+      if (window.gsap && body) {
+        gsap.fromTo(body, 
+          { scaleX: 1.06, scaleY: 0.98 }, 
+          { scaleX: 1, scaleY: 1, duration: 0.4, ease: "elastic.out(1.2, 0.3)" }
+        );
+      }
+
+      // Halka yayılımı
+      soundWavesPan.innerHTML = `
+        <circle cx="${x}" cy="${yTop}" r="12" fill="none" stroke="${color}" stroke-width="3" opacity="0.9" />
+        <circle cx="${x}" cy="${yTop}" r="22" fill="none" stroke="${color}" stroke-width="2" opacity="0.6" />
+        <circle cx="${x}" cy="${yTop}" r="32" fill="none" stroke="${color}" stroke-width="1.5" opacity="0.3" />
+      `;
+      soundWavesPan.setAttribute('opacity', '1');
+
+      if (window.gsap) {
+        gsap.fromTo(soundWavesPan.children, 
+          { scale: 0.5, transformOrigin: `${x}px ${yTop}px` },
+          { scale: 1.8, opacity: 0, duration: 0.5, stagger: 0.08, ease: "power1.out" }
+        );
+      }
+    }
+
+    // --- 5. MAKASLA KES & KEŞFET DENEYİ (LABORATUVAR) ---
+    let currentStrawLength = 18.0; // cm
+    const cuttableStrawGroup = document.getElementById('cuttableStrawGroup');
+    const cutStrawBody = document.getElementById('cutStrawBody');
+    const cutStrawRim = document.getElementById('cutStrawRim');
+    const cutStrawLenText = document.getElementById('cutStrawLenText');
+    const cutStrawFreqText = document.getElementById('cutStrawFreqText');
+    const cutStrawInfoBadge = document.getElementById('cutStrawInfoBadge');
+    const scissorGuide = document.getElementById('scissorGuide');
+    const strawLengthSlider = document.getElementById('strawLengthSlider');
+    const sliderLenVal = document.getElementById('sliderLenVal');
+    const fallingPiece = document.getElementById('fallingPiece');
+    const fallingPieceBody = document.getElementById('fallingPieceBody');
+    const soundWavesCut = document.getElementById('soundWavesCut');
+
+    // Pipet boyundan frekans hesaplama: f = v / (4 * L) ya da çocuk dostu ters orantı
+    // 20 cm = 261 Hz baz alınırsa: Freq = (261 * 20) / L
+    function calcFreq(lenCm) {
+      return (261.63 * 20.0) / lenCm;
+    }
+
+    function updateCutStrawDisplay(lenCm) {
+      // Yükseklik pikselleri: 22 cm = 310px, 6 cm = 95px
+      const pxHeight = (lenCm / 22) * 310;
+      const yTop = 390 - pxHeight;
+
+      cutStrawBody.setAttribute('y', yTop);
+      cutStrawBody.setAttribute('height', pxHeight);
+      cutStrawRim.setAttribute('cy', yTop + 6);
+
+      const freq = calcFreq(lenCm);
+      cutStrawLenText.textContent = `${lenCm.toFixed(1)} cm`;
+
+      let toneDesc = 'ORTA SES';
+      if (freq >= 440) toneDesc = 'TİZ (İNCE) SES ⚡';
+      else if (freq <= 300) toneDesc = 'PES (KALIN) SES 📢';
+      
+      cutStrawFreqText.textContent = `${Math.round(freq)} Hz (${toneDesc})`;
+
+      // Rozetin pozisyonunu ortala
+      cutStrawInfoBadge.setAttribute('transform', `translate(290, ${yTop + pxHeight / 2})`);
+    }
+
+    // Slider değişimi
+    strawLengthSlider.addEventListener('input', (e) => {
+      const targetCm = parseFloat(e.target.value);
+      sliderLenVal.textContent = `${targetCm.toFixed(1)} cm`;
+      
+      // Makas kılavuzunu hedef yüksekliğe taşı
+      const targetPxHeight = (targetCm / 22) * 310;
+      const guideY = 390 - targetPxHeight;
+      scissorGuide.setAttribute('transform', `translate(350, ${guideY})`);
+    });
+
+    // Makasla Kesme Eylemi
+    function executeCut() {
+      const targetCm = parseFloat(strawLengthSlider.value);
+      if (targetCm >= currentStrawLength) {
+        showConcept('Daha Kısa Bir Değer Seç!', 'Pipeti kesebilmek için kaydırıcıdan mevcut boydan (18 cm) daha küçük bir boy seçmelisin.', '✂️');
+        return;
+      }
+
+      playScissorSound();
+
+      // Kesilen parçanın düşme animasyonu
+      const oldPxHeight = (currentStrawLength / 22) * 310;
+      const newPxHeight = (targetCm / 22) * 310;
+      const cutDiffPx = oldPxHeight - newPxHeight;
+      const oldTop = 390 - oldPxHeight;
+
+      fallingPiece.setAttribute('opacity', '1');
+      fallingPieceBody.setAttribute('y', oldTop);
+      fallingPieceBody.setAttribute('height', cutDiffPx);
+
+      if (window.gsap) {
+        gsap.to(fallingPiece, {
+          y: 320,
+          rotation: 45,
+          opacity: 0,
+          duration: 0.7,
+          ease: 'power2.in',
+          onComplete: () => {
+            fallingPiece.setAttribute('opacity', '0');
+            gsap.set(fallingPiece, { y: 0, rotation: 0 });
+          }
+        });
+      }
+
+      // Yeni boyu sabitle
+      currentStrawLength = targetCm;
+      updateCutStrawDisplay(currentStrawLength);
+
+      // Yeni kesilmiş pipeti hemen üfle ve dinlet!
+      setTimeout(() => {
+        blowCutStraw();
+        showConcept(
+          '✂️ Pipet Kısaldı, Ses İnceleşti!',
+          `Pipet boyu ${currentStrawLength.toFixed(1)} cm'ye indi. İçindeki hava sütunu kısaldığı için daha hızlı titreşti ve ses tizleşti!`,
+          '🎉'
+        );
+      }, 400);
+    }
+
+    // Kesilen Pipeti Üfleme
+    function blowCutStraw() {
+      const freq = calcFreq(currentStrawLength);
+      playFluteNote(freq, 0.7);
+      currentWaveFreq = freq;
+
+      const pxHeight = (currentStrawLength / 22) * 310;
+      const yTop = 390 - pxHeight;
+
+      // Göstergeler
+      activeNoteName.textContent = `Kesilmiş Pipet (${currentStrawLength.toFixed(1)} cm)`;
+      activeFreqText.textContent = `• Frekans: ${Math.round(freq)} Hz`;
+      
+      if (freq >= 440) {
+        waveToneTag.textContent = 'İnce (Tiz) Ses 🎶';
+        waveToneTag.className = 'px-2 py-0.5 rounded-md text-[10px] font-black bg-pink-100 text-pink-900 border border-pink-700';
+      } else {
+        waveToneTag.textContent = 'Pes / Orta Ses 📢';
+        waveToneTag.className = 'px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-700';
+      }
+
+      // Bobi'yi yanaştır
+      animateBobiBlowing(220, yTop - 65);
+
+      // Pipet sarsıntısı
+      if (window.gsap) {
+        gsap.fromTo(cutStrawBody, 
+          { scaleX: 1.04 }, 
+          { scaleX: 1, duration: 0.35, ease: "elastic.out(1.2, 0.3)" }
+        );
+      }
+
+      setTimeout(() => { currentWaveFreq = 0; }, 750);
+    }
+
+    // Yeni Uzun Pipet Alma (Sıfırlama)
+    document.getElementById('btnResetStraw').addEventListener('click', () => {
+      currentStrawLength = 22.0;
+      strawLengthSlider.value = 12;
+      sliderLenVal.textContent = '12.0 cm';
+      scissorGuide.setAttribute('transform', `translate(350, ${390 - (12/22)*310})`);
+      updateCutStrawDisplay(22.0);
+      blowCutStraw();
+      showConcept('Yeni 22 cm Pipet Alındı!', 'En uzun pipet hazır. Şimdi en kalın (pes) sesi duyuyorsun. İstediğin yerden kesebilirsin!', '🔄');
+    });
+
+    document.getElementById('btnExecuteCut').addEventListener('click', executeCut);
+
+    // --- 6. MOD GEÇİŞLERİ (PAN FLÜT vs MAKAS MODU) ---
+    const tabPanFlute = document.getElementById('tabPanFlute');
+    const tabCutLab = document.getElementById('tabCutLab');
+    const viewPanFlute = document.getElementById('viewPanFlute');
+    const viewCutLab = document.getElementById('viewCutLab');
+    const cutControlsPanel = document.getElementById('cutControlsPanel');
+
+    tabPanFlute.addEventListener('click', () => {
+      tabPanFlute.className = 'pushable p-2.5 bg-sun text-ink font-extrabold text-xs flex flex-col items-center justify-center gap-1 text-center';
+      tabCutLab.className = 'pushable p-2.5 bg-white hover:bg-amber-50 text-ink font-bold text-xs flex flex-col items-center justify-center gap-1 text-center';
+
+      viewPanFlute.classList.remove('pointer-events-none');
+      viewCutLab.classList.add('pointer-events-none');
+      cutControlsPanel.classList.add('hidden');
+
+      if (window.gsap) {
+        gsap.to(viewPanFlute, { opacity: 1, duration: 0.3 });
+        gsap.to(viewCutLab, { opacity: 0, duration: 0.3 });
+      } else {
+        viewPanFlute.style.opacity = '1';
+        viewCutLab.style.opacity = '0';
+      }
+    });
+
+    tabCutLab.addEventListener('click', () => {
+      tabCutLab.className = 'pushable p-2.5 bg-sun text-ink font-extrabold text-xs flex flex-col items-center justify-center gap-1 text-center';
+      tabPanFlute.className = 'pushable p-2.5 bg-white hover:bg-amber-50 text-ink font-bold text-xs flex flex-col items-center justify-center gap-1 text-center';
+
+      viewCutLab.classList.remove('pointer-events-none');
+      viewPanFlute.classList.add('pointer-events-none');
+      cutControlsPanel.classList.remove('hidden');
+
+      if (window.gsap) {
+        gsap.to(viewCutLab, { opacity: 1, duration: 0.3 });
+        gsap.to(viewPanFlute, { opacity: 0, duration: 0.3 });
+      } else {
+        viewCutLab.style.opacity = '1';
+        viewPanFlute.style.opacity = '0';
+      }
+
+      updateCutStrawDisplay(currentStrawLength);
+      // Başlangıçta Bobi'yi merkeze al
+      animateBobiBlowing(220, 100);
+    });
+
+    // --- 7. GAM VE ŞARKI ÇALMA ETKİNLİĞİ ---
+    document.getElementById('btnPlayAllScale').addEventListener('click', () => {
+      STRAWS.forEach((s, idx) => {
+        setTimeout(() => {
+          playStraw(idx);
+        }, idx * 420);
+      });
+    });
+
+    // "Daha Dün Annemizin" (1 1 5 5 6 6 5 | 4 4 3 3 2 2 1)
+    const TWINKLE_NOTES = [0, 0, 4, 4, 5, 5, 4, 3, 3, 2, 2, 1, 1, 0];
+    document.getElementById('btnSongTwinkle').addEventListener('click', () => {
+      // Pan Flüt moduna geçir
+      tabPanFlute.click();
+      TWINKLE_NOTES.forEach((noteIdx, i) => {
+        setTimeout(() => {
+          playStraw(noteIdx);
+        }, i * 450);
+      });
+    });
+
+    // Klavye Kısayolları (1 - 8)
+    window.addEventListener('keydown', (e) => {
+      const key = parseInt(e.key);
+      if (key >= 1 && key <= 8) {
+        playStraw(key - 1);
+      }
+    });
+
+    // --- 8. MİNİ TEST & KAVRAM KARTLARI ---
+    const btnQuizHigh = document.getElementById('btnQuizHigh');
+    const btnQuizLow = document.getElementById('btnQuizLow');
+    const quizFeedback = document.getElementById('quizFeedback');
+
+    btnQuizHigh.addEventListener('click', () => {
+      quizFeedback.classList.remove('hidden', 'text-red-600');
+      quizFeedback.classList.add('text-emerald-700');
+      quizFeedback.innerHTML = '🎉 <strong>BİNGO! HARİKA CEVAP!</strong><br>Pipet kısaldıkça hava molekülleri daha hızlı salınır ve ses TİZ (İNCE) olur!';
+      if (window.confetti) {
+        confetti({ particleCount: 70, spread: 60, origin: { y: 0.7 } });
+      }
+      playWinChime();
+    });
+
+    btnQuizLow.addEventListener('click', () => {
+      quizFeedback.classList.remove('hidden', 'text-emerald-700');
+      quizFeedback.classList.add('text-red-600');
+      quizFeedback.innerHTML = '🤔 <strong>Tekrar Düşünelim!</strong><br>Uzun pipetler kalın (pes) ses çıkarır. Pipeti kesip kısaltırsak ses İNCE (TİZ) hale gelir!';
+    });
+
+    // Bilgi Kartı Popup
+    const conceptCard = document.getElementById('conceptCard');
+    const conceptTitle = document.getElementById('conceptTitle');
+    const conceptBody = document.getElementById('conceptBody');
+    const conceptEmoji = document.getElementById('conceptEmoji');
+    let conceptTimer = null;
+
+    function showConcept(title, body, emoji = '💡') {
+      if (conceptTimer) clearTimeout(conceptTimer);
+      conceptTitle.textContent = title;
+      conceptBody.textContent = body;
+      conceptEmoji.textContent = emoji;
+
+      if (window.gsap) {
+        gsap.to(conceptCard, { opacity: 1, y: 0, duration: 0.35, ease: "back.out(1.5)" });
+      } else {
+        conceptCard.style.opacity = '1';
+      }
+
+      conceptTimer = setTimeout(() => {
+        if (window.gsap) {
+          gsap.to(conceptCard, { opacity: 0, y: 10, duration: 0.4, ease: "power2.in" });
+        } else {
+          conceptCard.style.opacity = '0';
+        }
+      }, 5000);
+    }
+
+    // Ses Aç/Kapat Düğmesi
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    const soundLabel = document.getElementById('soundLabel');
+    soundToggle.addEventListener('click', () => {
+      isSoundOn = !isSoundOn;
+      soundIcon.textContent = isSoundOn ? '🔊' : '🔇';
+      soundLabel.textContent = isSoundOn ? 'Ses Açık' : 'Sessiz';
+    });
+
+    // Başlangıçta
+    window.addEventListener('DOMContentLoaded', () => {
+      updateCutStrawDisplay(currentStrawLength);
+      // 1.5 saniye sonra hoş geldin bilgi kartı
+      setTimeout(() => {
+        showConcept('Pipet Flütüne Hoş Geldin!', 'Renkli pipetlerin üzerine tıkla veya klavyeden 1-8 tuşlarına basarak havanın titreşimiyle kendi melodini çal!', '🎶');
+      }, 800);
+    });
+  </script>
+</body>
+</html>

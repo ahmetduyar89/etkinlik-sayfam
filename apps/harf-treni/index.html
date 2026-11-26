@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harf Treni | Atölye</title>
+<meta name="description" content="Ses temelli ilk okuma: harf avı, hece treni ile kelime kurma, resim-kelime eşleştirme ve parmakla harf yazma.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚂</text></svg>">
+<link rel="stylesheet" href="/shared/ilkokul.css">
+<style>
+  :root { --ik-accent: #2563eb; --ik-accent-2: #38bdf8; --ik-bg: #f2f8ff; }
+  .groups { display: flex; flex-wrap: wrap; gap: 6px; }
+  .groups button { border: 2px solid var(--ik-line); background: #fff; border-radius: 12px; padding: 6px 10px; font-weight: 800; font-size: 14px; }
+  .groups button.on { background: var(--ik-accent); border-color: var(--ik-accent); color: #fff; }
+  .bubbles { position: relative; height: 380px; overflow: hidden; border-radius: 18px; background: linear-gradient(#dbeafe, #eff6ff); }
+  .bubble { position: absolute; width: 74px; height: 74px; border-radius: 50%; border: 0; font-family: 'Baloo 2'; font-weight: 800; font-size: 40px; color: #1e3a8a; background: radial-gradient(circle at 32% 28%, #fff, #bfdbfe 55%, #93c5fd); box-shadow: inset -6px -8px 0 rgba(37,99,235,.12), 0 8px 18px -10px #1e40af; transition: transform .2s; }
+  .bubble.pop { transform: scale(1.5); opacity: 0; transition: all .3s; }
+  .bubble.bad { animation: ik-shake .35s; background: radial-gradient(circle at 32% 28%, #fff, #fecaca 55%, #fca5a5); }
+  .big-sound { font-family: 'Baloo 2'; font-size: 80px; font-weight: 800; line-height: 1; color: var(--ik-accent); }
+  .train { display: flex; align-items: flex-end; gap: 6px; overflow-x: auto; padding: 10px 4px 4px; min-height: 140px; }
+  .loco { font-size: 84px; line-height: .9; transform: scaleX(-1); flex-shrink: 0; }
+  .wagon { min-width: 96px; height: 78px; border-radius: 12px 12px 6px 6px; background: #fde68a; border: 3px solid #b45309; display: grid; place-items: center; font-family: 'Baloo 2'; font-weight: 800; font-size: 32px; position: relative; flex-shrink: 0; padding: 0 8px; }
+  .wagon::before, .wagon::after { content: ''; position: absolute; bottom: -14px; width: 22px; height: 22px; border-radius: 50%; background: #334155; border: 4px solid #94a3b8; }
+  .wagon::before { left: 12px; } .wagon::after { right: 12px; }
+  .wagon.empty { background: #fffbeb; border-style: dashed; color: #d6b98a; }
+  .wagon.filled { animation: ik-in .3s; }
+  .rail { height: 6px; background: repeating-linear-gradient(90deg, #78350f 0 18px, transparent 18px 26px), #a8a29e; border-radius: 3px; margin-top: 16px; }
+  .syl-pool { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 18px; }
+  .syl { min-width: 84px; font-family: 'Baloo 2'; font-size: 30px; }
+  .pic { font-size: 110px; text-align: center; line-height: 1.1; }
+  .word-opts .ik-choice { font-family: 'Baloo 2'; font-size: 30px; }
+  .pic-opts .ik-choice { font-size: 54px; min-height: 100px; }
+  .trace-wrap { position: relative; width: min(100%, 420px); aspect-ratio: 1; margin: 0 auto; border-radius: 22px; overflow: hidden; background: #fff; border: 2px solid var(--ik-line); background-image: linear-gradient(transparent 32%, #dbeafe 32%, #dbeafe 33%, transparent 33%, transparent 66%, #dbeafe 66%, #dbeafe 67%, transparent 67%); }
+  .trace-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .letter-row { display: flex; flex-wrap: wrap; gap: 5px; }
+  .letter-row button { width: 42px; height: 42px; border-radius: 12px; border: 2px solid var(--ik-line); background: #fff; font-family: 'Baloo 2'; font-weight: 800; font-size: 22px; }
+  .letter-row button.on { background: var(--ik-accent); color: #fff; border-color: var(--ik-accent); }
+  .meter { height: 14px; border-radius: 999px; background: #e5edf9; overflow: hidden; }
+  .meter span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #38bdf8, #22a565); transition: width .3s; }
+</style>
+</head>
+<body>
+<header class="ik-top">
+  <div class="ik-brand">
+    <div class="ik-logo">🚂</div>
+    <div><h1>Harf Treni</h1><p>Ses temelli ilk okuma-yazma parkı</p></div>
+  </div>
+  <nav class="ik-tabs" role="tablist">
+    <button class="ik-tab" data-tab="av"><span class="e">🫧</span>Harf Avı</button>
+    <button class="ik-tab" data-tab="hece"><span class="e">🚃</span>Hece Treni</button>
+    <button class="ik-tab" data-tab="resim"><span class="e">🖼️</span>Resim-Kelime</button>
+    <button class="ik-tab" data-tab="yaz"><span class="e">✍️</span>Harf Yazma</button>
+  </nav>
+  <span class="ik-stars">⭐ <span id="ik-stars">0</span></span>
+</header>
+
+<main class="ik-main">
+  <!-- HARF AVI -->
+  <section class="ik-panel" data-panel="av">
+    <div class="ik-head"><div><h2>Sesi Dinle, Balonu Patlat!</h2><p>Söylenen sesin harfini bul. Hangi ses grubunda çalışacağını seç.</p></div><div class="groups" id="groups"></div></div>
+    <div class="ik-grid two">
+      <div class="ik-card" style="padding:10px"><div class="bubbles" id="bubbles"></div></div>
+      <div class="ik-card ik-center" style="gap:12px">
+        <div class="ik-label">Bu sesi bul</div>
+        <div class="big-sound" id="hunt-target">?</div>
+        <button class="ik-btn blue" id="hunt-say">🔊 Sesi tekrar dinle</button>
+        <label class="ik-row" style="font-size:14px;justify-content:center"><input type="checkbox" id="show-letter" checked> Harfi göster</label>
+        <div class="ik-big" id="hunt-score">0 / 10</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HECE TRENİ -->
+  <section class="ik-panel" data-panel="hece">
+    <div class="ik-head"><div><h2>Hece Treni</h2><p>Resme bak, kelimenin hecelerini sırayla vagonlara yükle. Treni kalkışa hazırla!</p></div><button class="ik-btn ghost" id="syl-next">Yeni kelime ➜</button></div>
+    <div class="ik-card">
+      <div class="ik-row" style="gap:20px;align-items:center">
+        <div class="pic" id="syl-pic" style="font-size:90px"></div>
+        <div style="flex:1;min-width:0">
+          <div class="train" id="train"></div>
+          <div class="rail"></div>
+        </div>
+      </div>
+      <div class="syl-pool" id="syl-pool"></div>
+      <div class="ik-feedback" id="syl-fb" style="text-align:center"></div>
+    </div>
+  </section>
+
+  <!-- RESİM-KELİME -->
+  <section class="ik-panel" data-panel="resim">
+    <div class="ik-head"><div><h2>Oku ve Eşleştir</h2><p>Resmin adını oku, doğru kelimeyi seç. Sonra kelimeyi okuyup doğru resmi bul.</p></div></div>
+    <div class="ik-grid half">
+      <div class="ik-card">
+        <div class="ik-label">Resim ➜ Kelime</div>
+        <div class="pic" id="rw-pic"></div>
+        <div class="ik-choices word-opts" id="rw-opts"></div>
+        <div class="ik-feedback" id="rw-fb"></div>
+      </div>
+      <div class="ik-card">
+        <div class="ik-label">Kelime ➜ Resim</div>
+        <div class="ik-big" id="wr-word" style="text-align:center;font-size:56px;margin:16px 0 22px"></div>
+        <div class="ik-choices pic-opts" id="wr-opts"></div>
+        <div class="ik-feedback" id="wr-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- YAZMA -->
+  <section class="ik-panel" data-panel="yaz">
+    <div class="ik-head"><div><h2>Parmağınla Yaz</h2><p>Soluk harfin üzerinden parmağınla ya da fareyle geç. Harfi tamamen boyamaya çalış!</p></div>
+      <div class="ik-row"><button class="ik-btn ghost small" id="case-btn">Aa Büyük harf</button><button class="ik-btn ghost small" id="trace-clear">🧽 Sil</button><button class="ik-btn green small" id="trace-check">✔ Kontrol</button></div></div>
+    <div class="ik-grid two">
+      <div class="ik-card"><div class="trace-wrap"><canvas id="trace-bg"></canvas><canvas id="trace"></canvas></div></div>
+      <div class="ik-card">
+        <div class="ik-label">Harf seç</div>
+        <div class="letter-row" id="letter-row" style="margin:10px 0 18px"></div>
+        <div class="ik-label">Doluluk</div>
+        <div class="meter" style="margin:8px 0"><span id="meter"></span></div>
+        <div class="ik-feedback" id="trace-fb"></div>
+        <p class="ik-muted" id="trace-words" style="font-size:15px"></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="/shared/ilkokul.js"></script>
+<script>
+const { $, $$, el, say, pick, shuffle, rand } = IK;
+const lower = (s) => s.toLocaleLowerCase('tr-TR'), upper = (s) => s.toLocaleUpperCase('tr-TR');
+
+/* Maarif 1. sınıf ses grupları */
+const GROUPS = [['e', 'l', 'a', 'k', 'i', 'n'], ['o', 'm', 'u', 't', 'ü', 'y'], ['ö', 'r', 'ı', 'd', 's', 'b'], ['z', 'ç', 'g', 'ş', 'c', 'p'], ['h', 'ğ', 'v', 'f', 'j']];
+const ALL = GROUPS.flat();
+const SAMPLE = { e: 'el', l: 'lale', a: 'arı', k: 'kedi', i: 'inek', n: 'nar', o: 'okul', m: 'muz', u: 'uçak', t: 'top', ü: 'üzüm', y: 'yıldız', ö: 'ördek', r: 'roket', ı: 'ılık', d: 'dede', s: 'saat', b: 'balık', z: 'zil', ç: 'çiçek', g: 'gemi', ş: 'şapka', c: 'ceket', p: 'pasta', h: 'havuç', ğ: 'dağ', v: 'vazo', f: 'fil', j: 'jilet' };
+const sayLetter = (l) => say(`${l}… ${l}… ${SAMPLE[l]} kelimesindeki ${l} sesi`);
+
+/* ═════ HARF AVI ═════ */
+let grp = 0, target = null, huntScore = 0, floatT = null;
+GROUPS.forEach((g, i) => {
+  const b = el('button', null, g.join(' '));
+  b.onclick = () => { grp = i; $$('#groups button').forEach((x, j) => x.classList.toggle('on', j === i)); huntScore = 0; huntRound(); };
+  $('#groups').appendChild(b);
+});
+$$('#groups button')[0].classList.add('on');
+function huntRound() {
+  const pool = grp === 0 ? GROUPS[0] : [...GROUPS[grp], ...GROUPS[grp - 1].slice(-3)];
+  target = pick(GROUPS[grp]);
+  $('#hunt-target').textContent = $('#show-letter').checked ? `${target} ${upper(target)}` : '🔊';
+  $('#hunt-score').textContent = `${huntScore} / 10`;
+  const box = $('#bubbles'); box.innerHTML = '';
+  const letters = shuffle([target, target, ...shuffle(pool.filter((l) => l !== target)).slice(0, 5)]);
+  const W = box.clientWidth || 500, H = 380;
+  const placed = [];
+  letters.forEach((l, i) => {
+    let x, y, tries = 0;
+    do { x = rand(8, Math.max(10, W - 84)); y = rand(8, H - 84); tries++; } while (tries < 40 && placed.some((p) => Math.hypot(p[0] - x, p[1] - y) < 84));
+    placed.push([x, y]);
+    const b = el('button', { class: 'bubble', style: `left:${x}px;top:${y}px`, 'aria-label': l }, Math.random() < 0.5 ? l : upper(l));
+    b.dataset.vy = (Math.random() * 0.4 + 0.2) * (Math.random() < .5 ? 1 : -1);
+    b.onclick = () => {
+      if (l === target) {
+        b.classList.add('pop'); IK.beep('ok');
+        setTimeout(() => b.remove(), 300);
+        if (!$$('.bubble:not(.pop)', box).some((x) => x.getAttribute('aria-label') === target)) {
+          huntScore++; IK.addStar();
+          if (huntScore >= 10) { IK.win('Harf avcısı oldun! 🏹'); huntScore = 0; }
+          setTimeout(huntRound, 600);
+        }
+      } else { b.classList.remove('bad'); void b.offsetWidth; b.classList.add('bad'); IK.beep('bad'); sayLetter(target); }
+    };
+    box.appendChild(b);
+  });
+  sayLetter(target);
+}
+// Balonlar yavaşça süzülür.
+(function float() {
+  $$('#bubbles .bubble').forEach((b) => {
+    let y = parseFloat(b.style.top), vy = +b.dataset.vy;
+    y += vy; if (y < 4 || y > 300) { b.dataset.vy = -vy; }
+    b.style.top = y + 'px';
+  });
+  requestAnimationFrame(float);
+})();
+$('#hunt-say').onclick = () => sayLetter(target);
+$('#show-letter').onchange = () => { $('#hunt-target').textContent = $('#show-letter').checked ? `${target} ${upper(target)}` : '🔊'; };
+let huntStarted = false;
+function startHuntOnce() { if (!huntStarted) { huntStarted = true; huntRound(); } }
+
+/* ═════ KELİMELER ═════ */
+const WORDS = [
+  ['🌙', 'ay'], ['✋', 'el'], ['⚽', 'top'], ['🍌', 'muz'], ['🍎', 'el-ma'], ['🐱', 'ke-di'], ['🐝', 'a-rı'], ['🐟', 'ba-lık'], ['🏰', 'ka-le'], ['🚪', 'ka-pı'],
+  ['🐑', 'ku-zu'], ['🏫', 'o-kul'], ['📕', 'ki-tap'], ['🐔', 'ta-vuk'], ['🚗', 'a-ra-ba'], ['✏️', 'ka-lem'], ['🐢', 'kap-lum-ba-ğa'], ['🌸', 'çi-çek'], ['🍇', 'ü-züm'],
+  ['🍐', 'ar-mut'], ['🍉', 'kar-puz'], ['☀️', 'gü-neş'], ['☁️', 'bu-lut'], ['⭐', 'yıl-dız'], ['🎈', 'ba-lon'], ['🐘', 'fil'], ['🍞', 'ek-mek'], ['🦆', 'ör-dek'],
+  ['🚀', 'ro-ket'], ['🥕', 'ha-vuç'], ['🎩', 'şap-ka'], ['🐄', 'i-nek'], ['🌳', 'a-ğaç'], ['🦋', 'ke-le-bek'], ['🐸', 'kur-ba-ğa'], ['🍓', 'çi-lek'], ['🧀', 'pey-nir'], ['🔔', 'zil'],
+];
+const plain = (w) => w.replace(/-/g, '');
+
+/* ═════ HECE TRENİ ═════ */
+let sylWord = null, sylNext = 0, sylPrev = null;
+function sylRound() {
+  let w; do w = pick(WORDS.filter((x) => x[1].includes('-'))); while (w === sylPrev); sylPrev = w;
+  sylWord = w; sylNext = 0; const parts = w[1].split('-');
+  $('#syl-pic').textContent = w[0]; $('#syl-fb').textContent = '';
+  $('#train').innerHTML = '<span class="loco">🚂</span>' + parts.map((_, i) => `<div class="wagon empty" id="wg${i}">${i + 1}</div>`).join('');
+  const pool = $('#syl-pool'); pool.innerHTML = '';
+  const extra = shuffle(WORDS.flatMap((x) => x[1].split('-')).filter((s) => !parts.includes(s))).slice(0, 2);
+  shuffle([...parts.map((p, i) => [p, i]), ...extra.map((p) => [p, -1])]).forEach(([p, i]) => {
+    const b = el('button', { class: 'ik-btn ghost syl' }, p);
+    b.onclick = () => {
+      say(p);
+      if (p === parts[sylNext]) {
+        const wg = $('#wg' + sylNext); wg.textContent = p; wg.className = 'wagon filled'; b.remove(); sylNext++; IK.beep('tick');
+        if (sylNext === parts.length) {
+          $('#syl-fb').className = 'ik-feedback ok'; $('#syl-fb').textContent = `${parts.join(' - ')} ➜ ${plain(w[1])}`;
+          setTimeout(() => say(plain(w[1])), 500); IK.right('Tren kalkıyor! 🚂💨');
+          const tr = $('#train'); tr.style.transition = 'transform 1.6s ease-in'; setTimeout(() => tr.style.transform = 'translateX(110%)', 900);
+          setTimeout(() => { tr.style.transition = ''; tr.style.transform = ''; sylRound(); }, 2700);
+        }
+      } else { b.classList.add('bad'); IK.beep('bad'); $('#syl-fb').className = 'ik-feedback bad'; $('#syl-fb').textContent = 'Kelimeyi yavaşça söyle: hangi hece önce geliyor?'; setTimeout(() => b.classList.remove('bad'), 400); }
+    };
+    pool.appendChild(b);
+  });
+  setTimeout(() => say(plain(w[1])), 300);
+}
+$('#syl-next').onclick = sylRound;
+$('#syl-pic').onclick = () => say(plain(sylWord[1]));
+
+/* ═════ RESİM-KELİME ═════ */
+function rwRound() {
+  const w = pick(WORDS); $('#rw-pic').textContent = w[0]; $('#rw-fb').textContent = '';
+  // Çeldiriciler aynı harfle başlayan ya da benzer uzunlukta kelimelerden seçilir.
+  const others = shuffle(WORDS.filter((x) => x !== w)).sort((a, b) => (b[1][0] === w[1][0]) - (a[1][0] === w[1][0])).slice(0, 2);
+  const box = $('#rw-opts'); box.innerHTML = '';
+  shuffle([w, ...others]).forEach((o) => {
+    const b = el('button', { class: 'ik-choice' }, plain(o[1]));
+    b.onclick = () => { if (o === w) { b.classList.add('ok'); say(plain(w[1])); IK.right(); setTimeout(rwRound, 1100); } else { b.classList.add('bad'); IK.wrong(); say(plain(o[1])); } };
+    box.appendChild(b);
+  });
+}
+function wrRound() {
+  const w = pick(WORDS); $('#wr-word').textContent = plain(w[1]); $('#wr-fb').textContent = '';
+  const box = $('#wr-opts'); box.innerHTML = '';
+  shuffle([w, ...shuffle(WORDS.filter((x) => x !== w)).slice(0, 3)]).forEach((o) => {
+    const b = el('button', { class: 'ik-choice', 'aria-label': plain(o[1]) }, o[0]);
+    b.onclick = () => { if (o === w) { b.classList.add('ok'); say(plain(w[1])); IK.right(); setTimeout(wrRound, 1100); } else { b.classList.add('bad'); IK.wrong(); } };
+    box.appendChild(b);
+  });
+}
+$('#wr-word').onclick = () => say($('#wr-word').textContent);
+rwRound(); wrRound();
+
+/* ═════ HARF YAZMA ═════ */
+const bg = $('#trace-bg'), cv = $('#trace'), bctx = bg.getContext('2d'), ctx = cv.getContext('2d');
+let curLetter = 'e', isUpper = false, mask = null, drawing = false, last = null;
+const SZ = 600;
+[bg, cv].forEach((c) => { c.width = SZ; c.height = SZ; });
+ALL.forEach((l) => {
+  const b = el('button', null, l);
+  b.onclick = () => { curLetter = l; $$('#letter-row button').forEach((x) => x.classList.toggle('on', x === b)); setupTrace(); sayLetter(l); };
+  $('#letter-row').appendChild(b);
+});
+$$('#letter-row button')[0].classList.add('on');
+function paintLetters() { $$('#letter-row button').forEach((b, i) => b.textContent = isUpper ? upper(ALL[i]) : ALL[i]); }
+$('#case-btn').onclick = () => { isUpper = !isUpper; $('#case-btn').textContent = isUpper ? 'aa Küçük harf' : 'Aa Büyük harf'; paintLetters(); setupTrace(); };
+function letterFont() { return `800 ${isUpper ? 420 : 470}px Nunito, Arial, sans-serif`; }
+function setupTrace() {
+  const ch = isUpper ? upper(curLetter) : curLetter;
+  bctx.clearRect(0, 0, SZ, SZ); ctx.clearRect(0, 0, SZ, SZ);
+  bctx.font = letterFont(); bctx.textAlign = 'center'; bctx.textBaseline = 'alphabetic';
+  const baseY = SZ * 0.68 + (isUpper ? 0 : 10);
+  bctx.fillStyle = '#dbe7f7'; bctx.fillText(ch, SZ / 2, baseY);
+  bctx.setLineDash([10, 14]); bctx.lineWidth = 4; bctx.strokeStyle = '#7aa7e0'; bctx.strokeText(ch, SZ / 2, baseY); bctx.setLineDash([]);
+  // maske: harfin dolu pikselleri
+  const off = document.createElement('canvas'); off.width = SZ; off.height = SZ; const o = off.getContext('2d');
+  o.font = letterFont(); o.textAlign = 'center'; o.fillStyle = '#000'; o.fillText(ch, SZ / 2, baseY);
+  const d = o.getImageData(0, 0, SZ, SZ).data; mask = new Uint8Array(SZ * SZ / 16);
+  let total = 0;
+  for (let y = 0; y < SZ; y += 4) for (let x = 0; x < SZ; x += 4) { const on = d[(y * SZ + x) * 4 + 3] > 128; mask[(y / 4) * (SZ / 4) + x / 4] = on; total += on; }
+  mask.total = total;
+  $('#meter').style.width = '0%'; $('#trace-fb').textContent = '';
+  $('#trace-words').textContent = `Örnek kelime: ${SAMPLE[curLetter]}`;
+}
+function pos(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * SZ, (e.clientY - r.top) / r.height * SZ]; }
+cv.addEventListener('pointerdown', (e) => { drawing = true; last = pos(e); cv.setPointerCapture(e.pointerId); dot(last); });
+cv.addEventListener('pointermove', (e) => {
+  if (!drawing) return; const p = pos(e);
+  ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 34; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(last[0], last[1]); ctx.lineTo(p[0], p[1]); ctx.stroke(); last = p;
+});
+cv.addEventListener('pointerup', () => { drawing = false; $('#meter').style.width = Math.round(score().cover * 100) + '%'; });
+function dot(p) { ctx.fillStyle = '#2563eb'; ctx.beginPath(); ctx.arc(p[0], p[1], 17, 0, 7); ctx.fill(); }
+function score() {
+  const d = ctx.getImageData(0, 0, SZ, SZ).data; let hit = 0, out = 0, drawn = 0;
+  for (let y = 0; y < SZ; y += 4) for (let x = 0; x < SZ; x += 4) {
+    const on = d[(y * SZ + x) * 4 + 3] > 50; if (!on) continue; drawn++;
+    if (mask[(y / 4) * (SZ / 4) + x / 4]) hit++; else out++;
+  }
+  return { cover: hit / (mask.total || 1), outside: drawn ? out / drawn : 0 };
+}
+$('#trace-clear').onclick = setupTrace;
+$('#trace-check').onclick = () => {
+  const s = score(); const fb = $('#trace-fb');
+  if (s.cover > 0.7 && s.outside < 0.45) { fb.className = 'ik-feedback ok'; fb.textContent = 'Harika yazdın! ✨'; IK.win(); }
+  else if (s.cover <= 0.7) { fb.className = 'ik-feedback bad'; fb.textContent = 'Harfin boş kalan yerlerini de boya.'; IK.wrong(); }
+  else { fb.className = 'ik-feedback bad'; fb.textContent = 'Çizgilerin dışına çok taştın. Silip tekrar dene.'; IK.wrong(); }
+};
+document.fonts && document.fonts.ready.then(setupTrace); setupTrace();
+
+/* Sekme açılınca ilgili oyun sesle başlasın (otomatik ses için kullanıcı etkileşimi gerekir). */
+IK.tabs((id) => { if (id === 'av') setTimeout(startHuntOnce, 50); if (id === 'hece' && !sylWord) sylRound(); });
+</script>
+</body>
+</html>

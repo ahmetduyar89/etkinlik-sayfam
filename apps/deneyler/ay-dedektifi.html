@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ay Dedektifi: Evre Avcısı | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Nunito', 'sans-serif'], display: ['Baloo 2', 'cursive'] },
+          colors: { bgMain: '#fffbeb', ink: '#0f172a' },
+          borderWidth: { '3': '3px' },
+          boxShadow: { 'hard': '4px 4px 0px #0f172a', 'hard-sm': '2px 2px 0px #0f172a' }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display { font-family: 'Baloo 2', cursive; }
+    .chunky { border: 3.5px solid #0f172a; border-radius: 1.25rem; box-shadow: 4px 4px 0px #0f172a; }
+    .pushable { border: 3px solid #0f172a; border-radius: 0.85rem; box-shadow: 3px 3px 0px #0f172a; transition: all 0.12s ease; cursor: pointer; }
+    .pushable:hover { transform: translate(-1.5px, -1.5px); box-shadow: 4.5px 4.5px 0px #0f172a; }
+    .pushable:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #0f172a; }
+    .pushable:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .active-tab { background-color: #facc15 !important; color: #0f172a !important; border-color: #0f172a !important; }
+    #moonGroup { cursor: grab; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <header class="max-w-6xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-sm font-black flex items-center gap-1"><span>⬅️</span> <span class="hidden sm:inline">Oyunlara Dön</span></a>
+      <div>
+        <div class="flex items-center gap-2"><span class="text-2xl sm:text-3xl">🌙</span><h1 class="display text-lg sm:text-2xl font-black tracking-wide">Ay Dedektifi: Evre Avcısı</h1></div>
+        <p class="text-xs sm:text-sm font-extrabold text-gray-700">Ay'ı Dünya'nın çevresinde gezdir ve gökyüzündeki görünüşünün nasıl değiştiğini çöz! 🌑🌓🌕🌗</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="bg-gray-100 p-1 rounded-xl border-2 border-ink flex items-center gap-1">
+        <button id="tabLevels" class="pushable px-3 py-1.5 text-xs font-black rounded-lg active-tab">🕵️ 1. Vakalar</button>
+        <button id="tabSandbox" class="pushable px-3 py-1.5 text-xs font-black rounded-lg bg-white">🔭 2. Gözlemevi</button>
+      </div>
+      <button id="soundToggle" class="pushable p-2 bg-amber-200 hover:bg-amber-300 text-xs font-black"><span id="soundIcon">🔊</span></button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <div class="lg:col-span-7 flex flex-col gap-3">
+      <section class="chunky bg-white p-4 sm:p-5 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-gray-200 pb-3">
+          <div class="flex items-center gap-2">
+            <span id="levelBadge" class="px-3 py-1 bg-yellow-400 border-2 border-ink rounded-xl text-xs font-black">VAKA 1</span>
+            <h2 id="levelTitle" class="display text-base sm:text-lg font-black">Dört Ana Evre</h2>
+          </div>
+          <div id="levelDots" class="flex items-center gap-1.5"></div>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 p-2.5 bg-indigo-50 rounded-xl border-2 border-ink">
+          <div class="flex items-center gap-2">
+            <span id="taskIcon" class="text-2xl">🕵️</span>
+            <p id="taskText" class="text-xs sm:text-sm font-black">Ay'ı sürükle ve istenen evreyi oluştur!</p>
+          </div>
+          <div class="text-right shrink-0">
+            <p class="text-[10px] font-black text-gray-500">TUR</p>
+            <p id="roundText" class="display text-xl font-black leading-none">1/4</p>
+          </div>
+        </div>
+
+        <div class="relative w-full rounded-2xl border-3 border-ink overflow-hidden bg-slate-950">
+          <svg id="scene" viewBox="0 0 560 320" class="w-full h-auto block touch-none">
+            <defs>
+              <radialGradient id="sunG"><stop offset="0%" stop-color="#fef9c3" /><stop offset="100%" stop-color="#f59e0b" /></radialGradient>
+            </defs>
+            <!-- SOL: Uzaydan bakış -->
+            <rect width="330" height="320" fill="#0b1026" />
+            <g opacity="0.6"><circle cx="300" cy="30" r="1.2" fill="#fff" /><circle cx="260" cy="290" r="1" fill="#fff" /><circle cx="200" cy="20" r="1.3" fill="#fff" /><circle cx="310" cy="200" r="1" fill="#fff" /></g>
+            <text x="190" y="18" font-size="10.5" font-weight="900" fill="#fde68a" text-anchor="middle">UZAYDAN BAKIŞ (Kuzeyden)</text>
+            <!-- Güneş ışınları -->
+            <circle cx="-40" cy="160" r="70" fill="url(#sunG)" stroke="#0f172a" stroke-width="3" />
+            <text x="12" y="164" font-size="10" font-weight="900" fill="#7c2d12" text-anchor="middle">GÜNEŞ</text>
+            <g stroke="#fde047" stroke-width="2" opacity="0.55" stroke-dasharray="8 6">
+              <line x1="40" y1="60" x2="320" y2="60" /><line x1="40" y1="110" x2="320" y2="110" /><line x1="40" y1="210" x2="320" y2="210" /><line x1="40" y1="260" x2="320" y2="260" />
+            </g>
+            <circle cx="190" cy="160" r="112" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="5 5" />
+            <!-- Bakış çizgisi -->
+            <line id="sightLine" x1="190" y1="160" x2="190" y2="160" stroke="#a5b4fc" stroke-width="2" stroke-dasharray="3 4" />
+            <!-- Dünya -->
+            <g transform="translate(190,160)">
+              <circle r="28" fill="#1e3a8a" stroke="#0f172a" stroke-width="2.5" />
+              <path d="M0 -28 A28 28 0 0 0 0 28 Z" fill="#38bdf8" />
+              <path d="M-12 -12 q8 -6 14 0 q-3 8 -12 6 z M4 8 q8 -2 10 6 q-6 5 -12 0 z" fill="#22c55e" />
+              <text y="44" font-size="9.5" font-weight="900" fill="#e2e8f0" text-anchor="middle">DÜNYA</text>
+            </g>
+            <!-- Ay -->
+            <g id="moonGroup">
+              <circle r="26" fill="transparent" />
+              <circle r="15" fill="#334155" stroke="#0f172a" stroke-width="2" />
+              <path d="M0 -15 A15 15 0 0 0 0 15 Z" fill="#f1f5f9" />
+              <circle r="15" fill="none" stroke="#e2e8f0" stroke-width="1.5" />
+            </g>
+            <g id="orbitCover"></g>
+
+            <!-- SAĞ: Dünya'dan görünüş -->
+            <rect x="330" width="230" height="320" fill="#111827" />
+            <line x1="330" y1="0" x2="330" y2="320" stroke="#0f172a" stroke-width="3" />
+            <text x="445" y="18" font-size="10.5" font-weight="900" fill="#fde68a" text-anchor="middle">DÜNYA'DAN GÖRÜNÜŞ</text>
+            <g opacity="0.7"><circle cx="360" cy="60" r="1.2" fill="#fff" /><circle cx="530" cy="90" r="1.5" fill="#fff" /><circle cx="370" cy="250" r="1" fill="#fff" /><circle cx="540" cy="230" r="1.2" fill="#fff" /></g>
+            <g id="phaseView"></g>
+            <rect x="345" y="238" width="200" height="30" rx="10" fill="#ffffff" stroke="#0f172a" stroke-width="2.5" />
+            <text id="phaseName" x="445" y="258" font-size="13" font-weight="900" text-anchor="middle">Dolunay</text>
+            <text id="phaseInfo" x="445" y="290" font-size="10" font-weight="800" fill="#cbd5e1" text-anchor="middle">Aydınlık kısım: %100 · 15. gün</text>
+            <path d="M340 320 Q400 300 445 312 Q500 300 560 320 Z" fill="#1f2937" />
+          </svg>
+        </div>
+
+        <!-- Hedef kartı / quiz / sıralama -->
+        <div id="challenge" class="p-3 bg-slate-50 rounded-xl border-2 border-ink"></div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t-2 border-dashed border-gray-200">
+          <div class="flex items-center gap-2">
+            <button id="btnPlay" class="pushable px-4 py-2 bg-yellow-400 hover:bg-yellow-300 text-xs font-black hidden">▶️ Bir Ay Oynat</button>
+            <button id="btnReset" class="pushable px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-xs font-black">🔄 Baştan</button>
+          </div>
+          <button id="btnHint" class="pushable px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-black">💡 İpucu</button>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border-2 border-ink flex items-start gap-2.5">
+          <span class="text-2xl p-1 bg-white rounded-lg border border-ink shrink-0">🔬</span>
+          <div class="text-xs">
+            <p class="font-black">Biliyor musun?</p>
+            <p id="scienceNote" class="text-gray-700 font-semibold leading-relaxed mt-0.5">Ay kendi ışığını üretmez, Güneş'ten gelen ışığı yansıtır. Ay'ın <b>her zaman yarısı</b> aydınlıktır. Biz Dünya'dan bu aydınlık yarının ne kadarını gördüğümüze göre farklı <b>evreler</b> görürüz!</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🎯</span><h3 class="display text-base font-black">Dedektif Görevleri</h3></div>
+          <span id="scoreBadge" class="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">0 Puan</span>
+        </div>
+        <ul class="space-y-2.5" id="missionList"></ul>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center justify-between mb-3 border-b-2 border-dashed border-gray-200 pb-2">
+          <div class="flex items-center gap-2"><span class="text-xl">🗂️</span><h3 class="display text-base font-black">Evre Albümü</h3></div>
+          <span id="albumCount" class="text-xs font-bold text-gray-500">0/8</span>
+        </div>
+        <div id="album" class="grid grid-cols-4 gap-2"></div>
+      </div>
+
+      <div class="chunky bg-white p-4">
+        <div class="flex items-center gap-2 mb-3 border-b-2 border-dashed border-gray-200 pb-2"><span class="text-xl">📚</span><h3 class="display text-base font-black">Fen Bilgisi Rehberi</h3></div>
+        <div class="space-y-2 text-xs">
+          <div class="p-2 bg-slate-50 rounded-lg border border-slate-300"><p class="font-extrabold">🌑 Yeni Ay</p><p class="text-[11px] text-gray-700 font-semibold mt-0.5">Ay, Güneş ile Dünya'nın arasındadır. Aydınlık yüzü Güneş'e döner, biz karanlık yüzünü görürüz.</p></div>
+          <div class="p-2 bg-yellow-50 rounded-lg border border-yellow-300"><p class="font-extrabold text-yellow-900">🌕 Dolunay</p><p class="text-[11px] text-yellow-800 font-semibold mt-0.5">Dünya, Güneş ile Ay'ın arasındadır. Ay'ın bize bakan yüzü tamamen aydınlıktır.</p></div>
+          <div class="p-2 bg-indigo-50 rounded-lg border border-indigo-300"><p class="font-extrabold text-indigo-900">🔁 29,5 Gün</p><p class="text-[11px] text-indigo-800 font-semibold mt-0.5">Bir yeni aydan diğerine yaklaşık 29,5 gün geçer. Önce aydınlık kısım büyür (sağdan), dolunaydan sonra küçülür.</p></div>
+          <div class="p-2 bg-rose-50 rounded-lg border border-rose-300"><p class="font-extrabold text-rose-900">🚫 Yanlış Bilgi</p><p class="text-[11px] text-rose-800 font-semibold mt-0.5">Evreler Dünya'nın gölgesinden oluşmaz! Dünya'nın gölgesi Ay'a düşerse buna <b>Ay tutulması</b> denir ve çok daha seyrek olur.</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 z-50 hidden items-center justify-center p-4">
+    <div class="chunky bg-white max-w-md w-full p-5 sm:p-6 text-center">
+      <div id="resultEmoji" class="text-5xl mb-1">🏆</div>
+      <h3 id="resultTitle" class="display text-2xl font-black">Vaka Çözüldü!</h3>
+      <div id="resultStars" class="text-4xl my-2 tracking-widest">⭐⭐⭐</div>
+      <p id="resultInfo" class="text-sm font-bold text-gray-700 mb-3"></p>
+      <div class="p-3 bg-indigo-50 rounded-xl border-2 border-ink text-left mb-4">
+        <p class="text-xs font-black text-indigo-900 mb-1">🔬 Bilim Köşesi</p>
+        <p id="resultFact" class="text-xs font-semibold text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnModalRetry" class="pushable flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-sm font-black">🔄 Tekrar</button>
+        <button id="btnModalNext" class="pushable flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">Sonraki ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SES MOTORU ---
+    let soundEnabled = true;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function initAudio() { if (!audioCtx) audioCtx = new AudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+    function tone(type, f1, f2, dur, vol = 0.2, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const t = audioCtx.currentTime + delay;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
+      } catch (e) {}
+    }
+    const Sound = {
+      click() { tone('sine', 450, 800, 0.06); },
+      tick() { tone('sine', 1200, 1300, 0.03, 0.05); },
+      correct() { tone('triangle', 660, 990, 0.15, 0.2); tone('triangle', 990, 1320, 0.15, 0.2, 0.1); },
+      wrong() { tone('sawtooth', 220, 110, 0.3, 0.15); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f * 1.01, 0.22, 0.22, i * 0.12)); }
+    };
+
+    // --- 2. AY EVRELERİ ---
+    const PHASES = [
+      { n: 'Yeni Ay', e: '🌑', a: 0 },
+      { n: 'İlk Hilal', e: '🌒', a: 45 },
+      { n: 'İlk Dördün', e: '🌓', a: 90 },
+      { n: 'Şişkin Ay (büyüyen)', e: '🌔', a: 135 },
+      { n: 'Dolunay', e: '🌕', a: 180 },
+      { n: 'Şişkin Ay (küçülen)', e: '🌖', a: 225 },
+      { n: 'Son Dördün', e: '🌗', a: 270 },
+      { n: 'Son Hilal', e: '🌘', a: 315 }
+    ];
+    const CYCLE = 29.5;
+    const EARTH = { x: 190, y: 160 }, ORBIT = 112;
+    const rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;
+    const norm = a => ((a % 360) + 360) % 360;
+
+    // Ay'ın evre açısı: 0 = Yeni Ay (Güneş yönünde, solda), saat yönünün tersine artar
+    const phaseIndex = phi => Math.round(norm(phi) / 45) % 8;
+    function phaseAt(phi) { return PHASES[phaseIndex(phi)]; }
+    function moonPos(phi) {
+      const m = rad(180 + phi); // matematik açısı (y yukarı)
+      return { x: EARTH.x + ORBIT * Math.cos(m), y: EARTH.y - ORBIT * Math.sin(m) };
+    }
+
+    function phasePath(cx, cy, r, phi) {
+      phi = norm(phi);
+      const waxing = phi < 180;
+      const c = Math.cos(rad(phi));
+      const rx = Math.max(0.01, r * Math.abs(c));
+      const sweep = c > 0 ? 0 : 1;
+      const d = `M${cx} ${cy - r} A${r} ${r} 0 0 1 ${cx} ${cy + r} A${rx} ${r} 0 0 ${sweep} ${cx} ${cy - r} Z`;
+      return waxing ? `<path d="${d}" fill="#f8fafc" />` : `<path d="${d}" fill="#f8fafc" transform="translate(${2 * cx},0) scale(-1,1)" />`;
+    }
+
+    function phaseDisc(cx, cy, r, phi, stroke = true) {
+      const k = (1 - Math.cos(rad(phi))) / 2;
+      let h = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#374151" ${stroke ? 'stroke="#0f172a" stroke-width="2"' : ''} />`;
+      if (k > 0.01) h += phasePath(cx, cy, r, phi);
+      // Krater süsleri
+      h += `<g opacity="0.18"><circle cx="${cx - r * 0.3}" cy="${cy - r * 0.2}" r="${r * 0.14}" fill="#0f172a" /><circle cx="${cx + r * 0.25}" cy="${cy + r * 0.3}" r="${r * 0.1}" fill="#0f172a" /><circle cx="${cx + r * 0.1}" cy="${cy - r * 0.45}" r="${r * 0.07}" fill="#0f172a" /></g>`;
+      if (stroke) h += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#94a3b8" stroke-width="1.5" />`;
+      return h;
+    }
+
+    // --- 3. VAKALAR ---
+    const LEVELS = [
+      { title: 'Dört Ana Evre', type: 'find', targets: [0, 2, 4, 6], task: 'Ay\'ı sürükle, istenen evreyi oluştur ve "Buldum!" de.', hint: 'Yeni Ay\'da Ay, Güneş ile Dünya\'nın arasındadır. Dolunayda tam karşı taraftadır. Dördünler ise yarı yoldadır.', fact: 'Ay, Dünya\'nın çevresindeki bir turunu yaklaşık 29,5 günde tamamlar. Ana evreler arasında yaklaşık <b>1 hafta</b> vardır.' },
+      { title: 'Sekiz Evre Avı', type: 'find', targets: [1, 3, 5, 7, 2, 6], task: 'Ara evreleri de bul! Hilaller ve şişkin aylar...', hint: 'Hilal, Yeni Ay\'ın hemen yanındadır. Şişkin Ay ise Dolunay\'ın yanındadır. Büyüyenler Yeni Ay\'dan sonra, küçülenler Dolunay\'dan sonra gelir.', fact: 'Kuzey yarım küreden bakınca büyüyen Ay\'ın <b>sağ tarafı</b>, küçülen Ay\'ın <b>sol tarafı</b> aydınlıktır.' },
+      { title: 'Gökyüzü Sınavı', type: 'quiz', count: 8, task: 'Uzaydan bakış kapalı! Sadece gökyüzündeki Ay\'a bakarak evresini bil.', hint: 'Aydınlık kısım sağda mı solda mı? Yarıdan az mı çok mu? Bu iki soru evreyi bulmanı sağlar.', fact: 'Eski çağlarda insanlar takvimleri Ay\'ın evrelerine göre tutardı. Hicri takvim bugün de Ay\'a göre hesaplanır.' },
+      { title: 'Ay Takvimi', type: 'order', task: 'Evre kartlarına Yeni Ay\'dan başlayarak doğru sırayla dokun!', hint: 'Yeni Ay ➔ İlk Hilal ➔ İlk Dördün ➔ Şişkin (büyüyen) ➔ Dolunay ➔ Şişkin (küçülen) ➔ Son Dördün ➔ Son Hilal.', fact: 'Harika! Ay evreleri her ay aynı sırayla tekrar eder. Buna <b>döngü</b> denir.' }
+    ];
+
+    const MISSIONS = [
+      { id: 'm1', title: '1. Görev: Dördün Dedektifi', text: 'Dört ana evreyi bul.' },
+      { id: 'm2', title: '2. Görev: Kusursuz Gözlemci', text: 'Gökyüzü Sınavında 8 sorunun hepsini ilk denemede bil.' },
+      { id: 'm3', title: '3. Görev: Gözlemevi Nöbeti', text: 'Gözlemevinde bir ayın tamamını (29,5 gün) oynat.' },
+      { id: 'm4', title: '4. Görev: Baş Dedektif', text: '4 vakanın hepsini çöz.' }
+    ];
+
+    // --- 4. DURUM ---
+    const $ = id => document.getElementById(id);
+    let mode = 'levels';
+    let levelIndex = 0;
+    let phi = 180;
+    let round = 0;
+    let mistakes = 0;
+    let finished = false;
+    let queue = [];
+    let quizPhi = 0;
+    let quizFirstTry = true;
+    let quizAllFirst = true;
+    let orderStep = 0;
+    let playing = false;
+    let playedDays = 0;
+    let score = 0;
+    const stars = Array(LEVELS.length).fill(0);
+    const missionsDone = {};
+    const album = new Set();
+    let modalTimer = null;
+
+    // --- 5. ÇİZİM ---
+    function render() {
+      const p = moonPos(phi);
+      $('moonGroup').setAttribute('transform', `translate(${p.x},${p.y})`);
+      $('sightLine').setAttribute('x2', p.x); $('sightLine').setAttribute('y2', p.y);
+      const L = LEVELS[levelIndex];
+      const quiz = mode === 'levels' && L.type === 'quiz';
+      const shownPhi = quiz ? quizPhi : phi;
+      $('phaseView').innerHTML = phaseDisc(445, 125, 80, shownPhi);
+      const ph = phaseAt(shownPhi);
+      const hideName = mode === 'levels' && (L.type === 'find' || L.type === 'quiz') && !finished;
+      $('phaseName').textContent = hideName ? '❓ Evre adı gizli' : ph.n;
+      const k = (1 - Math.cos(rad(shownPhi))) / 2;
+      const dayN = Math.round(norm(shownPhi) / 360 * CYCLE * 10) / 10;
+      $('phaseInfo').textContent = `Aydınlık görünen kısım: %${Math.round(k * 100)} · ${String(dayN).replace('.', ',')}. gün`;
+      $('orbitCover').innerHTML = quiz && !finished ? `<rect width="330" height="320" fill="#0b1026" opacity="0.96" /><text x="165" y="150" font-size="44" text-anchor="middle">🙈</text><text x="165" y="190" font-size="12" font-weight="900" fill="#e2e8f0" text-anchor="middle">Uzaydan bakış bu vakada kapalı!</text>` : '';
+    }
+
+    function renderAlbum() {
+      $('album').innerHTML = PHASES.map((ph, i) => {
+        const got = album.has(i);
+        return `<div class="p-1 rounded-lg border-2 border-ink text-center ${got ? 'bg-indigo-50' : 'bg-gray-100'}">
+          <svg viewBox="0 0 40 40" class="w-9 h-9 mx-auto ${got ? '' : 'opacity-25'}">${phaseDisc(20, 20, 16, ph.a)}</svg>
+          <p class="text-[8.5px] font-black leading-tight">${got ? ph.n : '???'}</p></div>`;
+      }).join('');
+      $('albumCount').textContent = `${album.size}/8`;
+    }
+
+    // --- 6. SÜRÜKLEME ---
+    let dragging = false;
+    const svg = $('scene');
+    function svgPoint(e) { const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
+    $('moonGroup').addEventListener('pointerdown', e => {
+      if (mode === 'levels' && (LEVELS[levelIndex].type !== 'find' || finished)) return;
+      dragging = true; playing = false; updatePlay(); svg.setPointerCapture(e.pointerId); initAudio();
+    });
+    svg.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      const p = svgPoint(e);
+      const m = deg(Math.atan2(-(p.y - EARTH.y), p.x - EARTH.x));
+      const nphi = norm(m - 180);
+      if (phaseIndex(nphi) !== phaseIndex(phi)) Sound.tick();
+      phi = nphi;
+      if (mode === 'sandbox') { album.add(phaseIndex(phi)); renderAlbum(); }
+      render();
+    });
+    const endDrag = () => { dragging = false; };
+    svg.addEventListener('pointerup', endDrag); svg.addEventListener('pointercancel', endDrag);
+
+    // --- 7. VAKA MANTIĞI ---
+    function renderChallenge() {
+      const L = LEVELS[levelIndex];
+      const box = $('challenge');
+      if (mode === 'sandbox') {
+        box.innerHTML = `<p class="text-xs font-black">🔭 Ay'ı sürükle ya da "Bir Ay Oynat" düğmesine bas. Evrelerin sırasını ve gün sayısını izle!</p>`;
+        return;
+      }
+      if (finished) { box.innerHTML = '<p class="text-sm font-black text-emerald-700">✅ Vaka çözüldü!</p>'; return; }
+      if (L.type === 'find') {
+        const t = PHASES[queue[round]];
+        box.innerHTML = `<div class="flex items-center gap-3">
+          <svg viewBox="0 0 60 60" class="w-14 h-14 shrink-0 rounded-xl bg-slate-900 border-2 border-ink">${phaseDisc(30, 30, 22, t.a)}</svg>
+          <div class="flex-1"><p class="text-[10px] font-black text-indigo-700 uppercase">Aranan Evre</p><p class="display text-lg font-black">${t.n}</p></div>
+          <button id="btnFound" class="pushable px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black">🔍 Buldum!</button></div>`;
+        $('btnFound').addEventListener('click', checkFind);
+        $('roundText').textContent = `${round + 1}/${queue.length}`;
+      } else if (L.type === 'quiz') {
+        const correct = phaseIndex(quizPhi);
+        const opts = quizOptions(correct);
+        box.innerHTML = `<p class="text-xs font-black mb-2">Gökyüzündeki Ay hangi evrede?</p>
+          <div class="grid grid-cols-2 gap-2">${opts.map(i => `<button data-i="${i}" class="q-opt pushable py-2 bg-white text-xs font-black">${PHASES[i].n}</button>`).join('')}</div>`;
+        box.querySelectorAll('.q-opt').forEach(b => b.addEventListener('click', () => answerQuiz(+b.dataset.i, b)));
+        $('roundText').textContent = `${round + 1}/${L.count}`;
+      } else if (L.type === 'order') {
+        box.innerHTML = `<p class="text-xs font-black mb-2">Sıradaki evre hangisi? (${orderStep}/8)</p>
+          <div class="grid grid-cols-4 gap-2">${queue.map(i => `<button data-i="${i}" class="o-card pushable p-1 bg-slate-900 flex flex-col items-center ${i < orderStep ? 'opacity-30' : ''}" ${i < orderStep ? 'disabled' : ''}>
+            <svg viewBox="0 0 40 40" class="w-10 h-10">${phaseDisc(20, 20, 16, PHASES[i].a)}</svg>
+            <span class="text-[8.5px] font-black text-white leading-tight text-center">${i < orderStep ? `${i + 1}. ` : ''}${PHASES[i].n}</span></button>`).join('')}</div>`;
+        box.querySelectorAll('.o-card').forEach(b => b.addEventListener('click', () => answerOrder(+b.dataset.i, b)));
+        $('roundText').textContent = `${orderStep}/8`;
+      }
+    }
+
+    function quizOptions(correct) {
+      const set = new Set([correct]);
+      // Yakın (karıştırılabilir) evreleri de ekle
+      [correct + 1, correct - 1, (correct + 4) % 8, correct + 2].forEach(i => { if (set.size < 4) set.add((i + 8) % 8); });
+      return [...set].sort(() => Math.random() - 0.5);
+    }
+
+    function checkFind() {
+      const target = queue[round];
+      const got = phaseIndex(phi);
+      if (got === target) {
+        Sound.correct();
+        album.add(target); renderAlbum();
+        $('scienceNote').innerHTML = `✅ <b>${PHASES[target].n}</b> bulundu! ${explain(target)}`;
+        round++;
+        if (round >= queue.length) { winLevel(); return; }
+        renderChallenge(); render();
+      } else {
+        mistakes++;
+        Sound.wrong();
+        $('scienceNote').innerHTML = `❌ Bu <b>${PHASES[got].n}</b>. Aradığımız <b>${PHASES[target].n}</b>. ${LEVELS[levelIndex].hint}`;
+        if (typeof gsap !== 'undefined') gsap.fromTo('#challenge', { x: -8 }, { x: 0, duration: 0.4, ease: 'elastic.out(4,0.2)' });
+      }
+    }
+
+    function explain(i) {
+      return [
+        'Ay, Güneş ile Dünya arasında. Karanlık yüzünü görüyoruz.',
+        'Aydınlık kısım sağda ince bir hilal. Gün batımından sonra batıda görülür.',
+        'Ay çeyrek yolda. Sağ yarısı aydınlık.',
+        'Aydınlık kısım yarıdan fazla ve büyümeye devam ediyor.',
+        'Dünya, Güneş ile Ay arasında. Bütün yüzü aydınlık!',
+        'Dolunaydan sonra aydınlık kısım soldan küçülmeye başladı.',
+        'Ay turunun dörtte üçünde. Sol yarısı aydınlık.',
+        'Sabaha karşı doğudan görülen ince hilal. Yakında Yeni Ay!'
+      ][i];
+    }
+
+    function nextQuiz() {
+      quizPhi = PHASES[Math.floor(Math.random() * 8)].a;
+      quizFirstTry = true;
+      render(); renderChallenge();
+    }
+
+    function answerQuiz(i, btn) {
+      const correct = phaseIndex(quizPhi);
+      if (i === correct) {
+        Sound.correct();
+        album.add(correct); renderAlbum();
+        $('scienceNote').innerHTML = `✅ Doğru: <b>${PHASES[correct].n}</b>. ${explain(correct)}`;
+        round++;
+        if (round >= LEVELS[levelIndex].count) { if (quizAllFirst) completeMission('m2'); winLevel(); return; }
+        nextQuiz();
+      } else {
+        mistakes++; quizAllFirst = false;
+        Sound.wrong();
+        btn.disabled = true; btn.classList.add('bg-rose-200');
+        $('scienceNote').innerHTML = '❌ Tekrar bak: Aydınlık kısım <b>sağda</b> mı <b>solda</b> mı? <b>Yarıdan az</b> mı <b>çok</b> mu?';
+      }
+    }
+
+    function answerOrder(i, btn) {
+      if (i === orderStep) {
+        Sound.correct();
+        album.add(i); renderAlbum();
+        orderStep++;
+        phi = PHASES[i].a; render();
+        if (orderStep >= 8) { winLevel(); return; }
+        renderChallenge();
+      } else {
+        mistakes++;
+        Sound.wrong();
+        if (typeof gsap !== 'undefined') gsap.fromTo(btn, { rotate: -8 }, { rotate: 0, duration: 0.5, ease: 'elastic.out(4,0.2)' });
+        $('scienceNote').innerHTML = `❌ Bu evre daha sonra geliyor. Sıradaki evre ${orderStep === 0 ? 'Yeni Ay' : `<b>${PHASES[orderStep - 1].n}</b>'dan hemen sonra gelen evre`}.`;
+      }
+    }
+
+    function winLevel() {
+      finished = true;
+      const L = LEVELS[levelIndex];
+      const s = mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1;
+      const gained = Math.max(0, s - stars[levelIndex]);
+      stars[levelIndex] = Math.max(stars[levelIndex], s);
+      score += 100 + gained * 20;
+      if (levelIndex === 0) completeMission('m1');
+      if (stars.every(v => v > 0)) completeMission('m4');
+      updateScore(); renderLevelDots(); renderChallenge(); render();
+      Sound.win();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 }, colors: ['#f8fafc', '#fde68a', '#a5b4fc'] });
+      showModal({ emoji: '🌙', title: 'Vaka Çözüldü!', stars: '⭐'.repeat(s) + '☆'.repeat(3 - s), info: mistakes === 0 ? 'Hiç hata yapmadın, süper dedektif!' : `${mistakes} hata yaptın.`, fact: L.fact, next: levelIndex < LEVELS.length - 1 ? 'Sonraki ➔' : 'Gözlemevi 🔭' });
+    }
+
+    function showModal(o) {
+      $('resultEmoji').textContent = o.emoji; $('resultTitle').textContent = o.title;
+      $('resultStars').textContent = o.stars; $('resultInfo').textContent = o.info; $('resultFact').innerHTML = o.fact;
+      $('btnModalNext').classList.toggle('hidden', !o.next); if (o.next) $('btnModalNext').textContent = o.next;
+      clearTimeout(modalTimer);
+      modalTimer = setTimeout(() => {
+        const m = $('resultModal'); m.classList.remove('hidden'); m.classList.add('flex');
+        if (typeof gsap !== 'undefined') gsap.from(m.firstElementChild, { scale: 0.7, opacity: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      }, 700);
+    }
+    function closeModal() { clearTimeout(modalTimer); const m = $('resultModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    // --- 8. OYNATMA ---
+    let last = performance.now();
+    function loop(now) {
+      const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+      last = now;
+      if (playing) {
+        const before = phaseIndex(phi);
+        phi = norm(phi + dt * 45);
+        playedDays += dt * 45 / 360 * CYCLE;
+        if (phaseIndex(phi) !== before) { Sound.tick(); album.add(phaseIndex(phi)); renderAlbum(); }
+        if (playedDays >= CYCLE) completeMission('m3');
+        render();
+      }
+      requestAnimationFrame(loop);
+    }
+    function updatePlay() { $('btnPlay').textContent = playing ? '⏸️ Durdur' : '▶️ Bir Ay Oynat'; }
+    $('btnPlay').addEventListener('click', () => { playing = !playing; if (playing) playedDays = 0; Sound.click(); updatePlay(); });
+
+    // --- 9. AKIŞ ---
+    function renderMissions() {
+      $('missionList').innerHTML = MISSIONS.map(m => {
+        const done = missionsDone[m.id];
+        return `<li class="p-2.5 rounded-xl border-2 border-ink ${done ? 'bg-emerald-50' : 'bg-gray-50'} flex items-start gap-2.5"><span class="text-lg">${done ? '✅' : '⬜'}</span><div class="flex-1 text-xs"><p class="font-extrabold">${m.title}</p><p class="text-gray-600 font-semibold text-[11px]">${m.text}</p></div></li>`;
+      }).join('');
+    }
+    function completeMission(id) {
+      if (missionsDone[id]) return;
+      missionsDone[id] = true; score += 50; updateScore(); renderMissions();
+      if (typeof confetti !== 'undefined') confetti({ particleCount: 40, spread: 50, origin: { x: 0.8, y: 0.3 } });
+    }
+    function updateScore() { $('scoreBadge').textContent = `${score} Puan`; }
+    function renderLevelDots() {
+      $('levelDots').innerHTML = '<span class="text-xs font-bold text-gray-500">Vakalar:</span>' + LEVELS.map((_, i) => {
+        const bg = i === levelIndex ? 'bg-yellow-400' : stars[i] > 0 ? 'bg-emerald-300' : 'bg-gray-200';
+        return `<button data-level="${i}" class="lvl-dot w-7 h-7 rounded-lg border-2 border-ink ${bg} font-black text-xs">${i + 1}</button>`;
+      }).join('');
+      document.querySelectorAll('.lvl-dot').forEach(b => b.addEventListener('click', () => { Sound.click(); loadLevel(+b.dataset.level); }));
+    }
+
+    function loadLevel(i) {
+      closeModal();
+      mode = 'levels'; levelIndex = i; finished = false; round = 0; mistakes = 0; orderStep = 0; quizAllFirst = true;
+      playing = false; updatePlay();
+      const L = LEVELS[i];
+      $('levelBadge').textContent = `VAKA ${i + 1}`;
+      $('levelTitle').textContent = L.title;
+      $('taskText').textContent = L.task;
+      if (L.type === 'find') { queue = [...L.targets].sort(() => Math.random() - 0.5); phi = 100; }
+      if (L.type === 'quiz') nextQuiz();
+      if (L.type === 'order') { queue = [0, 1, 2, 3, 4, 5, 6, 7].sort(() => Math.random() - 0.5); phi = 0; }
+      renderLevelDots(); renderChallenge(); render();
+    }
+
+    function switchMode(m) {
+      const isS = m === 'sandbox';
+      $('tabLevels').classList.toggle('active-tab', !isS); $('tabLevels').classList.toggle('bg-white', isS);
+      $('tabSandbox').classList.toggle('active-tab', isS); $('tabSandbox').classList.toggle('bg-white', !isS);
+      $('levelDots').classList.toggle('hidden', isS);
+      $('btnPlay').classList.toggle('hidden', !isS);
+      if (isS) {
+        closeModal();
+        mode = 'sandbox'; finished = false;
+        $('levelBadge').textContent = 'GÖZLEMEVİ';
+        $('levelTitle').textContent = 'Serbest Gözlem';
+        $('taskText').textContent = 'Ay\'ı dilediğin yere sürükle, evrelerin nasıl oluştuğunu keşfet.';
+        $('roundText').textContent = '∞';
+        renderChallenge(); render();
+      } else loadLevel(levelIndex);
+    }
+
+    $('btnReset').addEventListener('click', () => { Sound.click(); if (mode === 'levels') loadLevel(levelIndex); else { phi = 0; render(); } });
+    $('btnHint').addEventListener('click', () => {
+      Sound.click();
+      $('scienceNote').innerHTML = mode === 'levels' ? `<b>İpucu:</b> ${LEVELS[levelIndex].hint}` : '<b>Gözlem fikri:</b> Ay\'ın uzaydan bakışta hep sol yarısının aydınlık olduğuna dikkat et. Değişen, bizim o aydınlık yarının ne kadarını gördüğümüz!';
+    });
+    $('tabLevels').addEventListener('click', () => { Sound.click(); switchMode('levels'); });
+    $('tabSandbox').addEventListener('click', () => { Sound.click(); switchMode('sandbox'); });
+    $('btnModalRetry').addEventListener('click', () => loadLevel(levelIndex));
+    $('btnModalNext').addEventListener('click', () => { closeModal(); if (levelIndex < LEVELS.length - 1) loadLevel(levelIndex + 1); else switchMode('sandbox'); });
+    $('soundToggle').addEventListener('click', () => { soundEnabled = !soundEnabled; $('soundIcon').textContent = soundEnabled ? '🔊' : '🔇'; Sound.click(); });
+
+    renderMissions(); updateScore(); renderAlbum(); loadLevel(0);
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

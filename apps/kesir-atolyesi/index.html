@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pizza Kesir Atölyesi | Atölye</title>
+<meta name="description" content="Pizza dilimleme, kesir duvarı, sayı doğrusu ve bir çokluğun kesri ile ilkokul kesir atölyesi.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍕</text></svg>">
+<link rel="stylesheet" href="/shared/ilkokul.css">
+<style>
+  :root { --ik-accent: #e11d48; --ik-accent-2: #fb923c; }
+  .pizza { width: min(100%, 360px); display: block; margin: 0 auto; touch-action: manipulation; }
+  .pizza .slice { cursor: pointer; transition: filter .15s; }
+  .pizza .slice:hover { filter: brightness(1.06); }
+  .frac { display: inline-flex; flex-direction: column; align-items: center; font-family: 'Baloo 2'; font-weight: 800; line-height: 1; vertical-align: middle; }
+  .frac .n, .frac .d { padding: 0 6px; }
+  .frac .bar { height: 4px; width: 100%; background: currentColor; border-radius: 2px; margin: 3px 0; }
+  .frac.xl { font-size: 54px; }
+  .frac.md { font-size: 26px; }
+  .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+  .seg button { border: 2px solid var(--ik-line); background: #fff; border-radius: 12px; padding: 7px 12px; font-weight: 800; }
+  .seg button.on { background: var(--ik-accent); border-color: var(--ik-accent); color: #fff; }
+  .task-box { background: #fff1f2; border: 2px dashed #fda4af; border-radius: 18px; padding: 14px; text-align: center; width: 100%; }
+
+  .wall { display: flex; flex-direction: column; gap: 6px; }
+  .wrow { display: flex; gap: 4px; }
+  .brick { flex: 1; border: 0; border-radius: 10px; padding: 12px 0; font-family: 'Baloo 2'; font-weight: 800; font-size: 15px; color: #2b2d42; background: #f4ede2; transition: background .15s, transform .1s; min-width: 0; }
+  .brick:active { transform: scale(.97); }
+  .wlabel { width: 46px; flex-shrink: 0; display: grid; place-items: center; font-weight: 800; color: var(--ik-soft); font-size: 13px; }
+
+  .nline { width: 100%; height: auto; display: block; touch-action: manipulation; }
+  .nline .tick { cursor: pointer; }
+  .nline .tick:hover circle { fill: #fde68a; }
+
+  .items { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; min-height: 120px; }
+  .group { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px; border: 3px dashed transparent; border-radius: 18px; transition: all .3s; justify-content: center; max-width: 220px; }
+  .items.grouped .group { border-color: #fda4af; background: #fff7f8; }
+  .items.grouped .group.hl { border-color: var(--ik-ok); background: var(--ik-ok-bg); }
+  .item { font-size: 34px; line-height: 1; }
+  .items:not(.grouped) { gap: 6px; max-width: 520px; margin: 0 auto; }
+  .items:not(.grouped) .group { display: contents; }
+</style>
+</head>
+<body>
+<header class="ik-top">
+  <div class="ik-brand">
+    <div class="ik-logo">🍕</div>
+    <div><h1>Pizza Kesir Atölyesi</h1><p>Bütün, yarım, çeyrek ve daha fazlası</p></div>
+  </div>
+  <nav class="ik-tabs" role="tablist">
+    <button class="ik-tab" data-tab="pizza"><span class="e">🍕</span>Pizza Dilimle</button>
+    <button class="ik-tab" data-tab="duvar"><span class="e">🧱</span>Kesir Duvarı</button>
+    <button class="ik-tab" data-tab="dogru"><span class="e">📏</span>Sayı Doğrusu</button>
+    <button class="ik-tab" data-tab="cokluk"><span class="e">🍎</span>Çokluğun Kesri</button>
+  </nav>
+  <span class="ik-stars">⭐ <span id="ik-stars">0</span></span>
+</header>
+
+<main class="ik-main">
+  <!-- PİZZA -->
+  <section class="ik-panel" data-panel="pizza">
+    <div class="ik-head">
+      <div><h2>Pizzayı Eşit Dilimlere Böl</h2><p>Kaç dilim olacağını seç, sonra dilimlere dokunarak boya. <b>Pay</b> boyadığın dilim, <b>payda</b> toplam dilim sayısıdır.</p></div>
+      <div class="seg" id="pz-mode"><button data-m="serbest" class="on">Serbest</button><button data-m="gorev">Görev</button></div>
+    </div>
+    <div class="ik-grid two">
+      <div class="ik-card">
+        <div class="ik-row" style="justify-content:center;margin-bottom:10px" id="den-seg"></div>
+        <svg class="pizza" id="pizza" viewBox="-110 -110 220 220" aria-label="Pizza"></svg>
+      </div>
+      <div class="ik-card ik-center" style="gap:14px">
+        <div class="frac xl" id="pz-frac"><span class="n">0</span><span class="bar"></span><span class="d">4</span></div>
+        <div class="words" id="pz-words" style="font-size:20px;font-weight:800"></div>
+        <button class="ik-speak" id="pz-say">🔊 Sesli oku</button>
+        <div id="pz-task" style="width:100%"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DUVAR -->
+  <section class="ik-panel" data-panel="duvar">
+    <div class="ik-head">
+      <div><h2>Kesir Duvarı</h2><p>Tuğlalara dokunarak boya. Hangi kesirler aynı uzunlukta? Örneğin 1/2 ile 2/4'ü karşılaştır!</p></div>
+      <button class="ik-btn ghost" id="wall-clear">🧽 Temizle</button>
+    </div>
+    <div class="ik-grid two">
+      <div class="ik-card"><div class="wall" id="wall"></div></div>
+      <div class="ik-card">
+        <div class="ik-label">Hangisi daha büyük?</div>
+        <div class="ik-row" id="cmp" style="justify-content:center;gap:18px;margin:14px 0"></div>
+        <div class="ik-feedback" id="cmp-fb" style="text-align:center"></div>
+        <p class="ik-muted" style="font-size:14px;margin:8px 0 0">İpucu: Duvarda iki kesri de boyayıp uzunluklarını karşılaştır. Payda büyüdükçe parçalar küçülür!</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SAYI DOĞRUSU -->
+  <section class="ik-panel" data-panel="dogru">
+    <div class="ik-head"><div><h2>Kesirler Sayı Doğrusunda</h2><p>0 ile 1 arası eşit parçalara bölündü. İstenen kesrin yerine dokun.</p></div></div>
+    <div class="ik-card">
+      <div class="ik-center" style="margin-bottom:6px"><div class="ik-label">Bul</div><div class="frac xl" id="nl-target"></div></div>
+      <svg class="nline" id="nline" viewBox="0 0 800 170"></svg>
+      <div class="ik-feedback" id="nl-fb" style="text-align:center"></div>
+    </div>
+  </section>
+
+  <!-- ÇOKLUK -->
+  <section class="ik-panel" data-panel="cokluk">
+    <div class="ik-head"><div><h2>Bir Çokluğun Kesri</h2><p>Nesneleri eşit gruplara ayır, istenen kesir kadarını bul.</p></div><button class="ik-btn ghost" id="ck-next">Yeni soru ➜</button></div>
+    <div class="ik-grid two">
+      <div class="ik-card">
+        <div class="items" id="ck-items"></div>
+        <div class="ik-center" style="margin-top:12px"><button class="ik-btn blue" id="ck-group">✂️ Eşit gruplara ayır</button></div>
+      </div>
+      <div class="ik-card">
+        <p class="words" id="ck-q" style="font-size:22px;font-weight:800;margin:0 0 14px"></p>
+        <div class="ik-choices" id="ck-choices"></div>
+        <div class="ik-feedback" id="ck-fb"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="/shared/ilkokul.js"></script>
+<script>
+const { $, $$, el, say, pick, shuffle, rand } = IK;
+IK.tabs();
+const fracHTML = (n, d, cls) => `<span class="frac ${cls || 'md'}"><span class="n">${n}</span><span class="bar"></span><span class="d">${d}</span></span>`;
+const ORD = { 2: 'ikide', 3: 'üçte', 4: 'dörtte', 5: 'beşte', 6: 'altıda', 8: 'sekizde', 10: 'onda', 12: 'on ikide' };
+const NUMS = ['sıfır', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz', 'on', 'on bir', 'on iki'];
+const fracWords = (n, d) => n === d ? `${ORD[d]} ${NUMS[n]}, yani bir bütün` : `${ORD[d]} ${NUMS[n]}`;
+
+/* ═════ PİZZA ═════ */
+let den = 4, painted = new Set(), pzMode = 'serbest', pzTarget = null;
+const DENS = [2, 3, 4, 6, 8];
+DENS.forEach((d) => {
+  const b = el('button', { class: 'ik-btn ghost small' }, `${d} dilim`);
+  b.onclick = () => { den = d; painted.clear(); drawPizza(); markDen(); };
+  b.dataset.d = d; $('#den-seg').appendChild(b);
+});
+function markDen() { $$('#den-seg button').forEach((b) => { const on = +b.dataset.d === den; b.style.background = on ? 'var(--ik-accent)' : ''; b.style.color = on ? '#fff' : ''; }); }
+function drawPizza() {
+  const R = 100; let s = `<circle r="106" fill="#d97706"/>`;
+  for (let i = 0; i < den; i++) {
+    const a0 = (i / den) * 2 * Math.PI - Math.PI / 2, a1 = ((i + 1) / den) * 2 * Math.PI - Math.PI / 2;
+    const large = 1 / den > 0.5 ? 1 : 0;
+    const d = den === 1 ? `M0,-${R}A${R},${R} 0 1 1 -0.01,-${R}Z` : `M0,0 L${R * Math.cos(a0)},${R * Math.sin(a0)} A${R},${R} 0 ${large} 1 ${R * Math.cos(a1)},${R * Math.sin(a1)}Z`;
+    const on = painted.has(i);
+    s += `<path class="slice" data-i="${i}" d="${d}" fill="${on ? '#fbbf24' : '#fde7b0'}" stroke="#92400e" stroke-width="2.5"/>`;
+    if (on) {
+      const am = (a0 + a1) / 2;
+      [[0.55, 0], [0.75, 0.12], [0.72, -0.13]].forEach(([rr, off]) => {
+        s += `<circle cx="${R * rr * Math.cos(am + off * 4 / den)}" cy="${R * rr * Math.sin(am + off * 4 / den)}" r="${den > 6 ? 6 : 8}" fill="#dc2626" pointer-events="none"/>`;
+      });
+      s += `<circle cx="${R * 0.38 * Math.cos(am)}" cy="${R * 0.38 * Math.sin(am)}" r="4" fill="#15803d" pointer-events="none"/>`;
+    }
+  }
+  $('#pizza').innerHTML = s;
+  $$('#pizza .slice').forEach((p) => p.addEventListener('click', () => {
+    const i = +p.dataset.i; painted.has(i) ? painted.delete(i) : painted.add(i); IK.beep('tick'); drawPizza();
+  }));
+  $('#pz-frac').innerHTML = `<span class="n">${painted.size}</span><span class="bar"></span><span class="d">${den}</span>`;
+  $('#pz-words').textContent = painted.size ? fracWords(painted.size, den) : `Pizza ${den} eşit dilime bölündü`;
+}
+$('#pz-say').onclick = () => say($('#pz-words').textContent);
+$$('#pz-mode button').forEach((b) => b.onclick = () => { $$('#pz-mode button').forEach((x) => x.classList.toggle('on', x === b)); pzMode = b.dataset.m; pzTask(); });
+function pzTask() {
+  if (pzMode === 'serbest') { $('#pz-task').innerHTML = ''; return; }
+  const d = pick(DENS), n = rand(1, d - 1); pzTarget = [n, d];
+  den = d; painted.clear(); drawPizza(); markDen();
+  $('#pz-task').innerHTML = `<div class="task-box"><div class="ik-label">Görev</div><p style="margin:6px 0;font-size:18px">Pizzanın ${fracHTML(n, d)} kadarını boya!</p><button class="ik-btn green" id="pz-check">✔ Kontrol et</button></div>`;
+  say(`Pizzanın ${fracWords(n, d)} kadarını boya`);
+  $('#pz-check').onclick = () => {
+    if (den !== d) IK.wrong(`Önce pizzayı ${d} dilime böl!`);
+    else if (painted.size === n) { IK.right('Afiyet olsun! 😋'); setTimeout(pzTask, 1000); }
+    else IK.wrong(painted.size < n ? 'Biraz daha boya' : 'Fazla boyadın');
+  };
+}
+drawPizza(); markDen();
+
+/* ═════ DUVAR ═════ */
+const WALL = [[1, '#fca5a5'], [2, '#fdba74'], [3, '#fde047'], [4, '#86efac'], [6, '#67e8f9'], [8, '#c4b5fd']];
+const wallOn = new Set();
+function drawWall() {
+  $('#wall').innerHTML = '';
+  WALL.forEach(([d, c]) => {
+    const row = el('div', { class: 'wrow' });
+    row.appendChild(el('div', { class: 'wlabel' }, d === 1 ? '1' : `1/${d}`));
+    for (let i = 0; i < d; i++) {
+      const key = d + ':' + i;
+      const b = el('button', { class: 'brick', 'aria-pressed': wallOn.has(key) }, d === 1 ? '1 bütün' : `1/${d}`);
+      if (wallOn.has(key)) b.style.background = c;
+      b.onclick = () => { wallOn.has(key) ? wallOn.delete(key) : wallOn.add(key); IK.beep('tick'); drawWall(); };
+      row.appendChild(b);
+    }
+    $('#wall').appendChild(row);
+  });
+}
+$('#wall-clear').onclick = () => { wallOn.clear(); drawWall(); };
+drawWall();
+function cmpQuestion() {
+  let a, b;
+  do {
+    if (Math.random() < 0.5) { const n = 1; a = [n, pick([2, 3, 4, 6, 8])]; b = [n, pick([2, 3, 4, 6, 8])]; }
+    else { const d = pick([3, 4, 6, 8]); a = [rand(1, d - 1), d]; b = [rand(1, d - 1), d]; }
+  } while (a[0] / a[1] === b[0] / b[1]);
+  $('#cmp-fb').textContent = '';
+  const box = $('#cmp'); box.innerHTML = '';
+  [a, b].forEach((f, i) => {
+    const btn = el('button', { class: 'ik-choice', style: 'min-width:110px' }, fracHTML(f[0], f[1], 'xl'));
+    btn.onclick = () => {
+      const other = i ? a : b;
+      if (f[0] / f[1] > other[0] / other[1]) {
+        btn.classList.add('ok'); $('#cmp-fb').className = 'ik-feedback ok';
+        $('#cmp-fb').textContent = f[0] === other[0] ? 'Doğru! Paydası küçük olanın parçaları daha büyüktür.' : 'Doğru! Paydalar aynıysa payı büyük olan daha büyüktür.';
+        IK.right(); setTimeout(cmpQuestion, 1600);
+      } else { btn.classList.add('bad'); $('#cmp-fb').className = 'ik-feedback bad'; $('#cmp-fb').textContent = 'Duvarda boyayıp karşılaştır 🧱'; IK.wrong(); }
+    };
+    box.appendChild(btn);
+    if (!i) box.appendChild(el('span', { class: 'ik-big' }, '?'));
+  });
+}
+cmpQuestion();
+
+/* ═════ SAYI DOĞRUSU ═════ */
+let nlT = null;
+function nlQuestion() {
+  const d = pick([2, 3, 4, 5, 6, 8, 10]), n = rand(1, d - 1); nlT = [n, d];
+  $('#nl-target').innerHTML = `<span class="n">${n}</span><span class="bar"></span><span class="d">${d}</span>`;
+  $('#nl-fb').textContent = '';
+  const x0 = 60, x1 = 740, y = 90;
+  let s = `<line x1="${x0 - 30}" y1="${y}" x2="${x1 + 30}" y2="${y}" stroke="#2b2d42" stroke-width="5" stroke-linecap="round"/>`;
+  s += `<polygon points="${x1 + 40},${y} ${x1 + 26},${y - 9} ${x1 + 26},${y + 9}" fill="#2b2d42"/>`;
+  for (let i = 0; i <= d; i++) {
+    const x = x0 + (x1 - x0) * i / d;
+    const end = i === 0 || i === d;
+    s += `<g class="tick" data-i="${i}"><rect x="${x - 22}" y="${y - 50}" width="44" height="100" fill="transparent"/><line x1="${x}" y1="${y - (end ? 24 : 16)}" x2="${x}" y2="${y + (end ? 24 : 16)}" stroke="#2b2d42" stroke-width="${end ? 5 : 3}"/><circle cx="${x}" cy="${y}" r="11" fill="#fff" stroke="#e11d48" stroke-width="3"/></g>`;
+    if (end) s += `<text x="${x}" y="${y + 58}" text-anchor="middle" font-family="Baloo 2" font-weight="800" font-size="30">${i ? 1 : 0}</text>`;
+  }
+  s += `<g id="nl-flag" style="display:none"><line x1="0" y1="${y - 12}" x2="0" y2="${y - 62}" stroke="#2b2d42" stroke-width="3"/><polygon points="0,${y - 62} 34,${y - 52} 0,${y - 42}" fill="#e11d48"/></g>`;
+  $('#nline').innerHTML = s;
+  $$('#nline .tick').forEach((g) => g.addEventListener('click', () => {
+    const i = +g.dataset.i, x = x0 + (x1 - x0) * i / d;
+    const f = $('#nl-flag'); f.style.display = ''; f.setAttribute('transform', `translate(${x} 0)`);
+    if (i === n) { $('#nl-fb').className = 'ik-feedback ok'; $('#nl-fb').textContent = `Doğru! 0'dan başlayıp ${d} parçanın ${n} tanesini saydın.`; g.querySelector('circle').setAttribute('fill', '#22a565'); IK.right(); setTimeout(nlQuestion, 1500); }
+    else { $('#nl-fb').className = 'ik-feedback bad'; $('#nl-fb').textContent = i === 0 || i === d ? 'Bu nokta ' + (i ? '1 (bütün)' : '0') + '. 0’dan parçaları say.' : `Burası ${i}/${d}. Bir daha say!`; IK.wrong(); }
+  }));
+}
+nlQuestion();
+
+/* ═════ ÇOKLUK ═════ */
+const FRUITS = ['🍎', '🍓', '🍪', '🧁', '⚽', '🌟', '🐟', '🍬', '🥕', '🎈'];
+let ck = null;
+function ckQuestion() {
+  const d = pick([2, 3, 4, 5, 6]), per = rand(2, d <= 3 ? 5 : 4), total = d * per, n = rand(1, d - 1), item = pick(FRUITS);
+  ck = { d, per, total, n, item };
+  const box = $('#ck-items'); box.className = 'items'; box.innerHTML = '';
+  // Gruplar baştan oluşturulur, ayırma düğmesine kadar çerçevesiz kalır.
+  for (let g = 0; g < d; g++) box.appendChild(el('div', { class: 'group' }, `<span class="item">${item}</span>`.repeat(per)));
+  $('#ck-group').disabled = false;
+  $('#ck-q').innerHTML = `${total} tane ${item} var. Bunların ${fracHTML(n, d)} kaç tanedir?`;
+  $('#ck-fb').textContent = '';
+  const opts = new Set([n * per]); while (opts.size < 4) opts.add(rand(1, total));
+  const cbox = $('#ck-choices'); cbox.innerHTML = '';
+  shuffle([...opts]).forEach((o) => {
+    const b = el('button', { class: 'ik-choice' }, o);
+    b.onclick = () => {
+      if (o === n * per) { b.classList.add('ok'); showGroups(true); $('#ck-fb').className = 'ik-feedback ok'; $('#ck-fb').textContent = `Doğru! ${total} ÷ ${d} = ${per}, ${per} × ${n} = ${o}`; IK.right(); setTimeout(ckQuestion, 2200); }
+      else { b.classList.add('bad'); $('#ck-fb').className = 'ik-feedback bad'; $('#ck-fb').textContent = 'İpucu: Önce eşit gruplara ayır.'; IK.wrong(); }
+    };
+    cbox.appendChild(b);
+  });
+}
+function showGroups(hl) {
+  const box = $('#ck-items'); box.classList.add('grouped'); $('#ck-group').disabled = true;
+  if (hl) $$('.group', box).forEach((g, i) => g.classList.toggle('hl', i < ck.n));
+}
+$('#ck-group').onclick = () => { showGroups(false); say(`${ck.total} nesneyi ${ck.d} eşit gruba ayırdık. Her grupta ${ck.per} tane var.`); };
+$('#ck-next').onclick = ckQuestion;
+ckQuestion();
+</script>
+</body>
+</html>

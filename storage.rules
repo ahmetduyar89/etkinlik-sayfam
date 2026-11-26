@@ -1,0 +1,63 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function userDoc() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+    function hasUser() {
+      return request.auth != null && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+    function staff() {
+      return hasUser() && userDoc().active == true && userDoc().role in ['admin', 'board'];
+    }
+    function admin() {
+      return hasUser() && userDoc().active == true && userDoc().role == 'admin';
+    }
+    function activeClass(id) {
+      return firestore.exists(/databases/(default)/documents/classrooms/$(id)) && firestore.get(/databases/(default)/documents/classrooms/$(id)).data.archived == false;
+    }
+    function classAccess(id) {
+      return admin() || (staff() && activeClass(id));
+    }
+    function sharedPdf(classId, id) {
+      return firestore.exists(/databases/(default)/documents/classrooms/$(classId)/pdf_files/$(id))
+        && firestore.get(/databases/(default)/documents/classrooms/$(classId)/pdf_files/$(id)).data.shared == true;
+    }
+    function sharedRootPdf(id) {
+      return firestore.exists(/databases/(default)/documents/pdf_files/$(id))
+        && firestore.get(/databases/(default)/documents/pdf_files/$(id)).data.shared == true;
+    }
+    function pdf() {
+      return request.resource.size <= 25 * 1024 * 1024 && request.resource.contentType == 'application/pdf';
+    }
+    function notebookPdf() {
+      return request.resource.size <= 100 * 1024 * 1024 && request.resource.contentType == 'application/pdf';
+    }
+    function isNotebookOwner() {
+      return (request.auth != null && request.auth.token.role in ['teacher', 'class']) || admin();
+    }
+    // Etkinlik uygulamasının öğretmen oturumu custom claim kullanır.
+    // Mevcut admin erişimi ve diğer uygulamaların dosya izinleri korunur.
+    match /activities/{file} {
+      allow read: if true;
+      allow write: if (request.auth != null && request.auth.token.role == 'teacher') || admin();
+    }
+    // Defterlerim (GoodNotes modu) PDF belgeleri: QR ile paylaşılan öğrenci ekranları
+    // dahil tüm cihazlarda okunabilir; yalnız öğretmen veya sınıf oturumu yükleyip silebilir.
+    match /notebooks/pdfs/{pdfId}/{fileName} {
+      allow read: if true;
+      allow create, update: if isNotebookOwner() && notebookPdf();
+      allow delete: if isNotebookOwner();
+    }
+    match /pdfs/{id} {
+      allow read: if sharedRootPdf(id) || admin();
+      allow create, update: if admin() && pdf();
+      allow delete: if admin();
+    }
+    match /classrooms/{classId}/pdfs/{id} {
+      allow read: if sharedPdf(classId, id) || classAccess(classId);
+      allow create, update: if classAccess(classId) && pdf();
+      allow delete: if classAccess(classId);
+    }
+  }
+}

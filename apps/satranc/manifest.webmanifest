@@ -1,0 +1,17 @@
+{
+  "name": "Satranç Eğitimi",
+  "short_name": "Satranç Eğitimi",
+  "description": "İlkokul öğrencileri için çevrimdışı satranç eğitim platformu.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#fdf8ef",
+  "theme_color": "#7b5cf0",
+  "icons": [
+    {
+      "src": "./src/assets/icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

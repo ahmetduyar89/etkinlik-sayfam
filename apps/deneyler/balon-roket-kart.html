@@ -1,0 +1,2357 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Çılgın Balon-Roket Kart: Newton GP! | Küçük Mucitler</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Baloo 2 ve Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- GSAP Animasyon Kütüphanesi -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'sans-serif'],
+            display: ['Baloo 2', 'cursive'],
+          },
+          colors: {
+            bgMain: '#fffbeb',
+            ink: '#0f172a',
+            kartRed: '#ef4444',
+            thrustBlue: '#0284c7',
+            turboYellow: '#facc15',
+            nitroGreen: '#10b981',
+            purpleGrape: '#8b5cf6',
+          },
+          borderWidth: {
+            '3': '3px',
+            '3.5': '3.5px',
+          },
+          boxShadow: {
+            'hard': '4px 4px 0px #0f172a',
+            'hard-lg': '6px 6px 0px #0f172a',
+            'hard-sm': '2px 2px 0px #0f172a',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fffbeb;
+      color: #0f172a;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .display {
+      font-family: 'Baloo 2', cursive;
+    }
+    .chunky {
+      border: 3.5px solid #0f172a;
+      border-radius: 1.25rem;
+      box-shadow: 4px 4px 0px #0f172a;
+    }
+    .pushable {
+      border: 3px solid #0f172a;
+      border-radius: 0.85rem;
+      box-shadow: 3px 3px 0px #0f172a;
+      transition: all 0.12s ease;
+      cursor: pointer;
+    }
+    .pushable:hover {
+      transform: translate(-1.5px, -1.5px);
+      box-shadow: 4.5px 4.5px 0px #0f172a;
+    }
+    .pushable:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #0f172a;
+    }
+    .sticker {
+      filter: drop-shadow(2px 2px 0px #0f172a);
+    }
+    /* Nabız atan nitro butonu */
+    @keyframes nitroPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      50% { transform: scale(1.04); box-shadow: 0 0 0 12px rgba(16, 185, 129, 0); }
+    }
+    .pulse-nitro {
+      animation: nitroPulse 1.3s infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+
+  <!-- 1. ÜST BAŞLIK & NAVİGASYON -->
+  <header class="max-w-7xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-3 chunky bg-white p-3 sm:p-4">
+    <div class="flex items-center gap-3">
+      <a href="index.html#oyunlar" class="pushable p-2 bg-amber-100 hover:bg-amber-200 text-ink text-xs sm:text-sm font-black flex items-center gap-1">
+        <span>⬅️</span> <span>Oyunlara Dön</span>
+      </a>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">🏎️</span>
+          <h1 class="display text-lg sm:text-2xl font-black text-ink tracking-wide">
+            Çılgın Balon-Roket Kart: Newton GP!
+          </h1>
+          <span class="hidden md:inline px-2 py-0.5 bg-yellow-100 text-amber-900 text-xs font-extrabold rounded-lg border border-ink">
+            60 FPS Süper Hızlı Yarış
+          </span>
+        </div>
+        <p class="text-xs text-gray-500 font-bold hidden sm:block">
+          Newton 3. Yasa (Etki-Tepki) · Kütle & İvme ($F=ma$) · Zemin Sürtünmesi & Rampa Uçuşu
+        </p>
+      </div>
+    </div>
+
+    <!-- Puan, Ses & Bilim Rehberi -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <div class="bg-amber-100 px-3 py-1.5 rounded-xl border-2 border-ink text-xs font-black text-ink flex items-center gap-1.5">
+        <span>🏆</span> <span>Kupalar:</span> <span id="lblTrophies" class="text-sm font-black text-red-600">0</span>
+      </div>
+      <div class="bg-yellow-100 px-3 py-1.5 rounded-xl border-2 border-ink text-xs font-black text-ink flex items-center gap-1.5">
+        <span>⭐</span> <span>Puan:</span> <span id="lblScore" class="text-sm font-black text-amber-800">0</span>
+      </div>
+      <button id="btnToggleSound" class="pushable p-2 bg-purple-100 hover:bg-purple-200 text-ink font-bold text-xs" title="Ses Aç/Kapat">
+        <span id="soundIcon">🔊</span>
+      </button>
+      <button id="btnScienceGuide" class="pushable px-3 py-1.5 bg-yellow-300 hover:bg-yellow-400 text-ink text-xs font-extrabold flex items-center gap-1">
+        <span>💡</span> <span class="hidden sm:inline">Nasıl Çalışır?</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 2. SEKME VE PİST SEÇİMİ -->
+  <div class="max-w-7xl mx-auto w-full mb-3 flex flex-wrap items-center justify-between gap-2">
+    <!-- Ana Modlar: 1. Garaj / Modifiye, 2. Yarış Pisti -->
+    <div class="flex items-center gap-2 bg-gray-100 p-1.5 rounded-xl border-2 border-ink">
+      <button id="tabTrack" onclick="setMainTab('track')" class="pushable px-4 py-1.5 text-xs sm:text-sm font-black bg-emerald-400 text-white flex items-center gap-1.5">
+        <span>🏁</span> <span>Yarış Pisti</span>
+      </button>
+      <button id="tabGarage" onclick="setMainTab('garage')" class="pushable px-4 py-1.5 text-xs sm:text-sm font-black bg-white text-ink hover:bg-gray-100 flex items-center gap-1.5">
+        <span>🛠️</span> <span>Garaj & Modifiye</span>
+      </button>
+    </div>
+
+    <!-- Pist Seçici (Level 1, 2, 3, 4) -->
+    <div class="flex items-center gap-1.5 overflow-x-auto pb-1" id="trackSelectBar">
+      <button id="trackBtn1" onclick="setTrack(1)" class="pushable px-3 py-1 text-xs font-black bg-yellow-400 text-ink border-2 border-ink">
+        1. Parke Koridoru (150m)
+      </button>
+      <button id="trackBtn2" onclick="setTrack(2)" class="pushable px-3 py-1 text-xs font-black bg-white text-ink hover:bg-gray-100 border-2 border-ink">
+        2. Buz & Halı Vadisi (200m)
+      </button>
+      <button id="trackBtn3" onclick="setTrack(3)" class="pushable px-3 py-1 text-xs font-black bg-white text-ink hover:bg-gray-100 border-2 border-ink">
+        3. Çılgın Mega Rampa (240m)
+      </button>
+      <button id="trackBtn4" onclick="setTrack(4)" class="pushable px-3 py-1 text-xs font-black bg-white text-ink hover:bg-gray-100 border-2 border-ink">
+        4. Serbest Test Alanı (220m)
+      </button>
+    </div>
+  </div>
+
+  <!-- 3. ANA OYUN & SİMÜLASYON ALANI (PİST MODU) -->
+  <main id="viewTrack" class="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+    
+    <!-- SOL: KONTROL VE FIRLATMA PANELİ (4 Sütun) -->
+    <section class="lg:col-span-4 chunky bg-white p-4 flex flex-col gap-3.5 order-2 lg:order-1">
+      
+      <!-- Hızlı Araç Durum Kartı -->
+      <div class="bg-gradient-to-r from-amber-50 to-orange-50 p-3 rounded-xl border-2 border-ink/40 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div id="hudDriverAvatar" class="w-10 h-10 rounded-xl bg-white border-2 border-ink flex items-center justify-center text-2xl shadow-sm">
+            🐱
+          </div>
+          <div>
+            <div id="hudKartName" class="display text-sm font-black text-ink leading-tight">Süper Pipet Kart</div>
+            <div id="hudChassisInfo" class="text-[11px] font-bold text-gray-500">Kütle: 60g (Ultra Hafif)</div>
+          </div>
+        </div>
+        <button onclick="setMainTab('garage')" class="pushable px-2.5 py-1 bg-white hover:bg-gray-100 text-[11px] font-black text-ink">
+          Modifiye ➔
+        </button>
+      </div>
+
+      <!-- 1. Balon Şişirme & Hava Hacmi -->
+      <div class="bg-sky-50 p-3 rounded-xl border-2 border-ink/40 flex flex-col gap-2">
+        <div class="flex items-center justify-between text-xs font-black text-ink">
+          <span class="flex items-center gap-1.5">
+            <span>🎈</span> Balon Havası (İtki Deposu):
+          </span>
+          <span id="lblAirVal" class="text-sky-800 font-black text-sm">850 ml</span>
+        </div>
+        <input type="range" id="sliderAir" min="200" max="1400" step="50" value="850" class="w-full h-2.5 bg-sky-200 rounded-lg appearance-none cursor-pointer">
+        <div class="flex justify-between text-[10px] font-bold text-gray-500">
+          <span>200 ml (Kısa)</span>
+          <span class="text-sky-700">850 ml (Standart Yarış)</span>
+          <span>1400 ml (Mega Depo)</span>
+        </div>
+        
+        <!-- Hızlı Şişirme Pompası -->
+        <button id="btnQuickPump" onclick="quickPumpAir()" class="pushable w-full py-1.5 bg-sky-400 hover:bg-sky-300 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm">
+          <span>💨</span> <span>Pompaya Bas (+100 ml Şişir)</span>
+        </button>
+      </div>
+
+      <!-- 2. Nozul (Çıkış Ağzı) Çapı -->
+      <div class="bg-amber-50 p-3 rounded-xl border-2 border-ink/40 flex flex-col gap-2">
+        <div class="flex items-center justify-between text-xs font-black text-ink">
+          <span class="flex items-center gap-1.5">
+            <span>⚙️</span> Nozul Çıkış Genişliği:
+          </span>
+          <span id="lblNozzleVal" class="text-amber-900 font-black text-sm">5 mm (Dengeli)</span>
+        </div>
+        <div class="grid grid-cols-3 gap-1.5">
+          <button type="button" onclick="setNozzle(2, '2 mm (Dar - Maraton)')" id="btnNoz1" class="pushable px-1.5 py-1.5 bg-white text-ink text-[11px] font-bold">
+            2 mm (Uzun İtiş)
+          </button>
+          <button type="button" onclick="setNozzle(5, '5 mm (Dengeli)')" id="btnNoz2" class="pushable px-1.5 py-1.5 bg-amber-400 text-ink font-black text-[11px]">
+            5 mm (Dengeli)
+          </button>
+          <button type="button" onclick="setNozzle(9, '9 mm (Geniş - Roket)')" id="btnNoz3" class="pushable px-1.5 py-1.5 bg-white text-ink text-[11px] font-bold">
+            9 mm (Süper İvme)
+          </button>
+        </div>
+        <p class="text-[10px] text-gray-500 font-semibold leading-tight">
+          💡 <b>İpucu:</b> Dar nozül havayı yavaş boşaltarak uzun sürer; geniş nozül ani roket fırlaması sağlar!
+        </p>
+      </div>
+
+      <!-- 3. Yarış Butonları: FIRLAT & SIFIRLA -->
+      <div class="flex flex-col gap-2 pt-1">
+        <button id="btnStartRace" onclick="startRace()" class="pushable w-full py-3.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:opacity-95 text-white display font-black text-lg sm:text-xl flex items-center justify-center gap-2 shadow-md">
+          <span>🏁</span> <span>GAZI KÖKLE & YARIŞ!</span>
+        </button>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button id="btnNitro" onclick="applyNitro()" class="pushable py-2 bg-yellow-400 hover:bg-yellow-300 text-ink font-black text-xs sm:text-sm flex items-center justify-center gap-1 pulse-nitro">
+            <span>⚡</span> <span>NİTRO ÜFLE! (Space)</span>
+          </button>
+          <button id="btnResetRace" onclick="resetRace()" class="pushable py-2 bg-gray-100 hover:bg-gray-200 text-ink font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1">
+            <span>🔄</span> <span>Yeniden Başla</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Pist Açıklaması & Zemin İpucu Rozeti -->
+      <div id="trackInfoBadge" class="p-2.5 rounded-xl border-2 border-ink text-xs font-bold bg-white text-ink flex items-center gap-2 shadow-sm">
+        <span>📍</span>
+        <span id="lblTrackDesc">Parke Koridoru: Pürüzsüz ve hızlı zemin! (Mesafe: 100m)</span>
+      </div>
+
+    </section>
+
+    <!-- SAĞ: 60 FPS CANVAS OYUN EKRANI & HUD (8 Sütun) -->
+    <section class="lg:col-span-8 flex flex-col gap-3 order-1 lg:order-2">
+      
+      <div class="chunky bg-white overflow-hidden relative shadow-lg" style="height: 480px;">
+        <!-- Canvas -->
+        <canvas id="gameCanvas" width="920" height="480" class="w-full h-full block bg-[#ecfeff] cursor-default"></canvas>
+
+        <!-- Canlı Yarış HUD Paneli (Üst Bar) -->
+        <div class="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none">
+          
+          <!-- Hız Göstergesi -->
+          <div class="bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-xl border-2 border-ink shadow-sm flex items-center gap-2">
+            <span class="text-xl">⚡</span>
+            <div>
+              <div class="text-[9px] font-black text-gray-500 uppercase tracking-wider">Hız</div>
+              <div id="hudSpeed" class="display text-base sm:text-lg font-black text-ink leading-none">0 km/s</div>
+            </div>
+          </div>
+
+          <!-- Kalan Hava Barı -->
+          <div class="bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-xl border-2 border-ink shadow-sm flex items-center gap-2 flex-1 max-w-[200px] sm:max-w-xs">
+            <span class="text-xl">🎈</span>
+            <div class="flex-1">
+              <div class="flex justify-between text-[9px] font-black text-gray-500">
+                <span>Hava İtisi</span>
+                <span id="hudAirPct">100%</span>
+              </div>
+              <div class="w-full bg-gray-200 h-2.5 rounded-full border border-ink/40 overflow-hidden mt-0.5">
+                <div id="hudAirBar" class="h-full bg-sky-500 w-full transition-all duration-75"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sıralama & Konum -->
+          <div class="bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-xl border-2 border-ink shadow-sm flex items-center gap-1.5">
+            <span id="hudRankIcon" class="text-xl">🥇</span>
+            <div>
+              <div class="text-[9px] font-black text-gray-500 uppercase tracking-wider">Sıralama</div>
+              <div id="hudRankText" class="display text-base font-black text-ink leading-none">1. Sıra</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Mini Pist İlerleme Barı (Alt Kısım) -->
+        <div class="absolute bottom-3 left-4 right-4 bg-white/90 backdrop-blur-sm p-2 rounded-xl border-2 border-ink shadow-md flex items-center gap-2 pointer-events-none">
+          <span class="text-xs font-black text-ink">🏁 0m</span>
+          <div class="flex-1 relative h-3 bg-gray-200 rounded-full border border-ink/40">
+            <!-- Rakip 1 İğnesi -->
+            <div id="miniPinRival1" class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 text-xs" style="left: 0%;">🐌</div>
+            <!-- Rakip 2 İğnesi -->
+            <div id="miniPinRival2" class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 text-xs" style="left: 0%;">🐥</div>
+            <!-- Oyuncu İğnesi -->
+            <div id="miniPinPlayer" class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 text-sm z-10" style="left: 0%;">🏎️</div>
+          </div>
+          <span id="lblTrackTargetDist" class="text-xs font-black text-ink">100m 🏆</span>
+        </div>
+
+        <!-- Başlangıç Geri Sayım Rozeti (Büyük Ekran Ortası) -->
+        <div id="countdownOverlay" class="absolute inset-0 bg-ink/40 backdrop-blur-[2px] flex items-center justify-center hidden z-30">
+          <div id="countdownText" class="display text-7xl sm:text-8xl font-black text-yellow-400 drop-shadow-[0_6px_0_#0f172a] transform scale-100 transition-transform">
+            3
+          </div>
+        </div>
+
+        <!-- Dokunmatik Direksiyon & Gaz Butonları (Arcade Sürüş Kontrolleri) -->
+        <div class="absolute bottom-14 left-3 flex flex-col gap-2 z-20 select-none">
+          <button id="btnSteerUp" type="button" class="pushable px-3 sm:px-4 py-2 bg-sky-100/95 hover:bg-sky-200 text-ink font-black text-xs sm:text-sm flex items-center gap-1.5 backdrop-blur-sm border-2 border-ink shadow-hard-sm active:translate-y-0.5">
+            <span class="text-base sm:text-lg">⬆️</span> <span>ÜST ŞERİT</span>
+          </button>
+          <button id="btnSteerDown" type="button" class="pushable px-3 sm:px-4 py-2 bg-sky-100/95 hover:bg-sky-200 text-ink font-black text-xs sm:text-sm flex items-center gap-1.5 backdrop-blur-sm border-2 border-ink shadow-hard-sm active:translate-y-0.5">
+            <span class="text-base sm:text-lg">⬇️</span> <span>ALT ŞERİT</span>
+          </button>
+        </div>
+
+        <div class="absolute bottom-14 right-3 flex flex-col items-end gap-2 z-20 select-none">
+          <button id="btnGasPedal" type="button" class="pushable px-4 sm:px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white font-black text-xs sm:text-sm flex items-center gap-1.5 border-2 border-ink shadow-hard-sm active:scale-95 touch-none">
+            <span class="text-base sm:text-lg">🦶</span> <span id="lblGasPedal">GAZ BAS (Tut)</span>
+          </button>
+          <button id="btnNitroAction" type="button" onclick="applyNitro()" class="pushable px-3 sm:px-4 py-1.5 bg-yellow-400 hover:bg-yellow-300 text-ink font-black text-xs flex items-center gap-1 border-2 border-ink shadow-hard-sm active:scale-95 pulse-nitro">
+            <span>⚡</span> <span>NİTRO (Space)</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Çocuk Kontrol Banner'ı (Nasıl Oynanır) -->
+      <div class="bg-gradient-to-r from-amber-100 via-yellow-50 to-emerald-100 border-2 border-ink rounded-xl p-2 sm:p-2.5 flex items-center justify-between gap-2 text-xs font-black text-ink shadow-sm">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-lg">🎮</span>
+          <span class="bg-white px-2 py-0.5 rounded border border-ink shadow-sm"><b>Şerit Değiştir:</b> <kbd class="bg-gray-100 px-1 rounded">W / ↑</kbd> Üst · <kbd class="bg-gray-100 px-1 rounded">S / ↓</kbd> Alt</span>
+          <span class="bg-white px-2 py-0.5 rounded border border-ink shadow-sm"><b>Gaz:</b> <kbd class="bg-gray-100 px-1 rounded">Boşluk / Butona Tut</kbd></span>
+          <span class="text-amber-900">🎈 Hava tüplerini topla · 🟤 Çamur ve taşlardan kaç!</span>
+        </div>
+        <span class="hidden lg:inline-block px-2.5 py-1 bg-emerald-500 text-white text-[11px] font-black rounded-lg border border-ink shadow-sm">
+          Sen Yönet! 🏎️
+        </span>
+      </div>
+
+      <!-- Alt Hızlı Bilgi Şeridi -->
+      <div class="grid grid-cols-3 gap-2">
+        <div class="bg-white p-2.5 rounded-xl border-2 border-ink text-center">
+          <span class="text-[10px] font-bold text-gray-500 block">Kuvvet (Newton)</span>
+          <span id="statThrust" class="display text-sm sm:text-base font-black text-sky-700">0.0 N</span>
+        </div>
+        <div class="bg-white p-2.5 rounded-xl border-2 border-ink text-center">
+          <span class="text-[10px] font-bold text-gray-500 block">İvme (a = F / m)</span>
+          <span id="statAccel" class="display text-sm sm:text-base font-black text-emerald-700">0.0 m/s²</span>
+        </div>
+        <div class="bg-white p-2.5 rounded-xl border-2 border-ink text-center">
+          <span class="text-[10px] font-bold text-gray-500 block">Kat Edilen Yol</span>
+          <span id="statDistance" class="display text-sm sm:text-base font-black text-purple-700">0.0 m</span>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- 4. GARAJ & MODİFİYE ATÖLYESİ EKRANI (SEKME MODU) -->
+  <section id="viewGarage" class="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-start hidden">
+    
+    <!-- SOL: 3D-benzeri Canlı Araba Önizleme Sahnesi -->
+    <div class="lg:col-span-6 chunky bg-white p-6 flex flex-col items-center justify-center gap-4">
+      <h2 class="display text-2xl font-black text-ink flex items-center gap-2">
+        <span>🛠️</span> <span>Mucit Garajı: Kart Tasarımı</span>
+      </h2>
+      <p class="text-xs font-bold text-gray-500 text-center max-w-md">
+        Parçaları değiştirerek arabanın ağırlığını, tekerlek sürtünmesini ve hava çıkış gücünü ayarla!
+      </p>
+
+      <!-- Büyük Kart Çizimi (SVG) -->
+      <div class="w-full max-w-sm h-64 bg-gradient-to-b from-sky-50 to-amber-50 rounded-2xl border-3 border-ink flex items-center justify-center p-4 relative overflow-hidden shadow-inner">
+        <svg id="garageKartSvg" width="320" height="200" viewBox="0 0 320 200" class="sticker">
+          <!-- Zemin Çizgisi -->
+          <line x1="20" y1="160" x2="300" y2="160" stroke="#0f172a" stroke-width="4" stroke-linecap="round" />
+          
+          <!-- Balon (Arka Taraf) -->
+          <g id="svgBalloonGroup">
+            <ellipse id="svgBalloon" cx="95" cy="85" rx="65" ry="48" fill="#ef4444" stroke="#0f172a" stroke-width="3" />
+            <path id="svgBalloonHighlight" d="M60 65 Q85 50 115 65" stroke="#ffffff" stroke-width="4" fill="none" opacity="0.6" stroke-linecap="round" />
+            <!-- Balon Ağzı & Bağlantı Pipeti -->
+            <polygon points="160,85 175,78 175,92" fill="#ef4444" stroke="#0f172a" stroke-width="2" />
+            <rect id="svgNozzle" x="175" y="80" width="35" height="10" rx="2" fill="#facc15" stroke="#0f172a" stroke-width="2.5" />
+          </g>
+
+          <!-- Şasi Gövdesi -->
+          <rect id="svgChassis" x="110" y="115" width="130" height="24" rx="6" fill="#fde047" stroke="#0f172a" stroke-width="3.5" />
+
+          <!-- Sürücü Karakteri -->
+          <text id="svgDriver" x="170" y="110" font-size="36" text-anchor="middle">🐱</text>
+
+          <!-- Arka Tekerlek -->
+          <circle id="svgWheelBack" cx="135" cy="148" r="18" fill="#e2e8f0" stroke="#0f172a" stroke-width="3" />
+          <circle id="svgWheelBackRim" cx="135" cy="148" r="7" fill="#facc15" />
+
+          <!-- Ön Tekerlek -->
+          <circle id="svgWheelFront" cx="215" cy="148" r="18" fill="#e2e8f0" stroke="#0f172a" stroke-width="3" />
+          <circle id="svgWheelFrontRim" cx="215" cy="148" r="7" fill="#facc15" />
+        </svg>
+
+        <span class="absolute bottom-2 right-3 px-2 py-0.5 bg-white/90 border border-ink rounded text-[10px] font-black">
+          Önizleme
+        </span>
+      </div>
+
+      <!-- Dinamik Kart Özellikleri Özet Kartı -->
+      <div class="w-full grid grid-cols-3 gap-2">
+        <div class="bg-gray-50 p-2.5 rounded-xl border-2 border-ink text-center">
+          <span class="text-[10px] font-bold text-gray-500 block">Toplam Kütle ($m$)</span>
+          <span id="lblGarageMass" class="display text-base font-black text-ink">60 g</span>
+        </div>
+        <div class="bg-gray-50 p-2.5 rounded-xl border-2 border-ink text-center">
+          <span class="text-[10px] font-bold text-gray-500 block">Başlangıç İvmesi ($a$)</span>
+          <span id="lblGarageAccel" class="display text-base font-black text-emerald-600">Yüksek</span>
+        </div>
+        <div class="bg-gray-50 p-2.5 rounded-xl border-2 border-ink text-center">
+          <span class="text-[10px] font-bold text-gray-500 block">Yol Tutuşu ($\mu$)</span>
+          <span id="lblGarageGrip" class="display text-base font-black text-sky-600">Hızlı Disk</span>
+        </div>
+      </div>
+
+      <button onclick="setMainTab('track')" class="pushable w-full py-3 bg-emerald-400 hover:bg-emerald-300 text-ink display font-black text-base flex items-center justify-center gap-2">
+        <span>🏁</span> <span>Bu Araçla Yarışa Başla!</span>
+      </button>
+    </div>
+
+    <!-- SAĞ: MODİFİYE SEÇENEKLERİ -->
+    <div class="lg:col-span-6 chunky bg-white p-6 flex flex-col gap-4">
+      
+      <!-- 1. Şasi Seçimi (Kütle ve Ağırlık) -->
+      <div>
+        <label class="display text-sm font-black text-ink block mb-1.5 flex items-center gap-1.5">
+          <span>🏎️</span> 1. Şasi & Ağırlık Seçimi ($m$):
+        </label>
+        <div class="grid grid-cols-3 gap-2">
+          <button onclick="selectChassis('straw')" id="btnChassisStraw" class="pushable p-2.5 bg-yellow-300 text-ink text-left">
+            <div class="font-black text-xs">Pipet Şasi</div>
+            <div class="text-[10px] font-bold text-gray-700">60g (Çok Hafif)</div>
+            <div class="text-[9px] text-emerald-700 font-black mt-1">Hızlı Kalkış ⚡</div>
+          </button>
+          <button onclick="selectChassis('plastic')" id="btnChassisPlastic" class="pushable p-2.5 bg-white text-ink hover:bg-gray-100 text-left">
+            <div class="font-black text-xs">Plastik Şasi</div>
+            <div class="text-[10px] font-bold text-gray-700">120g (Dengeli)</div>
+            <div class="text-[9px] text-sky-700 font-black mt-1">İdeal Yarış 🏎️</div>
+          </button>
+          <button onclick="selectChassis('wood')" id="btnChassisWood" class="pushable p-2.5 bg-white text-ink hover:bg-gray-100 text-left">
+            <div class="font-black text-xs">Ahşap Şasi</div>
+            <div class="text-[10px] font-bold text-gray-700">200g (Ağır)</div>
+            <div class="text-[9px] text-purple-700 font-black mt-1">Büyük Momentum 🚀</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. Tekerlek Tipi (Sürtünme) -->
+      <div>
+        <label class="display text-sm font-black text-ink block mb-1.5 flex items-center gap-1.5">
+          <span>🛞</span> 2. Tekerlek & Zemin Tutuşu ($\mu$):
+        </label>
+        <div class="grid grid-cols-3 gap-2">
+          <button onclick="selectWheel('disk')" id="btnWheelDisk" class="pushable p-2.5 bg-yellow-300 text-ink text-left">
+            <div class="font-black text-xs">Yarış Diski</div>
+            <div class="text-[10px] font-bold text-gray-700">Düşük Sürtünme</div>
+            <div class="text-[9px] text-emerald-700 font-black mt-1">Düzde Uçar 💨</div>
+          </button>
+          <button onclick="selectWheel('rubber')" id="btnWheelRubber" class="pushable p-2.5 bg-white text-ink hover:bg-gray-100 text-left">
+            <div class="font-black text-xs">Kauçuk Lastik</div>
+            <div class="text-[10px] font-bold text-gray-700">Standart Tutuş</div>
+            <div class="text-[9px] text-sky-700 font-black mt-1">Dengeli 🛞</div>
+          </button>
+          <button onclick="selectWheel('allterrain')" id="btnWheelTerrain" class="pushable p-2.5 bg-white text-ink hover:bg-gray-100 text-left">
+            <div class="font-black text-xs">Dişli Dağ</div>
+            <div class="text-[10px] font-bold text-gray-700">Yüksek Tutuş</div>
+            <div class="text-[9px] text-orange-700 font-black mt-1">Halıda Güçlü 🧶</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. Balon Rengi -->
+      <div>
+        <label class="display text-sm font-black text-ink block mb-1.5 flex items-center gap-1.5">
+          <span>🎨</span> 3. Balon Rengi:
+        </label>
+        <div class="flex items-center gap-3">
+          <button onclick="selectBalloonColor('#ef4444')" class="w-9 h-9 rounded-xl bg-red-500 border-2 border-ink shadow-sm hover:scale-110 transition-transform"></button>
+          <button onclick="selectBalloonColor('#38bdf8')" class="w-9 h-9 rounded-xl bg-sky-400 border-2 border-ink shadow-sm hover:scale-110 transition-transform"></button>
+          <button onclick="selectBalloonColor('#facc15')" class="w-9 h-9 rounded-xl bg-yellow-400 border-2 border-ink shadow-sm hover:scale-110 transition-transform"></button>
+          <button onclick="selectBalloonColor('#10b981')" class="w-9 h-9 rounded-xl bg-emerald-500 border-2 border-ink shadow-sm hover:scale-110 transition-transform"></button>
+          <button onclick="selectBalloonColor('#a855f7')" class="w-9 h-9 rounded-xl bg-purple-500 border-2 border-ink shadow-sm hover:scale-110 transition-transform"></button>
+        </div>
+      </div>
+
+      <!-- 4. Pilot Karakteri -->
+      <div>
+        <label class="display text-sm font-black text-ink block mb-1.5 flex items-center gap-1.5">
+          <span>🐱</span> 4. Kart Sürücüsü:
+        </label>
+        <div class="grid grid-cols-4 gap-2">
+          <button onclick="selectDriver('🐱', 'Mucit Kedi')" id="btnDriverCat" class="pushable p-2 bg-yellow-300 text-center">
+            <div class="text-2xl">🐱</div>
+            <div class="text-[10px] font-black">Kedi</div>
+          </button>
+          <button onclick="selectDriver('🐰', 'Roket Tavşan')" id="btnDriverRabbit" class="pushable p-2 bg-white hover:bg-gray-100 text-center">
+            <div class="text-2xl">🐰</div>
+            <div class="text-[10px] font-black">Tavşan</div>
+          </button>
+          <button onclick="selectDriver('🐼', 'Turbo Panda')" id="btnDriverPanda" class="pushable p-2 bg-white hover:bg-gray-100 text-center">
+            <div class="text-2xl">🐼</div>
+            <div class="text-[10px] font-black">Panda</div>
+          </button>
+          <button onclick="selectDriver('🧑‍🔬', 'Küçük Mucit')" id="btnDriverScientist" class="pushable p-2 bg-white hover:bg-gray-100 text-center">
+            <div class="text-2xl">🧑‍🔬</div>
+            <div class="text-[10px] font-black">Mucit</div>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- 5. YARIŞ SONUCU VE PODYUM MODALI -->
+  <div id="resultModal" class="fixed inset-0 bg-ink/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="chunky bg-white max-w-md w-full p-6 flex flex-col items-center text-center gap-4 relative animate-scale-up">
+      
+      <div id="resultIcon" class="text-6xl animate-bounce">
+        🏆
+      </div>
+      
+      <div>
+        <h3 id="resultTitle" class="display text-3xl font-black text-ink">
+          1. Oldun! Tebrikler!
+        </h3>
+        <p id="resultDesc" class="text-xs sm:text-sm text-gray-700 font-bold mt-1">
+          Newton 3. Yasası'nın müthiş itişiyle pisti rekor sürede tamamladın!
+        </p>
+      </div>
+
+      <!-- İstatistikler -->
+      <div class="w-full grid grid-cols-3 gap-2 bg-amber-50 p-3 rounded-xl border-2 border-ink">
+        <div>
+          <span class="text-[10px] font-bold text-gray-500 block">Süre</span>
+          <span id="resTime" class="display text-base font-black text-ink">4.2 sn</span>
+        </div>
+        <div>
+          <span class="text-[10px] font-bold text-gray-500 block">Maks Hız</span>
+          <span id="resTopSpeed" class="display text-base font-black text-sky-700">68 km/s</span>
+        </div>
+        <div>
+          <span class="text-[10px] font-bold text-gray-500 block">Kazanılan</span>
+          <span id="resTrophyPoints" class="display text-base font-black text-red-600">+1 Kupa</span>
+        </div>
+      </div>
+
+      <!-- Bilimsel Çıkarım Kutusu -->
+      <div class="bg-sky-50 p-3 rounded-xl border-2 border-ink text-left w-full">
+        <span class="text-[10px] font-black text-sky-900 uppercase tracking-wider block mb-1">🔬 Fen Kuralı Açıklaması:</span>
+        <p id="resScienceText" class="text-xs text-sky-950 font-bold leading-relaxed">
+          Balonun arkasından fışkıran basınçlı hava ($F_{\text{etki}}$), arabayı eşit büyüklükte ve zıt yönde ileri doğru itti ($F_{\text{tepki}}$)!
+        </p>
+      </div>
+
+      <!-- Butonlar -->
+      <div class="flex items-center gap-2 w-full pt-1">
+        <button onclick="nextTrack()" class="pushable flex-1 py-3 bg-emerald-400 hover:bg-emerald-300 text-ink font-black text-sm flex items-center justify-center gap-1.5 shadow-sm">
+          <span>🏁</span> <span>Sonraki Piste Geç!</span>
+        </button>
+        <button onclick="closeResultModal()" class="pushable px-4 py-3 bg-gray-100 hover:bg-gray-200 text-ink font-bold text-xs">
+          Tekrar Dene
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 6. BİLİM REHBERİ (NASIL ÇALIŞIR?) MODALI -->
+  <div id="scienceModal" class="fixed inset-0 bg-ink/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="chunky bg-white max-w-lg w-full p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b-2 border-ink/20 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-3xl">💡</span>
+          <h3 class="display text-xl font-black text-ink">Balonlu Roket Kart Bilimi</h3>
+        </div>
+        <button onclick="closeScienceModal()" class="pushable w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 text-red-700 font-black text-sm flex items-center justify-center">
+          ✕
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs sm:text-sm text-gray-700 leading-relaxed font-semibold">
+        <div class="bg-red-50 p-3 rounded-xl border-2 border-ink">
+          <h4 class="font-black text-ink text-sm flex items-center gap-1 mb-1">
+            <span>🚀</span> 1. Newton'un 3. Hareket Yasası (Etki - Tepki)
+          </h4>
+          <p>
+            Her etkiye karşılık eşit büyüklükte ve zıt yönde bir tepki kuvveti vardır. Balonun içindeki sıkışmış hava nozülden <b>arkaya doğru fışkırırken (Etki)</b>, havayı iten kuvvet arabayı <b>aynı güçle ileri fırlatır (Tepki)</b>!
+          </p>
+        </div>
+
+        <div class="bg-amber-50 p-3 rounded-xl border-2 border-ink">
+          <h4 class="font-black text-ink text-sm flex items-center gap-1 mb-1">
+            <span>⚖️</span> 2. Kütle ve İvme İlişkisi ($F = m \cdot a$)
+          </h4>
+          <p>
+            Hafif bir pipet kart (60g), aynı balon itkisiyle çok daha hızlı ivmelenir ($a$ büyüktür). Ancak ağır bir ahşap kart (200g) yavaş hızlansa da momentumu yüksektir ($p = m \cdot v$) ve sürtünmeli zeminlerde hemen durmaz!
+          </p>
+        </div>
+
+        <div class="bg-sky-50 p-3 rounded-xl border-2 border-ink">
+          <h4 class="font-black text-ink text-sm flex items-center gap-1 mb-1">
+            <span>🧊</span> 3. Zemin Sürtünmesi ($\mu$)
+          </h4>
+          <p>
+            <b>Buz Pistinde:</b> Sürtünme neredeyse sıfırdır, araba kayarak minimum enerji kaybeder.<br>
+            <b>Halı Pisti:</b> Pürüzlü yüzey tekerleklerin dönmesini zorlaştırır, arabayı hızla yavaşlatır.
+          </p>
+        </div>
+      </div>
+
+      <button onclick="closeScienceModal()" class="pushable w-full py-2.5 bg-yellow-300 hover:bg-yellow-400 text-ink font-black text-sm">
+        Anladım, Yarışa Dönelim! 🚀
+      </button>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT OYUN MOTORU -->
+  <script>
+    // ==========================================
+    // 1. WEB AUDIO API SES MOTORU (PROSEDÜREL SESLER)
+    // ==========================================
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      beep(freq = 440, type = 'sine', duration = 0.1, gainVal = 0.2) {
+        if (!this.enabled) return;
+        this.init();
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {}
+      }
+      airRush() {
+        if (!this.enabled) return;
+        this.init();
+        try {
+          // Beyaz gürültü ile fıslayan jet havası
+          const bufferSize = this.ctx.sampleRate * 0.3;
+          const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+          const noise = this.ctx.createBufferSource();
+          noise.buffer = buffer;
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(1200, this.ctx.currentTime);
+          filter.Q.setValueAtTime(2, this.ctx.currentTime);
+
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.ctx.destination);
+          noise.start();
+        } catch (e) {}
+      }
+      nitro() {
+        this.beep(600, 'triangle', 0.15, 0.3);
+        setTimeout(() => this.beep(900, 'sine', 0.25, 0.4), 80);
+      }
+      laneChange() {
+        if (!this.enabled) return;
+        this.init();
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(560, this.ctx.currentTime + 0.08);
+          gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.08);
+        } catch (e) {}
+      }
+      itemPickup() {
+        if (!this.enabled) return;
+        this.init();
+        try {
+          const notes = [587, 880];
+          notes.forEach((freq, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime + i * 0.06);
+            gain.gain.setValueAtTime(0.25, this.ctx.currentTime + i * 0.06);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + i * 0.06 + 0.11);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(this.ctx.currentTime + i * 0.06);
+            osc.stop(this.ctx.currentTime + i * 0.06 + 0.11);
+          });
+        } catch (e) {}
+      }
+      obstacleHit() {
+        if (!this.enabled) return;
+        this.init();
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(160, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.18);
+          gain.gain.setValueAtTime(0.28, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.18);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.18);
+        } catch (e) {}
+      }
+      boostPad() {
+        if (!this.enabled) return;
+        this.init();
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(980, this.ctx.currentTime + 0.2);
+          gain.gain.setValueAtTime(0.22, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.2);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.2);
+        } catch (e) {}
+      }
+      countdown(final = false) {
+        if (final) {
+          this.beep(880, 'sine', 0.4, 0.4);
+        } else {
+          this.beep(440, 'sine', 0.15, 0.3);
+        }
+      }
+      victory() {
+        const notes = [523, 659, 784, 1046];
+        notes.forEach((n, i) => {
+          setTimeout(() => this.beep(n, 'triangle', 0.3, 0.35), i * 140);
+        });
+      }
+    }
+    const sounds = new SoundEngine();
+
+    document.getElementById('btnToggleSound').addEventListener('click', () => {
+      sounds.enabled = !sounds.enabled;
+      document.getElementById('soundIcon').textContent = sounds.enabled ? '🔊' : '🔇';
+    });
+
+    // ==========================================
+    // 2. OYUN DEĞİŞKENLERİ & MODİFİYE PARAMETRELERİ
+    // ==========================================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // 3 Şeritli Pist Geometrisi (Arcade Yol Düzeni)
+    const ROAD_TOP = 210;
+    const ROAD_BOTTOM = 440;
+    const LANE_Y = [250, 325, 400]; // 0: Üst Şerit, 1: Orta Şerit, 2: Alt Şerit
+    let isGasActive = false;
+    let playerScore = 0;
+    const floatingTexts = [];
+
+    // Oyuncu Kartı Ayarları
+    const playerKart = {
+      x: 10,            // metre cinsinden konum (başlangıç çizgisi)
+      vx: 0,            // hız (m/s)
+      ax: 0,            // ivme (m/s^2)
+      lane: 1,          // Başlangıç: Orta Şerit (0, 1, 2)
+      y: 325,           // dikey piksel konumu
+      targetY: 325,     // hedeflenen şerit pikseli (yumuşak geçiş)
+      tiltAngle: 0,     // şerit değiştirirken yatma açısı (radyan)
+      airVolume: 850,   // ml
+      maxAir: 850,      // ml
+      chassis: 'straw', // 'straw' (60g), 'plastic' (120g), 'wood' (200g)
+      mass: 0.06,       // kg (60g)
+      wheel: 'disk',    // 'disk' (0.04), 'rubber' (0.07), 'allterrain' (0.1)
+      wheelFriction: 0.038,
+      nozzleSize: 5,    // mm (2, 5, 9)
+      color: '#ef4444', // Balon rengi
+      driverIcon: '🐱',
+      driverName: 'Mucit Kedi',
+      state: 'idle',    // 'idle', 'countdown', 'racing', 'finished'
+      rank: 1,
+      wheelAngle: 0,
+      finishTime: 0,
+      mudTimer: 0,      // çamur yavaşlatma süresi
+      boostTimer: 0     // turbo depar süresi
+    };
+
+    // Rakip Kartlar (Yarış Heyecanı İçin 2 Sevimli AI Kart)
+    const rivals = [
+      {
+        id: 'rival1',
+        name: 'Turbo Salyangoz',
+        icon: '🐌',
+        color: '#10b981',
+        x: 10,
+        vx: 0,
+        ax: 0,
+        lane: 0,
+        y: 250,
+        targetY: 250,
+        tiltAngle: 0,
+        mass: 0.16, // Ağır şasi, yavaş kalkış ama büyük hava
+        airVolume: 950,
+        maxAir: 950,
+        nozzleSize: 4,
+        wheelFriction: 0.040,
+        rank: 2,
+        wheelAngle: 0,
+        mudTimer: 0,
+        boostTimer: 0,
+        laneChangeCooldown: 2.2
+      },
+      {
+        id: 'rival2',
+        name: 'Robot Civciv',
+        icon: '🐥',
+        color: '#facc15',
+        x: 10,
+        vx: 0,
+        ax: 0,
+        lane: 2,
+        y: 400,
+        targetY: 400,
+        tiltAngle: 0,
+        mass: 0.09, // Hafif, orta nozul
+        airVolume: 750,
+        maxAir: 750,
+        nozzleSize: 6,
+        wheelFriction: 0.038,
+        rank: 3,
+        wheelAngle: 0,
+        mudTimer: 0,
+        boostTimer: 0,
+        laneChangeCooldown: 3.2
+      }
+    ];
+
+    // Seviyeler & Pistler (15 - 25 Saniyelik 3 Şeritli Zengin Yarışlar)
+    let currentTrack = 1;
+    const TRACKS = {
+      1: {
+        name: "Okul Koridoru",
+        desc: "Pürüzsüz Parke: Düz ve akıcı 3 şerit! (Hedef: 150m)",
+        distance: 150, // metre (~18-22 saniye yarış)
+        surfaceType: 'parquet',
+        baseFriction: 0.038,
+        zones: [],
+        items: [
+          { id: 't1_1', x: 20, lane: 0, type: 'air', collected: false },
+          { id: 't1_2', x: 22, lane: 1, type: 'mud', collected: false },
+          { id: 't1_3', x: 25, lane: 2, type: 'star', collected: false },
+          { id: 't1_4', x: 40, lane: 0, type: 'rock', collected: false },
+          { id: 't1_5', x: 42, lane: 1, type: 'boost', collected: false },
+          { id: 't1_6', x: 45, lane: 2, type: 'air', collected: false },
+          { id: 't1_7', x: 62, lane: 0, type: 'boost', collected: false },
+          { id: 't1_8', x: 65, lane: 1, type: 'star', collected: false },
+          { id: 't1_9', x: 68, lane: 2, type: 'mud', collected: false },
+          { id: 't1_10', x: 85, lane: 0, type: 'air', collected: false },
+          { id: 't1_11', x: 88, lane: 1, type: 'mud', collected: false },
+          { id: 't1_12', x: 92, lane: 2, type: 'star', collected: false },
+          { id: 't1_13', x: 108, lane: 0, type: 'star', collected: false },
+          { id: 't1_14', x: 110, lane: 1, type: 'rock', collected: false },
+          { id: 't1_15', x: 112, lane: 2, type: 'boost', collected: false },
+          { id: 't1_16', x: 128, lane: 0, type: 'boost', collected: false },
+          { id: 't1_17', x: 130, lane: 1, type: 'air', collected: false },
+          { id: 't1_18', x: 133, lane: 2, type: 'mud', collected: false }
+        ]
+      },
+      2: {
+        name: "Buz & Halı Vadisi",
+        desc: "Dikkat: Halıda sürtünme artar, buzda süper kayar! (Hedef: 200m)",
+        distance: 200, // (~20-25 saniye yarış)
+        surfaceType: 'mixed',
+        baseFriction: 0.038,
+        zones: [
+          { start: 40, end: 90, type: 'carpet', label: '🧶 Halı Şeridi (Yüksek Sürtünme)', friction: 0.12, color: '#fbcfe8' },
+          { start: 110, end: 165, type: 'ice', label: '🧊 Buz Şeridi (Sıfır Sürtünme!)', friction: 0.008, color: '#bae6fd' }
+        ],
+        items: [
+          { id: 't2_1', x: 20, lane: 0, type: 'star', collected: false },
+          { id: 't2_2', x: 23, lane: 1, type: 'air', collected: false },
+          { id: 't2_3', x: 26, lane: 2, type: 'mud', collected: false },
+          { id: 't2_4', x: 48, lane: 0, type: 'boost', collected: false },
+          { id: 't2_5', x: 52, lane: 1, type: 'mud', collected: false },
+          { id: 't2_6', x: 56, lane: 2, type: 'air', collected: false },
+          { id: 't2_7', x: 72, lane: 0, type: 'air', collected: false },
+          { id: 't2_8', x: 75, lane: 1, type: 'rock', collected: false },
+          { id: 't2_9', x: 78, lane: 2, type: 'star', collected: false },
+          { id: 't2_10', x: 96, lane: 1, type: 'boost', collected: false },
+          { id: 't2_11', x: 115, lane: 0, type: 'oil', collected: false },
+          { id: 't2_12', x: 118, lane: 1, type: 'boost', collected: false },
+          { id: 't2_13', x: 122, lane: 2, type: 'air', collected: false },
+          { id: 't2_14', x: 142, lane: 0, type: 'star', collected: false },
+          { id: 't2_15', x: 145, lane: 1, type: 'oil', collected: false },
+          { id: 't2_16', x: 148, lane: 2, type: 'boost', collected: false },
+          { id: 't2_17', x: 172, lane: 0, type: 'air', collected: false },
+          { id: 't2_18', x: 175, lane: 1, type: 'mud', collected: false },
+          { id: 't2_19', x: 178, lane: 2, type: 'star', collected: false }
+        ]
+      },
+      3: {
+        name: "Çılgın Mega Rampa",
+        desc: "Dev rampa ve zıplama platformu! (Hedef: 240m)",
+        distance: 240, // (~25-30 saniye yarış)
+        surfaceType: 'ramps',
+        baseFriction: 0.038,
+        zones: [
+          { start: 55, end: 85, type: 'ramp', label: '🚀 Fırlatma Rampası', friction: 0.03, isRamp: true, color: '#fed7aa' },
+          { start: 115, end: 170, type: 'ice', label: '🧊 Süper Buz Pisti', friction: 0.008, color: '#bae6fd' },
+          { start: 190, end: 220, type: 'carpet', label: '🧶 Halı Virajı', friction: 0.11, color: '#fbcfe8' }
+        ],
+        items: [
+          { id: 't3_1', x: 22, lane: 0, type: 'boost', collected: false },
+          { id: 't3_2', x: 25, lane: 1, type: 'mud', collected: false },
+          { id: 't3_3', x: 28, lane: 2, type: 'air', collected: false },
+          { id: 't3_4', x: 52, lane: 1, type: 'boost', collected: false },
+          { id: 't3_5', x: 54, lane: 0, type: 'star', collected: false },
+          { id: 't3_6', x: 78, lane: 1, type: 'air', collected: false },
+          { id: 't3_7', x: 94, lane: 0, type: 'mud', collected: false },
+          { id: 't3_8', x: 97, lane: 2, type: 'star', collected: false },
+          { id: 't3_9', x: 122, lane: 0, type: 'boost', collected: false },
+          { id: 't3_10', x: 125, lane: 1, type: 'oil', collected: false },
+          { id: 't3_11', x: 128, lane: 2, type: 'air', collected: false },
+          { id: 't3_12', x: 152, lane: 0, type: 'rock', collected: false },
+          { id: 't3_13', x: 155, lane: 1, type: 'boost', collected: false },
+          { id: 't3_14', x: 158, lane: 2, type: 'star', collected: false },
+          { id: 't3_15', x: 188, lane: 0, type: 'air', collected: false },
+          { id: 't3_16', x: 192, lane: 1, type: 'mud', collected: false },
+          { id: 't3_17', x: 198, lane: 2, type: 'boost', collected: false },
+          { id: 't3_18', x: 218, lane: 1, type: 'air', collected: false }
+        ]
+      },
+      4: {
+        name: "Serbest Test Laboratuvarı",
+        desc: "İstediğin gibi test et, sınırları zorla! (Hedef: 220m)",
+        distance: 220,
+        surfaceType: 'sandbox',
+        baseFriction: 0.038,
+        zones: [
+          { start: 60, end: 140, type: 'carpet', label: '🧶 Test Halısı', friction: 0.11, color: '#fef08a' }
+        ],
+        items: [
+          { id: 't4_1', x: 25, lane: 0, type: 'air', collected: false },
+          { id: 't4_2', x: 28, lane: 1, type: 'boost', collected: false },
+          { id: 't4_3', x: 32, lane: 2, type: 'mud', collected: false },
+          { id: 't4_4', x: 56, lane: 0, type: 'star', collected: false },
+          { id: 't4_5', x: 60, lane: 1, type: 'rock', collected: false },
+          { id: 't4_6', x: 64, lane: 2, type: 'air', collected: false },
+          { id: 't4_7', x: 88, lane: 0, type: 'boost', collected: false },
+          { id: 't4_8', x: 92, lane: 1, type: 'air', collected: false },
+          { id: 't4_9', x: 96, lane: 2, type: 'mud', collected: false },
+          { id: 't4_10', x: 120, lane: 0, type: 'rock', collected: false },
+          { id: 't4_11', x: 124, lane: 1, type: 'boost', collected: false },
+          { id: 't4_12', x: 128, lane: 2, type: 'star', collected: false },
+          { id: 't4_13', x: 156, lane: 0, type: 'air', collected: false },
+          { id: 't4_14', x: 160, lane: 1, type: 'mud', collected: false },
+          { id: 't4_15', x: 165, lane: 2, type: 'boost', collected: false },
+          { id: 't4_16', x: 190, lane: 1, type: 'air', collected: false },
+          { id: 't4_17', x: 205, lane: 0, type: 'star', collected: false }
+        ]
+      }
+    };
+
+    let trophies = 0;
+    let raceStartTime = 0;
+    let cameraX = 0;
+    const PIXELS_PER_METER = 7.5; // Canvas ölçeği
+
+    // Parçacıklar (Egzoz Havası, Toz, Kıvılcım)
+    const particles = [];
+
+    // ==========================================
+    // 3. FİZİK MOTORU & KUVVET HESAPLAMALARI
+    // ==========================================
+    function updatePhysics(dt) {
+      if (playerKart.state !== 'racing') return;
+
+      const track = TRACKS[currentTrack];
+
+      // --- OYUNCU ARABASI GÜNCELLEMESİ ---
+      updateKartPhysics(playerKart, dt, track);
+
+      // --- RAKİP ARABALAR GÜNCELLEMESİ & YAPAY ZEKA ŞERİT TERCİHİ ---
+      rivals.forEach(rival => {
+        updateKartPhysics(rival, dt, track);
+        updateRivalAI(rival, dt, track);
+      });
+
+      // --- ŞERİT ÖDÜLLERİ VE ENGELLERİ ÇARPIŞMA KONTROLÜ ---
+      checkTrackItemsCollision(track);
+
+      // --- SIRALAMA HESABI (RANKING) ---
+      const allKarts = [
+        { kart: playerKart, isPlayer: true },
+        { kart: rivals[0], isPlayer: false },
+        { kart: rivals[1], isPlayer: false }
+      ];
+      allKarts.sort((a, b) => b.kart.x - a.kart.x);
+
+      allKarts.forEach((entry, idx) => {
+        entry.kart.rank = idx + 1;
+      });
+
+      // HUD Güncellemesi
+      updateHUD();
+
+      // Bitiş Kontrolü
+      if (playerKart.x >= track.distance && playerKart.state === 'racing') {
+        finishRace();
+      }
+    }
+
+    function updateKartPhysics(kart, dt, track) {
+      // 0. Yumuşak Şerit Değişimi İnterpolasyonu
+      kart.y += (kart.targetY - kart.y) * 0.18;
+      kart.tiltAngle *= 0.88;
+
+      // Zamanlayıcılar (Çamur & Turbo)
+      if (kart.mudTimer > 0) kart.mudTimer -= dt;
+      if (kart.boostTimer > 0) kart.boostTimer -= dt;
+
+      // 1. Zemin Sürtünme Katsayısını Belirle
+      let currentFriction = kart.wheelFriction;
+      for (const zone of track.zones) {
+        if (kart.x >= zone.start && kart.x <= zone.end) {
+          currentFriction = zone.friction;
+          break;
+        }
+      }
+      if (kart.mudTimer > 0) {
+        currentFriction *= 2.8; // Çamurda yüksek sürtünme!
+      }
+
+      // 2. İtiş Kuvveti (Newton 3. Yasası)
+      let thrustForce = 0;
+      const isThrusting = (kart === playerKart) 
+        ? (isGasActive && kart.airVolume > 0) 
+        : (kart.airVolume > 0 && (kart.vx < 8.5 || Math.random() < 0.3));
+
+      if (isThrusting && kart.airVolume > 0) {
+        // Nozul çapına göre debi (ml/s)
+        const dischargeRate = 7.0 + kart.nozzleSize * 5.5;
+        const airDischarged = Math.min(kart.airVolume, dischargeRate * dt);
+        kart.airVolume -= airDischarged;
+
+        // Hava Çıkış Hızı (m/s)
+        const exhaustVel = 14.0 + kart.nozzleSize * 2.2;
+        // Kütlesel debi m_dot (kg/s)
+        const m_dot = dischargeRate * 0.0012 * 0.001;
+        // Sürekli İtki Kuvveti (Newton)
+        thrustForce = m_dot * exhaustVel * 680.0;
+
+        if (kart.boostTimer > 0) {
+          thrustForce += 2.0; // Turbo boost bonus itkisi
+        }
+
+        // Hava egzoz parçacıkları üret
+        createExhaustParticles(kart);
+      }
+
+      // 3. Sürtünme ve Hava Direnci Kuvvetleri (Eylemsizlik / Newton 1. Yasa)
+      const normalForce = kart.mass * 9.8;
+      const frictionForce = currentFriction * normalForce;
+      const airDrag = 0.5 * 0.016 * (kart.vx * kart.vx);
+
+      // 4. Net İvme: a = (F_net) / m
+      let netForce = thrustForce - frictionForce - airDrag;
+      if (kart.vx <= 0.05 && thrustForce <= frictionForce) {
+        netForce = 0;
+        kart.vx = 0;
+      }
+
+      kart.ax = netForce / kart.mass;
+
+      // Hız ve Konum Entegrasyonu
+      kart.vx += kart.ax * dt;
+      if (kart.vx < 0) kart.vx = 0;
+
+      kart.x += kart.vx * dt;
+      kart.wheelAngle += (kart.vx * dt * 8);
+
+      // Ses efekti (Oyuncu kartı için)
+      if (kart === playerKart && thrustForce > 0.4 && Math.random() < 0.2) {
+        sounds.airRush();
+      }
+    }
+
+    function updateRivalAI(rival, dt, track) {
+      if (!rival.laneChangeCooldown) rival.laneChangeCooldown = 2.0;
+      rival.laneChangeCooldown -= dt;
+
+      if (rival.laneChangeCooldown <= 0) {
+        rival.laneChangeCooldown = 1.8 + Math.random() * 2.2;
+
+        // İlerideki engelleri tara (16 metre önü)
+        const obstacleAhead = track.items.find(it => 
+          !it.collected && 
+          it.lane === rival.lane && 
+          (it.type === 'mud' || it.type === 'rock' || it.type === 'oil') && 
+          it.x > rival.x && it.x < rival.x + 16
+        );
+
+        if (obstacleAhead) {
+          // Engelin olmadığı komşu şeride geç
+          const possibleLanes = [0, 1, 2].filter(l => l !== rival.lane);
+          const chosenLane = possibleLanes[Math.floor(Math.random() * possibleLanes.length)];
+          rival.lane = chosenLane;
+          rival.targetY = LANE_Y[chosenLane];
+          rival.tiltAngle = (chosenLane > rival.lane ? 0.12 : -0.12);
+        } else {
+          // %35 ihtimalle yakındaki bir hava veya nitroya yönel
+          const rewardNearby = track.items.find(it => 
+            !it.collected && 
+            it.lane !== rival.lane && 
+            (it.type === 'air' || it.type === 'boost') && 
+            it.x > rival.x && it.x < rival.x + 20
+          );
+          if (rewardNearby && Math.random() < 0.4) {
+            rival.lane = rewardNearby.lane;
+            rival.targetY = LANE_Y[rewardNearby.lane];
+            rival.tiltAngle = (rewardNearby.lane > rival.lane ? 0.12 : -0.12);
+          }
+        }
+      }
+    }
+
+    function checkTrackItemsCollision(track) {
+      if (!track.items) return;
+
+      const allKarts = [playerKart, rivals[0], rivals[1]];
+
+      track.items.forEach(item => {
+        if (item.collected) return;
+
+        allKarts.forEach(kart => {
+          if (item.collected) return;
+
+          // Çarpışma kutusu: Mesafe X < 2.6m ve Şerit Y farkı < 32px
+          const distMeters = Math.abs(kart.x - item.x);
+          const distPixelsY = Math.abs(kart.y - LANE_Y[item.lane]);
+
+          if (distMeters < 2.6 && distPixelsY < 32) {
+            const isPlayer = (kart === playerKart);
+
+            if (item.type === 'air') {
+              item.collected = true;
+              kart.airVolume = Math.min(1400, kart.airVolume + 150);
+              kart.maxAir = Math.max(kart.maxAir, kart.airVolume);
+              if (isPlayer) {
+                sounds.itemPickup();
+                spawnFloatingText('+150ml HAVA! 🎈', item.x * PIXELS_PER_METER, kart.y - 25, '#0284c7');
+                createCollectParticles(item.x * PIXELS_PER_METER, kart.y, '#38bdf8');
+              }
+            } else if (item.type === 'star') {
+              item.collected = true;
+              if (isPlayer) {
+                playerScore += 50;
+                document.getElementById('lblScore').textContent = playerScore;
+                trophies += 0.2;
+                document.getElementById('lblTrophies').textContent = Math.floor(trophies);
+                sounds.itemPickup();
+                spawnFloatingText('+50 PUAN ⭐', item.x * PIXELS_PER_METER, kart.y - 25, '#f59e0b');
+                createCollectParticles(item.x * PIXELS_PER_METER, kart.y, '#facc15');
+              }
+            } else if (item.type === 'boost') {
+              item.collected = true;
+              kart.vx += 4.5;
+              kart.boostTimer = 1.4;
+              if (isPlayer) {
+                sounds.boostPad();
+                spawnFloatingText('SÜPER TURBO! ⚡', item.x * PIXELS_PER_METER, kart.y - 25, '#10b981');
+                createCollectParticles(item.x * PIXELS_PER_METER, kart.y, '#10b981');
+              }
+            } else if (item.type === 'mud') {
+              item.collected = true;
+              kart.vx = Math.max(1.2, kart.vx * 0.45);
+              kart.mudTimer = 1.4;
+              if (isPlayer) {
+                sounds.obstacleHit();
+                spawnFloatingText('ÇAMUR! YAVAŞLADI 🟤', item.x * PIXELS_PER_METER, kart.y - 25, '#78350f');
+                createMudParticles(item.x * PIXELS_PER_METER, kart.y);
+              }
+            } else if (item.type === 'rock') {
+              item.collected = true;
+              kart.vx = Math.max(0.5, kart.vx - 3.2);
+              kart.tiltAngle = -0.22;
+              if (isPlayer) {
+                sounds.obstacleHit();
+                spawnFloatingText('TAŞA ÇARPTI! 💥', item.x * PIXELS_PER_METER, kart.y - 25, '#ef4444');
+                createRockParticles(item.x * PIXELS_PER_METER, kart.y);
+              }
+            } else if (item.type === 'oil') {
+              item.collected = true;
+              kart.vx = Math.max(1.0, kart.vx * 0.7);
+              kart.tiltAngle = 0.35;
+              if (isPlayer) {
+                sounds.obstacleHit();
+                spawnFloatingText('KAYGAN YAĞ! 🖤', item.x * PIXELS_PER_METER, kart.y - 25, '#334155');
+              }
+            }
+          }
+        });
+      });
+    }
+
+    // Direksiyon Manevraları
+    window.steerUp = function() {
+      if (playerKart.lane > 0) {
+        playerKart.lane--;
+        playerKart.targetY = LANE_Y[playerKart.lane];
+        playerKart.tiltAngle = -0.15;
+        sounds.laneChange();
+        createLaneChangeParticles(playerKart);
+      }
+    };
+
+    window.steerDown = function() {
+      if (playerKart.lane < 2) {
+        playerKart.lane++;
+        playerKart.targetY = LANE_Y[playerKart.lane];
+        playerKart.tiltAngle = 0.15;
+        sounds.laneChange();
+        createLaneChangeParticles(playerKart);
+      }
+    };
+
+    window.setGas = function(active) {
+      isGasActive = active;
+      const pedal = document.getElementById('btnGasPedal');
+      const lbl = document.getElementById('lblGasPedal');
+      if (pedal && lbl) {
+        if (active) {
+          pedal.className = 'pushable px-4 sm:px-5 py-2.5 bg-emerald-500 text-white font-black text-xs sm:text-sm flex items-center gap-1.5 border-2 border-ink shadow-hard-sm ring-4 ring-emerald-300 scale-95 touch-none';
+          lbl.textContent = 'GAZ VERİLİYOR! 💨';
+        } else {
+          pedal.className = 'pushable px-4 sm:px-5 py-2.5 bg-gray-100 hover:bg-emerald-400 text-ink font-black text-xs sm:text-sm flex items-center gap-1.5 border-2 border-ink shadow-hard-sm touch-none';
+          lbl.textContent = 'GAZ BAS (Tut) 🟢';
+        }
+      }
+    };
+
+    function createExhaustParticles(kart) {
+      const px = (kart.x * PIXELS_PER_METER) - 45;
+      const py = kart.y - 8;
+      for (let i = 0; i < 2; i++) {
+        particles.push({
+          x: px,
+          y: py + (Math.random() - 0.5) * 8,
+          vx: -(12 + Math.random() * 20),
+          vy: (Math.random() - 0.5) * 6,
+          life: 0.25 + Math.random() * 0.2,
+          maxLife: 0.4,
+          size: 4 + Math.random() * 5,
+          color: Math.random() > 0.4 ? '#e0f2fe' : '#38bdf8'
+        });
+      }
+    }
+
+    function createLaneChangeParticles(kart) {
+      const px = kart.x * PIXELS_PER_METER;
+      const py = kart.y;
+      for (let i = 0; i < 6; i++) {
+        particles.push({
+          x: px + (Math.random() - 0.5) * 20,
+          y: py + 10,
+          vx: -(4 + Math.random() * 6),
+          vy: (Math.random() - 0.5) * 8,
+          life: 0.2 + Math.random() * 0.15,
+          maxLife: 0.35,
+          size: 3 + Math.random() * 3,
+          color: '#cbd5e1'
+        });
+      }
+    }
+
+    function createCollectParticles(px, py, color) {
+      for (let i = 0; i < 14; i++) {
+        particles.push({
+          x: px,
+          y: py - 10,
+          vx: (Math.random() - 0.5) * 16,
+          vy: -(8 + Math.random() * 12),
+          life: 0.35 + Math.random() * 0.2,
+          maxLife: 0.5,
+          size: 4 + Math.random() * 5,
+          color: color
+        });
+      }
+    }
+
+    function createMudParticles(px, py) {
+      for (let i = 0; i < 12; i++) {
+        particles.push({
+          x: px - 15,
+          y: py + 5,
+          vx: -(8 + Math.random() * 15),
+          vy: -(4 + Math.random() * 10),
+          life: 0.3 + Math.random() * 0.2,
+          maxLife: 0.45,
+          size: 4 + Math.random() * 4,
+          color: '#78350f'
+        });
+      }
+    }
+
+    function createRockParticles(px, py) {
+      for (let i = 0; i < 10; i++) {
+        particles.push({
+          x: px,
+          y: py + 5,
+          vx: (Math.random() - 0.5) * 14,
+          vy: -(6 + Math.random() * 10),
+          life: 0.25 + Math.random() * 0.15,
+          maxLife: 0.4,
+          size: 3 + Math.random() * 4,
+          color: '#64748b'
+        });
+      }
+    }
+
+    function spawnFloatingText(text, x, y, color) {
+      floatingTexts.push({
+        text,
+        x,
+        y,
+        color,
+        life: 1.0,
+        maxLife: 1.0
+      });
+    }
+
+    // ==========================================
+    // 4. YARIŞ KONTROLLERİ & AKSİYONLARI
+    // ==========================================
+    window.startRace = function() {
+      if (playerKart.state === 'racing' || playerKart.state === 'countdown') return;
+
+      if (playerKart.airVolume < 50) {
+        alert("⚠️ Balonda yeterli hava yok! Lütfen 'Pompaya Bas' butonuyla en az 200 ml hava doldur.");
+        return;
+      }
+
+      // Geri sayım başlat (3, 2, 1, GO!)
+      playerKart.state = 'countdown';
+      const overlay = document.getElementById('countdownOverlay');
+      const text = document.getElementById('countdownText');
+      overlay.classList.remove('hidden');
+
+      let count = 3;
+      text.textContent = count;
+      sounds.countdown(false);
+
+      const countdownInterval = setInterval(() => {
+        count--;
+        if (count > 0) {
+          text.textContent = count;
+          sounds.countdown(false);
+          gsap.fromTo(text, { scale: 1.4 }, { scale: 1, duration: 0.25 });
+        } else if (count === 0) {
+          text.textContent = 'GAZLA!';
+          sounds.countdown(true);
+          gsap.fromTo(text, { scale: 1.5 }, { scale: 1, duration: 0.3 });
+        } else {
+          clearInterval(countdownInterval);
+          overlay.classList.add('hidden');
+          
+          // Yarış başladı!
+          playerKart.state = 'racing';
+          raceStartTime = Date.now();
+          playerKart.maxAir = playerKart.airVolume;
+          setGas(true);
+        }
+      }, 750);
+    };
+
+    window.applyNitro = function() {
+      if (playerKart.state !== 'racing') return;
+      // Nitro ile anlık 120 ml ekstra hava itkisi
+      playerKart.airVolume = Math.min(1000, playerKart.airVolume + 120);
+      sounds.nitro();
+      
+      // Nitro alev parçacıkları
+      const px = (playerKart.x * PIXELS_PER_METER) - 45;
+      const py = playerKart.y - 8;
+      for (let i = 0; i < 15; i++) {
+        particles.push({
+          x: px,
+          y: py,
+          vx: -(25 + Math.random() * 35),
+          vy: (Math.random() - 0.5) * 14,
+          life: 0.3 + Math.random() * 0.2,
+          maxLife: 0.45,
+          size: 6 + Math.random() * 8,
+          color: Math.random() > 0.5 ? '#facc15' : '#ef4444'
+        });
+      }
+    };
+
+    window.resetRace = function() {
+      playerKart.state = 'idle';
+      playerKart.x = 10;
+      playerKart.vx = 0;
+      playerKart.ax = 0;
+      playerKart.lane = 1;
+      playerKart.y = LANE_Y[1];
+      playerKart.targetY = LANE_Y[1];
+      playerKart.tiltAngle = 0;
+      playerKart.mudTimer = 0;
+      playerKart.boostTimer = 0;
+      playerKart.airVolume = parseInt(document.getElementById('sliderAir').value);
+      playerKart.maxAir = playerKart.airVolume;
+
+      rivals[0].x = 10;
+      rivals[0].vx = 0;
+      rivals[0].ax = 0;
+      rivals[0].lane = 0;
+      rivals[0].y = LANE_Y[0];
+      rivals[0].targetY = LANE_Y[0];
+      rivals[0].tiltAngle = 0;
+      rivals[0].mudTimer = 0;
+      rivals[0].boostTimer = 0;
+      rivals[0].airVolume = 950;
+      rivals[0].maxAir = 950;
+
+      rivals[1].x = 10;
+      rivals[1].vx = 0;
+      rivals[1].ax = 0;
+      rivals[1].lane = 2;
+      rivals[1].y = LANE_Y[2];
+      rivals[1].targetY = LANE_Y[2];
+      rivals[1].tiltAngle = 0;
+      rivals[1].mudTimer = 0;
+      rivals[1].boostTimer = 0;
+      rivals[1].airVolume = 750;
+      rivals[1].maxAir = 750;
+
+      // Toplanan tüm pist eşyalarını sıfırla
+      const track = TRACKS[currentTrack];
+      if (track.items) {
+        track.items.forEach(it => it.collected = false);
+      }
+
+      setGas(false);
+      floatingTexts.length = 0;
+      particles.length = 0;
+      cameraX = 0;
+      updateHUD();
+      document.getElementById('resultModal').classList.add('hidden');
+      sounds.beep(300, 'sine', 0.1);
+    };
+
+    function finishRace() {
+      playerKart.state = 'finished';
+      const durationSec = ((Date.now() - raceStartTime) / 1000).toFixed(1);
+      playerKart.finishTime = durationSec;
+
+      const topSpeedKmh = Math.round(playerKart.vx * 3.6);
+      document.getElementById('resTime').textContent = `${durationSec} sn`;
+      document.getElementById('resTopSpeed').textContent = `${topSpeedKmh} km/s`;
+
+      const modal = document.getElementById('resultModal');
+      const icon = document.getElementById('resultIcon');
+      const title = document.getElementById('resultTitle');
+      const desc = document.getElementById('resultDesc');
+      const resPoints = document.getElementById('resTrophyPoints');
+
+      if (playerKart.rank === 1) {
+        trophies++;
+        document.getElementById('lblTrophies').textContent = trophies;
+        sounds.victory();
+        if (window.confetti) confetti({ particleCount: 150, spread: 80, origin: { y: 0.5 } });
+        icon.textContent = '🏆';
+        title.textContent = 'Şampiyon Oldun! 🥇';
+        title.className = 'display text-3xl font-black text-emerald-600';
+        desc.textContent = `Harika bir yarış çıkardın! Rakiplerini geride bırakıp 1. sırayı kaptın.`;
+        resPoints.textContent = '+1 Altın Kupa';
+      } else if (playerKart.rank === 2) {
+        icon.textContent = '🥈';
+        title.textContent = '2. Sıradasın! Gümüş Madalya';
+        title.className = 'display text-3xl font-black text-sky-600';
+        desc.textContent = `Çok yaklaştın! Nozul genişliğini veya şasi hafifliğini ayarlayarak tekrar dene.`;
+        resPoints.textContent = 'Podyum';
+      } else {
+        icon.textContent = '🥉';
+        title.textContent = 'Yarışı Tamamladın! 3. Sıra';
+        title.className = 'display text-3xl font-black text-amber-600';
+        desc.textContent = `Daha hafif bir şasi seçerek veya nitro desteği kullanarak hızını artırabilirsin!`;
+        resPoints.textContent = 'Podyum';
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    window.closeResultModal = function() {
+      document.getElementById('resultModal').classList.add('hidden');
+      resetRace();
+    };
+
+    window.nextTrack = function() {
+      document.getElementById('resultModal').classList.add('hidden');
+      setTrack((currentTrack % 4) + 1);
+    };
+
+    // ==========================================
+    // 5. GARAJ & MODİFİYE FONKSİYONLARI
+    // ==========================================
+    window.setMainTab = function(tab) {
+      const viewTrack = document.getElementById('viewTrack');
+      const viewGarage = document.getElementById('viewGarage');
+      const tabTrack = document.getElementById('tabTrack');
+      const tabGarage = document.getElementById('tabGarage');
+
+      if (tab === 'track') {
+        viewTrack.classList.remove('hidden');
+        viewGarage.classList.add('hidden');
+        tabTrack.className = 'pushable px-4 py-1.5 text-xs sm:text-sm font-black bg-emerald-400 text-white flex items-center gap-1.5';
+        tabGarage.className = 'pushable px-4 py-1.5 text-xs sm:text-sm font-black bg-white text-ink hover:bg-gray-100 flex items-center gap-1.5';
+      } else {
+        viewTrack.classList.add('hidden');
+        viewGarage.classList.remove('hidden');
+        tabTrack.className = 'pushable px-4 py-1.5 text-xs sm:text-sm font-black bg-white text-ink hover:bg-gray-100 flex items-center gap-1.5';
+        tabGarage.className = 'pushable px-4 py-1.5 text-xs sm:text-sm font-black bg-emerald-400 text-white flex items-center gap-1.5';
+      }
+    };
+
+    window.selectChassis = function(type) {
+      playerKart.chassis = type;
+      ['btnChassisStraw', 'btnChassisPlastic', 'btnChassisWood'].forEach(id => {
+        document.getElementById(id).className = 'pushable p-2.5 bg-white text-ink hover:bg-gray-100 text-left';
+      });
+
+      if (type === 'straw') {
+        playerKart.mass = 0.06;
+        document.getElementById('btnChassisStraw').className = 'pushable p-2.5 bg-yellow-300 text-ink text-left';
+        document.getElementById('svgChassis').setAttribute('fill', '#fde047');
+        document.getElementById('hudKartName').textContent = 'Süper Pipet Kart';
+        document.getElementById('hudChassisInfo').textContent = 'Kütle: 60g (Ultra Hafif)';
+      } else if (type === 'plastic') {
+        playerKart.mass = 0.12;
+        document.getElementById('btnChassisPlastic').className = 'pushable p-2.5 bg-yellow-300 text-ink text-left';
+        document.getElementById('svgChassis').setAttribute('fill', '#38bdf8');
+        document.getElementById('hudKartName').textContent = 'Dengeli Plastik Kart';
+        document.getElementById('hudChassisInfo').textContent = 'Kütle: 120g (Dengeli)';
+      } else {
+        playerKart.mass = 0.20;
+        document.getElementById('btnChassisWood').className = 'pushable p-2.5 bg-yellow-300 text-ink text-left';
+        document.getElementById('svgChassis').setAttribute('fill', '#b45309');
+        document.getElementById('hudKartName').textContent = 'Zırhlı Ahşap Kart';
+        document.getElementById('hudChassisInfo').textContent = 'Kütle: 200g (Ağır & Yüksek Momentum)';
+      }
+
+      document.getElementById('lblGarageMass').textContent = `${Math.round(playerKart.mass * 1000)} g`;
+      sounds.beep(400, 'triangle', 0.1);
+    };
+
+    window.selectWheel = function(wheel) {
+      playerKart.wheel = wheel;
+      ['btnWheelDisk', 'btnWheelRubber', 'btnWheelTerrain'].forEach(id => {
+        document.getElementById(id).className = 'pushable p-2.5 bg-white text-ink hover:bg-gray-100 text-left';
+      });
+
+      if (wheel === 'disk') {
+        playerKart.wheelFriction = 0.035;
+        document.getElementById('btnWheelDisk').className = 'pushable p-2.5 bg-yellow-300 text-ink text-left';
+        document.getElementById('svgWheelBack').setAttribute('fill', '#e2e8f0');
+        document.getElementById('svgWheelFront').setAttribute('fill', '#e2e8f0');
+        document.getElementById('lblGarageGrip').textContent = 'Yarış Diski';
+      } else if (wheel === 'rubber') {
+        playerKart.wheelFriction = 0.06;
+        document.getElementById('btnWheelRubber').className = 'pushable p-2.5 bg-yellow-300 text-ink text-left';
+        document.getElementById('svgWheelBack').setAttribute('fill', '#1e293b');
+        document.getElementById('svgWheelFront').setAttribute('fill', '#1e293b');
+        document.getElementById('lblGarageGrip').textContent = 'Kauçuk Lastik';
+      } else {
+        playerKart.wheelFriction = 0.09;
+        document.getElementById('btnWheelTerrain').className = 'pushable p-2.5 bg-yellow-300 text-ink text-left';
+        document.getElementById('svgWheelBack').setAttribute('fill', '#78350f');
+        document.getElementById('svgWheelFront').setAttribute('fill', '#78350f');
+        document.getElementById('lblGarageGrip').textContent = 'Dişli Dağ';
+      }
+      sounds.beep(450, 'triangle', 0.1);
+    };
+
+    window.selectBalloonColor = function(color) {
+      playerKart.color = color;
+      document.getElementById('svgBalloon').setAttribute('fill', color);
+      sounds.beep(500, 'sine', 0.08);
+    };
+
+    window.selectDriver = function(icon, name) {
+      playerKart.driverIcon = icon;
+      playerKart.driverName = name;
+      document.getElementById('svgDriver').textContent = icon;
+      document.getElementById('hudDriverAvatar').textContent = icon;
+      ['btnDriverCat', 'btnDriverRabbit', 'btnDriverPanda', 'btnDriverScientist'].forEach(id => {
+        document.getElementById(id).className = 'pushable p-2 bg-white hover:bg-gray-100 text-center';
+      });
+      if (icon === '🐱') document.getElementById('btnDriverCat').className = 'pushable p-2 bg-yellow-300 text-center';
+      if (icon === '🐰') document.getElementById('btnDriverRabbit').className = 'pushable p-2 bg-yellow-300 text-center';
+      if (icon === '🐼') document.getElementById('btnDriverPanda').className = 'pushable p-2 bg-yellow-300 text-center';
+      if (icon === '🧑‍🔬') document.getElementById('btnDriverScientist').className = 'pushable p-2 bg-yellow-300 text-center';
+      sounds.beep(550, 'sine', 0.1);
+    };
+
+    // ==========================================
+    // 6. NOZÜL & PİST AYARLARI
+    // ==========================================
+    window.setNozzle = function(size, label) {
+      playerKart.nozzleSize = size;
+      document.getElementById('lblNozzleVal').textContent = label;
+      ['btnNoz1', 'btnNoz2', 'btnNoz3'].forEach(id => {
+        document.getElementById(id).className = 'pushable px-1.5 py-1.5 bg-white text-ink text-[11px] font-bold';
+      });
+      if (size === 2) document.getElementById('btnNoz1').className = 'pushable px-1.5 py-1.5 bg-amber-400 text-ink font-black text-[11px]';
+      if (size === 5) document.getElementById('btnNoz2').className = 'pushable px-1.5 py-1.5 bg-amber-400 text-ink font-black text-[11px]';
+      if (size === 9) document.getElementById('btnNoz3').className = 'pushable px-1.5 py-1.5 bg-amber-400 text-ink font-black text-[11px]';
+      sounds.beep(480, 'sine', 0.08);
+    };
+
+    window.setTrack = function(lvl) {
+      currentTrack = lvl;
+      for (let i = 1; i <= 4; i++) {
+        const btn = document.getElementById(`trackBtn${i}`);
+        if (i === lvl) {
+          btn.className = 'pushable px-3 py-1 text-xs font-black bg-yellow-400 text-ink border-2 border-ink';
+        } else {
+          btn.className = 'pushable px-3 py-1 text-xs font-black bg-white text-ink hover:bg-gray-100 border-2 border-ink';
+        }
+      }
+      const t = TRACKS[lvl];
+      document.getElementById('lblTrackDesc').textContent = `${t.name}: ${t.desc}`;
+      document.getElementById('lblTrackTargetDist').textContent = `${t.distance}m 🏆`;
+      resetRace();
+    };
+
+    window.quickPumpAir = function() {
+      const slider = document.getElementById('sliderAir');
+      let val = parseInt(slider.value) + 100;
+      if (val > 1400) val = 1400;
+      slider.value = val;
+      playerKart.airVolume = val;
+      playerKart.maxAir = Math.max(playerKart.maxAir, val);
+      document.getElementById('lblAirVal').textContent = `${val} ml`;
+      sounds.airRush();
+    };
+
+    document.getElementById('sliderAir').addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      playerKart.airVolume = val;
+      playerKart.maxAir = Math.max(playerKart.maxAir, val);
+      document.getElementById('lblAirVal').textContent = `${val} ml`;
+    });
+
+    // ==========================================
+    // 7. KLAVYE VE DOKUNMATİK KONTROL DİNLEYİCİLERİ
+    // ==========================================
+    const btnSteerUp = document.getElementById('btnSteerUp');
+    const btnSteerDown = document.getElementById('btnSteerDown');
+    const btnGasPedal = document.getElementById('btnGasPedal');
+
+    if (btnSteerUp) {
+      btnSteerUp.addEventListener('click', (e) => {
+        e.preventDefault();
+        steerUp();
+      });
+    }
+    if (btnSteerDown) {
+      btnSteerDown.addEventListener('click', (e) => {
+        e.preventDefault();
+        steerDown();
+      });
+    }
+    if (btnGasPedal) {
+      const startGas = (e) => {
+        e.preventDefault();
+        if (playerKart.state === 'idle') {
+          startRace();
+        }
+        setGas(true);
+      };
+      const stopGas = (e) => {
+        e.preventDefault();
+        setGas(false);
+      };
+      btnGasPedal.addEventListener('pointerdown', startGas);
+      btnGasPedal.addEventListener('pointerup', stopGas);
+      btnGasPedal.addEventListener('pointerleave', stopGas);
+      btnGasPedal.addEventListener('pointercancel', stopGas);
+    }
+
+    // Klavye Kontrolleri: W/S & Yukarı/Aşağı (Şerit), Space/D/Sağ Ok (Gaz), N (Nitro)
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+        e.preventDefault();
+        steerUp();
+      } else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+        e.preventDefault();
+        steerDown();
+      } else if (e.code === 'Space' || e.code === 'KeyD' || e.code === 'ArrowRight') {
+        e.preventDefault();
+        if (playerKart.state === 'idle') {
+          startRace();
+        }
+        setGas(true);
+      } else if (e.code === 'KeyN') {
+        e.preventDefault();
+        applyNitro();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space' || e.code === 'KeyD' || e.code === 'ArrowRight') {
+        e.preventDefault();
+        setGas(false);
+      }
+    });
+
+    // ==========================================
+    // 8. CANVAS 60 FPS ÇİZİM & RENDER DÖNGÜSÜ
+    // ==========================================
+    let lastTime = performance.now();
+
+    function renderLoop(time) {
+      const dt = Math.min(0.05, (time - lastTime) / 1000);
+      lastTime = time;
+
+      // Fizik motoru güncelle
+      updatePhysics(dt);
+
+      // Kamera takibi (Oyuncu kartını ortada tut)
+      const targetCamX = (playerKart.x * PIXELS_PER_METER) - (canvas.width * 0.35);
+      cameraX += (targetCamX - cameraX) * 0.1;
+      if (cameraX < 0) cameraX = 0;
+
+      // Ekranı temizle
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      ctx.translate(-cameraX, 0);
+
+      // Gökyüzü, Pist Arka Planı ve 3 Şeritli Yol
+      drawEnvironment();
+
+      // Özel Zemin Bölgeleri (Halı, Buz, Rampa)
+      drawTrackZones();
+
+      // 3 Şerit Boyunca Dağılmış Eşyalar (Hava, Yıldız, Turbo, Çamur, Taş, Yağ)
+      drawTrackItems();
+
+      // Bitiş Çizgisi & Damalı Bayrak Kemeri
+      drawFinishLine();
+
+      // Parçacıklar
+      drawParticles(dt);
+
+      // Y derinliğine göre sıralı kart çizimi (Üst şeritteki kart arkada, alt şeritteki önde)
+      const kartsToDraw = [playerKart, rivals[0], rivals[1]];
+      kartsToDraw.sort((a, b) => a.y - b.y);
+      kartsToDraw.forEach(kart => {
+        drawKart(kart);
+      });
+
+      // Yükselen Mesaj Baloncukları (+150ml HAVA!, ÇAMUR!, vb.)
+      drawFloatingTexts(dt);
+
+      ctx.restore();
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    function drawEnvironment() {
+      // Gökyüzü degradesi (0 - ROAD_TOP)
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, ROAD_TOP);
+      skyGrad.addColorStop(0, '#bae6fd');
+      skyGrad.addColorStop(1, '#f0f9ff');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(cameraX - 100, 0, canvas.width + 200, ROAD_TOP);
+
+      // Paralaks Arka Plan Detayları (Tribünler, Bayraklar)
+      const trackLimit = (TRACKS[currentTrack].distance + 80) * PIXELS_PER_METER;
+      for (let bx = 0; bx <= trackLimit + 200; bx += 130) {
+        // Seyirci tribün direkleri
+        ctx.fillStyle = (bx / 130) % 2 === 0 ? '#fbbf24' : '#ef4444';
+        ctx.fillRect(bx, ROAD_TOP - 65, 8, 65);
+        // Renkli flama bayrakları
+        ctx.beginPath();
+        ctx.moveTo(bx, ROAD_TOP - 65);
+        ctx.lineTo(bx + 30, ROAD_TOP - 50);
+        ctx.lineTo(bx, ROAD_TOP - 38);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      // Üst Bordür (Rumble Strip): Y = 202 - 210
+      const curbStartX = Math.floor((cameraX - 100) / 20) * 20;
+      const curbEndX = cameraX + canvas.width + 100;
+      for (let cx = curbStartX; cx <= curbEndX; cx += 20) {
+        ctx.fillStyle = ((cx / 20) % 2 === 0) ? '#ef4444' : '#ffffff';
+        ctx.fillRect(cx, ROAD_TOP - 8, 20, 8);
+      }
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(curbStartX, ROAD_TOP - 8, curbEndX - curbStartX, 8);
+
+      // 3 ŞERİTLİ ANA ASFALT / PARKE YOL (ROAD_TOP = 210, ROAD_BOTTOM = 440)
+      ctx.fillStyle = currentTrack === 1 ? '#e2e8f0' : '#1e293b';
+      ctx.fillRect(-200, ROAD_TOP, (TRACKS[currentTrack].distance + 60) * PIXELS_PER_METER + 500, ROAD_BOTTOM - ROAD_TOP);
+
+      // Yol Kenar Sınır Çizgileri
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(-200, ROAD_TOP);
+      ctx.lineTo((TRACKS[currentTrack].distance + 60) * PIXELS_PER_METER + 500, ROAD_TOP);
+      ctx.moveTo(-200, ROAD_BOTTOM);
+      ctx.lineTo((TRACKS[currentTrack].distance + 60) * PIXELS_PER_METER + 500, ROAD_BOTTOM);
+      ctx.stroke();
+
+      // 2 Adet Beyaz Kesikli Şerit Ayırıcı Çizgi (Y = 287.5 ve Y = 362.5)
+      ctx.strokeStyle = currentTrack === 1 ? '#94a3b8' : '#f8fafc';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([24, 18]);
+      ctx.beginPath();
+      // Üst ve Orta şerit arası
+      ctx.moveTo(-200, 287.5);
+      ctx.lineTo((TRACKS[currentTrack].distance + 60) * PIXELS_PER_METER + 500, 287.5);
+      // Orta ve Alt şerit arası
+      ctx.moveTo(-200, 362.5);
+      ctx.lineTo((TRACKS[currentTrack].distance + 60) * PIXELS_PER_METER + 500, 362.5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Alt Bordür (Rumble Strip): Y = 440 - 448
+      for (let cx = curbStartX; cx <= curbEndX; cx += 20) {
+        ctx.fillStyle = ((cx / 20) % 2 === 0) ? '#ef4444' : '#ffffff';
+        ctx.fillRect(cx, ROAD_BOTTOM, 20, 8);
+      }
+      ctx.strokeRect(curbStartX, ROAD_BOTTOM, curbEndX - curbStartX, 8);
+
+      // En Alt Çim / Kaldırım Alanı: Y = 448 - 480
+      ctx.fillStyle = '#86efac';
+      ctx.fillRect(curbStartX, ROAD_BOTTOM + 8, curbEndX - curbStartX, 32);
+
+      // Başlangıç Çizgisi (10m)
+      const startX = 10 * PIXELS_PER_METER;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(startX - 6, ROAD_TOP, 12, ROAD_BOTTOM - ROAD_TOP);
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(startX - 6, ROAD_TOP, 12, ROAD_BOTTOM - ROAD_TOP);
+
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 11px "Baloo 2", cursive';
+      ctx.textAlign = 'center';
+      ctx.fillText('BAŞLANGIÇ 🚦', startX, ROAD_TOP - 14);
+    }
+
+    function drawTrackZones() {
+      const track = TRACKS[currentTrack];
+      for (const zone of track.zones) {
+        const zx = zone.start * PIXELS_PER_METER;
+        const zw = (zone.end - zone.start) * PIXELS_PER_METER;
+
+        ctx.save();
+        ctx.fillStyle = zone.color;
+        ctx.globalAlpha = 0.88;
+        ctx.fillRect(zx, ROAD_TOP, zw, ROAD_BOTTOM - ROAD_TOP);
+        ctx.globalAlpha = 1.0;
+
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(zx, ROAD_TOP, zw, ROAD_BOTTOM - ROAD_TOP);
+
+        // Zemin Etiketi Rozeti
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(zx + zw / 2 - 120, ROAD_TOP + 8, 240, 22);
+        ctx.strokeRect(zx + zw / 2 - 120, ROAD_TOP + 8, 240, 22);
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 11px Nunito';
+        ctx.textAlign = 'center';
+        ctx.fillText(zone.label, zx + zw / 2, ROAD_TOP + 23);
+
+        ctx.restore();
+      }
+    }
+
+    function drawTrackItems() {
+      const track = TRACKS[currentTrack];
+      if (!track.items) return;
+      const time = Date.now() * 0.003;
+
+      for (const item of track.items) {
+        if (item.collected && (item.type === 'air' || item.type === 'star' || item.type === 'boost')) continue;
+
+        const ix = item.x * PIXELS_PER_METER;
+        const iy = LANE_Y[item.lane];
+
+        // Ekran dışı çizimleri atla (Culling)
+        if (ix < cameraX - 90 || ix > cameraX + canvas.width + 90) continue;
+
+        ctx.save();
+
+        if (item.type === 'air') {
+          // 🎈 Yüzen Hava Tüpü (+150 ml)
+          const bob = Math.sin(time * 5 + item.x) * 4;
+          ctx.translate(ix, iy - 6 + bob);
+
+          ctx.fillStyle = 'rgba(14, 165, 233, 0.25)';
+          ctx.beginPath();
+          ctx.arc(0, 0, 19, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#0284c7';
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          ctx.roundRect(-10, -14, 20, 28, [8]);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#facc15';
+          ctx.fillRect(-6, -17, 12, 4);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 9px Nunito';
+          ctx.textAlign = 'center';
+          ctx.fillText('HAVA', 0, 3);
+
+          ctx.fillStyle = '#0284c7';
+          ctx.font = 'bold 10px Baloo 2';
+          ctx.fillText('+150ml 🎈', 0, -20);
+
+        } else if (item.type === 'star') {
+          // ⭐ Altın Yıldız (+50 Puan)
+          const bob = Math.sin(time * 4 + item.x) * 3;
+          ctx.translate(ix, iy - 6 + bob);
+          ctx.rotate(time * 1.6);
+
+          ctx.fillStyle = 'rgba(250, 204, 21, 0.35)';
+          ctx.beginPath();
+          ctx.arc(0, 0, 18, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#facc15';
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          for (let i = 0; i < 5; i++) {
+            const oAngle = (i * Math.PI * 2) / 5 - Math.PI / 2;
+            const iAngle = oAngle + Math.PI / 5;
+            const ox = Math.cos(oAngle) * 12;
+            const oy = Math.sin(oAngle) * 12;
+            const inx = Math.cos(iAngle) * 6;
+            const iny = Math.sin(iAngle) * 6;
+            if (i === 0) ctx.moveTo(ox, oy);
+            else ctx.lineTo(ox, oy);
+            ctx.lineTo(inx, iny);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+        } else if (item.type === 'boost') {
+          // ⏩ Turbo Okları (Yeşil Neon Hızlandırıcı)
+          ctx.translate(ix, iy + 4);
+          const pulse = 1 + Math.sin(time * 8) * 0.08;
+          ctx.scale(pulse, pulse);
+
+          ctx.fillStyle = '#10b981';
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 2;
+
+          for (let c = -14; c <= 14; c += 14) {
+            ctx.beginPath();
+            ctx.moveTo(c - 6, -9);
+            ctx.lineTo(c + 4, 0);
+            ctx.lineTo(c - 6, 9);
+            ctx.lineTo(c - 1, 9);
+            ctx.lineTo(c + 9, 0);
+            ctx.lineTo(c - 1, -9);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          }
+
+          ctx.fillStyle = '#065f46';
+          ctx.font = 'bold 9px Baloo 2';
+          ctx.textAlign = 'center';
+          ctx.fillText('TURBO ⚡', 0, -13);
+
+        } else if (item.type === 'mud') {
+          // 🟤 Çamur Birikintisi
+          ctx.translate(ix, iy + 6);
+          ctx.fillStyle = '#78350f';
+          ctx.strokeStyle = '#451a03';
+          ctx.lineWidth = 2;
+
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 24, 11, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#92400e';
+          ctx.beginPath();
+          ctx.arc(-13, -4, 4, 0, Math.PI * 2);
+          ctx.arc(12, 3, 5, 0, Math.PI * 2);
+          ctx.arc(-4, 5, 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#fef3c7';
+          ctx.font = 'bold 9px Nunito';
+          ctx.textAlign = 'center';
+          ctx.fillText('ÇAMUR', 0, 3);
+
+        } else if (item.type === 'rock') {
+          // 🪨 Taş Engeli
+          ctx.translate(ix, iy + 4);
+
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.3)';
+          ctx.beginPath();
+          ctx.ellipse(0, 8, 16, 6, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#64748b';
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 2;
+
+          ctx.beginPath();
+          ctx.moveTo(-14, 6);
+          ctx.lineTo(-10, -10);
+          ctx.lineTo(2, -14);
+          ctx.lineTo(12, -4);
+          ctx.lineTo(14, 6);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#94a3b8';
+          ctx.beginPath();
+          ctx.moveTo(-7, 4);
+          ctx.lineTo(-4, -8);
+          ctx.lineTo(4, -10);
+          ctx.lineTo(2, 2);
+          ctx.closePath();
+          ctx.fill();
+
+        } else if (item.type === 'oil') {
+          // 🖤 Kaygan Yağ Birikintisi
+          ctx.translate(ix, iy + 6);
+          ctx.fillStyle = '#1e293b';
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 2;
+
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 22, 10, -0.2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.strokeStyle = '#a855f7';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(2, -1, 10, 0.4, 2.2);
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      }
+    }
+
+    function drawFinishLine() {
+      const track = TRACKS[currentTrack];
+      const fx = track.distance * PIXELS_PER_METER;
+
+      // 3 Şerit Boyunca Damalı Bitiş Izgarası (ROAD_TOP'tan ROAD_BOTTOM'a)
+      const boxSize = 14;
+      const rows = Math.ceil((ROAD_BOTTOM - ROAD_TOP) / boxSize);
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < 2; c++) {
+          ctx.fillStyle = (r + c) % 2 === 0 ? '#0f172a' : '#ffffff';
+          ctx.fillRect(fx + (c * boxSize), ROAD_TOP + (r * boxSize), boxSize, boxSize);
+        }
+      }
+
+      // Sol ve Sağ Bitiş Kuleleri & Üst Tabela
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(fx - 6, ROAD_TOP - 75, 12, 75);
+      ctx.strokeRect(fx - 6, ROAD_TOP - 75, 12, 75);
+
+      ctx.fillRect(fx + 24, ROAD_TOP - 75, 12, 75);
+      ctx.strokeRect(fx + 24, ROAD_TOP - 75, 12, 75);
+
+      ctx.fillStyle = '#facc15';
+      ctx.fillRect(fx - 28, ROAD_TOP - 95, 86, 26);
+      ctx.strokeRect(fx - 28, ROAD_TOP - 95, 86, 26);
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 12px "Baloo 2", cursive';
+      ctx.textAlign = 'center';
+      ctx.fillText('BİTİŞ 🏆', fx + 15, ROAD_TOP - 78);
+    }
+
+    function drawKart(kart) {
+      const kx = kart.x * PIXELS_PER_METER;
+      const ky = kart.y;
+
+      ctx.save();
+      ctx.translate(kx, ky);
+      ctx.rotate(kart.tiltAngle || 0);
+
+      // Balon Hacmine Göre Ölçekleme (Hava azaldıkça küçülür)
+      const airRatio = Math.max(0.12, kart.airVolume / (kart.maxAir || 600));
+      const balloonRadiusX = 26 * Math.sqrt(airRatio);
+      const balloonRadiusY = 20 * Math.sqrt(airRatio);
+
+      // Çamur Sıçrama Efekti
+      if (kart.mudTimer > 0) {
+        ctx.fillStyle = '#78350f';
+        for (let i = 0; i < 4; i++) {
+          ctx.beginPath();
+          ctx.arc(-22 - Math.random() * 12, 2 + (Math.random() - 0.5) * 8, 2.5 + Math.random() * 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Turbo / Nitro Alev Püskürtme Efekti
+      if (kart.boostTimer > 0) {
+        ctx.fillStyle = '#10b981';
+        ctx.beginPath();
+        ctx.moveTo(-40, -18);
+        ctx.lineTo(-58 - Math.random() * 10, -15);
+        ctx.lineTo(-40, -12);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // 1. Şişkin Balon
+      ctx.fillStyle = kart.color;
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(-26, -18, balloonRadiusX, balloonRadiusY, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Balon Parlaması
+      if (airRatio > 0.3) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(-26 - (balloonRadiusX * 0.3), -18 - (balloonRadiusY * 0.3), balloonRadiusY * 0.4, 0, Math.PI);
+        ctx.stroke();
+      }
+
+      // Nozul / Egzoz Borusu
+      ctx.fillStyle = '#facc15';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2;
+      ctx.fillRect(-40, -21, 14, 6);
+      ctx.strokeRect(-40, -21, 14, 6);
+
+      // 2. Şasi / Gövde
+      ctx.fillStyle = kart.chassis === 'wood' ? '#b45309' : (kart.chassis === 'straw' ? '#fde047' : '#38bdf8');
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.roundRect(-24, -12, 54, 12, [4]);
+      ctx.fill();
+      ctx.stroke();
+
+      // 3. Sürücü Karakteri
+      ctx.font = '22px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(kart.driverIcon || kart.icon, 2, -14);
+
+      // 4. Dönen Tekerlekler
+      drawWheel(-14, 0, kart.wheelAngle, kart.wheel);
+      drawWheel(18, 0, kart.wheelAngle, kart.wheel);
+
+      // Sürücü İsim & Şerit Etiketi
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 10px Nunito';
+      const laneLabel = kart.lane === 0 ? 'ÜST' : (kart.lane === 1 ? 'ORTA' : 'ALT');
+      ctx.fillText(`${kart.driverName || kart.name} (${laneLabel})`, 3, -36);
+
+      ctx.restore();
+    }
+
+    function drawWheel(wx, wy, angle, type) {
+      ctx.save();
+      ctx.translate(wx, wy);
+      ctx.rotate(angle);
+
+      ctx.fillStyle = type === 'disk' ? '#e2e8f0' : (type === 'allterrain' ? '#78350f' : '#1e293b');
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Jant Çizgisi
+      ctx.strokeStyle = '#facc15';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-5, 0);
+      ctx.lineTo(5, 0);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawFloatingTexts(dt) {
+      for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        const ft = floatingTexts[i];
+        ft.y -= 28 * dt;
+        ft.life -= dt;
+        if (ft.life <= 0) {
+          floatingTexts.splice(i, 1);
+          continue;
+        }
+
+        const alpha = Math.max(0, ft.life / ft.maxLife);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = 'bold 14px "Baloo 2", cursive';
+        ctx.textAlign = 'center';
+
+        // Siyah dış hat
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 3.5;
+        ctx.strokeText(ft.text, ft.x, ft.y);
+
+        // Canlı renkli dolgu
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
+      }
+    }
+
+    function drawParticles(dt) {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= dt;
+
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        const alpha = p.life / p.maxLife;
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+      }
+    }
+
+    function updateHUD() {
+      const speedKmh = Math.round(playerKart.vx * 3.6);
+      document.getElementById('hudSpeed').textContent = `${speedKmh} km/s`;
+
+      const airPct = Math.max(0, Math.round((playerKart.airVolume / (playerKart.maxAir || 600)) * 100));
+      document.getElementById('hudAirPct').textContent = `${airPct}%`;
+      document.getElementById('hudAirBar').style.width = `${airPct}%`;
+
+      // Sıralama
+      const r = playerKart.rank;
+      document.getElementById('hudRankText').textContent = `${r}. Sıra`;
+      document.getElementById('hudRankIcon').textContent = r === 1 ? '🥇' : (r === 2 ? '🥈' : '🥉');
+
+      // İstatistikler
+      document.getElementById('statThrust').textContent = `${(playerKart.ax * playerKart.mass).toFixed(1)} N`;
+      document.getElementById('statAccel').textContent = `${playerKart.ax.toFixed(1)} m/s²`;
+      document.getElementById('statDistance').textContent = `${playerKart.x.toFixed(1)} m`;
+
+      // Mini Yol İğneleri
+      const trackDist = TRACKS[currentTrack].distance;
+      const playerPct = Math.min(100, Math.max(0, (playerKart.x / trackDist) * 100));
+      const r1Pct = Math.min(100, Math.max(0, (rivals[0].x / trackDist) * 100));
+      const r2Pct = Math.min(100, Math.max(0, (rivals[1].x / trackDist) * 100));
+
+      document.getElementById('miniPinPlayer').style.left = `${playerPct}%`;
+      document.getElementById('miniPinRival1').style.left = `${r1Pct}%`;
+      document.getElementById('miniPinRival2').style.left = `${r2Pct}%`;
+    }
+
+    // Modal Fonksiyonları
+    function closeScienceModal() {
+      document.getElementById('scienceModal').classList.add('hidden');
+    }
+    document.getElementById('btnScienceGuide').addEventListener('click', () => {
+      document.getElementById('scienceModal').classList.remove('hidden');
+    });
+
+    // Başlangıç
+    window.addEventListener('DOMContentLoaded', () => {
+      setTrack(1);
+      requestAnimationFrame(renderLoop);
+    });
+  </script>
+</body>
+</html>

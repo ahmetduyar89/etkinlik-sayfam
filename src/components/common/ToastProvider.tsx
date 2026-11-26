@@ -57,7 +57,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             <div
                 aria-live="polite"
                 aria-atomic="true"
-                className="fixed top-4 right-4 z-[20000] flex flex-col gap-2 pointer-events-none"
+                className="fixed top-[max(1rem,env(safe-area-inset-top))] left-3 right-3 sm:left-auto sm:right-4 z-[20000] flex flex-col gap-2 pointer-events-none"
             >
                 <AnimatePresence>
                     {toasts.map((t) => {
@@ -70,7 +70,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                                 exit={{ opacity: 0, x: 20 }}
                                 role="status"
                                 className={cn(
-                                    'pointer-events-auto flex items-start gap-3 min-w-[260px] max-w-sm rounded-xl border px-4 py-3 text-white shadow-xl',
+                                    'pointer-events-auto flex items-start gap-3 min-w-0 w-full sm:w-auto sm:min-w-[260px] sm:max-w-sm rounded-xl border px-4 py-3 text-white shadow-xl',
                                     VARIANT_STYLES[t.variant]
                                 )}
                             >

@@ -1,0 +1,97 @@
+/* Tüm bağımsız modüllerde aynı mobil temel; sahnelerin çizim ölçüleri değiştirilmez. */
+html, body { min-width: 0; }
+body[data-atolye-app] { min-height: 100svh; }
+[data-atolye-app] :is(.grid, .flex) > * { min-width: 0; }
+[data-atolye-app] :is(main, section, aside) { min-width: 0; }
+[data-atolye-app] :is(input, textarea) { -webkit-user-select: auto; user-select: auto; }
+
+@media (max-width: 767px) {
+  [data-atolye-app] input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),
+  [data-atolye-app] textarea, [data-atolye-app] select { font-size: 16px !important; }
+  [data-atolye-app] > header {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding-left: max(12px, env(safe-area-inset-left)) !important;
+    padding-right: max(12px, env(safe-area-inset-right)) !important;
+  }
+  [data-atolye-app] > header > div { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+  [data-atolye-app] > header :is(button, a),
+  [data-atolye-app] > nav button, [data-atolye-app] .top-actions button {
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+  [data-atolye-app] > header > nav {
+    order: 3;
+    flex-basis: 100%;
+    max-width: 100% !important;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+  [data-atolye-app] .layout { grid-template-columns: minmax(0, 1fr) !important; }
+  [data-atolye-app] .topbar { height: auto; }
+  [data-atolye-app] :is(.controls, .panel, .glass-panel, .glass-card) { min-width: 0; }
+  [data-atolye-app] .min-w-max { max-width: none; } /* sıralayıcı, piyano gibi kaydırılabilir yüzeyler */
+  [data-atolye-app=finans-pazar] main select { max-width: 100%; }
+  [data-atolye-app=finans-pazar] .glass-card > .flex.justify-between { flex-wrap: wrap; gap: 8px; }
+  [data-atolye-app=akil-oyunlari] > header > div:first-child { flex: 1 1 220px; }
+  [data-atolye-app=akil-oyunlari] > header > div:first-child > div { height: auto; min-height: 44px; flex: 1; padding: 8px; }
+  [data-atolye-app=dna-genetik] .controls { grid-template-columns: minmax(0,1fr); }
+  [data-atolye-app=dna-genetik] .controls > * { min-width: 0; }
+  [data-atolye-app=satranc] :is(.page-heading, .topbar) { flex-wrap: wrap; gap: 8px; }
+}
+
+/* 3B sahne, mobil adres çubuğu açılıp kapanınca görünür yüksekliği takip eder. */
+body[data-atolye-app=gunes-sistemi], body[data-atolye-app=insan-vucudu] {
+  height: 100dvh !important;
+  min-height: 0;
+}
+@media (max-width: 639px) {
+  [data-atolye-app=insan-vucudu] > header > div:nth-child(2) {
+    order: 3; flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto;
+  }
+  [data-atolye-app=gunes-sistemi] #info-panel {
+    max-height: calc(100dvh - 200px) !important;
+    width: min(320px, calc(100vw - 24px)) !important;
+    right: 12px !important;
+    top: 112px !important;
+  }
+  [data-atolye-app] .organelles { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+
+/* Bitmap boyutu sabit kalır; yalnız görünen oyun alanı ölçeklenir. */
+[data-atolye-app=geometri] canvas,
+[data-atolye-app=kodlama] #maze-canvas,
+[data-atolye-app=akil-oyunlari] canvas {
+  max-width: 100%;
+  height: auto !important;
+}
+[data-atolye-app=geometri] .glass-panel > .relative,
+[data-atolye-app=kodlama] .glass-panel > .relative,
+[data-atolye-app=muzik] #keyboard-container { max-width: 100%; }
+
+[data-atolye-app] .layout > * { min-width: 0; }
+[data-atolye-app] :is(input, select, textarea) { max-width: 100%; min-width: 0; }
+@media (max-width: 767px) {
+  [data-atolye-app=deneyler] > header :is(.flex, .inline-flex) { max-width: 100%; flex-wrap: wrap; }
+  [data-atolye-app=deneyler] :is(.scene-wrap, .scene) { width: 100%; min-width: 0; max-width: 100%; }
+  [data-atolye-app=deneyler] :is(.scene-wrap, .scene) > svg { min-width: 0; max-width: 100%; }
+}
+
+@media (max-width: 1023px) {
+  [data-atolye-app] > header { flex-wrap: wrap !important; gap: 8px !important; }
+  [data-atolye-app] > header > div { min-width: 0; max-width: 100%; }
+  [data-atolye-app] > header :is(button, a) { min-height: 44px; min-width: 44px; flex-shrink: 0; }
+  [data-atolye-app] > header > nav { order: 3; flex-basis: 100%; max-width: 100% !important; overflow-x: auto; }
+  :is([data-atolye-app=muzik], [data-atolye-app=geometri], [data-atolye-app=kodlama],
+      [data-atolye-app=turkce], [data-atolye-app=tarih-atlasi], [data-atolye-app=gunes-sistemi],
+      [data-atolye-app=insan-vucudu]) > header > div:nth-child(2) {
+    order: 3; flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain;
+  }
+  [data-atolye-app] > header > div:nth-child(2) > button { white-space: nowrap; }
+  [data-atolye-app] > main { padding-bottom: max(64px, env(safe-area-inset-bottom)); }
+  [data-atolye-app]:not([data-atolye-app=satranc]) a[data-atolye-geri] { bottom: max(12px, env(safe-area-inset-bottom)) !important; }
+}
+@media (max-width: 639px) {
+  [data-atolye-app] a[data-atolye-geri] { min-width: 44px; min-height: 44px; padding: 12px; justify-content: center; }
+  [data-atolye-app] a[data-atolye-geri] span { display: none; }
+}
