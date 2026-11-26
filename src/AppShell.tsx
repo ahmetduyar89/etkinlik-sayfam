@@ -17,6 +17,7 @@ import { PortalHome } from './components/portal/PortalHome';
 import { ClassroomDashboard } from './components/classrooms/ClassroomDashboard';
 import { ClassAdminDashboard } from './components/classrooms/ClassAdminDashboard';
 import { findFolder, findModule, findModuleByView } from './constants/portal';
+import { useClassrooms } from './lib/classrooms';
 import { goToSection, sectionFromLocation, type Section } from './lib/navigation';
 import { isChessLink, isStudentLink, getSession, SESSION_CHANGED_EVENT, SESSION_STORAGE_KEY, AUTH_STORAGE_KEY } from './utils/auth';
 import type { MainView, ClassRoom } from './types';
@@ -26,6 +27,11 @@ export default function AppShell() {
     const [previewClass, setPreviewClass] = useState<ClassRoom | null>(null);
     const [session, setSession] = useState(getSession);
     const isClassMode = session?.role === 'class';
+    const { classes } = useClassrooms();
+    // Sınıf oturumu yalnızca kendisine atanan bölümleri açabilir (adres çubuğuyla da).
+    const assignedModules = session?.role === 'class'
+        ? classes.find((c) => c.id === session.classId)?.assignedModules ?? []
+        : [];
 
     useEffect(() => {
         const sync = () => { setSession(getSession()); setPreviewClass(null); };
@@ -66,7 +72,7 @@ export default function AppShell() {
 
     // Sınıf oturumu açıldıysa veya Admin bir sınıfı önizliyorsa
     if (previewClass || isClassMode) {
-        if (section === 'portal') {
+        if (section === 'portal' || (isClassMode && !assignedModules.includes(section))) {
             return (
                 <ClassroomDashboard
                     classRoom={previewClass}
